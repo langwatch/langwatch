@@ -1,12 +1,12 @@
-import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
+import * as os from "node:os";
 /**
  * RFC 8628 device-code OAuth client for `langwatch login --device`, hitting the control plane's
  * `/api/auth/cli/*` endpoints (documented in
  * `docs/ai-gateway/governance/admin-setup.mdx#cli-device-flow-rest-api`).
  */
-
-import * as os from "node:os";
 import { setTimeout as wait } from "node:timers/promises";
+
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 

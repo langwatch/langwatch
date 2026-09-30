@@ -41,6 +41,7 @@ import {
   type WebhookDeliveryProcessDeps,
 } from "../services/webhook-delivery.service.ts";
 import { WebhookDestinationDispatchService } from "../services/webhook-destination-dispatch.service.ts";
+import { WebhookEndpointRequeueService } from "../services/webhook-endpoint-requeue.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
@@ -300,17 +301,7 @@ export class WebhookApp implements WebhookApiContract {
   };
   rollSecret: WebhookApiContract["rollSecret"] = (input) =>
     this.#dependencies.endpoints.rollSecret(input);
-  /** Re-enabling revives the batches that parked while paused; events that arrived during the
-   *  pause were never appended (a disabled endpoint subscribes to nothing), so replay covers those. */
-  enable: WebhookApiContract["enable"] = async (input) => {
-    const { endpoints, endpointStream } = this.#dependencies;
-    if (!endpointStream) {
-      throw new Error("webhook enable needs the process store its eventing build supplies");
-    }
-    const endpoint = await endpoints.enable(input);
-    await endpointStream.requeueParked(input);
-    return endpoint;
-  };
+  enable: WebhookApiContract["enable"] = (input) => this.#requeue.enable(input);
   disable: WebhookApiContract["disable"] = (input) => this.#dependencies.endpoints.disable(input);
   archive: WebhookApiContract["archive"] = (input) => this.#dependencies.endpoints.archive(input);
   findDeliverable: WebhookApiContract["findDeliverable"] = (input) =>
@@ -393,35 +384,16 @@ export class WebhookApp implements WebhookApiContract {
     if (!event) throw new WebhookEventNotFoundError();
     return event;
   };
-  appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = async ({
-    organizationId,
-    endpoint,
-    envelope,
-    replayId,
-  }) => {
-    // The caller (the gateway's replay route) names the endpoint by id only;
-    // the stream needs its live delivery controls (batch size, delay,
-    // in-flight cap), so this re-resolves the full deliverable view rather
-    // than trusting the caller's reduced projection.
-    const deliverable = await this.#dependencies.endpoints.findDeliverable({
-      organizationId,
-      endpointId: endpoint.id,
-    });
-    if (!deliverable) {
-      throw new Error(`webhook endpoint ${endpoint.id} is not deliverable for replay`);
-    }
+  appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = (input) =>
+    this.#requeue.appendReplay(input);
 
-    const { endpointStream } = this.#dependencies;
+  get #requeue(): WebhookEndpointRequeueService {
+    const { endpoints, endpointStream } = this.#dependencies;
     if (!endpointStream) {
-      throw new Error("webhook replay needs the process store its eventing build supplies");
+      throw new Error("webhook enable and replay need the process store eventing supplies");
     }
-    await endpointStream.appendReplay({
-      organizationId,
-      endpoint: deliverable,
-      envelope,
-      replayId,
-    });
-  };
+    return WebhookEndpointRequeueService.create({ endpoints, endpointStream });
+  }
 
   /**
    * Reuses this process's endpoint, event and delivery graph with its

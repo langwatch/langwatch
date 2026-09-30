@@ -300,6 +300,28 @@ function combineSignals(signal: AbortSignal | undefined, timeoutMs: number): Abo
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
+async function throwForBadRequest(response: Response): Promise<never> {
+  let body: ApiErrorBody = {};
+  try {
+    body = (await response.json()) as ApiErrorBody;
+  } catch {
+    body = {};
+  }
+  if (body.error?.code === "langy_api_request_invalid") {
+    throw new CallRejectedError(rejectionText(body));
+  }
+  throw new AppUnreachableError("the LangWatch app did not answer");
+}
+
+async function throwForBusy(response: Response): Promise<never> {
+  // A 503 is also how the app says no folder is connected, after it waited
+  // for one: asking again would only wait again.
+  if (response.status === 503 && (await errorCode(response)) === WORKSPACE_OFFLINE_CODE) {
+    throw new AppUnreachableError("no local folder is connected to this conversation");
+  }
+  throw new AppBusyError(retryAfterHeaderMs(response));
+}
+
 /**
  * One request to the app. The session key in LANGWATCH_API_KEY is the whole
  * credential and it names the conversation. Any failure the model cannot act
@@ -336,26 +358,8 @@ export async function callApp<T>({
   if (response.status === 404) {
     throw new CallLostError("the LangWatch app does not hold this call any more");
   }
-  if (response.status === 400) {
-    let body: ApiErrorBody = {};
-    try {
-      body = (await response.json()) as ApiErrorBody;
-    } catch {
-      body = {};
-    }
-    if (body.error?.code === "langy_api_request_invalid") {
-      throw new CallRejectedError(rejectionText(body));
-    }
-    throw new AppUnreachableError("the LangWatch app did not answer");
-  }
-  if (response.status === 429 || response.status === 503) {
-    // A 503 is also how the app says no folder is connected, after it waited
-    // for one: asking again would only wait again.
-    if (response.status === 503 && (await errorCode(response)) === WORKSPACE_OFFLINE_CODE) {
-      throw new AppUnreachableError("no local folder is connected to this conversation");
-    }
-    throw new AppBusyError(retryAfterHeaderMs(response));
-  }
+  if (response.status === 400) return throwForBadRequest(response);
+  if (response.status === 429 || response.status === 503) return throwForBusy(response);
   if (!response.ok) throw new AppUnreachableError("the LangWatch app did not answer");
   try {
     return (await response.json()) as T;

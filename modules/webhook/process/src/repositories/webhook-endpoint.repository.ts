@@ -51,7 +51,8 @@ export interface WebhookEndpointRepository {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;
-  /** Whether a frozen batch may ship, and when it may not, whether the endpoint is gone or paused. */
+  /** Whether a frozen batch may ship, and when it may not, whether the endpoint is gone or
+   *  paused. */
   getDeliveryDisposition(input: {
     organizationId: string;
     endpointId: string;

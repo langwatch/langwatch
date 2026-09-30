@@ -341,10 +341,7 @@ describe("createLangyChatTransport", () => {
       // shows a card, the panel hides readiness statuses, and the retry line
       // would vanish with it.
       const onSignal = vi.fn();
-      const { transport } = makeTransport(
-        { conversationId: null },
-        { onSignal },
-      );
+      const { transport } = makeTransport({ conversationId: null }, { onSignal });
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 

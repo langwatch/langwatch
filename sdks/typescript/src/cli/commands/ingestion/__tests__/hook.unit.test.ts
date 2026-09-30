@@ -7,6 +7,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
+
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 import {
@@ -46,8 +47,7 @@ describe("the session context hook", () => {
       it("includes the configured credentials, CLI identity, and content type", async () => {
         await hook.runHook({
           env: {
-            OTEL_EXPORTER_OTLP_HEADERS:
-              "Authorization=Bearer ik-lw-abc_secret",
+            OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ik-lw-abc_secret",
           },
         });
 

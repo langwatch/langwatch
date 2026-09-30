@@ -9,8 +9,8 @@ import {
 } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
-import { Temporal, toDate } from "@langwatch/time";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { Temporal, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -350,10 +350,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
             now: 1_000 + index,
             apply: (current) => ({
               state: {
-                appended: [
-                  ...(current?.state.appended ?? []),
-                  `envelope-${index}`,
-                ],
+                appended: [...(current?.state.appended ?? []), `envelope-${index}`],
               },
               nextWakeAt: null,
               messages: [message(`append-${index}`)],
@@ -1271,7 +1268,10 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
 
         await prisma.processManagerOutbox.updateMany({
           where: { processName, projectId: "project-1" },
-          data: { status: "discarded", updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(deadAt)) },
+          data: {
+            status: "discarded",
+            updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(deadAt)),
+          },
         });
         expect(await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 })).toBe(1);
         expect(

@@ -95,7 +95,11 @@ export class WebhookEndpointStreamService {
             ? [...current.state.pending]
             : [];
           if (append) {
-            pending.push({ envelope: append, appendedAtMs: now, ...(appendSalt ? { salt: appendSalt } : {}) });
+            pending.push({
+              envelope: append,
+              appendedAtMs: now,
+              ...(appendSalt ? { salt: appendSalt } : {}),
+            });
           }
           const { messages, remaining, inFlight } = planner.plan({
             organizationId,
@@ -119,7 +123,8 @@ export class WebhookEndpointStreamService {
     } catch (error) {
       if (
         error instanceof Error &&
-        (error.name === "DispatchError" || Reflect.get(error, DIAGNOSTIC_SAFE) === true)
+        (error.name === "DispatchError" ||
+          (DIAGNOSTIC_SAFE in error && error[DIAGNOSTIC_SAFE] === true))
       ) {
         throw error;
       }
@@ -202,10 +207,11 @@ export class WebhookEndpointStreamService {
   }
 }
 
-/** A foreign failure's class, safe to quote: its name plus a machine code (Prisma P-code, errno). */
+/** A foreign failure's class, safe to quote: its name plus a machine code (Prisma P-code,
+ *  errno). */
 function failureClassOf(error: unknown): string {
   if (typeof error !== "object" || error === null) return "non-error";
   const name = error instanceof Error ? error.name : "non-error";
-  const code = Reflect.get(error, "code");
+  const code = "code" in error ? error.code : undefined;
   return typeof code === "string" ? `${name} (${code})` : name;
 }

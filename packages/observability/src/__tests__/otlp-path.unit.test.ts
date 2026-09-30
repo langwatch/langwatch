@@ -1,24 +1,19 @@
 import { describe, expect, it } from "vitest";
+
 import { canonicalOtlpPath } from "../request/otlp-path.ts";
 
 describe("canonicalOtlpPath", () => {
   describe("given a base endpoint that already named a signal", () => {
     describe("when the exporter appends its signal path", () => {
       it("maps the appended signal onto its canonical path", () => {
-        expect(canonicalOtlpPath("/api/otel/v1/traces/v1/logs")).toBe(
-          "/api/otel/v1/logs",
-        );
+        expect(canonicalOtlpPath("/api/otel/v1/traces/v1/logs")).toBe("/api/otel/v1/logs");
       });
     });
 
     describe("when the appended signal differs from the base signal", () => {
       it("takes the signal from the suffix", () => {
-        expect(canonicalOtlpPath("/api/otel/v1/traces/v1/metrics")).toBe(
-          "/api/otel/v1/metrics",
-        );
-        expect(canonicalOtlpPath("/api/otel/v1/logs/v1/traces")).toBe(
-          "/api/otel/v1/traces",
-        );
+        expect(canonicalOtlpPath("/api/otel/v1/traces/v1/metrics")).toBe("/api/otel/v1/metrics");
+        expect(canonicalOtlpPath("/api/otel/v1/logs/v1/traces")).toBe("/api/otel/v1/traces");
       });
     });
   });
@@ -26,12 +21,8 @@ describe("canonicalOtlpPath", () => {
   describe("given a base endpoint that named the collector", () => {
     describe("when the exporter appends a trace path", () => {
       it("maps the collector-prefixed path onto its canonical path", () => {
-        expect(canonicalOtlpPath("/api/collector/api/otel/v1/traces")).toBe(
-          "/api/otel/v1/traces",
-        );
-        expect(canonicalOtlpPath("/api/collector/v1/traces")).toBe(
-          "/api/otel/v1/traces",
-        );
+        expect(canonicalOtlpPath("/api/collector/api/otel/v1/traces")).toBe("/api/otel/v1/traces");
+        expect(canonicalOtlpPath("/api/collector/v1/traces")).toBe("/api/otel/v1/traces");
       });
     });
   });
@@ -40,9 +31,7 @@ describe("canonicalOtlpPath", () => {
     describe("when the exporter appends a trace path", () => {
       it("maps the root-level signal path onto its canonical path", () => {
         expect(canonicalOtlpPath("/v1/traces")).toBe("/api/otel/v1/traces");
-        expect(canonicalOtlpPath("/api/v1/traces")).toBe(
-          "/api/otel/v1/traces",
-        );
+        expect(canonicalOtlpPath("/api/v1/traces")).toBe("/api/otel/v1/traces");
       });
     });
   });
@@ -50,24 +39,16 @@ describe("canonicalOtlpPath", () => {
   describe("given a path that is already canonical", () => {
     describe("when it contains no stray slashes", () => {
       it("reports the canonical path it is on", () => {
-        expect(canonicalOtlpPath("/api/otel/v1/traces")).toBe(
-          "/api/otel/v1/traces",
-        );
+        expect(canonicalOtlpPath("/api/otel/v1/traces")).toBe("/api/otel/v1/traces");
       });
     });
 
     describe("when it contains repeated or trailing slashes", () => {
       it("normalises the slashes", () => {
-        expect(canonicalOtlpPath("/api/otel/v1/traces/")).toBe(
-          "/api/otel/v1/traces",
-        );
-        expect(canonicalOtlpPath("/api/otel/v1//traces")).toBe(
-          "/api/otel/v1/traces",
-        );
+        expect(canonicalOtlpPath("/api/otel/v1/traces/")).toBe("/api/otel/v1/traces");
+        expect(canonicalOtlpPath("/api/otel/v1//traces")).toBe("/api/otel/v1/traces");
         expect(
-          canonicalOtlpPath(
-            `${"/".repeat(100_000)}api/otel/v1/traces${"/".repeat(100_000)}`,
-          ),
+          canonicalOtlpPath(`${"/".repeat(100_000)}api/otel/v1/traces${"/".repeat(100_000)}`),
         ).toBe("/api/otel/v1/traces");
       });
     });
@@ -78,9 +59,7 @@ describe("canonicalOtlpPath", () => {
       it("claims nothing", () => {
         expect(canonicalOtlpPath("/api/gateway/v1/traces")).toBeNull();
         expect(canonicalOtlpPath("/api/rum/v1/traces")).toBeNull();
-        expect(
-          canonicalOtlpPath("/api/ingest/otel/src_123/v1/traces"),
-        ).toBeNull();
+        expect(canonicalOtlpPath("/api/ingest/otel/src_123/v1/traces")).toBeNull();
       });
     });
 
@@ -94,12 +73,8 @@ describe("canonicalOtlpPath", () => {
 
     describe("when the suffix does not name a supported signal", () => {
       it("claims nothing", () => {
-        expect(
-          canonicalOtlpPath("/api/otel/v1/traces/v1/profiles"),
-        ).toBeNull();
-        expect(
-          canonicalOtlpPath("/api/otel/v1/traces/v2/traces"),
-        ).toBeNull();
+        expect(canonicalOtlpPath("/api/otel/v1/traces/v1/profiles")).toBeNull();
+        expect(canonicalOtlpPath("/api/otel/v1/traces/v2/traces")).toBeNull();
         expect(canonicalOtlpPath("/api/collector")).toBeNull();
         expect(canonicalOtlpPath("/")).toBeNull();
       });

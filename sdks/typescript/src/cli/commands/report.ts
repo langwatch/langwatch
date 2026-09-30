@@ -1,8 +1,8 @@
-import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { readFileSync, statSync } from "node:fs";
 
 import chalk from "chalk";
 
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { normalizeEndpoint } from "../../internal/endpoint.ts";

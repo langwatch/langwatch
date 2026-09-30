@@ -10,7 +10,7 @@ import {
 } from "@langwatch/scenario-contract";
 import type { Suite } from "@langwatch/suite-contract";
 
-import { probeCauseOf } from "./probe-cause.rules.ts";
+import { deriveProbeCause } from "./probe-cause.rules.ts";
 
 /** Total wall-time budget for the probe, inclusive of the one retry. */
 export const SCENARIO_CANARY_TOTAL_BUDGET_MS = 120_000;
@@ -46,7 +46,7 @@ export type CanaryConfig = Readonly<{
 
 /** A terminal failure status is `run_failed`; a success is judged by its verdict. */
 export function classifyCanaryOutcome({ status, results }: ScenarioRunSnapshot): CanaryVerdict {
-  const cause = probeCauseOf(results?.error);
+  const cause = deriveProbeCause(results?.error);
   const withCause = cause ? { cause } : {};
   if (isTerminalStatus(status) && status !== ScenarioRunStatus.SUCCESS) {
     return { healthy: false, reason: "run_failed", ...withCause };

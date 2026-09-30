@@ -276,7 +276,8 @@ function tableOf(params: unknown): string {
 
 /** The caller's `abort_signal`, so an abandoned statement is not retried. */
 function abortSignalOf(params: unknown): AbortSignalLike | undefined {
-  if (params === null || typeof params !== "object" || !("abort_signal" in params)) return undefined;
+  if (params === null || typeof params !== "object" || !("abort_signal" in params))
+    return undefined;
   const signal = params.abort_signal;
   return isAbortSignalLike(signal) ? signal : undefined;
 }

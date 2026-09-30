@@ -1,8 +1,6 @@
 /**
- * Whether a free-text query looks like a trace id. Advisory only: it adds a
- * sentence to an empty result and never changes what the tool does (ADR-164).
- * Restates the platform's HEX_ONLY, MIN_TRACE_ID_PREFIX_LENGTH and
- * FULL_TRACE_ID_LENGTH, since this published client shares no server code.
+ * Whether a free-text query looks like a trace id. Advisory only: it adds a sentence to an
+ * empty result (ADR-164). Restates the platform's trace-id constants; no server code is shared.
  */
 
 /** Hex-only, matching the server's prefix resolver. */

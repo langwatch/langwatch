@@ -4,7 +4,8 @@ import packageJson from "../package.json" with { type: "json" };
 import { getConfig, requireApiKey } from "./config.ts";
 import type { EvaluationSummary } from "./utils/format-evaluations.ts";
 
-/** Every request names itself so the platform attributes it (specs/observability/traffic-attribution.feature). */
+/** Every request names itself so the platform attributes it. */
+// See specs/observability/traffic-attribution.feature.
 export const MCP_IDENTITY_HEADERS: Record<string, string> = {
   "User-Agent": `langwatch-mcp/${packageJson.version}`,
   "X-LangWatch-SDK-Name": "langwatch-mcp",

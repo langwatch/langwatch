@@ -228,10 +228,7 @@ export class McpStreamableTransportService {
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => generate(SESSION_KSUID_RESOURCE).toString(),
       onsessioninitialized: (id) => {
-        sessions.streamable.set(
-          id,
-          sessions.openSession({ transport, apiKey, projectId, userId }),
-        );
+        sessions.streamable.set(id, sessions.openSession({ transport, apiKey, projectId, userId }));
         sessions.storeStreamableRecord({ sessionId: id, apiKey, projectId });
       },
     });

@@ -147,11 +147,9 @@ export async function handleSearchTraces(params: {
   const hasTraceIds = (params.traceIds?.length ?? 0) > 0;
   const defaultSpanMs = hasTraceIds ? ID_LOOKUP_WINDOW_MS : TEXT_SEARCH_WINDOW_MS;
 
-  const endDate =
-    params.endDate !== undefined ? parseRelativeDate(params.endDate) : now;
-  const startDate = params.startDate !== undefined
-    ? parseRelativeDate(params.startDate)
-    : endDate - defaultSpanMs;
+  const endDate = params.endDate !== undefined ? parseRelativeDate(params.endDate) : now;
+  const startDate =
+    params.startDate !== undefined ? parseRelativeDate(params.startDate) : endDate - defaultSpanMs;
 
   if (startDate >= endDate) {
     throw new Error(

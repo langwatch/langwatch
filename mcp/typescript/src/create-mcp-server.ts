@@ -252,7 +252,7 @@ function registerObservabilityTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "Text search query. Matches captured input/output, the trace name and span names ONLY. It does not match trace IDs — to fetch a known trace ID use get_trace, or pass traceIds here for several at once."
+          "Text search query. Matches captured input/output, the trace name and span names ONLY. It does not match trace IDs — to fetch a known trace ID use get_trace, or pass traceIds here for several at once.",
         ),
       traceIds: z
         .array(z.string().min(1))
@@ -260,7 +260,7 @@ function registerObservabilityTools(server: McpServer): void {
         .max(1000)
         .optional()
         .describe(
-          "Exact trace IDs to fetch (1–1000). Use instead of query when you already know the IDs. When set and no startDate is given, the window defaults to the last 90 days rather than 24 hours."
+          "Exact trace IDs to fetch (1–1000). Use instead of query when you already know the IDs. When set and no startDate is given, the window defaults to the last 90 days rather than 24 hours.",
         ),
       filters: z
         .record(z.string(), z.array(z.string()))
@@ -281,7 +281,11 @@ function registerObservabilityTools(server: McpServer): void {
         .describe(
           'Start of the window: ISO date, or relative like "24h", "7d", "4w", "3m" — units are h (hours), d (days), w (weeks), m (30-day months). Defaults to 24h ago for a text search, or 90d when traceIds is set. Widen this when a search comes back empty.',
         ),
-      endDate: z.string().min(1).optional().describe("End of the window: ISO date or relative. Default: now"),
+      endDate: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("End of the window: ISO date or relative. Default: now"),
       pageSize: z.number().optional().describe("Results per page (default: 25, max: 1000)"),
       scrollId: z.string().optional().describe("Pagination token from previous search"),
       format: z
@@ -305,7 +309,7 @@ function registerObservabilityTools(server: McpServer): void {
       traceId: z
         .string()
         .describe(
-          "The trace ID to retrieve. A full ID resolves at any age; a unique 8–31 character hex prefix also resolves, git-style, within the last 90 days."
+          "The trace ID to retrieve. A full ID resolves at any age; a unique 8–31 character hex prefix also resolves, git-style, within the last 90 days.",
         ),
       format: z
         .enum(["digest", "json"])

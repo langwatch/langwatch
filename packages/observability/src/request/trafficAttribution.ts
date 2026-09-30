@@ -44,21 +44,27 @@ export interface RequestAttribution extends ClientAttribution {
 const under = ({ path, prefix }: { path: string; prefix: string }): boolean =>
   path === prefix || path.startsWith(`${prefix}/`);
 
+const MCP_EXACT_PATHS = new Set(["/sse", "/messages", "/sse/messages"]);
+
+const MCP_PREFIXES = [
+  "/mcp",
+  "/oauth",
+  "/.well-known/oauth-protected-resource",
+  "/.well-known/oauth-authorization-server",
+];
+
+const isMcpPath = (path: string): boolean =>
+  MCP_EXACT_PATHS.has(path) || MCP_PREFIXES.some((prefix) => under({ path, prefix }));
+
 /**
  * Classes a pathname by the surface that serves it. First match wins, so the
  * specific surfaces come before the `/api` catch-all — everything under
  * `/api` that no other surface claims is the public REST API.
  */
 export function endpointClassOf(pathname: string): EndpointClass {
-  const path =
-    pathname.length > 1 && pathname.endsWith("/")
-      ? pathname.slice(0, -1)
-      : pathname;
+  const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
 
-  if (
-    under({ path, prefix: "/api/otel" }) ||
-    canonicalOtlpPath(path) !== null
-  ) {
+  if (under({ path, prefix: "/api/otel" }) || canonicalOtlpPath(path) !== null) {
     return "otlp";
   }
   if (path === "/api/collector") return "collector";
@@ -66,24 +72,11 @@ export function endpointClassOf(pathname: string): EndpointClass {
   if (under({ path, prefix: "/api/trpc" })) return "dashboard";
   if (under({ path, prefix: "/api/auth" })) return "auth";
   if (under({ path, prefix: "/api/langy" })) return "langy";
-  if (
-    under({ path, prefix: "/api/gateway" }) ||
-    under({ path, prefix: "/api/internal/gateway" })
-  ) {
+  if (under({ path, prefix: "/api/gateway" }) || under({ path, prefix: "/api/internal/gateway" })) {
     return "gateway";
   }
   if (under({ path, prefix: "/api/ingest" })) return "ingest";
-  if (
-    under({ path, prefix: "/mcp" }) ||
-    path === "/sse" ||
-    path === "/messages" ||
-    path === "/sse/messages" ||
-    under({ path, prefix: "/oauth" }) ||
-    under({ path, prefix: "/.well-known/oauth-protected-resource" }) ||
-    under({ path, prefix: "/.well-known/oauth-authorization-server" })
-  ) {
-    return "mcp";
-  }
+  if (isMcpPath(path)) return "mcp";
   if (under({ path, prefix: "/api" })) return "api";
   return "other";
 }
@@ -119,6 +112,64 @@ const INTERNAL_SERVICE_AGENT = "langwatch-aigateway";
 const present = (value: string | null | undefined): string | undefined =>
   value ? value : undefined;
 
+type ClientIdentity = Omit<ClientAttribution, "clientSource">;
+
+const OTEL_EXPORTER_AGENTS = ["otel-otlp-exporter", "otel otlp exporter", "opentelemetry"];
+
+function classifyByIdentityHeaders({
+  surface,
+  sdkName,
+  identity,
+}: {
+  surface: string | undefined;
+  sdkName: string | undefined;
+  identity: ClientIdentity;
+}): ClientAttribution | undefined {
+  if (surface === "cli") return { clientSource: "cli", ...identity };
+  if (sdkName === "langwatch-mcp") return { clientSource: "mcp", ...identity };
+  if (sdkName) return { clientSource: "sdk", ...identity };
+  return undefined;
+}
+
+function classifyByAgentName({
+  userAgent,
+  identity,
+}: {
+  userAgent: string;
+  identity: ClientIdentity;
+}): ClientAttribution | undefined {
+  const [agentName, agentVersion] = userAgent.split("/", 2);
+  const version = agentVersion ? { clientSdkVersion: agentVersion } : {};
+  const agentLanguage = agentName ? SDK_LANGUAGE_BY_AGENT.get(agentName) : undefined;
+  if (agentLanguage) {
+    return {
+      clientSource: "sdk",
+      clientSdkName: agentName,
+      clientSdkLanguage: agentLanguage,
+      ...version,
+      ...identity,
+    };
+  }
+  if (agentName === "langwatch-mcp") return { clientSource: "mcp", ...version, ...identity };
+  if (agentName === INTERNAL_SERVICE_AGENT) {
+    return { clientSource: "internal", clientSdkName: agentName, ...version, ...identity };
+  }
+  return undefined;
+}
+
+function classifyByUserAgent(userAgent: string): ClientAttribution {
+  if (!userAgent) return { clientSource: "unknown" };
+  if (userAgent.startsWith("curl/")) return { clientSource: "curl" };
+  if (OTEL_EXPORTER_AGENTS.some((agent) => userAgent.includes(agent))) {
+    return { clientSource: "otel-exporter" };
+  }
+  if (userAgent.startsWith("mozilla/")) return { clientSource: "browser" };
+  if (HTTP_CLIENT_AGENTS.some((agent) => userAgent.includes(agent))) {
+    return { clientSource: "http-client" };
+  }
+  return { clientSource: "unknown" };
+}
+
 /**
  * Our own clients by the identity headers they send (`x-langwatch-sdk-*`, `x-langwatch-surface`),
  * the rest by User-Agent. A bare `x-langwatch-sdk-version` is an older Python SDK; the AI gateway
@@ -140,59 +191,20 @@ export function classifyClient(
       ...(sdkVersion ? { clientSdkVersion: sdkVersion } : {}),
     };
 
-    if (surface === "cli") return { clientSource: "cli", ...identity };
-    if (sdkName === "langwatch-mcp") return { clientSource: "mcp", ...identity };
-    if (sdkName) return { clientSource: "sdk", ...identity };
+    const olderPythonSdk: ClientAttribution | undefined = sdkVersion
+      ? {
+          clientSource: "sdk",
+          ...(userAgent.includes("python") ? { clientSdkLanguage: "python" } : {}),
+          ...identity,
+        }
+      : undefined;
 
-    const [agentName, agentVersion] = userAgent.split("/", 2);
-    const agentLanguage = agentName ? SDK_LANGUAGE_BY_AGENT.get(agentName) : undefined;
-    if (agentLanguage) {
-      return {
-        clientSource: "sdk",
-        clientSdkName: agentName,
-        clientSdkLanguage: agentLanguage,
-        ...(agentVersion ? { clientSdkVersion: agentVersion } : {}),
-        ...identity,
-      };
-    }
-    if (agentName === "langwatch-mcp") {
-      return {
-        clientSource: "mcp",
-        ...(agentVersion ? { clientSdkVersion: agentVersion } : {}),
-        ...identity,
-      };
-    }
-    if (agentName === INTERNAL_SERVICE_AGENT) {
-      return {
-        clientSource: "internal",
-        clientSdkName: agentName,
-        ...(agentVersion ? { clientSdkVersion: agentVersion } : {}),
-        ...identity,
-      };
-    }
-
-    if (sdkVersion) {
-      return {
-        clientSource: "sdk",
-        ...(userAgent.includes("python") ? { clientSdkLanguage: "python" } : {}),
-        ...identity,
-      };
-    }
-
-    if (!userAgent) return { clientSource: "unknown" };
-    if (userAgent.startsWith("curl/")) return { clientSource: "curl" };
-    if (
-      userAgent.includes("otel-otlp-exporter") ||
-      userAgent.includes("otel otlp exporter") ||
-      userAgent.includes("opentelemetry")
-    ) {
-      return { clientSource: "otel-exporter" };
-    }
-    if (userAgent.startsWith("mozilla/")) return { clientSource: "browser" };
-    if (HTTP_CLIENT_AGENTS.some((agent) => userAgent.includes(agent))) {
-      return { clientSource: "http-client" };
-    }
-    return { clientSource: "unknown" };
+    return (
+      classifyByIdentityHeaders({ surface, sdkName, identity }) ??
+      classifyByAgentName({ userAgent, identity }) ??
+      olderPythonSdk ??
+      classifyByUserAgent(userAgent)
+    );
   } catch {
     return { clientSource: "unknown" };
   }

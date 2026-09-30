@@ -722,6 +722,26 @@ describe("given a folder shared with a Langy conversation", () => {
   });
 });
 
+function expectPathRefused(commands: string[]): void {
+  for (const command of commands) {
+    expect(bash(command), command).toMatchObject({ kind: "refuse", code: "path_refused" });
+  }
+}
+
+function expectCommandsNotRefused(commands: string[]): void {
+  for (const command of commands) expect(bash(command).kind, command).not.toBe("refuse");
+}
+
+function expectCallsRefusedNamingRoot(calls: LocalToolCall[]): void {
+  for (const call of calls) {
+    expect(at(call)).toMatchObject({
+      kind: "refuse",
+      code: "path_refused",
+      message: expect.stringContaining(ROOT),
+    });
+  }
+}
+
 describe("given a folder shared with a Langy conversation", () => {
   describe("when a path points outside the folder", () => {
     /** @scenario "A path outside the folder is refused" */
@@ -739,57 +759,40 @@ describe("given a folder shared with a Langy conversation", () => {
         { tool: "local_write", params: { path: "../escape.txt", content: "x" } },
         { tool: "local_grep", params: { pattern: "key", path: "/etc" } },
       ];
-      for (const call of calls) {
-        const decision = at(call);
-        expect(decision.kind).toBe("refuse");
-        if (decision.kind !== "refuse") continue;
-        expect(decision.code).toBe("path_refused");
-        expect(decision.message).toContain(ROOT);
-      }
+      expectCallsRefusedNamingRoot(calls);
     });
 
     it("refuses a command argument that leaves the folder", () => {
-      for (const command of [
+      expectPathRefused([
         "cat /etc/passwd",
         "cat ../other/notes.txt",
         "cat ~/.netrc",
         "ls outside-link",
-      ]) {
-        const decision = bash(command);
-        expect(decision.kind).toBe("refuse");
-        if (decision.kind !== "refuse") continue;
-        expect(decision.code).toBe("path_refused");
-      }
+      ]);
     });
 
     /** @scenario "A redirect into /dev/null is not a path outside the folder" */
     it("lets a redirect into /dev/null through and keeps every other escape refused", () => {
-      for (const command of [
+      expectCommandsNotRefused([
         "git status --porcelain 2>/dev/null",
         "git branch --show-current 2> /dev/null && git remote -v",
         "npm ls langwatch >/dev/null",
         "node -e \"require('langwatch')\" &>/dev/null",
         "cat agent.mjs >> /dev/null",
         "node agent.mjs </dev/null",
-      ]) {
-        expect(bash(command).kind, command).not.toBe("refuse");
-      }
-      for (const command of [
+      ]);
+      expectPathRefused([
         "cat agent.mjs > /etc/hosts",
         "git status 2>/tmp/langy.log",
         "node agent.mjs < /etc/passwd",
         "cat agent.mjs > /dev/null/../../etc/hosts",
         "cat /dev/null",
-      ]) {
-        const decision = bash(command);
-        expect(decision.kind, command).toBe("refuse");
-        if (decision.kind === "refuse") expect(decision.code).toBe("path_refused");
-      }
+      ]);
     });
 
     /** @scenario "The script of sed or awk and the pattern of grep are not judged paths" */
     it("reads the script or pattern as the command's own words and still checks every file", () => {
-      for (const command of [
+      expectCommandsNotRefused([
         "git remote show origin | sed -n '/HEAD branch/s/.*: //p'",
         "sed -e '/^#/d' agent.mjs",
         "awk '/^import/ {print $2}' agent.mjs",
@@ -800,10 +803,8 @@ describe("given a folder shared with a Langy conversation", () => {
         "grep -A 2 -n '/api/' agent.mjs",
         "grep --regexp=/api/ agent.mjs",
         "sed --expression='/^#/d' agent.mjs",
-      ]) {
-        expect(bash(command).kind, command).not.toBe("refuse");
-      }
-      for (const command of [
+      ]);
+      expectPathRefused([
         "sed -n '/HEAD branch/p' /etc/passwd",
         "sed -e 's/a/b/' ../other/notes.txt",
         "sed -f /etc/evil.sed agent.mjs",
@@ -821,11 +822,7 @@ describe("given a folder shared with a Langy conversation", () => {
         "rg --ignore-file /etc/ignore KEY",
         "grep --ignore-case root /etc/passwd",
         "sed --in-place 's/a/b/' /etc/hosts",
-      ]) {
-        const decision = bash(command);
-        expect(decision.kind, command).toBe("refuse");
-        if (decision.kind === "refuse") expect(decision.code).toBe("path_refused");
-      }
+      ]);
     });
 
     it("allows a home path that lands inside the folder", () => {

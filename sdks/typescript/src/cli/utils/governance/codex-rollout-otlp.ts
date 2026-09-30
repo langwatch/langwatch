@@ -1,4 +1,3 @@
-import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * Emit codex turn input/output as OTLP spans on codex's own per-turn
  * trace_ids, so they join the native token-spans with no receiver change.
@@ -14,6 +13,7 @@ import {
   readSessionContext,
   runGitCommand,
 } from "@/cli/commands/ingestion/git-context";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 import { GovernanceCliError } from "./cli-api";

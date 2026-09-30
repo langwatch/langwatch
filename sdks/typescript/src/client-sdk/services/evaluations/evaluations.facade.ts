@@ -6,8 +6,8 @@
 
 import { trace, SpanStatusCode, context as otelContext, type Span } from "@opentelemetry/api";
 
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import type { Logger } from "@/logger";
 import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
 

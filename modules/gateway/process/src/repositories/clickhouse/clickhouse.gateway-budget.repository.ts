@@ -592,7 +592,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     });
   }
 
-  /** The same read as `getSpendForBudgetsAcrossTenants`, abandoned (retries included) when `signal` aborts. */
+  /** The same read as `getSpendForBudgetsAcrossTenants`, abandoned (retries too) on abort. */
   async getSpendForBudgetsAcrossTenantsUntil({
     tenantIds,
     budgets,

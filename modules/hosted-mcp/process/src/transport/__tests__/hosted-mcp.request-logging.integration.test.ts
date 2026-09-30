@@ -107,6 +107,105 @@ const requestHeaders = {
   accept: "application/json, text/event-stream",
 };
 
+type LoggedRequest = (args: { path: string; body: unknown }) => Promise<Response>;
+
+/** Waits for the access log line, which is written when the response closes. */
+async function accessLogFor(path: string) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const line = logLines.find((l) => l.message === "MCP request" && l.fields.path === path);
+    if (line) return line;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`no access log line was written for ${path}`);
+}
+
+function portOf(server: Server): number {
+  const address = server.address();
+  return typeof address === "object" && address ? address.port : 0;
+}
+
+function sessionRecord({
+  transport,
+  sessionId,
+  legacy,
+}: {
+  transport: "streamable" | "sse";
+  sessionId: string;
+  legacy: boolean;
+}) {
+  const projectId = legacy ? {} : { projectId: "logging-project" };
+  return {
+    transport,
+    sessionId,
+    apiKey: VALID_API_KEY,
+    encryptedApiKey: VALID_API_KEY,
+    ...projectId,
+  };
+}
+
+async function sendSessionRequest({
+  baseUrl,
+  method,
+  sessionId,
+}: {
+  baseUrl: string;
+  method: string;
+  sessionId: string;
+}): Promise<void> {
+  const abort = new AbortController();
+  const body = method === "POST" ? { body: JSON.stringify(toolsListBody({ id: 2 })) } : {};
+  try {
+    const response = await fetch(`${baseUrl}/mcp`, {
+      method,
+      headers: { ...requestHeaders, "mcp-session-id": sessionId },
+      signal: abort.signal,
+      ...body,
+    });
+    expect(response.status).toBe(200);
+    if (method !== "GET") await response.text();
+  } finally {
+    abort.abort();
+  }
+}
+
+async function expectRecoveredRequestsAttributed({
+  baseUrl,
+  sessionId,
+}: {
+  baseUrl: string;
+  sessionId: string;
+}): Promise<void> {
+  for (let id = 2; id < 4; id++) {
+    logLines.length = 0;
+    const response = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: { ...requestHeaders, "mcp-session-id": sessionId },
+      body: JSON.stringify(toolsListBody({ id })),
+    });
+    expect(response.status).toBe(200);
+    await response.text();
+    expect((await accessLogFor("/mcp")).fields.projectId).toBe("logging-project");
+  }
+}
+
+async function expectRelayedMessagesAttributed({
+  post,
+  sessionId,
+}: {
+  post: LoggedRequest;
+  sessionId: string;
+}): Promise<void> {
+  for (let id = 1; id < 3; id++) {
+    logLines.length = 0;
+    const response = await post({
+      path: `/messages?sessionId=${sessionId}`,
+      body: initializeBody({ id }),
+    });
+    expect(response.status).toBe(202);
+    expect((await accessLogFor("/messages")).fields.projectId).toBe("logging-project");
+  }
+}
+
 describe("Feature: MCP request logging", () => {
   let server: Server;
   let handler: McpHandler;
@@ -131,9 +230,7 @@ describe("Feature: MCP request logging", () => {
     });
     server = createServer((req, res) => handler.handleRequest(req, res));
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-    const address = server.address();
-    const port = typeof address === "object" && address ? address.port : 0;
-    baseUrl = `http://127.0.0.1:${port}`;
+    baseUrl = `http://127.0.0.1:${portOf(server)}`;
   });
 
   afterAll(async () => {
@@ -144,16 +241,6 @@ describe("Feature: MCP request logging", () => {
   beforeEach(() => {
     logLines.length = 0;
   });
-
-  /** Waits for the access log line, which is written when the response closes. */
-  async function accessLogFor(path: string) {
-    for (let attempt = 0; attempt < 50; attempt++) {
-      const line = logLines.find((l) => l.message === "MCP request" && l.fields.path === path);
-      if (line) return line;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    throw new Error(`no access log line was written for ${path}`);
-  }
 
   async function post({ path, body }: { path: string; body: unknown }) {
     const response = await fetch(`${baseUrl}${path}`, {
@@ -179,9 +266,9 @@ describe("Feature: MCP request logging", () => {
     it("stores the authenticated project with the session for other replicas", async () => {
       const sessionId = await initializeSession();
 
-      await expect(records.getRecord({ transport: "streamable", sessionId })).resolves.toMatchObject(
-        { kind: "found", projectId: "logging-project" },
-      );
+      await expect(
+        records.getRecord({ transport: "streamable", sessionId }),
+      ).resolves.toMatchObject({ kind: "found", projectId: "logging-project" });
     });
 
     describe("when the client makes another session request", () => {
@@ -189,19 +276,7 @@ describe("Feature: MCP request logging", () => {
         "attributes its %s without another project lookup",
         async (method) => {
           const sessionId = await initializeSession();
-          const abort = new AbortController();
-          try {
-            const response = await fetch(`${baseUrl}/mcp`, {
-              method,
-              headers: { ...requestHeaders, "mcp-session-id": sessionId },
-              signal: abort.signal,
-              ...(method === "POST" ? { body: JSON.stringify(toolsListBody({ id: 2 })) } : {}),
-            });
-            expect(response.status).toBe(200);
-            if (method !== "GET") await response.text();
-          } finally {
-            abort.abort();
-          }
+          await sendSessionRequest({ baseUrl, method, sessionId });
 
           const line = await accessLogFor("/mcp");
           expect(line.fields.projectId).toBe("logging-project");
@@ -231,26 +306,10 @@ describe("Feature: MCP request logging", () => {
     describe("when the client resumes it on this replica", () => {
       it.each([true, false])("attributes the recovered session (legacy: %s)", async (legacy) => {
         const sessionId = `recovered-logging-${legacy}`;
-        await records.store({
-          transport: "streamable",
-          sessionId,
-          apiKey: VALID_API_KEY,
-          encryptedApiKey: VALID_API_KEY,
-          ...(legacy ? {} : { projectId: "logging-project" }),
-        });
+        await records.store(sessionRecord({ transport: "streamable", sessionId, legacy }));
         projectLookup.mockClear();
 
-        for (let id = 2; id < 4; id++) {
-          logLines.length = 0;
-          const response = await fetch(`${baseUrl}/mcp`, {
-            method: "POST",
-            headers: { ...requestHeaders, "mcp-session-id": sessionId },
-            body: JSON.stringify(toolsListBody({ id })),
-          });
-          expect(response.status).toBe(200);
-          await response.text();
-          expect((await accessLogFor("/mcp")).fields.projectId).toBe("logging-project");
-        }
+        await expectRecoveredRequestsAttributed({ baseUrl, sessionId });
 
         await expect(
           records.getRecord({ transport: "streamable", sessionId }),
@@ -292,24 +351,10 @@ describe("Feature: MCP request logging", () => {
         const sessionId = `remote-sse-${legacy}`;
         const relayed: string[] = [];
         await relay.listen({ sessionId, onMessage: (raw) => relayed.push(raw) });
-        await records.store({
-          transport: "sse",
-          sessionId,
-          apiKey: VALID_API_KEY,
-          encryptedApiKey: VALID_API_KEY,
-          ...(legacy ? {} : { projectId: "logging-project" }),
-        });
+        await records.store(sessionRecord({ transport: "sse", sessionId, legacy }));
         projectLookup.mockClear();
 
-        for (let id = 1; id < 3; id++) {
-          logLines.length = 0;
-          const response = await post({
-            path: `/messages?sessionId=${sessionId}`,
-            body: initializeBody({ id }),
-          });
-          expect(response.status).toBe(202);
-          expect((await accessLogFor("/messages")).fields.projectId).toBe("logging-project");
-        }
+        await expectRelayedMessagesAttributed({ post, sessionId });
 
         expect(projectLookup).toHaveBeenCalledTimes(legacy ? 1 : 0);
         expect(relayed).toContain(JSON.stringify(initializeBody({ id: 2 })));

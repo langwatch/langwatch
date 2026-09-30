@@ -6,8 +6,8 @@ import { z } from "zod";
 import { initConfig } from "../config.ts";
 import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.ts";
 import { deleteAgent, getAgent, updateAgent } from "../langwatch-api-agents.ts";
-import QUERY_REFERENCE_FIXTURE from "./fixtures/query-reference.json" with { type: "json" };
 import { handleSearchTraces } from "../tools/search-traces.ts";
+import QUERY_REFERENCE_FIXTURE from "./fixtures/query-reference.json" with { type: "json" };
 
 // --- Canned responses for every API endpoint ---
 
@@ -1351,9 +1351,7 @@ describe("All MCP tools integration", () => {
     describe("when no traces match", () => {
       /** @scenario A search that matches nothing says which window it searched */
       it("states the window it searched and names get_trace", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           query: "__empty__",
         });
@@ -1367,9 +1365,7 @@ describe("All MCP tools integration", () => {
 
       /** @scenario An empty search offers a wider window */
       it("offers a wider startDate and the units it accepts", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           query: "__empty__",
         });
@@ -1380,9 +1376,7 @@ describe("All MCP tools integration", () => {
 
       /** @scenario An end-only search anchors its default window to that end */
       it("anchors the default start to an explicit end", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
 
         await handleSearchTraces({
           endDate: "2026-08-01T12:00:00Z",
@@ -1397,9 +1391,7 @@ describe("All MCP tools integration", () => {
 
       /** @scenario A trace id in a format the shape check cannot recognise still gets guidance */
       it("still names get_trace for a customer-assigned id it cannot recognise", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({ query: "order-12345" });
 
         expect(result).toContain("No traces found matching your query.");
@@ -1413,25 +1405,19 @@ describe("All MCP tools integration", () => {
     describe("when the query looks like a trace id", () => {
       /** @scenario Agent pastes a trace id into the search query */
       it("says it looks like a trace id and points at get_trace", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           query: "63dc535cea6335c506bc81ef3543a07d",
         });
 
         expect(result).toContain("No traces found matching your query.");
         expect(result).toContain("looks like a trace id");
-        expect(result).toContain(
-          'get_trace` with traceId: "63dc535cea6335c506bc81ef3543a07d"'
-        );
+        expect(result).toContain('get_trace` with traceId: "63dc535cea6335c506bc81ef3543a07d"');
       });
 
       /** @scenario A trace id truncated by the CLI is still recognised as an id */
       it("recognises a 20-character truncation the CLI prints", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           query: "63dc535cea6335c506bc",
         });
@@ -1441,9 +1427,7 @@ describe("All MCP tools integration", () => {
 
       /** @scenario An id-shaped query is still executed as a search */
       it("still executes a search and never a single-trace lookup", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         delete lastRequests["GET /api/traces/63dc535cea6335c506bc81ef3543a07d"];
 
         await handleSearchTraces({
@@ -1452,13 +1436,9 @@ describe("All MCP tools integration", () => {
 
         const search = lastRequests["POST /api/v1/traces/search"];
         expect(search).toBeDefined();
-        const requestBody = traceSearchRequestSchema.parse(
-          JSON.parse(search!.body)
-        );
+        const requestBody = traceSearchRequestSchema.parse(JSON.parse(search!.body));
         expect(requestBody.query).toBe("63dc535cea6335c506bc81ef3543a07d");
-        expect(
-          lastRequests["GET /api/traces/63dc535cea6335c506bc81ef3543a07d"]
-        ).toBeUndefined();
+        expect(lastRequests["GET /api/traces/63dc535cea6335c506bc81ef3543a07d"]).toBeUndefined();
       });
     });
 
@@ -1478,14 +1458,9 @@ describe("All MCP tools integration", () => {
 
       /** @scenario Agent looks up several traces by id in one call */
       it("fetches exactly those traces in one call", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
-          traceIds: [
-            "63dc535cea6335c506bc81ef3543a07d",
-            "a3c6656cf433e97549f654034be02955",
-          ],
+          traceIds: ["63dc535cea6335c506bc81ef3543a07d", "a3c6656cf433e97549f654034be02955"],
         });
 
         expect(result).toContain("63dc535cea6335c506bc81ef3543a07d");
@@ -1495,21 +1470,16 @@ describe("All MCP tools integration", () => {
 
       /** @scenario Naming trace ids widens the default window past 24 hours */
       it("defaults the window to 90 days instead of 24 hours", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.ts"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         await handleSearchTraces({
           traceIds: ["63dc535cea6335c506bc81ef3543a07d"],
         });
 
         const req = lastRequests["POST /api/v1/traces/search"];
         const parsed = traceSearchRequestSchema.parse(JSON.parse(req!.body));
-        const spanDays =
-          (parsed.endDate - parsed.startDate) / (24 * 60 * 60 * 1000);
+        const spanDays = (parsed.endDate - parsed.startDate) / (24 * 60 * 60 * 1000);
 
-        expect(parsed.traceIds).toEqual([
-          "63dc535cea6335c506bc81ef3543a07d",
-        ]);
+        expect(parsed.traceIds).toEqual(["63dc535cea6335c506bc81ef3543a07d"]);
         expect(spanDays).toBeCloseTo(90, 0);
       });
     });

@@ -666,7 +666,10 @@ describe.skipIf(!databaseUrl)("webhook delivery via the transactional inbox", ()
         throw new Error("The test fire is not exercised here");
       },
       testFireBounds: { assertTestFireWithinBounds: async () => undefined },
-      endpointStream: WebhookEndpointStreamService.create({ processStore: store, now: () => clock }),
+      endpointStream: WebhookEndpointStreamService.create({
+        processStore: store,
+        now: () => clock,
+      }),
     });
     const requestId = `req-${randomBytes(4).toString("hex")}`;
     await consume(admittedEnvelope(requestId));

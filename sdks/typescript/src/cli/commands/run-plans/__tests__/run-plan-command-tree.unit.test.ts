@@ -11,8 +11,9 @@ vi.mock("@/internal/api/client", () => ({
   createLangWatchApiClient: vi.fn(() => ({ use: useSpy })),
 }));
 
-import { buildProgram } from "../../../program.ts";
 import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
+
+import { buildProgram } from "../../../program.ts";
 import { createCliTestSuitesService } from "../../test-suites/cli-test-suites-service.ts";
 import { createCliRunPlansService } from "../cli-run-plans-service.ts";
 

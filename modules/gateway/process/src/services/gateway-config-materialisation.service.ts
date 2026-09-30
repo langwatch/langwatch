@@ -375,15 +375,24 @@ export class GatewayConfigMaterialiserService {
 // Empty-rules normalize to the wire-contracted shape regardless of DB content.
 
 /** Resolves with `work`, or rejects with the signal's reason once it aborts. */
-function settleBefore<T>({ work, signal }: { work: Promise<T>; signal: AbortSignal }): Promise<T> {
+async function settleBefore<T>({
+  work,
+  signal,
+}: {
+  work: Promise<T>;
+  signal: AbortSignal;
+}): Promise<T> {
   // A late rejection from abandoned work has nobody waiting for it.
   work.catch(() => undefined);
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(signal.reason);
-    if (signal.aborted) return onAbort();
+  signal.throwIfAborted();
+  let onAbort = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason);
     signal.addEventListener("abort", onAbort, { once: true });
-    work.then(resolve, reject).finally(() => {
-      signal.removeEventListener("abort", onAbort);
-    });
   });
+  try {
+    return await Promise.race([work, aborted]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
 }

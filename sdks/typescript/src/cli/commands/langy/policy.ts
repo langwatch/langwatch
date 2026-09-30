@@ -1586,78 +1586,144 @@ const NO_SCRIPT_OPERAND_LONG_FLAGS: ReadonlySet<string> = new Set([
   "--type-list",
 ]);
 
+type ScriptScan = {
+  text: Set<number>;
+  scriptFiles: string[];
+  scriptGiven: boolean;
+  afterEndOfOptions: boolean;
+  firstOperand: number | undefined;
+};
+
+function takesNextToken({ part, index }: { part: CommandPart; index: number }): boolean {
+  return index < part.tokens.length && part.redirectTarget[index] !== true;
+}
+
+/** Records a `--flag` or `--flag=value`; answers how many following tokens it consumed. */
+function scanLongFlag({
+  part,
+  index,
+  scan,
+}: {
+  part: CommandPart;
+  index: number;
+  scan: ScriptScan;
+}): number {
+  const token = part.tokens[index]!;
+  const equalsAt = token.indexOf("=");
+  const flag = equalsAt === -1 ? token : token.slice(0, equalsAt);
+  const value = equalsAt === -1 ? undefined : token.slice(equalsAt + 1);
+  if (SCRIPT_LONG_FLAGS.has(flag)) {
+    scan.scriptGiven = true;
+    if (value !== undefined) scan.text.add(index);
+    if (value !== undefined || !takesNextToken({ part, index: index + 1 })) return 0;
+    scan.text.add(index + 1);
+    return 1;
+  }
+  if (NO_SCRIPT_OPERAND_LONG_FLAGS.has(flag)) {
+    scan.scriptGiven = true;
+    return flag === "--file" && value === undefined ? 1 : 0;
+  }
+  // Whether it takes the next token is not known here, so no operand is
+  // read as the script: every one of them is checked.
+  if (value === undefined) scan.scriptGiven = true;
+  return 0;
+}
+
+/** A `-e` in a short cluster: the next token is script text unless one is attached. */
+function scanExpressionFlag({
+  part,
+  index,
+  scan,
+  attached,
+}: {
+  part: CommandPart;
+  index: number;
+  scan: ScriptScan;
+  attached: string;
+}): number {
+  scan.scriptGiven = true;
+  if (attached !== "" || !takesNextToken({ part, index: index + 1 })) return 0;
+  scan.text.add(index + 1);
+  return 1;
+}
+
+/** A `-f` in a short cluster: the attached text, or else the next token, is a script file. */
+function scanFileFlag({ scan, attached }: { scan: ScriptScan; attached: string }): number {
+  scan.scriptGiven = true;
+  if (attached === "") return 1;
+  scan.scriptFiles.push(attached);
+  return 0;
+}
+
+/** Records a `-e`, `-f` or value option inside a short cluster; answers the tokens it consumed. */
+function scanShortFlags({
+  part,
+  index,
+  scan,
+  valueOptions,
+}: {
+  part: CommandPart;
+  index: number;
+  scan: ScriptScan;
+  valueOptions: string;
+}): number {
+  const token = part.tokens[index]!;
+  for (let at = 1; at < token.length; at += 1) {
+    const letter = token[at]!;
+    const attached = token.slice(at + 1);
+    if (letter === "e") return scanExpressionFlag({ part, index, scan, attached });
+    if (letter === "f") return scanFileFlag({ scan, attached });
+    if (valueOptions.includes(letter)) return attached === "" ? 1 : 0;
+  }
+  return 0;
+}
+
+/** Reads the token at `index` into the scan; answers how many following tokens it consumed. */
+function scanScriptToken({
+  part,
+  index,
+  scan,
+  valueOptions,
+}: {
+  part: CommandPart;
+  index: number;
+  scan: ScriptScan;
+  valueOptions: string;
+}): number {
+  const token = part.tokens[index]!;
+  if (part.redirectTarget[index] === true) return 0;
+  if (scan.afterEndOfOptions || !token.startsWith("-") || token === "-") {
+    scan.firstOperand ??= index;
+    return 0;
+  }
+  if (token === "--") {
+    scan.afterEndOfOptions = true;
+    return 0;
+  }
+  if (token.startsWith("--")) return scanLongFlag({ part, index, scan });
+  return scanShortFlags({ part, index, scan, valueOptions });
+}
+
 /**
  * Tokens of a SCRIPT_COMMANDS part that are script text rather than paths, and
  * the `-fFILE` script files it names. Every `-e` value is text; the first
  * operand only while no option gave the script. Unsure readings stay paths.
  */
 function scriptText(part: CommandPart): { text: Set<number>; scriptFiles: string[] } {
-  const text = new Set<number>();
-  const scriptFiles: string[] = [];
+  const scan: ScriptScan = {
+    text: new Set<number>(),
+    scriptFiles: [],
+    scriptGiven: false,
+    afterEndOfOptions: false,
+    firstOperand: undefined,
+  };
   const valueOptions = SCRIPT_COMMANDS.get(part.tokens[0] ?? "");
-  if (valueOptions === undefined) return { text, scriptFiles };
-  const takesNext = (index: number) =>
-    index < part.tokens.length && part.redirectTarget[index] !== true;
-  let scriptGiven = false;
-  let afterEndOfOptions = false;
-  let firstOperand: number | undefined;
+  if (valueOptions === undefined) return scan;
   for (let index = 1; index < part.tokens.length; index += 1) {
-    const token = part.tokens[index]!;
-    if (part.redirectTarget[index] === true) continue;
-    if (afterEndOfOptions || !token.startsWith("-") || token === "-") {
-      firstOperand ??= index;
-      continue;
-    }
-    if (token === "--") {
-      afterEndOfOptions = true;
-      continue;
-    }
-    if (token.startsWith("--")) {
-      const equalsAt = token.indexOf("=");
-      const flag = equalsAt === -1 ? token : token.slice(0, equalsAt);
-      const value = equalsAt === -1 ? undefined : token.slice(equalsAt + 1);
-      if (SCRIPT_LONG_FLAGS.has(flag)) {
-        scriptGiven = true;
-        if (value !== undefined) text.add(index);
-        else if (takesNext(index + 1)) {
-          text.add(index + 1);
-          index += 1;
-        }
-      } else if (NO_SCRIPT_OPERAND_LONG_FLAGS.has(flag)) {
-        scriptGiven = true;
-        if (flag === "--file" && value === undefined) index += 1;
-      } else if (value === undefined) {
-        // Whether it takes the next token is not known here, so no operand is
-        // read as the script: every one of them is checked.
-        scriptGiven = true;
-      }
-      continue;
-    }
-    for (let at = 1; at < token.length; at += 1) {
-      const letter = token[at]!;
-      const attached = token.slice(at + 1);
-      if (letter === "e") {
-        scriptGiven = true;
-        if (attached === "" && takesNext(index + 1)) {
-          text.add(index + 1);
-          index += 1;
-        }
-        break;
-      }
-      if (letter === "f") {
-        scriptGiven = true;
-        if (attached !== "") scriptFiles.push(attached);
-        else index += 1;
-        break;
-      }
-      if (valueOptions.includes(letter)) {
-        if (attached === "") index += 1;
-        break;
-      }
-    }
+    index += scanScriptToken({ part, index, scan, valueOptions });
   }
-  if (!scriptGiven && firstOperand !== undefined) text.add(firstOperand);
-  return { text, scriptFiles };
+  if (!scan.scriptGiven && scan.firstOperand !== undefined) scan.text.add(scan.firstOperand);
+  return scan;
 }
 
 /** The device a redirect discards output into, or reads nothing from. */

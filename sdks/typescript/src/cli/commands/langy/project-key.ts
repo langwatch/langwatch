@@ -32,6 +32,10 @@ export class ProjectKeyError extends Error {
   }
 }
 
+function pickNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
 function asProjectKeyError(stage: "lookup" | "key", error: unknown): ProjectKeyError {
   const { status, httpStatus, code, message } = (error ?? {}) as {
     status?: unknown;
@@ -41,7 +45,7 @@ function asProjectKeyError(stage: "lookup" | "key", error: unknown): ProjectKeyE
   };
   return new ProjectKeyError(
     stage,
-    typeof status === "number" ? status : typeof httpStatus === "number" ? httpStatus : undefined,
+    pickNumber(status) ?? pickNumber(httpStatus),
     typeof code === "string" ? code : undefined,
     typeof message === "string" ? message : "the project's key could not be read",
   );
@@ -66,7 +70,7 @@ export function createProjectKeyReader(
   };
 }
 
-/** The reader over the platform: the signed-in credentials for the lookup, the device session for the key. */
+/** The reader over the platform: signed-in credentials look up, the device session fetches. */
 export function platformProjectKeyReader({
   endpoint,
   apiKey,

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runWithCliCredentialHolder, setResolvedApiKey } from "@/internal/credentialContext";
+
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
-import { listMonitorsCommand } from "../monitors/list";
+import { runWithCliCredentialHolder, setResolvedApiKey } from "@/internal/credentialContext";
+
 import { listIngestionSources } from "../../utils/governance/cli-api";
+import { listMonitorsCommand } from "../monitors/list";
 
 vi.mock("../../utils/apiKey", () => ({ resolveCredentials: vi.fn() }));
 vi.mock("../../utils/spinner", () => ({

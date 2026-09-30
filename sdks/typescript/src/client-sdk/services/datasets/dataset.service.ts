@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { type LangwatchApiClient } from "@/internal/api/client";
 import { isLangWatchHandledError } from "@/internal/api/errors";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { type operations } from "@/internal/generated/openapi/api-client";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";

@@ -164,11 +164,7 @@ describe("VendorClientResilience", () => {
       it("stops after the failing attempt instead of retrying", async () => {
         const query = vi
           .fn()
-          .mockRejectedValue(
-            new Error(
-              "Code: 202. DB::Exception: Too many simultaneous queries.",
-            ),
-          );
+          .mockRejectedValue(new Error("Code: 202. DB::Exception: Too many simultaneous queries."));
         const controller = new AbortController();
         controller.abort();
 

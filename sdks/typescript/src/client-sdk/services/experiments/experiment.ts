@@ -6,8 +6,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import { trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
 
-import { buildRequestHeaders } from "@/internal/api/request-headers";
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import type { Logger } from "@/logger";

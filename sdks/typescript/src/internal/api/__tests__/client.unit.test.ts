@@ -1,20 +1,12 @@
 /**
- * The platform tells CLI traffic apart from a plain SDK embed by the
- * `x-langwatch-surface: cli` header (packages/observability/src/request/
- * trafficAttribution.ts). Every request the CLI makes through
- * `createLangWatchApiClient` must carry it; a plain SDK embed must send
- * nothing extra, since it never scopes a surface.
- *
+ * Every request the CLI makes through `createLangWatchApiClient` carries
+ * `x-langwatch-surface: cli`; a plain SDK embed sends nothing extra.
  * Feature: specs/observability/traffic-attribution.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// The real openapi-fetch client keeps its header config private, so capture
-// what the factory hands it: the headers the transport would send are
-// exactly what these tests need to observe.
-const createClientCalls = vi.hoisted(
-  () => [] as Array<{ headers?: Record<string, string> }>,
-);
+// openapi-fetch keeps its header config private, so capture what the factory hands it.
+const createClientCalls = vi.hoisted(() => [] as { headers?: Record<string, string> }[]);
 vi.mock("openapi-fetch", () => ({
   default: (config: { headers?: Record<string, string> }) => {
     createClientCalls.push(config);
@@ -22,13 +14,14 @@ vi.mock("openapi-fetch", () => ({
   },
 }));
 
-import { createLangWatchApiClient } from "../client";
 import {
   resetFallbackCredentialHolder,
   runWithCliCredentialHolder,
   runWithCredentialHolder,
 } from "@/internal/credentialContext";
 import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
+
+import { createLangWatchApiClient } from "../client";
 
 describe("createLangWatchApiClient", () => {
   afterEach(() => {

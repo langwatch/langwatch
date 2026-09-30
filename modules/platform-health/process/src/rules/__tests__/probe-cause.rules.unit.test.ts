@@ -5,11 +5,12 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
-import { probeCauseOf } from "../probe-cause.rules.ts";
+
+import { deriveProbeCause } from "../probe-cause.rules.ts";
 
 class FakeHandledError extends HandledError {}
 
-describe("probeCauseOf", () => {
+describe("deriveProbeCause", () => {
   describe("given a serialized Langy turn error chain ending in insufficient_quota", () => {
     describe("when the cause is read", () => {
       /** @scenario "A typed error chain reports its innermost code" */
@@ -22,31 +23,20 @@ describe("probeCauseOf", () => {
             {
               code: "llm_upstream_error",
               meta: { body_kind: "json" },
-              reasons: [
-                { code: "insufficient_quota", kind: "insufficient_quota" },
-              ],
+              reasons: [{ code: "insufficient_quota", kind: "insufficient_quota" }],
             },
           ],
         });
 
-        expect(probeCauseOf(turnError)).toBe("insufficient_quota");
+        expect(deriveProbeCause(turnError)).toBe("insufficient_quota");
       });
 
       it("reads a live HandledError chain the same way", () => {
-        const error = new FakeHandledError(
-          "langy_agent_errored",
-          "Agent errored.",
-          {
-            reasons: [
-              new FakeHandledError(
-                "auth_upstream_unavailable",
-                "Control plane down.",
-              ),
-            ],
-          },
-        );
+        const error = new FakeHandledError("langy_agent_errored", "Agent errored.", {
+          reasons: [new FakeHandledError("auth_upstream_unavailable", "Control plane down.")],
+        });
 
-        expect(probeCauseOf(error)).toBe("auth_upstream_unavailable");
+        expect(deriveProbeCause(error)).toBe("auth_upstream_unavailable");
       });
     });
   });
@@ -55,15 +45,11 @@ describe("probeCauseOf", () => {
     describe("when the cause is read", () => {
       /** @scenario "A chain whose innermost link has no code reports the nearest code above it" */
       it("reports the nearest code above it", () => {
-        const error = new FakeHandledError(
-          "llm_upstream_error",
-          "Upstream failed.",
-          {
-            reasons: [new Error("socket hang up")],
-          },
-        );
+        const error = new FakeHandledError("llm_upstream_error", "Upstream failed.", {
+          reasons: [new Error("socket hang up")],
+        });
 
-        expect(probeCauseOf(error)).toBe("llm_upstream_error");
+        expect(deriveProbeCause(error)).toBe("llm_upstream_error");
       });
     });
   });
@@ -79,13 +65,13 @@ describe("probeCauseOf", () => {
           stack: "Error: ...",
         });
 
-        expect(probeCauseOf(runError)).toBe("insufficient_quota");
+        expect(deriveProbeCause(runError)).toBe("insufficient_quota");
       });
 
       it("matches a gateway budget refusal", () => {
-        expect(
-          probeCauseOf(new Error("402 budget_exceeded: monthly cap")),
-        ).toBe("budget_exceeded");
+        expect(deriveProbeCause(new Error("402 budget_exceeded: monthly cap"))).toBe(
+          "budget_exceeded",
+        );
       });
     });
   });
@@ -94,10 +80,10 @@ describe("probeCauseOf", () => {
     describe("when the cause is read", () => {
       /** @scenario "A failure with nothing code-shaped in it has no cause" */
       it("has no cause", () => {
-        expect(probeCauseOf("boom")).toBeUndefined();
-        expect(probeCauseOf(new Error("Agent not configured"))).toBeUndefined();
-        expect(probeCauseOf(null)).toBeUndefined();
-        expect(probeCauseOf({ code: "unknown" })).toBeUndefined();
+        expect(deriveProbeCause("boom")).toBeUndefined();
+        expect(deriveProbeCause(new Error("Agent not configured"))).toBeUndefined();
+        expect(deriveProbeCause(null)).toBeUndefined();
+        expect(deriveProbeCause({ code: "unknown" })).toBeUndefined();
       });
     });
   });
@@ -106,14 +92,12 @@ describe("probeCauseOf", () => {
     describe("when the cause is read", () => {
       /** @scenario "A cause is never a message" */
       it("has no cause", () => {
-        expect(
-          probeCauseOf({ code: "Invalid key sk-live-123 for https://x" }),
-        ).toBeUndefined();
-        expect(probeCauseOf({ code: `a${"b".repeat(64)}` })).toBeUndefined();
+        expect(deriveProbeCause({ code: "Invalid key sk-live-123 for https://x" })).toBeUndefined();
+        expect(deriveProbeCause({ code: `a${"b".repeat(64)}` })).toBeUndefined();
       });
 
       it("lowercases an errno-style code", () => {
-        expect(probeCauseOf({ code: "ECONNREFUSED" })).toBe("econnrefused");
+        expect(deriveProbeCause({ code: "ECONNREFUSED" })).toBe("econnrefused");
       });
     });
   });

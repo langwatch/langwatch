@@ -250,9 +250,7 @@ describe("handleSearchTraces()", () => {
 
     /** @scenario "An empty date input fails before the API call" */
     it("rejects an empty date before calling the API", async () => {
-      await expect(handleSearchTraces({ startDate: "" })).rejects.toThrow(
-        'Invalid date: ""',
-      );
+      await expect(handleSearchTraces({ startDate: "" })).rejects.toThrow('Invalid date: ""');
       expect(mockSearchTraces).not.toHaveBeenCalled();
     });
   });

@@ -86,7 +86,10 @@ describe("the webhook delivery process manager's outbox", () => {
       const retryDelayMs = recordedOutboxConfig()?.retryDelayMs;
 
       expect(
-        isAround(retryDelayMs?.({ attempt: WEBHOOK_SEND_MAX_ATTEMPTS }), WEBHOOK_RETRY_LADDER_MS.at(-1)),
+        isAround(
+          retryDelayMs?.({ attempt: WEBHOOK_SEND_MAX_ATTEMPTS }),
+          WEBHOOK_RETRY_LADDER_MS.at(-1),
+        ),
       ).toBe(true);
     });
 

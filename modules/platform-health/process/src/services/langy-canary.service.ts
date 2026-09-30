@@ -12,7 +12,7 @@ import {
   type LangyCanaryOutcome,
   type LangyCanaryResult,
 } from "../rules/langy-canary.rules.ts";
-import { probeCauseOf } from "../rules/probe-cause.rules.ts";
+import { deriveProbeCause } from "../rules/probe-cause.rules.ts";
 
 const logger = createLogger("langwatch:langy-canary");
 
@@ -164,7 +164,7 @@ export class LangyCanaryService {
       };
     } catch (error) {
       logger.error({ error, ...started }, "Langy canary could not start or follow its turn");
-      const cause = probeCauseOf(error);
+      const cause = deriveProbeCause(error);
       return {
         healthy: false,
         reason: "turn_failed",

@@ -8,9 +8,9 @@ import { scopedSurface } from "../credentialContext";
 import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../surface";
 import { buildAuthHeaders, type LangWatchAuthHeadersInput } from "./auth";
 
-export function buildSdkIdentityHeaders(
-  { surface = scopedSurface() }: { surface?: "cli" } = {},
-): Record<string, string> {
+export function buildSdkIdentityHeaders({
+  surface = scopedSurface(),
+}: { surface?: "cli" } = {}): Record<string, string> {
   return {
     "user-agent": `langwatch-sdk-node/${LANGWATCH_SDK_VERSION}`,
     "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,

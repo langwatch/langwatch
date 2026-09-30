@@ -89,12 +89,14 @@ export class InMemoryProcessStore implements ProcessStore {
   async findByRef<State = unknown>(params: {
     ref: ProcessRef;
   }): Promise<PersistedProcessInstance<State> | null> {
-    return this.readInstance<State>(params.ref);
+    const [instance] = this.findInstances<State>(params.ref);
+    return instance ?? null;
   }
 
-  private readInstance<State>(ref: ProcessRef): PersistedProcessInstance<State> | null {
+  /** The instance at `ref`, if any; `State` is the caller's word, as the durable store's is. */
+  private findInstances<State>(ref: ProcessRef): PersistedProcessInstance<State>[] {
     const instance = this.instances.get(refKey(ref));
-    return (instance as PersistedProcessInstance<State> | undefined) ?? null;
+    return instance ? [instance as PersistedProcessInstance<State>] : [];
   }
 
   async hasConsumedSource(params: { ref: ProcessRef; sourceEventId: string }): Promise<boolean> {
@@ -156,8 +158,8 @@ export class InMemoryProcessStore implements ProcessStore {
       return { outcome: "duplicateEvent" };
     }
 
-    const existing = this.readInstance<State>(ref);
-    const applied = transaction.apply(existing);
+    const [existing] = this.findInstances<State>(ref);
+    const applied = transaction.apply(existing ?? null);
 
     const result = await this.commit<State>({
       ref,
@@ -254,15 +256,12 @@ export class InMemoryProcessStore implements ProcessStore {
     let count = 0;
     let nextAttemptAt: number | null = null;
     for (const message of this.messages.values()) {
-      if (
-        message.processName !== params.ref.processName ||
-        message.projectId !== params.ref.projectId ||
-        message.processKey !== params.ref.processKey ||
-        message.intentType !== params.intentType ||
-        message.status !== "pending"
-      ) {
-        continue;
-      }
+      const sameInstance =
+        message.processName === params.ref.processName &&
+        message.projectId === params.ref.projectId &&
+        message.processKey === params.ref.processKey;
+      if (!sameInstance || message.intentType !== params.intentType) continue;
+      if (message.status !== "pending") continue;
       count += 1;
       if (nextAttemptAt === null || message.nextAttemptAt < nextAttemptAt) {
         nextAttemptAt = message.nextAttemptAt;
@@ -434,8 +433,7 @@ export class InMemoryProcessStore implements ProcessStore {
     // is undelivered work, kept until it delivers or an operator discards it.
     return this.deleteOutboxBatch(
       params,
-      (message) =>
-        message.status === "discarded" && message.updatedAt < params.before,
+      (message) => message.status === "discarded" && message.updatedAt < params.before,
     );
   }
 

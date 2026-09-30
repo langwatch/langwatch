@@ -1,7 +1,7 @@
 /** The Langy canary's verdict and answer, from main's `health-probes/langy-canary.service.ts`. */
 import type { LangyTurnSettlementWait } from "@langwatch/langy-contract";
 
-import { probeCauseOf } from "./probe-cause.rules.ts";
+import { deriveProbeCause } from "./probe-cause.rules.ts";
 
 /** Wall-time budget for one check: under the 60s a plain HTTP monitor allows. */
 export const LANGY_CANARY_BUDGET_MS = 55_000;
@@ -35,7 +35,7 @@ export function classifyLangyCanaryOutcome(
   if (wait.kind === "awaiting_user") return { healthy: true };
   const { settlement } = wait;
   if (!settlement.succeeded) {
-    const cause = probeCauseOf(settlement.error);
+    const cause = deriveProbeCause(settlement.error);
     return { healthy: false, reason: "turn_failed", ...(cause && { cause }) };
   }
   if (settlement.outcome !== "completed") {

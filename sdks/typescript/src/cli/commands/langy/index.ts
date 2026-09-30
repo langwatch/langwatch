@@ -7,6 +7,7 @@
 import chalk from "chalk";
 
 import { runDeviceFlowLogin } from "../../utils/governance/login-flow";
+import { platformProjectKeyReader } from "./project-key";
 import {
   chooseRequest,
   createControlApi,
@@ -18,7 +19,6 @@ import {
   platformTakesTheKey,
   waitForRequests,
 } from "./requests";
-import { platformProjectKeyReader } from "./project-key";
 import { startLangySession } from "./session";
 import { noticeRows } from "./ui";
 

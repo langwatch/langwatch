@@ -53,7 +53,7 @@ describe("isTransientModelFailure", () => {
       "500 Internal server error",
       "502 Bad Gateway",
       "503 Service Unavailable",
-      "529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\"}}",
+      '529 {"type":"error","error":{"type":"overloaded_error"}}',
       "429 Rate limit reached for gpt-5-mini. Please try again in 2s.",
       "408 Request Timeout",
     ])("retries %s", (message) => {
@@ -69,12 +69,12 @@ describe("isTransientModelFailure", () => {
   describe("when the failure is a refusal", () => {
     /** @scenario "A refusal is not retried" */
     it.each([
-      "400 {\"error\":{\"message\":\"Invalid schema for function\"}}",
+      '400 {"error":{"message":"Invalid schema for function"}}',
       "401 Incorrect API key provided",
       "403 Permission denied",
       "404 The model does not exist",
       "422 Unprocessable Entity",
-      "400 {\"error\":{\"type\":\"rate_limit_error\"}}",
+      '400 {"error":{"type":"rate_limit_error"}}',
       "429 You exceeded your current quota: insufficient_quota",
       "usage_limit_reached",
       "Your credit balance is too low to access the API. Please go to Plans & Billing",
@@ -276,7 +276,6 @@ describe("TurnEventMapper", () => {
         { type: "retry_settled", turnId: "t1" },
       ]);
     });
-
   });
 
   describe("when the retries end without an answer", () => {

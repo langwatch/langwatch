@@ -648,13 +648,9 @@ describe("langwatch-api", () => {
       await searchTraces({ startDate: 1000, endDate: 2000 });
 
       const [, calledOptions] = mockFetch.mock.calls[0]!;
-      expect(calledOptions.headers["X-LangWatch-SDK-Name"]).toBe(
-        "langwatch-mcp"
-      );
+      expect(calledOptions.headers["X-LangWatch-SDK-Name"]).toBe("langwatch-mcp");
       expect(calledOptions.headers["X-LangWatch-SDK-Language"]).toBe("typescript");
-      expect(calledOptions.headers["X-LangWatch-SDK-Version"]).toMatch(
-        /^\d+\.\d+\.\d+/
-      );
+      expect(calledOptions.headers["X-LangWatch-SDK-Version"]).toMatch(/^\d+\.\d+\.\d+/);
       expect(calledOptions.headers["User-Agent"]).toMatch(/^langwatch-mcp\//);
     });
   });

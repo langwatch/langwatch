@@ -276,7 +276,7 @@ class TurnStreamSink {
     this.handlers.onSignal(signal);
   }
 
-  /** Only the stream's first status before output is the placeholder; a later one (a retry line) is real. */
+  /** Only the first status before output is the placeholder; a later one (a retry line) is real. */
   status(entry: Extract<LangyStreamWireEntry, { type: "status" }>): void {
     const readiness = !this.sawOutput && !this.sawReadinessStatus;
     this.sawReadinessStatus = true;

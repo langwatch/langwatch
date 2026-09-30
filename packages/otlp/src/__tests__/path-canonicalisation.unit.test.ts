@@ -6,10 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  readCorrectedPath,
-  stampCorrectedPath,
-} from "../path-canonicalisation.ts";
+import { readCorrectedPath, stampCorrectedPath } from "../path-canonicalisation.ts";
 
 describe("the corrected-path marker", () => {
   /** @scenario The correction names the path the exporter used */

@@ -44,6 +44,7 @@ vi.mock("ora", () => ({
 }));
 
 import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
+
 import { createCliScenariosService } from "../cli-scenarios-service";
 import { updateScenarioCommand } from "../update";
 

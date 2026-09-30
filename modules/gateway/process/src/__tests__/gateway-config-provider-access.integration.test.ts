@@ -12,8 +12,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
