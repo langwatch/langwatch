@@ -520,6 +520,25 @@ describe("given the sign-up screen", () => {
       expect(container.querySelector('[role="alert"]')).toBeNull();
     });
 
+    /** @scenario Returning to the address step clears the refusal that sent me to log-in */
+    it("returns to the address step with no trace of the refusal", async () => {
+      requestVerificationMock.mockRejectedValueOnce({
+        data: { error: { code: "email_already_registered", httpStatus: 409, fault: "customer" } },
+      });
+
+      const { container } = renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+      await screen.findByTestId("method-picker");
+
+      await userEvent.click(screen.getByRole("button", { name: /use a different email/i }));
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("method-picker")).toBeNull();
+      expect(container.querySelector('[role="alert"]')).toBeNull();
+      expect(container.textContent).not.toMatch(/already|registered|exists/i);
+    });
+
     /** @scenario A correct password with a second factor asks for the code on the same card */
     it("asks for the second factor on the same card when the password was right", async () => {
       requestVerificationMock.mockRejectedValue({
