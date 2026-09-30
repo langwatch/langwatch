@@ -78,6 +78,10 @@ A thumbs-down from an end user is a `thumbs_up_down` event, not an annotation: `
 
 For an alert, find the graph that plots the metric with `langwatch graph list --format json`; when none does, create one with `langwatch graph create`. `--graph-alert` names the series as `<index>/<metric>/<aggregation>` (for example `0/performance.completion_time/p95`), a comparison `gt`, `gte`, `lt`, `lte` or `eq`, a threshold in the metric's own unit and a window in minutes (1, 5, 15, 30, 60 or 1440). A percentage written as "5%" is the threshold `5` on a percentage series and `0.05` on a rate series: read the graph to tell which.
 
+Analytics has no error-rate metric: never pass `--metric error-rate`. For errors, plot a trace count (`metadata.trace_id` / `cardinality`) on a series filtered to errored traces (`"filters":{"traces.error":["true"]}`) and alert on the count per window; tell the user the threshold is a count, not a percentage.
+
+When `graph create` is refused with `custom_graph_writes_disabled_for_playground`, this project cannot get a new alert graph. Do not create a dashboard widget: an alert cannot watch one. Say so in one line and offer a trace automation on errored traces (`--filters '{"traces.error":["true"]}'`) instead.
+
 ## Pause, Resume, Test and Review
 
 ```bash
