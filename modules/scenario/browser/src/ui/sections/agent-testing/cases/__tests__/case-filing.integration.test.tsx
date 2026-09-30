@@ -4,10 +4,11 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/page-structure.feature
+ * @see specs/features/agent-testing/suites-rail.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { Temporal } from "@langwatch/time";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +22,17 @@ const mockArchiveScenario = vi.hoisted(() => vi.fn());
 const mockRunScenario = vi.hoisted(() => vi.fn());
 const mockRunPlan = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
+const mockCreateSuite = vi.hoisted(() =>
+  vi.fn<(input: unknown, options: { onSuccess: () => void }) => void>(),
+);
+const mockSetTestSuites = vi.hoisted(() =>
+  vi.fn<(input: unknown, update: (rows: unknown[] | undefined) => unknown) => void>(),
+);
+// The create mutation's own onSuccess, so a test decides when the create lands.
+const createSuiteHooks = vi.hoisted(() => {
+  const hooks: { onSuccess: ((suite: unknown) => void) | null } = { onSuccess: null };
+  return hooks;
+});
 const mockAgentsGetAll = vi.hoisted(() =>
   vi.fn(() => ({
     data: [
@@ -55,7 +67,7 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
       suites: {
-        testSuites: { getAll: { invalidate: vi.fn() } },
+        testSuites: { getAll: { invalidate: vi.fn(), setData: mockSetTestSuites } },
         getById: { invalidate: vi.fn() },
       },
     }),
@@ -77,7 +89,12 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
     suites: {
       testSuites: {
         getAll: { useQuery: mockTestSuitesGetAll },
-        create: { useMutation: mutation(vi.fn()) },
+        create: {
+          useMutation: (options: { onSuccess: (suite: unknown) => void }) => {
+            createSuiteHooks.onSuccess = options.onSuccess;
+            return { mutate: mockCreateSuite, isPending: false };
+          },
+        },
         rename: { useMutation: mutation(vi.fn()) },
         archive: { useMutation: mutation(vi.fn()) },
       },
@@ -266,6 +283,37 @@ describe("the Scenarios tab", () => {
     expect(mockOpenDrawer).toHaveBeenCalledWith(
       "agentTestingCaseEditor",
       expect.objectContaining({ testSuiteId: REFUNDS.id }),
+    );
+  });
+
+  /** @scenario "A scenario created right after its suite is filed into that new suite" */
+  it("keeps the new suite dialog open until the suite lands, then opens it from the answer", async () => {
+    const user = userEvent.setup();
+    const billing = { id: "suite_billing", name: "Billing", slug: "billing", scenarioIds: [] };
+    renderTab();
+
+    await user.click(screen.getByTestId("agent-testing-rail-new-suite"));
+    await user.type(screen.getByLabelText("Test suite name"), "Billing");
+    await user.click(screen.getByTestId("suite-name-confirm"));
+
+    expect(mockCreateSuite).toHaveBeenCalledWith(
+      { projectId: "proj_1", name: "Billing" },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    // Still open: a New scenario chosen now would be filed in the old suite.
+    expect(screen.getByTestId("agent-testing-suite-name-dialog")).toBeInTheDocument();
+
+    act(() => {
+      createSuiteHooks.onSuccess?.(billing);
+      mockCreateSuite.mock.calls[0]![1].onSuccess();
+    });
+
+    const [input, update] = mockSetTestSuites.mock.calls[0]!;
+    expect(input).toEqual({ projectId: "proj_1" });
+    expect(update([REFUNDS])).toEqual([REFUNDS, billing]);
+    expect(mockRouterPush).toHaveBeenCalledWith("/test-project/agent-testing/suites/billing");
+    await waitFor(() =>
+      expect(screen.queryByTestId("agent-testing-suite-name-dialog")).not.toBeInTheDocument(),
     );
   });
 

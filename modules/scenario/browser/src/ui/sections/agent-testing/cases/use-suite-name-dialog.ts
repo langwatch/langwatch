@@ -10,6 +10,8 @@ import type { SuiteMutations } from "../../../../behavior/agent-testing/cases/us
 
 export type SuiteNameDialogModel = {
   isOpen: boolean;
+  /** True while the suite is being created; the dialog stays open until it lands. */
+  isCreating: boolean;
   openNew: () => void;
   close: () => void;
   confirm: (name: string) => void;
@@ -26,14 +28,14 @@ export function useSuiteNameDialog({
 
   const confirm = useCallback(
     (name: string) => {
-      suiteMutations.createSuite(name);
-      close();
+      suiteMutations.createSuite({ name, onCreated: close });
     },
     [suiteMutations, close],
   );
 
   return {
     isOpen,
+    isCreating: suiteMutations.isCreating,
     openNew: useCallback(() => setIsOpen(true), []),
     close,
     confirm,
