@@ -3308,11 +3308,11 @@
   request: {"path": "/api/projects"}
   expect: {"status": [401, 403]}
 
-- id: "project-list-refuses-project-b-key"
+- id: "project-list-project-b-key-sees-only-its-project"
   endpoint: "GET /api/projects"
   auth: "project-b"
   request: {"path": "/api/projects"}
-  expect: {"status": [401, 403]}
+  expect: {"status": 200, "notContains": "{projectId}"}
 
 - id: "project-create-with-new-team"
   endpoint: "POST /api/projects"
