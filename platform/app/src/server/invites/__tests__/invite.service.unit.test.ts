@@ -87,6 +87,23 @@ describe("classifyInvitesByMemberType()", () => {
     });
   });
 
+  describe("when invites have DEVELOPER role", () => {
+    /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+    it("counts them as developers, in neither metered pool", () => {
+      const invites = [
+        { role: OrganizationUserRole.DEVELOPER },
+        { role: OrganizationUserRole.DEVELOPER, teams: [] },
+      ];
+      const customRoleMap = new Map();
+
+      const result = classifyInvitesByMemberType(invites, customRoleMap);
+
+      expect(result.developers).toBe(2);
+      expect(result.fullMembers).toBe(0);
+      expect(result.liteMembers).toBe(0);
+    });
+  });
+
   describe("when invites have EXTERNAL role with view-only custom role", () => {
     it("counts them as lite members", () => {
       const invites = [

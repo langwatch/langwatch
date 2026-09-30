@@ -265,9 +265,10 @@ export function classifyInvitesByMemberType(
     teams?: Array<{ customRoleId?: string }>;
   }>,
   customRoleMap: Map<string, string[]>,
-): { fullMembers: number; liteMembers: number } {
+): { fullMembers: number; liteMembers: number; developers: number } {
   let fullMembers = 0;
   let liteMembers = 0;
+  let developers = 0;
 
   for (const invite of invites) {
     if (
@@ -275,6 +276,9 @@ export function classifyInvitesByMemberType(
       invite.role === OrganizationUserRole.MEMBER
     ) {
       fullMembers++;
+    } else if (invite.role === OrganizationUserRole.DEVELOPER) {
+      // Counted so the caller can see it; never compared to a limit (ADR-143).
+      developers++;
     } else if (invite.role === OrganizationUserRole.EXTERNAL) {
       const hasNonViewRole = invite.teams?.some((t) => {
         if (!t.customRoleId) return false;
@@ -289,7 +293,7 @@ export function classifyInvitesByMemberType(
     }
   }
 
-  return { fullMembers, liteMembers };
+  return { fullMembers, liteMembers, developers };
 }
 
 /**

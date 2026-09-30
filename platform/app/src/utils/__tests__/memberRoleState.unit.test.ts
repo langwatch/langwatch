@@ -451,6 +451,39 @@ describe("memberRoleState", () => {
         expect(result).toBeNull();
       });
     });
+
+    describe("when a Developer seat is involved", () => {
+      /** @scenario Developers are counted and never capped */
+      it("returns null when moving onto a Developer seat", () => {
+        expect(
+          getLicenseLimitTypeForRoleChange({
+            previousRole: OrganizationUserRole.MEMBER,
+            nextRole: OrganizationUserRole.DEVELOPER,
+          }),
+        ).toBeNull();
+        expect(
+          getLicenseLimitTypeForRoleChange({
+            previousRole: OrganizationUserRole.EXTERNAL,
+            nextRole: OrganizationUserRole.DEVELOPER,
+          }),
+        ).toBeNull();
+      });
+
+      it("returns the pool entered when leaving a Developer seat", () => {
+        expect(
+          getLicenseLimitTypeForRoleChange({
+            previousRole: OrganizationUserRole.DEVELOPER,
+            nextRole: OrganizationUserRole.MEMBER,
+          }),
+        ).toBe("members");
+        expect(
+          getLicenseLimitTypeForRoleChange({
+            previousRole: OrganizationUserRole.DEVELOPER,
+            nextRole: OrganizationUserRole.EXTERNAL,
+          }),
+        ).toBe("membersLite");
+      });
+    });
   });
 
   describe("applyOrganizationRoleToPendingTeamRoles()", () => {
