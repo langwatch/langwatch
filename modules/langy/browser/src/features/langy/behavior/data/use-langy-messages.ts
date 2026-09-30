@@ -82,6 +82,9 @@ export function useLangyMessages(conversationId: string | null): LangyMessagesRe
       refetchOnWindowFocus: false,
       placeholderData: keepPreviousData,
       refetchInterval: (query) => langyMessagesPollInterval(query.state.data),
+      // A hidden tab keeps reading a turn in flight: the cards that wait on the person and the
+      // turn to reattach to both follow this read, and they are what a notification is about.
+      refetchIntervalInBackground: true,
     },
   );
 

@@ -109,6 +109,12 @@ Feature: Langy notifies the person when it needs them or has finished
       When Langy puts up a card that waits for my answer
       Then a notification says Langy needs a decision
 
+    @integration
+    Scenario: A card that comes up while the tab is hidden still reaches it
+      Given a turn is in flight and the tab is hidden
+      When Langy puts up a card that waits for my answer
+      Then the tab keeps reading the conversation and sees the card
+
     @unit
     Scenario: Nothing is sent while the tab is focused and visible
       Given Langy notifications are enabled and the browser allows them
