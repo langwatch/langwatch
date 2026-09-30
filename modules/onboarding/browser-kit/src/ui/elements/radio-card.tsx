@@ -29,7 +29,7 @@ export const RadioCard = forwardRef<HTMLInputElement, RadioCardProps>(
           _hover={{
             backgroundColor: "gray.50",
           }}
-          px={5}
+          px={3}
           py={3}
           height="full"
           display="flex"

@@ -131,6 +131,20 @@ describe("given an administrator on the Authentication page", () => {
     });
   });
 
+  describe("when the page renders its title", () => {
+    it("sits above the rail, as on the Identity provider and Connectors pages", () => {
+      renderWithOrganizationHost(
+        <AuthenticationSettingsScreen />,
+        hostWith({ grants: ["sso:view", "organization:manage"] }),
+      );
+
+      const title = screen.getByRole("heading", { level: 1, name: "Authentication" });
+      const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
+      expect(rail.contains(title)).toBe(false);
+      expect(title.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
   describe("when the reader may not see single sign-on", () => {
     it("says which permission the page needs rather than drawing it", () => {
       renderWithOrganizationHost(<AuthenticationSettingsScreen />, hostWith({ grants: [] }));

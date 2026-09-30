@@ -172,8 +172,8 @@ export function TechStackSelector({
   const currentLanguage = language || Object.keys(techStackLanguageOptions)[0];
 
   const handleLanguageChange = (value: string) => {
-    const availableForLanguage = Object.entries(techStackFrameworkOptions).filter(
-      ([_, framework]) => Object.keys(framework.languages).includes(value),
+    const availableForLanguage = Object.entries(techStackFrameworkOptions).filter(([, framework]) =>
+      Object.keys(framework.languages).includes(value),
     );
 
     form.setValue("language", value);
@@ -190,7 +190,7 @@ export function TechStackSelector({
           value={language}
           onValueChange={(change) => handleLanguageChange(change.value ?? "")}
         >
-          <HStack gap={6} alignItems="stretch" wrap="wrap">
+          <HStack gap={3} alignItems="stretch" wrap="wrap">
             {Object.entries(techStackLanguageOptions).map(([key, option]) => (
               <RadioCard key={key} value={key}>
                 <VStack width="64px">
@@ -210,11 +210,9 @@ export function TechStackSelector({
           value={framework}
           onValueChange={(change) => form.setValue("framework", change.value ?? "")}
         >
-          <HStack gap={6} alignItems="stretch" wrap="wrap">
+          <HStack gap={3} alignItems="stretch" wrap="wrap">
             {Object.entries(techStackFrameworkOptions)
-              .filter(([_, option]) =>
-                Object.keys(option.languages).includes(currentLanguage ?? ""),
-              )
+              .filter(([, option]) => Object.keys(option.languages).includes(currentLanguage ?? ""))
               .map(([key, option]) => (
                 <RadioCard key={key} value={key}>
                   <VStack width="64px">
