@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // shardContext is the credentials and ids one slice of the pool runs with:
@@ -278,9 +279,32 @@ func (runner *scenarioRunner) seedProject(side *scenarioSide, index int) *shardC
 		return shard
 	}
 	name := fmt.Sprintf("apidiff-shard-%s-p%d", runner.tag, index)
-	created := runner.call(side, http.MethodPost, "/api/projects", home.keys.OrgKey, projectBody(name, ""))
+	created := runner.createProject(side, home.keys.OrgKey, name)
 	runner.fileProject(shard, created)
 	return shard
+}
+
+const seedProjectAttempts = 3
+
+// createProject retries a transport failure (no answer, as under load) with a
+// fresh name each time, since the lost attempt may have been created.
+func (runner *scenarioRunner) createProject(side *scenarioSide, orgKey, name string) rawResult {
+	var created rawResult
+	for attempt := range seedProjectAttempts {
+		attemptName := name
+		if attempt > 0 {
+			attemptName = fmt.Sprintf("%s-r%d", name, attempt)
+			select {
+			case <-runner.ctx.Done():
+				return created
+			case <-time.After(time.Duration(attempt) * time.Second):
+			}
+		}
+		if created = runner.call(side, http.MethodPost, "/api/projects", orgKey, projectBody(attemptName, "")); created.status != 0 {
+			return created
+		}
+	}
+	return created
 }
 
 func projectBody(name, teamID string) map[string]any {

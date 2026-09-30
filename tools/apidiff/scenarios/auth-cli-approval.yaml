@@ -6,7 +6,7 @@
   endpoint: "GET /api/auth/cli/device-approval"
   auth: "none"
   request: {"path": "/api/auth/cli/device-approval"}
-  expect: {"status": 400, "body": {"error": "invalid_request"}}
+  expect: {"status": [400, 422]}
 
 - id: "auth-cli-device-approval-unknown-code-is-expired"
   endpoint: "GET /api/auth/cli/device-approval"

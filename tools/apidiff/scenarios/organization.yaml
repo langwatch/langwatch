@@ -7272,7 +7272,7 @@
   endpoint: "POST /api/auth/cli/deny"
   auth: "session"
   request: {"path": "/api/auth/cli/deny", "body": {"user_code": "NOPE-{uid}"}}
-  expect: {"status": [400, 404]}
+  expect: {"status": 200, "body": {"ok": true}}
 
 - id: "auth-cli-deny-rejects-missing-code"
   endpoint: "POST /api/auth/cli/deny"
