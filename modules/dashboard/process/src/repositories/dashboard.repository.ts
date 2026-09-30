@@ -53,10 +53,11 @@ export interface DashboardRepository {
 
   findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]>;
   findGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | undefined>;
-  findLastGraphGridRow(input: {
-    projectId: string;
-    dashboardId: string;
-  }): Promise<number | undefined>;
+  /**
+   * The first grid row below every card on the dashboard, whichever kind, so a
+   * new card never lands on a tall one; row 0 on an empty dashboard.
+   */
+  findNextFreeGridRow(input: { projectId: string; dashboardId: string }): Promise<number>;
   createGraph(input: {
     id: string;
     projectId: string;

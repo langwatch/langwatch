@@ -72,11 +72,22 @@ export class InstanceIdentityService {
   }
 
   async setReportSwitches(switches: InstanceReportSwitches): Promise<void> {
-    await this.deps.repository.setReportSwitches(switches);
+    await this.deps.repository.setReportSwitches({
+      switches,
+      instanceIdIfMissing: this.#idForAMissingRow(),
+    });
   }
 
   async recordReport(params: { error: string | null; at: Instant }): Promise<void> {
-    await this.deps.repository.recordReport(params);
+    await this.deps.repository.recordReport({
+      ...params,
+      instanceIdIfMissing: this.#idForAMissingRow(),
+    });
+  }
+
+  /** The id a write creates the row under when none exists; ignored when one does. */
+  #idForAMissingRow(): string {
+    return this.#held ?? this.deps.instanceIdOverride ?? this.deps.newInstanceId();
   }
 }
 

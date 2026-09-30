@@ -46,6 +46,7 @@ export const NoDataInfoBlock = ({
         <Icon size="md">{icon}</Icon>
       </Box>
       <Text
+        as="h3"
         fontFamily="heading"
         fontSize="20px"
         fontWeight="500"

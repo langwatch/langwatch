@@ -12,6 +12,8 @@ import type { UiDeployment } from "./capabilities.ts";
 export type UiDeploymentSlices = Readonly<{
   process: ProcessWebConfig;
   origin: string;
+  /** The public URL auth signs readers in on; beats an in-cluster BASE_HOST. */
+  publicUrl?: string;
   demoProjectSlug?: string;
   licensePaymentUrl?: string;
   hasLangevals: boolean;
@@ -25,6 +27,7 @@ export type UiDeploymentSlices = Readonly<{
 export function deriveUiDeployment({
   process,
   origin,
+  publicUrl,
   demoProjectSlug,
   licensePaymentUrl,
   hasLangevals,
@@ -37,7 +40,7 @@ export function deriveUiDeployment({
   return {
     isDevelopment: process.mode === "development",
     isSaaS: process.deployment === "saas",
-    appBaseUrl: process.appBaseUrl ?? origin,
+    appBaseUrl: publicUrl || process.appBaseUrl || origin,
     ...(demoProjectSlug ? { demoProjectSlug } : {}),
     ...(licensePaymentUrl ? { licensePaymentUrl } : {}),
     hasNlpService: process.nlp,

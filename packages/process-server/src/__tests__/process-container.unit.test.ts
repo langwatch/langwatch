@@ -11,7 +11,7 @@ function containerRuntime(phases: string[]): ProcessBoot {
   return {
     surfaceDefaults: {},
     async boot({ role, modules, pipelines }) {
-      const eventing = pipelines.configure(30);
+      const eventing = pipelines.configure({ defaultRetentionDays: 30 });
       phases.push(eventing.consumersEnabled ? "consumer" : "producer");
       return bootInstalledProcess({
         role,

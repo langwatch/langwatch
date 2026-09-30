@@ -5,9 +5,10 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
-import { replaceLocation } from "../../behavior/browser-navigation.ts";
+import { hardNavigate, replaceLocation } from "../../behavior/browser-navigation.ts";
 import { useExpiredSessionRecovery } from "../../behavior/use-expired-session-recovery.ts";
 import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { signUpHref } from "../../model/carried-email.ts";
@@ -351,10 +352,17 @@ function NoAccountYet({
 }) {
   const guidance = reasonCode ? signInRoutingReasonCopy(reasonCode) : null;
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
+  const sendsEmail = usePublicEnv().data.HAS_EMAIL_PROVIDER_KEY;
 
   const beginSignUp = async () => {
     try {
-      await requestVerification.mutateAsync({ email });
+      const result = await requestVerification.mutateAsync({ email });
+      if (!result.sent) {
+        // Nothing was mailed: the sign-up door takes the unconfirmed proof straight to the
+        // password step, the same step its own address form leads to on this installation.
+        hardNavigate(signUpHref({ callbackUrl, email, addressProof: result.addressProof }));
+        return;
+      }
       onAwaitingConfirmation(email);
     } catch (failure) {
       if (readHandledError(failure)?.code === "email_already_registered") {
@@ -386,7 +394,7 @@ function NoAccountYet({
           loading={requestVerification.isPending}
           onClick={() => void beginSignUp()}
         >
-          Send confirmation link
+          {sendsEmail ? "Send confirmation link" : "Continue"}
         </Button>
         <Button variant="outline" onClick={onUseDifferentEmail}>
           Use a different email

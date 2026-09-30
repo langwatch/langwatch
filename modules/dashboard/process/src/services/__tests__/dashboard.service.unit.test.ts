@@ -115,6 +115,30 @@ describe("DashboardService", () => {
     });
   });
 
+  describe("given a dashboard whose chart at row 0 spans three rows", () => {
+    /** @scenario "A new graph is placed below the bottom edge of the tallest chart" */
+    it("places a new graph on row 3, below that chart's bottom edge", async () => {
+      const { service } = serviceWith();
+      const dashboard = await service.create({ projectId: PROJECT, name: "Reports" });
+      await service.createGraph({
+        projectId: PROJECT,
+        name: "Latency",
+        graph: { graphType: "line" },
+        dashboardId: dashboard.id,
+        layout: { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 3 },
+      });
+
+      const created = await service.createGraph({
+        projectId: PROJECT,
+        name: "Errors",
+        graph: { graphType: "line" },
+        dashboardId: dashboard.id,
+      });
+
+      expect(created.gridRow).toBe(3);
+    });
+  });
+
   describe("given a project with dashboards already in it", () => {
     /** @scenario "A dashboard is created after the project's current dashboards" */
     it("creates each new dashboard after the current last", async () => {

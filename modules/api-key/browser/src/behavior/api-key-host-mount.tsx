@@ -5,7 +5,11 @@
  */
 
 import { useUiAddress } from "@langwatch/browser-host/address";
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import {
+  useUiCapabilities,
+  useUiDeployment,
+  useUiScope,
+} from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
 
@@ -31,11 +35,7 @@ import { approveCliDeviceCode, denyCliDeviceCode, lookupCliDeviceCode } from "./
 
 const LEAD_SOURCE_STORAGE_KEY = "lw_attrib.leadSource";
 
-/**
- * Where the API a minted key will be used against lives. `UiDeployment`
- * carries no base-URL field, and a module may not read the shell's injected
- * config itself — this is the SaaS default until that capability widens.
- */
+/** Where a minted key is used when the deployment names no address of its own. */
 const DEFAULT_API_ENDPOINT = "https://app.langwatch.ai";
 
 /**
@@ -79,6 +79,7 @@ class CapabilityApiKeyHost extends ApiKeyHostApi {
       succeeded: (notice: ApiKeySuccessNotice) => void;
       failed: (failure: ApiKeyFailureNotice) => void;
       openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+      apiEndpoint: string;
     },
   ) {
     super();
@@ -118,7 +119,7 @@ class CapabilityApiKeyHost extends ApiKeyHostApi {
   }
 
   apiEndpoint(): string {
-    return DEFAULT_API_ENDPOINT;
+    return this.deps.apiEndpoint;
   }
 
   route(): ApiKeyRouteReading {
@@ -194,6 +195,7 @@ class CapabilityApiKeyHost extends ApiKeyHostApi {
 
 export default function ApiKeyHostMount({ children }: { children?: ReactNode }) {
   const { session, route, feedback, navigation } = useUiCapabilities();
+  const apiEndpoint = useUiDeployment().appBaseUrl || DEFAULT_API_ENDPOINT;
   const activeScope = useUiScope().activeScope();
   const address = useUiAddress();
   const { openDrawer } = useDrawer();
@@ -223,8 +225,10 @@ export default function ApiKeyHostMount({ children }: { children?: ReactNode }) 
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
         openDrawer,
+        apiEndpoint,
       }),
     [
+      apiEndpoint,
       activeScope.organizationId,
       activeScope.projectId,
       graph,

@@ -36,7 +36,7 @@ export type SavedWorkbenchChartRepository = Pick<
   | "deleteSavedWorkbenchChart"
   | "findAllSavedWorkbenchCharts"
   | "findDashboard"
-  | "findLastGraphGridRow"
+  | "findNextFreeGridRow"
   | "findSavedWorkbenchChart"
   | "placeSavedWorkbenchChart"
   | "unplaceSavedWorkbenchChart"
@@ -170,10 +170,10 @@ export class SavedWorkbenchChartService {
 
     const gridRow =
       placement.gridRow ??
-      ((await this.#repository.findLastGraphGridRow({
+      (await this.#repository.findNextFreeGridRow({
         projectId: ref.projectId,
         dashboardId: placement.dashboardId,
-      })) ?? -1) + 1;
+      }));
 
     return present(
       await this.#repository.placeSavedWorkbenchChart({

@@ -90,6 +90,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
+  GATEWAY_CONTROL_PLANE_URL env entry for the app: the address the chart's
+  gateway dials to reach this control plane, computed the way the gateway
+  subchart's ConfigMap computes it. The checkup compares it with the address
+  the gateway reports, so an in-cluster address passes and another install
+  fails. Renders nothing when the chart does not run the gateway.
+*/}}
+{{- define "langwatch.gatewayControlPlaneUrlEnv" -}}
+{{- $gw := .Values.gateway | default dict }}
+{{- if $gw.chartManaged }}
+{{- $url := (($gw.controlPlane) | default dict).baseUrl | default (printf "http://%s-app:5560" .Release.Name) }}
+- name: GATEWAY_CONTROL_PLANE_URL
+  value: {{ $url | quote }}
+{{- end }}
+{{- end -}}
+
+{{/*
   LANGY_WORKER_CALLBACK_URL env entry — the origin the Langy agent's workers dial
   back on: the relay frame push, the durable turn finalize, the session-key
   revoke, and the LANGWATCH_ENDPOINT the langwatch CLI uses for every tool call.
@@ -1718,43 +1734,42 @@ here, once, by name, so both consuming templates agree.
 {{- end -}}
 
 {{/* Renders terminationGracePeriodSeconds for a Node component, refusing the
-     render when it cannot cover that component's shutdown drain.
+     render when it cannot cover that component's shutdown budget.
 
-     The Node processes run four nested shutdown clocks — the drain
-     (shutdownDrainSeconds), the close backstop, the process deadline
-     (PROCESS_SHUTDOWN_DEADLINE_MS, packages/process-server/src/config.ts), and
-     this one. They are derived from a single number:
+     Three clocks are derived from one number, shutdownDrainSeconds (D):
 
-       processDeadlineMs = drain + 5s (close) + 15s (process teardown)
-       required grace    = processDeadlineMs + 10s of kubelet slack
+       SHUTDOWN_DRAIN_TIMEOUT_MS    = D         the queue stops waiting for
+                                                in-flight jobs here
+                                                (packages/process-stores/src/config-owner.ts)
+       PROCESS_SHUTDOWN_DEADLINE_MS = D + 20s   the process force-exits here
+                                                (packages/process-server/src/config.ts)
+       required grace               = D + 30s   the kubelet SIGKILLs here
 
-     So a drain of D seconds needs a grace period of at least D + 30. The
-     workers Deployment had no grace period at all and ran on the k8s default
-     of 30s, which a 20s drain plus teardown does not fit inside; the kubelet
-     answered with SIGKILL mid-drain, severing in-flight ClickHouse statements
-     and producing `Broken pipe ... ParallelFormattingOutputFormat` on the
-     server. See specs/background/worker-graceful-shutdown.feature.
+     The 20s above the drain pays for App.close (5s) and process teardown
+     (15s). The 10s between the deadline and the grace period covers the signal-to-handler gap and lets the
+     overrun log line ship before the process dies. The workers Deployment
+     once ran on the k8s default of 30s, which a 25s drain plus teardown does
+     not fit inside; the kubelet answered with SIGKILL mid-drain, severing
+     in-flight ClickHouse statements and producing `Broken pipe ...
+     ParallelFormattingOutputFormat` on the server. See
+     specs/background/worker-graceful-shutdown.feature.
 
      Validated rather than derived, matching the gateway subchart: an operator
      draining behind a slow load balancer wants a wider margin than a formula
-     would pick, so the number stays theirs to set — the chart only refuses to
-     install a release the kubelet would kill mid-drain.
-
-     langwatch.shutdownEnv hands the process the deadline from the same
-     shutdownDrainSeconds, so the pod is validated against what the process
-     will actually do. */}}
+     would pick, so the number stays theirs to set. The chart only refuses to
+     install a release the kubelet would kill mid-drain. */}}
 {{/* The process side of the same number the pod is sized for.
 
      Emitted per component rather than in sharedEnv because app and workers
-     each carry their own shutdownDrainSeconds, and a process told a budget its
-     pod was not sized for is exactly the drift this pair exists to prevent:
-     the kubelet SIGKILLs a drain the process still believes it has time for.
-     One value in values.yaml now drives both. */}}
+     each carry their own shutdownDrainSeconds, and a process told a deadline
+     its pod was not sized for is exactly the drift this pair exists to
+     prevent: the kubelet SIGKILLs a drain the process still believes it has
+     time for. One value in values.yaml drives both. */}}
 {{/* Reads a whole-second count, refusing anything that is not one.
 
      `int` is the trap this exists for: it silently yields 0 for a value Helm
      kept as a string, which `--set-string x=abc` and `--set x=25.9` both
-     produce. A zero drain then renders a deadline with no drain in it, while ALSO collapsing
+     produce. A zero drain then renders a deadline of bare slack while ALSO collapsing
      the required grace period to the bare margin, so the guard below happily
      passes and the release installs looking correct. A silent 0 is the worst
      of both: the render says fine and the fleet does not come up. */}}
@@ -1924,6 +1939,7 @@ here, once, by name, so both consuming templates agree.
        the assistant refuses every turn with a credential-resolution
        error naming this variable. */}}
 {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 0 }}
+{{- include "langwatch.gatewayControlPlaneUrlEnv" . | nindent 0 }}
 
 # Auth configuration (NEXTAUTH_SECRET lives in sharedEnv —
 # every app-image consumer needs it, see _helpers.tpl).
@@ -1971,19 +1987,17 @@ here, once, by name, so both consuming templates agree.
 
 {{- define "langwatch.shutdownEnv" -}}
 {{- $drain := include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" .component.shutdownDrainSeconds "fallback" 25) -}}
-{{/* apps/api and apps/worker read ONE shutdown clock, PROCESS_SHUTDOWN_DEADLINE_MS
-     (packages/process-server/src/config.ts): the watchdog that exits the process
-     once its drain phases have had their turn. It sits at the drain plus 5s for
-     close and 15s for teardown, 10s inside the grace period below, so the process
-     exits on its own clock before the kubelet's SIGKILL. The per-process names
-     main read (SHUTDOWN_DRAIN_TIMEOUT_MS, API_HTTP_DRAIN_GRACE_MS) are gone.
-     extraEnvs renders after this block and the kubelet takes the LAST duplicate,
-     so setting it there would silently outrun the grace period: refused. */}}
+{{/* extraEnvs renders after this block, and the kubelet takes the LAST
+     duplicate, so setting either variable there silently wins over the value
+     the pod was sized for. Set shutdownDrainSeconds instead; it moves all
+     three clocks. */}}
 {{- range (default (list) .component.extraEnvs) -}}
-{{- if eq .name "PROCESS_SHUTDOWN_DEADLINE_MS" -}}
-{{- fail (printf "%s must not be set through extraEnvs — it would override the shutdown deadline the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both." .name) -}}
+{{- if has .name (list "SHUTDOWN_DRAIN_TIMEOUT_MS" "PROCESS_SHUTDOWN_DEADLINE_MS") -}}
+{{- fail (printf "%s must not be set through extraEnvs. It would override the shutdown budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves the drain, the process deadline and the grace period together." .name) -}}
 {{- end -}}
 {{- end -}}
+- name: SHUTDOWN_DRAIN_TIMEOUT_MS
+  value: {{ mul (int $drain) 1000 | quote }}
 - name: PROCESS_SHUTDOWN_DEADLINE_MS
   value: {{ mul (add (int $drain) 20) 1000 | quote }}
 {{- end -}}

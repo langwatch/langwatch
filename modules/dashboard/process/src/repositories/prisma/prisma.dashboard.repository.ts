@@ -1,3 +1,4 @@
+import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
   dashboardSchema,
   graphFiltersSchema,
@@ -253,16 +254,12 @@ export class PrismaDashboardRepository
     return row ? graphRow(row) : undefined;
   }
 
-  async findLastGraphGridRow(input: {
-    projectId: string;
-    dashboardId: string;
-  }): Promise<number | undefined> {
-    const row = await this.prisma.customGraph.findFirst({
+  async findNextFreeGridRow(input: { projectId: string; dashboardId: string }): Promise<number> {
+    const cards = await this.prisma.customGraph.findMany({
       where: { projectId: input.projectId, dashboardId: input.dashboardId },
-      orderBy: { gridRow: "desc" },
-      select: { gridRow: true },
+      select: { gridRow: true, rowSpan: true },
     });
-    return row?.gridRow ?? undefined;
+    return chartGridBottomRow(cards);
   }
 
   async createGraph(input: {

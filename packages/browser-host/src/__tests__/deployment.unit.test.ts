@@ -55,6 +55,32 @@ describe("deriveUiDeployment", () => {
     });
   });
 
+  describe("when the installation names a public URL besides BASE_HOST", () => {
+    /** @scenario "The browser deployment prefers the public URL over BASE_HOST" */
+    it("answers the public URL, the one every setup snippet copies", () => {
+      const deployment = deriveUiDeployment(
+        slicesWith({
+          process: {
+            appBaseUrl: "http://localhost:5560",
+            mode: "production",
+            deployment: "self-hosted",
+            nlp: true,
+          },
+          publicUrl: "http://localhost:5580",
+        }),
+      );
+
+      expect(deployment.appBaseUrl).toBe("http://localhost:5580");
+    });
+  });
+
+  describe("when the installation names no public URL", () => {
+    /** @scenario "The browser deployment falls back to BASE_HOST without a public URL" */
+    it("answers BASE_HOST", () => {
+      expect(deriveUiDeployment(slicesWith({})).appBaseUrl).toBe("https://app.example");
+    });
+  });
+
   describe("given a deployment that sells a licence", () => {
     it("carries the purchase address, so a host never reads the meta tag itself", () => {
       const deployment = deriveUiDeployment(

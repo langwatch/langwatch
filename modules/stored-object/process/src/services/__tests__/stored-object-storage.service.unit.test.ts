@@ -78,6 +78,34 @@ describe("StoredObjectStorageService", () => {
     });
   });
 
+  describe("given a project whose storage destination accepts writes", () => {
+    describe("when the storage checkup probe runs for it", () => {
+      /** @scenario "The storage checkup probe writes and removes one canary object" */
+      it("writes one canary under the checkup prefix and removes it", async () => {
+        const inner = memoryObjectStorage();
+        const keys: { write: string[]; remove: string[] } = { write: [], remove: [] };
+        const objectStorage: ObjectStorage = {
+          ...inner,
+          write: (at, body, facts) => {
+            keys.write.push(at.key);
+            return inner.write(at, body, facts);
+          },
+          remove: (at) => {
+            keys.remove.push(at.key);
+            return inner.remove(at);
+          },
+        };
+        const storage = StoredObjectStorageService.create({ objectStorage });
+
+        await storage.probe({ projectId: "project-1" });
+
+        expect(keys.write).toHaveLength(1);
+        expect(keys.write[0]).toMatch(/^project-1\/checkup\/[^/]+\.txt$/);
+        expect(keys.remove).toEqual(keys.write);
+      });
+    });
+  });
+
   describe.each(otherProjects)("given an address outside the project ($relativeId)", (address) => {
     it("does not read another project through a caller-supplied project address", async () => {
       const { storage, reached } = recordingStorage();

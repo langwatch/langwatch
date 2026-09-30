@@ -47,6 +47,25 @@ Feature: License sync
     When two processes mint one at the same time
     Then the one that loses the write takes the identity the winner minted
 
+  @unit @integration
+  Scenario: The usage report switches persist on an install with no identity row yet
+    Given an install that has never presented an identity
+    When a manager turns the optional metrics and the hostname off on the Checkup
+    Then the identity row is created holding both switches off
+    And the Checkup shows them off after a reload
+
+  @integration
+  Scenario: Two first writes of the usage report switches end with one identity row
+    Given an install that has never presented an identity
+    When two processes write the usage report switches at the same time
+    Then the install holds one identity row
+
+  @unit @integration
+  Scenario: A usage report sent before any identity row existed is still recorded
+    Given an install whose operator named the instance id, so no row was minted
+    When a usage report is accepted
+    Then the identity row is created with the named id and the time the report landed
+
   @unit
   Scenario: An operator can name the identity this install presents
     Given a deployment configuration that names an instance id

@@ -41,10 +41,10 @@ export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof grap
           filters: input.filterParams?.filters ?? {},
           ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
           layout: {
-            gridColumn: input.gridColumn ?? 0,
+            ...(input.gridColumn === undefined ? {} : { gridColumn: input.gridColumn }),
             ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
-            colSpan: input.colSpan ?? 1,
-            rowSpan: input.rowSpan ?? 1,
+            ...(input.colSpan === undefined ? {} : { colSpan: input.colSpan }),
+            ...(input.rowSpan === undefined ? {} : { rowSpan: input.rowSpan }),
           },
         }),
       ),
