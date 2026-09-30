@@ -1538,7 +1538,7 @@ export class SsoConnectionGuards {
       await this.licenseAuthority.licenseAuthorizesDomainClaims();
     if (licensed) return;
     throw new SsoLicenseRequiredError(
-      `no licence on this deployment authorizes ${act}`,
+      `no license on this deployment authorizes ${act}`,
     );
   }
 

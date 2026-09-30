@@ -65,7 +65,7 @@ describe("the license registry on Postgres", () => {
   });
 
   describe("when an operator issues a license for a new customer", () => {
-    it("creates the customer organization marked as a self-hosted customer, with a unique slug", async () => {
+    it("creates the customer organization marked as a self-hosted customer, with an organization_ id and a unique slug", async () => {
       const first = await issue("ACME");
       const second = await issue("ACME");
 
@@ -78,10 +78,13 @@ describe("the license registry on Postgres", () => {
             ],
           },
         },
-        select: { slug: true, selfHostedCustomer: true },
+        select: { id: true, slug: true, selfHostedCustomer: true },
       });
 
       expect(organizations).toHaveLength(2);
+      for (const organization of organizations) {
+        expect(organization.id).toMatch(/^organization_/);
+      }
       expect(organizations.every((o) => o.selfHostedCustomer)).toBe(true);
       expect(new Set(organizations.map((o) => o.slug)).size).toBe(2);
     });

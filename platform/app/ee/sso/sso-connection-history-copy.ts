@@ -67,7 +67,7 @@ function selfProvedMethodWords(method: string | null): string {
     case "https-file":
       return "a file published on the domain";
     case "license-token":
-      return "your installation's licence";
+      return "your installation's license";
     case "legacy-configuration":
       return "your existing configuration";
     default:

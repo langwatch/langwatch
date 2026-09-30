@@ -109,9 +109,9 @@ export function domainNextStepFor({
   }
   return {
     kind: "get-record",
-    action: provesWithLicense ? "Prove with our licence" : "Prove this domain",
+    action: provesWithLicense ? "Prove with our license" : "Prove this domain",
     explanation: provesWithLicense
-      ? "This installation's enterprise licence is what proves the domain, so this finishes in one press and there is nothing to publish anywhere."
-      : "Next you prove the domain is yours. We give you a short value to publish in your domain's DNS — or as a file on your website — and then we look for it.",
+      ? "This installation's enterprise license is what proves the domain, so this finishes in one press and there is nothing to publish anywhere."
+      : "Next you prove the domain is yours. We give you a short value to publish in your domain's DNS, or as a file on your website, and then we look for it.",
   };
 }

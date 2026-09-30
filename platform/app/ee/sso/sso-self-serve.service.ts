@@ -1149,8 +1149,8 @@ export class SsoSelfServeService {
     }
     throw new SsoLicenseRequiredError(
       availability.refusal === "license_restart_required"
-        ? `organization ${organizationId}: a licence was activated after this process started`
-        : `organization ${organizationId}: the installation holds no genuine licence`,
+        ? `organization ${organizationId}: a license was activated after this process started`
+        : `organization ${organizationId}: the installation holds no genuine license`,
     );
   }
 

@@ -73,7 +73,7 @@ describe("domainNextStepFor", () => {
         recordIssued: true,
       });
       expect(next.kind).toBe("get-record");
-      expect(next.action).toBe("Prove with our licence");
+      expect(next.action).toBe("Prove with our license");
     });
   });
 

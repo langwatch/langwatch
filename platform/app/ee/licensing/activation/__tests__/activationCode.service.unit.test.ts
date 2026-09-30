@@ -12,7 +12,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import { ENTERPRISE_TEMPLATE } from "../../planTemplates";
 import { activationCodeHash, normaliseActivationCode } from "../activationCode";
 import {
   ActivationCodeService,
@@ -296,6 +296,70 @@ describe("given a code that was already redeemed", () => {
         ok: false,
         code: "activation_code_already_redeemed",
       });
+    });
+  });
+});
+
+function issueInput(overrides: { maxMembersLite?: number } = {}) {
+  return {
+    organizationId: "org-acme",
+    organizationName: "ACME",
+    email: "ops@acme.test",
+    planType: "ENTERPRISE",
+    maxMembers: 25,
+    licenseTermDays: 365,
+    services: ["instant_evals"],
+    expiresAt: new Date("2027-01-01T00:00:00.000Z"),
+    operatorId: "operator-1",
+    ...overrides,
+  };
+}
+
+describe("given an operator issuing an enterprise activation code with no lite seats given", () => {
+  describe("when an install redeems it", () => {
+    /** @scenario "A code issued with no lite seats mints the plan's lite seats" */
+    it("mints the enterprise plan's lite seats, as a license issued directly does", async () => {
+      const { service, licenses } = serviceOver({ rows: [] });
+
+      const { code, row } = await service.issue(issueInput());
+      expect(row.maxMembersLite).toBe(ENTERPRISE_TEMPLATE.maxMembersLite);
+
+      const result = await service.redeem({ code, instanceId: "instance-a" });
+
+      expect(result.ok).toBe(true);
+      expect(licenses.issue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite,
+        }),
+      );
+    });
+  });
+});
+
+describe("given an operator issuing an activation code with 3 lite seats", () => {
+  describe("when an install redeems it", () => {
+    /** @scenario "A code issued with lite seats mints exactly those" */
+    it("mints exactly those lite seats", async () => {
+      const { service, licenses } = serviceOver({ rows: [] });
+
+      const { code, row } = await service.issue(
+        issueInput({ maxMembersLite: 3 }),
+      );
+      expect(row.maxMembersLite).toBe(3);
+
+      await service.redeem({ code, instanceId: "instance-a" });
+
+      expect(licenses.issue).toHaveBeenCalledWith(
+        expect.objectContaining({ maxMembersLite: 3 }),
+      );
+    });
+
+    it("keeps an explicit 0 rather than reading it as unset", async () => {
+      const { service } = serviceOver({ rows: [] });
+
+      const { row } = await service.issue(issueInput({ maxMembersLite: 0 }));
+
+      expect(row.maxMembersLite).toBe(0);
     });
   });
 });
