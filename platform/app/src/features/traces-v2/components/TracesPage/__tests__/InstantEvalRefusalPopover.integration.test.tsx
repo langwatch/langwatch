@@ -109,7 +109,7 @@ describe("given Instant Evals are off for a self-serve organization", () => {
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model. Enable turns this on for every project in your organization.",
+          "Instant Evals send the text of your traces and your question to the model that judges them, under a data processing agreement. It is never used to train the model. Enable turns this on for every project in your organization.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
@@ -165,7 +165,7 @@ describe("given Instant Evals are off and the reader may not manage the organiza
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model. Ask an organization admin to turn it on for every project in your organization.",
+          "Instant Evals send the text of your traces and your question to the model that judges them, under a data processing agreement. It is never used to train the model. Ask an organization admin to turn it on for every project in your organization.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(

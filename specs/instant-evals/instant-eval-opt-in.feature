@@ -4,8 +4,8 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
   I want to switch Instant Evals on from the search bar, after being told where my trace text goes
   So that my organization agrees to that data flow itself, rather than having it turned on for it
 
-  A run sends the judged text to the judge's provider, TypeSafe, under LangWatch's data
-  processing agreement with them, and TypeSafe does not train on it. That is a flow an
+  A run sends the judged text to the judge's provider under a data processing agreement,
+  and the provider does not train on it. That is a flow an
   organization agrees to, so:
   - a self-serve organization is offered the switch in the popover, with the explanation and a
     link to the docs paragraph that says the same at length, to a member who may manage the

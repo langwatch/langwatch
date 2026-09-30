@@ -1,7 +1,7 @@
 ---
 title: Instant Evals limits, cost and billing
 sidebarTitle: Limits and cost
-keywords: langwatch, instant evals, pricing, cost per token, row cap, free budget, estimate, billing, spend, typesafe, jev, data processing, sub-processor
+keywords: langwatch, instant evals, pricing, cost per token, row cap, free budget, estimate, billing, spend, data processing, sub-processor
 description: How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, where the spend shows up, and where the judged text goes.
 ---
 
@@ -69,12 +69,10 @@ LangWatch stores the trace, the question and the answer for each verdict, and no
 
 ## Where the judged text goes
 
-The judge is Jev, a model built and run by [TypeSafe](https://typesafe.ai). When a run starts, LangWatch sends TypeSafe the text of each row it judges, the inputs, outputs and metadata of the traces in that row, together with your questions and the name of the model.
+When a run starts, LangWatch sends the judge the text of each row: the inputs, outputs and metadata of the traces in that row, your questions and the name of the model. LangWatch adds no account or organization identifier and none of your keys. Trace content can carry your project id and may contain personal data.
 
-LangWatch adds no account or organization identifier and none of your keys to that request. The trace content itself can carry your project id, and because it is the content of your traces, it may contain personal data.
-
-TypeSafe processes that text on LangWatch's instructions under a data processing agreement, answers the questions, and does not use it to train its models. TypeSafe is a LangWatch sub-processor; the [privacy policy](https://langwatch.ai/legal/privacy-policy) and the [trust center](https://langwatch.ai/trust-center) carry the current list.
+The judge is run by a third-party provider under a data processing agreement. It processes the text on LangWatch's instructions, answers the questions, keeps nothing, and does not use it to train its models. The provider is listed as a sub-processor in the [privacy policy](https://langwatch.ai/legal/privacy-policy) and the [trust center](https://langwatch.ai/trust-center).
 
 LangWatch sends judged text only after someone in your organization starts a run or a judged query. Judging is off for a self-serve organization until a member with organization management rights switches it on from the search bar; a member without those rights reads the same explanation there and is asked to turn to an organization admin. An enterprise organization is switched on by LangWatch once it asks.
 
-A self-hosted install with its own `JEV_API_KEY` sends the text to TypeSafe directly with that key, under its own agreement with them. A self-hosted install judging through [Connect](/self-hosting/connect) sends it to LangWatch, which passes it to TypeSafe as above.
+A self-hosted install with its own `JEV_API_KEY` sends the text to the provider directly, under its own agreement. Through [Connect](/self-hosting/connect) it goes to LangWatch, which passes it on as above.

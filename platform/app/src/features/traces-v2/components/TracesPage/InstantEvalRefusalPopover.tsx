@@ -104,7 +104,7 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
     };
   }
   const whereItGoes =
-    "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model.";
+    "Instant Evals send the text of your traces and your question to the model that judges them, under a data processing agreement. It is never used to train the model.";
   if (refusal.kind === "opt_in") {
     return {
       title: "Turn on Instant Evals for your organization",
