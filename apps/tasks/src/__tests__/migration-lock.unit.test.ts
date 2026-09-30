@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { holdMigrationLock, migrationLockKey } from "../migration-lock.ts";
 
+const logs = vi.hoisted(() => ({ info: vi.fn() }));
+
+vi.mock("@langwatch/observability", () => ({ createLogger: () => ({ info: logs.info }) }));
+
 const database = vi.hoisted(() => ({
   query: vi.fn<(sql: string, values: string[]) => Promise<{ rows: { locked: boolean }[] }>>(),
   release: vi.fn(),
@@ -14,6 +18,7 @@ const database = vi.hoisted(() => ({
 const pool = { connect: database.connect };
 
 beforeEach(() => {
+  logs.info.mockReset();
   database.query.mockReset().mockResolvedValue({ rows: [{ locked: true }] });
   database.release.mockReset();
   database.connect
@@ -26,6 +31,7 @@ describe("given the deployment migration lock", () => {
   describe("when another runner holds it", () => {
     /** @scenario "Two migration runs started together never overlap" */
     /** @scenario "The migration lock is released when the run ends" */
+    /** @scenario A second runner waits for the first rather than migrating alongside it */
     it("waits on the same session and unlocks after the sequence", async () => {
       database.query.mockResolvedValueOnce({ rows: [{ locked: false }] });
       const run = vi.fn(async () => {
@@ -44,8 +50,31 @@ describe("given the deployment migration lock", () => {
     });
   });
 
+  describe("when it is free", () => {
+    /** @scenario Waiting is announced once, and only when there was a wait */
+    it("says nothing about waiting", async () => {
+      await holdMigrationLock(pool, async () => {});
+
+      expect(logs.info).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when it has to be waited for", () => {
+    /** @scenario A runner that has to wait says so */
+    /** @scenario Waiting is announced once, and only when there was a wait */
+    it("says once that it is waiting for the migration lock", async () => {
+      database.query.mockResolvedValueOnce({ rows: [{ locked: false }] });
+
+      await holdMigrationLock(pool, async () => {});
+
+      expect(logs.info).toHaveBeenCalledTimes(1);
+      expect(logs.info).toHaveBeenCalledWith(expect.stringContaining("waiting for migration lock"));
+    });
+  });
+
   describe("when a task fails", () => {
     /** @scenario "A failed migration run releases the lock" */
+    /** @scenario The lock is released even when a task fails */
     it("unlocks and closes the session before propagating the failure", async () => {
       const failure = new Error("task failed");
       await expect(
