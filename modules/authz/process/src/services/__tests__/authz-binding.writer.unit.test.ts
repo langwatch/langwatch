@@ -1,4 +1,3 @@
-import { DuplicateBindingError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
@@ -190,8 +189,8 @@ describe("Authz binding management writes", () => {
   });
 
   /** @scenario "Every write goes through the group queue" */
-  /** @scenario "A duplicate binding is reported as already existing" */
-  it("emits one ledger attach and maps duplicate storage signals", async () => {
+  /** @scenario "An identical binding is written again" */
+  it("emits one ledger attach that writes an identical binding too", async () => {
     const { writes, writer } = setup();
 
     await expect(writer.create(createInput)).resolves.toEqual({ id: "binding-new" });
@@ -208,14 +207,7 @@ describe("Authz binding management writes", () => {
         },
       ],
       actor,
-      onDuplicate: "reject",
-    });
-
-    writes.attachBindings.mockRejectedValue(new DuplicateBindingError());
-    await expect(writer.create(createInput)).rejects.toMatchObject({
-      code: "role_binding_already_exists",
-      httpStatus: 409,
-      meta: { scopeType: "TEAM", scopeId: "team-1" },
+      onDuplicate: "attach",
     });
   });
 

@@ -1,6 +1,5 @@
-import { DuplicateBindingError, type AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
-  GroupBindingAlreadyExistsError,
   GroupBindingNotFoundError,
   ScimManagedGroupError,
   addOrganizationGroupBindingInputSchema,
@@ -232,25 +231,12 @@ export class OrganizationGroupService {
     await this.groups.get(parsed);
     await this.bindings.validateGroupBindings(parsed.organizationId, [parsed.binding]);
     const write = this.bindings.groupBindingWrite(parsed.groupId, parsed.binding);
-    try {
-      await this.grants.attachBindings({
-        organizationId: parsed.organizationId,
-        bindings: [write],
-        actor: parsed.actor,
-        onDuplicate: "reject",
-      });
-    } catch (error) {
-      if (error instanceof DuplicateBindingError) {
-        throw new GroupBindingAlreadyExistsError();
-      }
-      const code =
-        typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
-      if (code === "role_binding_already_exists") {
-        throw new GroupBindingAlreadyExistsError();
-      }
-
-      throw error;
-    }
+    await this.grants.attachBindings({
+      organizationId: parsed.organizationId,
+      bindings: [write],
+      actor: parsed.actor,
+      onDuplicate: "attach",
+    });
 
     return {
       id: write.bindingId,

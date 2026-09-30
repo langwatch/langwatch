@@ -155,7 +155,7 @@ export class RoleApp implements RoleApi {
       permissions: input.role.permissions,
       kind: ROLE_KIND.CUSTOM,
       actor: actorOf(by),
-      requireProjection: false,
+      requireProjection: true,
     });
 
     const now = toDate(nowInstant());

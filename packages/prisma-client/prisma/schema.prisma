@@ -4003,10 +4003,8 @@ model RoleBinding {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  // Uniqueness is enforced by six partial unique indexes defined in migrations:
-  //   • user + group (built-in and custom) - 20260410120000_fix_role_binding_unique_custom_role
-  //   • apiKey (built-in and custom) - 20260414222341_add_personal_access_tokens
-  // Prisma does not support partial indexes natively, so there is no @@unique here.
+  // No uniqueness: the same principal, role and scope may be bound twice
+  // (20260930120000_role_name_live_unique_bindings_not_unique).
   @@index([organizationId])
   @@index([userId])
   @@index([groupId])
@@ -4144,12 +4142,11 @@ model Role {
   occurredAt     DateTime
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
-  // A delete marks the row. The name stays taken: identity is the id, and
-  // reusing a deleted role's name would make two different roles read as one
-  // in every audit trail that recorded the name.
+  // A delete marks the row and frees the name. A name is unique among live
+  // roles only: a partial unique index WHERE "deletedAt" IS NULL, raw SQL in
+  // 20260930120000_role_name_live_unique_bindings_not_unique.
   deletedAt      DateTime?
 
-  @@unique([organizationId, name])
   @@index([organizationId])
 }
 

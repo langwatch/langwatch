@@ -203,7 +203,7 @@ describe("AuthzGrantsService compatibility operations", () => {
           },
         ],
         actor,
-        onDuplicate: "reject",
+        onDuplicate: "attach",
       }),
     ).toBe(false);
     expect(

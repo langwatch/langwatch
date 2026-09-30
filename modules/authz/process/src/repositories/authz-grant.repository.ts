@@ -51,16 +51,12 @@ export { BindingMissingError, DuplicateBindingError };
 export type { OffboardCounts };
 
 export abstract class AuthzGrantRepository extends ScopeLineageRepository {
-  /** @throws DuplicateBindingError on a unique-index collision. */
   abstract createBinding(args: {
     row: RoleBindingWrite;
     actor: LedgerActor;
     source?: GrantEventSource;
   }): Promise<void>;
-  /**
-   * @throws DuplicateBindingError on a unique-index collision.
-   * @throws BindingMissingError when the row is gone.
-   */
+  /** @throws BindingMissingError when the row is gone. */
   abstract updateBindingRole(args: {
     bindingId: string;
     organizationId: string;

@@ -1264,6 +1264,11 @@ facts, a projection over the same events on its own pipeline, and never reads `e
 governance's cost drift check compares `governance_cost_rollup_charges` with
 `governance_cost_rollup_1d` (Alex, 2026-09-30).
 
+**Uniqueness is the exception** (Alex, 2026-09-30): a custom role's name is unique among live roles
+only (a partial index, so a deleted role frees its name); a grant or role binding carries no
+uniqueness at all, so the same principal, role and scope may be bound twice within the limits, and a
+re-assertion that must stay idempotent asks the ledger to `skip` rather than being refused.
+
 ---
 
 ## 8. Transports (REST + tRPC)

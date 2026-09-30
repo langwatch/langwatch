@@ -4,7 +4,6 @@
  * else refuses by name, so unexpected authorization access fails loudly here.
  */
 import {
-  DuplicateBindingError,
   type AuthzAccessBinding,
   type AuthzApi,
   type AuthzAttachBindingsInput,
@@ -125,8 +124,7 @@ export class TestAuthzApi implements AuthzApi {
           row.customRoleId === binding.customRoleId,
       );
 
-      if (existing) {
-        if (args.onDuplicate === "reject") throw new DuplicateBindingError();
+      if (existing && args.onDuplicate === "skip") {
         duplicates.push(binding.bindingId);
         continue;
       }

@@ -165,12 +165,7 @@ class MemberAccessStore {
             scopeId: binding.scopeId,
           };
           const identity = identityOf(candidate);
-          if (this.rows.some((row) => identityOf(row) === identity)) {
-            if (onDuplicate === "reject") {
-              throw Object.assign(new Error("duplicate"), {
-                code: "role_binding_already_exists",
-              });
-            }
+          if (onDuplicate === "skip" && this.rows.some((row) => identityOf(row) === identity)) {
             duplicates.push(binding.bindingId);
             continue;
           }

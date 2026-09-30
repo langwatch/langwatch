@@ -5,7 +5,6 @@ import {
   bindingScopeCanGrantPermission,
   CustomRoleIdRequiredError,
   CustomRoleNotAssignableError,
-  DuplicateGrantError,
   GroupNotInOrganizationError,
   OrgExclusivePermissionScopeError,
   RoleBindingNotFoundError,
@@ -108,29 +107,22 @@ export class AuthzBindingWriterService {
     });
 
     const bindingId = this.options.newBindingId();
-    try {
-      await this.options.ledger.attachBindings({
-        organizationId: input.organizationId,
-        bindings: [
-          {
-            bindingId,
-            principal,
-            role: input.role,
-            customRoleId: input.role === "CUSTOM" ? (input.customRoleId ?? null) : null,
-            scopeType: input.scopeType,
-            scopeId: input.scopeId,
-            ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
-          },
-        ],
-        actor: input.actor,
-        onDuplicate: "reject",
-      });
-    } catch (error) {
-      this.rethrowDuplicate(error, {
-        scopeType: input.scopeType,
-        scopeId: input.scopeId,
-      });
-    }
+    await this.options.ledger.attachBindings({
+      organizationId: input.organizationId,
+      bindings: [
+        {
+          bindingId,
+          principal,
+          role: input.role,
+          customRoleId: input.role === "CUSTOM" ? (input.customRoleId ?? null) : null,
+          scopeType: input.scopeType,
+          scopeId: input.scopeId,
+          ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
+        },
+      ],
+      actor: input.actor,
+      onDuplicate: "attach",
+    });
 
     return { id: bindingId };
   }
@@ -172,20 +164,13 @@ export class AuthzBindingWriterService {
       }
     }
 
-    try {
-      await this.options.ledger.changeBindingRole({
-        organizationId: input.organizationId,
-        bindingId: input.bindingId,
-        role: input.role,
-        customRoleId: input.role === "CUSTOM" ? (input.customRoleId ?? null) : null,
-        actor: input.actor,
-      });
-    } catch (error) {
-      this.rethrowDuplicate(error, {
-        scopeType: binding.scopeType,
-        scopeId: binding.scopeId,
-      });
-    }
+    await this.options.ledger.changeBindingRole({
+      organizationId: input.organizationId,
+      bindingId: input.bindingId,
+      role: input.role,
+      customRoleId: input.role === "CUSTOM" ? (input.customRoleId ?? null) : null,
+      actor: input.actor,
+    });
 
     return { id: input.bindingId };
   }
@@ -432,18 +417,5 @@ export class AuthzBindingWriterService {
     const scopeName = scopeRows.find((row) => row.id === offending.scopeId)?.name;
 
     throw new AuthzLiteMemberViewerOnlyError(scopeName ?? null);
-  }
-
-  private rethrowDuplicate(error: unknown, meta: Record<string, unknown>): never {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "role_binding_already_exists"
-    ) {
-      throw new DuplicateGrantError(meta);
-    }
-
-    throw error;
   }
 }
