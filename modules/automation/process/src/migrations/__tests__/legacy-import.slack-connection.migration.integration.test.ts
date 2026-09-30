@@ -1,13 +1,18 @@
 /** One organization's Slack connection pass. @see specs/automations/slack-connections.feature */
+import { SystemMigrationRunnerService, type TenantSource } from "@langwatch/system-migrations";
 import { describe, expect, it } from "vitest";
 
 import {
   BOT_TOKEN,
   fixtureCrypto,
+  MemoryMigrationState,
   ORGANIZATION_ID,
   OTHER_PROJECT_ID,
   PROJECT_ID,
+  SECOND_ORGANIZATION_ID,
+  SECOND_PROJECT_ID,
   slackMigrationWorld,
+  soleProcessLease,
   WEBHOOK_URL,
 } from "./legacy-import.slack-connection.migration.fixture.ts";
 
@@ -355,6 +360,62 @@ describe("SlackConnectionMigration", () => {
       expect(outcome).toMatchObject({
         report: { linked: 0, skippedReasons: { "changed during migration": 1 } },
       });
+    });
+  });
+
+  describe("given two organizations and one whose connection store fails partway", () => {
+    /** @scenario "One organization's failure does not stop the others" */
+    it("parks that organization, migrates the other, and a retry reuses what was stored", async () => {
+      const world = slackMigrationWorld();
+      await world.addAutomation({ id: "first-a", actionParams: { slackWebhook: WEBHOOK_URL } });
+      await world.addAutomation({
+        id: "first-b",
+        actionParams: { slackWebhook: `${WEBHOOK_URL}-b` },
+      });
+      await world.addAutomation({
+        id: "second",
+        projectId: SECOND_PROJECT_ID,
+        actionParams: { slackWebhook: `${WEBHOOK_URL}-second` },
+      });
+      world.slack.failStore = { organizationId: ORGANIZATION_ID, afterStored: 1 };
+      const organizations = [ORGANIZATION_ID, SECOND_ORGANIZATION_ID];
+      const tenants: TenantSource = {
+        findTenantIdsAfter: async ({ cursor }) => (cursor === null ? organizations : []),
+      };
+      const state = new MemoryMigrationState();
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: soleProcessLease,
+        tenants,
+        cohort: () => true,
+        migrations: [world.migration],
+      });
+      const statusOf = async (tenantId: string) =>
+        (await state.getRecord({ migrationName: world.migration.name, tenantId })).status;
+      const secretsStored = () => world.slack.connections.map(({ secret }) => secret).toSorted();
+
+      await runner.runPass();
+
+      expect(await statusOf(ORGANIZATION_ID)).toBe("parked");
+      expect(await statusOf(SECOND_ORGANIZATION_ID)).toBe("migrated");
+      const storedBeforeRetry = world.slack.connections.map(({ id }) => id);
+      expect(storedBeforeRetry).toHaveLength(2);
+
+      await runner.runPass();
+      await runner.runPass();
+
+      expect(await statusOf(ORGANIZATION_ID)).toBe("finalized");
+      expect(await statusOf(SECOND_ORGANIZATION_ID)).toBe("finalized");
+      expect(secretsStored()).toEqual(
+        [WEBHOOK_URL, `${WEBHOOK_URL}-b`, `${WEBHOOK_URL}-second`].toSorted(),
+      );
+      expect(world.slack.connections.map(({ id }) => id)).toEqual(
+        expect.arrayContaining(storedBeforeRetry),
+      );
+      for (const triggerId of ["first-a", "first-b"]) {
+        const row = await world.triggers.findByIdOrThrow({ triggerId, projectId: PROJECT_ID });
+        expect(row.actionParams).toEqual({ slackIntegrationId: expect.any(String) });
+      }
     });
   });
 });

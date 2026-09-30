@@ -7,9 +7,10 @@ Feature: The background worker owns automation settlement
   one method and four methods. Those are three narrow ports now, so the worker
   composes them over its own Postgres client and its own ClickHouse.
 
-  What the worker still cannot do about a settled match it says by name, once,
-  at composition — because a settlement half that quietly did four fifths of the
-  job would look identical from outside to one that did all of it.
+  Every peer settlement delivers or writes through is a declared dependency, so
+  a worker missing one is refused at boot by name, because a settlement half
+  that quietly did four fifths of the job would look identical from outside to
+  one that did all of it.
 
   Background:
     Given a background worker composed from its own database, ClickHouse and mail
@@ -55,11 +56,12 @@ Feature: The background worker owns automation settlement
     Then the row names when it happened and shows the input as its preview
 
   @unit
-  Scenario: A settlement half that cannot deliver says so
-    Given a deployment that named no host for its links
-    When the composition root builds the automations pipeline
-    Then it reports that it composed no outbound delivery
-    And it reports every other capability it does not have, by name
+  Scenario: A settlement half that cannot deliver never boots
+    Given a worker process that supplies every automation peer except mail
+    When the process boots
+    Then the boot is refused, naming the automation module and its mail
+      dependency
+    And no settlement runs that could drop a digest in silence
 
   @unit
   Scenario: A trace whose full record this process cannot read still notifies
@@ -135,13 +137,12 @@ Feature: The background worker owns automation settlement
     And nothing is queued and the automation is not stamped as having run
 
   @unit
-  Scenario: An annotation-queue automation without a database client is refused
-    Given an active automation that queues matched traces for annotation
-    And a process that opened no database client
-    When a confirmed match is persisted through the pipeline's own intent handler
-    Then the match is refused by name, naming the client the write is composed
-      over
-    And nothing is appended and the automation is not stamped as having run
+  Scenario: An annotation-queue automation cannot run on a worker without the annotation peer
+    Given a worker process that supplies every automation peer except annotation
+    When the process boots
+    Then the boot is refused, naming the automation module and its annotation
+      dependency
+    And so no confirmed match is ever half-persisted or stamped as having run
 
   @unit
   Scenario: A settled match is re-checked against an automation's legacy filters
@@ -166,12 +167,13 @@ Feature: The background worker owns automation settlement
     Then no digest is sent, because an errored evaluation carries no verdict
 
   @unit
-  Scenario: A breached ceiling is contained from this process
-    Given a background worker that composed outbound mail and its tenancy
-      directories
-    When the composition root builds the automations pipeline
-    Then runaway containment is not reported as absent
-    And a worker without those directories still reports it
+  Scenario: A breached ceiling is contained from every worker that boots
+    Given a worker process that supplies every automation peer except the
+      authorization directory containment reads administrators from
+    When the process boots
+    Then the boot is refused, naming the automation module and its
+      authorization dependency
+    And so every worker that does boot composes runaway containment
 
   @unit
   Scenario: A misconfigured automation is paused and its administrators are told

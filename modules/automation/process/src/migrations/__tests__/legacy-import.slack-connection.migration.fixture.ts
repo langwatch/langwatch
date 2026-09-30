@@ -1,4 +1,10 @@
 import type { SlackConnectionKind, SlackConnectionList } from "@langwatch/slack-contract";
+import {
+  SystemMigrationRecordNotFoundError,
+  type MigrationLeaseRepository,
+  type SystemMigrationStateRepository,
+  type TenantMigrationRecord,
+} from "@langwatch/system-migrations";
 
 import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
 import { MemoryTriggerRepository } from "../../repositories/memory/memory.trigger.repository.ts";
@@ -9,6 +15,13 @@ import { SlackConnectionMigration } from "../legacy-import.slack-connection.migr
 export const ORGANIZATION_ID = "org-slack";
 export const PROJECT_ID = "project-slack";
 export const OTHER_PROJECT_ID = "project-other";
+export const SECOND_ORGANIZATION_ID = "org-second";
+export const SECOND_PROJECT_ID = "project-second";
+
+const PROJECTS_BY_ORGANIZATION: Record<string, string[]> = {
+  [ORGANIZATION_ID]: [PROJECT_ID, OTHER_PROJECT_ID],
+  [SECOND_ORGANIZATION_ID]: [SECOND_PROJECT_ID],
+};
 
 // Built at runtime so no fixture reads as a real credential.
 export const WEBHOOK_URL = ["https://hooks.slack.com", "services", "T0", "B0", "hook"].join("/");
@@ -40,6 +53,9 @@ export class SlackTwin {
   readonly actors: string[] = [];
   /** Runs once, after the pass planned and before it stores anything: another writer's moment. */
   beforeStore: (() => Promise<void>) | undefined;
+  /** Refuses one store: the organization's `afterStored + 1`th, once. */
+  failStore: { organizationId: string; afterStored: number } | undefined;
+  readonly #stored = new Map<string, number>();
 
   addConnection(connection: StoredConnection): void {
     this.connections.push(connection);
@@ -81,6 +97,14 @@ export class SlackTwin {
     const rival = this.beforeStore;
     this.beforeStore = undefined;
     await rival?.();
+    const stored = this.#stored.get(input.organizationId) ?? 0;
+    if (this.failStore?.organizationId === input.organizationId) {
+      if (this.failStore.afterStored === stored) {
+        this.failStore = undefined;
+        throw new Error("slack connection store unavailable");
+      }
+    }
+    this.#stored.set(input.organizationId, stored + 1);
     const [held] = this.connections.filter(
       (connection) =>
         connection.secret === input.secret &&
@@ -133,7 +157,7 @@ export function slackMigrationWorld({
   const slack = new SlackTwin();
   const projects = {
     listByOrganization: async ({ organizationId }: { organizationId: string }) => {
-      const data = organizationId === ORGANIZATION_ID ? [PROJECT_ID, OTHER_PROJECT_ID] : [];
+      const data = PROJECTS_BY_ORGANIZATION[organizationId] ?? [];
       return {
         data: data.map((id) => ({
           id,
@@ -145,7 +169,10 @@ export function slackMigrationWorld({
   };
   const slackConnections = AutomationSlackConnectionService.create({
     slack,
-    projects: { getOrganizationId: async () => ORGANIZATION_ID },
+    projects: {
+      getOrganizationId: async (projectId: string) =>
+        projectId === SECOND_PROJECT_ID ? SECOND_ORGANIZATION_ID : ORGANIZATION_ID,
+    },
     crypto: fixtureCrypto,
   });
   const migration = SlackConnectionMigration.create({
@@ -181,3 +208,36 @@ export function slackMigrationWorld({
 
   return { triggers, slack, migration, addAutomation };
 }
+
+/** The runner's per-tenant records, in memory. */
+export class MemoryMigrationState implements SystemMigrationStateRepository {
+  readonly records = new Map<string, TenantMigrationRecord>();
+
+  async getRecord(args: { migrationName: string; tenantId: string }) {
+    const record = this.records.get(`${args.migrationName}::${args.tenantId}`);
+    if (!record) throw new SystemMigrationRecordNotFoundError(args);
+    return record;
+  }
+
+  async upsertRecord(record: TenantMigrationRecord): Promise<void> {
+    this.records.set(`${record.migrationName}::${record.tenantId}`, record);
+  }
+
+  async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
+    await this.upsertRecord(record);
+    return true;
+  }
+
+  async hasFinalizedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
+    return [...this.records.values()].some(
+      (record) => record.migrationName === migrationName && record.status === "finalized",
+    );
+  }
+}
+
+/** One process's claims: every claim is granted, as when no other process runs. */
+export const soleProcessLease: MigrationLeaseRepository = {
+  acquire: async () => true,
+  renew: async () => true,
+  release: async () => undefined,
+};

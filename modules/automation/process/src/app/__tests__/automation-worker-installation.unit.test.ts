@@ -78,7 +78,7 @@ type Installed = Readonly<{
   logger?: ReturnType<typeof createTestLogger>["logger"];
 }>;
 
-function process(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
+function composed(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { NEXTAUTH_SECRET: "session-secret" } }).withEnv(),
   );
@@ -95,22 +95,40 @@ function process(role: "api" | "worker", eventing: EventSourcing, installed: Ins
     })
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("isSaas", false)
-    .withMember("logging", installed.logger ?? createTestLogger().logger)
-    .provide({
-      analytics: createApiFixture<AnalyticsApi>(),
-      monitor: createApiFixture<MonitorApi>(),
-      evaluator: createApiFixture<EvaluatorApi>(),
-      entitlement: installed.entitlement ?? createApiFixture<EntitlementApi>(),
-      project: installed.project ?? createApiFixture<ProjectApi>(),
-      "audit-log": createApiFixture<AuditLogApi>(),
-      trace: installed.trace ?? createApiFixture<TraceApi>(),
-      evaluation: createApiFixture<EvaluationApi>(),
-      dataset: installed.dataset ?? createApiFixture<DatasetApi>(),
-      annotation: installed.annotation ?? createApiFixture<AnnotationApi>(),
-      authz: installed.authz ?? createApiFixture<AuthzApi>(),
-      notification: installed.notification ?? createApiFixture<NotificationService>(),
-      slack: createApiFixture<SlackApi>(),
-    });
+    .withMember("logging", installed.logger ?? createTestLogger().logger);
+}
+
+function peers(installed: Installed = {}) {
+  return {
+    analytics: createApiFixture<AnalyticsApi>(),
+    monitor: createApiFixture<MonitorApi>(),
+    evaluator: createApiFixture<EvaluatorApi>(),
+    entitlement: installed.entitlement ?? createApiFixture<EntitlementApi>(),
+    project: installed.project ?? createApiFixture<ProjectApi>(),
+    "audit-log": createApiFixture<AuditLogApi>(),
+    trace: installed.trace ?? createApiFixture<TraceApi>(),
+    evaluation: createApiFixture<EvaluationApi>(),
+    dataset: installed.dataset ?? createApiFixture<DatasetApi>(),
+    annotation: installed.annotation ?? createApiFixture<AnnotationApi>(),
+    authz: installed.authz ?? createApiFixture<AuthzApi>(),
+    notification: installed.notification ?? createApiFixture<NotificationService>(),
+    slack: createApiFixture<SlackApi>(),
+  };
+}
+
+function process(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
+  return composed(role, eventing, installed).provide(peers(installed));
+}
+
+/** A worker whose process supplies every peer but `absent`. */
+function bootWithout(absent: keyof ReturnType<typeof peers>) {
+  const supplied = Object.fromEntries(
+    Object.entries(peers()).filter(([module]) => module !== absent),
+  );
+  return Promise.resolve().then(() =>
+    // @ts-expect-error MissingSupply: the compiler refuses a worker missing a peer it names
+    composed("worker", eventingFor("worker")).provide(supplied).boot(),
+  );
 }
 
 async function installedOn(role: "api" | "worker") {
@@ -158,6 +176,35 @@ describe("given the automation module installed on the api role", () => {
     const { unrun } = await installedOn("api");
 
     expect(unrun).toContain("reportSchedule");
+  });
+});
+
+describe("given a worker process missing a peer settlement delivers through", () => {
+  /** @scenario "A settlement half that cannot deliver never boots" */
+  it("refuses the boot naming the mail dependency", async () => {
+    await expect(bootWithout("notification")).rejects.toMatchObject({
+      name: "MissingProviderError",
+      feature: "automation",
+      dependencyKey: "notifications",
+    });
+  });
+
+  /** @scenario "An annotation-queue automation cannot run on a worker without the annotation peer" */
+  it("refuses the boot naming the annotation dependency", async () => {
+    await expect(bootWithout("annotation")).rejects.toMatchObject({
+      name: "MissingProviderError",
+      feature: "automation",
+      dependencyKey: "annotations",
+    });
+  });
+
+  /** @scenario "A breached ceiling is contained from every worker that boots" */
+  it("refuses the boot naming the directory containment reads administrators from", async () => {
+    await expect(bootWithout("authz")).rejects.toMatchObject({
+      name: "MissingProviderError",
+      feature: "automation",
+      dependencyKey: "authorization",
+    });
   });
 });
 

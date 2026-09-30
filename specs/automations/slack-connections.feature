@@ -377,11 +377,11 @@ Feature: Slack connections
     @integration
     Scenario: One organization's failure does not stop the others
       Given two organizations with Slack automations to migrate
-      And writing the first organization's connections fails partway
-      When the Slack connection migration runs for the organization
-      Then the first organization keeps no connection and no link
-      And the second organization is migrated
-      And the first organization's pass fails by its error code, never its message, and is retried on a later pass
+      And storing the first organization's connections fails partway
+      When the system migrations runner makes a pass
+      Then the first organization is parked and the second is migrated
+      And a later pass retries the parked organization until it finishes
+      And the retry reuses every connection the failed pass stored, creating no second
 
     @unit
     Scenario: A pass aborted at shutdown writes nothing

@@ -4,6 +4,7 @@
  * counting on core-tier deployments that cannot compose Enterprise features.
  */
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import { applyPlanTypeEntitlements } from "@langwatch/enterprise-licensing-contract";
 import {
   type BaselinePlanSource,
   type Plan,
@@ -240,6 +241,8 @@ export function buildEntitlementInfrastructure(input: {
     baseline: subscription ?? coreBaseline(input.isSaas),
     license: input.license,
     subscription: subscription ? BillingSubscriptionGrants.create(subscription) : undefined,
+    // Main's PlanProviderService: every leg's plan gets the entitlements its tier grants.
+    enrichers: [{ enrich: applyPlanTypeEntitlements }],
   };
 
   const plans = EntitlementService.create(sources);
