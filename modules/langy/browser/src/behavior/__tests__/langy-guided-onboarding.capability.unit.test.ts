@@ -30,6 +30,8 @@ describe("given a guided onboarding handing over to Langy", () => {
   });
 
   describe("when it queues a kickoff for a conversation it already attached", () => {
+    /** @scenario "Queuing the kickoff opens the panel on the path's conversation" */
+    /** @scenario "A queued kickoff for an attached conversation continues that conversation" */
     it("opens the panel on that conversation with the brief waiting", () => {
       langyGuidedOnboarding.queueKickoff({ brief: "set up tracing", conversationId: "conv_1" });
 
@@ -42,6 +44,7 @@ describe("given a guided onboarding handing over to Langy", () => {
   });
 
   describe("when it queues a kickoff with no conversation", () => {
+    /** @scenario "A queued kickoff with no attached conversation starts a fresh one" */
     it("starts fresh, so the transport's new conversation takes it", () => {
       langyGuidedOnboarding.queueKickoff({ brief: "set up tracing" });
 
