@@ -1,0 +1,31 @@
+[
+  {
+    "name": "not_similar_default",
+    "entry": {
+      "output": "I love this"
+    },
+    "settings": {}
+  },
+  {
+    "name": "similar_to_on_input",
+    "entry": {
+      "input": "Tell me about refunds"
+    },
+    "settings": {
+      "field": "input",
+      "rule": "is_similar_to",
+      "value": "refund policy",
+      "threshold": 0.1
+    }
+  },
+  {
+    "name": "other_embeddings_model",
+    "entry": {
+      "output": "The weather is nice"
+    },
+    "settings": {
+      "embeddings_model": "openai/text-embedding-3-large",
+      "value": "weather"
+    }
+  }
+]

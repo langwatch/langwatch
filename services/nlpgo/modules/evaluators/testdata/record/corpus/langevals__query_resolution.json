@@ -1,0 +1,46 @@
+[
+  {
+    "name": "resolved",
+    "entry": {
+      "conversation": [
+        {
+          "input": "How do I reset my password?",
+          "output": "Click 'Forgot password' on the login page."
+        }
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "queries_total": 1,
+        "queries_answered": 1
+      }
+    }
+  },
+  {
+    "name": "unresolved",
+    "entry": {
+      "conversation": [
+        {
+          "input": "How do I reset my password?",
+          "output": "Click 'Forgot password' on the login page."
+        },
+        {
+          "input": "And how do I delete my account?",
+          "output": "I am not sure."
+        }
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "queries_total": 2,
+        "queries_answered": 1
+      }
+    }
+  }
+]
