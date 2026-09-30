@@ -5,10 +5,12 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
+  assertEvaluatorRuntimeConfig,
   deriveEvaluatorId,
   EvaluationApi,
   evaluationBrowserConfig,
   evaluationConfig,
+  evaluationSecrets,
   isAzureEvaluatorType,
   type CustomEvaluator,
   type EvaluationServerConfig,
@@ -274,6 +276,7 @@ export class EvaluationModule implements EvaluationApiContract {
   static readonly secrets = {
     openAi: openAiApiKey,
     azureContentSafety: Secret.load("AZURE_CONTENT_SAFETY_KEY", { optional: true }),
+    nlpgoInternal: evaluationSecrets.nlpgoInternal,
   } as const;
 
   readonly #service: EvaluationService;
@@ -380,13 +383,21 @@ export class EvaluationModule implements EvaluationApiContract {
       ),
     );
 
-    return EvaluationModule.withEnvironment(setup, environment);
+    return secrets.into(EvaluationModule.secrets.nlpgoInternal, (internalSecret) => {
+      assertEvaluatorRuntimeConfig({ config: setup.config, internalSecret });
+      return EvaluationModule.withEnvironment({ setup, environment, internalSecret });
+    });
   }
 
-  private static withEnvironment(
-    { dependencies, repositories, config, channels }: EvaluationSetup,
-    environment: EvaluatorEnvironmentService,
-  ): EvaluationModule {
+  private static withEnvironment({
+    setup: { dependencies, repositories, config, channels },
+    environment,
+    internalSecret,
+  }: {
+    setup: EvaluationSetup;
+    environment: EvaluatorEnvironmentService;
+    internalSecret: string | undefined;
+  }): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
     const lifecycle = EvaluationLifecycleService.create({
       retention: {
@@ -428,6 +439,7 @@ export class EvaluationModule implements EvaluationApiContract {
           endpoint: config.langevalsEndpoint,
           maxRetries: LANGEVALS_MAX_RETRIES,
           timeoutMs: LANGEVALS_TIMEOUT_MS,
+          evaluatorRuntime: { ...config.evaluatorRuntime, internalSecret },
         },
         telemetry,
       }),

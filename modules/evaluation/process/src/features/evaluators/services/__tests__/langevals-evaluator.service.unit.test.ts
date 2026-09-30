@@ -14,6 +14,7 @@ import type { LangevalsEvaluateParams } from "../langevals-evaluator.service.ts"
 const ENDPOINT = "http://langevals.internal.langwatch.svc.cluster.local:5562";
 
 const params: LangevalsEvaluateParams = {
+  projectId: "project_1",
   evaluatorType: "langevals/llm_boolean",
   data: { input: "hi", output: "there" },
   settings: {},
