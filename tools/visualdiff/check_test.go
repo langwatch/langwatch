@@ -190,3 +190,23 @@ func TestARunnerThatDroveNoCandidatePageIsOneRunnerFailure(t *testing.T) {
 		t.Fatalf("a runner that drove pages is not a runner failure: %s", got)
 	}
 }
+
+func TestARecordedSeedStandsUntilTheStackRefusesItsIsolatedKey(t *testing.T) {
+	refused := false
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if refused && request.Header.Get("X-Auth-Token") == "sk-iso" {
+			writer.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = writer.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+	fixtures := map[string]string{FixtureIsolatedKey: "sk-iso"}
+	if !seedStands(context.Background(), server.URL, fixtures) {
+		t.Fatal("a stack that answers every probe lost its seed")
+	}
+	refused = true
+	if seedStands(context.Background(), server.URL, fixtures) {
+		t.Fatal("a stack that refuses the isolated key still stands")
+	}
+}
