@@ -87,7 +87,7 @@ type HeaderButtonProps = ChakraButtonProps;
 
 function HeaderButton({ children, ...props }: PropsWithChildren<HeaderButtonProps>) {
   return (
-    <Button variant="outline" size="sm" {...props}>
+    <Button variant="outline" colorPalette="orange" size="sm" {...props}>
       {children}
     </Button>
   );

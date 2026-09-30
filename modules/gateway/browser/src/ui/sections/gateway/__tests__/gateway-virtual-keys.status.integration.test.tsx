@@ -142,9 +142,9 @@ describe("virtual keys status column", () => {
     /** @scenario "A key past its expiration date is badged Expired" */
     it("badges it expired, and leaves a key with time left active", () => {
       renderPage();
-      expect(screen.getByTestId("vk-status-vk-expired")).toHaveTextContent("expired");
-      expect(screen.getByTestId("vk-status-vk-future")).toHaveTextContent("active");
-      expect(screen.getByTestId("vk-status-vk-live")).toHaveTextContent("active");
+      expect(screen.getByTestId("vk-status-vk-expired")).toHaveTextContent("Expired");
+      expect(screen.getByTestId("vk-status-vk-future")).toHaveTextContent("Active");
+      expect(screen.getByTestId("vk-status-vk-live")).toHaveTextContent("Active");
     });
 
     /** @scenario "A key past its expiration date is badged Expired" */
@@ -159,9 +159,9 @@ describe("virtual keys status column", () => {
       await userEvent.click(screen.getByRole("tab", { name: /Revoked/ }));
 
       await waitFor(() =>
-        expect(screen.getByTestId("vk-status-vk-gone")).toHaveTextContent("revoked"),
+        expect(screen.getByTestId("vk-status-vk-gone")).toHaveTextContent("Revoked"),
       );
-      expect(screen.getByTestId("vk-status-vk-gone")).not.toHaveTextContent("expired");
+      expect(screen.getByTestId("vk-status-vk-gone")).not.toHaveTextContent("Expired");
     });
   });
 
@@ -169,7 +169,7 @@ describe("virtual keys status column", () => {
     /** @scenario "A disabled key is listed with the active keys and keeps its actions" */
     it("lists it with the live keys, badged disabled", () => {
       renderPage();
-      expect(screen.getByTestId("vk-status-vk-paused")).toHaveTextContent("disabled");
+      expect(screen.getByTestId("vk-status-vk-paused")).toHaveTextContent("Disabled");
       // Four live keys, one revoked: the counts are what the tabs claim.
       expect(screen.getByRole("tab", { name: /Active/ })).toHaveTextContent("4");
       expect(screen.getByRole("tab", { name: /Revoked/ })).toHaveTextContent("1");
@@ -183,7 +183,9 @@ describe("virtual keys status column", () => {
 
       const row = screen.getByTestId("vk-status-vk-paused").closest("tr");
       expect(row).not.toBeNull();
-      await userEvent.click(within(row as HTMLElement).getByRole("button", { name: /^Actions for / }));
+      await userEvent.click(
+        within(row as HTMLElement).getByRole("button", { name: /^Actions for / }),
+      );
 
       await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
       expect(screen.getByText("View traces")).toBeInTheDocument();
