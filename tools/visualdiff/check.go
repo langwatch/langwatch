@@ -2,6 +2,7 @@ package visualdiff
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -25,7 +26,7 @@ const DefaultCheckPages = 16
 // checkFlags is one parsed `visualdiff check` command line.
 type checkFlags struct {
 	root, url, only, skip string
-	pages                 int
+	pages, maxErrors      int
 	all, mark, down       bool
 	devUI, shared         bool
 }
@@ -53,13 +54,13 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 		return ExitOperational
 	}
 	if err := RunnerPreflight(ctx, parsed.root); err != nil {
-		fmt.Fprintln(streams.Err, "visualdiff check:", err)
+		fmt.Fprintln(streams.Err, "visualdiff:", diffkit.SetupFailed(err))
 		return ExitOperational
 	}
 	times := checkTimes{}
 	side, err := checkSide(ctx, parsed, &times, streams.Err)
 	if err != nil {
-		fmt.Fprintln(streams.Err, "visualdiff check:", err)
+		fmt.Fprintln(streams.Err, "visualdiff:", diffkit.SetupFailed(err))
 		return ExitOperational
 	}
 	setupStarted := time.Now()
@@ -80,14 +81,14 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 	results := newFlowResults()
 	started := time.Now()
 	progress := &checkProgress{results: results, total: len(plan.Flows), started: started, out: streams.Err}
-	stream, runErr := RunRunner(ctx, plan, CaptureOptions{Root: parsed.root, Stderr: streams.Err, OnCapture: func(capture Capture) {
+	stream, runErr := RunRunner(ctx, plan, CaptureOptions{Root: parsed.root, Stderr: streams.Err, MaxConsecutiveErrors: parsed.maxErrors, OnCapture: func(capture Capture) {
 		if line := results.add(capture); line != "" {
 			fmt.Fprintln(streams.Err, line)
 		}
 	}, OnPhase: progress.phase})
 	fmt.Fprintf(streams.Err, "check: phase flows %s, compare and close %s\n", progress.flowsTook().Round(time.Second), progress.windDown().Round(time.Second))
 	if failure := runnerFailure(stream, runErr); failure != "" {
-		fmt.Fprintln(streams.Err, "visualdiff check:", failure)
+		fmt.Fprintln(streams.Err, "visualdiff:", diffkit.SetupFailed(errors.New(failure)))
 		_ = os.WriteFile(filepath.Join(plan.OutDir, "check-report.md"), []byte("# visualdiff check\n\nRUNNER FAILED: "+failure+"\n"), 0o600)
 		return ExitOperational
 	}
@@ -99,6 +100,11 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 	}
 	if parsed.mark {
 		markPassed(parsed.root, outcome.passed, BuildRows(stream.Captures, stream.Diffs), streams.Out)
+	}
+	var stopped *diffkit.Stopped
+	if errors.As(runErr, &stopped) {
+		fmt.Fprintln(streams.Err, "visualdiff:", stopped)
+		return diffkit.ExitStopped
 	}
 	if runErr != nil {
 		fmt.Fprintln(streams.Err, "visualdiff check:", runErr)
@@ -133,6 +139,7 @@ func parseCheckFlags(args []string, stderr io.Writer) (checkFlags, error) {
 	flags.StringVar(&parsed.only, "only", "", "comma-separated flow ids to run (default: all not done)")
 	flags.StringVar(&parsed.skip, "skip", "", "comma-separated flow ids to leave out")
 	flags.IntVar(&parsed.pages, "pages", DefaultCheckPages, "flows run at once")
+	flags.IntVar(&parsed.maxErrors, "max-consecutive-errors", DefaultMaxConsecutiveErrors, "stop after this many captures in a row that are harness or stack errors (0 never stops)")
 	flags.BoolVar(&parsed.all, "all", false, "run the flows the done ledger holds too (the final pass)")
 	flags.BoolVar(&parsed.mark, "mark", false, "mark every flow that passes as done, so later checks skip it")
 	flags.BoolVar(&parsed.down, "down", false, "destroy check's own stack and forget its seed")

@@ -363,3 +363,41 @@ func (runner *scenarioRunner) mintRestricted(side *scenarioSide, shard *shardCon
 	}
 	shard.restricted = token
 }
+
+// setupFailure names why a stack has nothing to run the scenarios with, or
+// "": the shared or run organization could not be made, or every isolated
+// project, organization and sign-in the scenarios asked for failed.
+func (runner *scenarioRunner) setupFailure(needs scenarioNeeds) string {
+	for _, side := range runner.sides {
+		if cause := side.setupFailure(needs); cause != "" {
+			return side.name + ": " + cause
+		}
+	}
+	return ""
+}
+
+func (side *scenarioSide) setupFailure(needs scenarioNeeds) string {
+	for _, home := range []*shardContext{side.shared, side.runOrg} {
+		if home != nil && home.err != "" {
+			return home.err
+		}
+	}
+	var asked []string // one cause per thing the scenarios asked for; "" when it worked
+	for _, shard := range append(append([]*shardContext{}, side.projects...), side.orgs...) {
+		asked = append(asked, shard.err)
+	}
+	if needs.sessionLogin && side.creds[credSessionCookie] == "" {
+		asked = append(asked, "fixture sign-in of the seeded admin failed")
+	} else if needs.sessionLogin {
+		asked = append(asked, "")
+	}
+	for _, cause := range asked {
+		if cause == "" {
+			return ""
+		}
+	}
+	if len(asked) == 0 {
+		return ""
+	}
+	return asked[0]
+}

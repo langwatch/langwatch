@@ -138,6 +138,21 @@ reason for each one (`-no-fail-fast` carries on anyway). Run with `-keep`,
 fix, then `recapture` the routes or flows that failed: it replays the base
 from the same baseline.
 
+**Stopping when nothing works.** A setup that fails (preflight, boot, seed,
+worktrees, or `check`'s browser and stack) stops the run before any capture and
+prints `visualdiff: stopping: setup failed: <cause>`. Once capturing, `run`,
+`check` and `recapture` count captures in the order they arrive, per side: a
+route that errored, a flow step whose text says the browser or page closed, the
+network refused, sign-in or the shell did not come up or the page never loaded,
+or a page whose own modules failed, is an error; a screen that captured, even
+with console errors or a blank page, ends the streak; a failed expectation or a
+step whose locator never matched is a FAIL and neither counts nor ends it. After
+`-max-consecutive-errors N` errors in a row (default 10, `0` disables) the
+runner and its browsers are stopped, the captures so far are classified and
+written as usual, and it prints `visualdiff: stopping: N consecutive errors,
+most common cause: <cause> (xK)` and exits 3. `recapture` has no flag and uses
+the default; `flow` and `route` do not stop early.
+
 ## Booting through haven
 
 The previous port-based runner boots each ref on a hand-rolled environment

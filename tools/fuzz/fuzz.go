@@ -4,10 +4,13 @@ package fuzz
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // Streams are the fuzzer's output sinks.
@@ -28,13 +31,15 @@ type Options struct {
 	// ActionsPerRoute is how many random actions a UI visit makes before moving on.
 	ActionsPerRoute int
 	URL             string // app origin; empty resolves the shared stack via haven
-	Root            string // repository root, for .fuzz output and the UI runner
+	// MaxConsecutiveErrors stops the run after this many harness errors in a row; 0 never, negative the mode's default.
+	MaxConsecutiveErrors int
+	Root                 string // repository root, for .fuzz output and the UI runner
 }
 
 // Main parses args and runs the fuzzer, returning a process exit code.
 func Main(ctx context.Context, args []string, streams Streams, root string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(streams.Err, "usage: fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only AREA] [-reload-every N] [-actions N] [-url URL]")
+		fmt.Fprintln(streams.Err, "usage: fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only AREA] [-reload-every N] [-actions N] [-max-consecutive-errors N] [-url URL]")
 		return 2
 	}
 	options := Options{Mode: args[0], Root: root}
@@ -46,6 +51,7 @@ func Main(ctx context.Context, args []string, streams Streams, root string) int 
 	flags.StringVar(&options.Only, "only", "", "restrict to operations/routes whose path contains this")
 	flags.IntVar(&options.ReloadEvery, "reload-every", DefaultReloadEvery, "ui: full page load every Nth visit, in-app navigation between (1 = always load)")
 	flags.IntVar(&options.ActionsPerRoute, "actions", DefaultActionsPerRoute, "ui: random actions per visited route")
+	flags.IntVar(&options.MaxConsecutiveErrors, "max-consecutive-errors", -1, "stop after this many harness errors in a row: api transport errors (default 200), ui visits that errored or stayed loading (default 10); 0 never stops")
 	flags.StringVar(&options.URL, "url", "", "app origin; default resolves the shared stack")
 	if err := flags.Parse(args[1:]); err != nil {
 		return 2
@@ -67,9 +73,25 @@ func Main(ctx context.Context, args []string, streams Streams, root string) int 
 }
 
 func runOrReport(ctx context.Context, streams Streams, options Options, run func(context.Context, Streams, Options) error) int {
-	if err := run(ctx, streams, options); err != nil {
+	err := run(ctx, streams, options)
+	var stopped *diffkit.Stopped
+	if errors.As(err, &stopped) {
+		if stopped.Reason != "" {
+			fmt.Fprintf(streams.Err, "fuzz %s: %s\n", options.Mode, stopped.Reason)
+		}
+		return diffkit.ExitStopped
+	}
+	if err != nil {
 		fmt.Fprintf(streams.Err, "fuzz %s: %v\n", options.Mode, err)
 		return 1
 	}
 	return 0
+}
+
+// errorLimit is the consecutive-error limit: the flag's, or the mode's default when unset.
+func (options Options) errorLimit(fallback int) int {
+	if options.MaxConsecutiveErrors < 0 {
+		return fallback
+	}
+	return options.MaxConsecutiveErrors
 }

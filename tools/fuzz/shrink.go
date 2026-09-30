@@ -89,7 +89,7 @@ func ShrinkBody(body map[string]any, reproduces func(map[string]any) bool) map[s
 
 // reproduces reruns one request and reports whether the same oracle fires.
 func (run *apiRun) reproduces(ctx context.Context, finding rawFinding) bool {
-	status, elapsed, responseBody := run.do(ctx, finding.request)
+	status, elapsed, responseBody, _ := run.do(ctx, finding.request)
 	hits := Evaluate(Observation{
 		Mutation: finding.item.mutation, Status: status, Elapsed: elapsed, Body: responseBody,
 		JSONExpected: true, SeparateOrg: run.org.Separate, LatencyCap: LatencyCap, ForeignIDs: finding.request.foreign,

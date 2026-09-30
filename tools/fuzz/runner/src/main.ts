@@ -16,6 +16,7 @@ import { hashSeed, mulberry32, shuffled } from "./rng.ts";
 import { expandRoute, registeredRoutes, type Expanded } from "./routes.ts";
 import { ReloadSchedule } from "./schedule.ts";
 import { FindingSink } from "./sink.ts";
+import { ErrorStreak } from "./streak.ts";
 
 const out = process.stdout;
 const PROGRESS_MILLIS = 5000;
@@ -23,6 +24,26 @@ const PROGRESS_MILLIS = 5000;
 const UNBOUNDED_PASSES = 1_000_000;
 const WATCHDOG_MILLIS = 120_000;
 const LANDING_MILLIS = 180_000;
+/** STOPPED_EXIT is the exit code of a run that stopped early on purpose (the Go side reads it). */
+const STOPPED_EXIT = 3;
+const REASON_CHARS = 200;
+
+const firstLine = (thrown: unknown): string =>
+  String(thrown instanceof Error ? thrown.message : thrown)
+    .split("\n")[0]
+    ?.slice(0, REASON_CHARS) ?? "";
+
+/** SetupFailed is a failure of the runner's own setup: the browser, sign-in or the landing page. */
+class SetupFailed extends Error {}
+
+/** setup runs one setup step; its failure stops the run before any visit. */
+const setup = async <T>(work: () => Promise<T>): Promise<T> => {
+  try {
+    return await work();
+  } catch (thrown) {
+    throw new SetupFailed(`stopping: setup failed: ${firstLine(thrown)}`);
+  }
+};
 
 const stamp = (text: string): void =>
   note({ text: `[${new Date().toTimeString().slice(0, 8)}] ${text}`, err: process.stderr });
@@ -141,6 +162,7 @@ class Run {
   inAppVisits = 0;
   navigationFallbacks = 0;
   sessionLost: SessionLost | undefined;
+  readonly streak: ErrorStreak;
   private next = 0;
 
   readonly plan: FuzzPlan;
@@ -161,6 +183,7 @@ class Run {
     this.sink = input.sink;
     this.avoid = input.avoid;
     this.deadline = input.deadline;
+    this.streak = new ErrorStreak(input.plan.maxConsecutiveErrors);
   }
 
   get routesVisited(): number {
@@ -174,7 +197,12 @@ class Run {
 
   /** take hands out the next visit, or nothing once the queue, deadline or session is gone. */
   take(): { entry: Expanded; visit: number } | undefined {
-    if (this.next >= this.total || Date.now() >= this.deadline || this.sessionLost)
+    if (
+      this.next >= this.total ||
+      Date.now() >= this.deadline ||
+      this.sessionLost ||
+      this.streak.stopped !== undefined
+    )
       return undefined;
     const index = this.next++;
     return {
@@ -219,9 +247,11 @@ class Run {
         visit,
         navigation,
         avoid: this.avoid,
-        now: Date.now,
+        // A stopped run ends its in-flight visits at their next action.
+        now: () => (this.streak.stopped === undefined ? Date.now() : Number.POSITIVE_INFINITY),
         deadline: this.deadline,
       });
+      this.streak.record(result.error);
       stats.visits += 1;
       stats.actions += result.actions;
       stats.findings += result.findings;
@@ -234,7 +264,10 @@ class Run {
       return result;
     } catch (thrown) {
       if (thrown instanceof SessionLost) this.sessionLost = thrown;
-      else stamp(`fuzz: visit ${entry.route} #${visit} failed: ${String(thrown).slice(0, 200)}`);
+      else {
+        stamp(`fuzz: visit ${entry.route} #${visit} failed: ${String(thrown).slice(0, 200)}`);
+        this.streak.record(firstLine(thrown));
+      }
     }
     return { navigation, broken: true };
   }
@@ -273,13 +306,13 @@ const walk = async ({
   plan: FuzzPlan;
   runDir: string;
   browser: SideBrowser;
-}): Promise<void> => {
+}): Promise<string | undefined> => {
   const outDir = join(runDir, "ui");
   const sink = new FindingSink(runDir);
   const signInStartedAt = Date.now();
-  const pages = await openPages({ plan, outDir, browser, count: plan.workers });
+  const pages = await setup(async () => openPages({ plan, outDir, browser, count: plan.workers }));
   const first = pages[0] as Side;
-  const slug = plan.slug ?? (await projectSlug(first));
+  const slug = plan.slug ?? (await setup(async () => projectSlug(first)));
   const signInMillis = Date.now() - signInStartedAt;
   const expanded = (plan.routes ?? registeredRoutes())
     .filter((route) => !plan.only || route.includes(plan.only))
@@ -328,27 +361,32 @@ const walk = async ({
     `fuzz: done in ${timing.walkMillis}ms: ${coverage.routesVisited}/${coverage.routesTotal} routes, ${run.reloads} reloads, ${run.inAppVisits} in-app (${run.navigationFallbacks} fell back), ${run.actions} actions, ${sink.findings} findings (${sink.distinct} distinct)`,
   );
   if (run.sessionLost !== undefined) throw run.sessionLost;
+  return run.streak.stopped;
 };
 
-const main = async (): Promise<void> => {
+const main = async (): Promise<number> => {
   const { plan, runDir } = readPlan(process.argv.slice(2));
-  const browser = await openSideBrowser({
-    side: { name: "fuzz", baseUrl: plan.url },
-    viewport: plan.viewport,
-    settle: plan.settle,
-  });
+  const browser = await setup(async () =>
+    openSideBrowser({
+      side: { name: "fuzz", baseUrl: plan.url },
+      viewport: plan.viewport,
+      settle: plan.settle,
+    }),
+  );
   try {
-    await walk({ plan, runDir, browser });
+    const stopped = await walk({ plan, runDir, browser });
+    if (stopped === undefined) return 0;
+    note({ text: `fuzz ui: ${stopped}`, err: process.stderr });
+    return STOPPED_EXIT;
   } finally {
     await browser.close();
   }
 };
 
-const code = await main().then(
-  () => 0,
-  (thrown: unknown) => {
-    stamp(`fuzz: ${thrown instanceof Error ? thrown.message : String(thrown)}`);
-    return 1;
-  },
-);
+const code = await main().catch((thrown: unknown) => {
+  if (thrown instanceof SetupFailed)
+    note({ text: `fuzz ui: ${thrown.message}`, err: process.stderr });
+  else stamp(`fuzz: ${thrown instanceof Error ? thrown.message : String(thrown)}`);
+  return 1;
+});
 out.write("", () => process.exit(code));

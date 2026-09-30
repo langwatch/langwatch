@@ -3,9 +3,12 @@ package visualdiff
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // RecaptureRequest is one `visualdiff recapture` invocation: which run's
@@ -62,10 +65,14 @@ func Recapture(ctx context.Context, request RecaptureRequest, streams Streams) (
 	fmt.Fprintf(streams.Err, "recapture: %d route(s), %d flow(s) against run %s (%s)\n", len(plan.Routes), len(plan.Flows), request.RunID, request.Edition)
 	findingsPath := filepath.Join(runDir, FindingsFile)
 	stream, err := runWithFindings(ctx, findingsRunInputs{
-		Deps: request.Deps, Plan: plan, Options: CaptureOptions{Root: request.Root, Stderr: streams.Err},
+		Deps: request.Deps, Plan: plan, Options: CaptureOptions{Root: request.Root, Stderr: streams.Err, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors},
 		FindingsPath: findingsPath, CatalogueRoot: request.Root, Edition: request.Edition,
 	})
 	if err != nil {
+		var stopped *diffkit.Stopped
+		if errors.As(err, &stopped) {
+			return RecaptureResult{}, stopped
+		}
 		return RecaptureResult{}, fmt.Errorf("recapture: %w", err)
 	}
 	rows := BuildRows(stream.Captures, stream.Diffs)

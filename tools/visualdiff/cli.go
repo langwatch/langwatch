@@ -19,7 +19,7 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-dry-run] [-keep] [-agent] [-no-haven]
                  [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
                  [-no-fail-fast] [-resume RUNID] [-no-publish] [-include-done]
-                 [-rebase-main] [-force] [-max-load N] [-pages N]
+                 [-rebase-main] [-force] [-max-load N] [-pages N] [-max-consecutive-errors N]
 
   visualdiff flow ID | route PATH [-edition E] [-candidate REF] [-force] [-dev-ui] [-dry-run] [-root DIR]
   visualdiff down [-root DIR]
@@ -103,7 +103,8 @@ worktrees, haven stacks and databases, and every orphan visualdiff-* stack;
 by hand, it removes run directories older than -older-than.
 A -keep run is left alone unless -kept is given.
 
-Exit status: 0 no findings, 1 findings, 2 the run could not be completed.
+Exit status: 0 no findings, 1 findings, 2 the run could not be completed, 3 it
+stopped early on -max-consecutive-errors captures that were errors, not findings.
 `
 
 // Run is the visualdiff CLI. It returns the process exit code.
@@ -233,6 +234,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	force := flags.Bool("force", false, "run on battery, under load or beside another visualdiff stack")
 	maxLoad := flags.Float64("max-load", DefaultMaxLoad, "refuse to start above this 1-minute load average")
 	pages := flags.Int("pages", 0, "pages each side captures on at once (default half the CPUs, fewer under load)")
+	maxErrors := flags.Int("max-consecutive-errors", DefaultMaxConsecutiveErrors, "stop after this many captures in a row that are harness or stack errors on one side (0 never stops)")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
@@ -262,7 +264,8 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		Editions: editions, Baseline: !*noBaseline, RefreshBaseline: *refreshBaseline,
 		FailFast: !*noFailFast, NoPublish: *noPublish, DevUI: *devUI,
 		PinMain: !isFlagSet(flags, "base"), RebaseMain: *rebaseMain, Force: *force, MaxLoad: *maxLoad, Pages: *pages,
-		SkipWorks: !*includeDone && *routeList == "" && *flowList == "",
+		MaxConsecutiveErrors: *maxErrors,
+		SkipWorks:            !*includeDone && *routeList == "" && *flowList == "",
 	}
 	resumeRun(&options, *resume)
 	return &runFlags{options: options, config: config, includeDone: *includeDone}, nil
@@ -382,7 +385,7 @@ func recaptureCommand(ctx context.Context, args []string, streams Streams) int {
 	}, streams)
 	if err != nil {
 		fmt.Fprintln(streams.Err, "visualdiff:", err)
-		return ExitOperational
+		return ExitCode(Result{}, err)
 	}
 	if result.Findings > 0 {
 		return ExitFindings

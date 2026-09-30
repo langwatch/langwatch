@@ -58,7 +58,7 @@ func (run *apiRun) foreignID(ctx context.Context, collection string) string {
 		{"X-Auth-Token": diffkit.SeededProjectKey},
 		{"Authorization": "Bearer " + diffkit.SeededOrgKey},
 	} {
-		status, _, body := run.do(ctx, builtRequest{method: http.MethodGet, url: run.apiURL + collection, headers: headers})
+		status, _, body, _ := run.do(ctx, builtRequest{method: http.MethodGet, url: run.apiURL + collection, headers: headers})
 		if id = firstID(body); success(status) && id != "" {
 			break
 		}
