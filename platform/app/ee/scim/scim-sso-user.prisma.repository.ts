@@ -244,10 +244,15 @@ export class PrismaScimSsoUsers {
    * included. The link is authorized by the domain instead: this connection
    * has verified the address's domain (DNS record, HTTPS file or licence), so
    * the organization controls every address on it, and its identity provider
-   * is vouching for this one. An account on that domain that never proved its
-   * inbox is vouched for by the same owner, so linking it hands nobody's
-   * account to anybody else. Without the proof, or without the provider's
+   * is vouching for this one. That proves the provider's user owns the
+   * address. It does not prove who set the account's existing password, and
+   * that password stays usable after the link; the self-hosted scope below is
+   * what makes that acceptable. Without the proof, or without the provider's
    * word, the link stays refused (ADR-027).
+   *
+   * The confirmation written here is uncommitted until the callback ends, so
+   * the account-create hook that re-checks the link's evidence has to read
+   * inside the same transaction (`PrismaSsoAccountFactsRepository`).
    *
    * An account that already holds this connection's subject is signed in
    * by better-auth as it always was, whatever the proof now says.
