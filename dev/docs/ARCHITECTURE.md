@@ -391,16 +391,17 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    **Amended 2026-09-30** to match the `browser-kit-dependencies` policy, which outranks this record:
    `@langwatch/api/web` is not a kit dependency. A kit component that needs data takes it as props
    and each consumer fetches its own: analytics' `LwqlEditor` takes `schema` and `markers`.
-3. **A kit owns its module's client, store and UI for one concept** (Alex,
-   2026-09-29). It derives its client from its own contract, and the owner's
-   browser package imports that client and store from the kit rather than
-   holding a second copy; consumers render the kit. It never calls a peer's
+3. **A kit owns its module's store and UI for one concept** (Alex, 2026-09-29;
+   its client clause withdrawn 2026-09-30, the linter wins). It holds no client: its
+   components take data as props and each consumer derives its own client from the
+   owner's contract; the owner's browser package imports the store from the kit
+   rather than holding a second copy, and consumers render the kit. It never calls a peer's
    procedure and never reads a `*HostApi`; a component that needs either stays
-   in its owner (rule 7). Rule 2 keeps it a leaf. The case: identity's kit holds
-   identity's `twoStepVerification` client and the requirement UI (user,
-   organization and ops render it), while the passkey, two-step and
-   sign-in-method ceremonies call auth's endpoints and so live in auth's kit
-   (Alex, 2026-09-29).
+   in its owner (rule 7). Rule 2 keeps it a leaf. The case: identity's kit holds the
+   two-step requirement UI (user, organization and ops render it, each through its
+   own client), while the passkey, two-step and sign-in-method ceremonies call
+   auth's endpoints and so live in auth (Alex, 2026-09-29). Kits that still hold a
+   client (identity, user, stored-object) are findings of rule 2, moved as touched.
 4. **A kit is a package, not a subpath** — a subpath is invisible to the
    dependency graph, so it cannot break a cycle or be budgeted. A package
    makes every cross-module browser edge a visible, lintable manifest line.
