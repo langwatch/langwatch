@@ -21,7 +21,7 @@ import type { UiRootCapabilities } from "./ui-root-capabilities";
 /** Auth restates the public shape to break a cycle, so the projection lives here. */
 function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
   return {
-    BASE_HOST: config.process.appBaseUrl ?? window.location.origin,
+    BASE_HOST: config.auth.publicUrl ?? config.process.appBaseUrl ?? window.location.origin,
     DEMO_PROJECT_SLUG: config.authz.demoProjectSlug,
     NODE_ENV: config.process.mode,
     PASSKEYS_ENABLED: config.auth.passkeys,

@@ -74,6 +74,18 @@ describe("public application configuration projection", () => {
     expect(processSlice(base)).not.toHaveProperty("devIndicatorLabel");
   });
 
+  describe("when the dev server reads a public URL besides BASE_HOST", () => {
+    /** @scenario "The development server projects the public URL the same way" */
+    it("names it on the auth slice, and omits it when none is named", () => {
+      const base = { BASE_HOST: "http://localhost:5560", NODE_ENV: "development" };
+
+      expect(
+        resolvePublicAppConfig({ ...base, NEXTAUTH_URL: "http://localhost:5580" }).auth,
+      ).toMatchObject({ publicUrl: "http://localhost:5580" });
+      expect(resolvePublicAppConfig(base).auth).not.toHaveProperty("publicUrl");
+    });
+  });
+
   describe("given the passkey switch the dev server projects for auth", () => {
     const base = { BASE_HOST: "https://app.example.test", NODE_ENV: "development" };
     const passkeys = (source: Record<string, string>) =>
