@@ -65,12 +65,14 @@ Feature: Process-manager inbox and outbox rows are reaped on a schedule
       Then the pending row is still there
       And it is still leasable for dispatch
 
+    # Dead is undelivered work nobody agreed to lose; only an operator's discard
+    # starts the dead-letter clock (specs/ops/dead-letter-recovery.feature).
     @integration
-    Scenario: Dead outbox rows are kept far longer than dispatched ones
-      Given a dead outbox row older than the dispatched retention window
-      And a dead outbox row older than the dead retention window
+    Scenario: Dead messages are retained until delivered or discarded
+      Given a dead outbox row older than the dead retention window
       When the retention sweep runs
-      Then only the row past the dead retention window is deleted
+      Then the dead row is still there
+      And once discarded it is deleted after the dead retention window
 
     @integration
     Scenario: Consumed inbox rows past the retention window are deleted

@@ -11,6 +11,7 @@ import {
 } from "@langwatch/webhook-contract";
 
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
+import type { WebhookDeliveryDisposition } from "../../rules/webhook-delivery-contract.rules.ts";
 import {
   describeDestination,
   findUrlProblem,
@@ -549,6 +550,22 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
     }
 
     return toView(endpoint);
+  }
+
+  async getDeliveryDisposition(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDeliveryDisposition> {
+    const endpoint = this.#database.findEndpoint(params.endpointId);
+    if (
+      !endpoint ||
+      endpoint.organizationId !== params.organizationId ||
+      endpoint.archivedAt !== null
+    ) {
+      return { state: "gone" };
+    }
+    if (endpoint.status !== "ACTIVE") return { state: "paused" };
+    return { state: "deliverable", endpoint: toView(endpoint) };
   }
 
   async getDestinationConfig(params: {

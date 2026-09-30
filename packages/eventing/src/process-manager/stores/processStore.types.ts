@@ -102,6 +102,28 @@ export type CommitResult =
   | { outcome: "duplicateEvent" }
   | { outcome: "revisionConflict"; actualRevision: number };
 
+/**
+ * A read-modify-write inside the store's own lock: the store reads the instance, hands it to
+ * `apply` and writes what comes back, so no writer can lose a revision race it did not care
+ * about. `apply` runs while the lock is held: pure and prompt, never I/O.
+ */
+export interface ProcessTransaction<State = unknown> {
+  ref: ProcessRef;
+  tenantId: string;
+  userId?: string;
+  /** Inbox identity, exactly as {@link ProcessCommit.sourceEventId}. */
+  sourceEventId: string | null;
+  now: number;
+  apply: (current: PersistedProcessInstance<State> | null) => {
+    state: State;
+    nextWakeAt: number | null;
+    messages: NewOutboxMessage[];
+  };
+}
+
+/** {@link CommitResult} minus the outcome `transact` exists to remove. */
+export type TransactResult = Exclude<CommitResult, { outcome: "revisionConflict" }>;
+
 /** Transient append: intents only; deterministic messageKeys required. */
 export interface AppendIntentsResult {
   insertedMessageKeys: string[];
@@ -137,6 +159,9 @@ export interface ProcessStore {
   /** Atomically consume inbox, bump revision, persist state + wake, and insert messages. */
   commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
 
+  /** The same write with the read held inside the lock; see {@link ProcessTransaction}. */
+  transact<State = unknown>(transaction: ProcessTransaction<State>): Promise<TransactResult>;
+
   /**
    * Appends a transient evolution's intents (see {@link AppendIntentsResult}
    * for why this is neither transactional nor inbox-backed). Idempotent — an
@@ -154,6 +179,16 @@ export interface ProcessStore {
 
   /** All messages for one process, primarily for diagnostics and tests. */
   findMessagesByRef(params: { ref: ProcessRef }): Promise<OutboxMessageRecord[]>;
+
+  /**
+   * How many of one process's messages of one intent type are pending, and the soonest any
+   * becomes due: the hot append path's in-flight read, without fetching every row the ref
+   * ever minted. A caller at its in-flight cap sleeps until a slot can free, not polls.
+   */
+  countPendingMessages(params: {
+    ref: ProcessRef;
+    intentType: string;
+  }): Promise<{ count: number; nextAttemptAt: number | null }>;
 
   /**
    * Lease pending, due messages for exclusive dispatch until
@@ -238,9 +273,9 @@ export interface ProcessStore {
   deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number>;
 
   /**
-   * Retention sweep, dead family: delete at most `limit` DEAD outbox rows
-   * last touched before `before`, across every processName and project —
-   * dead rows are the operator's failure record, so callers use a far longer window.
+   * Retention sweep, dead-letter family: delete at most `limit` DISCARDED outbox rows last
+   * touched before `before`, across every processName and project. A DEAD row is undelivered
+   * work nobody agreed to lose, kept until it delivers or an operator discards it.
    */
   deleteDeadOutboxBatch(params: { before: number; limit: number }): Promise<number>;
 

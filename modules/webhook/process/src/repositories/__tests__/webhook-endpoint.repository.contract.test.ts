@@ -177,6 +177,27 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
     });
   });
 
+  describe("when a batch asks whether its endpoint may be delivered to", () => {
+    it("tells a disabled endpoint (paused) apart from an archived one (gone)", async () => {
+      const { endpoint } = await repository.create({
+        organizationId: ORGANIZATION_ID,
+        url: "https://example.com/hook",
+        enabledEvents: ["gateway.request.completed"],
+      });
+      const ask = () =>
+        repository.getDeliveryDisposition({
+          organizationId: ORGANIZATION_ID,
+          endpointId: endpoint.id,
+        });
+
+      await expect(ask()).resolves.toMatchObject({ state: "deliverable" });
+      await repository.disable({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id });
+      await expect(ask()).resolves.toEqual({ state: "paused" });
+      await repository.archive({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id });
+      await expect(ask()).resolves.toEqual({ state: "gone" });
+    });
+  });
+
   describe("when delivery attempts keep failing past the 72h streak", () => {
     let endpoint: Awaited<ReturnType<WebhookEndpointRepository["create"]>>["endpoint"];
     let start: Instant;

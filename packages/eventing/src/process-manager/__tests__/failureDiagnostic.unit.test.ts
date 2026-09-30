@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
+import { DispatchError } from "../../queues/dispatchError.ts";
+import { safeDiagnosticError, toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 
 describe("toSafeFailureDiagnostic", () => {
   it.each([
@@ -33,5 +34,17 @@ describe("toSafeFailureDiagnostic", () => {
       errorType: "NonErrorThrown",
       errorMessage: "Operation failed; sensitive details were omitted",
     });
+  });
+
+  it("quotes an error whose message we wrote, so the cause stays readable", () => {
+    expect(toSafeFailureDiagnostic(safeDiagnosticError("revision conflict on stream/1"))).toEqual({
+      errorType: "Error",
+      errorMessage: "revision conflict on stream/1",
+    });
+    expect(
+      toSafeFailureDiagnostic(
+        new DispatchError({ message: "webhook stream flush failed", retryable: true }),
+      ),
+    ).toEqual({ errorType: "DispatchError", errorMessage: "webhook stream flush failed" });
   });
 });

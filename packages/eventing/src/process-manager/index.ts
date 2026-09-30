@@ -40,7 +40,10 @@ export type {
   PersistedProcessInstance,
   ProcessCommit,
   ProcessStore,
+  ProcessTransaction,
+  TransactResult,
 } from "./stores/processStore.types.ts";
+export { captureTraceCarrier } from "./traceCarrier.ts";
 export {
   ProcessWakeWorker,
   type ProcessWakeWorkerOptions,
