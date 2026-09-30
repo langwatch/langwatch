@@ -2,6 +2,7 @@
 // context only, no UI/router/toast imports); supports tri-state feature flag for webhook channel.
 
 import type { DatasetColumns } from "@langwatch/dataset-contract";
+import type { SlackConnectionSaved } from "@langwatch/slack-browser-kit";
 import { createContext, useContext } from "react";
 
 /** The organization, team and project the current page is about. */
@@ -42,6 +43,7 @@ export type AutomationSuccessNotice = {
   title: string;
   description?: string;
   id?: string;
+  action?: { label: string; run: () => void };
 };
 
 /**
@@ -114,6 +116,12 @@ export abstract class AutomationHost {
    *  handover callback and navigates back rather than closing the stack. */
   abstract createDataset(handover: {
     created: (dataset: AutomationDatasetCreation) => void;
+    returned: () => void;
+  }): void;
+
+  /** Hands over to slack's connection drawer and returns, as createDataset does. */
+  abstract createSlackConnection(handover: {
+    created: (saved: SlackConnectionSaved) => void;
     returned: () => void;
   }): void;
 

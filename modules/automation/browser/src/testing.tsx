@@ -3,6 +3,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";
+import type { SlackConnectionSaved } from "@langwatch/slack-browser-kit";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
@@ -36,6 +37,12 @@ export type AutomationDatasetHandover = {
   returned: () => void;
 };
 
+/** One request to create a Slack connection without leaving the automation. */
+export type AutomationSlackConnectionHandover = {
+  created: (saved: SlackConnectionSaved) => void;
+  returned: () => void;
+};
+
 export type AutomationHostRecording = {
   navigations: string[];
   queries: { next: AutomationQuery; replace: boolean }[];
@@ -51,6 +58,7 @@ export type AutomationHostRecording = {
    * the double records the request and lets the test choose the ending.
    */
   datasetHandovers: AutomationDatasetHandover[];
+  slackConnectionHandovers: AutomationSlackConnectionHandover[];
   successes: AutomationSuccessNotice[];
   failures: AutomationFailureNotice[];
 };
@@ -102,6 +110,7 @@ export class FakeAutomationHost extends AutomationHost {
         queries: [],
         drawerOpens: [],
         datasetHandovers: [],
+        slackConnectionHandovers: [],
         successes: [],
         failures: [],
       },
@@ -233,6 +242,10 @@ export class FakeAutomationHost extends AutomationHost {
 
   createDataset(handover: AutomationDatasetHandover): void {
     this.recording.datasetHandovers.push(handover);
+  }
+
+  createSlackConnection(handover: AutomationSlackConnectionHandover): void {
+    this.recording.slackConnectionHandovers.push(handover);
   }
 
   succeeded(notice: AutomationSuccessNotice): void {

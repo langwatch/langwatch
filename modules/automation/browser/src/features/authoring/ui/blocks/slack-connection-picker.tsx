@@ -5,8 +5,8 @@ import {
   findSlackConnection,
   NEW_CONNECTION,
   type SlackConnection,
+  type SlackConnectionList,
   type SlackConnectionSaved,
-  slackApi,
   useSlackConnectionCollection,
 } from "@langwatch/slack-browser-kit";
 import type { SlackConnectionKind } from "@langwatch/slack-contract";
@@ -14,7 +14,7 @@ import { Plus } from "lucide-react";
 
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { announceSubFlowDeparture, keepDraftOnSubFlowReturn } from "../../behavior/sub-flow.ts";
-import type { SlackSlice } from "../sections/slack.client.tsx";
+import type { SlackSlice } from "../../model/slack-slice.ts";
 
 interface ConnectionOption {
   value: string;
@@ -49,27 +49,21 @@ export function selectConnection({
 
 /**
  * The Slack step's connection choice (ADR-093 §5a). "New Slack connection" hands over to
- * slack's `slackConnection` drawer and comes back with it selected.
+ * slack's `slackConnection` drawer and comes back with it selected. The section fetches the
+ * list and hands it down; `refetch` reloads it once a new connection is saved.
  */
 export function SlackConnectionPicker({
-  projectId,
+  data,
+  refetch,
   slice,
   onChange,
 }: {
-  projectId: string;
+  data: SlackConnectionList | undefined;
+  refetch: () => unknown;
   slice: SlackSlice;
   onChange: (next: SlackSlice) => void;
 }) {
-  const connections = slackApi.slackIntegration.list.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnWindowFocus: false },
-  );
-  const openConnectionCreation = useConnectionCreation({
-    slice,
-    onChange,
-    refetch: connections.refetch,
-  });
-  const data = connections.data;
+  const openConnectionCreation = useConnectionCreation({ slice, onChange, refetch });
   const canCreate = !!data?.canManageProject || !!data?.canManageOrganization;
   const collection = useSlackConnectionCollection({ connections: data?.connections, canCreate });
 

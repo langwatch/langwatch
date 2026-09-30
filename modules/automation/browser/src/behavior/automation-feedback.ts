@@ -13,6 +13,7 @@ export type AutomationToast = {
   description?: string;
   type?: string;
   id?: string;
+  action?: { label: string; run: () => void };
 };
 
 export type AutomationToaster = { create: (toast: AutomationToast) => void };
@@ -41,6 +42,7 @@ function createToast({ host, toast }: { host: AutomationHost; toast: AutomationT
     title: toast.title,
     ...(toast.description ? { description: toast.description } : {}),
     ...(toast.id ? { id: toast.id } : {}),
+    ...(toast.action ? { action: toast.action } : {}),
   });
 }
 

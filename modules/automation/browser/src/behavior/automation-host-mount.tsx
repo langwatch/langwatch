@@ -17,6 +17,7 @@ import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
+import type { SlackConnectionSaved } from "@langwatch/slack-browser-kit";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -154,6 +155,20 @@ class CapabilityAutomationHost extends AutomationHost {
     this.members.openRegisteredDrawer("addOrEditDataset", {
       onSuccess: (saved: { datasetId: string; columnTypes: DatasetColumns }) =>
         handover.created({ datasetId: saved.datasetId, columnTypes: saved.columnTypes }),
+      onClose: () => {
+        handover.returned();
+        this.members.goBackDrawer();
+      },
+    });
+  }
+
+  /** Slack's connection drawer, handed over and returned like the dataset drawer. */
+  createSlackConnection(handover: {
+    created: (saved: SlackConnectionSaved) => void;
+    returned: () => void;
+  }): void {
+    this.members.openRegisteredDrawer("slackConnection", {
+      onSuccess: (saved: SlackConnectionSaved) => handover.created(saved),
       onClose: () => {
         handover.returned();
         this.members.goBackDrawer();

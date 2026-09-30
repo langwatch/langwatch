@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Box,
   Button,
@@ -34,10 +33,17 @@ import { useOrganizationTeamProject } from "../../../../behavior/automation-sess
 import { deriveSeriesOptionsFromGraph } from "../../../../model/graph-series.ts";
 import { formatTimeAgoCompact } from "../../../../model/relative-time.ts";
 import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
+import {
+  DAILY_CAP_OPTIONS,
+  PREVIEW_LIST_OPTIONS,
+  PREVIEW_SORT,
+  PREVIEW_WINDOW_MS,
+} from "../../behavior/use-daily-cap-advice.ts";
 import { checkQuery, queryIsStructurable } from "../../model/condition-query.ts";
 import { type DailyCapAdvice, dailyCapAdvice } from "../../model/daily-cap-advice.ts";
 import { estimateFiringRate, estimateRatePerDay } from "../../model/firing-rate.ts";
 import { ConditionBuilder } from "../blocks/condition-builder.tsx";
+import { DailyCapAdviceAlert } from "../blocks/daily-cap-advice-alert.tsx";
 import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
 import { QueryFilterInput } from "../elements/query-filter-input.tsx";
 import { useConfigComplete, useDraft } from "./automation-selectors.ts";
@@ -49,6 +55,7 @@ import {
   isNotifyAction,
   type ReportSourceKind,
   subjectIsSet,
+  subjectIsValid,
 } from "./draft-model.ts";
 
 /** One-line preview shown when the Subject facet is collapsed. */
@@ -114,7 +121,7 @@ export function SubjectSection({
       title={title}
       help={SUBJECT_HELP[draft.source]}
       accordion={accordion}
-      complete={subjectIsSet(draft)}
+      complete={subjectIsValid(draft)}
       summary={subjectSummary(draft)}
     >
       {renderSubjectContent(draft, prefilledGraphId)}
@@ -542,8 +549,6 @@ const STATUS_DOT_COLOR: Record<AutomationPreviewTrace["status"], string> = {
   warning: "orange.solid",
 };
 
-const PREVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
 const QUERY_DEBOUNCE_MS = 400;
 
 /**
@@ -603,17 +608,8 @@ function TraceQuerySubject({
     },
     {
       enabled: !!projectId && trimmed.length > 0 && doesDebouncedParse,
-      retry: false,
-      // A long stale window plus keepPreviousData keeps the last result on
-      // screen while a new query resolves, so the preview refreshes in place
-      // instead of blanking to a spinner. Focus changes never refetch — the
-      // matched set doesn't move fast enough to justify the flicker.
-      staleTime: 5 * 60_000,
-      // The React Query `keepPreviousData` sentinel by hand: a feature-web
-      // package may not import the query library, and the sentinel is exactly
-      // this function.
+      ...PREVIEW_LIST_OPTIONS,
       placeholderData: (previous) => previous,
-      refetchOnWindowFocus: false,
     },
   );
 
@@ -621,13 +617,9 @@ function TraceQuerySubject({
   // only when the plan does, and a failed read simply means no advice below.
   const capStatus = api.automation.getDailyCap.useQuery(
     { projectId },
-    {
-      enabled: !!projectId,
-      staleTime: 10 * 60 * 1000,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
+    { enabled: !!projectId, ...DAILY_CAP_OPTIONS },
   );
+  const setHasInvalidConditionRows = useAutomationStore((s) => s.setHasInvalidConditionRows);
 
   // Advice, never a gate: this warns that the drafted condition would outrun
   // the plan's daily ceiling, and every missing piece (no preview, no cap, an
@@ -668,7 +660,11 @@ function TraceQuerySubject({
         <SubjectModeToggle mode={mode} onMode={setMode} builderEnabled={structurable} />
       </HStack>
       {mode === "builder" ? (
-        <ConditionBuilder query={query} onChange={onChange} />
+        <ConditionBuilder
+          query={query}
+          onChange={onChange}
+          onInvalidRowsChange={setHasInvalidConditionRows}
+        />
       ) : (
         <VStack align="stretch" gap={2}>
           <QueryFilterInput
@@ -909,59 +905,6 @@ function TracePreview({
           ))}
         </VStack>
       ) : null}
-    </Box>
-  );
-}
-
-/**
- * Advice under the firing-rate line: the drafted condition would match
- * more traces a day than the plan's daily ceiling allows. Never blocks
- * saving, and absent whenever the estimate or ceiling is in doubt.
- */
-function DailyCapAdviceAlert({
-  advice,
-  hasDividerBelow,
-}: {
-  advice: DailyCapAdvice | null;
-  hasDividerBelow: boolean;
-}) {
-  if (!advice) return null;
-  return (
-    <Box
-      paddingX={3}
-      paddingY={2}
-      borderBottomWidth={hasDividerBelow ? "1px" : "0"}
-      borderColor="border"
-    >
-      <Alert.Root
-        status="warning"
-        size="sm"
-        variant="subtle"
-        width="full"
-        data-testid="daily-cap-advice"
-      >
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Description textStyle="xs">
-            About {advice.perDay.toLocaleString()} matches a day is over your plan&apos;s daily
-            automation limit of {advice.cap.toLocaleString()}. Matches past the limit are skipped
-            for the rest of the day. Narrow the condition so it selects fewer traces.
-          </Alert.Description>
-        </Alert.Content>
-        <Button
-          asChild
-          size="xs"
-          variant="outline"
-          bg="bg"
-          flexShrink={0}
-          alignSelf="center"
-          data-testid="daily-cap-advice-upgrade"
-        >
-          <Link unstyled href="/settings/plans">
-            Upgrade Plan
-          </Link>
-        </Button>
-      </Alert.Root>
     </Box>
   );
 }

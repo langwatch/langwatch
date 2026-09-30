@@ -430,39 +430,47 @@ describe("SubjectSection", () => {
       });
 
     describe("when the query cannot parse", () => {
-      it("shows the parse error inline", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("shows the parse error inline and no answered check", () => {
         seedQuery("status:error AND (model:gpt");
         render(<SubjectSection />, { wrapper: Wrapper });
 
         expect(screen.getByRole("alert")).toHaveTextContent(/./);
+        expect(screen.queryByText("Answered")).toBeNull();
       });
     });
 
     describe("when a clause names a value its field never has", () => {
-      it("warns that it never matches", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("warns that it never matches and shows no answered check", () => {
         seedQuery("status:error#simplified");
         render(<SubjectSection />, { wrapper: Wrapper });
 
         expect(screen.getByRole("status")).toHaveTextContent(
           "`status` is never `error#simplified`: expected one of error, warning, ok.",
         );
+        expect(screen.queryByText("Answered")).toBeNull();
       });
     });
 
     describe("when a clause names an unknown field", () => {
-      it("warns that the field is unknown", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("warns that the field is unknown and shows no answered check", () => {
         seedQuery("stauts:error");
         render(<SubjectSection />, { wrapper: Wrapper });
 
         expect(screen.getByRole("status")).toHaveTextContent("Unknown field `stauts`");
+        expect(screen.queryByText("Answered")).toBeNull();
       });
     });
 
     describe("when the query parses and names real fields", () => {
-      it("says nothing more", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("marks the section answered and says nothing more", () => {
         seedQuery("status:error AND trace.attribute.plan:pro");
         render(<SubjectSection />, { wrapper: Wrapper });
 
+        expect(screen.getByText("Answered")).toBeInTheDocument();
         expect(screen.queryByRole("alert")).toBeNull();
         expect(screen.queryByRole("status")).toBeNull();
       });

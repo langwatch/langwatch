@@ -18,8 +18,14 @@ import {
 export const useDraft = () => useAutomationStore((s) => s.draft);
 export const useSection = () => useAutomationStore((s) => s.section);
 export const useTestHistory = () => useAutomationStore((s) => s.testHistory);
+/** The wizard step on screen (ADR-093 §4). */
+export const useWizardStep = () => useAutomationStore((s) => s.step);
+/** The furthest step reached, so the rail keeps earlier steps one click away. */
+export const useFurthestWizardStep = () => useAutomationStore((s) => s.furthestStep);
 
 export const useConditionsSet = () => useAutomationStore((s) => conditionsAreSet(s.draft));
+export const useHasInvalidConditionRows = () =>
+  useAutomationStore((s) => s.hasInvalidConditionRows);
 export const useSubjectSet = () => useAutomationStore((s) => subjectIsSet(s.draft));
 export const useCadenceSet = () => useAutomationStore((s) => cadenceIsSet(s.draft));
 /** Preset noun set (heading / button / toast copy) for the chosen type.
@@ -27,7 +33,7 @@ export const useCadenceSet = () => useAutomationStore((s) => cadenceIsSet(s.draf
  *  state; the hook only subscribes to `draft.source`. */
 export const usePresetLabels = (isEdit: boolean) => {
   const source = useAutomationStore((s) => s.draft.source);
-  return presetLabels(source, isEdit);
+  return presetLabels({ source, isEdit });
 };
 export const useConfigComplete = () => useAutomationStore((s) => configIsComplete(s.draft));
 export const useConfigurationSummary = () =>

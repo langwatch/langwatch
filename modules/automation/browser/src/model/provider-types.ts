@@ -106,6 +106,8 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown> extends Client
      *  webhook. `botToken` is the freshly-typed token, or null to reuse the
      *  saved automation's stored token. */
     botDestination?: { channelId: string; botToken: string | null } | null;
+    /** The Slack connection the test fire delivers through (ADR-093 §5a). */
+    slackIntegrationId?: string | null;
     /** Generic HTTP destination (ADR-040): the full request shape the test
      *  fire sends through the SSRF-fenced sender. */
     webhookDestination?: {
@@ -117,8 +119,9 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown> extends Client
   };
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;
-  /** Delivery-specific preview options needed for payload parity. */
-  previewOptions?(slice: S): { allowGatedBlocks?: boolean };
+  /** Render options the preview mirrors so it shows what is really delivered: Slack renders
+   *  charts, tables and banners only over a bot connection. */
+  previewOptions?(params: { slice: S }): { allowGatedBlocks?: boolean };
 }
 
 export interface ClientEntry<S = unknown, TPreview = unknown> {
