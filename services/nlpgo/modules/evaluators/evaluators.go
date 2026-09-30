@@ -19,6 +19,7 @@ type Deps struct {
 	Config        contract.Config
 	LLM           channels.LLMChannel
 	CustomerTrace channels.CustomerTraceChannel
+	Vendor        channels.VendorChannel
 	OpsTracer     trace.Tracer
 	Logger        *zap.Logger
 }
@@ -36,6 +37,7 @@ func New(deps Deps) *Module {
 		Config:        deps.Config,
 		LLM:           deps.LLM,
 		CustomerTrace: deps.CustomerTrace,
+		Vendor:        deps.Vendor,
 		OpsTracer:     deps.OpsTracer,
 		Logger:        deps.Logger,
 	})}

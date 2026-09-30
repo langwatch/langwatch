@@ -67,6 +67,7 @@ type EvaluationDeps struct {
 	Config        contract.Config
 	LLM           channels.LLMChannel
 	CustomerTrace channels.CustomerTraceChannel
+	Vendor        channels.VendorChannel
 	OpsTracer     trace.Tracer
 	Logger        *zap.Logger
 	Evaluators    map[string]Evaluator
@@ -77,6 +78,7 @@ type EvaluationService struct {
 	cfg        contract.Config
 	llm        channels.LLMChannel
 	trace      channels.CustomerTraceChannel
+	vendor     channels.VendorChannel
 	ops        trace.Tracer
 	logger     *zap.Logger
 	evaluators map[string]Evaluator
@@ -93,6 +95,7 @@ func NewEvaluationService(deps EvaluationDeps) *EvaluationService {
 		cfg:        deps.Config,
 		llm:        deps.LLM,
 		trace:      deps.CustomerTrace,
+		vendor:     deps.Vendor,
 		ops:        deps.OpsTracer,
 		logger:     deps.Logger,
 		evaluators: evaluators,

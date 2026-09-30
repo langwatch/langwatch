@@ -111,6 +111,7 @@ func Run(ctx context.Context, opts Options) error {
 			Config:     cfg,
 			Deps:       deps,
 			Dispatcher: disp,
+			Egress:     ssrfOpts,
 		})
 		if err != nil {
 			return err
