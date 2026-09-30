@@ -375,6 +375,7 @@ type AnalyzeResult struct {
 }
 ```
 
+- **Default is simple** (Alex, 2026-09-30): nlpgo ships patterns only; any model is a `remote` analyser, never embedded.
 - **Who owns what**: data-privacy (TS) keeps the policy and the method choice, including Google
   DLP and `connect` (it has licensing and the org opt-in). nlpgo owns detection: patterns plus a
   configured analyser for what patterns cannot find.
@@ -406,6 +407,7 @@ type AnalyzeResult struct {
 | OpenAI Privacy Filter | Apache-2.0 | 1.5B MoE, no LOCATION label, weak real-world recall in one vendor benchmark |
 | LiquidAI LFM2.5-Encoder-350M-PII | LFM1.0, terms unverified | Multilingual, strong claimed F1 |
 | Piiranha | CC-BY-NC-ND | Not usable |
+| Perplexity PII-Tracer | check | 0.6B, 13 languages, on-device focus; too large to embed, fine as a `remote` analyser an operator runs |
 
 - **Data residency**: `connect` and a SaaS-hosted `remote` send trace text to LangWatch; per-org
   opt-in, DPA coverage and region pinning are part of the connect decision.
