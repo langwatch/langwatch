@@ -278,7 +278,7 @@ export class RoleBindingService {
    * anything shared at all, so any row this method is asked about is refused.
    * (The personal team is refused earlier, by `assertNoPersonalTeamScope`.)
    */
-  private async assertRowsWithinLiteMemberSeat({
+  private async assertRowsWithinSeat({
     organizationRole,
     organizationId,
     bindings,
@@ -648,7 +648,7 @@ export class RoleBindingService {
       organizationId,
       bindings: [{ role, customRoleId, scopeType }],
     });
-    await this.assertRowsWithinLiteMemberSeat({
+    await this.assertRowsWithinSeat({
       organizationRole,
       organizationId,
       bindings: [{ role, scopeType, scopeId }],
@@ -718,7 +718,7 @@ export class RoleBindingService {
       // A row can outlive its member (historical data); with nobody on a seat
       // there is no ceiling to hold the edit against.
       if (membership) {
-        await this.assertRowsWithinLiteMemberSeat({
+        await this.assertRowsWithinSeat({
           organizationRole: membership.role,
           organizationId,
           bindings: [
@@ -823,7 +823,7 @@ export class RoleBindingService {
     });
     // The dialog applies the seat before this batch, so the ceiling is held
     // against the seat the member is on by the time the rows would be written.
-    await this.assertRowsWithinLiteMemberSeat({
+    await this.assertRowsWithinSeat({
       organizationRole,
       organizationId,
       bindings: bindingsToCreate,

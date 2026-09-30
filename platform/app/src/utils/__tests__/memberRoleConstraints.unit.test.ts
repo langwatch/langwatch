@@ -5,6 +5,7 @@ import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   getDefaultTeamRoleForOrganizationRole,
   getOrganizationRoleLabel,
+  holdsOrganizationBinding,
   holdsSharedAccess,
   isBindingRoleAllowedForOrganizationRole,
   isTeamRoleAllowedForOrganizationRole,
@@ -20,6 +21,19 @@ describe("memberRoleConstraints", () => {
           ORGANIZATION_TO_TEAM_ROLE_MAP[OrganizationUserRole.DEVELOPER],
         ).not.toBe(TeamUserRole.ADMIN);
       });
+    });
+  });
+
+  describe("holdsOrganizationBinding()", () => {
+    it("is true for the two Full seats only", () => {
+      expect(holdsOrganizationBinding(OrganizationUserRole.ADMIN)).toBe(true);
+      expect(holdsOrganizationBinding(OrganizationUserRole.MEMBER)).toBe(true);
+      expect(holdsOrganizationBinding(OrganizationUserRole.EXTERNAL)).toBe(
+        false,
+      );
+      expect(holdsOrganizationBinding(OrganizationUserRole.DEVELOPER)).toBe(
+        false,
+      );
     });
   });
 

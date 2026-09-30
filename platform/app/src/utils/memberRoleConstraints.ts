@@ -38,6 +38,18 @@ export function holdsSharedAccess(role: OrganizationUserRole): boolean {
   return role !== OrganizationUserRole.DEVELOPER;
 }
 
+/**
+ * Whether a seat carries the ORGANIZATION-scoped binding a Full member
+ * holds. A Lite Member does not (their access comes from their teams) and
+ * neither does a Developer (ADR-143), so the two writers of that binding ask
+ * this one question instead of naming each seat.
+ */
+export function holdsOrganizationBinding(role: OrganizationUserRole): boolean {
+  return (
+    role === OrganizationUserRole.ADMIN || role === OrganizationUserRole.MEMBER
+  );
+}
+
 export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
   if (role === OrganizationUserRole.ADMIN) return "Organization Admin";
   if (role === OrganizationUserRole.MEMBER) return "Organization Member";

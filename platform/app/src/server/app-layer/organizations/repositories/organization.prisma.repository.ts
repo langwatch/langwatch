@@ -26,7 +26,7 @@ import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-t
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
-  holdsSharedAccess,
+  holdsOrganizationBinding,
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
@@ -1255,10 +1255,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         data: { role },
       });
 
-      // Keep the ORGANIZATION-scoped grant in sync. A Lite Member has none
-      // (access comes from their teams) and neither does a Developer
-      // (ADR-143: personal team only), so both seats revoke it instead.
-      if (role !== OrganizationUserRole.EXTERNAL && holdsSharedAccess(role)) {
+      // Keep the ORGANIZATION-scoped grant in sync. The seats that carry
+      // none (Lite Member: access comes from their teams; Developer: personal
+      // team only, ADR-143) revoke it instead.
+      if (holdsOrganizationBinding(role)) {
         plans.push(
           await planUserScopeBinding({
             tx,
