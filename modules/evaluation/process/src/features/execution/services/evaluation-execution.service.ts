@@ -379,6 +379,7 @@ export class EvaluationExecutionService {
     });
 
     const result = await this.deps.langevalsClient.evaluate({
+      projectId,
       evaluatorType: builtInType,
       data: data.data,
       settings: settings ?? {},

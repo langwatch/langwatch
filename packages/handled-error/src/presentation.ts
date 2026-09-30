@@ -1022,6 +1022,10 @@ const presentations = {
     title: "That's too much text for this evaluator",
     describe: () => "Shorten the input and try again.",
   },
+  evaluation_busy: {
+    title: "Too many evaluations are running for this project",
+    describe: () => "Wait a moment, then run the evaluator again.",
+  },
   experiment_not_ready_for_monitor: {
     title: "This evaluation can't run as a monitor yet",
     describe: () => "Add an evaluator to it and save, then try again.",
@@ -6059,6 +6063,20 @@ const presentations = {
   evaluator_unconfigured: {
     title: "This evaluator isn't configured",
     describe: () => "Finish setting it up before running.",
+  },
+
+  // ---- evaluator runtime (server-to-server; TS maps each to its own code) ----
+  tenant_missing: {
+    title: "The evaluator runtime didn't know which project this was for",
+    describe: () => "Try running the evaluator again.",
+  },
+  evaluator_settings_invalid: {
+    title: "This evaluator isn't configured correctly",
+    describe: () => "Check its settings and try again.",
+  },
+  evaluation_payload_too_large: {
+    title: "That's too much text for this evaluator",
+    describe: () => "Shorten the input and try again.",
   },
 
   // ---- agent node ----
