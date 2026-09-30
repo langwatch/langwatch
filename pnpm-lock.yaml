@@ -7492,9 +7492,6 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/experiment-browser':
-        specifier: workspace:*
-        version: link:../../experiment/browser
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -7510,27 +7507,18 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
-      '@langwatch/prompt-browser':
-        specifier: workspace:*
-        version: link:../../prompt/browser
       '@langwatch/prompt-browser-kit':
         specifier: workspace:*
         version: link:../../prompt/browser-kit
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/trace-browser':
-        specifier: workspace:*
-        version: link:../../trace/browser
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
-      '@langwatch/workflow-browser':
-        specifier: workspace:*
-        version: link:../../workflow/browser
       '@langwatch/workflow-browser-kit':
         specifier: workspace:*
         version: link:../../workflow/browser-kit
@@ -7871,9 +7859,6 @@ importers:
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
-      '@langwatch/workflow-browser':
-        specifier: workspace:*
-        version: link:../../workflow/browser
       '@langwatch/workflow-browser-kit':
         specifier: workspace:*
         version: link:../../workflow/browser-kit
@@ -12106,9 +12091,6 @@ importers:
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../../../packages/error-presentation
-      '@langwatch/experiment-browser':
-        specifier: workspace:*
-        version: link:../../experiment/browser
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -12145,9 +12127,6 @@ importers:
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../topic/contract
-      '@langwatch/trace-browser':
-        specifier: workspace:*
-        version: link:../../trace/browser
       '@langwatch/trace-browser-kit':
         specifier: workspace:*
         version: link:../../trace/browser-kit
@@ -12157,9 +12136,6 @@ importers:
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
-      '@langwatch/workflow-browser':
-        specifier: workspace:*
-        version: link:../../workflow/browser
       '@langwatch/workflow-browser-kit':
         specifier: workspace:*
         version: link:../../workflow/browser-kit
@@ -12731,9 +12707,6 @@ importers:
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../../../packages/error-presentation
-      '@langwatch/evaluator-browser':
-        specifier: workspace:*
-        version: link:../../evaluator/browser
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -12773,9 +12746,6 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
-      '@langwatch/prompt-browser':
-        specifier: workspace:*
-        version: link:../../prompt/browser
       '@langwatch/prompt-browser-kit':
         specifier: workspace:*
         version: link:../../prompt/browser-kit
@@ -12794,9 +12764,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/trace-browser':
-        specifier: workspace:*
-        version: link:../../trace/browser
       '@langwatch/trace-browser-kit':
         specifier: workspace:*
         version: link:../../trace/browser-kit
@@ -12806,9 +12773,6 @@ importers:
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
-      '@langwatch/workflow-browser':
-        specifier: workspace:*
-        version: link:../../workflow/browser
       '@langwatch/workflow-browser-kit':
         specifier: workspace:*
         version: link:../../workflow/browser-kit
@@ -14018,9 +13982,6 @@ importers:
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
-      '@langwatch/evaluator-browser':
-        specifier: workspace:*
-        version: link:../../evaluator/browser
       '@langwatch/evaluator-browser-kit':
         specifier: workspace:*
         version: link:../../evaluator/browser-kit
@@ -14063,9 +14024,6 @@ importers:
       '@langwatch/redaction':
         specifier: workspace:*
         version: link:../../../packages/redaction
-      '@langwatch/scenario-browser':
-        specifier: workspace:*
-        version: link:../../scenario/browser
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
@@ -15002,18 +14960,12 @@ importers:
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../../../packages/error-presentation
-      '@langwatch/evaluator-browser':
-        specifier: workspace:*
-        version: link:../../evaluator/browser
       '@langwatch/evaluator-browser-kit':
         specifier: workspace:*
         version: link:../../evaluator/browser-kit
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
-      '@langwatch/experiment-browser':
-        specifier: workspace:*
-        version: link:../../experiment/browser
       '@langwatch/experiment-browser-kit':
         specifier: workspace:*
         version: link:../../experiment/browser-kit
@@ -15038,9 +14990,6 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
-      '@langwatch/prompt-browser':
-        specifier: workspace:*
-        version: link:../../prompt/browser
       '@langwatch/prompt-browser-kit':
         specifier: workspace:*
         version: link:../../prompt/browser-kit
@@ -15854,9 +15803,6 @@ importers:
         specifier: workspace:*
         version: link:../time
     devDependencies:
-      '@langwatch/test-harness':
-        specifier: workspace:*
-        version: link:../test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -17298,9 +17244,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/auth-browser':
-        specifier: workspace:*
-        version: link:../../modules/auth/browser
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config

@@ -7,12 +7,6 @@
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
-  privateRouteOrgId,
-  startTestClickHouseEndpoints,
-} from "@langwatch/test-harness/clickhouse";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
   ClickHouseConnection,
@@ -22,7 +16,10 @@ import {
   PRIVATE_ROUTE_ENV_PREFIX,
   type ClickHouseClientCreationInput,
   type TenantDirectory,
-} from "../index.ts";
+} from "@langwatch/clickhouse-client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { privateRouteOrgId, startTestClickHouseEndpoints } from "../clickhouse-test-endpoints.ts";
 
 const TEST_TABLE = "tenant_routing_isolation";
 

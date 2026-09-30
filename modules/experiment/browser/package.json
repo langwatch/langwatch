@@ -46,7 +46,6 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
-    "@langwatch/workflow-browser": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",

@@ -28,9 +28,6 @@
     },
     {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../test-harness/tsconfig.build.json"
     }
   ]
 }

@@ -10,9 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1", slug: "p1" } }),
 }));
-vi.mock("@langwatch/trace-browser/surfaces/project-span-names", () => ({
-  useProjectSpanNames: () => ({ spanNames: [], metadataKeys: [] }),
-}));
 
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
