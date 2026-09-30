@@ -210,8 +210,6 @@ export default function SecretsScreen() {
         {canManageSecrets && (
           <Tooltip content="Add a new secret for use in code blocks" disabled={false}>
             <PageLayout.HeaderButton
-              variant="solid"
-              colorPalette="blue"
               onClick={() => setIsAddDialogOpen(true)}
               data-testid="secret-add"
             >
@@ -221,6 +219,7 @@ export default function SecretsScreen() {
         )}
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text color="fg.muted">Encrypted values your code blocks can read at run time.</Text>
         {secretsQuery.isLoading && <Skeleton width="full" height="120px" />}
         {showEmpty && (
           <NoDataInfoBlock
@@ -305,7 +304,8 @@ export default function SecretsScreen() {
                 <Button variant="outline">Cancel</Button>
               </Dialog.ActionTrigger>
               <Button
-                colorPalette="blue"
+                variant="outline"
+                colorPalette="orange"
                 loading={createMutation.isPending}
                 disabled={!newSecretName || !newSecretValue}
                 data-testid="secret-save"
@@ -380,7 +380,8 @@ export default function SecretsScreen() {
                 <Button variant="outline">Cancel</Button>
               </Dialog.ActionTrigger>
               <Button
-                colorPalette="blue"
+                variant="outline"
+                colorPalette="orange"
                 loading={updateMutation.isPending}
                 disabled={!updateValue}
                 data-testid="secret-update-save"
