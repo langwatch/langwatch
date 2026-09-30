@@ -138,10 +138,11 @@ type selectionFields struct {
 	// Payment is stored as "paymentsim": every file written while the lane was
 	// opt-in says `"payment": false`, which would keep the new default off, so
 	// that key is no longer decoded (the "workers" precedent above).
-	Payment   *bool `json:"paymentsim"`
-	Telemetry *bool `json:"telemetry"`
-	Lambda    *bool `json:"lambda"`
-	Github    *bool `json:"github"`
+	Payment      *bool `json:"paymentsim"`
+	Telemetry    *bool `json:"telemetry"`
+	Lambda       *bool `json:"lambda"`
+	Github       *bool `json:"github"`
+	GoEvaluators *bool `json:"go-evaluators"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
 	// when both are present; WriteSelection never writes it, so the next
@@ -173,6 +174,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Telemetry, nil, &sel.Telemetry},
 		{f.Lambda, nil, &sel.Lambda},
 		{f.Github, nil, &sel.Github},
+		{f.GoEvaluators, nil, &sel.GoEvaluators},
 	} {
 		switch {
 		case field.stated != nil:
@@ -235,6 +237,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Telemetry:    &sel.Telemetry,
 		Lambda:       &sel.Lambda,
 		Github:       &sel.Github,
+		GoEvaluators: &sel.GoEvaluators,
 	}}, "", "  ")
 	if err != nil {
 		return err
