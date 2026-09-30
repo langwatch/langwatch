@@ -489,12 +489,12 @@ export class ModelProviderApp implements ModelProviderApi {
   }
 
   /**
-   * The project credential's own write. Nothing is attributed and nothing is
-   * authorized here: the key was already held to `project:update` on the one
-   * project it resolves to, which is the whole gate this door has ever had.
+   * The project credential's own write. Nothing is attributed or authorized here:
+   * the key was already held to `project:update` on its one project. The provider
+   * string names that project's own row, as main's did.
    */
   upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider> {
-    return this.#modelProviders.upsert(input);
+    return this.#modelProviders.upsertByProviderKey(input);
   }
 
   /** Removes a provider row, attributed to the caller. */

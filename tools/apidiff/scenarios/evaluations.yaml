@@ -52,7 +52,7 @@
 - {"id": "monitors-create-guardrail-mode", "endpoint": "POST /api/monitors", "setup": [{"request": "POST /api/evaluators", "body": {"name": "ev-{uid}", "config": {"evaluatorType": "langevals/exact_match"}}, "capture": {"evaluatorId": "id", "evaluatorSlug": "slug"}}], "request": {"path": "/api/monitors", "body": {"name": "mon-{uid}", "checkType": "langevals/exact_match", "evaluatorId": "{evaluatorId}", "parameters": {}, "executionMode": "AS_GUARDRAIL"}}, "capture": {"monitorId": "id"}, "expect": {"status": 201}, "verify": [{"request": "GET /api/monitors/{monitorId}", "expect": {"status": 200, "body": {"executionMode": "AS_GUARDRAIL"}}}]}
 - {"id": "monitors-create-sample-and-thread-level", "endpoint": "POST /api/monitors", "setup": [{"request": "POST /api/evaluators", "body": {"name": "ev-{uid}", "config": {"evaluatorType": "langevals/exact_match"}}, "capture": {"evaluatorId": "id", "evaluatorSlug": "slug"}}], "request": {"path": "/api/monitors", "body": {"name": "mon-{uid}", "checkType": "langevals/exact_match", "evaluatorId": "{evaluatorId}", "parameters": {}, "sample": 0.25, "level": "thread", "threadIdleTimeout": 300}}, "capture": {"monitorId": "id"}, "expect": {"status": 201}, "verify": [{"request": "GET /api/monitors/{monitorId}", "expect": {"status": 200, "body": {"sample": 0.25, "level": "thread", "threadIdleTimeout": 300}}}]}
 - {"id": "monitors-create-with-preconditions", "endpoint": "POST /api/monitors", "setup": [{"request": "POST /api/evaluators", "body": {"name": "ev-{uid}", "config": {"evaluatorType": "langevals/exact_match"}}, "capture": {"evaluatorId": "id", "evaluatorSlug": "slug"}}], "request": {"path": "/api/monitors", "body": {"name": "mon-{uid}", "checkType": "langevals/exact_match", "evaluatorId": "{evaluatorId}", "parameters": {}, "preconditions": [{"field": "input", "rule": "contains", "value": "hello"}]}}, "capture": {"monitorId": "id"}, "expect": {"status": 201}, "verify": [{"request": "GET /api/monitors/{monitorId}", "expect": {"status": 200, "contains": "hello"}}]}
-- {"id": "monitors-create-without-evaluator", "endpoint": "POST /api/monitors", "request": {"path": "/api/monitors", "body": {"name": "mon-{uid}", "checkType": "langevals/exact_match", "parameters": {}}}, "expect": {"status": 400, "body": {"error": "monitor_evaluator_required"}}, "verify": [{"request": "GET /api/monitors", "expect": {"status": 200, "notContains": "mon-{uid}"}}]}
+- {"id": "monitors-create-without-evaluator", "endpoint": "POST /api/monitors", "request": {"path": "/api/monitors", "body": {"name": "mon-{uid}", "checkType": "langevals/exact_match", "parameters": {}}}, "expect": {"status": 400, "contains": "monitor_evaluator_required"}, "verify": [{"request": "GET /api/monitors", "expect": {"status": 200, "notContains": "mon-{uid}"}}]}
 - {"id": "monitors-create-unknown-evaluator", "endpoint": "POST /api/monitors", "request": {"path": "/api/monitors", "body": {"name": "mon-{uid}", "checkType": "langevals/exact_match", "evaluatorId": "evaluator_missing_{uid}", "parameters": {}}}, "expect": {"status": [400, 404]}, "verify": [{"request": "GET /api/monitors", "expect": {"status": 200, "notContains": "mon-{uid}"}}]}
 - {"id": "monitors-create-missing-name", "endpoint": "POST /api/monitors", "setup": [{"request": "POST /api/evaluators", "body": {"name": "ev-{uid}", "config": {"evaluatorType": "langevals/exact_match"}}, "capture": {"evaluatorId": "id", "evaluatorSlug": "slug"}}], "request": {"path": "/api/monitors", "body": {"checkType": "langevals/exact_match", "evaluatorId": "{evaluatorId}", "parameters": {}}}, "expect": {"status": [400, 422]}, "verify": [{"countDelta": {"request": "GET /api/monitors", "path": "", "by": 0}}], "shard": "project"}
 - {"id": "monitors-create-missing-check-type", "endpoint": "POST /api/monitors", "setup": [{"request": "POST /api/evaluators", "body": {"name": "ev-{uid}", "config": {"evaluatorType": "langevals/exact_match"}}, "capture": {"evaluatorId": "id", "evaluatorSlug": "slug"}}], "request": {"path": "/api/monitors", "body": {"name": "mon-{uid}", "evaluatorId": "{evaluatorId}", "parameters": {}}}, "expect": {"status": [400, 422]}, "verify": [{"request": "GET /api/monitors", "expect": {"status": 200, "notContains": "mon-{uid}"}}]}
@@ -224,7 +224,20 @@
 - {"id": "experiments-wbstate-put-not-found", "endpoint": "PUT /api/experiments/{slug}/workbench-state", "request": {"path": "/api/experiments/missing-{uid}/workbench-state", "body": {"state": {}}}, "expect": {"status": [400, 404]}}
 - {"id": "experiments-wbstate-put-refuses-no-key", "endpoint": "PUT /api/experiments/{slug}/workbench-state", "auth": "none", "setup": [{"request": "POST /api/experiments", "body": {"name": "exp-{uid}"}, "capture": {"expId": "id", "expSlug": "slug"}}], "request": {"path": "/api/experiments/{expSlug}/workbench-state", "body": {"state": {}}}, "expect": {"status": 401}}
 - {"id": "experiments-wbstate-put-refuses-readonly-key", "endpoint": "PUT /api/experiments/{slug}/workbench-state", "auth": "restricted", "setup": [{"request": "POST /api/experiments", "body": {"name": "exp-{uid}"}, "capture": {"expId": "id", "expSlug": "slug"}}], "request": {"path": "/api/experiments/{expSlug}/workbench-state", "body": {"state": {}}}, "expect": {"status": [401, 403]}}
-- {"id": "experiments-wbstate-put-wrong-project", "endpoint": "PUT /api/experiments/{slug}/workbench-state", "auth": "project-b", "setup": [{"request": "POST /api/experiments", "body": {"name": "exp-{uid}"}, "capture": {"expId": "id", "expSlug": "slug"}}], "request": {"path": "/api/experiments/{expSlug}/workbench-state", "body": {"state": {}}}, "expect": {"status": 404}}
+- id: experiments-wbstate-put-wrong-project
+  endpoint: PUT /api/experiments/{slug}/workbench-state
+  auth: project-b
+  setup:
+    - request: POST /api/experiments
+      auth: project
+      body: { name: "exp-{uid}" }
+      capture: { expSlug: slug }
+  request: { path: "/api/experiments/{expSlug}/workbench-state", body: { state: {}, commitMessage: "hijacked-{uid}" } }
+  expect: { status: [400, 404] }
+  verify:
+    - request: GET /api/experiments/{expSlug}/versions
+      auth: project
+      expect: { status: 200, path: versions, length: 1, notContains: "hijacked-{uid}" }
 - {"id": "experiments-versions-list-happy", "endpoint": "GET /api/experiments/{slug}/versions", "setup": [{"request": "POST /api/experiments", "body": {"name": "exp-{uid}"}, "capture": {"expId": "id", "expSlug": "slug"}}], "request": {"path": "/api/experiments/{expSlug}/versions"}, "expect": {"status": 200}}
 - {"id": "experiments-versions-list-not-found", "endpoint": "GET /api/experiments/{slug}/versions", "request": {"path": "/api/experiments/missing-{uid}/versions"}, "expect": {"status": 404}}
 - {"id": "experiments-versions-list-bad-limit", "endpoint": "GET /api/experiments/{slug}/versions", "setup": [{"request": "POST /api/experiments", "body": {"name": "exp-{uid}"}, "capture": {"expId": "id", "expSlug": "slug"}}], "request": {"path": "/api/experiments/{expSlug}/versions", "query": {"limit": -1}}, "expect": {"status": 200}}
@@ -265,9 +278,9 @@
 - {"id": "experiment-init-init-refuses-no-key", "endpoint": "POST /api/experiment/init", "auth": "none", "request": {"path": "/api/experiment/init", "body": {"experiment_slug": "init-{uid}", "experiment_type": "DSPY"}}, "expect": {"status": 401}, "verify": [{"request": "GET /api/experiments/init-{uid}", "expect": {"status": 404}}]}
 - {"id": "experiment-init-init-refuses-readonly-key", "endpoint": "POST /api/experiment/init", "auth": "restricted", "request": {"path": "/api/experiment/init", "body": {"experiment_slug": "init-{uid}", "experiment_type": "DSPY"}}, "expect": {"status": [401, 403]}, "verify": [{"request": "GET /api/experiments/init-{uid}", "expect": {"status": 404}}]}
 - {"id": "experiments-execute-refuses-no-key", "endpoint": "POST /api/experiments/execute", "auth": "none", "request": {"path": "/api/experiments/execute", "body": {}}, "expect": {"status": [400, 401, 422]}}
-- {"id": "experiments-execute-empty-body", "endpoint": "POST /api/experiments/execute", "request": {"path": "/api/experiments/execute", "body": {}}, "expect": {"status": [400, 422]}}
+- {"id": "experiments-execute-empty-body", "endpoint": "POST /api/experiments/execute", "auth": "session", "request": {"path": "/api/experiments/execute", "body": {}}, "expect": {"status": [400, 422]}}
 - {"id": "experiments-execute-refuses-readonly-key", "endpoint": "POST /api/experiments/execute", "auth": "restricted", "request": {"path": "/api/experiments/execute", "body": {}}, "expect": {"status": [400, 401, 403, 422]}}
-- {"id": "experiments-execute-unknown-experiment", "endpoint": "POST /api/experiments/execute", "request": {"path": "/api/experiments/execute", "body": {"experimentId": "exp_missing_{uid}"}}, "expect": {"status": [400, 404, 422]}}
+- {"id": "experiments-execute-unknown-experiment", "endpoint": "POST /api/experiments/execute", "auth": "session", "request": {"path": "/api/experiments/execute", "body": {"experimentId": "exp_missing_{uid}"}}, "expect": {"status": [400, 404, 422]}}
 - {"id": "experiments-abort-refuses-no-key", "endpoint": "POST /api/experiments/abort", "auth": "none", "request": {"path": "/api/experiments/abort", "body": {}}, "expect": {"status": [400, 401, 422]}}
 - {"id": "experiments-abort-empty-body", "endpoint": "POST /api/experiments/abort", "request": {"path": "/api/experiments/abort", "body": {}}, "expect": {"status": [400, 422]}}
 - {"id": "experiments-abort-refuses-readonly-key", "endpoint": "POST /api/experiments/abort", "auth": "restricted", "request": {"path": "/api/experiments/abort", "body": {}}, "expect": {"status": [400, 401, 403, 422]}}
@@ -328,13 +341,15 @@
 - {"id": "workflows-code-completion-empty-body", "endpoint": "POST /api/workflows/code-completion", "request": {"path": "/api/workflows/code-completion", "body": {}}, "expect": {"status": [400, 401, 422]}}
 - {"id": "workflows-health-answers", "endpoint": "GET /api/health/workflows", "request": {"path": "/api/health/workflows"}, "expect": {"status": [200, 404, 500, 502, 503]}}
 
-# ---- cov-readback: writes read back (workflows have no create route, so they borrow the first listed workflow) ----
+# ---- cov-readback: writes read back (workflows are created by the session through tRPC workflow.create) ----
 
 - id: workflows-get-reads-listed-workflow
   endpoint: GET /api/workflows/{id}
   setup:
-    - request: GET /api/workflows
-      capture: { wfId: "0.id", wfName: "0.name" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}" }
   expect: { status: 200, body: { id: "{wfId}", name: "{wfName}", platformUrl: "<any>", isEvaluator: "<any>", createdAt: "<any>" } }
@@ -343,8 +358,10 @@
   endpoint: PATCH /api/workflows/{id}
   shard: serial
   setup:
-    - request: GET /api/workflows
-      capture: { wfId: "0.id", wfName: "0.name" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "renamed-{uid}" } }
   expect: { status: 200, body: { id: "{wfId}", name: "renamed-{uid}" } }
@@ -363,8 +380,10 @@
   endpoint: PATCH /api/workflows/{id}
   shard: serial
   setup:
-    - request: GET /api/workflows
-      capture: { wfId: "0.id", wfName: "0.name", wfDescription: "0.description" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name", wfDescription: "result.data.json.workflow.description" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { description: "described-{uid}", icon: "🧪" } }
   expect: { status: 200, body: { id: "{wfId}", description: "described-{uid}", icon: "🧪", name: "{wfName}" } }
@@ -380,8 +399,10 @@
 - id: workflows-update-empty-name-leaves-name
   endpoint: PATCH /api/workflows/{id}
   setup:
-    - request: GET /api/workflows
-      capture: { wfId: "0.id", wfName: "0.name" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "" } }
   expect: { status: [400, 422] }
@@ -393,9 +414,10 @@
   endpoint: PATCH /api/workflows/{id}
   auth: none
   setup:
-    - request: GET /api/workflows
-      auth: project
-      capture: { wfId: "0.id", wfName: "0.name" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "refused-{uid}" } }
   expect: { status: 401 }
@@ -408,9 +430,10 @@
   endpoint: PATCH /api/workflows/{id}
   auth: restricted
   setup:
-    - request: GET /api/workflows
-      auth: project
-      capture: { wfId: "0.id", wfName: "0.name" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "refused-{uid}" } }
   expect: { status: [401, 403] }
@@ -423,9 +446,10 @@
   endpoint: PATCH /api/workflows/{id}
   auth: project-b
   setup:
-    - request: GET /api/workflows
-      auth: project
-      capture: { wfId: "0.id", wfName: "0.name" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "hijacked-{uid}" } }
   expect: { status: 404 }
@@ -438,9 +462,10 @@
   endpoint: DELETE /api/workflows/{id}
   auth: none
   setup:
-    - request: GET /api/workflows
-      auth: project
-      capture: { wfId: "0.id" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}" }
   expect: { status: 401 }
@@ -453,9 +478,10 @@
   endpoint: DELETE /api/workflows/{id}
   auth: restricted
   setup:
-    - request: GET /api/workflows
-      auth: project
-      capture: { wfId: "0.id" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}" }
   expect: { status: [401, 403] }
@@ -468,9 +494,10 @@
   endpoint: DELETE /api/workflows/{id}
   auth: project-b
   setup:
-    - request: GET /api/workflows
-      auth: project
-      capture: { wfId: "0.id" }
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
+      capture: { wfId: "result.data.json.workflow.id" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}" }
   expect: { status: 404 }

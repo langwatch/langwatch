@@ -2157,13 +2157,13 @@
 
 - id: export-traces-rejects-empty-body
   endpoint: POST /api/export/traces/download
-  auth: none
+  auth: session
   request: {"path": "/api/export/traces/download", "body": {}}
   expect: {"status": [400, 422]}
 
 - id: export-traces-rejects-unknown-format
   endpoint: POST /api/export/traces/download
-  auth: none
+  auth: session
   request: {"path": "/api/export/traces/download", "body": {"projectId": "{projectId}", "mode": "summary", "format": "xlsx", "startDate": 1700000000000, "endDate": 4102444800000}}
   expect: {"status": [400, 422]}
 

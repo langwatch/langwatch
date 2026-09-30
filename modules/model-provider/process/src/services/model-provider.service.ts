@@ -269,6 +269,10 @@ export class ModelProviderService {
     return this.commands.upsert(input);
   }
 
+  upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProvider> {
+    return this.commands.upsertByProviderKey(input);
+  }
+
   delete(input: ModelProviderDeleteInput): Promise<void> {
     return this.commands.delete(input);
   }
