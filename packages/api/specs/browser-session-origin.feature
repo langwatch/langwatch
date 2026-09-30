@@ -14,14 +14,14 @@ Feature: A browser-session write is accepted only from this deployment's own pag
       When a signed-in browser writes with an Origin naming the public base host, or marks it Sec-Fetch-Site same-origin
       Then the session is read and the caller is identified
 
-  Rule: A write that does not prove it came from our own pages is refused before any session is read
+  Rule: A signed-in write that does not prove it came from our own pages is refused
 
     @unit
     Scenario: A write from a foreign origin is refused
       Given the deployment's public base host is configured
       When a browser writes with an Origin naming another site, or marks it Sec-Fetch-Site cross-site
       Then it is refused with 403 and the code cross_origin_refused
-      And no session is looked up
+      And a foreign write carrying no session is answered as nobody, 401 where a session is required
 
     @unit
     Scenario: A write carrying neither an Origin nor a Referer is refused

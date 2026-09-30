@@ -104,9 +104,10 @@ import { registerRoutePolicy } from "./security.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
-// The one REST execution path: parse, authenticate, decide, handle, check answer, respond.
-// Request parsed BEFORE credential resolution, so malformed bodies are refused without touching
-// the key. Routes answer at three addresses (dated namespace, `latest`, bare path) plus v1 twins.
+// The one REST execution path: authenticate, parse, decide, handle, check answer, respond.
+// The caller is authenticated BEFORE the body is parsed, so a refused credential never learns
+// the body failed its schema (ARCHITECTURE.md §8). Routes answer at three addresses (dated
+// namespace, `latest`, bare path) plus v1 twins.
 
 const ROUTE_PARAMS = "routeParams" as const;
 const VERSION_REQUEST = "apiVersionRequest" as const;
@@ -562,6 +563,23 @@ function routeStack<Api>({
   // cookie, so an advertised operation would be one nothing can call.
   const publishable = route.anyMethod !== true && declaration.credential !== "browser";
   const documents = documented && publishable;
+  const credential = route.credential ?? declaration.credential;
+  const door = authenticateMiddleware({ route, credential, ports });
+
+  // Ahead of the validators: they read the body to parse it, and a stream
+  // read once cannot be drained again to measure it.
+  const cap = limit
+    ? [
+        bodyLimit({
+          maxSize: limit.maxBytes,
+          onError: () => {
+            throw limit.onExceeded();
+          },
+        }),
+      ]
+    : [];
+
+  const raw = route.rawBody ? [rawBodyMiddleware(route.rawBody)] : [];
 
   return [
     ...(route.response?.refusal ? [protocolRefusalScope(route)] : []),
@@ -581,21 +599,9 @@ function routeStack<Api>({
     ...(deprecated
       ? [deprecatedAlias(deprecated), deprecationLog({ route, family, deprecated, ports })]
       : []),
-    // Ahead of the validators: they read the body to parse it, and a stream
-    // read once cannot be drained again to measure it.
-    ...(limit
-      ? [
-          bodyLimit({
-            maxSize: limit.maxBytes,
-            onError: () => {
-              throw limit.onExceeded();
-            },
-          }),
-        ]
-      : []),
-    // After the cap and before the validators, which never see a raw body: the
-    // bytes are read once, exactly as they were sent.
-    ...(route.rawBody ? [rawBodyMiddleware(route.rawBody)] : []),
+    // The door answers before the cap drains a byte (main's order), unless it signs over the
+    // body: then the capped bytes are read once, exactly as sent, and it verifies those.
+    ...(doorReadsBody(route) ? [...cap, ...raw, door] : [door, ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -609,7 +615,7 @@ function routeStack<Api>({
     inputMiddleware({ route, paramSource }),
     handlerMiddleware({
       route,
-      credential: route.credential ?? declaration.credential,
+      credential,
       ports,
       options,
       facts,
@@ -617,6 +623,55 @@ function routeStack<Api>({
       version,
     }),
   ];
+}
+
+/** Who each request's door authenticated: `null` for nobody at an optional door. */
+const callers = new WeakMap<Context, RestCaller | null>();
+
+/** Whether the door verifies the raw body (a signed door), so reads it before it answers. */
+function doorReadsBody(route: RestTransportRoute<unknown>): boolean {
+  const kind = route.access?.kind;
+
+  return route.rawBody !== undefined && (kind === "authenticated" || kind === "deferred");
+}
+
+/**
+ * Who is calling, settled before the body is parsed or validated (Alex, 2026-09-30). Which
+ * project the caller may act on is decided later, from the parsed input.
+ */
+function authenticateMiddleware({
+  route,
+  credential,
+  ports,
+}: {
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+  ports: RestRuntimeMembers;
+}): MiddlewareHandler {
+  return async (context, next) => {
+    if (route.access?.kind !== "public") {
+      const caller = await callerOf({
+        route,
+        door: doorOf({ credential, ports }),
+        credential,
+        request: context.req.raw,
+        rawBody: context.get(ROUTE_RAW_BODY),
+      });
+
+      callers.set(context, caller);
+    }
+
+    await next();
+  };
+}
+
+/** @see authenticateMiddleware, which every non-public route's stack runs first. */
+function authenticatedCaller(context: Context): RestCaller | null {
+  const caller = callers.get(context);
+
+  if (caller === undefined) throw new Error("REST handler reached before its door answered");
+
+  return caller;
 }
 
 /** The exact characters or bytes a route that parses nothing was sent. */
@@ -950,14 +1005,7 @@ function handlerMiddleware<Api>({
     }
 
     const door = doorOf({ credential, ports });
-
-    const caller = await callerOf({
-      route,
-      door,
-      credential,
-      request: context.req.raw,
-      rawBody: context.get(ROUTE_RAW_BODY),
-    });
+    const caller = authenticatedCaller(context);
 
     // An optional door the caller presented nothing at: the handler is told
     // there is no one behind the request rather than handed a guess.

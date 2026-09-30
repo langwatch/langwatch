@@ -87,3 +87,25 @@ Feature: The REST runtime renders what a transport may not hand-roll
       When the refusal is rendered
       Then its status and its body are exactly what the family's boundary renders
       And a Retry-After the boundary or the rate limiter already set is kept
+
+  Rule: A request is authenticated before its body is read (ARCHITECTURE.md §8, Alex, 2026-09-30)
+
+    @integration
+    Scenario: A refused credential is answered before the body is validated
+      Given a route whose body, form or path fails its schema, or exceeds its cap
+      When the caller presents no credential or an invalid one
+      Then it is refused with 401, never 422 or 413, and the handler is not reached
+      And an authenticated caller sending the same request is refused with 422 or 413
+
+    @integration
+    Scenario: A signed door verifies the raw body before anything is parsed
+      Given a route whose door verifies a signature over the raw body
+      When the signature does not match
+      Then it is refused with 401 before its path or body is validated
+      And a matching signature hands the handler the exact bytes that were verified
+
+    @integration
+    Scenario: The project a route acts on is still resolved from its parsed input
+      Given a route that names its project in its query
+      When an authenticated caller sends it
+      Then the permission is asked at the project the parsed query named

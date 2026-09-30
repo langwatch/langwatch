@@ -63,11 +63,12 @@ export class BrowserSessionIdentity implements RestIdentity {
   }
 
   async identifyOptional({ request }: { request: Request }): Promise<RestCaller | null> {
-    const writes = !["GET", "HEAD", "OPTIONS"].includes(request.method);
-    if (writes && !this.#isFromOwnPages(request)) throw new BrowserOriginRefusedError();
-
+    // No session is no credential to forge a write with: nobody answers as nobody, 401 as on main.
     const caller = await this.#sessions.read(request);
     if (!caller?.userId) return null;
+
+    const writes = !["GET", "HEAD", "OPTIONS"].includes(request.method);
+    if (writes && !this.#isFromOwnPages(request)) throw new BrowserOriginRefusedError();
 
     recordBrowserCaller(request, { userId: caller.userId });
 

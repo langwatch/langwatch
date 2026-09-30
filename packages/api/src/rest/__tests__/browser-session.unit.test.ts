@@ -78,15 +78,27 @@ describe("browser session identity", () => {
       ["a foreign Referer", { referer: "https://other.example/page" }],
       ["a malformed Origin", { origin: "not a url" }],
       ["Sec-Fetch-Site cross-site", { "sec-fetch-site": "cross-site", origin: PUBLIC_BASE_URL }],
-    ])("refuses %s before looking up a session", async (_, headers) => {
-      const { identity, verify } = identityOver();
+    ])("refuses %s from a signed-in session", async (_, headers) => {
+      const { identity } = identityOver();
 
       await expect(identity.identify({ request: write(headers) })).rejects.toMatchObject({
         code: "cross_origin_refused",
         httpStatus: 403,
       });
+    });
 
-      expect(verify).not.toHaveBeenCalled();
+    /** @scenario "A write from a foreign origin is refused" */
+    it("answers a foreign write carrying no session as nobody, 401 where one is required", async () => {
+      const identity = BrowserSessionIdentity.create({
+        sessions: SessionReader.create({ verify: async () => null }),
+        authz: createApiFixture<AuthzApi>(),
+        publicBaseUrl: PUBLIC_BASE_URL,
+      });
+
+      const request = write({ origin: "https://other.example" });
+
+      expect(await identity.identifyOptional({ request })).toBeNull();
+      await expect(identity.identify({ request })).rejects.toMatchObject({ httpStatus: 401 });
     });
 
     /** @scenario "A write from a foreign origin is refused" */
@@ -100,13 +112,11 @@ describe("browser session identity", () => {
 
     /** @scenario "A write carrying neither an Origin nor a Referer is refused" */
     it("refuses a write with no Sec-Fetch-Site, Origin or Referer", async () => {
-      const { identity, verify } = identityOver();
+      const { identity } = identityOver();
 
       await expect(
         identity.identify({ request: write({ host: "127.0.0.1:6560" }) }),
       ).rejects.toMatchObject({ code: "cross_origin_refused", httpStatus: 403 });
-
-      expect(verify).not.toHaveBeenCalled();
     });
   });
 
