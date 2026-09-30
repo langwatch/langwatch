@@ -1720,13 +1720,17 @@ here, once, by name, so both consuming templates agree.
 {{/* Renders terminationGracePeriodSeconds for a Node component, refusing the
      render when it cannot cover that component's shutdown budget.
 
-     Two clocks are derived from one number, shutdownDrainSeconds (D):
+     Three clocks are derived from one number, shutdownDrainSeconds (D):
 
+       SHUTDOWN_DRAIN_TIMEOUT_MS    = D         the queue stops waiting for
+                                                in-flight jobs here
+                                                (packages/process-stores/src/config-owner.ts)
        PROCESS_SHUTDOWN_DEADLINE_MS = D + 20s   the process force-exits here
                                                 (packages/process-server/src/config.ts)
        required grace               = D + 30s   the kubelet SIGKILLs here
 
-     The 10s between them covers the signal-to-handler gap and lets the
+     The 20s above the drain pays for App.close (5s) and process teardown
+     (15s). The 10s between the deadline and the grace period covers the signal-to-handler gap and lets the
      overrun log line ship before the process dies. The workers Deployment
      once ran on the k8s default of 30s, which a 25s drain plus teardown does
      not fit inside; the kubelet answered with SIGKILL mid-drain, severing
@@ -1774,13 +1778,16 @@ here, once, by name, so both consuming templates agree.
 {{- define "langwatch.shutdownEnv" -}}
 {{- $drain := include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" .component.shutdownDrainSeconds "fallback" 25) -}}
 {{/* extraEnvs renders after this block, and the kubelet takes the LAST
-     duplicate, so setting the variable there silently wins over the value the
-     pod was sized for. Set shutdownDrainSeconds instead; it moves both. */}}
+     duplicate, so setting either variable there silently wins over the value
+     the pod was sized for. Set shutdownDrainSeconds instead; it moves all
+     three clocks. */}}
 {{- range (default (list) .component.extraEnvs) -}}
-{{- if eq .name "PROCESS_SHUTDOWN_DEADLINE_MS" -}}
-{{- fail (printf "%s must not be set through extraEnvs. It would override the shutdown deadline the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both." .name) -}}
+{{- if has .name (list "SHUTDOWN_DRAIN_TIMEOUT_MS" "PROCESS_SHUTDOWN_DEADLINE_MS") -}}
+{{- fail (printf "%s must not be set through extraEnvs. It would override the shutdown budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves the drain, the process deadline and the grace period together." .name) -}}
 {{- end -}}
 {{- end -}}
+- name: SHUTDOWN_DRAIN_TIMEOUT_MS
+  value: {{ mul (int $drain) 1000 | quote }}
 - name: PROCESS_SHUTDOWN_DEADLINE_MS
   value: {{ mul (add (int $drain) 20) 1000 | quote }}
 {{- end -}}

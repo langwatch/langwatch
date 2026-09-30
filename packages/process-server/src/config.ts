@@ -15,9 +15,13 @@ const processSettings = (role: "api" | "worker") =>
       role === "worker"
         ? c.env("WORKER_METRICS_PORT", port.default(2999))
         : c.env("API_PORT", port.default(6560)),
+    /** Absent follows the queue drain (SHUTDOWN_DRAIN_TIMEOUT_MS), see shutdown-deadline.ts. */
     shutdownDeadlineMs: c.env(
       "PROCESS_SHUTDOWN_DEADLINE_MS",
-      z.coerce.number().int().positive().default(60000),
+      z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().int().positive().optional(),
+      ),
     ),
     /** The port the worker's raw-socket doors listen on (voice media dials back here). */
     rawSocketPort: c.env("VOICE_WS_PORT", port.default(3300)),

@@ -10,6 +10,18 @@ export const storesOwner = {
       "DEFAULT_RETENTION_DAYS",
       z.coerce.number().int().positive().default(30),
     ),
+    /**
+     * How long the queue waits for in-flight jobs on shutdown, in milliseconds.
+     * The chart sets it from shutdownDrainSeconds; absent keeps the queue's
+     * own default. The process deadline defaults to this plus its close slack.
+     */
+    shutdownDrainTimeoutMs: c.env(
+      "SHUTDOWN_DRAIN_TIMEOUT_MS",
+      z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().int().positive().optional(),
+      ),
+    ),
     clickhousePool: {
       override: c.env("CLICKHOUSE_MAX_OPEN_CONNECTIONS", z.coerce.number().optional()),
       replicas: c.env("CLICKHOUSE_CLIENT_REPLICAS", z.coerce.number().optional()),

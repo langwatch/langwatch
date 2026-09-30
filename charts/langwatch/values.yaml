@@ -189,7 +189,8 @@ app:
   # Shutdown budget — same shape and the same rule as workers.* below. The app
   # runs its own process now (apps/api; the workers are apps/worker in their own
   # Deployment) and is sized the same way, because the clock has the same shape:
-  # the process deadline (PROCESS_SHUTDOWN_DEADLINE_MS) is this value plus 20s.
+  # the queue drains for this value (SHUTDOWN_DRAIN_TIMEOUT_MS) and the process
+  # deadline (PROCESS_SHUTDOWN_DEADLINE_MS) is this value plus 20s.
   # The API drains in well under this; the grace period is a ceiling, not a
   # wait.
   ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
@@ -1005,8 +1006,9 @@ workers:
   replicaCount: 1
 
   # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
-  # for in-flight jobs to finish their ClickHouse writes. The chart sets the
-  # process deadline (PROCESS_SHUTDOWN_DEADLINE_MS) to this value plus 20s.
+  # for in-flight jobs to finish their ClickHouse writes. The chart passes it
+  # to the queue as SHUTDOWN_DRAIN_TIMEOUT_MS and sets the process deadline
+  # (PROCESS_SHUTDOWN_DEADLINE_MS) to this value plus 20s.
   #
   # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
   # the drain plus 5s for App.close, 15s for process teardown and 10s of

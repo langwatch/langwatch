@@ -87,6 +87,25 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Then all of them agree
     So that the pod cannot be sized for a budget the process no longer uses
 
+  # The chart's shutdownDrainSeconds reaches the queue as
+  # SHUTDOWN_DRAIN_TIMEOUT_MS. Without it the queue kept its own 25s drain
+  # whatever the pod was sized for, so raising the drain for long jobs only
+  # widened the watchdog while in-flight jobs were still abandoned at 25s.
+
+  @unit @shutdown-budget
+  Scenario: The queue drains for as long as the chart's drain value
+    Given SHUTDOWN_DRAIN_TIMEOUT_MS names a drain budget
+    When a producing or a consuming role configures its eventing
+    Then the queue's drain timeout is that budget
+    And with no budget named the queue keeps its own default
+
+  @unit @shutdown-budget
+  Scenario: The process deadline defaults above the queue drain
+    Given a drain budget and no PROCESS_SHUTDOWN_DEADLINE_MS
+    When the process shutdown deadline is resolved
+    Then it is the drain plus twenty seconds of close slack
+    And an explicit PROCESS_SHUTDOWN_DEADLINE_MS still wins
+
   @unit @shutdown-budget
   Scenario: A malformed drain override is reported and falls back, never fatal
     Given the configured drain budget is not a positive number of milliseconds
@@ -332,7 +351,8 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Given the app and workers Deployments are rendered
     Then the workers Deployment sets PROCESS_SHUTDOWN_DEADLINE_MS to workers.shutdownDrainSeconds plus twenty seconds
     And the app Deployment sets PROCESS_SHUTDOWN_DEADLINE_MS to app.shutdownDrainSeconds plus twenty seconds
-    And raising shutdownDrainSeconds raises each process's deadline with it
+    And each Deployment sets SHUTDOWN_DRAIN_TIMEOUT_MS to its own shutdownDrainSeconds
+    And raising shutdownDrainSeconds raises each process's drain and deadline with it
 
   @regression @helm-grace-period
   Scenario: Operators can raise the grace period for a slower drain
