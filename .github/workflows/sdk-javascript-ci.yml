@@ -243,7 +243,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
-          version: 10.34.5
+          version: 12.6.0
 
       # Single setup-node call covers all three pnpm lockfiles used by the
       # e2e job (typescript-sdk, langwatch app, mcp-server). Calling

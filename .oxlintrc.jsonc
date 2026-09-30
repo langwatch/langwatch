@@ -62,6 +62,20 @@
 
     "unicorn/no-array-sort": "error",
 
+    // React Compiler rules (correctness since oxlint 1.84): off until the ~680 findings are fixed (ruling 2026-09-30).
+    "react/error-boundaries": "off",
+    "react/globals": "off",
+    "react/immutability": "off",
+    "react/incompatible-library": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/purity": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/set-state-in-render": "off",
+    "react/static-components": "off",
+    "react/use-memo": "off",
+    "react/void-use-memo": "off",
+
     "jsx-a11y/no-autofocus": "error",
     "jsx-a11y/no-static-element-interactions": "error",
     "jsx-a11y/click-events-have-key-events": "error",

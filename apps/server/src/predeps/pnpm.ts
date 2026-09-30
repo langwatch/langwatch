@@ -1,7 +1,8 @@
-import { chmodSync, existsSync } from "node:fs";
+import { chmodSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { execa } from "execa";
+import * as tar from "tar";
 
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep, DetectionResult, InstallContext } from "./types.ts";
@@ -9,23 +10,22 @@ import type { Predep, DetectionResult, InstallContext } from "./types.ts";
 // Pinned pnpm version. Keep in lockstep with the root package.json's
 // `packageManager` field — both control which pnpm we expect dev tooling
 // + npx-server to use.
-const PNPM_VERSION = "10.34.5";
+const PNPM_VERSION = "12.6.0";
 
-// Standalone-binary URL pattern published by pnpm/pnpm releases.
-// linux-x64 / linux-arm64 are glibc; linuxstatic-* are fully static and
-// work on Alpine/musl. macOS uses pnpm-macos-{x64,arm64}.
+// Release archive published by pnpm/pnpm since v11: `pnpm` plus the `dist/` it
+// ships beside it (node-gyp, bundled deps). Asset names match our platform keys.
+const PLATFORMS = new Set([
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-arm64",
+  "linux-x64",
+  "linux-arm64-musl",
+  "linux-x64-musl",
+]);
+
 function downloadUrl(platform: string): string {
-  const map: Record<string, string> = {
-    "darwin-arm64": "macos-arm64",
-    "darwin-x64": "macos-x64",
-    "linux-arm64": "linux-arm64",
-    "linux-x64": "linux-x64",
-    "linux-arm64-musl": "linuxstatic-arm64",
-    "linux-x64-musl": "linuxstatic-x64",
-  };
-  const slug = map[platform];
-  if (!slug) throw new Error(`pnpm: unsupported platform ${platform}`);
-  return `https://github.com/pnpm/pnpm/releases/download/v${PNPM_VERSION}/pnpm-${slug}`;
+  if (!PLATFORMS.has(platform)) throw new Error(`pnpm: unsupported platform ${platform}`);
+  return `https://github.com/pnpm/pnpm/releases/download/v${PNPM_VERSION}/pnpm-${platform}.tar.gz`;
 }
 
 async function resolveVersion(bin: string): Promise<string | null> {
@@ -58,19 +58,17 @@ export const pnpmPredep: Predep = {
         reason: `bundled pnpm ${v ?? "unknown"} != pinned ${PNPM_VERSION}`,
       };
     }
-    // Fall through to user's system pnpm if it's a 10.x — pnpm 10's
-    // `manage-package-manager-versions: true` default handles the `packageManager:
-    // pnpm@10.34.5` lockfile pin transparently across patch versions (pnpm 10.30.x reads the
-    // field, self-fetches 10.34.5 into its own cache when needed, runs scripts with the right
-    // version). This is the same pattern uv.ts uses for the host's uv.
+    // Fall through to a system pnpm 10+: each honours the `packageManager: pnpm@12.6.0`
+    // pin, fetching that version into its own cache and running with it. The same
+    // pattern uv.ts uses for the host's uv.
     const sysVersion = await resolveVersion("pnpm");
-    if (sysVersion && sysVersion.startsWith("10.")) {
+    if (sysVersion && Number(sysVersion.split(".")[0]) >= 10) {
       return { installed: true, version: sysVersion, resolvedPath: "pnpm" };
     }
     return {
       installed: false,
       reason: sysVersion
-        ? `system pnpm ${sysVersion} is not 10.x — bundled pnpm ${PNPM_VERSION} required`
+        ? `system pnpm ${sysVersion} is older than 10 — bundled pnpm ${PNPM_VERSION} required`
         : "no system pnpm on PATH; will install bundled",
     };
   },
@@ -78,7 +76,11 @@ export const pnpmPredep: Predep = {
   async install({ platform, paths, task }: InstallContext) {
     const url = downloadUrl(platform);
     const bin = join(paths.bin, "pnpm");
-    await downloadWithProgress({ url, tmp: bin, task, prefix: `downloading pnpm ${PNPM_VERSION}` });
+    const tmp = join(paths.bin, `.pnpm-${PNPM_VERSION}.tgz`);
+    await downloadWithProgress({ url, tmp, task, prefix: `downloading pnpm ${PNPM_VERSION}` });
+    task.output = "extracting";
+    tar.x({ sync: true, file: tmp, cwd: paths.bin });
+    rmSync(tmp, { force: true });
     chmodSync(bin, 0o755);
     const version = (await resolveVersion(bin)) ?? "unknown";
     if (version !== PNPM_VERSION) {
