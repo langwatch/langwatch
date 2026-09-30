@@ -43,7 +43,7 @@ export type GuidedOnboardingTrackedEvent = Readonly<{
 /** The onboarding capability. Operations arrive with the port of the process half. */
 export interface OnboardingApi {
   getGuidedState(
-    input: Readonly<{ organizationId: string; userId: string }>,
+    input: Readonly<{ organizationId: string; userId: string | null }>,
   ): Promise<GuidedOnboardingStateWithVariant>;
   recordPaths(
     input: OnboardingCallerInput & Readonly<{ paths: readonly string[] }>,
@@ -62,7 +62,7 @@ export interface OnboardingApi {
     input: OnboardingCallerInput & Readonly<{ path: string }>,
   ): Promise<GuidedOnboardingStateWithInstance>;
   completePath(
-    input: OnboardingCallerInput & Readonly<{ path: string }>,
+    input: Readonly<{ organizationId: string; userId: string | null; path: string }>,
   ): Promise<GuidedOnboardingState>;
   attachConversation(
     input: OnboardingCallerInput & Readonly<{ conversationId: string }>,

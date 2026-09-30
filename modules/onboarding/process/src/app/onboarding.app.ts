@@ -122,9 +122,9 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
 
   async getGuidedState(input: {
     organizationId: string;
-    userId: string;
+    userId: string | null;
   }): Promise<GuidedOnboardingStateWithVariant> {
-    await this.authorizeOrganizationView(input.userId, input.organizationId);
+    await this.authorizeNamedPerson(input.userId, input.organizationId);
     const state = await this.#guided.getStateWithVariant({ organizationId: input.organizationId });
 
     return withInstanceFacts(state, this.#gateway.getDeploymentAddresses());
@@ -184,12 +184,15 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
     return withInstanceFacts(state, this.#gateway.getDeploymentAddresses());
   }
 
-  async completePath(
-    input: OnboardingCallerInput & { path: string },
-  ): Promise<GuidedOnboardingState> {
-    await this.authorizeOrganizationView(input.userId, input.organizationId);
+  async completePath(input: {
+    organizationId: string;
+    userId: string | null;
+    path: string;
+  }): Promise<GuidedOnboardingState> {
+    await this.authorizeNamedPerson(input.userId, input.organizationId);
+    const actor = { organizationId: input.organizationId, userId: input.userId ?? undefined };
 
-    return this.#guided.completePath(this.actorOf(input), { path: input.path });
+    return this.#guided.completePath(actor, { path: input.path });
   }
 
   async attachConversation(
@@ -243,6 +246,11 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
 
   private actorOf(input: OnboardingCallerInput): { organizationId: string; userId: string } {
     return { organizationId: input.organizationId, userId: input.userId };
+  }
+
+  /** A project key bound to no user was already checked by the REST door, as on main. */
+  private async authorizeNamedPerson(userId: string | null, organizationId: string): Promise<void> {
+    if (userId !== null) await this.authorizeOrganizationView(userId, organizationId);
   }
 
   private async authorizeOrganizationView(userId: string, organizationId: string): Promise<void> {

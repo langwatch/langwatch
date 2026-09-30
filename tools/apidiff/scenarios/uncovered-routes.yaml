@@ -449,6 +449,20 @@
     status: 422
     contains: guided_onboarding_path_unknown
 
+# The organization comes from the key, so another organization's key reads only its own state.
+- id: onboarding-other-org-key-cannot-see-this-orgs-done-paths
+  endpoint: GET /api/v1/onboarding/guided
+  auth: org-c
+  setup:
+    - request: POST /api/v1/onboarding/guided/paths/governance/complete
+      auth: project
+      expect: { status: 200 }
+  request:
+    path: /api/v1/onboarding/guided
+  expect:
+    status: 200
+    notContains: '"governance"'
+
 - id: onboarding-complete-path-refuses-no-key
   endpoint: POST /api/v1/onboarding/guided/paths/{path}/complete
   auth: none

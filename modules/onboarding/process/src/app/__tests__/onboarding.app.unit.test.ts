@@ -139,6 +139,15 @@ describe("OnboardingApp", () => {
     expect(state.gatewayUrl).toBeUndefined();
   });
 
+  it("reads a key's organization with no user and no person to authorize", async () => {
+    const { app, hasPermission } = buildApp();
+
+    const state = await app.getGuidedState({ organizationId: ORGANIZATION_ID, userId: null });
+
+    expect(hasPermission).not.toHaveBeenCalled();
+    expect(state).toMatchObject({ paths: [], donePaths: [] });
+  });
+
   /** @scenario "recording paths stores them in pick order and starts the first one" */
   it("stores recorded paths in pick order and starts the first one", async () => {
     const { app } = buildApp();

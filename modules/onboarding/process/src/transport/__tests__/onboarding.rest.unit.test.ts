@@ -141,25 +141,37 @@ describe("given a project whose organization recorded llmops and gateway", () =>
 });
 
 describe("given a project API key that names no user", () => {
-  describe("when it reads or completes a guided onboarding path", () => {
-    /** @scenario "An unbound key is refused rather than read as nobody's state" */
-    it("refuses with a handled 403 naming permission_denied", async () => {
-      const getGuidedState = vi.fn();
-      const completePath = vi.fn();
+  describe("when it reads the guided onboarding state", () => {
+    it("reads the key's organization with no user, as main does", async () => {
+      const getGuidedState = vi.fn(async () => ({ paths: [], currentPath: null, donePaths: [] }));
       const { send } = mount({
         credential: { organizationId: ORGANIZATION, userId: null },
-        onboarding: {
-          getGuidedState: getGuidedState as never,
-          completePath: completePath as never,
-        },
+        onboarding: { getGuidedState: getGuidedState as never },
       });
 
       const response = await send("GET", "/api/onboarding/guided");
 
-      expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toMatchObject({ error: "permission_denied" });
-      expect(getGuidedState).not.toHaveBeenCalled();
-      expect(completePath).not.toHaveBeenCalled();
+      expect(response.status).toBe(200);
+      expect(getGuidedState).toHaveBeenCalledWith({ organizationId: ORGANIZATION, userId: null });
+    });
+  });
+
+  describe("when it completes a guided onboarding path", () => {
+    it("completes it on the key's organization with no user", async () => {
+      const completePath = vi.fn(async () => ({ paths: ["llmops"], donePaths: ["llmops"] }));
+      const { send } = mount({
+        credential: { organizationId: ORGANIZATION, userId: null },
+        onboarding: { completePath: completePath as never },
+      });
+
+      const response = await send("POST", "/api/onboarding/guided/paths/llmops/complete");
+
+      expect(response.status).toBe(200);
+      expect(completePath).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+        userId: null,
+        path: "llmops",
+      });
     });
   });
 
