@@ -42,17 +42,17 @@ export const workflowServer = defineServerModule("workflow")
       return caller?.userId ? { user: { id: caller.userId } } : null;
     }),
     // A legacy project key predates RBAC and carries full project access by
-    // its class alone, so it always clears the ceiling. An api key with no
-    // owning user checks nothing it can act on and is refused - fail closed
-    // rather than guessing at a person's standing.
+    // its class alone. An api key answers for its own bindings, owner or not.
     bindRestMiddleware(workflowEvaluationRunCeiling, async (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
       if (credential.type === "legacyProjectKey") return true;
-      if (!credential.userId) return false;
 
-      return WorkflowPermissionService.create({ authz: dependencies.authz }).has({
+      return WorkflowPermissionService.create({ authz: dependencies.authz }).hasApiKeyPermission({
+        apiKeyId: credential.apiKeyId,
         userId: credential.userId,
+        organizationId: credential.organizationId,
         projectId: credential.project.id,
+        teamId: credential.project.teamId,
         permission: "evaluations:view",
       });
     }),

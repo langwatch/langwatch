@@ -3,7 +3,7 @@
  * process mounts BEFORE the packaged workflow family, writing their own
  * answers, over a session that arrives as a fact so the refusals stay theirs.
  */
-import { publicRoute } from "@langwatch/api/access";
+import { optionalCredential } from "@langwatch/api/access";
 import {
   defineRestMiddleware,
   defineRestRouter,
@@ -57,14 +57,13 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withMiddleware(workflowStudioSession)
   .handle(({ app, input }, session) => {
     const { projectId, ...body } = input;
-
     return app.completeCode({ projectId, body, userId: session?.user.id });
   })
 
   .post("/api/workflows/post_event", "postWorkflowStudioEvent")
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: SESSION_RESOLVED_IN_HANDLER }))
+  .withAccess(optionalCredential({ reason: SESSION_RESOLVED_IN_HANDLER }))
   .withResponse("sse", {})
   .withDocs({ requestBody: { schema: workflowStudioRestEventSchema } })
   .withMiddleware(workflowStudioSession)

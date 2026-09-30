@@ -237,3 +237,15 @@ Feature: Workflow service boundary
     Given the workflow module is installed from its declared members alone
     When the project's workflows are listed with their copy lineage
     Then the list answers instead of failing on a member the process never supplied
+
+  @unit
+  Scenario: An evaluation run is judged against an API key's own bindings
+    Given an API key that no user owns but that is bound to the project
+    When it asks to evaluate a workflow
+    Then the authz peer is asked about the key at that project with no user
+
+  @unit
+  Scenario: The Studio event door hands the app the signed-in browser session
+    Given an editor with a browser session
+    When it posts a Studio event
+    Then the app receives that session's user rather than nobody

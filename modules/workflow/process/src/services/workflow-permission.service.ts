@@ -4,13 +4,15 @@ import type { WorkflowPermissionProbe } from "../app/workflow.app.ts";
 
 /** Whether one person holds a permission on a project, answered by the authz peer. */
 export class WorkflowPermissionService implements WorkflowPermissionProbe {
-  static create(options: { authz: Pick<AuthzApi, "hasPermission"> }): WorkflowPermissionService {
+  static create(options: {
+    authz: Pick<AuthzApi, "hasPermission" | "hasApiKeyPermission">;
+  }): WorkflowPermissionService {
     return new WorkflowPermissionService(options.authz);
   }
 
-  readonly #authz: Pick<AuthzApi, "hasPermission">;
+  readonly #authz: Pick<AuthzApi, "hasPermission" | "hasApiKeyPermission">;
 
-  private constructor(authz: Pick<AuthzApi, "hasPermission">) {
+  private constructor(authz: Pick<AuthzApi, "hasPermission" | "hasApiKeyPermission">) {
     this.#authz = authz;
   }
 
@@ -19,6 +21,25 @@ export class WorkflowPermissionService implements WorkflowPermissionProbe {
       userId: input.userId,
       permission: input.permission,
       projectId: input.projectId,
+    });
+  }
+
+  /** One permission asked of an API key itself, so a key with no owning user is judged by its
+   * own bindings. */
+  hasApiKeyPermission(input: {
+    apiKeyId: string;
+    userId: string | null;
+    organizationId: string;
+    projectId: string;
+    teamId: string;
+    permission: AuthzPermission;
+  }): Promise<boolean> {
+    return this.#authz.hasApiKeyPermission({
+      apiKeyId: input.apiKeyId,
+      userId: input.userId,
+      organizationId: input.organizationId,
+      scope: { type: "project", id: input.projectId, teamId: input.teamId },
+      permission: input.permission,
     });
   }
 
