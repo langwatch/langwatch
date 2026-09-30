@@ -19,6 +19,7 @@ import {
   HomeBriefingSection,
   SetupHairline,
 } from "~/features/briefing";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DashboardLayout } from "../DashboardLayout";
@@ -30,6 +31,7 @@ import { HomePageBanners } from "./HomePageBanners";
 import { LangyHomeHero } from "./LangyHomeHero";
 import { LearningResources } from "./LearningResources";
 import { OnboardingProgress } from "./OnboardingProgress";
+import { PendingJoinRequests } from "./PendingJoinRequests";
 import { RecentItemsSection } from "./RecentItemsSection";
 import { TracesOverview } from "./TracesOverview";
 import { useHomeComposition } from "./useHomeComposition";
@@ -75,19 +77,11 @@ export function HomePage() {
       <Box width="full" position="relative" overflowX="clip">
         {/* A reading measure, not a dashboard sprawl: the briefing sheet is
             the page, so the column narrows to keep its lines composed. */}
+        {/* zIndex={1} is load-bearing: it is the stacking context the
+            lantern's zIndex -1 light sits in, above the layout's page fill. */}
         <Container maxW="7xl" padding={5} position="relative" zIndex={1}>
           <VStack gap={4} width="full" align="start">
-            {/* Positioned above the hero's bleed on purpose: the lantern's
-                ground (and its light-mode bloom) are positioned layers that
-                would otherwise paint over this static row. The page's order
-                is colour, then bloom, then every element on top. */}
-            <HStack
-              width="full"
-              align="center"
-              gap={2}
-              position="relative"
-              zIndex={2}
-            >
+            <HStack width="full" align="center" gap={2}>
               {/* The Langy home greets from the centre of its own hero, where
                   the question is being asked. Rendering the greeting here as
                   well would put it on the page twice. */}
@@ -103,6 +97,15 @@ export function HomePage() {
               <ConsideringLangWatch />
             </HStack>
 
+            {/* Above every composition on purpose: whoever can answer a join
+                request sees the wait wherever the home happens to open. */}
+            <PendingJoinRequests />
+
+            {/* The Langy home carries the offer inside its hero, under the
+                ask field; the other homes carry it here, under the header. */}
+            {composition === "signal-focused" || composition === "classic" ? (
+              <GuidedOnboardingOffer space="project" />
+            ) : null}
             {composition === "undecided" ? (
               <HomeCompositionSkeleton />
             ) : composition === "signal-focused" ? (

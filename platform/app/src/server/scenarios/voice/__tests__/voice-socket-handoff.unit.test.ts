@@ -32,6 +32,46 @@ describe("isVoiceMediaSocketMessage", () => {
     expect(isVoiceMediaSocketMessage(null)).toBe(false);
     expect(isVoiceMediaSocketMessage("string")).toBe(false);
   });
+
+  describe("when the discriminator matches but a required field is malformed", () => {
+    it("rejects a message with no headBase64", () => {
+      const { headBase64: _headBase64, ...rest } = message();
+      expect(isVoiceMediaSocketMessage(rest)).toBe(false);
+    });
+
+    it("rejects a message with a non-string nonce", () => {
+      expect(isVoiceMediaSocketMessage({ ...message(), nonce: 123 })).toBe(
+        false,
+      );
+    });
+
+    it("rejects a message with null headers", () => {
+      expect(isVoiceMediaSocketMessage({ ...message(), headers: null })).toBe(
+        false,
+      );
+    });
+
+    it("rejects a message with array headers", () => {
+      expect(
+        isVoiceMediaSocketMessage({ ...message(), headers: ["websocket"] }),
+      ).toBe(false);
+    });
+
+    it("rejects a message with a non-string, non-array header value", () => {
+      expect(
+        isVoiceMediaSocketMessage({
+          ...message(),
+          headers: { upgrade: 42 },
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the message is well-formed", () => {
+    it("accepts it", () => {
+      expect(isVoiceMediaSocketMessage(message())).toBe(true);
+    });
+  });
 });
 
 describe("createVoiceSocketReceiver", () => {

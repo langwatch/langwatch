@@ -28,6 +28,7 @@
  */
 
 import { voice as scenarioVoice } from "@langwatch/scenario";
+import { ensureCloudflaredOnPath } from "./voice-cloudflared-binary";
 
 type OpenedTunnel = Awaited<ReturnType<typeof scenarioVoice.openTwilioTunnel>>;
 
@@ -187,8 +188,21 @@ export async function openVoicePublicUrlTunnel(params: {
     provider: "cloudflared";
   }) => Promise<OpenedTunnel>;
   resolveHost?: (host: string) => Promise<boolean>;
+  /** Puts the cloudflared binary on PATH before `openTunnel` spawns it.
+   *  Injectable so a test with a fake opener stays hermetic; defaults to the
+   *  real {@link ensureCloudflaredOnPath}. */
+  ensureBinaryOnPath?: () => Promise<void>;
 }): Promise<VoicePublicUrlTunnel> {
   const openTunnel = params.openTunnel ?? defaultOpenTunnel;
+  // The SDK's cloudflared provider opens the tunnel with a BARE `spawn(
+  // "cloudflared", ...)` — a PATH lookup — so the binary's directory must be on
+  // PATH BEFORE openTunnel runs (see voice-cloudflared-binary.ts). A failure
+  // here (binary missing and the fallback install failed) throws
+  // VoiceTunnelBinaryError, which the worker boot catches and threads into the
+  // run's error.
+  const ensureBinaryOnPath =
+    params.ensureBinaryOnPath ?? (() => ensureCloudflaredOnPath());
+  await ensureBinaryOnPath();
   const tunnel = await openTunnel({
     port: params.port,
     provider: "cloudflared",

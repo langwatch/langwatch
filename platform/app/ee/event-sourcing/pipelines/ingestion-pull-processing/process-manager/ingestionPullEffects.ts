@@ -60,6 +60,12 @@ export interface IngestionPullRunPort {
      * source row, where it reads as unknown rather than as either answer.
      */
     completeness?: "complete" | "truncated";
+    /**
+     * Set when the run banked progress over a page it could not read at all.
+     * Optional for the same reason as the field above, and absent means the
+     * errors were input the run deliberately stepped over.
+     */
+    unreadPage?: true;
     readThroughAt?: number | null;
   }>;
 }
@@ -124,6 +130,7 @@ export interface IngestionPullOutcomeCommands {
     eventCount: number;
     errorCount: number;
     completeness?: "complete" | "truncated";
+    unreadPage?: true;
     readThroughAt?: number | null;
   }): Promise<void>;
   recordRunFailed(args: {

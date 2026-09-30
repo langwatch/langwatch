@@ -2,39 +2,37 @@
  * The frame-side author runtime, as a string of plain JavaScript.
  *
  * Executes once, from the shim's `window.__lwActivateAuthor` hook — i.e. only
- * after `lw:init` has delivered params/theme, the same invariant every
- * activation path has always enforced (see `shimSource.ts`). It compiles the
- * widget's React/TSX source with Babel standalone (loaded from CDN alongside
- * the React, ReactDOM and Recharts UMD builds — see `buildSrcdoc`), resolves
- * the handful of module specifiers a widget may `import` through a tiny
- * `require` shim, and mounts the file's default export into `#lw-root`.
+ * after `lw:init` has delivered the widget source (over `window.__LW_AUTHOR_
+ * SOURCE__`), params and theme, the same invariant every activation path has
+ * always enforced (see `shimSource.ts`). It compiles the widget's React/TSX
+ * source with Babel standalone (loaded from CDN alongside the React, ReactDOM
+ * and Recharts UMD builds — see `buildFrameHtml`) to ESM, rewrites every bare
+ * `import`/`export` specifier through `resolveImportSpecifier` (so any npm
+ * package resolves to esm.sh with React externalised while the frame's own
+ * built-ins stay mapped to its UMD globals via the import map), then loads the
+ * compiled module by `import()`-ing a blob URL and mounts its default export.
  *
- * A compile, load or render failure shows a readable panel in the frame
- * itself (`#lw-compile-error`) rather than a silent blank iframe, and is also
+ * ESM, not CommonJS: a widget may `import` any package, and only a real module
+ * load resolves those imports through the frame's import map. A compile, load
+ * or render failure shows a readable panel in the frame itself
+ * (`#lw-compile-error`) rather than a silent blank iframe, and is also
  * forwarded through `LW.error` so it reaches the parent's log panel too.
  */
+
+import {
+  CHART_FRAME_BUILTIN_MODULES,
+  resolveImportSpecifier,
+} from "./resolveImportSpecifier";
 
 export function buildAuthorRuntimeScript(): string {
   return `
 (function () {
   "use strict";
 
-  var MODULES = {
-    "react": function () { return window.React; },
-    "react-dom": function () { return window.ReactDOM; },
-    "react-dom/client": function () { return window.ReactDOM; },
-    "recharts": function () { return window.Recharts; },
-    "@langwatch/charts": function () { return window.LWCharts; }
-  };
-
-  function requireShim(specifier) {
-    var resolve = MODULES[specifier];
-    if (!resolve) {
-      var available = Object.keys(MODULES).map(function (name) { return "'" + name + "'"; }).join(", ");
-      throw new Error("Cannot import '" + specifier + "' — a chart widget may import only " + available + ".");
-    }
-    return resolve();
-  }
+  // Bound to a stable name (not left as a bare declaration) so a bundler that
+  // renames the source function can't desync it from the call site below.
+  var resolveImportSpecifier = ${resolveImportSpecifier.toString()};
+  var BUILTINS = ${JSON.stringify(CHART_FRAME_BUILTIN_MODULES)};
 
   function showError(title, detail) {
     var panel = document.getElementById("lw-compile-error");
@@ -73,6 +71,46 @@ export function buildAuthorRuntimeScript(): string {
     return ErrorBoundary;
   }
 
+  function mount(Component) {
+    if (Component == null || (typeof Component !== "function" && typeof Component !== "object")) {
+      showError("No default export", "The widget file must export default a React component.");
+      return;
+    }
+    var root = document.getElementById("lw-root");
+    try {
+      var ErrorBoundary = makeErrorBoundary(window.React);
+      window.ReactDOM.createRoot(root).render(
+        window.React.createElement(
+          ErrorBoundary,
+          null,
+          window.React.createElement(Component)
+        )
+      );
+    } catch (renderError) {
+      showError("Render error", renderError.message);
+    }
+  }
+
+  // Rewrites the source specifier of a static import/export declaration in
+  // place, so any bare package points at esm.sh (React externalised) while the
+  // frame's built-ins and any URL/path are left untouched.
+  function rewrite(path) {
+    var src = path.node.source;
+    if (src && typeof src.value === "string") {
+      src.value = resolveImportSpecifier(src.value, BUILTINS);
+    }
+  }
+
+  // Rewrites the first argument of a dynamic import() call if it is a string
+  // literal. Non-literal arguments (computed specifiers) cannot be resolved
+  // statically and will only work for full URLs.
+  function rewriteDynamicImport(path) {
+    var args = path.node.arguments;
+    if (args && args.length > 0 && args[0].type === "StringLiteral") {
+      args[0].value = resolveImportSpecifier(args[0].value, BUILTINS);
+    }
+  }
+
   window.__lwActivateAuthor = function () {
     var source = window.__LW_AUTHOR_SOURCE__;
     if (typeof source !== "string") return;
@@ -99,11 +137,24 @@ export function buildAuthorRuntimeScript(): string {
           ["react", { runtime: "classic" }],
           ["typescript", { isTSX: true, allExtensions: true }]
         ],
-        // preset-react/preset-typescript only strip JSX and types — import
-        // and export statements are still ES module syntax until this plugin
-        // rewrites them to the require()/exports.default pair \`run\` below
-        // executes.
-        plugins: ["transform-modules-commonjs"],
+        // ESM out (no transform-modules-commonjs): the import/export syntax
+        // stays, so the compiled module's imports resolve through the frame's
+        // import map when it is loaded below. \`rewrite\` handles static imports
+        // and exports; \`CallExpression\` with Import callee rewrites dynamic
+        // import() calls where the argument is a string literal.
+        plugins: [{
+          visitor: {
+            ImportDeclaration: rewrite,
+            ExportNamedDeclaration: rewrite,
+            ExportAllDeclaration: rewrite,
+            CallExpression: function (path) {
+              if (path.node.callee.type === "Import") {
+                rewriteDynamicImport(path);
+              }
+            }
+          }
+        }],
+        sourceType: "module",
         filename: "widget.tsx"
       }).code;
     } catch (compileError) {
@@ -111,39 +162,21 @@ export function buildAuthorRuntimeScript(): string {
       return;
     }
 
-    var moduleExports = {};
-    try {
-      // Babel's CJS output references \`require(...)\` and assigns to
-      // \`exports.default\` — exactly the two bindings passed in here. Runs
-      // in the global scope (not a closure), so an unqualified JSX-pragma
-      // reference to \`React\` resolves through the window chain to the UMD
-      // global, whether or not the widget also explicitly imports it.
-      var run = new Function("require", "exports", transpiled);
-      run(requireShim, moduleExports);
-    } catch (runError) {
-      showError("Widget threw while loading", runError.message);
-      return;
-    }
-
-    var Component = moduleExports && moduleExports.default;
-    if (typeof Component !== "function") {
-      showError("No default export", "The widget file must export default a React component.");
-      return;
-    }
-
-    var root = document.getElementById("lw-root");
-    try {
-      var ErrorBoundary = makeErrorBoundary(window.React);
-      window.ReactDOM.createRoot(root).render(
-        window.React.createElement(
-          ErrorBoundary,
-          null,
-          window.React.createElement(Component)
-        )
-      );
-    } catch (renderError) {
-      showError("Render error", renderError.message);
-    }
+    // Loading the compiled ESM by blob URL is what lets the browser resolve
+    // the widget's imports (esm.sh packages, the import-mapped built-ins). The
+    // classic JSX pragma's unqualified \`React\` still resolves to the UMD
+    // global even inside the module, so a widget need not import React.
+    var url = URL.createObjectURL(new Blob([transpiled], { type: "text/javascript" }));
+    import(url).then(
+      function (mod) {
+        URL.revokeObjectURL(url);
+        mount(mod && mod.default);
+      },
+      function (loadError) {
+        URL.revokeObjectURL(url);
+        showError("Failed to load widget or one of its imports", loadError && loadError.message);
+      }
+    );
   };
 })();
 `;

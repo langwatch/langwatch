@@ -33,6 +33,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 // RBAC is what this file pins, not licensing — same override, same reason,
@@ -86,15 +87,14 @@ describe("governancePeople router — RBAC enforcement", () => {
       // ties the two columns together: a customRoleId demands role CUSTOM,
       // and the custom role's permission bag then resolves instead of the
       // built-in role's.
-      await prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: user.id,
-          role: customRoleId ? TeamUserRole.CUSTOM : teamRole,
-          customRoleId: customRoleId ?? null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
+      await seedRoleBinding(prisma, {
+        id: `gov-people-${user.id}`,
+        organizationId,
+        userId: user.id,
+        role: customRoleId ? TeamUserRole.CUSTOM : teamRole,
+        customRoleId: customRoleId ?? null,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
       });
       return user.id;
     };
@@ -114,12 +114,11 @@ describe("governancePeople router — RBAC enforcement", () => {
 
     // The delegated viewer: a MEMBER whose custom role carries the one read
     // grant the Governance product is offered on, and nothing that manages.
-    const viewerRole = await prisma.customRole.create({
-      data: {
-        organizationId,
-        name: `Governance viewer ${ns}`,
-        permissions: ["organization:view", "governance:view"],
-      },
+    const viewerPermissions = ["organization:view", "governance:view"];
+    const viewerRole = await seedCustomRole(prisma, {
+      organizationId,
+      name: `Governance viewer ${ns}`,
+      permissions: viewerPermissions,
     });
     viewerUserId = await principal(
       "People Viewer",
@@ -133,6 +132,8 @@ describe("governancePeople router — RBAC enforcement", () => {
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["roleBinding", { organizationId }],
+      ["grant", { organizationId }],
+      ["role", { organizationId }],
       ["customRole", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["organizationUser", { organizationId }],

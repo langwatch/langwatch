@@ -7,8 +7,8 @@
  * dropped, this goes red when the document is stale — a route annotated,
  * shipped, and never regenerated is published to nobody.
  *
- * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/lwql-langy-authoring.feature — the placement operations
+ * @see specs/lwql/saved-charts.feature
+ * @see specs/lwql/langy-authoring.feature — the placement operations
  */
 
 import { describe, expect, it } from "vitest";

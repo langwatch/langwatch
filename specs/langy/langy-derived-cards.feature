@@ -81,11 +81,16 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
   # Derived is visible, measured stays measured
   # ===========================================================================
 
+  # The frame marks a VIEW OF DATA Langy composed (a timeseries, a table,
+  # stats): its tooltip says the figures are the reader's and the grouping is
+  # Langy's suggestion. A question is an ask, not a view, so it wears no
+  # frame: see specs/langy/langy-choice-questions.feature.
   Scenario: Every derived card wears its provenance
-    Given any card Langy wrote itself
+    Given any card Langy composed from the project's data
     When it renders
     Then its chrome visibly marks it as derived by Langy
     And it is distinguishable at a glance from a platform-measured card
+    And a choices card wears no such frame
 
   Scenario: A derived card offers verification instead of pretending
     Given a derived card whose data the platform could compute for real

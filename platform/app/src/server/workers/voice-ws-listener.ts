@@ -94,13 +94,15 @@ export function routeVoiceUpgrade(params: {
   return { action: "handoff", nonce, child: lookup.child };
 }
 
-/** Write a bare HTTP status line to a pre-handshake socket and close it. */
+/**
+ * Write a bare HTTP status line to a pre-handshake socket, then end it. Uses
+ * `socket.end` rather than a `write` followed by `destroy` - destroy can tear
+ * the socket down before the write flushes, so the client would see a
+ * connection reset instead of the intended status.
+ */
 function refuseSocket(socket: Duplex, status: 404 | 403): void {
   const reasonPhrase = status === 404 ? "Not Found" : "Forbidden";
-  socket.write(
-    `HTTP/1.1 ${status} ${reasonPhrase}\r\nConnection: close\r\n\r\n`,
-  );
-  socket.destroy();
+  socket.end(`HTTP/1.1 ${status} ${reasonPhrase}\r\nConnection: close\r\n\r\n`);
 }
 
 /** The plain-HTTP handler: 200 at the liveness path, 404 for everything else. */

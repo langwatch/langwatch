@@ -108,6 +108,25 @@ export const ingestionPullRunCompletedEventDataSchema = sourceEnvelope.extend({
    */
   completeness: z.enum(["complete", "truncated"]).optional(),
   /**
+   * Whether this run's `errorCount` includes a page it could not read AT ALL,
+   * as opposed to rows it read and stepped over.
+   *
+   * The two are the same number and opposite news. Skipped input is a run that
+   * did its job around a bad row, so the failure count holds still. A page
+   * nobody could read is a failure that happens to arrive on a completion,
+   * because the adapter banked the pages it had already read rather than
+   * throwing them away — and without this field the fold cannot tell them
+   * apart, so a source refused part-way through every run sits at zero
+   * failures forever, never turns red, and collects a fraction of its spend
+   * every hour with nothing to say so.
+   *
+   * Optional, like the two fields above and for the same reason: the fold
+   * reads events straight off the log, and no completion written before this
+   * existed has the key. Absent means skipped input, which is what every
+   * producer before this meant.
+   */
+  unreadPage: z.boolean().optional(),
+  /**
    * The instant the source is known to have been read up to, epoch ms.
    *
    * Deliberately NOT the instant the run finished. The run clock advances on

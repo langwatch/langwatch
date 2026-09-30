@@ -16,7 +16,6 @@
  */
 
 import { PROJECT_KIND } from "@ee/governance/services/governanceProject.service";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -25,13 +24,17 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
-wireDefaultTestApp();
+wireDefaultTestApp(() => ({
+  projects: new ProjectService(new PrismaProjectRepository(prisma)),
+}));
 
 describe("Feature: the governance project is refused by the generic project routes", () => {
   const ns = `gov-guard-${nanoid(8)}`;
@@ -79,15 +82,12 @@ describe("Feature: the governance project is refused by the generic project rout
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        userId: adminId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: adminId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     const governanceProject = await prisma.project.create({
@@ -140,6 +140,7 @@ describe("Feature: the governance project is refused by the generic project rout
   afterAll(async () => {
     if (!organizationId) return;
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["apiKey", { organizationId }],
       ["customRole", { organizationId }],
@@ -166,7 +167,13 @@ describe("Feature: the governance project is refused by the generic project rout
           `/api/projects/${governanceProjectId}/api-key`,
         );
 
-        expect(response.status).toBe(404);
+        // 403, not the 404 the read-by-id route answers. This branch retires
+        // the legacy base-key routes outright: the handler refuses before it
+        // looks anything up, so an ordinary project, the governance area and
+        // an id that never existed all get the identical response. The leak
+        // this suite guards against (ADR-128 §11) is therefore still shut —
+        // more tightly than a 404 shuts it, because no lookup happens at all.
+        expect(response.status).toBe(403);
       });
     });
 
@@ -209,7 +216,10 @@ describe("Feature: the governance project is refused by the generic project rout
           { method: "POST" },
         );
 
-        expect(response.status).toBe(404);
+        // 403 for the same reason the key read above answers 403: re-keying
+        // through this route is refused for every project now, so the
+        // governance area is not singled out and its key is untouched.
+        expect(response.status).toBe(403);
         const project = await prisma.project.findUnique({
           where: { id: governanceProjectId },
         });

@@ -95,55 +95,6 @@ function observedEvent({
   } as never;
 }
 
-/** One priced gateway outcome, as the ingest seam appends it. */
-function confirmedEvent({
-  costNanoUsd,
-  occurredAt = DAY_MS,
-  id = `evt-gw-${occurredAt}`,
-}: {
-  costNanoUsd: number;
-  occurredAt?: number;
-  id?: string;
-}) {
-  return {
-    id,
-    type: "lw.gateway.spend.confirmed",
-    tenantId: TENANT,
-    aggregateId: `gwreq-${id}`,
-    occurredAt,
-    data: {
-      gateway_request_id: `gwreq-${id}`,
-      occurred_at: occurredAt,
-      tenantId: TENANT,
-      organization_id: "org_acme",
-      virtual_key_id: "vk_1",
-      principal_user_id: "user_ada",
-      end_user_id: "",
-      trace_id: "",
-      request_type: "chat",
-      labels: [],
-      metadata: "",
-      admitted_at: occurredAt,
-      team_id: "",
-      model: "openai/gpt-5-mini",
-      model_provider_id: "openai",
-      usage: {
-        input_tokens: 100,
-        output_tokens: 20,
-        cache_read_input_tokens: 0,
-        cache_creation_input_tokens: 0,
-        reasoning_tokens: 0,
-        input_audio_tokens: 0,
-        output_audio_tokens: 0,
-        input_chars: 0,
-      },
-      rate_version: "registry@2026-08-01",
-      duration_ms: 120,
-      cost_nano_usd: costNanoUsd,
-    },
-  } as never;
-}
-
 /**
  * The event that withdraws what one restatement key holds in the cell it is
  * currently filed under.
@@ -395,19 +346,6 @@ describe("the restatement marker", () => {
       expect(reversed.revisionCount).toBe(2);
     });
   });
-
-  describe("given a gateway outcome", () => {
-    it("never marks the day revised, because nothing restates one", () => {
-      const state = fold([
-        confirmedEvent({ costNanoUsd: 5_000, id: "a" }),
-        confirmedEvent({ costNanoUsd: 7_000, id: "b" }),
-      ]);
-
-      expect(governanceCostRollupTotals(state).amountNanoUsd).toBe(12_000);
-      expect(state.revisedAt).toBe(null);
-      expect(state.revisionCount).toBe(0);
-    });
-  });
 });
 
 describe("the last-observed anchor", () => {
@@ -492,20 +430,6 @@ describe("the last-observed anchor", () => {
       // log delivered newest-first needs every observation of the item, not
       // just the newest two. Left as its own decision rather than quietly
       // redefined into "how many items changed".
-    });
-  });
-
-  describe("given a gateway outcome", () => {
-    it("anchors on the moment the request was served", () => {
-      const served = Date.parse("2026-08-01T18:00:00.000Z");
-      const state = fold([
-        confirmedEvent({ costNanoUsd: 5_000, occurredAt: served }),
-      ]);
-
-      // We metered it as we served it, so serving time IS observation time
-      // here. The read side exempts the lane from the provisional marker
-      // outright rather than relying on this arithmetic.
-      expect(state.lastObservedAt).toBe(served);
     });
   });
 });

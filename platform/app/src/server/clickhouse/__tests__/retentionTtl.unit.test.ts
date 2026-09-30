@@ -2,12 +2,19 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  classifyEventLogRowRetention,
+  EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE,
+  eventLogRetentionCategorySqlPredicate,
+} from "../../data-retention/event-log-retention-policy";
+import {
   INDEFINITE_DEFAULT_RETENTION_TABLES,
   PRODUCTION_STORAGE_METER_TABLES,
+  RETENTION_CATEGORIES,
   RETENTION_MANAGED_TABLES,
   RETENTION_TABLE_CATEGORY_MAP,
   RETENTION_TTL_MANAGED_TABLES,
 } from "../../data-retention/retentionPolicy.schema";
+import { AGGREGATE_TYPE_IDENTIFIERS } from "../../event-sourcing/schemas/typeIdentifiers";
 import {
   buildRetentionTTLExpression,
   hasRetentionTTL,
@@ -130,6 +137,126 @@ describe("RETENTION_MANAGED_TABLES", () => {
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_run_items");
     expect(RETENTION_MANAGED_TABLES).toContain("dspy_steps");
+  });
+
+  /**
+   * Security history lives in `event_log`, and `event_log` carries a FINITE
+   * retention TTL like every other managed table — so nothing about the table
+   * keeps an identity or authorization event alive. The only thing that does
+   * is the row-level predicate: every finite category's retroactive UPDATE
+   * negates the indefinite guard, so a row the classifier calls "indefinite"
+   * is never handed a `_retention_days` at all and falls to the far-future
+   * sentinel instead.
+   *
+   * Both halves of that have to hold together, and they are written in two
+   * different modules — the classifier that stamps a row on the way in, and
+   * the SQL that rewrites rows already stored. An aggregate added to one and
+   * not the other is how a security event acquires a finite lifetime without
+   * anybody choosing to give it one.
+   */
+  /** @scenario Tenant retention never enrolls durable security projections */
+  it("never enrolls durable identity, SSO, SCIM, or authorization state", () => {
+    const eventLog = TABLE_TTL_CONFIG.find((c) => c.table === "event_log");
+    // The premise. If this ever stops being true the rest of the test is
+    // measuring nothing, because the table would keep its rows regardless.
+    expect(eventLog?.retentionTTLColumn).toBeDefined();
+    expect(RETENTION_MANAGED_TABLES).toContain("event_log");
+
+    // A security event type overrides the aggregate, whatever the aggregate
+    // is — the safety net for rows written before the aggregate map knew
+    // about them. Asserted over EVERY registered aggregate rather than a
+    // hand-picked few, so a new one cannot arrive outside the net.
+    for (const AggregateType of AGGREGATE_TYPE_IDENTIFIERS) {
+      for (const EventType of [
+        "lw.identity.something_happened",
+        "lw.authz.something_happened",
+      ]) {
+        expect(
+          classifyEventLogRowRetention({ AggregateType, EventType }),
+          `${AggregateType} / ${EventType}`,
+        ).toBe("indefinite");
+      }
+    }
+
+    // The aggregates that are indefinite on their own account, derived by
+    // running the classifier rather than restated here: adding one, or moving
+    // one onto a customer policy, changes this set and is meant to.
+    const indefiniteAggregateTypes = AGGREGATE_TYPE_IDENTIFIERS.filter(
+      (AggregateType) =>
+        classifyEventLogRowRetention({
+          AggregateType,
+          EventType: `lw.other.${AggregateType}.something_happened`,
+        }) === "indefinite",
+    );
+    expect(indefiniteAggregateTypes.length).toBeGreaterThan(0);
+
+    for (const category of RETENTION_CATEGORIES) {
+      const predicate = eventLogRetentionCategorySqlPredicate(category);
+      // Every finite category excludes the whole guard. Compared against the
+      // generated constant, not a transcription of it, so the two cannot
+      // drift apart while both still look right.
+      expect(predicate).toContain(
+        `NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`,
+      );
+
+      // What the category positively selects, with the negated guard removed
+      // first — the guard names the indefinite aggregates itself, and leaving
+      // it in would make every category look like it selects them.
+      const selection = predicate.replace(
+        `NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`,
+        "",
+      );
+      const positivelySelected =
+        /AggregateType IN \(([^)]*)\)/.exec(selection)?.[1] ?? "";
+
+      for (const aggregateType of indefiniteAggregateTypes) {
+        expect(EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE).toContain(
+          `'${aggregateType}'`,
+        );
+        expect(
+          positivelySelected,
+          `${category} selects ${aggregateType}`,
+        ).not.toContain(`'${aggregateType}'`);
+      }
+    }
+  });
+
+  /**
+   * The reconciler and the policy schema are two lists of table names that
+   * have to be the same list, and neither one can see the other. A gated table
+   * missing a `retentionTTLColumn` here silently keeps its rows forever, so a
+   * customer's shortened policy — or their deletion request — quietly does
+   * not reach it. A table carrying one WITHOUT being in the gate is the mirror
+   * failure: the reconciler writes a `_retention_days` clause onto a table
+   * nothing ever populates that column for.
+   *
+   * The gate is `RETENTION_TTL_MANAGED_TABLES`, not the customer-facing
+   * `RETENTION_MANAGED_TABLES`. It is deliberately the wider of the two: the
+   * governance cost tables carry `_retention_days` and default it to zero, so
+   * the reconciler installs the clause and nothing expires until a day count
+   * is stamped on a row. Asking the customer set here would read that
+   * defaulted-to-forever table as an unmanaged one carrying a stray column.
+   */
+  it("gives a retention TTL to the gated tables and to nothing else", () => {
+    const withRetentionTTL = TABLE_TTL_CONFIG.filter(
+      (config) => config.retentionTTLColumn !== undefined,
+    ).map((config) => config.table);
+
+    expect([...withRetentionTTL].sort()).toEqual(
+      [...RETENTION_TTL_MANAGED_TABLES].sort(),
+    );
+
+    // The remainder is cold-storage-only on purpose: an entry outside the gate
+    // must carry no retention column at all, which is what keeps billing and
+    // durable security tables out of a tenant policy even if one of them is
+    // added to this config for cold storage.
+    for (const config of TABLE_TTL_CONFIG) {
+      if (RETENTION_TTL_MANAGED_TABLES.includes(config.table)) continue;
+      expect(
+        config.retentionTTLColumn,
+        `${config.table} is outside the reconciler gate but carries a retention column`,
+      ).toBeUndefined();
+    }
   });
 
   it("does not include billable_events", () => {

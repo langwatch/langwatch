@@ -8,8 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -315,6 +318,10 @@ func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent)
 	if isTerminal(ev.Type) {
 		return true, a.finishTurn(ctx, st, ev)
 	}
+	if ev.Type == eventGuidedTurn {
+		logGuidedTurn(ctx, ev)
+		return false, nil
+	}
 	// A failed emit must NOT end the turn: the worker is still executing, and
 	// concluding here made driveTurn post a completed durable final for a turn
 	// that was mid-tool, release the worker, and let the idle reaper kill it
@@ -323,6 +330,23 @@ func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent)
 	// consuming to the real terminal; the durable fold stays complete.
 	_ = st.apply(ev)
 	return false, nil
+}
+
+// logGuidedTurn writes the wrapper's guided turn end guard report to the
+// manager's log. Worker stderr is discarded (see Spawn), so this event is the
+// guard's only sink, and the event name is the log message so a grep for it
+// finds the line. The whole report sits on that one line: the turn's logger
+// already carries the turn id (the transport's turnLogFields), so it is not
+// added again, and what the turn owed is joined into one string, since the
+// pretty console draws an array field on a continuation line that a grep for
+// the name does not return. No frame: the panel has nothing to draw for it.
+func logGuidedTurn(ctx context.Context, ev wireEvent) {
+	switch ev.Event {
+	case guidedTurnContinued, guidedTurnBareEnd:
+		clog.Get(ctx).Info(ev.Event, zap.Int("segment", ev.Segment), zap.String("missing", strings.Join(ev.Missing, "; ")))
+	default:
+		clog.Get(ctx).Warn("pi worker emitted a guided_turn event of an unknown kind", zap.String("event", ev.Event))
+	}
 }
 
 // finishTurn maps the terminal event per the table on Stream.
@@ -467,7 +491,13 @@ func (s *streamState) applyToolEnd(ev wireEvent) bool {
 	}
 	delete(s.startedInput, ev.ID)
 	output := toolmap.TruncateToolOutput(ev.Output)
-	f, mErr := frames.ToolEnd(ev.ID, ev.Name, input, ev.IsError, output, 0)
+	var f frames.Frame
+	var mErr error
+	if ev.Local {
+		f, mErr = frames.ToolEndLocal(ev.ID, ev.Name, input, ev.IsError, output, 0)
+	} else {
+		f, mErr = frames.ToolEnd(ev.ID, ev.Name, input, ev.IsError, output, 0)
+	}
 	if mErr != nil {
 		return true
 	}

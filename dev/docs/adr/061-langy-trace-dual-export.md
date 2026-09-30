@@ -105,3 +105,20 @@ and the future per-org policy has an audit trail.
   attribute (it must be a deliberate act, per the fail-closed doctrine).
 - Whether the per-org policy surface, when it lands, is customer-visible
   (data-privacy disposition) or ops-only — deferred with the store itself.
+
+## Amendment (2026-09-06): the gateway names Langy on the span it retells
+
+The gateway's retold gen_ai span is the first piece of a turn to reach the
+customer's project. The worker spans and the `langy.turn` root only land when
+the turn ends, many seconds later. Stamped with the gateway's own origin, that
+span folded a "gateway" trace first, and on a fresh guided project the
+first-trace subscriber marked the project as integrated before the root could
+rank the trace as Langy's.
+
+For a Langy call, recognised by its non-skip mirror tier (the same check that
+drops an unjoinable standalone copy), `customertracebridge` now stamps
+`langwatch.origin = langy` on the span itself. The resource keeps the gateway's
+identity, ordinary customer traffic through the gateway is untouched, and the
+fold's "Langy outranks gateway" rule stays as the backstop for spans stamped
+before this change. The first span to fold now settles the trace's origin, so
+every reader of the first-trace flag sees a Langy trace as Langy's.

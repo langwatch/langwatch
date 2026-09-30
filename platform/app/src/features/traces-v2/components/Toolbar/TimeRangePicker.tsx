@@ -17,8 +17,8 @@ import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Popover } from "../../../../components/ui/popover";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
-import type { TimeRange } from "../../stores/filterStore";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { TimeRange } from "../../stores/querySlice";
 import {
   getPresetById,
   matchPreset,
@@ -29,8 +29,8 @@ import {
 export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({
   compact = false,
 }) => {
-  const timeRange = useFilterStore((s) => s.timeRange);
-  const setTimeRange = useFilterStore((s) => s.setTimeRange);
+  const timeRange = useExplorerStore((s) => s.timeRange);
+  const setTimeRange = useExplorerStore((s) => s.setTimeRange);
   const [open, setOpen] = useState(false);
 
   const activePreset = useMemo(

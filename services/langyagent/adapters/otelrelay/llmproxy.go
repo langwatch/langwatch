@@ -159,6 +159,9 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			}
 			pr.SetXForwarded()
 		},
+		// A burst 429 is re-sent by the relay itself, with the provider's
+		// Retry-After, before anything reaches the worker (llmretry.go).
+		Transport: r.llmRetryTransport(entry),
 		// Negative ⇒ flush immediately after each write: SSE pass-through.
 		FlushInterval: -1,
 		// EVERY failed call is captured so the turn's terminal error frame

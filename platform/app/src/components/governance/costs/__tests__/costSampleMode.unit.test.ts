@@ -123,6 +123,29 @@ describe("reading the headline summary as a real-data read", () => {
     });
   });
 
+  describe("given a metered window of only requests with no dollar amount", () => {
+    /** @scenario "A window of only requests with no dollar amount still shows the metered lane" */
+    it("counts the request count as real data with no dollar figure and no unpriced cells", () => {
+      // The metered lane never marks a CELL as unpriced: it keeps its total
+      // and counts the requests with no amount beside it. A window of only
+      // settled or zero-priced requests therefore has a null dollar figure,
+      // no unpriced cell and no currency total — and a count of three. The
+      // lane reported; the screen must not say nothing was recorded.
+      const read = summaryAsRead(
+        summary({
+          gateway: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
+            requestsWithoutAmount: 3,
+          },
+        }),
+      );
+      expect(read?.length).toBeGreaterThan(0);
+    });
+  });
+
   describe("given every lane answered with nothing", () => {
     it("reads as measured and empty", () => {
       expect(summaryAsRead(summary())).toEqual({ length: 0 });

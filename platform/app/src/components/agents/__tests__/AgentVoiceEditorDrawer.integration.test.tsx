@@ -480,4 +480,74 @@ describe("AgentVoiceEditorDrawer", () => {
       expect(talk).toHaveAttribute("title", "Add an ElevenLabs key first");
     });
   });
+
+  describe("given the Call direction radio group on a phone target", () => {
+    it("selects Inbound when the saved config has callDirection: inbound", async () => {
+      mockAgentById = {
+        id: "agent_phone_inbound",
+        name: "Hotline",
+        config: {
+          transport: "phone",
+          phoneNumber: "+14155550123",
+          callDirection: "inbound",
+        },
+      };
+      mockProviders = [TWILIO_KEYED_PROVIDER];
+      renderVoiceDrawer({ agentId: "agent_phone_inbound" });
+
+      await screen.findByTestId("voice-agent-call-direction");
+      expect(screen.getByRole("radio", { name: /Inbound/ })).toBeChecked();
+      expect(screen.getByRole("radio", { name: /Outbound/ })).not.toBeChecked();
+    });
+
+    it("selects Outbound when the saved config has no callDirection", async () => {
+      mockAgentById = {
+        id: "agent_phone_no_direction",
+        name: "Hotline",
+        config: { transport: "phone", phoneNumber: "+14155550123" },
+      };
+      mockProviders = [TWILIO_KEYED_PROVIDER];
+      renderVoiceDrawer({ agentId: "agent_phone_no_direction" });
+
+      await screen.findByTestId("voice-agent-call-direction");
+      expect(screen.getByRole("radio", { name: /Outbound/ })).toBeChecked();
+      expect(screen.getByRole("radio", { name: /Inbound/ })).not.toBeChecked();
+    });
+
+    it("saves callDirection: inbound and no isAgentSpeaksFirst key after choosing Inbound", async () => {
+      const user = userEvent.setup();
+      mockAgentById = {
+        id: "agent_phone_switch",
+        name: "Hotline",
+        config: { transport: "phone", phoneNumber: "+14155550123" },
+      };
+      mockProviders = [TWILIO_KEYED_PROVIDER];
+      renderVoiceDrawer({ agentId: "agent_phone_switch" });
+
+      await user.click(await screen.findByRole("radio", { name: /Inbound/ }));
+      await user.click(screen.getByTestId("save-agent-button"));
+
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "agent_phone_switch",
+          config: expect.objectContaining({ callDirection: "inbound" }),
+        }),
+      );
+      const savedConfig = updateMock.mock.calls[0]?.[0]?.config as Record<
+        string,
+        unknown
+      >;
+      expect(savedConfig).not.toHaveProperty("isAgentSpeaksFirst");
+    });
+
+    it("does not render the radio group for the ElevenLabs transport", async () => {
+      mockProviders = [ELEVENLABS_KEYED_PROVIDER];
+      renderVoiceDrawer();
+
+      await screen.findByTestId("voice-agent-name-input");
+      expect(
+        screen.queryByTestId("voice-agent-call-direction"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

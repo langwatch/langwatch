@@ -14,6 +14,12 @@ export interface BarStateOverrides {
   preset?: string;
   timeFrom?: number;
   timeTo?: number;
+  /**
+   * The Instant Eval runs behind the query's `eval` chips, run key to run id,
+   * written as one `run=<key>:<runId>` parameter each. Carried so a refresh
+   * or a shared link reuses the judgements rather than paying for them again.
+   */
+  runs?: Record<string, string>;
 }
 
 export interface FragmentState {
@@ -21,12 +27,21 @@ export interface FragmentState {
   overrides: BarStateOverrides;
 }
 
+const RUN_PARAM = "run";
+
 function safeDecode(value: string): string | null {
   try {
     return decodeURIComponent(value);
   } catch {
     return null;
   }
+}
+
+/** `<key>:<runId>` read back, or null for anything else. */
+function parseRunEntry(entry: string): [string, string] | null {
+  const separator = entry.indexOf(":");
+  if (separator <= 0 || separator === entry.length - 1) return null;
+  return [entry.slice(0, separator), entry.slice(separator + 1)];
 }
 
 export function parseFragment(fragment: string): FragmentState | null {
@@ -59,6 +74,13 @@ export function parseFragment(fragment: string): FragmentState | null {
         }
       }
     }
+
+    const runs: Record<string, string> = {};
+    for (const entry of params.getAll(RUN_PARAM)) {
+      const parsed = parseRunEntry(entry);
+      if (parsed) runs[parsed[0]] = parsed[1];
+    }
+    if (Object.keys(runs).length > 0) overrides.runs = runs;
   }
 
   return { lensId, overrides };
@@ -68,6 +90,8 @@ interface ComputeOverridesInput {
   query: string;
   timeRange: { from: number; to: number; presetId?: string };
   defaultPresetId: string;
+  /** Only the runs the query still names are worth an address. */
+  runs?: Record<string, string>;
 }
 
 export function computeOverrides(
@@ -82,6 +106,9 @@ export function computeOverrides(
   } else {
     overrides.timeFrom = input.timeRange.from;
     overrides.timeTo = input.timeRange.to;
+  }
+  if (input.runs && Object.keys(input.runs).length > 0) {
+    overrides.runs = input.runs;
   }
   return overrides;
 }
@@ -100,6 +127,11 @@ export function buildFragment(
   ) {
     params.set("from", String(overrides.timeFrom));
     params.set("to", String(overrides.timeTo));
+  }
+  if (overrides.runs) {
+    for (const key of Object.keys(overrides.runs).sort()) {
+      params.append(RUN_PARAM, `${key}:${overrides.runs[key]}`);
+    }
   }
   const encodedLens = encodeURIComponent(lensId);
   const paramStr = params.toString();

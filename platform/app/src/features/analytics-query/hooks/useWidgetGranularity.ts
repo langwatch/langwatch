@@ -21,7 +21,7 @@
  * contract refuses — an error on a shared link, in place of a chart.
  *
  * @see ~/components/PeriodSelector — the period half of the same URL state
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { useCallback, useMemo } from "react";

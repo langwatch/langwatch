@@ -17,6 +17,7 @@ import {
   listDirectory,
   readFile,
   writeFile,
+  writeLangwatchEnv,
 } from "../fs-ops";
 
 describe("given a shared folder with a link that leaves it", () => {
@@ -176,6 +177,99 @@ describe("given a shared folder with a link that leaves it", () => {
       expect(fs.readFileSync(path.join(root, "src/app.py"), "utf8")).toContain(
         "print('hello')",
       );
+    });
+  });
+
+  describe("when an edit appends to a file", () => {
+    /** @scenario "An edit can append to the end of a file" */
+    it("adds the text as the last line and keeps the rest", () => {
+      const answer = editFile({
+        params: { path: "README.md", edits: [{ append: "Second line" }] },
+        root,
+      });
+      expect(answer).toContain("1 edit");
+      expect(fs.readFileSync(path.join(root, "README.md"), "utf8")).toBe(
+        "# Acme\nSecond line\n",
+      );
+    });
+
+    it("creates the file when there is none", () => {
+      editFile({
+        params: { path: "notes/todo.txt", edits: [{ append: "one\ntwo" }] },
+        root,
+      });
+      expect(fs.readFileSync(path.join(root, "notes/todo.txt"), "utf8")).toBe(
+        "one\ntwo\n",
+      );
+    });
+
+    it("still refuses a replacement in a file that is not there", () => {
+      let thrown: unknown;
+      try {
+        editFile({
+          params: {
+            path: "missing.txt",
+            edits: [{ oldText: "a", newText: "b" }, { append: "c" }],
+          },
+          root,
+        });
+      } catch (error) {
+        thrown = error;
+      }
+      expect((thrown as LocalCallFailure).code).toBe("not_found");
+      expect(fs.existsSync(path.join(root, "missing.txt"))).toBe(false);
+    });
+  });
+
+  describe("when the LangWatch credentials are written", () => {
+    const params = { path: ".env" };
+
+    /** @scenario "The app gets the project's key through the developer's own login" */
+    it("sets both variables and keeps every other line", () => {
+      fs.writeFileSync(
+        path.join(root, ".env"),
+        "OPENAI_API_KEY=sk-openai\nLANGWATCH_API_KEY=old-key\n",
+      );
+      const answer = writeLangwatchEnv({
+        params,
+        root,
+        apiKey: "sk-lw-project-key",
+        endpoint: "http://localhost:5560",
+        projectName: "Acme Shop",
+      });
+      expect(fs.readFileSync(path.join(root, ".env"), "utf8")).toBe(
+        "OPENAI_API_KEY=sk-openai\nLANGWATCH_API_KEY=sk-lw-project-key\nLANGWATCH_ENDPOINT=http://localhost:5560\n",
+      );
+      expect(answer).toBe(
+        "Set LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in .env for project Acme Shop.",
+      );
+      expect(answer).not.toContain("sk-lw-project-key");
+    });
+
+    it("creates the file when there is none", () => {
+      writeLangwatchEnv({
+        params: {},
+        root,
+        apiKey: "sk-lw-project-key",
+        endpoint: "http://localhost:5560",
+        projectName: "Acme Shop",
+      });
+      expect(fs.readFileSync(path.join(root, ".env"), "utf8")).toBe(
+        "LANGWATCH_API_KEY=sk-lw-project-key\nLANGWATCH_ENDPOINT=http://localhost:5560\n",
+      );
+    });
+
+    it("refuses a file outside the folder", () => {
+      expect(() =>
+        writeLangwatchEnv({
+          params: { path: "escape/.env" },
+          root,
+          apiKey: "sk-lw-project-key",
+          endpoint: "http://localhost:5560",
+          projectName: "Acme Shop",
+        }),
+      ).toThrow(LocalCallFailure);
+      expect(fs.existsSync(path.join(outside, ".env"))).toBe(false);
     });
   });
 

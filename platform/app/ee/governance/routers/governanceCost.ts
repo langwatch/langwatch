@@ -19,12 +19,12 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import {
   checkOrganizationPermission,
   type PermissionMiddlewareParams,
-} from "~/server/api/rbac";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+} from "~/server/app-layer/authz/permission-adapters";
 
 const enterpriseGate = requireEnterprisePlan(
   ENTERPRISE_FEATURE_ERRORS.GOVERNANCE_COST,
@@ -91,6 +91,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.summary({
         organizationId: input.organizationId,
@@ -119,6 +121,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.dailyByProvider({
         organizationId: input.organizationId,
@@ -147,6 +151,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.spendByModel({
         organizationId: input.organizationId,
@@ -196,6 +202,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.periodRecords({
         organizationId: input.organizationId,
@@ -224,6 +232,8 @@ export const governanceCostRouter = createTRPCRouter({
         prisma: ctx.prisma,
         costRollup: getApp().governance.costRollup,
         ocsfEvents: getApp().governance.ocsfEvents,
+        gatewaySpend: getApp().governance.gatewaySpend,
+        projects: getApp().governance.projects,
       });
       return await service.spenderBreakdown({
         organizationId: input.organizationId,

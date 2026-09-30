@@ -128,12 +128,18 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
   @integration
   Scenario: The comparator counts a summary that drifted from its events
     Given a summary row that no longer matches the sum of its events
-    When the scheduled comparator runs
+    When the comparator runs for that day
     # Reported = the mismatch metric increments (prom-client counter,
     # labelled by cost source, org in the log line). Wave 1 surfaces
     # signals and sends nothing — no alert fires anywhere.
     Then the drift metric counts the mismatch
     And the mismatch details are in the log
+
+  # The comparator checks the billed lane alone. It is no longer run by a
+  # nightly schedule at all: a pulled charge marks its own day and the day
+  # is compared at the next 04:23 UTC. See cost-rollup-watch.feature, which
+  # owns that behaviour and the two scenarios about leftover scheduled rows
+  # that used to sit here — the rows are deleted and nothing creates them.
 
   @unit
   Scenario: The summary's lag behind the event log is measured

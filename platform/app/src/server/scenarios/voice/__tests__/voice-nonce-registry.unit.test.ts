@@ -22,7 +22,6 @@ describe("VoiceNonceRegistry", () => {
       const first = registry.consume("abc");
       expect(first).toEqual({ ok: true, child: fakeChild });
 
-      // Single use: the same nonce is unknown on a replay.
       expect(registry.consume("abc")).toEqual({ ok: false, reason: "unknown" });
     });
   });

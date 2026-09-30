@@ -2,9 +2,11 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Organization } from "~/generated/prisma/client";
+import type { Organization, Prisma } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 import {
+  disableEndpointForFailureStreak,
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
   WebhookEndpointService,
@@ -258,6 +260,39 @@ describe("webhook endpoint service", () => {
     expect(reEnabled.status).toBe("ACTIVE");
     expect(reEnabled.failingSince).toBeNull();
     expect(reEnabled.disabledReason).toBeNull();
+  });
+
+  /** @scenario Two failing attempts crossing the seventy two hour mark disable the endpoint once */
+  it("tells exactly one of two overlapping attempts that it flipped the endpoint", async () => {
+    // The flip is what gates the notification, so one flip is one
+    // notification. Staged on the write itself: the first attempt's flip is
+    // held open until the second's is parked on the row lock, which is the
+    // overlap under which a guard in a subquery would tell both yes.
+    const { endpoint } = await createEndpoint();
+    const now = new Date();
+    const flip = (tx: Prisma.TransactionClient) =>
+      disableEndpointForFailureStreak({
+        prisma: tx,
+        organizationId: organization.id,
+        endpointId: endpoint.id,
+        now,
+      });
+
+    const flips = await raceOnOneRow({
+      prisma,
+      table: "WebhookEndpoint",
+      first: flip,
+      second: flip,
+    });
+
+    expect(flips.first).toBe(true);
+    expect(flips.second).toBe(false);
+    const health = await service.health({
+      organizationId: organization.id,
+      endpointId: endpoint.id,
+    });
+    expect(health.status).toBe("DISABLED");
+    expect(health.disabledReason).toBe(WEBHOOK_DISABLED_REASON_AUTO);
   });
 
   it("stores the receiver's status per attempt in the delivery log", async () => {

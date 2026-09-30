@@ -9,12 +9,12 @@ import type {
   LangwatchSignalBucket,
   SpanTreeNode,
 } from "~/server/api/routers/tracesV2.schemas";
+import { formatDuration } from "~/shared/format/time";
 import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
-import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
 import { GroupTimelineBar, TimelineBar } from "./TimelineBar";
 import { TreeRow } from "./TreeRow";

@@ -40,6 +40,13 @@ The chips, in the order the dialog shows them:
 | **Run against a prompt** | Replaces the agent with a prompt from the project as the target. See [Targets](/agent-testing/targets). |
 | **Custom simulation models** | Opens **Simulation models**: the **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both. |
 | **Run multiple times** | The repeat count, `times per scenario and target`, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row. |
+| **Add evaluators** | Opens **Evaluators**: the evaluators inherited from the test suites in scope, each under `Inherited from <suite> · edit in the suite`, and **Add evaluator** under **On this run** for one on the plan itself. A plan evaluator reads the conversation and the trace only, since a plan has no scenario field to map to. The block is already open when a test suite in scope attaches any. See [Evaluators](/agent-testing/evaluators#evaluators-on-a-run-plan). |
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-dialog-inherited-and-extra.png" alt="The run dialog with the evaluators inherited from the Case lookups suite and a PII Leak Scanner added on this run" />
+</Frame>
+
+The **Evaluators** block: two chips inherited from the `Case lookups` suite, and a PII Leak Scanner added under **On this run**.
 
 <Note>
 The dialog shows **No model provider is set up** when the project has no model provider for the simulator and the judge. Add one under the project settings before the first run.
@@ -63,7 +70,7 @@ A scope by labels is dynamic: a scenario that gets the label later is in the nex
 
 ## While it runs
 
-The run opens as soon as it starts. Each row shows `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
+The run opens as soon as it starts. Each row shows `Running` until the judge is done, then `Passed` or `Failed`. A row with evaluators shows `Evaluating` between the two, until every evaluator has reported. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with rows still running and the Stop all button" />

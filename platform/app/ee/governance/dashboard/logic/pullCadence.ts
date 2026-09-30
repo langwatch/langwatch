@@ -90,6 +90,67 @@ export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   http_polling: "*/15 * * * *",
 };
 
+/**
+ * How many months of history a NEWLY added source proposes to read, per source
+ * type.
+ *
+ * A source added with no start date reads only the last few days, so the
+ * Activity Monitor shows a flat line on the day the admin finishes setting it
+ * up — the moment they are most likely to conclude the integration is broken.
+ * The form therefore proposes a start rather than leaving the field empty. It
+ * is a proposal and nothing more: the admin can move it, and clearing it still
+ * means the adapter's own default.
+ *
+ * The figures differ because the providers do, and because reading further
+ * back is not free — every extra month is more pages on the first run. OpenAI
+ * serves four years, so a year is a deliberate choice rather than a limit:
+ * enough to show a year-on-year trend on day one without a first run that
+ * reads four years of days. Neither figure is sized against a page count:
+ * the Anthropic adapter asks for no page size, so how many pages a span
+ * costs is the provider's to decide. A first read may well take several runs,
+ * and that is fine — a run that reaches its page cap saves the cursor and the
+ * next one resumes from it.
+ *
+ * Beside the cadence defaults and in one table for the same reason they are:
+ * the proposal and any copy describing it have to read one source, or the form
+ * proposes one span while the hint beside it names another.
+ */
+export const SOURCE_BACKFILL_MONTHS: Partial<Record<SourceType, number>> = {
+  openai_admin: 12,
+  anthropic_admin: 6,
+};
+
+/**
+ * The instant a new source of this type proposes to read history from:
+ * midnight UTC, that many months before today.
+ *
+ * Midnight UTC because every one of these reports is bucketed by UTC day, so a
+ * start in the middle of one asks for a partial bucket the provider will not
+ * serve. Undefined for a source type with no proposal, which leaves the field
+ * empty and the adapter's own default in charge.
+ *
+ * The day is clamped to the target month's last, because `Date.UTC` rolls an
+ * impossible day forward instead of refusing it: six months before the 31st of
+ * August is the 31st of February, which arrives as the 3rd of March. The
+ * proposal would then be five months back on a form whose hint says six.
+ * Clamping lands on the 28th, which is what "six months before" means for a
+ * month that has no 31st.
+ */
+export function defaultBackfillStart(
+  sourceType: SourceType,
+): string | undefined {
+  const months = SOURCE_BACKFILL_MONTHS[sourceType];
+  if (months === undefined) return undefined;
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() - months;
+  // Day 0 of the following month is the last day of this one, and Date.UTC
+  // normalizes a month outside 0-11 into the right year on the way.
+  const lastDayOfTarget = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const day = Math.min(now.getUTCDate(), lastDayOfTarget);
+  return new Date(Date.UTC(year, month, day)).toISOString();
+}
+
 /** The recommended schedule for a source type, or null when it has no
  *  pull adapter (push and s3 sources carry no cadence). */
 export function recommendedPullSchedule(sourceType: SourceType): string | null {

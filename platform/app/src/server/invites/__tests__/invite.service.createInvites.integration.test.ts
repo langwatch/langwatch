@@ -55,6 +55,7 @@ vi.mock("../../../env.mjs", async (importOriginal) => {
     ...original,
     env: {
       ...original.env,
+      EMAIL_PROVIDER: "sendgrid",
       SENDGRID_API_KEY: "test-sendgrid-key",
       BASE_HOST: "http://localhost:3000",
     },
@@ -162,6 +163,46 @@ describe("InviteService.createInvites", () => {
   });
 
   describe("given a member with a personal workspace in the organization", () => {
+    /** @scenario "Admin invitations retain the authenticated sender across resend" */
+    it.each(["admin", "service"])("preserves the %s sender", async (kind) => {
+      const result = await service.createInvites({
+        organizationId,
+        invites: [
+          {
+            email: `sender-${kind}-${ns}@test.com`,
+            role: OrganizationUserRole.EXTERNAL,
+            teams: [{ teamId: sharedTeamId, role: TeamUserRole.VIEWER }],
+          },
+        ],
+        ...(kind === "admin" ? { user: { id: ownerUserId } } : {}),
+        validation: "strict",
+      });
+      const created = result.invites[0]?.invite;
+      if (!created) {
+        throw new Error("Expected one created invitation");
+      }
+      const senderId = kind === "admin" ? ownerUserId : null;
+      expect(created.requestedBy).toBe(senderId);
+
+      const resent = await service.resendInvite({
+        organizationId,
+        inviteId: created.id,
+      });
+      const listed = await service.listInvites({ organizationId });
+
+      expect(resent.invite.inviteCode).not.toBe(created.inviteCode);
+      expect(resent.invite.requestedBy).toBe(senderId);
+      expect(listed).toHaveLength(1);
+      expect(listed[0]).toMatchObject({
+        id: created.id,
+        requestedBy: senderId,
+        requestedByUser:
+          kind === "admin"
+            ? { id: ownerUserId, name: "Workspace Owner" }
+            : null,
+      });
+    });
+
     /** @scenario An invite cannot assign a personal workspace team */
     it("refuses a team assignment on the personal workspace and creates no invite", async () => {
       await expect(

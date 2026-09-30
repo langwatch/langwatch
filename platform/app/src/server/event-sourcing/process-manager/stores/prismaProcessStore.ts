@@ -107,6 +107,69 @@ const COMMIT_TRANSACTION_OPTIONS = {
   timeout: 20_000,
 } as const;
 
+/**
+ * Append idempotent process intents through either a root Prisma client or an
+ * already-open transaction. The latter lets a domain commit its own durable
+ * row and the retryable follow-up intent together.
+ */
+export async function appendProcessManagerIntents(
+  prisma: PrismaClient | Prisma.TransactionClient,
+  params: {
+    ref: ProcessRef;
+    tenantId: string;
+    userId?: string;
+    sourceEventId: string | null;
+    messages: NewOutboxMessage[];
+    now: number;
+  },
+): Promise<AppendIntentsResult> {
+  if (params.messages.length === 0) {
+    return { insertedMessageKeys: [], duplicateMessageKeys: [] };
+  }
+  const at = asDate(params.now);
+  const inserted = await prisma.processManagerOutbox.createMany({
+    data: params.messages.map((message) => ({
+      id: generate(KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX).toString(),
+      ...refWhere(params.ref),
+      tenantId: params.tenantId,
+      userId: message.userId ?? params.userId ?? null,
+      messageKey: message.messageKey,
+      intentType: message.intentType,
+      payload: toJsonInput(message.payload),
+      traceCarrier: message.traceCarrier,
+      sourceEventId: params.sourceEventId,
+      status: "pending" as const,
+      attempts: 0,
+      nextAttemptAt: at,
+      leasedUntil: null,
+      leaseToken: null,
+      dispatchedAt: null,
+      createdAt: at,
+      updatedAt: at,
+    })),
+    skipDuplicates: true,
+  });
+
+  const keys = params.messages.map((message) => message.messageKey);
+  if (inserted.count === keys.length) {
+    return { insertedMessageKeys: keys, duplicateMessageKeys: [] };
+  }
+  const preexisting = await prisma.processManagerOutbox.findMany({
+    where: {
+      projectId: params.ref.projectId,
+      processName: params.ref.processName,
+      messageKey: { in: keys },
+      createdAt: { lt: at },
+    },
+    select: { messageKey: true },
+  });
+  const duplicates = new Set(preexisting.map((row) => row.messageKey));
+  return {
+    insertedMessageKeys: keys.filter((key) => !duplicates.has(key)),
+    duplicateMessageKeys: keys.filter((key) => duplicates.has(key)),
+  };
+}
+
 /** Durable Postgres implementation of the process state/inbox/outbox port. */
 export class PrismaProcessStore implements ProcessStore {
   constructor(private readonly prisma: PrismaClient) {}
@@ -325,59 +388,7 @@ export class PrismaProcessStore implements ProcessStore {
     messages: NewOutboxMessage[];
     now: number;
   }): Promise<AppendIntentsResult> {
-    if (params.messages.length === 0) {
-      return { insertedMessageKeys: [], duplicateMessageKeys: [] };
-    }
-    const at = asDate(params.now);
-    const inserted = await this.prisma.processManagerOutbox.createMany({
-      data: params.messages.map((message) => ({
-        id: generate(KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX).toString(),
-        ...refWhere(params.ref),
-        tenantId: params.tenantId,
-        userId: message.userId ?? params.userId ?? null,
-        messageKey: message.messageKey,
-        intentType: message.intentType,
-        payload: toJsonInput(message.payload),
-        traceCarrier: message.traceCarrier,
-        sourceEventId: params.sourceEventId,
-        status: "pending" as const,
-        attempts: 0,
-        nextAttemptAt: at,
-        leasedUntil: null,
-        leaseToken: null,
-        dispatchedAt: null,
-        createdAt: at,
-        updatedAt: at,
-      })),
-      skipDuplicates: true,
-    });
-
-    const keys = params.messages.map((message) => message.messageKey);
-    // The overwhelmingly common case is a clean insert, and it costs no
-    // second read. Only a partial insert has to ask which keys were already
-    // there, and only to REPORT them — the rows themselves are already right
-    // either way, so this read is diagnostic and never load-bearing. Rows this
-    // call wrote carry exactly `at`, which is what separates them from earlier
-    // ones; a concurrent insert landing in the same millisecond would be
-    // reported as inserted rather than duplicate, and misattributing a log
-    // line is the whole cost of that.
-    if (inserted.count === keys.length) {
-      return { insertedMessageKeys: keys, duplicateMessageKeys: [] };
-    }
-    const preexisting = await this.prisma.processManagerOutbox.findMany({
-      where: {
-        projectId: params.ref.projectId,
-        processName: params.ref.processName,
-        messageKey: { in: keys },
-        createdAt: { lt: at },
-      },
-      select: { messageKey: true },
-    });
-    const duplicates = new Set(preexisting.map((row) => row.messageKey));
-    return {
-      insertedMessageKeys: keys.filter((key) => !duplicates.has(key)),
-      duplicateMessageKeys: keys.filter((key) => duplicates.has(key)),
-    };
+    return await appendProcessManagerIntents(this.prisma, params);
   }
 
   async findMessagesByRef(params: {
@@ -433,26 +444,35 @@ export class PrismaProcessStore implements ProcessStore {
     return rows.map(toLeasedMessage);
   }
 
+  /**
+   * The three acknowledgements below are fenced on the lease token and on
+   * the row still being pending, and the fence is on the UPDATE itself, as
+   * the lease query above states its own. Through `updateMany` the fence sits
+   * in a subquery, and a statement that waited on the row lock re-checks only
+   * the outer key predicate against the committed row, so a late holder's
+   * acknowledgement parked behind a re-lease or behind the other
+   * acknowledgement of the same lease would land on a row it no longer holds.
+   */
   async markDispatched(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;
     now: number;
   }): Promise<{ applied: boolean }> {
-    const result = await this.prisma.processManagerOutbox.updateMany({
-      where: {
-        ...params.identity,
-        leaseToken: params.leaseToken,
-        status: "pending",
-      },
-      data: {
-        status: "dispatched",
-        leasedUntil: null,
-        leaseToken: null,
-        dispatchedAt: asDate(params.now),
-        updatedAt: asDate(params.now),
-      },
-    });
-    return { applied: result.count === 1 };
+    const now = asDate(params.now);
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "status" = 'dispatched',
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "dispatchedAt" = ${now},
+             "updatedAt" = ${now}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
   }
 
   async markFailed(params: {
@@ -462,21 +482,21 @@ export class PrismaProcessStore implements ProcessStore {
     nextAttemptAt: number;
     dead: boolean;
   }): Promise<{ applied: boolean }> {
-    const result = await this.prisma.processManagerOutbox.updateMany({
-      where: {
-        ...params.identity,
-        leaseToken: params.leaseToken,
-        status: "pending",
-      },
-      data: {
-        status: params.dead ? "dead" : "pending",
-        nextAttemptAt: asDate(params.nextAttemptAt),
-        leasedUntil: null,
-        leaseToken: null,
-        updatedAt: asDate(params.now),
-      },
-    });
-    return { applied: result.count === 1 };
+    const status = params.dead ? "dead" : "pending";
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "status" = ${status}::"ProcessManagerOutboxStatus",
+             "nextAttemptAt" = ${asDate(params.nextAttemptAt)},
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "updatedAt" = ${asDate(params.now)}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
   }
 
   async recordFailedAttempt(params: {
@@ -513,22 +533,21 @@ export class PrismaProcessStore implements ProcessStore {
     leaseToken: string;
     now: number;
   }): Promise<{ applied: boolean }> {
-    const result = await this.prisma.processManagerOutbox.updateMany({
-      where: {
-        ...params.identity,
-        leaseToken: params.leaseToken,
-        status: "pending",
-      },
-      data: {
-        // The decrement hands back the attempt the lease charged: the
-        // delivery never started, so it must not burn retirement budget.
-        attempts: { decrement: 1 },
-        leasedUntil: null,
-        leaseToken: null,
-        updatedAt: asDate(params.now),
-      },
-    });
-    return { applied: result.count === 1 };
+    // The decrement hands back the attempt the lease charged: the delivery
+    // never started, so it must not burn retirement budget.
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "attempts" = "attempts" - 1,
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "updatedAt" = ${asDate(params.now)}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
   }
 
   async findDueWakes(params: {

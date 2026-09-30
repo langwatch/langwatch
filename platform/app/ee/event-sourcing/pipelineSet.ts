@@ -2,8 +2,12 @@ import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipeli
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
 import type { PulledUsageRetractedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
-import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manager/pulledUsageLedger.process";
+import type {
+  PulledUsageLedgerProcessDeps,
+  RetractCommandEnvelope,
+} from "@ee/governance/process-manager/pulledUsageLedger.process";
 import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
+import type { CostRollupComparatorDayComparer } from "@ee/governance/services/costRollupComparator.service";
 import { createAgentListingPort } from "@ee/governance/services/pullers/agentListingPort";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import { createPeopleListingPort } from "@ee/governance/services/pullers/peopleListingPort";
@@ -43,6 +47,13 @@ export interface EnterprisePipelineSetConfig {
    * pipeline still records every observation, only the summary is skipped.
    */
   governanceCostRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
+  /**
+   * ADR-128's drift check, which reads the rollup summary back. Absent without
+   * ClickHouse, on exactly the store's terms and for the same reason: with no
+   * summary there is nothing to hold a day's charges against, so the watch is
+   * not mounted at all rather than mounted to fail.
+   */
+  costRollupDayComparer?: CostRollupComparatorDayComparer;
   /**
    * ADR-128 §12's identity-match engine, composed by the root on the worker
    * role only. A type, never an import: this module is statically reachable
@@ -103,19 +114,24 @@ function registerIngestionPullPipeline(
     }),
   );
   const ingestionPullCommands = mapCommands(pipeline.commands);
+  // Typed rather than cast. `IngestionPullOutcomeCommands` already names the
+  // envelope — `tenantId` and `occurredAt` — on every one of these, and the
+  // compiler confirms each is the payload its command takes, so an `as never`
+  // here buys nothing and costs the one check that matters: it is exactly what
+  // let a withdrawal missing both fields reach validation instead of the
+  // compiler on the sibling pipeline below (#8111). Do not reinstate it.
   outcomeCommands = {
     recordRunCompleted: (args) =>
-      ingestionPullCommands.recordRunCompleted(args as never),
-    recordRunFailed: (args) =>
-      ingestionPullCommands.recordRunFailed(args as never),
+      ingestionPullCommands.recordRunCompleted(args),
+    recordRunFailed: (args) => ingestionPullCommands.recordRunFailed(args),
     recordAgentsListed: (args) =>
-      ingestionPullCommands.recordAgentsListed(args as never),
+      ingestionPullCommands.recordAgentsListed(args),
     recordAgentsListingRefused: (args) =>
-      ingestionPullCommands.recordAgentsListingRefused(args as never),
+      ingestionPullCommands.recordAgentsListingRefused(args),
     recordPeopleListed: (args) =>
-      ingestionPullCommands.recordPeopleListed(args as never),
+      ingestionPullCommands.recordPeopleListed(args),
     recordPeopleListingRefused: (args) =>
-      ingestionPullCommands.recordPeopleListingRefused(args as never),
+      ingestionPullCommands.recordPeopleListingRefused(args),
   };
 
   if (deps.runsWorkers) {
@@ -157,13 +173,15 @@ function registerIngestionPullPipeline(
  */
 function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
   let sendRetract:
-    | ((data: PulledUsageRetractedEventData) => Promise<void>)
+    | ((
+        data: PulledUsageRetractedEventData & RetractCommandEnvelope,
+      ) => Promise<void>)
     | null = null;
   const ledger = deps.pulledUsageLedger
     ? {
         ...deps.pulledUsageLedger,
         sendRetractPulledUsage: async (
-          data: PulledUsageRetractedEventData,
+          data: PulledUsageRetractedEventData & RetractCommandEnvelope,
         ): Promise<void> => {
           if (!sendRetract) {
             // Unreachable in composition order, and thrown rather than
@@ -182,11 +200,15 @@ function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
     createPulledUsageProcessingPipeline({
       ledger,
       costRollupStore: deps.governanceCostRollupStore,
+      costRollupComparator: deps.costRollupDayComparer,
     }),
   );
   const commands = mapCommands(pipeline.commands);
+  // Typed rather than cast: the command payload is the event data plus the
+  // envelope, and an `as never` here is exactly what let a withdrawal missing
+  // `tenantId` and `occurredAt` reach validation instead of the compiler.
   sendRetract = async (data) => {
-    await commands.retractPulledUsage(data as never);
+    await commands.retractPulledUsage(data);
   };
   return { commands };
 }

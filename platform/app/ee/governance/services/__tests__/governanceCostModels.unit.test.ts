@@ -16,6 +16,7 @@
  * Decision: ADR-128 §1 (the model is a wave 1 "where" dimension).
  */
 import { describe, expect, it, vi } from "vitest";
+import { NullProjectRepository } from "~/server/app-layer/projects/repositories/project.repository";
 
 import { GovernanceCostService } from "../governanceCost.service";
 import type { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
@@ -59,6 +60,8 @@ function serviceOver(rows: ModelRow[]) {
     prisma: prismaWith("gov-1"),
     costRollup: rollupReturning(rows),
     ocsfEvents: undefined,
+    gatewaySpend: undefined,
+    projects: new NullProjectRepository(),
   });
 }
 
@@ -162,6 +165,8 @@ describe("GovernanceCostService.spendByModel", () => {
         prisma: prismaWith(null),
         costRollup: rollupReturning([]),
         ocsfEvents: undefined,
+        gatewaySpend: undefined,
+        projects: new NullProjectRepository(),
       });
 
       const result = await service.spendByModel({

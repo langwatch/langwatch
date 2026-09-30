@@ -149,7 +149,7 @@ describe("bootVoiceWsListener", () => {
   it("closes an upgrade on a non-media path with 404", async () => {
     const port = await boot();
     const { statusLine, socket } = await rawUpgrade(port, "/not-twilio");
-    expect(statusLine).toContain("404");
+    expect(statusLine).toBe("HTTP/1.1 404 Not Found");
     socket.destroy();
   });
 
@@ -157,7 +157,7 @@ describe("bootVoiceWsListener", () => {
   it("closes an upgrade with an unknown nonce with 403", async () => {
     const port = await boot();
     const { statusLine, socket } = await rawUpgrade(port, "/twilio/unknown");
-    expect(statusLine).toContain("403");
+    expect(statusLine).toBe("HTTP/1.1 403 Forbidden");
     socket.destroy();
   });
 

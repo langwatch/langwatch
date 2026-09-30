@@ -38,6 +38,8 @@ function command() {
 }
 
 describe("AcceptAgentTurn command", () => {
+  /** @scenario "Sending the first message creates the conversation from its events" */
+  /** @scenario "A message and its activity bump are one command, not two writes" */
   it("emits the whole turn boundary as one ordered event batch", () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(1_700_000_100_000);
     const events = new AcceptAgentTurnCommand().handle(command() as never);
@@ -77,6 +79,7 @@ describe("AcceptAgentTurn command", () => {
     });
   });
 
+  /** @scenario "Retrying the same send does not double-count" */
   it("reuses every storage idempotency slot when the command is redelivered", () => {
     const first = new AcceptAgentTurnCommand().handle(command() as never);
     const replay = new AcceptAgentTurnCommand().handle(command() as never);
