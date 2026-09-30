@@ -1099,7 +1099,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 				}
 			}
 			return false
-		}, keepLastKnown, evictReason(ch.Kind), ch.ModelProviderID)
+		}, evictScope{reason: evictReason(ch.Kind), target: ch.ModelProviderID, keepLastKnown: keepLastKnown})
 	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
 		// Only PROJECT-scoped creates carry project_id. Updates, deletes, and
 		// every other scope omit it, so invalidate the polled organization in
@@ -1107,12 +1107,12 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		if ch.ProjectID != "" {
 			s.evictWhere(func(b *domain.Bundle) bool {
 				return b.ProjectID == ch.ProjectID
-			}, keepLastKnown, evictReason(ch.Kind), ch.ProjectID)
+			}, evictScope{reason: evictReason(ch.Kind), target: ch.ProjectID, keepLastKnown: keepLastKnown})
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, keepLastKnown, evictReason(ch.Kind), organizationID)
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown})
 	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked,
 		ChangeKindVirtualKeyDisabled, ChangeKindVirtualKeyEnabled:
 		if ch.VirtualKeyID == "" {
@@ -1120,7 +1120,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, keepLastKnown, evictReason(ch.Kind), ch.VirtualKeyID)
+		}, evictScope{reason: evictReason(ch.Kind), target: ch.VirtualKeyID, keepLastKnown: keepLastKnown})
 	case ChangeKindRoutingPolicyUpdated, ChangeKindRoutingPolicyDeleted:
 		// A bundle carries the resolved routing mode and chain, not the id
 		// of the policy they came from, so there is nothing finer than the
@@ -1128,13 +1128,13 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		// project.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, keepLastKnown, evictReason(ch.Kind), organizationID)
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown})
 	case ChangeKindCacheRuleCreated, ChangeKindCacheRuleUpdated, ChangeKindCacheRuleDeleted:
 		// Cache rules are org-scoped and baked into every bundle as a
 		// pre-sorted array, with no rule id left on the bundle to join on.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, keepLastKnown, evictReason(ch.Kind), organizationID)
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown})
 	case ChangeKindVirtualKeyCreated:
 		// Nothing to evict: a key nobody has resolved yet is in no cache, on
 		// this node or any other. Named rather than left to the default so a
@@ -1188,7 +1188,8 @@ func evictReason(kind string) string {
 //
 // keepLastKnown sets the evicted entries aside as the outage fallback; a key
 // the change made unusable passes false, which also drops any fallback held.
-func (s *Service) evictWhere(match func(*domain.Bundle) bool, keepLastKnown bool, reason, target string) {
+func (s *Service) evictWhere(match func(*domain.Bundle) bool, scope evictScope) {
+	keepLastKnown, reason, target := scope.keepLastKnown, scope.reason, scope.target
 	evicted := 0
 	for _, h := range s.l1.Keys() {
 		e, ok := s.l1.Peek(h)
@@ -1213,6 +1214,14 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, keepLastKnown bool
 		zap.String("target", target),
 		zap.Int("evicted", evicted),
 	)
+}
+
+// evictScope names an eviction for the log (reason, target) and says whether
+// the evicted entries stay as an outage fallback.
+type evictScope struct {
+	reason        string
+	target        string
+	keepLastKnown bool
 }
 
 // dropLastKnownWhere discards every outage fallback whose bundle matches.
