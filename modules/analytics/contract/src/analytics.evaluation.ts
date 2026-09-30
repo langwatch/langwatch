@@ -3,6 +3,8 @@ import { z } from "zod";
 const finiteNumberSchema = z.number().finite();
 const nullableStringSchema = z.string().nullable();
 const nullableFiniteNumberSchema = finiteNumberSchema.nullable();
+// 0 is the indefinite sentinel (INDEFINITE_RETENTION_DAYS): the row is kept, never aged out.
+const retentionDaysSchema = z.number().int().nonnegative().optional();
 
 /** Portable row written to the evaluation_analytics slim table. */
 export const analyticsEvaluationRowSchema = z.object({
@@ -57,7 +59,7 @@ export type AnalyticsEvaluationRollupRow = z.infer<typeof analyticsEvaluationRol
 
 export const analyticsEvaluationUpsertInputSchema = z.object({
   row: analyticsEvaluationRowSchema,
-  retentionDays: z.number().int().positive().optional(),
+  retentionDays: retentionDaysSchema,
   appliedEventIds: z.array(z.string()).optional(),
 });
 
@@ -82,7 +84,7 @@ export type AnalyticsEvaluationReadInput = z.infer<typeof analyticsEvaluationRea
 
 export const analyticsEvaluationRollupAppendInputSchema = z.object({
   row: analyticsEvaluationRollupRowSchema,
-  retentionDays: z.number().int().positive().optional(),
+  retentionDays: retentionDaysSchema,
 });
 
 export type AnalyticsEvaluationRollupAppendInput = z.infer<
@@ -91,7 +93,7 @@ export type AnalyticsEvaluationRollupAppendInput = z.infer<
 
 export const analyticsEvaluationRollupAppendBatchInputSchema = z.object({
   rows: z.array(analyticsEvaluationRollupRowSchema),
-  retentionDays: z.number().int().positive().optional(),
+  retentionDays: retentionDaysSchema,
 });
 
 export type AnalyticsEvaluationRollupAppendBatchInput = z.infer<
