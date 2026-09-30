@@ -103,3 +103,10 @@ Feature: Annotation service boundary
       When the queue service queues them for validated annotators
       Then only distinct trimmed trace IDs held by that project are written
       And all other supplied IDs count as skipped
+
+  @integration
+  Scenario: the score settings screen asks for scores only once a project resolves
+    Given the annotation-scores screen renders before its project has resolved
+    When the screen mounts and the score editor opens or closes
+    Then no score list is requested with an empty project id
+    And the list is requested once the project resolves

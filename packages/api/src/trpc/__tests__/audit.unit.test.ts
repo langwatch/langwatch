@@ -12,6 +12,7 @@ import { TRPCError } from "@trpc/server";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  auditScopeIds,
   callerTraceContext,
   deriveAuditTarget,
   handleTrpcCallLogging,
@@ -400,6 +401,24 @@ const NAMESPACE_KINDS: [string, string][] = [
   ["subscription.create", "subscription"],
   ["webhookEndpoints.create", "webhook_endpoint"],
 ];
+
+describe("auditScopeIds", () => {
+  describe("given input naming an empty project and organization", () => {
+    /** @scenario "A refused call that names an empty scope id keeps its refusal" */
+    it("names no scope, so the audit row does not refuse it", () => {
+      expect(auditScopeIds({ projectId: "", organizationId: "" })).toEqual({
+        organizationId: undefined,
+        projectId: undefined,
+      });
+    });
+  });
+
+  describe("given input naming a project", () => {
+    it("names that project", () => {
+      expect(auditScopeIds({ projectId: "project_1" }).projectId).toBe("project_1");
+    });
+  });
+});
 
 describe("deriveAuditTarget", () => {
   describe("given a mutation that wrote a resource", () => {

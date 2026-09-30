@@ -207,9 +207,12 @@ export default function AnnotationScoresScreen() {
   const deleteAnnotationScore = annotationScoresApi.annotationScore.delete.useMutation();
 
   const { refetch: refetchAnnotationScores } = getAllAnnotationScores;
+  const projectId = project?.id;
+  // refetch() ignores `enabled`, so it waits for the project like the query does.
   useEffect(() => {
+    if (!projectId) return;
     void refetchAnnotationScores();
-  }, [isAnnotationDrawerOpen, refetchAnnotationScores]);
+  }, [projectId, isAnnotationDrawerOpen, refetchAnnotationScores]);
 
   const handleToggleScore = (scoreId: string, active: boolean) => {
     toggleAnnotationScore.mutate(

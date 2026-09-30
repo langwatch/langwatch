@@ -22,6 +22,11 @@ import { getHTTPStatusCodeFromError } from "@trpc/server/http";
 // whether it is worth recording at all.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** An empty id names no scope; the audit row refuses one, and a 500 would replace the refusal. */
+function scopeId(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
 export function auditScopeIds(input: unknown): {
   organizationId: string | undefined;
   projectId: string | undefined;
@@ -33,8 +38,8 @@ export function auditScopeIds(input: unknown): {
   const record = input as Record<string, unknown>;
 
   return {
-    organizationId: typeof record.organizationId === "string" ? record.organizationId : undefined,
-    projectId: typeof record.projectId === "string" ? record.projectId : undefined,
+    organizationId: scopeId(record.organizationId),
+    projectId: scopeId(record.projectId),
   };
 }
 

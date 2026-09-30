@@ -58,6 +58,13 @@ Feature: tRPC framework boundary
     And the field name is kept
 
   @unit
+  Scenario: A refused call that names an empty scope id keeps its refusal
+    Given a call whose input carries an empty projectId or organizationId
+    When the refusal is written to the audit trail
+    Then the row names no project or organization
+    And the caller receives the refusal, not an internal server error
+
+  @unit
   Scenario: A slow call is raised without burying the log
     Given a call succeeds slower than its budget
     When it is recorded
