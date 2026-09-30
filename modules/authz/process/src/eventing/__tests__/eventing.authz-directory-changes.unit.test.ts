@@ -13,8 +13,8 @@ function repositoryOver({
   attached,
   removed,
 }: {
-  attached: { id: string; principalId: string; createdAt: Date }[];
-  removed: { id: string; principalId: string; revokedAt: Date }[];
+  attached: { id: string; principalId: string; createdAt: Date; revokedAt: null }[];
+  removed: { id: string; principalId: string; createdAt: Date; revokedAt: Date }[];
 }) {
   const findMany = vi
     .fn()
@@ -33,8 +33,17 @@ function repositoryOver({
 describe("given the directory has attached and taken back grants", () => {
   it("answers both, newest first, capped at the limit asked for", async () => {
     const { repository, findMany } = repositoryOver({
-      attached: [{ id: "grant_new", principalId: "user_1", createdAt: new Date(3000) }],
-      removed: [{ id: "grant_old", principalId: "user_2", revokedAt: new Date(5000) }],
+      attached: [
+        { id: "grant_new", principalId: "user_1", createdAt: new Date(3000), revokedAt: null },
+      ],
+      removed: [
+        {
+          id: "grant_old",
+          principalId: "user_2",
+          createdAt: new Date(1000),
+          revokedAt: new Date(5000),
+        },
+      ],
     });
 
     const changes = await repository.findDirectoryCausedChanges({
@@ -57,10 +66,17 @@ describe("given the directory has attached and taken back grants", () => {
   it("never answers more rows than the caller asked to read", async () => {
     const { repository } = repositoryOver({
       attached: [
-        { id: "grant_a", principalId: "user_1", createdAt: new Date(4000) },
-        { id: "grant_b", principalId: "user_2", createdAt: new Date(3000) },
+        { id: "grant_a", principalId: "user_1", createdAt: new Date(4000), revokedAt: null },
+        { id: "grant_b", principalId: "user_2", createdAt: new Date(3000), revokedAt: null },
       ],
-      removed: [{ id: "grant_c", principalId: "user_3", revokedAt: new Date(2000) }],
+      removed: [
+        {
+          id: "grant_c",
+          principalId: "user_3",
+          createdAt: new Date(1000),
+          revokedAt: new Date(2000),
+        },
+      ],
     });
 
     const changes = await repository.findDirectoryCausedChanges({
