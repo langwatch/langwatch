@@ -53,7 +53,7 @@ const (
 	// the shared container's config, and the number every stack's app is told
 	// about (CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES) so it sizes its pool for
 	// this server rather than for the 300-query one it assumes by default.
-	ClickHouseMaxConcurrentQueries = 32
+	ClickHouseMaxConcurrentQueries = 100
 )
 
 // ClickHouseLimits bound what the managed server may take from the host. Proven
