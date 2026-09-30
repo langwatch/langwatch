@@ -113,8 +113,11 @@ export class AutomationProviderRegistryService {
     action: TriggerAction,
     args: PersistActionParamsArgs,
   ): Promise<unknown> {
-    const { server } = this.providers[action];
-    return server.persistActionParams ? server.persistActionParams(args) : args.incoming;
+    // A row naming a channel this server no longer offers has no at-rest
+    // form to prepare, so it is stored as it was sent.
+    const entry: ServerEntry | undefined = this.providers[action];
+    const server = entry?.server;
+    return server?.persistActionParams ? server.persistActionParams(args) : args.incoming;
   }
 
   /** Strips secrets from stored `actionParams` before the row leaves. */

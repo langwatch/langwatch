@@ -8,6 +8,7 @@ import {
   settlementTrace,
   settlementTrigger,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
+import { AutomationTraceRecordUnavailableError } from "../../repositories/automation-settlement-read.repository.ts";
 
 const loggerWarn = vi.hoisted(() => vi.fn());
 
@@ -48,6 +49,7 @@ describe("AutomationSettlementDispatchService", () => {
     loggerWarn.mockClear();
   });
 
+  /** @scenario "The worker publishes the settlement overflow series" */
   it("records overflow only when the durable intent executes", async () => {
     const fixture = createSettlementFixture(datasetTrigger());
 
@@ -99,6 +101,28 @@ describe("AutomationSettlementDispatchService", () => {
     expect(fixture.automation.lastRuns).toEqual([
       { triggerId: "trigger-1", projectId: "project-1" },
     ]);
+  });
+
+  describe("given a process that composed no full-record trace read", () => {
+    /** @scenario "A trace whose full record this process cannot read still notifies" */
+    it("sends the digest from the settled fold state alone", async () => {
+      const fixture = createSettlementFixture(emailTrigger());
+      fixture.traces.recordErrors.set(
+        "trace-1",
+        new AutomationTraceRecordUnavailableError("no full-record read composed"),
+      );
+
+      await fixture.service.notifyDigest(
+        { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
+        settlementContext(),
+      );
+
+      expect(fixture.delivery.emails).toHaveLength(1);
+      expect(fixture.delivery.emails[0]?.html).toContain("Matched 1 trace");
+      expect(fixture.automation.claims).toEqual([
+        { triggerId: "trigger-1", traceId: "trace-1", projectId: "project-1" },
+      ]);
+    });
   });
 
   it("keeps tenant email cap claims distinct for triggers sharing a digest", async () => {

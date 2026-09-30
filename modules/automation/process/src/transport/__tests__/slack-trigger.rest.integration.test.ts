@@ -6,10 +6,13 @@
  */
 import { InvalidActionParamsError, type AutomationApi } from "@langwatch/automation-contract";
 import { SlackIntegrationMissingError } from "@langwatch/slack-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { slackAutomationRest } from "../slack-trigger.rest.ts";
-import { mountSlackAutomationRest } from "./automation-rest.harness.ts";
+import {
+  mountSlackAutomationRest,
+  mountSlackAutomationRestForUnauthenticatedCaller,
+} from "./automation-rest.harness.ts";
 
 type Created = Parameters<AutomationApi["create"]>[0];
 
@@ -119,6 +122,27 @@ describe("given the Slack alert door", () => {
 
       expect(response.status).toBe(200);
       expect(api.created).toHaveLength(1);
+    });
+  });
+
+  describe("when the caller is one the credential chain does not authenticate", () => {
+    /** @scenario "Every spelling of the route demands the same credential" */
+    it("refuses the bare path and the versioned alias alike, creating nothing", async () => {
+      const create = vi.fn();
+      const api = mountSlackAutomationRestForUnauthenticatedCaller({ create });
+      const body = {
+        slack_webhook: "https://hooks.slack.com/services/abc",
+        name: "Billing alerts",
+        alert_type: "INFO",
+      };
+
+      const bare = await api.post("/api/trigger/slack", body);
+      const aliased = await api.post("/api/v1/trigger/slack", body);
+
+      expect([bare.status, aliased.status]).toEqual([401, 401]);
+      expect(await bare.json()).toMatchObject({ code: "missing_credentials" });
+      expect(await aliased.json()).toMatchObject({ code: "missing_credentials" });
+      expect(create).not.toHaveBeenCalled();
     });
   });
 

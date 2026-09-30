@@ -11,11 +11,13 @@ import {
   getUntypedClient,
   httpBatchLink,
   httpLink,
+  loggerLink,
   splitLink,
 } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
 
 import { type SseEventSourceConstructor, sseSubscriptionLink } from "./sse-subscription-link";
+import { logTrpcOperation } from "./trpc-request-log";
 
 /** Same-origin, so the browser sends the session cookie without configuration. */
 export const UI_TRPC_ENDPOINT = "/api/trpc";
@@ -53,6 +55,8 @@ export type UiFeatureApiClientOptions = {
   subscriptionUrl?: string;
   /** The EventSource to open live channels with. Defaults to the browser's. */
   eventSource?: SseEventSourceConstructor;
+  /** The deployment's `isDevelopment`: logs operation and timing, never what a request carried. */
+  isDevelopment?: boolean;
 };
 
 /**
@@ -63,6 +67,7 @@ function uiFeatureApiLinks({
   fetch,
   subscriptionUrl = subscriptionOrigin(),
   eventSource,
+  isDevelopment = false,
 }: UiFeatureApiClientOptions) {
   const batchRouting = splitLink({
     condition: (operation) => operation.context.skipBatch === true,
@@ -89,6 +94,7 @@ function uiFeatureApiLinks({
   });
 
   return [
+    loggerLink({ enabled: () => isDevelopment, logger: logTrpcOperation }),
     splitLink({
       condition: (operation) => operation.type === "subscription",
       // Reconnect attempts and backoff are the link's own defaults, which

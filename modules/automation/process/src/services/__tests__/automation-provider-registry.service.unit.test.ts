@@ -22,4 +22,18 @@ describe("AutomationProviderRegistryService", () => {
       ).toEqual({});
     });
   });
+
+  describe("when a delivery configuration is saved for a channel this server does not offer", () => {
+    /** @scenario "A delivery channel the server no longer offers is written as it was sent" */
+    it("stores the configuration as the caller sent it", async () => {
+      const incoming = { pigeonWebhook: "https://hooks.example.com/x", retries: 2 };
+
+      const stored = await registry.persistActionParamsFor(RETIRED_CHANNEL, {
+        incoming,
+        loadExisting: async () => undefined,
+      });
+
+      expect(stored).toEqual(incoming);
+    });
+  });
 });

@@ -233,7 +233,9 @@ export async function startUi(): Promise<void> {
   const config = parseUiFeatureConfig(served);
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
-  const transport = createUiFeatureApiClient();
+  const transport = createUiFeatureApiClient({
+    isDevelopment: config.process.mode === "development",
+  });
   const rootCapabilities = await loadUiRootCapabilities();
   const installed = await createUi({ document, mount: "root" })
     .withModules(webModules)

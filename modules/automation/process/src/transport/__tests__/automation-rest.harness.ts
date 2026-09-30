@@ -1,3 +1,4 @@
+import { ProjectMissingCredentialsError } from "@langwatch/api";
 /**
  * The automation REST families over a process's own door, as a test supplies
  * one: a project API key that resolves to `project_1`, and the facts a
@@ -96,6 +97,25 @@ export function mountAutomationRest(app: Partial<AutomationApi>) {
 export function mountSlackAutomationRest(app: Partial<AutomationApi>) {
   return requests(
     runtime().mount(slackAutomationRest.router(), {
+      app: () => app as AutomationApi,
+      credential: "project",
+      onError: canonicalErrorResponse,
+    }),
+  );
+}
+
+/** `/api/trigger/slack` for a caller the credential chain refuses: no handler is ever reached. */
+export function mountSlackAutomationRestForUnauthenticatedCaller(app: Partial<AutomationApi>) {
+  const refusing = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new ProjectMissingCredentialsError();
+      },
+    },
+  });
+
+  return requests(
+    refusing.mount(slackAutomationRest.router(), {
       app: () => app as AutomationApi,
       credential: "project",
       onError: canonicalErrorResponse,
