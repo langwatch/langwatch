@@ -165,6 +165,7 @@ describe("LangWatchQLHydrationService.hydrateTexts", () => {
     expect(input?.pass).toEqual({ kind: "page", traceIds: ["trace-a"] });
   });
 
+  /** @scenario "A page read for a run holds the text that would be judged, not a verdict" */
   it("answers the text an eval would judge rather than a verdict, calling no judge", async () => {
     const { service } = hydrationService();
 
