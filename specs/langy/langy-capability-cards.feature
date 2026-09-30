@@ -48,6 +48,7 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy averages a metric split by model, with the models averaging 1 and 3
     Then the metrics card shows each model's average beside its name
     And it never shows their sum as the period's figure
+    And when every model spans several days, the card says the result has no single figure rather than that there is no data
     And the CLI draws one line per model instead of one summed line, with no period-over-period total
 
   @unit

@@ -394,5 +394,37 @@ describe("given the CLI averaged latency split by model", () => {
       expect(screen.queryByText("4")).toBeNull();
       expect(screen.queryByText("average")).toBeNull();
     });
+
+    /** @scenario A grouped average is never summed into one figure */
+    it("says there is no single figure when every group spans several days", () => {
+      const byModel = (mini: number, terra: number) => ({
+        "metadata.model": {
+          "gpt-5-mini": { "0/performance.completion_time/avg": mini },
+          "gpt-5.6-terra": { "0/performance.completion_time/avg": terra },
+        },
+      });
+      renderCall(
+        settledCall({
+          name: "langwatch.analytics.query",
+          resource: "analytics",
+          verb: "query",
+          payload: {
+            ...averageLatencyByModelPayload(),
+            currentPeriod: [
+              { date: "2026-09-28", ...byModel(1, 3) },
+              { date: "2026-09-29", ...byModel(2, 4) },
+            ],
+          },
+        }),
+      );
+
+      expect(
+        screen.getByText(
+          /spans several periods or groups, so it has no single/,
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText("No data for this period.")).toBeNull();
+      expect(screen.queryByText("10")).toBeNull();
+    });
   });
 });
