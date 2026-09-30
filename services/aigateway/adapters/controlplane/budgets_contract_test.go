@@ -250,7 +250,7 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 	}
 
 	debits := readControlPlaneSource(t,
-		"enterprise", "modules", "governance", "process", "src", "eventing",
+		"modules", "gateway", "process", "src", "eventing",
 		"gateway-debit.process.ts")
 	if !regexp.MustCompile(commandField + `:\s*\w+\.` + commandField).MatchString(debits) {
 		t.Error("gateway-debit.process.ts no longer carries model_provider_id into the debit payload, so provider-filtered budgets stop accruing")
