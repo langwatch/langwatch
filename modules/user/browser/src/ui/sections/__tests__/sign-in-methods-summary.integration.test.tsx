@@ -11,8 +11,8 @@ import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../.
 import type { FakePersonalHostOptions } from "../../../testing.tsx";
 import { SignInMethodsSummary } from "../sign-in-methods-summary.tsx";
 
-const linkedAccountsData: { data: unknown } = { data: [] };
 const identifiersData: { data: unknown } = { data: [] };
+const confirmationData: { data: unknown; error: unknown } = { data: undefined, error: null };
 const hasPasswordData: { data: unknown; isError: boolean; error: unknown } = {
   data: { hasPassword: true },
   isError: false,
@@ -25,8 +25,10 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
     identity: {
       myIdentifiers: { useQuery: () => identifiersData },
     },
+    auth: {
+      myAddressConfirmation: { useQuery: () => confirmationData },
+    },
     user: {
-      getLinkedAccounts: { useQuery: () => linkedAccountsData },
       hasPassword: { useQuery: () => hasPasswordData },
     },
   },
@@ -46,7 +48,8 @@ function renderSummary(options: FakePersonalHostOptions = {}) {
 
 afterEach(() => {
   cleanup();
-  linkedAccountsData.data = [];
+  confirmationData.data = undefined;
+  confirmationData.error = null;
   identifiersData.data = [];
   hasPasswordData.data = { hasPassword: true };
   hasPasswordData.isError = false;
@@ -57,14 +60,16 @@ describe("given an account signed in with an address, a linked account and a pas
   describe("when the profile opens", () => {
     /** @scenario Each way in is one line */
     it("gives each one its own line, including whether a password is set", async () => {
-      linkedAccountsData.data = [{ id: "acct-1", provider: "google", providerAccountId: "g-1" }];
+      identifiersData.data = [
+        { identifierId: "g", provider: "google", value: "ana@gmail.example", confirmed: true },
+      ];
 
       renderSummary();
 
-      expect(screen.getByTestId("method-line-address")).toBeTruthy();
-      await waitFor(() => expect(screen.getByTestId("method-line-passkeys")).toBeTruthy());
-      expect(screen.getByTestId("method-line-linked-account")).toBeTruthy();
-      expect(screen.getByTestId("method-line-password")).toBeTruthy();
+      expect(screen.getByTestId("method-row-email")).toBeTruthy();
+      await waitFor(() => expect(screen.getByTestId("method-row-passkeys")).toBeTruthy());
+      expect(screen.getByTestId("method-row-federated")).toBeTruthy();
+      expect(screen.getByTestId("method-row-password")).toBeTruthy();
     });
   });
 });
@@ -95,7 +100,7 @@ describe("given a deployment that offers passkeys", () => {
         },
       });
 
-      await waitFor(() => expect(screen.getByTestId("method-line-passkeys")).toBeTruthy());
+      await waitFor(() => expect(screen.getByTestId("method-row-passkeys")).toBeTruthy());
     });
   });
 });
@@ -109,7 +114,7 @@ describe("given the read of whether I have a password fails", () => {
 
       const host = renderSummary();
 
-      expect(screen.getByTestId("method-line-address")).toBeTruthy();
+      expect(screen.getByTestId("method-row-email")).toBeTruthy();
       await waitFor(() =>
         expect(host.recording.failures).toContainEqual(
           expect.objectContaining({ fallbackTitle: "Couldn't tell whether you have a password" }),
@@ -127,7 +132,7 @@ describe("given an account with a passkey but no address ever added", () => {
         currentUser: { id: "user-1", name: "Ana", email: "ana@acme.example", image: null },
       });
 
-      expect(screen.getByTestId("method-line-address").textContent).toContain("ana@acme.example");
+      expect(screen.getByTestId("method-row-email").textContent).toContain("ana@acme.example");
     });
   });
 });
@@ -140,25 +145,80 @@ describe("given an account with no address on it and no identifiers", () => {
         currentUser: { id: "user-1", name: "Ana", email: null, image: null },
       });
 
-      expect(screen.getByTestId("method-line-address").textContent).toContain("None yet");
+      expect(screen.getByTestId("method-row-email").textContent).toContain("None yet");
     });
   });
 });
 
-describe("given an account holding a confirmed and an unconfirmed address", () => {
+describe("given an address on the account that has not been confirmed", () => {
+  describe("when the sign-in methods on the profile open", () => {
+    /** @scenario An address I have not confirmed is marked in Security's words */
+    it("marks it not confirmed yet and marks a confirmed one nothing", () => {
+      confirmationData.data = {
+        email: "ana@acme.example",
+        confirmed: false,
+        canSendConfirmation: true,
+      };
+      renderSummary();
+      expect(screen.getByTestId("method-row-email").textContent).toContain("Not confirmed yet");
+      cleanup();
+
+      confirmationData.data = {
+        email: "ana@acme.example",
+        confirmed: true,
+        canSendConfirmation: true,
+      };
+      renderSummary();
+      expect(screen.getByTestId("method-row-email").textContent).not.toContain("confirmed");
+    });
+  });
+});
+
+describe("given the read of my own address fails", () => {
+  describe("when the sign-in methods on the profile open", () => {
+    /** @scenario The read of my own address failing says so */
+    it("says what could not be read and keeps the other ways in listed", async () => {
+      confirmationData.error = new Error("boom");
+
+      const host = renderSummary();
+
+      expect(screen.getByTestId("method-row-password")).toBeTruthy();
+      await waitFor(() =>
+        expect(host.recording.failures).toContainEqual(
+          expect.objectContaining({ fallbackTitle: "Couldn't read the address on your account" }),
+        ),
+      );
+    });
+  });
+});
+
+describe("given an account with two addresses and a single sign-on identifier", () => {
   describe("when the summary renders", () => {
-    it("gives each address its own line and says whether it is confirmed", () => {
+    /** @scenario The sign-in methods keep the Security page's labels */
+    it("labels the rows Email address and Single sign-on, and counts the addresses", () => {
       identifiersData.data = [
-        { identifierId: "a", provider: "email", value: "ana@acme.example", confirmed: true },
-        { identifierId: "b", provider: "email", value: "ana@other.example", confirmed: false },
+        {
+          identifierId: "a",
+          provider: "email",
+          value: "ana@acme.example",
+          isPrimary: true,
+          confirmed: true,
+        },
+        {
+          identifierId: "b",
+          provider: "email",
+          value: "ana@other.example",
+          isPrimary: false,
+          confirmed: true,
+        },
+        { identifierId: "c", provider: "oidc", value: "ana@acme.example", confirmed: true },
       ];
 
       renderSummary();
 
-      const lines = screen.getAllByTestId("method-line-address");
-      expect(lines).toHaveLength(2);
-      expect(lines[0]!.textContent).toContain("Confirmed");
-      expect(lines[1]!.textContent).toContain("Not confirmed yet");
+      expect(screen.getByTestId("method-row-email").textContent).toContain("Email address");
+      expect(screen.getByTestId("method-row-email").textContent).toContain("2 addresses");
+      expect(screen.getByTestId("method-row-federated").textContent).toContain("Single sign-on");
     });
   });
 });

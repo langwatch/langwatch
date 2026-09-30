@@ -116,3 +116,123 @@ export function isSecurityKey(passkey: { transports?: string | null }): boolean 
 export function passkeyLabel(passkey: { name?: string | null }): string {
   return passkey.name?.trim() || "Passkey";
 }
+
+/**
+ * What a federated identifier is called on the profile. A provider id is the
+ * operator's word (`oidc`, `azure-ad`); known consumer identities keep their
+ * own name and everything else reads as single sign-on.
+ */
+const FEDERATED_LABELS: Readonly<Record<string, string>> = {
+  google: "Google",
+  github: "GitHub",
+  gitlab: "GitLab",
+  "azure-ad": "Microsoft",
+  microsoft: "Microsoft",
+  okta: "Okta",
+  cognito: "Amazon Cognito",
+  onelogin: "OneLogin",
+  "auth0-google": "Google",
+  "auth0-github": "GitHub",
+  "auth0-microsoft": "Microsoft",
+};
+
+export function federatedMethodLabel(provider: string): string {
+  return FEDERATED_LABELS[provider] ?? "Single sign-on";
+}
+
+/** One line of the profile's sign-in methods summary. */
+export type SignInMethodRow = {
+  key: string;
+  label: string;
+  detail: string;
+  chip: { label: string; tone: "neutral" | "warning" } | null;
+  testId: string;
+};
+
+type SummaryIdentifier = {
+  identifierId: string;
+  provider: string;
+  value: string | null;
+  isPrimary: boolean;
+  confirmed: boolean;
+};
+
+/**
+ * The lines this account earns, addresses first. The identifier projection is
+ * the richer answer but is empty for an account that never attached one, so the
+ * account's own address stands in and "None yet" means none anywhere.
+ */
+export function signInMethodRows({
+  identifiers,
+  accountAddress,
+  passkeyDetail,
+  hasPassword,
+}: {
+  identifiers: readonly SummaryIdentifier[];
+  accountAddress: { email: string | null; confirmed: boolean } | null;
+  passkeyDetail: string;
+  hasPassword: boolean;
+}): SignInMethodRow[] {
+  const addresses = identifiers.filter((row) => row.provider === "email" && row.value !== null);
+  const federated = identifiers.filter(
+    (row) => !["email", "credential", "passkey"].includes(row.provider),
+  );
+  const primary = addresses.find((row) => row.isPrimary) ?? addresses[0];
+  const shown = shownAddress({ primary, accountAddress });
+
+  return [
+    {
+      key: "email",
+      label: "Email address",
+      detail: shown?.value ?? "None yet",
+      chip: addressChip({ count: addresses.length, shown }),
+      testId: "method-row-email",
+    },
+    ...federated.map((row) => ({
+      key: row.identifierId,
+      label: federatedMethodLabel(row.provider),
+      detail: row.value ?? "Not recorded",
+      chip: null,
+      testId: "method-row-federated",
+    })),
+    {
+      key: "passkeys",
+      label: "Passkeys",
+      detail: passkeyDetail,
+      chip: null,
+      testId: "method-row-passkeys",
+    },
+    {
+      key: "password",
+      label: "Password",
+      detail: hasPassword ? "Set" : "Not set",
+      chip: null,
+      testId: "method-row-password",
+    },
+  ];
+}
+
+function shownAddress({
+  primary,
+  accountAddress,
+}: {
+  primary: SummaryIdentifier | undefined;
+  accountAddress: { email: string | null; confirmed: boolean } | null;
+}): { value: string | null; confirmed: boolean } | null {
+  if (primary) return { value: primary.value, confirmed: primary.confirmed };
+  if (accountAddress?.email)
+    return { value: accountAddress.email, confirmed: accountAddress.confirmed };
+  return null;
+}
+
+function addressChip({
+  count,
+  shown,
+}: {
+  count: number;
+  shown: { confirmed: boolean } | null;
+}): SignInMethodRow["chip"] {
+  if (count > 1) return { label: `${count} addresses`, tone: "neutral" };
+  if (shown && !shown.confirmed) return { label: "Not confirmed yet", tone: "warning" };
+  return null;
+}

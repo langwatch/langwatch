@@ -7,11 +7,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   canChangePassword,
+  federatedMethodLabel,
   isCredentialAccount,
   isRemovableMethod,
   isSecurityKey,
   passkeyLabel,
   providerDisplayName,
+  signInMethodRows,
 } from "../sign-in-methods.ts";
 
 describe("given an account linked through Auth0", () => {
@@ -160,6 +162,38 @@ describe("given a passkey in a list of them", () => {
       expect(passkeyLabel({ name: null })).toBe("Passkey");
       expect(passkeyLabel({ name: "   " })).toBe("Passkey");
       expect(passkeyLabel({})).toBe("Passkey");
+    });
+  });
+});
+
+describe("given a federated identifier on the profile", () => {
+  describe("when its provider is a known identity or an operator's own", () => {
+    /** @scenario The sign-in methods keep the Security page's labels */
+    it("names the known identity and calls the rest single sign-on", () => {
+      expect(federatedMethodLabel("google")).toBe("Google");
+      expect(federatedMethodLabel("oidc")).toBe("Single sign-on");
+    });
+  });
+
+  describe("when the account holds no address anywhere", () => {
+    /** @scenario Only an account with no address anywhere is told it has none */
+    it("says none yet, and leaves the credential and passkey identifiers out", () => {
+      const rows = signInMethodRows({
+        identifiers: [
+          {
+            identifierId: "c",
+            provider: "credential",
+            value: null,
+            isPrimary: false,
+            confirmed: true,
+          },
+        ],
+        accountAddress: { email: null, confirmed: true },
+        passkeyDetail: "None yet",
+        hasPassword: false,
+      });
+      expect(rows.map((row) => row.label)).toEqual(["Email address", "Passkeys", "Password"]);
+      expect(rows[0]?.detail).toBe("None yet");
     });
   });
 });

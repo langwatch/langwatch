@@ -1,34 +1,61 @@
 /**
- * How this account signs in, one line each: read-only, because everything
- * here is changed on Security. Two pages that both add an address would be
- * two places for the same refusal to be worded differently.
+ * How this account signs in, one bordered row each: read-only, because
+ * everything here is changed on Security. Two pages that both add an address
+ * would be two places for the same refusal to be worded differently.
  */
 
-import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost, type HeldPasskey } from "../../model/personal-workspace-host.ts";
-import { providerDisplayName } from "../../model/sign-in-methods.ts";
+import { signInMethodRows, type SignInMethodRow } from "../../model/sign-in-methods.ts";
 
-/** One line: what a way in is called, and what it says about it. */
-function MethodLine({ testId, label, detail }: { testId: string; label: string; detail: string }) {
+function MethodRow({ label, detail, chip, testId }: Omit<SignInMethodRow, "key">) {
   return (
-    <HStack width="full" gap={2} data-testid={testId}>
-      <Text fontSize="sm">{label}</Text>
-      <Spacer />
-      <Text fontSize="sm" color="fg.muted">
-        {detail}
+    <HStack
+      width="full"
+      gap={3}
+      paddingX={4}
+      paddingY={3}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="lg"
+      data-testid={testId}
+    >
+      <Text fontSize="sm" fontWeight={500} minWidth="160px">
+        {label}
       </Text>
+      <HStack gap={2} flex={1} minWidth={0}>
+        <Text fontSize="sm" color="fg.muted" truncate>
+          {detail}
+        </Text>
+        {chip && (
+          <Badge
+            size="sm"
+            variant="subtle"
+            colorPalette={chip.tone === "warning" ? "orange" : "gray"}
+          >
+            {chip.label}
+          </Badge>
+        )}
+      </HStack>
     </HStack>
   );
 }
 
+/** A failed read says so in words, once, and leaves the other rows standing. */
+function useReportFailure(error: unknown, fallbackTitle: string) {
+  const host = usePersonalWorkspaceHost();
+  useEffect(() => {
+    if (error) host.failed({ error, fallbackTitle });
+  }, [error, fallbackTitle, host]);
+}
+
 export function SignInMethodsSummary() {
   const host = usePersonalWorkspaceHost();
-  const address = host.currentUser()?.email ?? null;
   const passkeysEnabled = host.deployment().passkeysEnabled;
 
   const [passkeys, setPasskeys] = useState<readonly HeldPasskey[] | null>(null);
@@ -37,31 +64,36 @@ export function SignInMethodsSummary() {
     void host.listPasskeys().then(setPasskeys);
   }, [passkeysEnabled, host]);
 
-  const accounts = api.user.getLinkedAccounts.useQuery({});
   const identifiers = api.identity.myIdentifiers.useQuery({});
+  const confirmation = api.auth.myAddressConfirmation.useQuery();
   const password = api.user.hasPassword.useQuery({});
 
-  useEffect(() => {
-    if (password.isError) {
-      host.failed({
-        error: password.error,
-        fallbackTitle: "Couldn't tell whether you have a password",
-      });
-    }
-  }, [password.isError, password.error, host]);
+  useReportFailure(identifiers.error, "Couldn't read your sign-in methods");
+  useReportFailure(confirmation.error, "Couldn't read the address on your account");
+  useReportFailure(password.error, "Couldn't tell whether you have a password");
 
-  const linked = accounts.data ?? [];
-  const addresses = (identifiers.data ?? []).filter(
-    (identifier) => identifier.provider === "email" && identifier.value,
-  );
+  const rows = signInMethodRows({
+    identifiers: identifiers.data ?? [],
+    accountAddress: {
+      email: confirmation.data?.email ?? host.currentUser()?.email ?? null,
+      confirmed: confirmation.data?.confirmed ?? true,
+    },
+    passkeyDetail: passkeysEnabled ? passkeyDetail(passkeys) : "None yet",
+    hasPassword: password.data?.hasPassword === true,
+  });
 
   return (
     <VStack align="stretch" gap={3} width="full" data-testid="sign-in-methods-summary">
       <HStack justify="space-between" width="full">
-        <HStack gap={2}>
-          <KeyRound size={18} />
-          <Text fontWeight={600}>Sign-in methods</Text>
-        </HStack>
+        <VStack align="start" gap={1}>
+          <HStack gap={2}>
+            <KeyRound size={18} />
+            <Text fontWeight={600}>Sign-in methods</Text>
+          </HStack>
+          <Text color="fg.muted" fontSize="sm">
+            What this account can prove it is with.
+          </Text>
+        </VStack>
         <Button asChild size="xs" variant="outline" data-testid="sign-in-methods-manage">
           <Link unstyled href="/settings/security">
             Manage
@@ -69,43 +101,15 @@ export function SignInMethodsSummary() {
         </Button>
       </HStack>
 
-      <VStack align="stretch" gap={2} width="full">
-        {addresses.length > 0 ? (
-          addresses.map((identifier) => (
-            <MethodLine
-              key={identifier.identifierId}
-              testId="method-line-address"
-              label={identifier.value ?? ""}
-              detail={identifier.confirmed ? "Confirmed" : "Not confirmed yet"}
-            />
-          ))
-        ) : (
-          <MethodLine testId="method-line-address" label="Address" detail={address ?? "None yet"} />
-        )}
-
-        {linked.map((account) => (
-          <MethodLine
-            key={account.id}
-            testId="method-line-linked-account"
-            label={providerDisplayName(account.provider, account.providerAccountId)}
-            detail="Linked"
-          />
-        ))}
-
-        {passkeysEnabled && (
-          <MethodLine
-            testId="method-line-passkeys"
-            label="Passkeys"
-            detail={passkeyDetail(passkeys)}
-          />
-        )}
-
-        <MethodLine
-          testId="method-line-password"
-          label="Password"
-          detail={password.data?.hasPassword ? "Set" : "Not set"}
-        />
-      </VStack>
+      {identifiers.isPending || confirmation.isPending ? (
+        <Spinner size="sm" />
+      ) : (
+        <VStack align="stretch" gap={2} width="full">
+          {rows.map(({ key, ...row }) => (
+            <MethodRow key={key} {...row} />
+          ))}
+        </VStack>
+      )}
     </VStack>
   );
 }
