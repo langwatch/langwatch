@@ -40,6 +40,7 @@ import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { confirmArchiveSource } from "../../../features/ingestion-sources/model/confirm-archive-source.ts";
 import {
   needsIngestSecret,
+  SOURCE_TYPE_OPTIONS,
   type SourceType,
 } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
@@ -134,7 +135,7 @@ function SourceDetailHeader({
       </BackLink>
       <PageLayout.Heading>{source.name}</PageLayout.Heading>
       <Badge size="sm" variant="surface">
-        {source.sourceType}
+        {SOURCE_TYPE_OPTIONS.find((o) => o.value === source.sourceType)?.label ?? source.sourceType}
       </Badge>
       <HStack gap={1}>
         <Box color={status.color} display="flex">

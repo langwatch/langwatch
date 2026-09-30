@@ -342,7 +342,9 @@ func (exec *scenarioExec) build(request scenarioRequest, fallbackAuth string) (p
 		}
 	}
 	if request.ContentType != "" {
-		built.headers["Content-Type"] = request.ContentType
+		if built.headers["Content-Type"], err = expandText(request.ContentType, exec.vars); err != nil {
+			return built, err
+		}
 	}
 	if built.query, err = exec.expandQuery(request.Query); err != nil {
 		return built, err
