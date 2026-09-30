@@ -197,7 +197,7 @@
 		"msgpackr": "^2.0.4",
 		"nanoid": "^6.0.0",
 		"node-fetch-cache": "^5.1.0",
-		"nodemailer": "^9.0.3",
+		"nodemailer": "^10.0.9",
 		"numeral": "^2.0.6",
 		"ohm-js": "^17.5.0",
 		"openai": "^7.4.0",
