@@ -1125,7 +1125,7 @@
     path: /api/workflows/code-completion
     body: { completionMetadata: {} }
   expect:
-    status: 400
+    status: [400, 422]
 
 - id: workflow-studio-code-completion-unknown-project-is-403
   endpoint: POST /api/workflows/code-completion

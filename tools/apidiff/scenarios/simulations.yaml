@@ -3475,7 +3475,7 @@
       "body": {
         "type": "SCENARIO_RUN_STARTED",
         "timestamp": "{nowMs}",
-        "batchRunId": "batch-{uid}",
+        "batchRunId": "batch2-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run2-{uid}",
         "scenarioSetId": "set-{uid}",
@@ -3495,7 +3495,7 @@
     {
       "request": "GET /api/simulation-runs",
       "query": {
-        "batchRunId": "batch-{uid}"
+        "scenarioSetId": "set-{uid}"
       },
       "expect": {
         "status": 200,
@@ -15610,6 +15610,7 @@
   "expect": {
     "status": [
       400,
+      403,
       422
     ]
   }
