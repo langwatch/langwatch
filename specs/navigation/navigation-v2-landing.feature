@@ -36,6 +36,16 @@ Feature: Landing
     When the chrome draws the front door
     Then it draws the resolver rather than refusing them for want of a team
 
+  # The chrome draws around an organization, and a reader who belongs to none
+  # has nothing for it to draw. "/" is where such a reader is sent after
+  # signing up or joining, so the resolver runs without the chrome for them.
+  @integration
+  Scenario: The front door sends a reader with no organization to onboarding
+    Given a signed-in reader who belongs to no organization
+    When they open "/"
+    Then the front door resolves without drawing the chrome
+    And they are sent to "/onboarding/welcome"
+
   @unit
   Scenario: An explicit pin outranks everything
     Given I pinned my home to "/governance"
