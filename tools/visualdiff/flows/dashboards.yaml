@@ -6,7 +6,7 @@
 # Not scripted, with the reason:
 #  - a shared dashboard: nothing in the dashboard or analytics modules shares one;
 #  - a saved LangWatchQL chart placed on a dashboard, and a code widget seeded over REST: both
-#    routes are project-scoped (/api/v1/projects/:projectId/...) and no fixture carries the id.
+#    routes are project-scoped (/api/projects/:projectId/...) and no fixture carries the id.
 flows:
   - id: dashboard-graph-edit-and-delete
     title: Open a builder graph from its dashboard, rename it in the builder, then delete it

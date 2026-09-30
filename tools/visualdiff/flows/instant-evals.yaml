@@ -9,7 +9,7 @@ flows:
   - id: instant-eval-run-persists
     title: Start a run over traces through the API and read it back from the run list
     setup:
-      - post: /api/v1/instant-evals
+      - post: /api/instant-evals
         body:
           name: vd-instant-eval-setup
           target: traces
@@ -26,17 +26,17 @@ flows:
           path: /{slug}/traces
       - action: expect
         with:
-          api: /api/v1/instant-evals/{runId}
+          api: /api/instant-evals/{runId}
           field: id
           equals: "{runId}"
       - action: expect
         with:
-          api: /api/v1/instant-evals
+          api: /api/instant-evals
           field: runs
           contains: "{runId}"
       - action: expect
         with:
-          api: /api/v1/instant-evals/{runId}
+          api: /api/instant-evals/{runId}
           field: questions.0.kind
           equals: boolean
 
@@ -53,7 +53,7 @@ flows:
           submit: "true"
       - action: expect
         with:
-          api: /api/v1/instant-evals
+          api: /api/instant-evals
           field: runs
           contains: vd{uid}
           timeout: "45000"
