@@ -80,7 +80,7 @@ describe("InstanceDetailDrawer", () => {
       expect(screen.getAllByText("never reached").length).toBeGreaterThan(0);
       expect(screen.getByText("acme.test")).toBeTruthy();
       expect(screen.getByText("8 users")).toBeTruthy();
-      expect(screen.getByText("1,200")).toBeTruthy();
+      expect(screen.getByText((1200).toLocaleString())).toBeTruthy();
     });
   });
 });

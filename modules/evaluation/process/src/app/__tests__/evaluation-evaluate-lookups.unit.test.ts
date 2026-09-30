@@ -77,7 +77,7 @@ async function boot({
       experiment: experiments,
       automation: createApiFixture<AutomationApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
-      projects: createApiFixture<ProjectApi>(),
+      project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
         getPlatformDefaultRetentionDays: () => 30,
       }),

@@ -7,7 +7,10 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
-import type { RecordEvaluationLifecycleCompletedCommandData } from "../../eventing/evaluation-lifecycle.events.ts";
+import type {
+  RecordEvaluationLifecycleCompletedCommandData,
+  RecordEvaluationRanCommandData,
+} from "../../eventing/evaluation-lifecycle.events.ts";
 import { EvaluationLifecycleService } from "../evaluation-lifecycle.service.ts";
 
 const run = {
@@ -46,7 +49,7 @@ function serviceOver(input: { admin: string | null; counts: Record<string, numbe
     runs: { countRuns: async ({ tenantId }) => input.counts[tenantId] ?? 0 },
   });
   service.connect({
-    recordEvaluationRan: recorder([]),
+    recordEvaluationRan: recorder<RecordEvaluationRanCommandData>([]),
     recordEvaluationLifecycleCompleted: recorder(completed),
   });
   return { service, completed };

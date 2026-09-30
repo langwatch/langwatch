@@ -1,6 +1,6 @@
-import { HandledError } from "@langwatch/handled-error";
 import { sendInviteEmail, sendInviteReRequestEmail, type MailSender } from "@langwatch/mail";
 import type { NotificationService } from "@langwatch/notification-contract";
+import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
 
 import type { OrganizationInviteMail } from "../../app/organization.members.ts";
 import { OrganizationInviteMailChannel } from "../organization-invite-mail.channel.ts";
@@ -19,9 +19,7 @@ export class SesOrganizationInviteMailChannel extends OrganizationInviteMailChan
       send: async (content) => {
         const { provider } = await input.notifications.getMailDelivery();
         if (provider === undefined) {
-          throw new HandledError("mail_not_configured", "No email sending method available", {
-            httpStatus: 503,
-          });
+          throw new OrganizationCapabilityUnavailableError("email sending");
         }
         await input.notifications.sendEmail(content);
       },

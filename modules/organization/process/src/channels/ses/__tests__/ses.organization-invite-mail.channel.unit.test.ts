@@ -67,7 +67,7 @@ describe("SesOrganizationInviteMailChannel", () => {
           organization: { name: "Acme Corp" },
           acceptInviteUrl: "https://app.langwatch.test/invite/accept?inviteCode=abc",
         }),
-      ).rejects.toMatchObject({ code: "mail_not_configured" });
+      ).rejects.toMatchObject({ code: "service_unavailable" });
       expect(sent).toHaveLength(0);
     });
   });

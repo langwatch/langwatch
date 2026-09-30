@@ -2,7 +2,6 @@
  * @vitest-environment node
  *
  * The sign-up ceremony seeds the standard AI-tool catalogue through governance,
- notifications: createApiFixture<Pick<NotificationService, "sendEmail" | "getMailDelivery">>(),
  * as main's onboarding did.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
@@ -45,6 +44,7 @@ function ceremonyOver({
       entitlement: createApiFixture<Pick<EntitlementApi, "getActivePlan" | "requestBound">>(),
       permissions: createApiFixture<AuthzApi>(),
       roles: createApiFixture<InviteAssignableRoles>(),
+      notifications: createApiFixture<Pick<NotificationService, "sendEmail" | "getMailDelivery">>(),
       governance,
     },
   }).ceremony;

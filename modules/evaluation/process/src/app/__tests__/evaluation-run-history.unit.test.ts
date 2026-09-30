@@ -77,7 +77,7 @@ describe("given a process that installs the evaluation module over its repositor
           experiment: createApiFixture<ExperimentApi>(),
           automation: createApiFixture<AutomationApi>(),
           analytics: createApiFixture<AnalyticsApi>(),
-          projects: createApiFixture<ProjectApi>(),
+          project: createApiFixture<ProjectApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
             getPlatformDefaultRetentionDays: () => 30,
           }),

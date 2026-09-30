@@ -7,6 +7,7 @@ import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -45,6 +46,7 @@ function process(role: "api" | "worker") {
       entitlement: createApiFixture<EntitlementApi>(),
       governance: createApiFixture<GovernanceRestApi>(),
       identity: createApiFixture<IdentityApi>(),
+      notification: createApiFixture<NotificationService>(),
       nurturing: createApiFixture<NurturingApi>(),
       project: createApiFixture<ProjectApi>(),
       role: createApiFixture<RoleApi>(),

@@ -41,7 +41,7 @@ async function installed() {
       experiment: createApiFixture<ExperimentApi>(),
       automation: createApiFixture<AutomationApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
-      projects: createApiFixture<ProjectApi>(),
+      project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),
     })
     .boot();

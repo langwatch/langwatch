@@ -200,7 +200,7 @@ describe("when Better Auth deletes a user", () => {
 
     await options.databaseHooks?.user?.delete?.before?.(USER, null);
 
-    expect(erased).toEqual([{ id: "user_1" }]);
+    expect(erased.map(({ id }) => id)).toEqual(["user_1"]);
   });
 });
 
