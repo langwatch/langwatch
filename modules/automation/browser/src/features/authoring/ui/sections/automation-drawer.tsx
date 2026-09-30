@@ -188,11 +188,6 @@ export function AutomationDrawer({
   // graph-prefilled create as an alert from the first paint so the title
   // doesn't flash "Add automation" before the prefill effect lands.
   const labels = presetLabels(prefilledGraphId ? "customGraph" : draft.source, !!automationId);
-  // A saved graph alert or report can't become a trace automation mid-edit
-  // (the kind decides the row's whole shape — schedule, source, dispatcher),
-  // and a drawer opened from a specific chart is pinned to that alert — lock
-  // the Type cards visibly in all three cases.
-  const sourceLocked = (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
   const hydrate = useAutomationStore((s) => s.hydrate);
@@ -447,9 +442,7 @@ export function AutomationDrawer({
               editLoading={editLoading}
               noun={labels.noun}
               isEdit={!!automationId}
-              sourceLocked={sourceLocked}
               prefilledGraphId={prefilledGraphId}
-              webhookEnabled={webhookEnabled}
             />
           </Drawer.Body>
           <Drawer.Footer>
@@ -1133,17 +1126,13 @@ function DrawerBodyContent({
   editLoading,
   noun,
   isEdit,
-  sourceLocked,
   prefilledGraphId,
-  webhookEnabled,
 }: {
   editError: boolean;
   editLoading: boolean;
   noun: string;
   isEdit: boolean;
-  sourceLocked: boolean;
   prefilledGraphId: string | undefined;
-  webhookEnabled: boolean;
 }) {
   if (editError) {
     return (
@@ -1173,12 +1162,7 @@ function DrawerBodyContent({
   }
   return (
     <Box css={{ zoom: 0.9 }}>
-      <MainSectionList
-        isEdit={isEdit}
-        sourceLocked={sourceLocked}
-        prefilledGraphId={prefilledGraphId}
-        webhookEnabled={webhookEnabled}
-      />
+      <MainSectionList isEdit={isEdit} prefilledGraphId={prefilledGraphId} />
     </Box>
   );
 }

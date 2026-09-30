@@ -1,7 +1,9 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { TriggerAction } from "@langwatch/automation-contract";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Settings2 } from "lucide-react";
 
+import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
 import { useConfigComplete, useConfigurationSummary } from "./automation-selectors.ts";
 import { useAutomationStore } from "./automation-store.ts";
@@ -15,43 +17,36 @@ const ACCENT_FOR_SOURCE: Record<ConditionSource, string> = {
   report: "purple",
 };
 
+/** Alex's wording (ARCHITECTURE.md §6): the one place "off" is said out loud. */
+const EMAIL_NOT_CONFIGURED = "Email is not configured. Ask an admin to set up a mail provider.";
+
 type AutomationProviderEntry = AutomationProviderRegistry[keyof AutomationProviderRegistry];
 
 /**
- * The Delivery facet (ADR-043 facet 6): cards come from `CLIENT_PROVIDERS`
- * automatically, grouped by `shared.category`; alerts/reports hide the
- * `action` group (the router enforces the same rule server-side).
+ * The Delivery facet (ADR-043 facet 6): cards come from `CLIENT_PROVIDERS`, grouped by
+ * `shared.category`; graph-watching automations and schedules only notify (the router
+ * enforces it server-side), and a schedule never offers the webhook card.
  */
 export function DeliveryPicker({
   value,
   onChange,
   source,
-  webhookEnabled,
-  preserveHiddenWebhook,
   accordion,
 }: {
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
   source: ConditionSource;
-  webhookEnabled: boolean;
-  preserveHiddenWebhook: boolean;
   accordion?: FacetAccordionProps;
 }) {
   const setSection = useAutomationStore((s) => s.setSection);
   const configComplete = useConfigComplete();
   const configSummary = useConfigurationSummary();
-  // ADR-040: the webhook channel ships dark. The card is hidden until the
-  // flag is on (the save/test routes are gated server-side too), and never
-  // offered for reports — the scheduled-report dispatch is email/Slack only.
-  const isAlertKind = source === "customGraph";
-  const notifyOnly = isAlertKind || source === "report";
-  const webhookReadOnly =
-    preserveHiddenWebhook && value === TriggerAction.SEND_WEBHOOK && !webhookEnabled;
+  const emailUnavailable = !useAutomationHost().hasEmailProvider();
+  const notifyOnly = source === "customGraph" || source === "report";
+  // The scheduled-report dispatch is email/Slack only.
+  const hasEndpointDelivery = source !== "report";
   const entries = Object.values(CLIENT_PROVIDERS).filter(
-    (e) =>
-      e.shared.action !== TriggerAction.SEND_WEBHOOK ||
-      (webhookEnabled && source !== "report") ||
-      (preserveHiddenWebhook && e.shared.action === value),
+    (e) => e.shared.action !== TriggerAction.SEND_WEBHOOK || hasEndpointDelivery,
   );
   const notify = entries.filter((e) => e.shared.category === "notify");
   const action = entries.filter((e) => e.shared.category === "action");
@@ -68,9 +63,9 @@ export function DeliveryPicker({
     <FacetSection
       title="Delivery"
       help={
-        webhookEnabled
+        hasEndpointDelivery
           ? "Where the notification goes and what it sends. Notify channels post to Slack, send email, or call an endpoint. Actions add matching traces to a dataset or annotation queue."
-          : "Where the notification goes and what it sends. Notify channels post to Slack or send email. Actions add matching traces to a dataset or annotation queue."
+          : "Where the notification goes and what it sends. Notify channels post to Slack or send email."
       }
       accordion={accordion}
       complete={configComplete}
@@ -81,17 +76,16 @@ export function DeliveryPicker({
           <DeliveryGroup
             label="Notify"
             description={
-              webhookEnabled
+              hasEndpointDelivery
                 ? "Tell someone through Slack, email, or an endpoint."
                 : "Tell someone through Slack or email."
             }
             entries={notify}
             value={value}
             onChange={pick}
-            isAlertKind={isAlertKind}
+            source={source}
             accent={accent}
-            webhookEnabled={webhookEnabled}
-            readOnlyAction={webhookReadOnly ? TriggerAction.SEND_WEBHOOK : null}
+            emailUnavailable={emailUnavailable}
           />
         ) : null}
         {action.length > 0 && !notifyOnly ? (
@@ -101,28 +95,12 @@ export function DeliveryPicker({
             entries={action}
             value={value}
             onChange={pick}
-            isAlertKind={isAlertKind}
+            source={source}
             accent={accent}
-            webhookEnabled={webhookEnabled}
-            readOnlyAction={null}
+            emailUnavailable={emailUnavailable}
           />
         ) : null}
-        {webhookReadOnly ? (
-          <Box
-            padding={2.5}
-            borderRadius="md"
-            borderWidth="1px"
-            colorPalette="orange"
-            borderColor="colorPalette.muted"
-            bg="colorPalette.subtle"
-          >
-            <Text textStyle="sm">
-              Webhook delivery is unavailable for this project. This saved setup is read-only.
-              Choose another channel to replace it.
-            </Text>
-          </Box>
-        ) : null}
-        {value && !webhookReadOnly ? (
+        {value ? (
           <HStack
             justify="space-between"
             gap={3}
@@ -157,20 +135,18 @@ function DeliveryGroup({
   entries,
   value,
   onChange,
-  isAlertKind,
+  source,
   accent,
-  webhookEnabled,
-  readOnlyAction,
+  emailUnavailable,
 }: {
   label: string;
   description: string;
   entries: AutomationProviderEntry[];
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
-  isAlertKind: boolean;
+  source: ConditionSource;
   accent: string;
-  webhookEnabled: boolean;
-  readOnlyAction: TriggerAction | null;
+  emailUnavailable: boolean;
 }) {
   return (
     <VStack align="stretch" gap={2}>
@@ -195,10 +171,13 @@ function DeliveryGroup({
             entry={entry}
             active={entry.shared.action === value}
             onClick={() => onChange(entry.shared.action)}
-            isAlertKind={isAlertKind}
+            source={source}
             accent={accent}
-            webhookEnabled={webhookEnabled}
-            readOnly={entry.shared.action === readOnlyAction}
+            disabledReason={
+              emailUnavailable && entry.shared.action === TriggerAction.SEND_EMAIL
+                ? EMAIL_NOT_CONFIGURED
+                : void 0
+            }
           />
         ))}
       </Box>
@@ -210,31 +189,21 @@ function DeliveryCard({
   entry,
   active,
   onClick,
-  isAlertKind,
+  source,
   accent,
-  webhookEnabled,
-  readOnly,
+  disabledReason,
 }: {
   entry: AutomationProviderEntry;
   active: boolean;
   onClick: () => void;
-  isAlertKind: boolean;
+  source: ConditionSource;
   accent: string;
-  webhookEnabled: boolean;
-  readOnly: boolean;
+  /** Set when the channel cannot be chosen on this installation; shown on hover. */
+  disabledReason?: string;
 }) {
   const Icon = entry.client.Icon;
-  let description: string;
-  if (!webhookEnabled && entry.shared.action === TriggerAction.SEND_SLACK_MESSAGE) {
-    description = isAlertKind
-      ? "Post a message to Slack when the alert fires."
-      : "Post a message to Slack when a trace matches.";
-  } else if (isAlertKind) {
-    description = entry.shared.alertDescription ?? entry.shared.description;
-  } else {
-    description = entry.shared.description;
-  }
-  return (
+  const disabled = disabledReason !== void 0;
+  const card = (
     <chakra.button
       type="button"
       textAlign="left"
@@ -244,18 +213,33 @@ function DeliveryCard({
       colorPalette={accent}
       borderColor={active ? "colorPalette.emphasized" : "border"}
       bg={active ? "colorPalette.subtle" : "bg"}
-      cursor={readOnly ? "not-allowed" : "pointer"}
-      aria-disabled={readOnly || undefined}
+      cursor={disabled ? "not-allowed" : "pointer"}
+      opacity={disabled ? 0.6 : 1}
+      aria-disabled={disabled || undefined}
       data-testid={`automation-delivery-${entry.shared.action.toLowerCase().replaceAll("_", "-")}`}
-      onClick={readOnly ? undefined : onClick}
+      onClick={disabled ? undefined : onClick}
     >
       <HStack gap={2} mb={1}>
         <Icon size={18} />
         <Text fontWeight="semibold">{entry.shared.label}</Text>
       </HStack>
       <Text textStyle="xs" color="fg.muted">
-        {description}
+        {descriptionFor({ shared: entry.shared, source })}
       </Text>
     </chakra.button>
   );
+  return disabled ? <Tooltip content={disabledReason}>{card}</Tooltip> : card;
+}
+
+/** The card's line in the words of what is being delivered. */
+function descriptionFor({
+  shared,
+  source,
+}: {
+  shared: AutomationProviderEntry["shared"];
+  source: ConditionSource;
+}): string {
+  if (source === "customGraph") return shared.alertDescription ?? shared.description;
+  if (source === "report") return shared.reportDescription ?? shared.description;
+  return shared.description;
 }

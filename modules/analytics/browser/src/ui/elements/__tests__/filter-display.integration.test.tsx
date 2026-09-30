@@ -81,4 +81,26 @@ describe("FilterDisplay", () => {
       });
     });
   });
+
+  describe("given a keyed metadata filter", () => {
+    /** @scenario "A keyed filter chip names its key" */
+    it("names the key it reads", () => {
+      renderFilters({ filters: { "metadata.value": { plan: ["true"] } } });
+
+      expect(screen.getByText("Metadata · plan")).toBeInTheDocument();
+      expect(screen.getByText("true")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a keyed filter stored as a bare list", () => {
+    /** @scenario "A keyed filter stored without its key is flagged as never matching" */
+    it("renders a warning chip instead of a valid-looking one", () => {
+      renderFilters({ filters: { "metadata.value": ["true"] } });
+
+      expect(screen.getByTestId("unkeyed-filter-chip")).toHaveTextContent(
+        "never matches: needs a metadata key",
+      );
+      expect(screen.queryByText("true")).toBeNull();
+    });
+  });
 });

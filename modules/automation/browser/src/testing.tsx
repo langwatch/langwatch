@@ -83,6 +83,8 @@ export type FakeAutomationHostOptions = {
   team?: AutomationTeam | null;
   project?: AutomationProject | null;
   appBaseUrl?: string;
+  /** Whether the installation can send email; defaults to true. */
+  hasEmailProvider?: boolean;
   /** Path parameters the screen was opened with, for example `{ project: "web-app" }`. */
   params?: Readonly<Record<string, string | undefined>>;
   /** The query string the screen opens on. */
@@ -200,6 +202,10 @@ export class FakeAutomationHost extends AutomationHost {
 
   appBaseUrl(): string {
     return this.options.appBaseUrl ?? DEFAULT_APP_BASE_URL;
+  }
+
+  hasEmailProvider(): boolean {
+    return this.options.hasEmailProvider ?? true;
   }
 
   route(): AutomationRouteReading {

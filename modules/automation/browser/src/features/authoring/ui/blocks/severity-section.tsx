@@ -20,7 +20,7 @@ const SEVERITY_LABEL: Record<(typeof AlertType)[keyof typeof AlertType], string>
 
 const SEVERITY_COLLECTION = createListCollection({ items: SEVERITY_OPTIONS });
 
-/** Controlled alert severity facet. */
+/** Controlled severity facet: graph-watching automations only (ADR-043). */
 export function AutomationSeveritySection({
   source,
   value,
@@ -37,7 +37,7 @@ export function AutomationSeveritySection({
   return (
     <FacetSection
       title="Severity"
-      help="How urgent this alert is when it fires. Higher severities stand out in the notification and can page the whole channel."
+      help="How urgent this automation is when it fires. Higher severities stand out in the notification and can page the whole channel."
       accordion={accordion}
       complete={value !== null}
       summary={value ? SEVERITY_LABEL[value] : "Pick a severity"}

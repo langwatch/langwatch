@@ -1,6 +1,6 @@
-import { Box, Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import {
-  CADENCE_LABELS,
+  CADENCE_CHOICE_LABELS,
   GRAPH_ALERT_TIME_PERIODS,
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
@@ -9,8 +9,8 @@ import {
 import { useEffect, useState } from "react";
 
 import { describeCron, isValidCron } from "../../model/report-schedule.ts";
-import { AutomationCadenceField } from "../elements/cadence-field.tsx";
 import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
+import { ReceiveCadenceField } from "../elements/receive-cadence-field.tsx";
 import { ReportScheduleField } from "../elements/report-schedule-field.tsx";
 import { AutomationTraceDebounceField } from "../elements/trace-debounce-field.tsx";
 
@@ -56,9 +56,9 @@ const TIME_PERIOD_LABELS: Record<GraphAlertTimePeriod, string> = {
 
 const CADENCE_HELP: Record<AutomationSource, string> = {
   trace:
-    "How often notifications go out (one per matching trace, or batched into a digest) plus how long to wait for late spans before evaluating.",
+    "Whether each matching trace sends its own message or matches are batched into one, plus how long a trace must be quiet before it counts as settled and can send.",
   customGraph:
-    "What makes the alert fire: the watched metric crosses this threshold over the chosen window.",
+    "What makes it fire: the watched metric crosses this threshold over the chosen window.",
   report: "When it's sent, as a recurring schedule in the timezone you pick.",
 };
 
@@ -70,7 +70,13 @@ function cadenceIsSet(draft: AutomationCadenceDraft): boolean {
   return true;
 }
 
-function cadenceSummary(draft: AutomationCadenceDraft): string {
+function cadenceSummary({
+  draft,
+  isNotify,
+}: {
+  draft: AutomationCadenceDraft;
+  isNotify: boolean;
+}): string {
   if (draft.source === "customGraph") {
     const { operator, threshold, timePeriod } = draft.graphAlert;
     if (!Number.isFinite(threshold)) return "Set a threshold";
@@ -82,12 +88,16 @@ function cadenceSummary(draft: AutomationCadenceDraft): string {
       : "Set a schedule";
   }
   const settle = Math.round(draft.traceDebounceMs / 1000);
-  return `${CADENCE_LABELS[draft.notificationCadence]}, ${settle}s settle`;
+  // A persist action writes per match (the router coerces its cadence to
+  // immediate), so the summary must not echo a digest the server discards.
+  if (!isNotify) return `Per matching trace, ${settle}s settle window`;
+  return `${CADENCE_CHOICE_LABELS[draft.notificationCadence]}, ${settle}s settle window`;
 }
 
 function cadenceContent({
   draft,
   isEdit,
+  showReceiveChooser,
   onCadenceChange,
   onTraceDebounceChange,
   onGraphAlertChange,
@@ -95,6 +105,7 @@ function cadenceContent({
 }: {
   draft: AutomationCadenceDraft;
   isEdit: boolean;
+  showReceiveChooser: boolean;
   onCadenceChange: (value: NotificationCadence) => void;
   onTraceDebounceChange: (value: number) => void;
   onGraphAlertChange: (value: AutomationGraphAlertDraft) => void;
@@ -107,17 +118,15 @@ function cadenceContent({
     return <ReportCadence value={draft.report} isEdit={isEdit} onChange={onReportChange} />;
   }
   return (
-    <HStack align="start" gap={4}>
-      <Box flex="1" minWidth="0">
-        <AutomationCadenceField value={draft.notificationCadence} onValueChange={onCadenceChange} />
-      </Box>
-      <Box flex="1" minWidth="0">
-        <AutomationTraceDebounceField
-          value={draft.traceDebounceMs}
-          onChange={onTraceDebounceChange}
-        />
-      </Box>
-    </HStack>
+    <VStack align="stretch" gap={4}>
+      {showReceiveChooser ? (
+        <ReceiveCadenceField value={draft.notificationCadence} onChange={onCadenceChange} />
+      ) : null}
+      <AutomationTraceDebounceField
+        value={draft.traceDebounceMs}
+        onChange={onTraceDebounceChange}
+      />
+    </VStack>
   );
 }
 
@@ -126,6 +135,9 @@ export function AutomationCadenceSection({
   draft,
   isEdit = false,
   accordion,
+  title = "Cadence",
+  isNotify,
+  chooserHostedByChannel,
   onCadenceChange,
   onTraceDebounceChange,
   onGraphAlertChange,
@@ -134,6 +146,12 @@ export function AutomationCadenceSection({
   draft: AutomationCadenceDraft;
   isEdit?: boolean;
   accordion?: FacetAccordionProps;
+  /** The wizard names the facet after what it decides on that step (ADR-093 §4). */
+  title?: string;
+  /** A persist action always writes per match, so it is offered no batch window. */
+  isNotify: boolean;
+  /** The channel hosts the receive choice beside the templates it filters. */
+  chooserHostedByChannel: boolean;
   onCadenceChange: (value: NotificationCadence) => void;
   onTraceDebounceChange: (value: number) => void;
   onGraphAlertChange: (value: AutomationGraphAlertDraft) => void;
@@ -141,15 +159,16 @@ export function AutomationCadenceSection({
 }) {
   return (
     <FacetSection
-      title="Cadence"
+      title={title}
       help={CADENCE_HELP[draft.source]}
       accordion={accordion}
       complete={cadenceIsSet(draft)}
-      summary={cadenceSummary(draft)}
+      summary={cadenceSummary({ draft, isNotify })}
     >
       {cadenceContent({
         draft,
         isEdit,
+        showReceiveChooser: isNotify && !chooserHostedByChannel,
         onCadenceChange,
         onTraceDebounceChange,
         onGraphAlertChange,

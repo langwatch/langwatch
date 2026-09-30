@@ -15,7 +15,15 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function Harness({ initial, onChangeSpy }: { initial: string; onChangeSpy?: (q: string) => void }) {
+function Harness({
+  initial,
+  onChangeSpy,
+  onInvalidRowsChange,
+}: {
+  initial: string;
+  onChangeSpy?: (q: string) => void;
+  onInvalidRowsChange?: (hasInvalidRows: boolean) => void;
+}) {
   const [query, setQuery] = useState(initial);
   return (
     <ConditionBuilder
@@ -24,6 +32,7 @@ function Harness({ initial, onChangeSpy }: { initial: string; onChangeSpy?: (q: 
         onChangeSpy?.(q);
         setQuery(q);
       }}
+      onInvalidRowsChange={onInvalidRowsChange}
     />
   );
 }
@@ -59,14 +68,75 @@ describe("ConditionBuilder", () => {
     });
   });
 
-  describe("when a condition is added to an empty builder", () => {
-    it("shows a fresh field picker", async () => {
-      const user = userEvent.setup();
+  describe("given an empty query", () => {
+    /** @scenario "A fresh trace automation starts with one editable condition" */
+    it("starts with one empty, editable condition row already there", () => {
       render(<Harness initial="" />, { wrapper: Wrapper });
 
-      await user.click(screen.getByText("Add a condition"));
-
       expect(screen.getByText("Field…")).toBeTruthy();
+    });
+
+    it("does not emit a query for the seeded, untouched row", () => {
+      const onChangeSpy = vi.fn();
+      render(<Harness initial="" onChangeSpy={onChangeSpy} />, { wrapper: Wrapper });
+
+      expect(onChangeSpy).not.toHaveBeenCalled();
+    });
+
+    describe("when a second condition is added", () => {
+      it("shows a second field picker joined by AND", async () => {
+        const user = userEvent.setup();
+        render(<Harness initial="" />, { wrapper: Wrapper });
+
+        await user.click(screen.getByText("Add AND condition"));
+
+        expect(screen.getAllByText("Field…")).toHaveLength(2);
+        expect(screen.getByText("AND")).toBeTruthy();
+      });
+    });
+  });
+
+  describe("given a custom-attribute condition from the code editor", () => {
+    it("renders a key sub-input alongside the attribute field", () => {
+      render(<Harness initial="trace.attribute.user_id:premium" />, { wrapper: Wrapper });
+
+      expect(screen.getByDisplayValue("user_id")).toBeTruthy();
+      expect(screen.getByDisplayValue("premium")).toBeTruthy();
+    });
+  });
+
+  describe("when the user edits an existing attribute condition's key", () => {
+    it("emits the composed field without touching the value", () => {
+      const onChangeSpy = vi.fn();
+      render(<Harness initial="trace.attribute.user_id:premium" onChangeSpy={onChangeSpy} />, {
+        wrapper: Wrapper,
+      });
+
+      fireEvent.change(screen.getByDisplayValue("user_id"), { target: { value: "plan" } });
+
+      expect(onChangeSpy).toHaveBeenLastCalledWith("trace.attribute.plan:premium");
+    });
+  });
+
+  describe("when a completed attribute key cannot round-trip", () => {
+    it("reports invalid rows until the key is fixed", () => {
+      const onInvalidRowsChange = vi.fn();
+      render(
+        <Harness
+          initial="trace.attribute.user_id:premium"
+          onInvalidRowsChange={onInvalidRowsChange}
+        />,
+        { wrapper: Wrapper },
+      );
+      expect(onInvalidRowsChange).toHaveBeenLastCalledWith(false);
+
+      // The row stays complete while its key would re-parse as two clauses:
+      // the case that would otherwise silently save a wider automation.
+      fireEvent.change(screen.getByDisplayValue("user_id"), { target: { value: "user id" } });
+      expect(onInvalidRowsChange).toHaveBeenLastCalledWith(true);
+
+      fireEvent.change(screen.getByDisplayValue("user id"), { target: { value: "user_id" } });
+      expect(onInvalidRowsChange).toHaveBeenLastCalledWith(false);
     });
   });
 });

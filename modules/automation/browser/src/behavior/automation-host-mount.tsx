@@ -6,6 +6,7 @@
 
 import {
   useUiCapabilities,
+  useUiDeployment,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
@@ -75,6 +76,7 @@ class CapabilityAutomationHost extends AutomationHost {
       openRegisteredDrawer: ReturnType<typeof useDrawer>["openDrawer"];
       goBackDrawer: ReturnType<typeof useDrawer>["goBack"];
       organizations: readonly AutomationOrganizationGraph[];
+      hasEmailProvider: boolean;
     },
   ) {
     super();
@@ -164,6 +166,10 @@ class CapabilityAutomationHost extends AutomationHost {
     return "";
   }
 
+  hasEmailProvider(): boolean {
+    return this.members.hasEmailProvider;
+  }
+
   succeeded(notice: AutomationSuccessNotice): void {
     this.members.feedback.succeeded(notice);
   }
@@ -190,6 +196,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();
   const { openDrawer: openRegisteredDrawer, goBack } = useDrawer();
+  const deployment = useUiDeployment();
 
   const hostScope = useMemo<AutomationScope>(
     () => ({ organizationId, teamId: scopeHost?.team()?.id ?? null, projectId }),
@@ -215,6 +222,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
         openRegisteredDrawer,
         goBackDrawer: goBack,
         organizations,
+        hasEmailProvider: deployment.hasEmailProvider,
       }),
     [
       hostScope,
@@ -226,6 +234,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
       openRegisteredDrawer,
       goBack,
       organizations,
+      deployment.hasEmailProvider,
     ],
   );
 

@@ -7,6 +7,8 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AutomationHostProvider } from "../../../model/automation-host.ts";
+import { fakeAutomationHost } from "../../../testing.tsx";
 import { AutomationDrawer } from "../ui/sections/automation-drawer.tsx";
 import { useAutomationStore } from "../ui/sections/automation-store.ts";
 
@@ -98,8 +100,12 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
   },
 }));
 
+const host = fakeAutomationHost();
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <ChakraProvider value={defaultSystem}>
+    <AutomationHostProvider value={host}>{children}</AutomationHostProvider>
+  </ChakraProvider>
 );
 
 const renderDrawer = (

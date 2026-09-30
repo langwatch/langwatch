@@ -55,6 +55,7 @@ export type AutomationPreviewTrace = {
   traceId: string;
   name: string;
   timestamp: number;
+  durationMs: number;
   status: "ok" | "error" | "warning";
 };
 

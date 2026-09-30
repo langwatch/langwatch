@@ -5,6 +5,7 @@
 import {
   type FilterField,
   isZeroWhenAbsentSeries,
+  SeriesPercentageUnsupportedError,
   type AnalyticsSeries,
 } from "@langwatch/analytics-contract";
 
@@ -162,6 +163,300 @@ function referencedTraceColumns(
     ...TRACE_IDENTITY_COLUMNS,
     ...extractReferencedTraceColumns([...metricExpressions, ...extraExpressions]),
   ];
+}
+
+/**
+ * A translated metric plus the series' own filter and percentage mode (#6718). Both rewrite
+ * the aggregate into its `-If` form, not the shared WHERE. An empty `seriesCondition` means
+ * no filters of its own; the column is where it is hoisted when aggregating outside the scan.
+ */
+interface SeriesMetric extends MetricTranslation {
+  seriesCondition: string;
+  seriesConditionColumn: string;
+  /** Only ever true with a condition: ES treated percentage on an unfiltered series as a no-op. */
+  asPercent: boolean;
+  /** isZeroWhenAbsentSeries: `-If` combinators return 0, not NULL, over an empty match set. */
+  shouldZeroWhenAbsent: boolean;
+}
+
+/** Aggregates a metric can compile to; one missing here fails loudly, never drops a filter. */
+const AGGREGATE_FUNCTION_NAMES: ReadonlySet<string> = new Set([
+  "avg",
+  "avgArray",
+  "avgArrayIf",
+  "avgIf",
+  "count",
+  "countIf",
+  "max",
+  "maxArray",
+  "maxArrayIf",
+  "maxIf",
+  "min",
+  "minArray",
+  "minArrayIf",
+  "minIf",
+  "quantileExact",
+  "quantileExactArray",
+  "quantileExactArrayIf",
+  "quantileExactIf",
+  "quantileTDigest",
+  "quantileTDigestArray",
+  "quantileTDigestArrayIf",
+  "quantileTDigestIf",
+  "sum",
+  "sumArray",
+  "sumArrayIf",
+  "sumIf",
+  "uniq",
+  "uniqArray",
+  "uniqArrayIf",
+  "uniqExact",
+  "uniqExactIf",
+  "uniqIf",
+]);
+
+/** A located aggregate call inside a SELECT expression; `argsOpen` follows any parameter list. */
+interface AggregateCall {
+  nameStart: number;
+  name: string;
+  argsOpen: number;
+  argsClose: number;
+}
+
+const FUNCTION_CALL_PATTERN = /([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+
+/**
+ * The outermost aggregate call, as zero or one entries. Scans left to right so a
+ * non-aggregate wrapper (`coalesce(sum(x), 0)`) is stepped over, and skips string
+ * literals (`ts.Attributes['langwatch.user_id']`, `ss."Events.Name"`).
+ */
+function findOutermostAggregate(expression: string): AggregateCall[] {
+  for (const match of expression.matchAll(FUNCTION_CALL_PATTERN)) {
+    const name = match[1]!;
+    if (!AGGREGATE_FUNCTION_NAMES.has(name)) continue;
+    if (isInsideStringLiteral(expression, match.index)) continue;
+    const firstOpen = match.index + match[0].length - 1;
+    return [{ nameStart: match.index, name, ...resolveArgumentGroup(expression, firstOpen) }];
+  }
+  return [];
+}
+
+/** A parametric aggregate (`quantileTDigest(0.5)(col)`) takes its arguments in the second group. */
+function resolveArgumentGroup(
+  expression: string,
+  firstOpen: number,
+): { argsOpen: number; argsClose: number } {
+  const firstClose = matchClosingParen(expression, firstOpen);
+  const afterFirst = skipWhitespace(expression, firstClose + 1);
+  if (expression[afterFirst] !== "(") {
+    return { argsOpen: firstOpen, argsClose: firstClose };
+  }
+  return { argsOpen: afterFirst, argsClose: matchClosingParen(expression, afterFirst) };
+}
+
+/** Index of the first non-whitespace character at or after `from`. */
+function skipWhitespace(expression: string, from: number): number {
+  let index = from;
+  while (index < expression.length && /\s/.test(expression[index]!)) {
+    index += 1;
+  }
+  return index;
+}
+
+/** Index just past the string literal opened at `start`. */
+function skipQuoted(expression: string, start: number): number {
+  const quote = expression[start];
+  let index = start + 1;
+  while (index < expression.length) {
+    if (expression[index] === "\\") {
+      index += 2;
+      continue;
+    }
+    if (expression[index] === quote) return index + 1;
+    index += 1;
+  }
+  return expression.length;
+}
+
+/** Does `position` fall inside a string literal? */
+function isInsideStringLiteral(expression: string, position: number): boolean {
+  let index = 0;
+  while (index < position) {
+    if (!isQuote(expression[index])) {
+      index += 1;
+      continue;
+    }
+    const end = skipQuoted(expression, index);
+    if (end > position) return true;
+    index = end;
+  }
+  return false;
+}
+
+function isQuote(char: string | undefined): boolean {
+  return char === "'" || char === '"' || char === "`";
+}
+
+/** One step of a quote-aware scan: where the next character begins, and the depth change. */
+function scanStep(expression: string, index: number): { next: number; delta: number } {
+  const char = expression[index]!;
+  if (isQuote(char)) return { next: skipQuoted(expression, index), delta: 0 };
+  if (char === "(" || char === "[") return { next: index + 1, delta: 1 };
+  if (char === ")" || char === "]") return { next: index + 1, delta: -1 };
+  return { next: index + 1, delta: 0 };
+}
+
+/** Index of the `)` matching the `(` at `open`; `[]` only appear balanced, as map access. */
+function matchClosingParen(expression: string, open: number): number {
+  let depth = 0;
+  let index = open;
+  while (index < expression.length) {
+    const { next, delta } = scanStep(expression, index);
+    depth += delta;
+    if (depth === 0 && delta < 0) return index;
+    index = next;
+  }
+  throw new Error(`Unbalanced parentheses in metric expression: ${expression}`);
+}
+
+/** Split an argument list on its top-level commas. */
+function splitTopLevelArguments(argumentList: string): string[] {
+  const args: string[] = [];
+  let depth = 0;
+  let start = 0;
+  let index = 0;
+  while (index < argumentList.length) {
+    const { next, delta } = scanStep(argumentList, index);
+    depth += delta;
+    if (depth === 0 && argumentList[index] === ",") {
+      args.push(argumentList.slice(start, index));
+      start = index + 1;
+    }
+    index = next;
+  }
+  args.push(argumentList.slice(start));
+  return args;
+}
+
+/**
+ * `sum(x)` → `sumIf(x, (condition))`, `count()` → `countIf((condition))`; an aggregate
+ * already conditional (`avgIf(es.Score, …)`) has the condition ANDed into its own.
+ */
+function withAggregateCondition(expression: string, condition: string): string {
+  const [call] = findOutermostAggregate(expression);
+  if (!call) {
+    throw new Error(
+      `Cannot apply a per-series filter to "${expression}": no known aggregate function found. ` +
+        `Add the aggregate metric-translator.ts emits to AGGREGATE_FUNCTION_NAMES in aggregation-builder.ts.`,
+    );
+  }
+  const head = expression.slice(0, call.nameStart);
+  const parameters = expression.slice(call.nameStart + call.name.length, call.argsOpen);
+  const argumentList = expression.slice(call.argsOpen + 1, call.argsClose);
+  const tail = expression.slice(call.argsClose + 1);
+
+  if (call.name.endsWith("If")) {
+    const args = splitTopLevelArguments(argumentList);
+    const existing = args.pop() ?? "";
+    const merged = [...args, `(${existing.trim()}) AND (${condition})`].join(", ");
+    return `${head}${call.name}${parameters}(${merged})${tail}`;
+  }
+
+  const merged =
+    argumentList.trim().length > 0 ? `${argumentList}, (${condition})` : `(${condition})`;
+  return `${head}${call.name}If${parameters}(${merged})${tail}`;
+}
+
+/**
+ * Apply a series' own filter and percentage mode to its SELECT expression. Percentage is
+ * ES's `bucket_script`: `all > 0 ? filtered / all * 100 : 0`. A non-additive series gets
+ * a `countIf(cond) > 0` guard so an empty match set reads NULL, not a real-looking 0.
+ */
+function shapeSeriesExpression({
+  selectExpression,
+  alias,
+  condition,
+  asPercent,
+  shouldZeroWhenAbsent,
+}: {
+  selectExpression: string;
+  alias: string;
+  condition: string;
+  asPercent: boolean;
+  shouldZeroWhenAbsent: boolean;
+}): string {
+  if (!condition) return selectExpression;
+  const base = stripSelectExpressionAlias(selectExpression, alias);
+  // The pipeline fallback for a metric that cannot be nested emits a literal NULL.
+  if (base === "NULL") return selectExpression;
+  const filtered = withAggregateCondition(base, condition);
+  if (asPercent) {
+    const ratio = `if(${base} > 0, (${filtered}) / (${base}) * 100, 0)`;
+    if (shouldZeroWhenAbsent) return `${ratio} AS ${alias}`;
+    return `if(countIf(${condition}) > 0, ${ratio}, NULL) AS ${alias}`;
+  }
+  if (shouldZeroWhenAbsent) return `${filtered} AS ${alias}`;
+  return `if(countIf(${condition}) > 0, ${filtered}, NULL) AS ${alias}`;
+}
+
+/**
+ * One series' own filters as a predicate over the `ts` scan, or "" when it has none (or
+ * only the empty entries the composer keeps while values are picked). A filter needing
+ * a JOIN is refused: the JOIN would narrow every other series in the graph too.
+ */
+function translateSeriesCondition({
+  series,
+  params,
+}: {
+  series: AnalyticsSeries;
+  params: Record<string, unknown>;
+}): string {
+  const filters = series.filters;
+  if (!filters || Object.keys(filters).length === 0) return "";
+
+  const translation = translateAllFilters(filters, SPAN_TIME_FILTER_BOTH_PERIODS);
+  if (translation.whereClause === "1=1") return "";
+  if (translation.requiredJoins.length > 0) {
+    throw new Error(
+      `Per-series filter for metric "${series.metric}" requires a JOIN (${translation.requiredJoins.join(", ")}), ` +
+        `which cannot be scoped to a single series. Express the filter as a predicate in filter-translator.ts.`,
+    );
+  }
+  Object.assign(params, translation.params);
+  return translation.whereClause;
+}
+
+/** The CTE column a series' filter predicate is hoisted to. */
+function seriesConditionColumnName(index: number): string {
+  return `series_filter_${index}`;
+}
+
+/**
+ * A series' metric with its own filter and percentage mode. A per-entity (pipeline)
+ * measurement filtered AND shown as a percentage needs its denominator over a different
+ * entity set, a second scan: refused by name instead of a plausible-looking number.
+ */
+function translateSeries({
+  series,
+  index,
+  params,
+}: {
+  series: AnalyticsSeries;
+  index: number;
+  params: Record<string, unknown>;
+}): SeriesMetric {
+  const translation = translateSeriesMetric({ series, index });
+  const seriesCondition = translateSeriesCondition({ series, params });
+  if (series.asPercent && seriesCondition && translation.requiresSubquery) {
+    throw new SeriesPercentageUnsupportedError();
+  }
+  return {
+    ...translation,
+    seriesCondition,
+    seriesConditionColumn: seriesCondition ? seriesConditionColumnName(index) : "",
+    asPercent: series.asPercent === true && seriesCondition !== "",
+    shouldZeroWhenAbsent: isZeroWhenAbsentSeries(series),
+  };
 }
 
 /** Maximum number of filter options returned by filter queries */
@@ -477,9 +772,13 @@ const groupByExpressions: Partial<Record<string, (groupByKey?: string) => GroupB
     usesArrayJoin: true,
   }),
 
+  // Error status is a TRACE-level fact (ts.ContainsErrorStatus, what the `traces.error`
+  // filter reads): grouping on span StatusCode put a trace with mixed spans in BOTH
+  // buckets. `ifNull` keeps the grouping total where the column still admits NULL.
   "error.has_error": () => ({
-    column: `if(${tableAliases.stored_spans}.StatusCode = 2, 'with error', 'without error')`,
-    requiredJoins: ["stored_spans"],
+    column: `if(ifNull(${tableAliases.trace_summaries}.ContainsErrorStatus, 0) = 1, 'with error', 'without error')`,
+    requiredJoins: [],
+    handlesUnknown: true,
   }),
 };
 
@@ -695,12 +994,18 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const timeZone = input.timeZone ?? "UTC";
 
   const allJoins = new Set<CHTable>();
+  const seriesFilterParams: Record<string, unknown> = {};
   const metricTranslations = input.series.map((series, index) =>
-    translateSeriesMetric({ series, index }),
+    translateSeries({ series, index, params: seriesFilterParams }),
   );
   for (const translation of metricTranslations) {
     for (const join of translation.requiredJoins) allJoins.add(join);
   }
+
+  // Every per-series predicate, so the deduped trace subquery keeps the columns they read.
+  const seriesConditionExpressions = metricTranslations
+    .map((metric) => metric.seriesCondition)
+    .filter(Boolean);
 
   // Translate filters. Span/event facet filters resolve to stored_spans
   // subqueries; pass the StartTime envelope so they prune partitions instead of
@@ -717,6 +1022,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   );
   const allTranslationParams = {
     ...filterTranslation.params,
+    ...seriesFilterParams,
     ...metricParams,
   };
 
@@ -735,6 +1041,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // so we only SELECT the columns actually needed in each JOIN subquery.
   const allExpressions = [
     ...metricTranslations.map((m) => m.selectExpression),
+    ...seriesConditionExpressions,
     filterTranslation.whereClause,
     groupByColumn ?? "",
   ];
@@ -884,8 +1191,8 @@ function buildStandardTimeseriesQuery({
 }: {
   input: TimeseriesQueryInput;
   ts: string;
-  simpleMetrics: MetricTranslation[];
-  metricTranslations: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
+  metricTranslations: SeriesMetric[];
   groupByColumn: string | null;
   groupByHandlesUnknown: boolean;
   joinClauses: string;
@@ -917,9 +1224,17 @@ function buildStandardTimeseriesQuery({
   const groupKeyExpr = buildGroupKeyExpression({ groupByColumn, groupByHandlesUnknown });
   if (groupKeyExpr) selectExprs.push(groupKeyExpr);
 
-  // Add metric expressions
+  // The scan is in scope here, so a series' own filter goes straight into its aggregate.
   for (const metric of simpleMetrics) {
-    selectExprs.push(metric.selectExpression);
+    selectExprs.push(
+      shapeSeriesExpression({
+        selectExpression: metric.selectExpression,
+        alias: metric.alias,
+        condition: metric.seriesCondition,
+        asPercent: metric.asPercent,
+        shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
+      }),
+    );
   }
 
   // Build GROUP BY
@@ -939,6 +1254,7 @@ function buildStandardTimeseriesQuery({
   });
 
   const traceColumns = referencedTraceColumns(metricTranslations, [
+    ...metricTranslations.map((metric) => metric.seriesCondition),
     filterWhere,
     groupByColumn ?? "",
     joinClauses,
@@ -971,11 +1287,30 @@ function buildStandardTimeseriesQuery({
   };
 }
 
+/**
+ * A series' own filter is applied in the OUTER query against its per-trace predicate
+ * hoisted into the CTE: the raw predicate reads `ts`, which only exists inside the CTE,
+ * and every filter is a trace-level fact, decided once per trace.
+ */
 function appendPerTraceMetricExpressions(
-  simpleMetrics: MetricTranslation[],
+  simpleMetrics: SeriesMetric[],
   innerSelectExprs: string[],
 ): string[] {
   const outerMetricExprs: string[] = [];
+  const pushOuterMetric = (metric: SeriesMetric, outerExpr: string): void => {
+    if (metric.seriesCondition && metric.seriesConditionColumn) {
+      innerSelectExprs.push(`any(${metric.seriesCondition}) AS ${metric.seriesConditionColumn}`);
+    }
+    outerMetricExprs.push(
+      shapeSeriesExpression({
+        selectExpression: outerExpr,
+        alias: quoteIdentifier(metric.alias),
+        condition: metric.seriesConditionColumn,
+        asPercent: metric.asPercent,
+        shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
+      }),
+    );
+  };
   for (const metric of simpleMetrics) {
     const perTraceAlias = quoteIdentifier(`${metric.alias}__per_trace`);
     const quotedAlias = quoteIdentifier(metric.alias);
@@ -991,7 +1326,7 @@ function appendPerTraceMetricExpressions(
             `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
         );
       }
-      outerMetricExprs.push(`${outerAgg}(${perTraceAlias}) AS ${quotedAlias}`);
+      pushOuterMetric(metric, `${outerAgg}(${perTraceAlias}) AS ${quotedAlias}`);
       continue;
     }
 
@@ -999,7 +1334,7 @@ function appendPerTraceMetricExpressions(
     // count() / count(*) becomes sum(1) across traces = count(distinct traces).
     if (/\bcount\s*\(\s*\*?\s*\)/.test(exprWithoutAlias)) {
       innerSelectExprs.push(`1 AS ${perTraceAlias}`);
-      outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
+      pushOuterMetric(metric, `sum(${perTraceAlias}) AS ${quotedAlias}`);
       continue;
     }
 
@@ -1007,7 +1342,7 @@ function appendPerTraceMetricExpressions(
     const isUniqueTraceCount = isUniqOverTraceId(exprWithoutAlias);
     if (isUniqueTraceCount) {
       innerSelectExprs.push(`1 AS ${perTraceAlias}`);
-      outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
+      pushOuterMetric(metric, `sum(${perTraceAlias}) AS ${quotedAlias}`);
       continue;
     }
 
@@ -1028,7 +1363,7 @@ function appendPerTraceMetricExpressions(
     }
     innerSelectExprs.push(`any(${column}) AS ${perTraceAlias}`);
     const outerExpr = replaceColumnWithAlias(exprWithoutAlias, column, perTraceAlias);
-    outerMetricExprs.push(`${outerExpr} AS ${quotedAlias}`);
+    pushOuterMetric(metric, `${outerExpr} AS ${quotedAlias}`);
   }
 
   return outerMetricExprs;
@@ -1052,7 +1387,7 @@ function buildMixedEvalTimeseriesQuery({
 }: {
   input: TimeseriesQueryInput;
   ts: string;
-  simpleMetrics: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
   groupByColumn: string | null;
   groupByHandlesUnknown: boolean;
   joinClauses: string;
@@ -1062,6 +1397,7 @@ function buildMixedEvalTimeseriesQuery({
   timeZone: string;
 }): BuiltQuery {
   const traceColumns = referencedTraceColumns(simpleMetrics, [
+    ...simpleMetrics.map((metric) => metric.seriesCondition),
     filterWhere,
     groupByColumn ?? "",
     joinClauses,
@@ -1253,9 +1589,9 @@ function traceIdPipelinesAsSimpleMetrics({
   metricTranslations,
 }: {
   input: TimeseriesQueryInput;
-  metricTranslations: MetricTranslation[];
-}): MetricTranslation[] {
-  const retranslated: MetricTranslation[] = [];
+  metricTranslations: SeriesMetric[];
+}): SeriesMetric[] {
+  const retranslated: SeriesMetric[] = [];
   for (let i = 0; i < input.series.length; i++) {
     const series = input.series[i]!;
     const translation = metricTranslations[i]!;
@@ -1282,6 +1618,12 @@ function traceIdPipelinesAsSimpleMetrics({
           new RegExp(` AS ${escapedAlias}$`),
           ` AS ${translation.alias}`,
         ),
+        // The series' own filter travels with the re-translated metric: dropping it here
+        // is how a filtered pie-chart series lost its filter while every other path kept it.
+        seriesCondition: translation.seriesCondition,
+        seriesConditionColumn: translation.seriesConditionColumn,
+        asPercent: translation.asPercent,
+        shouldZeroWhenAbsent: translation.shouldZeroWhenAbsent,
       });
     }
   }
@@ -1295,7 +1637,7 @@ function buildTraceColumnSelects({
   spanModelPartitioned,
 }: {
   ts: string;
-  simpleMetrics: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
   hasEvalMixWithTrace: boolean;
   spanModelPartitioned: boolean;
 }): string[] {
@@ -1405,7 +1747,7 @@ function buildOuterMetricSelects({
   simpleMetrics,
   evalPerTraceAliases,
 }: {
-  simpleMetrics: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
   evalPerTraceAliases: Map<string, string>;
 }): string[] {
   const outerMetricSelects: string[] = [];
@@ -1421,12 +1763,29 @@ function buildOuterMetricSelects({
             `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
         );
       }
-      outerMetricSelects.push(`${outerAgg}(${perTraceAlias}) AS ${quoteIdentifier(metric.alias)}`);
+      outerMetricSelects.push(
+        shapeSeriesExpression({
+          selectExpression: `${outerAgg}(${perTraceAlias}) AS ${quoteIdentifier(metric.alias)}`,
+          alias: quoteIdentifier(metric.alias),
+          condition: metric.seriesConditionColumn,
+          asPercent: metric.asPercent,
+          shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
+        }),
+      );
       continue;
     }
-    // Transform the metric expression for the deduplicated context
+    // Rewrite for the deduplicated context THEN apply the series' own filter: the rewrite
+    // maps count() onto uniqExact(trace_id), and conditioning it keeps that mapping.
     const transformedExpr = transformMetricForDedup(metric.selectExpression, metric.alias);
-    outerMetricSelects.push(transformedExpr);
+    outerMetricSelects.push(
+      shapeSeriesExpression({
+        selectExpression: transformedExpr,
+        alias: metric.alias,
+        condition: metric.seriesConditionColumn,
+        asPercent: metric.asPercent,
+        shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
+      }),
+    );
   }
   return outerMetricSelects;
 }
@@ -1453,7 +1812,7 @@ function buildEvaluationColumnSelects({
   simpleMetrics,
   hasEvalMixWithTrace,
 }: {
-  simpleMetrics: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
   hasEvalMixWithTrace: boolean;
 }): string[] {
   const es = tableAliases.evaluation_runs;
@@ -1464,7 +1823,7 @@ function buildEvaluationColumnSelects({
   });
 }
 
-function evalPerTraceAliasesFor(simpleMetrics: MetricTranslation[]): Map<string, string> {
+function evalPerTraceAliasesFor(simpleMetrics: SeriesMetric[]): Map<string, string> {
   const evalPerTraceAliases = new Map<string, string>();
   for (const metric of simpleMetrics) {
     if (!metric.requiredJoins.includes("evaluation_runs")) continue;
@@ -1515,6 +1874,39 @@ function buildDedupCteBody({
     `;
 }
 
+function buildEvalPerTraceSelects({
+  simpleMetrics,
+  evalPerTraceAliases,
+}: {
+  simpleMetrics: SeriesMetric[];
+  evalPerTraceAliases: Map<string, string>;
+}): string[] {
+  const selects: string[] = [];
+  for (const metric of simpleMetrics) {
+    const perTraceAlias = evalPerTraceAliases.get(metric.alias);
+    if (perTraceAlias === undefined) continue;
+    const exprWithoutAlias = stripSelectExpressionAlias(metric.selectExpression, metric.alias);
+    selects.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
+  }
+  return selects;
+}
+
+function buildHoistedSeriesConditionSelects({
+  simpleMetrics,
+  hasEvalMixWithTrace,
+}: {
+  simpleMetrics: SeriesMetric[];
+  hasEvalMixWithTrace: boolean;
+}): string[] {
+  const selects: string[] = [];
+  for (const metric of simpleMetrics) {
+    if (!metric.seriesCondition || !metric.seriesConditionColumn) continue;
+    const hoisted = hasEvalMixWithTrace ? `any(${metric.seriesCondition})` : metric.seriesCondition;
+    selects.push(`${hoisted} AS ${metric.seriesConditionColumn}`);
+  }
+  return selects;
+}
+
 /**
  * Build a timeseries query using CTE for arrayJoin grouping (labels, events)
  * or span-level grouping (model, span_type).
@@ -1535,7 +1927,7 @@ function buildArrayJoinTimeseriesQuery({
   input: TimeseriesQueryInput;
   groupByColumn: string;
   groupByHandlesUnknown: boolean;
-  metricTranslations: MetricTranslation[];
+  metricTranslations: SeriesMetric[];
   joinClauses: string;
   baseWhere: string;
   filterWhere: string;
@@ -1610,12 +2002,7 @@ function buildArrayJoinTimeseriesQuery({
   const evalPerTraceAliases = hasEvalMixWithTrace
     ? evalPerTraceAliasesFor(simpleMetrics)
     : new Map<string, string>();
-  for (const metric of simpleMetrics) {
-    const perTraceAlias = evalPerTraceAliases.get(metric.alias);
-    if (perTraceAlias === undefined) continue;
-    const exprWithoutAlias = stripSelectExpressionAlias(metric.selectExpression, metric.alias);
-    cteSelectExprs.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
-  }
+  cteSelectExprs.push(...buildEvalPerTraceSelects({ simpleMetrics, evalPerTraceAliases }));
 
   // Include evaluation columns in CTE when evaluation metrics are used.
   // When hasEvalMixWithTrace is true the CTE uses GROUP BY (not SELECT DISTINCT),
@@ -1623,6 +2010,12 @@ function buildArrayJoinTimeseriesQuery({
   // only consumed by the non-mixed transformMetricForDedup path, but wrapping
   // them keeps the CTE valid for both modes.
   cteSelectExprs.push(...buildEvaluationColumnSelects({ simpleMetrics, hasEvalMixWithTrace }));
+
+  // Hoist each filtered series' predicate into the CTE as a per-trace boolean: it reads
+  // `ts`, out of scope in the outer SELECT that conditions the aggregate on it below.
+  cteSelectExprs.push(
+    ...buildHoistedSeriesConditionSelects({ simpleMetrics, hasEvalMixWithTrace }),
+  );
 
   // Build outer SELECT expressions
   const outerKeys = dateTrunc ? ["period", "date", "group_key"] : ["period", "group_key"];
@@ -1705,8 +2098,8 @@ function buildArrayJoinTimeseriesQuery({
 }
 
 function joinGroupMetricSources(
-  simpleMetrics: MetricTranslation[],
-  subqueryMetrics: MetricTranslation[],
+  simpleMetrics: SeriesMetric[],
+  subqueryMetrics: SeriesMetric[],
   simpleAliases: string[],
 ): {
   currentFrom: string;
@@ -1773,8 +2166,8 @@ function buildGroupByUnionAllQuery({
 }: {
   input: TimeseriesQueryInput;
   ctes: string[];
-  simpleMetrics: MetricTranslation[];
-  subqueryMetrics: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
+  subqueryMetrics: SeriesMetric[];
   filterParams: Record<string, unknown>;
 }): BuiltQuery {
   const simpleAliases = simpleMetrics.map((m) => quoteIdentifier(m.alias));
@@ -1845,7 +2238,7 @@ function buildSubqueryMetricCtes({
   groupByColumn,
   groupKeyExpr,
 }: {
-  metric: MetricTranslation;
+  metric: SeriesMetric;
   ts: string;
   traceColumns: readonly string[];
   joinClauses: string;
@@ -1857,12 +2250,16 @@ function buildSubqueryMetricCtes({
   if (!subquery) return [];
   const cteName = `cte_${metric.alias}`;
   const ctes: string[] = [];
+  // A per-entity metric takes its series filter in its OWN CTE's WHERE: the filter decides
+  // which entities exist, so an unmatched entity must not survive as a zero.
+  const seriesWhere = metric.seriesCondition ? `AND (${metric.seriesCondition})` : "";
 
   // When groupByColumn is set, propagate group_key into the CTE so the outer query
   // can group results by it. The group_key is added to both the inner SELECT and
   // inner GROUP BY of the subquery.
   const groupKeyInnerSelect = groupKeyExpr ? `, ${groupKeyExpr}` : "";
   const groupKeyInnerGroupBy = groupByColumn ? `, group_key` : "";
+  const outerGroupBy = groupByColumn ? "GROUP BY metric_name, group_key" : "";
 
   // Check if this is a nested subquery (3-level aggregation)
   if (subquery.nestedSubquery) {
@@ -1883,13 +2280,14 @@ function buildSubqueryMetricCtes({
               AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
               AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
               ${filterWhere}
+              ${seriesWhere}
             GROUP BY ${nested.groupBy}
             ${havingClause}
           ) thread_data
           GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
-        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
+        ${outerGroupBy}
       )`);
 
     // CTE for previous period with nested subquery
@@ -1906,13 +2304,14 @@ function buildSubqueryMetricCtes({
               AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
               AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
               ${filterWhere}
+              ${seriesWhere}
             GROUP BY ${nested.groupBy}
             ${havingClause}
           ) thread_data
           GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
-        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
+        ${outerGroupBy}
       )`);
   } else {
     // Standard 2-level aggregation
@@ -1928,10 +2327,11 @@ function buildSubqueryMetricCtes({
             AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
             AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
             ${filterWhere}
+            ${seriesWhere}
           GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
-        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
+        ${outerGroupBy}
       )`);
 
     // CTE for previous period
@@ -1946,10 +2346,11 @@ function buildSubqueryMetricCtes({
             AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
             AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
             ${filterWhere}
+            ${seriesWhere}
           GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
-        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
+        ${outerGroupBy}
       )`);
   }
   return ctes;
@@ -1970,8 +2371,8 @@ function buildSubqueryTimeseriesQuery({
   groupByHandlesUnknown = false,
 }: {
   input: TimeseriesQueryInput;
-  simpleMetrics: MetricTranslation[];
-  subqueryMetrics: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
+  subqueryMetrics: SeriesMetric[];
   joinClauses: string;
   baseWhere: string;
   filterWhere: string;
@@ -1980,10 +2381,13 @@ function buildSubqueryTimeseriesQuery({
   groupByHandlesUnknown?: boolean;
 }): BuiltQuery {
   const ts = tableAliases.trace_summaries;
-  const traceColumns = referencedTraceColumns(
-    [...simpleMetrics, ...subqueryMetrics],
-    [filterWhere, groupByColumn ?? "", joinClauses],
-  );
+  const allMetrics = [...simpleMetrics, ...subqueryMetrics];
+  const traceColumns = referencedTraceColumns(allMetrics, [
+    ...allMetrics.map((metric) => metric.seriesCondition),
+    filterWhere,
+    groupByColumn ?? "",
+    joinClauses,
+  ]);
   const ctes: string[] = [];
 
   // Build group_key expression when groupBy is active, matching the pattern used in
@@ -2015,11 +2419,14 @@ function buildSubqueryTimeseriesQuery({
   for (const metric of simpleMetrics) {
     // Replace unquoted alias with quoted alias in the selectExpression
     const quotedAlias = quoteIdentifier(metric.alias);
-    const quotedExpression = metric.selectExpression.replace(
-      ` AS ${metric.alias}`,
-      ` AS ${quotedAlias}`,
-    );
-    simpleSelectExprs.push(quotedExpression);
+    const shaped = shapeSeriesExpression({
+      selectExpression: metric.selectExpression,
+      alias: metric.alias,
+      condition: metric.seriesCondition,
+      asPercent: metric.asPercent,
+      shouldZeroWhenAbsent: metric.shouldZeroWhenAbsent,
+    });
+    simpleSelectExprs.push(shaped.replace(` AS ${metric.alias}`, ` AS ${quotedAlias}`));
   }
 
   // CTE for simple metrics current period
@@ -2158,7 +2565,7 @@ function buildSimpleMetricsCte({
   fullFilterWhere,
 }: {
   input: TimeseriesQueryInput;
-  simpleMetrics: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
   ts: string;
   periodCase: string;
   dateTrunc: string;
@@ -2174,7 +2581,14 @@ function buildSimpleMetricsCte({
     ...(groupKeyExpr ? [groupKeyExpr] : []),
     ...simpleMetrics.map((m) => {
       const quotedAlias = quoteIdentifier(m.alias);
-      return m.selectExpression.replace(` AS ${m.alias}`, ` AS ${quotedAlias}`);
+      const shaped = shapeSeriesExpression({
+        selectExpression: m.selectExpression,
+        alias: m.alias,
+        condition: m.seriesCondition,
+        asPercent: m.asPercent,
+        shouldZeroWhenAbsent: m.shouldZeroWhenAbsent,
+      });
+      return shaped.replace(` AS ${m.alias}`, ` AS ${quotedAlias}`);
     }),
   ];
   const simpleGroupByCols = ["period", "date"];
@@ -2198,6 +2612,7 @@ function buildSimpleMetricsCte({
   }
   const allSimpleExprs = [
     ...simpleMetrics.map((m) => m.selectExpression),
+    ...simpleMetrics.map((m) => m.seriesCondition),
     fullFilterWhere,
     groupByColumn ?? "",
   ];
@@ -2233,8 +2648,8 @@ function buildPipelineFinalSelect({
   pipelineMetrics,
   groupByColumn,
 }: {
-  simpleMetrics: MetricTranslation[];
-  pipelineMetrics: MetricTranslation[];
+  simpleMetrics: SeriesMetric[];
+  pipelineMetrics: SeriesMetric[];
   groupByColumn: string | null;
 }): string {
   const hasSimple = simpleMetrics.length > 0;
@@ -2295,8 +2710,8 @@ function buildDateBucketedPipelineQuery({
   timeZone,
 }: {
   input: TimeseriesQueryInput;
-  simpleMetrics?: MetricTranslation[];
-  pipelineMetrics: MetricTranslation[];
+  simpleMetrics?: SeriesMetric[];
+  pipelineMetrics: SeriesMetric[];
   groupByColumn: string | null;
   groupByHandlesUnknown: boolean;
   joinClauses: string;
@@ -2401,14 +2816,14 @@ interface PipelineCTEContext {
  * Build a single pipeline metric CTE with date bucketing.
  * Handles both standard 2-level and nested 3-level aggregations.
  */
-function buildPipelineMetricCTE(metric: MetricTranslation, ctx: PipelineCTEContext): string {
+function buildPipelineMetricCTE(metric: SeriesMetric, ctx: PipelineCTEContext): string {
   if (!metric.subquery) {
     throw new Error(`Metric "${metric.alias}" is missing subquery definition`);
   }
   const subquery = metric.subquery;
   const traceColumns = referencedTraceColumns(
     [metric],
-    [ctx.fullFilterWhere, ctx.groupKeyExpr ?? "", ctx.joinClauses],
+    [metric.seriesCondition, ctx.fullFilterWhere, ctx.groupKeyExpr ?? "", ctx.joinClauses],
   );
   const cteName = `cte_${metric.alias}`;
   const hasGroup = !!ctx.groupByColumn;
@@ -2430,11 +2845,15 @@ function buildPipelineMetricCTE(metric: MetricTranslation, ctx: PipelineCTEConte
     ...(ctx.groupKeyExpr ? [ctx.groupKeyExpr] : []),
   ];
 
+  // As in the timeScale-"full" pipeline CTEs: the filter changes which entities exist.
+  const seriesWhere = metric.seriesCondition ? `AND (${metric.seriesCondition})` : "";
+
   const baseFrom = `
           FROM ${dedupedTraceSummaries(ctx.ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
           ${ctx.joinClauses}
           WHERE (${ctx.baseWhere}
-            ${ctx.fullFilterWhere})`;
+            ${ctx.fullFilterWhere}
+            ${seriesWhere})`;
 
   if (subquery.nestedSubquery) {
     // 3-level aggregation (e.g., threads per user)
@@ -2674,10 +3093,10 @@ function rewriteMetricForDedup(selectExpression: string, alias: string): string 
     return evalRewritten;
   }
 
-  // Handle event-based metrics referencing stored_spans columns (ss."Events.Name", etc.). In the
-  // arrayJoin CTE, group_key already filters to matching events, so only count-like metrics are
-  // rewritten to uniqExact(trace_id). Value-based aggregations (avgArray, sumArray, etc.) pass
-  // through unchanged — rewriting them would silently turn "average score" into "count of traces".
+  // Handle event-based metrics referencing stored_spans columns (ss."Events.Name", etc.). In
+  // the arrayJoin CTE, group_key already filters to matching events, so only count-like metrics
+  // are rewritten to uniqExact(trace_id). Value-based aggregations (avgArray, sumArray, etc.)
+  // pass through unchanged: rewriting them would turn "average score" into "count of traces".
   const ss = tableAliases.stored_spans;
   const readsEventColumns =
     selectExpression.includes(`${ss}."Events.Name"`) ||

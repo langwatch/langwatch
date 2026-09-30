@@ -6,7 +6,7 @@ export const ALERT_TEMPLATE_VARIABLES: VariableInfo[] = [
   {
     path: "trigger.name",
     type: "string",
-    description: "The alert's configured name.",
+    description: "The automation's configured name.",
   },
   {
     path: "trigger.alertType",
@@ -16,17 +16,17 @@ export const ALERT_TEMPLATE_VARIABLES: VariableInfo[] = [
   {
     path: "trigger.editUrl",
     type: "string",
-    description: "Deep link to this alert's edit page.",
+    description: "Deep link to this automation's edit page.",
   },
   {
     path: "graph.name",
     type: "string",
-    description: "Name of the custom graph the alert watches.",
+    description: "Name of the custom graph the automation watches.",
   },
   {
     path: "graph.url",
     type: "string",
-    description: "Deep link to the graph, focused on the alert window.",
+    description: "Deep link to the graph, focused on the firing window.",
   },
   {
     path: "metric.label",
@@ -41,7 +41,7 @@ export const ALERT_TEMPLATE_VARIABLES: VariableInfo[] = [
   {
     path: "condition.operator",
     type: "'gt' | 'lt' | 'gte' | 'lte' | 'eq'",
-    description: "Raw comparison operator the alert stores.",
+    description: "Raw comparison operator the automation stores.",
   },
   {
     path: "condition.operatorLabel",
@@ -86,12 +86,12 @@ export const ALERT_TEMPLATE_VARIABLES: VariableInfo[] = [
   {
     path: "occurredAt",
     type: "string",
-    description: "ISO-8601 timestamp of when the alert fired.",
+    description: "ISO-8601 timestamp of when the automation fired.",
   },
   {
     path: "reason",
     type: "'real-time' | 'heartbeat-absence' | 'heartbeat-resolve'",
-    description: "Why the alert fired.",
+    description: "Why the automation fired.",
   },
   {
     path: "project.name",

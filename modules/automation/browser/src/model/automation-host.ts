@@ -124,6 +124,9 @@ export abstract class AutomationHost {
    */
   abstract appBaseUrl(): string;
 
+  /** Whether the installation can send email; without it the email channel is disabled (§6). */
+  abstract hasEmailProvider(): boolean;
+
   abstract succeeded(notice: AutomationSuccessNotice): void;
 
   abstract failed(failure: AutomationFailureNotice): void;

@@ -63,6 +63,10 @@ export interface ClientDef<S = unknown, TPreview = unknown> {
   /** Icon rendered in the type picker. Lucide / react-icons component. */
   readonly Icon: ComponentType<{ size?: number }>;
 
+  /** True when this provider's `ConfigForm` hosts the receive-cadence chooser beside the
+   *  templates it filters; the cadence facet then offers only the settle window. */
+  readonly hasOwnReceiveChooser?: boolean;
+
   /** Initial empty slice for this provider. */
   initialSlice(): S;
 

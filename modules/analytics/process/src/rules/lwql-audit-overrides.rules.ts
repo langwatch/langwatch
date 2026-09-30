@@ -1,15 +1,12 @@
-/** Overrides for audit and test suite views. */
+/**
+ * Overrides for the test suite and legacy event log views. The retired
+ * `automation_audit` table is not catalogued: its writer is gone (ADR-052
+ * 2026-07 amendment); firing history is `GET /api/triggers/:id/fires`.
+ */
 
 import type { DatasetOverride } from "./lwql-dataset-derivation.rules.ts";
 
 export const AUDIT_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
-  automation_audit: {
-    name: "automation_events",
-    description: "Audit log of automation trigger executions and actions",
-    grain: "one row per EventId",
-    timeColumn: "OccurredAt",
-    dedup: { versionColumn: "ProjectedAt" },
-  },
   suite_runs: {
     name: "test_suite_runs",
     description: "Test suite execution results with completion and pass counts",

@@ -2717,7 +2717,6 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   CODING_TOOL_RESULTS,
   JUDGMENTS,
   // ClickHouse derived views — opt-in, one explicit entry per source table.
-  clickhouseView("automation_audit", ["TenantId", "EventId", "TraceId"]),
   clickhouseView("billable_events", ["TenantId", "OrganizationId", "EventId"]),
   clickhouseView("coding_agent_trace_sessions", ["TenantId", "TraceId", "SessionId"]),
   clickhouseView("dspy_steps", ["TenantId", "ExperimentId", "RunId", "WorkflowVersionId"]),

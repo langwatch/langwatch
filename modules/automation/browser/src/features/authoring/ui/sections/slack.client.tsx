@@ -1165,6 +1165,7 @@ function ReuseSlackWebhook({
 
 const client: NotifyClientDef<SlackSlice, SlackPreview> = {
   Icon: FaSlack,
+  hasOwnReceiveChooser: true,
   channel: "slack",
   initialSlice,
   isComplete,
