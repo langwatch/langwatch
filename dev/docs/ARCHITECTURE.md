@@ -1282,6 +1282,9 @@ only (a partial index, so a deleted role frees its name); a grant or role bindin
 uniqueness at all, so the same principal, role and scope may be bound twice within the limits, and a
 re-assertion that must stay idempotent asks the ledger to `skip` rather than being refused.
 `/api/grants` succeeds `/api/role-bindings` (deprecated, same rows): nobody grants or writes into a role more than they hold at that scope, one authz rule every door reaches (Alex, 2026-09-30).
+Only that REST family says "role binding": every other name, type, file, tRPC route and UI string
+is a grant or a role, and the wire codes and the store keep their names (Alex, 2026-09-30). Granting
+is on every plan; creating a custom role is the Enterprise capability.
 
 ---
 
