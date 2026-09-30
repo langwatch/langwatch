@@ -778,10 +778,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/[project]/analytics/users",
           },
           {
-            path: "/:project/analytics/query",
-            page: "pages/[project]/analytics/query",
-          },
-          {
             path: "/:project/analytics/custom",
             page: "pages/[project]/analytics/custom/index",
           },

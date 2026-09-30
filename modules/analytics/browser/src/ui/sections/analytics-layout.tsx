@@ -13,7 +13,6 @@ import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { AnalyticsHeader, type AnalyticsHeaderProps } from "./analytics-header.tsx";
 import { CustomDashboardsSection } from "./custom-dashboards-section.tsx";
-import { CustomQueryMenuLink } from "./custom-query-menu-link.tsx";
 import { SavedViewsScope } from "./saved-views-scope.tsx";
 
 /** Which rail entry the page being rendered is. */
@@ -23,7 +22,6 @@ export type AnalyticsRailEntry =
   | "topics"
   | "metrics"
   | "evaluations"
-  | "query"
   | "reports"
   | "custom";
 
@@ -100,13 +98,6 @@ export default function AnalyticsLayout({
             <SmallLabel paddingX={4} paddingTop={4} paddingBottom={2} color="fg" textStyle="xs">
               Custom
             </SmallLabel>
-            {project?.id && project.slug && (
-              <CustomQueryMenuLink
-                projectId={project.id}
-                projectSlug={project.slug}
-                isSelected={railEntry === "query"}
-              />
-            )}
             {project?.slug && <CustomDashboardsSection projectSlug={project.slug} />}
           </VStack>
         </VStack>

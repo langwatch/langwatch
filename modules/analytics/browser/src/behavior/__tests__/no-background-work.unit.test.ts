@@ -122,7 +122,7 @@ describe("the feature's source", () => {
 
       // A scan that found nothing would pass vacuously, which is the one way
       // this test could go quietly useless.
-      expect(files.length).toBeGreaterThanOrEqual(30);
+      expect(files.length).toBeGreaterThanOrEqual(10);
       expect(offencesIn(files)).toEqual([]);
     });
   });

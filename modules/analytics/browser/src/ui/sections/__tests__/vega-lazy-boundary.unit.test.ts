@@ -26,11 +26,6 @@ const LAZY_BOUNDARIES = [
     deferred: join(FEATURE_DIR, "langwatch-ql-widget-chart.tsx"),
     specifier: 'import("./langwatch-ql-widget-chart.tsx")',
   },
-  {
-    wrapper: join(FEATURE_DIR, "lazy-langwatch-ql-chart-mode.tsx"),
-    deferred: join(FEATURE_DIR, "themed-langwatch-ql-chart-mode.tsx"),
-    specifier: 'import("./themed-langwatch-ql-chart-mode.tsx")',
-  },
 ] as const;
 
 /** Packages whose presence in a chunk means the Vega runtime is in it. */

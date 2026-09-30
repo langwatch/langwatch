@@ -22,7 +22,6 @@ vi.mock("../use-saved-views.tsx", () => ({
 }));
 vi.mock("../analytics-header.tsx", () => ({ AnalyticsHeader: () => null }));
 vi.mock("../custom-dashboards-section.tsx", () => ({ CustomDashboardsSection: () => null }));
-vi.mock("../custom-query-menu-link.tsx", () => ({ CustomQueryMenuLink: () => null }));
 vi.mock("../../../behavior/use-filter-toggle.ts", () => ({
   useFilterToggle: () => ({ showFilters: false }),
 }));
