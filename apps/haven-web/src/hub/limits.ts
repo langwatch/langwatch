@@ -48,7 +48,7 @@ export const SOURCE_LABELS: Record<Limit["source"], string> = {
 };
 
 export const rangeOf = ({ limit }: { limit: Limit }) =>
-  `${limit.allowZero ? "0 or " : ""}${limit.min} to ${limit.max}`;
+  `${limit.allowZero ? "0 or " : ""}${limit.min}–${limit.max}`;
 
 /** The value a draft says, or undefined when it is not a whole number the machine accepts. */
 export const parseDraft = ({ limit, text }: { limit: Limit; text: string }) => {

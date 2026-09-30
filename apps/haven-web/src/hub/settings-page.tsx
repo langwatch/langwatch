@@ -1,4 +1,4 @@
-import { Button, Callout, Page, Stack, useToast } from "@langwatch/design-system-internal";
+import { Callout, Page, Stack, useToast } from "@langwatch/design-system-internal";
 import { useState } from "react";
 
 import { LIMITS_PATH, getJson, limitPath, postAction } from "../shared/api.ts";
@@ -7,7 +7,7 @@ import { formatBytes } from "../shared/format.ts";
 import { HavenTopBar } from "../shared/haven-top-bar.tsx";
 import { usePoll } from "../shared/use-poll.ts";
 import { LimitsForm } from "./limits-form.tsx";
-import { changesOf, labelOf, type Change } from "./limits.ts";
+import { labelOf, type Change } from "./limits.ts";
 
 const POLL_MS = 10_000;
 
@@ -60,15 +60,9 @@ export const SettingsPage = () => {
       getJson({ path: LIMITS_PATH, schema: limitsSchema, signal }),
   });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
   const limits = poll.data;
-  const { changes, invalid } =
-    limits === undefined
-      ? { changes: [], invalid: [] }
-      : changesOf({ limits: limits.limits, drafts });
 
-  const save = async () => {
-    setSaving(true);
+  const save = async ({ changes }: { changes: Change[] }) => {
     const { saved, failed } = await sendAll({ changes });
     setDrafts((previous) =>
       Object.fromEntries(Object.entries(previous).filter(([name]) => !saved.includes(name))),
@@ -87,7 +81,6 @@ export const SettingsPage = () => {
       });
     }
     await poll.refresh();
-    setSaving(false);
   };
 
   return (
@@ -98,16 +91,6 @@ export const SettingsPage = () => {
         limits === undefined
           ? "Reading the machine's limits…"
           : `Limits for this machine: ${formatBytes({ bytes: limits.totalRamBytes })} RAM, ${limits.cpus} CPUs`
-      }
-      actions={
-        <Button
-          variant="primary"
-          loading={saving}
-          disabled={changes.length === 0 || invalid.length > 0}
-          onClick={() => void save()}
-        >
-          Save
-        </Button>
       }
     >
       {limits === undefined ? (
@@ -121,6 +104,7 @@ export const SettingsPage = () => {
           <LimitsForm
             limits={limits.limits}
             drafts={drafts}
+            onSave={({ changes: rowChanges }) => void save({ changes: rowChanges })}
             onDraft={({ name, text }) =>
               setDrafts((previous) => {
                 const rest = Object.entries(previous).filter(([key]) => key !== name);
