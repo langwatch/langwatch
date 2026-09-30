@@ -139,6 +139,8 @@ export interface AuthzApi {
   ): Promise<Binding.AuthzAccessBreakdownOutput>;
   isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
   findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
+  /** The caller's session version (ADR-164): 0 until first bumped; throws when unreadable. */
+  getSessionVersion(input: { userId: string }): Promise<number>;
   attach(args: Commands.AuthzAttachGrantInput): Promise<Commands.AuthzBindingOutput>;
   update(args: Commands.AuthzUpdateGrantInput): Promise<void>;
   revoke(args: Commands.AuthzRevokeGrantInput): Promise<void>;

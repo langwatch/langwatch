@@ -134,6 +134,8 @@ class MemberAccessStore {
       hasBindingsForUser: async () => false,
       hasLegacySharedTeamMembership: async () => false,
       findGroupMembers: async () => [],
+      findOrganizationUserIds: async () => [],
+      findGrantPrincipals: async () => [],
       findUserGroups: async () => [],
       isGroupInOrganization: async () => true,
       isApiKeyInOrganization: async () => true,

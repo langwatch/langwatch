@@ -230,6 +230,7 @@ export class TestAuthzApi implements AuthzApi {
   getAccessBreakdown = unsupported<AuthzApi["getAccessBreakdown"]>("getAccessBreakdown");
   isOnEngine = unsupported<AuthzApi["isOnEngine"]>("isOnEngine");
   findEngineCutoverAt = unsupported<AuthzApi["findEngineCutoverAt"]>("findEngineCutoverAt");
+  getSessionVersion = unsupported<AuthzApi["getSessionVersion"]>("getSessionVersion");
   attach = unsupported<AuthzApi["attach"]>("attach");
   update = unsupported<AuthzApi["update"]>("update");
   revoke = unsupported<AuthzApi["revoke"]>("revoke");

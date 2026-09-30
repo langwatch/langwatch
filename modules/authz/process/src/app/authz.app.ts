@@ -33,6 +33,7 @@ import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { AuthzBindingIdService } from "../services/authz-binding-id.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import { AuthzCommandDispatcherService } from "../services/authz-grants-command-dispatcher.service.ts";
+import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import {
   PostgresAuthzAdapter,
   type AuthzPipeline,
@@ -101,6 +102,8 @@ export class AuthzApp implements AuthzApi {
   #admissions: AuthzAdmissionService | undefined;
   /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no migration. */
   #migration: SystemMigration | undefined;
+  /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no version store. */
+  #sessionVersions: AuthzSessionVersionService | undefined;
 
   private constructor(
     permissions: AuthzService,
@@ -110,6 +113,7 @@ export class AuthzApp implements AuthzApi {
       demoProjectUserId?: string | undefined;
       admissions?: AuthzAdmissionService;
       migration?: SystemMigration;
+      sessionVersions?: AuthzSessionVersionService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: AuthzCommandDispatcherService;
@@ -124,6 +128,7 @@ export class AuthzApp implements AuthzApi {
     this.#demoProjectUserId = options.demoProjectUserId;
     this.#admissions = options.admissions;
     this.#migration = options.migration;
+    this.#sessionVersions = options.sessionVersions;
   }
 
   /**
@@ -163,6 +168,7 @@ export class AuthzApp implements AuthzApi {
       demoProjectUserId: setup.config.demoProjectUserId,
       admissions: AuthzAdmissionService.create({ admissions: setup.repositories.admissions }),
       migration: built.migration,
+      sessionVersions: built.sessionVersions,
       eventing: { pipeline: built.pipeline, dispatcher },
     });
   }
@@ -277,6 +283,16 @@ export class AuthzApp implements AuthzApi {
   completeAdmission: AuthzApi["completeAdmission"] = (a) => this.admissions().completeAdmission(a);
   clearPendingAdmission: AuthzApi["clearPendingAdmission"] = (a) =>
     this.admissions().clearPendingAdmission(a);
+
+  getSessionVersion: AuthzApi["getSessionVersion"] = (a) => {
+    if (!this.#sessionVersions) {
+      throw new Error(
+        "This AuthzApp was composed from already-built services, so it holds no session " +
+          "version store: compose it through AuthzApp.create to read one.",
+      );
+    }
+    return this.#sessionVersions.getSessionVersion(a);
+  };
 
   hasProjectPermission(a: {
     userId: string;
