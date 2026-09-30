@@ -30,14 +30,4 @@ describe("webhook server configuration", () => {
       expect(() => read({ WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS: "true" })).toThrow(ConfigParseError);
     });
   });
-
-  describe("given a deployment sets the standard proxy variables", () => {
-    /** @scenario "Queue deliveries follow the configured outbound proxy" */
-    it("reads each spelling for the SQS calls to follow", () => {
-      const { outboundProxy } = read({ https_proxy: "http://proxy.corp:8080", NO_PROXY: ".corp" });
-
-      expect(outboundProxy.https_proxy).toBe("http://proxy.corp:8080");
-      expect(outboundProxy.NO_PROXY).toBe(".corp");
-    });
-  });
 });

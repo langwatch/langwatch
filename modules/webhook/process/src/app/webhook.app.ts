@@ -138,7 +138,12 @@ const storeReads = reads("rateLimiter", "redis");
 
 type WebhookSetup = FeatureSetup<
   typeof WebhookApp.dependencies,
-  MembersRead<typeof storeReads> & Readonly<{ isSaas: boolean }>,
+  MembersRead<typeof storeReads> &
+    Readonly<{
+      isSaas: boolean;
+      /** The proxy spellings, a process fact; SQS deliveries follow them. */
+      outboundProxy: Readonly<Record<string, string | undefined>>;
+    }>,
   WebhookServerConfig,
   WebhookRepositories
 >;
@@ -157,7 +162,7 @@ export class WebhookApp implements WebhookApiContract {
    *  {@link WebhookApp.create} (`WebhookAccessService`). */
   static readonly dependencies = { entitlement: EntitlementApi };
   /** The test-fire door's per-organization counter. */
-  static readonly reads = ["rateLimiter", "redis", "isSaas"] as const;
+  static readonly reads = ["rateLimiter", "redis", "isSaas", "outboundProxy"] as const;
   static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookApp {
@@ -168,7 +173,7 @@ export class WebhookApp implements WebhookApiContract {
       rejectUnauthorized: input.members.isSaas,
     });
     const aws = AwsClientConfiguration.create({
-      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.config.outboundProxy)),
+      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.members.outboundProxy)),
     });
     const deliver = WebhookDeliveryService.dispatchThrough({
       destinations: WebhookDestinationDispatchService.create({

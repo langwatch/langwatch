@@ -87,5 +87,17 @@ export const processOwner = {
         .optional()
         .transform((value) => value?.trim() || void 0),
     ),
+    /**
+     * The standard proxy spellings, keyed by env name: a process fact handed to
+     * every module whose outbound calls follow it, as the `outboundProxy` member.
+     */
+    outboundProxy: {
+      HTTPS_PROXY: c.env("HTTPS_PROXY", z.string().optional()),
+      https_proxy: c.env("https_proxy", z.string().optional()),
+      HTTP_PROXY: c.env("HTTP_PROXY", z.string().optional()),
+      http_proxy: c.env("http_proxy", z.string().optional()),
+      NO_PROXY: c.env("NO_PROXY", z.string().optional()),
+      no_proxy: c.env("no_proxy", z.string().optional()),
+    },
   })),
 } as const;

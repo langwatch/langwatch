@@ -27,8 +27,14 @@ import { EmailDeliveryService } from "../services/email-delivery.service.ts";
 import { MailDeliveryService } from "../services/mail-delivery.service.ts";
 import { NotificationService } from "../services/notification.service.ts";
 
-/** The public base URL is the process's own; the sender address is derived from it when unnamed. */
-type NotificationMembers = Readonly<{ publicBaseUrl: string | undefined }>;
+/**
+ * Process facts: the sender address derives from the public base URL when unnamed,
+ * and the SES and Resend calls follow the proxy spellings.
+ */
+type NotificationMembers = Readonly<{
+  publicBaseUrl: string | undefined;
+  outboundProxy: Readonly<Record<string, string | undefined>>;
+}>;
 
 type NotificationSetup = FeatureSetup<
   typeof NotificationApp.dependencies,
@@ -40,7 +46,7 @@ type NotificationSetup = FeatureSetup<
 export class NotificationApp implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
-  static readonly reads = ["publicBaseUrl"] as const;
+  static readonly reads = ["publicBaseUrl", "outboundProxy"] as const;
   static readonly config = notificationConfig;
   static readonly publicConfig = notificationBrowserConfig.project;
   /** Resolved while the module constructs, before boot seals them. */
@@ -74,7 +80,7 @@ export class NotificationApp implements NotificationApiContract {
         baseHost: members.publicBaseUrl ?? "",
       }),
     };
-    const outboundProxy = parseOutboundProxyConfig(config.outboundProxy);
+    const outboundProxy = parseOutboundProxyConfig(members.outboundProxy);
     const aws = AwsClientConfiguration.create({ outboundProxy: emailProxyResolver(outboundProxy) });
     resources.own("Notification AWS clients", () => aws.close());
     const delivery = EmailDeliveryService.create({

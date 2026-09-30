@@ -28,14 +28,6 @@ const config: NotificationServerConfig = {
   provider: undefined,
   ses: { enabled: undefined, region: undefined, endpoint: undefined },
   smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
-  outboundProxy: {
-    HTTPS_PROXY: undefined,
-    https_proxy: undefined,
-    HTTP_PROXY: undefined,
-    http_proxy: undefined,
-    NO_PROXY: undefined,
-    no_proxy: undefined,
-  },
 };
 
 /** The gateway-facing message each send is handed, recorded rather than delivered. */

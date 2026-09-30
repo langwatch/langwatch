@@ -32,4 +32,13 @@ describe("the process owner's own declaration", () => {
       expect(read({}).nodeEnvironment).toBeUndefined();
     });
   });
+
+  describe("given a deployment sets the standard proxy variables", () => {
+    it("reads each spelling once, for every module's outbound calls to follow", () => {
+      const { outboundProxy } = read({ https_proxy: "http://proxy.corp:8080", NO_PROXY: ".corp" });
+
+      expect(outboundProxy.https_proxy).toBe("http://proxy.corp:8080");
+      expect(outboundProxy.NO_PROXY).toBe(".corp");
+    });
+  });
 });

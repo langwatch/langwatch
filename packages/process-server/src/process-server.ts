@@ -211,6 +211,8 @@ export class ProcessServer implements ProcessBoot {
               nlpServiceUrl: this.settings.nlpServiceUrl,
               nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
               adminEmails: this.settings.adminEmails ?? [],
+              // The proxy spellings, raw; each module's outbound calls parse and follow them.
+              outboundProxy: this.settings.outboundProxy ?? {},
               // The raw-socket door's port, which a module tunnelling to that door reads.
               rawSocketPort: this.settings.rawSocketPort,
               // Role facts: the composition's word, never a deployment's.
@@ -316,5 +318,6 @@ const processSettings = z.object({
   nlpServiceUrl: z.string().optional(),
   nlpCodeBlockTimeoutSeconds: z.string().optional(),
   adminEmails: z.array(z.string()).optional(),
+  outboundProxy: z.record(z.string(), z.string().optional()).optional(),
   rawSocketPort: z.number().int().min(0).max(65535).default(3300),
 });

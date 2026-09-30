@@ -56,20 +56,13 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
   })
     .withModules([withMemoryRepositories(notificationServer)])
     .withMember("publicBaseUrl", "https://app.langwatch.test")
+    .withMember("outboundProxy", {})
     .withConfig({
       notification: {
         defaultFrom: "LangWatch <contact@langwatch.test>",
         provider: smtp.provider,
         ses: { enabled: undefined, region: undefined, endpoint: undefined },
         smtp: { host: smtp.host, port: smtp.port, user: "u", secure: "false" },
-        outboundProxy: {
-          HTTPS_PROXY: undefined,
-          https_proxy: undefined,
-          HTTP_PROXY: undefined,
-          http_proxy: undefined,
-          NO_PROXY: undefined,
-          no_proxy: undefined,
-        },
       },
     });
 }

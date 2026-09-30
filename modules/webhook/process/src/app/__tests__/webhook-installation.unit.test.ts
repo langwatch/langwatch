@@ -51,11 +51,11 @@ function process(role: "api" | "worker") {
       webhook: {
         allowInsecureLocalUrls: false,
         allowAmbientAwsCredentials: false,
-        outboundProxy: {},
       },
     })
     .withStores(stores())
     .withMember("isSaas", false)
+    .withMember("outboundProxy", {})
     .provide({
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => entitledPlan,

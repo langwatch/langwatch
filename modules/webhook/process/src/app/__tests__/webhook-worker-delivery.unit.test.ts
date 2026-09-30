@@ -60,12 +60,12 @@ function worker() {
       webhook: {
         allowInsecureLocalUrls: false,
         allowAmbientAwsCredentials: false,
-        outboundProxy: {},
       },
     })
     .withStores(stores())
     .withEventing(eventing)
     .withMember("isSaas", false)
+    .withMember("outboundProxy", {})
     .provide({
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => entitledPlan,

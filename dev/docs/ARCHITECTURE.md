@@ -880,6 +880,8 @@ member:
   `http` owner no longer declares it either — it **derives** `production` from
   the process slice, because a derived value is not a second claim. A module
   wanting a boolean derives it the same way.
+- `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` and their lower-case spellings → the
+  `outboundProxy` member, raw by env name; notification and webhook parse it.
 
 The same holds for `processName` and anything else the process, not the
 deployment's module, knows.
