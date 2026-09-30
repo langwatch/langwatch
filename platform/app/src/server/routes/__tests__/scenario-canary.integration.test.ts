@@ -183,6 +183,32 @@ describe("GET /api/health/scenarios", () => {
       expect(body).toMatchObject({ status: "unhealthy", reason });
     });
 
+    /** @scenario "The scenario probe answers 503 with the cause beside the reason" */
+    it("returns 503 carrying reason and cause", async () => {
+      runScenarioHealthCanary.mockResolvedValue({
+        healthy: false,
+        reason: "run_failed",
+        cause: "insufficient_quota",
+        scenarioRunId: "canary-run-abc",
+        durationMs: 9000,
+      });
+      const app = await getApp();
+
+      const res = await app.request(
+        "/api/health/scenarios?runPlanId=plan-1",
+        AUTHED,
+      );
+
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({
+        status: "unhealthy",
+        reason: "run_failed",
+        cause: "insufficient_quota",
+        scenarioRunId: "canary-run-abc",
+        durationMs: 9000,
+      });
+    });
+
     /** @scenario "A concurrent canary while one is in flight starts no second run" */
     it("returns 429 busy when the probe reports it is already in flight", async () => {
       runScenarioHealthCanary.mockResolvedValue({ busy: true });

@@ -25,6 +25,7 @@
  *      guardrails + attachments.
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
+ *       specs/ai-gateway/budgets.feature
  *       specs/ai-gateway/governance/routing-policy-scope-cascade.feature
  *       specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature
  */
@@ -36,7 +37,11 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayConfigMaterialiser } from "../config.materialiser";
+import type { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
+import {
+  CONFIG_SPEND_READ_TIMEOUT_MS,
+  GatewayConfigMaterialiser,
+} from "../config.materialiser";
 import { GatewayGuardrailService } from "../guardrail.service";
 import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "../virtualKey.config";
 import { VirtualKeyRepository } from "../virtualKey.repository";
@@ -756,6 +761,68 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       expect(bundle.guardrail_attachments).toEqual([]);
       // RP still hydrates the policy side regardless of traceProject.
       expect(bundle.model_aliases).toEqual({ "gpt-5": "gpt-5-mini" });
+    });
+  });
+
+  describe("when the ClickHouse spend read does not answer", () => {
+    const BUDGET_ID = `bdg-mat-slow-${suffix}`;
+
+    beforeAll(async () => {
+      await prisma.gatewayBudget.create({
+        data: {
+          id: BUDGET_ID,
+          name: `Slow spend ${suffix}`,
+          organizationId: ORG_ID,
+          scopeType: "ORGANIZATION",
+          scopeId: ORG_ID,
+          window: "MONTH",
+          limitUsd: "100.00",
+          spentUsd: "12.34",
+          onBreach: "BLOCK",
+          createdById: USER_ID,
+          resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.gatewayBudget.deleteMany({ where: { id: BUDGET_ID } });
+    });
+
+    /** @scenario "A slow spend read does not hold up the key's config" */
+    it("ships the stored spend within the deadline and cancels the read", async () => {
+      let readSignal: AbortSignal | undefined;
+      const hangingSpendRead = {
+        getSpendForBudgetsAcrossTenants: (
+          _tenantIds: string[],
+          _budgets: unknown,
+          _now: Date,
+          { signal }: { signal?: AbortSignal } = {},
+        ) =>
+          new Promise((_resolve, reject) => {
+            readSignal = signal;
+            signal?.addEventListener("abort", () => reject(signal.reason), {
+              once: true,
+            });
+          }),
+      } as unknown as GatewayBudgetClickHouseRepository;
+      const vk = await new VirtualKeyRepository(prisma).findById(
+        VK_NO_PROJECT_ID,
+        ORG_ID,
+      );
+      const startedAt = Date.now();
+
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        hangingSpendRead,
+      ).materialise(vk!);
+
+      expect(Date.now() - startedAt).toBeLessThan(
+        CONFIG_SPEND_READ_TIMEOUT_MS + 3_000,
+      );
+      const budget = bundle.budgets.find((b) => b.id === BUDGET_ID);
+      expect(budget?.spent_micro_usd).toBe(12_340_000);
+      expect(readSignal?.aborted).toBe(true);
     });
   });
 

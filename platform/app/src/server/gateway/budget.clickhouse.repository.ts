@@ -177,6 +177,9 @@ export type PulledUsageTotals = {
   tokensOutput: number;
 };
 
+/** Options for a spend read; `signal` abandons the read, retries included. */
+export type SpendReadOptions = { signal?: AbortSignal };
+
 export type ScopeSpend = {
   budgetId: string;
   scope: GatewayBudgetScopeType;
@@ -1044,11 +1047,13 @@ export class GatewayBudgetClickHouseRepository {
     tenantIds: string[],
     budgets: GatewayBudget[] | BudgetSpendTarget[],
     now: Date = new Date(),
+    { signal }: SpendReadOptions = {},
   ): Promise<ScopeSpend[]> {
     return this.getSpendForTargetsAcrossTenants(
       tenantIds,
       toSpendTargets(budgets, now),
       now,
+      { signal },
     );
   }
 
@@ -1066,6 +1071,7 @@ export class GatewayBudgetClickHouseRepository {
     tenantIds: string[],
     targets: BudgetSpendTarget[],
     now: Date = new Date(),
+    { signal }: SpendReadOptions = {},
   ): Promise<ScopeSpend[]> {
     if (targets.length === 0 || tenantIds.length === 0) return [];
 
@@ -1073,7 +1079,11 @@ export class GatewayBudgetClickHouseRepository {
     // answered from the rollup: the rollup's buckets are keyed by calendar
     // PeriodStart and pre-aggregate the whole bucket, so a floor sitting
     // inside one is unanswerable there.
-    const spends = await this.readFlooredTargetSpend(tenantIds, targets);
+    const spends = await this.readFlooredTargetSpend(
+      tenantIds,
+      targets,
+      signal,
+    );
     for (const [window, targetsForWindow] of targetsByWindow(targets)) {
       spends.push(
         ...(await this.readRollupTargetSpend({
@@ -1081,6 +1091,7 @@ export class GatewayBudgetClickHouseRepository {
           window,
           targets: targetsForWindow,
           now,
+          signal,
         })),
       );
     }
@@ -1109,6 +1120,7 @@ export class GatewayBudgetClickHouseRepository {
   private async readFlooredTargetSpend(
     tenantIds: string[],
     targets: BudgetSpendTarget[],
+    signal?: AbortSignal,
   ): Promise<ScopeSpend[]> {
     const floored = targets.filter((t) => t.periodFloorMs !== undefined);
     if (floored.length === 0) return [];
@@ -1139,6 +1151,7 @@ export class GatewayBudgetClickHouseRepository {
           earliestFloor: earliestFloorMs,
         },
         format: "JSONEachRow",
+        ...(signal && { abort_signal: signal }),
       });
       const rows = (await result.json()) as Array<Record<string, string>>;
       const row = rows[0] ?? {};
@@ -1167,8 +1180,9 @@ export class GatewayBudgetClickHouseRepository {
     window: GatewayBudgetWindow;
     targets: BudgetSpendTarget[];
     now: Date;
+    signal?: AbortSignal;
   }): Promise<ScopeSpend[]> {
-    const { tenantIds, window, targets, now } = args;
+    const { tenantIds, window, targets, now, signal } = args;
     const scopeFilter = rollupScopeFilter(targets);
     try {
       // Any tenant resolves the client: the query hits
@@ -1196,6 +1210,7 @@ export class GatewayBudgetClickHouseRepository {
           periodStart: currentPeriodStart(window, now).getTime(),
         },
         format: "JSONEachRow",
+        ...(signal && { abort_signal: signal }),
       });
       const rows = (await result.json()) as RollupScopeRow[];
       return targets.map((t) => ({

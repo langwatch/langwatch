@@ -133,6 +133,29 @@ describe("classifyCanaryOutcome", () => {
     });
   });
 
+  describe("given a run that terminated in ERROR because the provider has no credits", () => {
+    /** @scenario "A failed scenario canary run reports the run error's cause" */
+    it("classifies the outcome as run_failed with cause insufficient_quota", () => {
+      const outcome = classifyCanaryOutcome({
+        status: ScenarioRunStatus.ERROR,
+        results: {
+          ...verdictResults(Verdict.FAILURE),
+          error: JSON.stringify({
+            name: "Error",
+            message:
+              "[UserSimulatorAgent] AI_RetryError: Failed after 3 attempts. Last error: You have no credits remaining.",
+          }),
+        },
+      });
+
+      expect(outcome).toEqual({
+        healthy: false,
+        reason: "run_failed",
+        cause: "insufficient_quota",
+      });
+    });
+  });
+
   describe.each([
     Verdict.FAILURE,
     Verdict.INCONCLUSIVE,

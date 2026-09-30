@@ -8,6 +8,7 @@
  * RoutingPolicy.modelProviderIds ordering. See `scopeResolver.ts` for
  * the cascade walker.
  */
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudget,
   GatewayCacheRule,
@@ -41,6 +42,15 @@ import {
 import { organizationSpendTenantIds } from "./spendTenants";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+
+const logger = createLogger("langwatch:gateway:config-materialiser");
+
+/**
+ * How long the config endpoint waits for the ClickHouse spend read before it
+ * ships the stored spend instead. Well under the gateway's 10s config fetch
+ * timeout, so a slow replica costs budget freshness, not the key's config.
+ */
+export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
 export type GuardrailWire = {
   id: string;
@@ -500,7 +510,8 @@ export class GatewayConfigMaterialiser {
 
   /**
    * CH spend rollup. Best-effort: falls back to PG `spentUsd` when CH
-   * isn't wired (test fixtures, deploys without CH). Tenant set = every
+   * isn't wired (test fixtures, deploys without CH) or does not answer
+   * inside CONFIG_SPEND_READ_TIMEOUT_MS. Tenant set = every
    * project under the VK's organization so ORG/TEAM/PRINCIPAL-scoped
    * budgets see ledger rows under whichever project emitted the trace.
    */
@@ -536,13 +547,19 @@ export class GatewayConfigMaterialiser {
             match: "exact" as const,
             periodFloorMs: budgetPeriodFloorMs(r.budget),
           })),
+        new Date(),
+        { signal: AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS) },
       );
       const out = new Map<string, string>();
       for (const s of spends) {
         out.set(s.budgetId, s.spentUsd);
       }
       return out;
-    } catch {
+    } catch (error) {
+      logger.warn(
+        { virtualKeyId: vk.id, error },
+        "gateway config spend read failed; shipping the stored spend instead",
+      );
       return new Map();
     }
   }
