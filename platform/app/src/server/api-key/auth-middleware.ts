@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
@@ -15,7 +16,6 @@ import type {
   PrismaClient,
   Project,
 } from "~/generated/prisma/client";
-import type { Permission } from "~/server/api/rbac";
 import { type App, getApp } from "~/server/app-layer/app";
 // A pure rule with a type-only dependency of its own, so reading it here adds
 // no module cycle back into the Langy feature.

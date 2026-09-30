@@ -10,18 +10,20 @@
  *    the table actually is. The caller declares only what the manifest cannot
  *    know — the exposed name, the grain, the join and time columns, which
  *    columns are gated, and any renames.
- *  - {@link deriveDefaultCatalog} makes the catalog opt-*out*: it yields a
- *    view for every manifest table that is neither hand-written nor skipped,
- *    with safe defaults (content columns gated `output`, cost columns gated
- *    `costs`) that an override can refine or lift. A new table is therefore
- *    catalogued and content-gated by default, rather than silently omitted.
+ *  - {@link defineCatalogTable} is the opt-*in* per-table entry the catalog
+ *    lists: given one table name and its override, it reads that table's
+ *    columns from the manifest and applies safe defaults (content columns gated
+ *    `output`, cost columns gated `costs`) that the override refines or lifts.
+ *    There is no loop over the manifest — a table is queryable only because
+ *    `LWQL_VIEW_CATALOG` names it in an explicit {@link defineCatalogTable}
+ *    call, so a new ClickHouse table stays off the catalog until it is listed.
  *
  * The output is shape-identical to a hand-written entry: the same consumers
  * (schema endpoint, AST validator, provisioning generators) read it without
- * knowing it was derived.
+ * knowing it was built from the manifest.
  *
  * @see ./columnsManifest.ts — where the column types come from
- * @see ./skippedTables.ts — what opt-out leaves off, and why
+ * @see ./lwqlViews.ts — the explicit catalog that lists every table
  * @see ./types.ts — the shape this produces
  */
 
@@ -30,9 +32,9 @@ import {
   type ColumnsManifest,
   type ColumnsManifestTable,
   columnsManifestTable,
+  LWQL_COLUMNS_MANIFEST,
 } from "./columnsManifest";
 import { contentFilteredMapSql } from "./contentGating";
-import { skipReason } from "./skippedTables";
 import type {
   LangWatchQLColumnUnit,
   LangWatchQLViewColumn,
@@ -717,47 +719,12 @@ function defaultTimeColumn(manifestTable: ColumnsManifestTable): string {
 }
 
 /**
- * The join keys a table gets by default: its `*Id` columns that also appear on
- * another catalogued table, so a join key is one that can actually match
- * another view.
- */
-function defaultJoinKeys({
-  manifestTable,
-  sharedColumns,
-}: {
-  manifestTable: ColumnsManifestTable;
-  sharedColumns: ReadonlySet<string>;
-}): string[] {
-  return manifestTable.columns
-    .map((column) => column.name)
-    .filter((name) => name.endsWith("Id") && sharedColumns.has(name));
-}
-
-/**
- * The names that appear on more than one catalogued table — the candidates for
- * a join key that can match another view.
- */
-function columnsSharedAcrossTables(
-  tables: readonly ColumnsManifestTable[],
-): Set<string> {
-  const seenOnce = new Set<string>();
-  const shared = new Set<string>();
-  for (const table of tables) {
-    for (const column of table.columns) {
-      if (seenOnce.has(column.name)) shared.add(column.name);
-      else seenOnce.add(column.name);
-    }
-  }
-  return shared;
-}
-
-/**
  * A derived table's dedup, with the override merged onto a computed default
  * rather than replacing it outright.
  *
  * The default engine key is the sort key, and the default strategy is
  * `in-tuple` exactly when the published grain is narrower than that key —
- * which it always is once {@link deriveDefaultCatalog} strips the tenant
+ * which it always is once {@link defineCatalogTable} strips the tenant
  * column from the grain — because plain `FINAL` can only merge on the whole
  * engine key, never a subset of it. An override that sets `aggregating: true`
  * turns the narrowing off here: an aggregating source delivers its narrower
@@ -848,33 +815,28 @@ function computeGrainColumns({
 }
 
 /**
- * The join keys a derived table advertises.
+ * The join keys a table advertises.
  *
- * An aggregating view must advertise its whole bucket key as its join keys:
- * every measure is a merge, so a join on a prefix would add several buckets'
- * measures under one row rather than repeat it. A superseding view advertises
- * TenantId (every view is narrowable on it — see the schema-catalog guard
- * "lists an ungated, joinable TenantId column") plus its shared `*Id` foreign
- * keys.
+ * An explicit `joinKeys` override wins verbatim — the catalog entry states the
+ * whole list, including the foreign keys that reach another view, because with
+ * no manifest loop there is no cross-table set to derive them from. Absent an
+ * override, an aggregating view advertises its whole bucket key (every measure
+ * is a merge, so a join on a prefix would add several buckets' measures under
+ * one row) and a superseding view advertises `TenantId` alone (every view is
+ * narrowable on it — see the schema-catalog guard "lists an ungated, joinable
+ * TenantId column").
  */
 function computeJoinKeys({
   aggregating,
   grainColumns,
   override,
-  manifestTable,
-  sharedColumns,
 }: {
   aggregating: boolean;
   grainColumns: readonly string[];
   override?: readonly string[];
-  manifestTable: ColumnsManifestTable;
-  sharedColumns: ReadonlySet<string>;
 }): readonly string[] {
-  if (aggregating) return grainColumns;
-  return [
-    DEFAULT_TENANT_COLUMN,
-    ...(override ?? defaultJoinKeys({ manifestTable, sharedColumns })),
-  ].filter((key, index, all) => all.indexOf(key) === index);
+  if (override) return override;
+  return aggregating ? grainColumns : [DEFAULT_TENANT_COLUMN];
 }
 
 /** The per-table shape {@link deriveDataset} computes before building the input. */
@@ -898,11 +860,9 @@ interface DerivedDatasetShape {
 function deriveDatasetShape({
   manifestTable,
   override,
-  sharedColumns,
 }: {
   manifestTable: ColumnsManifestTable;
   override: Partial<DatasetOverride>;
-  sharedColumns: ReadonlySet<string>;
 }): DerivedDatasetShape {
   const aliases = override.aliases ?? {};
   const skipColumns = override.skipColumns ?? {};
@@ -932,8 +892,6 @@ function deriveDatasetShape({
     aggregating,
     grainColumns,
     override: override.joinKeys,
-    manifestTable,
-    sharedColumns,
   });
 
   return {
@@ -992,63 +950,31 @@ function buildDatasetInput({
   };
 }
 
-/** Derives one manifest table's view definition, applying its override. */
-function deriveDataset({
-  manifestTable,
-  override,
-  sharedColumns,
-  manifest,
-}: {
-  manifestTable: ColumnsManifestTable;
-  override: Partial<DatasetOverride>;
-  sharedColumns: ReadonlySet<string>;
-  manifest: ColumnsManifest;
-}): LangWatchQLViewDefinition {
-  const shape = deriveDatasetShape({ manifestTable, override, sharedColumns });
+/**
+ * One catalog entry, built opt-*in* from a named ClickHouse table and its
+ * override.
+ *
+ * This is the only way a ClickHouse table (that is not hand-written) enters the
+ * catalog: `LWQL_VIEW_CATALOG` calls it once per listed table. It reads that
+ * one table's columns and types from the manifest and applies safe defaults —
+ * content columns gated `output`, cost columns gated `costs`, a partition
+ * column and grain chosen from the schema — which the override refines or
+ * lifts (a default gate is lifted with `columnGates: { Col: [] }`). There is no
+ * loop over the manifest and no skip list: a table not named in an explicit
+ * call is simply not in the catalog, not queryable, and not granted.
+ *
+ * `joinKeys` that reach another view are stated on the entry's override, since
+ * with no manifest loop there is no cross-table set to derive them from.
+ */
+export function defineCatalogTable(
+  table: string,
+  override: Partial<DatasetOverride> = {},
+  manifest: ColumnsManifest = LWQL_COLUMNS_MANIFEST,
+): LangWatchQLViewDefinition {
+  const manifestTable = columnsManifestTable(manifest, table);
+  const shape = deriveDatasetShape({ manifestTable, override });
   return defineDatasetFromTable(
     buildDatasetInput({ manifestTable, override, shape, manifest }),
-  );
-}
-
-/**
- * Every manifest table that is neither hand-written nor skipped, as a derived
- * view definition.
- *
- * The catalog's opt-out half: a table earns a view by existing, and stays
- * off only by being in {@link ./skippedTables} with a reason. Defaults are safe
- * — content columns gated `output`, cost columns gated `costs`, a partition
- * column and grain chosen from the schema — and an override refines any of them,
- * including lifting a column's default gate with `columnGates: { Col: [] }`.
- */
-export function deriveDefaultCatalog({
-  manifest,
-  skip,
-  handWritten,
-  overrides = {},
-}: {
-  manifest: ColumnsManifest;
-  /** The skip map — {@link ./skippedTables#LWQL_CATALOG_SKIPPED_TABLES}. */
-  skip: Record<string, string>;
-  /** Source tables already carried by hand-written catalog entries. */
-  handWritten: readonly string[];
-  /** Per-table refinements to the defaults. */
-  overrides?: Record<string, Partial<DatasetOverride>>;
-}): LangWatchQLViewDefinition[] {
-  const handWrittenSet = new Set(handWritten);
-  const candidates = manifest.tables.filter(
-    (table) =>
-      !handWrittenSet.has(table.name) &&
-      skipReason(table.name, skip) === undefined,
-  );
-  const sharedColumns = columnsSharedAcrossTables(candidates);
-
-  return candidates.map((manifestTable) =>
-    deriveDataset({
-      manifestTable,
-      override: overrides[manifestTable.name] ?? {},
-      sharedColumns,
-      manifest,
-    }),
   );
 }
 

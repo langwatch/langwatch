@@ -28,7 +28,7 @@ Feature: Signing in works on whatever port the app is actually served on
     Then I am signed in
     And the request is not refused as coming from an unrecognised address
 
-  @integration
+  @unit @integration
   Scenario: The address the app checks against follows the port it was started on
     When the app finishes loading its configuration
     Then the address it accepts sign-ins from names the port it was started on
@@ -39,6 +39,18 @@ Feature: Signing in works on whatever port the app is actually served on
     When I sign in with a valid email and the wrong password
     Then I am told the email or password is wrong
     And the request is not refused as coming from an unrecognised address
+
+  # The app also hands its own address to the processes it starts: the Langy
+  # agent worker posts each turn's result back to it, scenario runs call it,
+  # and the setup snippets in the UI print it. That address is written by the
+  # environment file too, with the same default port, so a second checkout
+  # would send every Langy turn to a port that is not its own and the
+  # conversation would never finish.
+  @unit
+  Scenario: The address handed to the agent worker follows the port the app was started on
+    When the app finishes loading its configuration
+    Then the address the agent worker reports back to names the port the app was started on
+    And a Langy turn on the second checkout completes
 
   # Anything that is not a plain localhost address is a deliberate choice by
   # whoever set it: a proxy in front of a preview environment, a tunnel, a

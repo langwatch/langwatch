@@ -123,6 +123,7 @@ function InputOptions() {
     <>
       <InputOption type="str" />
       <InputOption type="image" />
+      <InputOption type="file" />
       <InputOption type="float" />
       <InputOption type="bool" />
     </>

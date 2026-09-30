@@ -558,4 +558,46 @@ describe("given somebody who is already signed in", () => {
       expect(createSession).not.toHaveBeenCalled();
     });
   });
+
+  /**
+   * The bug this closes: a sign-up ceremony run from a browser that already
+   * holds a session. The sign-up screen sends a context; the plugin then
+   * forces the credential onto the signed-in account, so the address the
+   * ceremony named never gets an account and its passkey lands on the wrong
+   * one — with no error. Refused, on the one seam the plugin runs for it.
+   */
+  describe("when they run a sign-up ceremony for a different address", () => {
+    /** @scenario "A signed-in browser cannot sign up a different address's passkey" */
+    it("refuses because a session is already open", async () => {
+      const { ctx } = fakeContext();
+
+      await expect(
+        afterVerification({ ctx, context: signUpContext("robin@corp.com") }),
+      ).rejects.toMatchObject({ body: { code: "ALREADY_SIGNED_IN" } });
+    });
+
+    /** @scenario "A signed-in browser cannot sign up a different address's passkey" */
+    it("creates no account for the address the ceremony named", async () => {
+      const { ctx } = fakeContext();
+
+      await afterVerification({
+        ctx,
+        context: signUpContext("robin@corp.com"),
+      }).catch(() => void 0);
+
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A signed-in browser cannot sign up a different address's passkey" */
+    it("spends no address proof, because nothing is being signed up", async () => {
+      const { ctx } = fakeContext();
+
+      await afterVerification({
+        ctx,
+        context: signUpContext("robin@corp.com"),
+      }).catch(() => void 0);
+
+      expect(claimAddressProof).not.toHaveBeenCalled();
+    });
+  });
 });

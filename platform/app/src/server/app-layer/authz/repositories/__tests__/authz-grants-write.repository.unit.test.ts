@@ -130,6 +130,21 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
       expect(updateClause).not.toContain('"revokedAt"');
       expect(updateClause).not.toContain('"revokedReason"');
     });
+
+    it("guards a stamped USER attach by the active membership lifetime", async () => {
+      const { repository, executeRaw } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow(),
+        membershipStamp: "membership_1",
+      } as GrantProjectionWrite);
+
+      const sql = JSON.stringify(executeRaw.mock.calls[0]);
+      expect(sql).toContain("OrganizationUser");
+      expect(sql).toContain("membershipStamp");
+      expect(sql).toContain("FOR UPDATE");
+    });
   });
 
   describe("given a write that states one field", () => {

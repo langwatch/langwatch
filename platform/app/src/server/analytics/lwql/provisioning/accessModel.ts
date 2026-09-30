@@ -45,11 +45,20 @@
  * @see specs/lwql/api.feature
  */
 
-import {
-  DEFAULT_LWQL_RESOURCE_LIMITS,
-  type LangWatchQLResourceLimits,
-} from "../limits";
 import { assertIdentifier, clickHouseLiteral } from "../sqlText";
+
+// The access model is single-sourced from the typed definition (issue #8258):
+// `renderLwqlAccessModelDdl` / `renderLwqlNamedCollectionDdl` over
+// `buildLwqlAccessModelDefinition` are the only access DDL in the codebase. The
+// per-statement builders were deleted. What remains in `./accessModelDdl.ts` and
+// is re-exported here is the structural setup, the DROP-policy helper (used to
+// prove the row policy is load-bearing), and the shared predicate templates.
+export {
+  dropLangWatchQLRowPolicyStatement,
+  LWQL_KEY_MAP_SELF_FILTER_TEMPLATE,
+  LWQL_TENANT_PREDICATE_TEMPLATE,
+  lwqlClickHouseSetupStatements,
+} from "./accessModelDdl";
 
 /**
  * Server-level ClickHouse config declaring the `custom_` settings prefix.
@@ -242,344 +251,6 @@ export function lwqlKeyMapTableStatement({
 }
 
 /**
- * The settings profile.
- *
- * The tenant capability is the single `CHANGEABLE_IN_READONLY` setting, and its
- * default of `''` is what makes an absent context read zero rows instead of all
- * rows. Everything else is `CONST`.
- *
- * `max_result_rows` / `max_result_bytes` (with `result_overflow_mode =
- * 'throw'`) are the backstop for the row cap the validator and service already
- * enforce in TypeScript — see {@link LangWatchQLResourceLimits.maxResultRows}.
- * A `LIMIT` written as a bound parameter (`LIMIT {n:UInt64}`) is not a value
- * the validator can read, so it passes both the append decision and the
- * `LIMIT_TOO_HIGH` refusal. Pinning the same ceiling `CONST` server-side means
- * such a query still cannot return more than the cap — it fails with
- * TOO_MANY_ROWS_OR_BYTES (396) instead, mapped to `lwql_result_too_large` by
- * `isClickHouseResultTooLargeError` in the executor, never surfaced raw.
- */
-export function lwqlSettingsProfileStatement({
-  names,
-  limits = DEFAULT_LWQL_RESOURCE_LIMITS,
-}: {
-  names: LangWatchQLNames;
-  limits?: LangWatchQLResourceLimits;
-}): string {
-  assertNames(names);
-  return (
-    `CREATE SETTINGS PROFILE OR REPLACE ${names.settingsProfile}\n` +
-    `  SETTINGS ${names.tenantSetting} = '' CHANGEABLE_IN_READONLY,\n` +
-    `           readonly = 1 CONST,\n` +
-    `           max_execution_time = ${limits.maxExecutionTimeSeconds} CONST,\n` +
-    `           max_memory_usage = ${limits.maxMemoryUsageBytes} CONST,\n` +
-    `           max_threads = ${limits.maxThreads} CONST,\n` +
-    `           max_concurrent_queries_for_user = ${limits.maxConcurrentQueriesForUser} CONST,\n` +
-    `           max_rows_to_read = ${limits.maxRowsToRead} CONST,\n` +
-    `           max_bytes_to_read = ${limits.maxBytesToRead} CONST,\n` +
-    `           read_overflow_mode = 'throw' CONST,\n` +
-    `           max_result_rows = ${limits.maxResultRows} CONST,\n` +
-    `           max_result_bytes = ${limits.maxResultBytes} CONST,\n` +
-    `           result_overflow_mode = 'throw' CONST`
-  );
-}
-
-/**
- * The shared restricted identity, carrying the profile and nothing else.
- *
- * `sha256_password` rather than `plaintext_password`, because the two differ
- * only in what ClickHouse keeps at rest: the wire is identical — the client
- * sends the password and the server hashes it to compare — so nothing about the
- * connection changes, while `plaintext_password` would leave the credential
- * recoverable in the access storage and in `SHOW CREATE USER` for anyone who
- * reaches the server as an administrator. This identity is shared by every
- * LangWatchQL query, so a recovered password is a foothold on all of them.
- */
-export function lwqlRestrictedUserStatement({
-  names,
-  password,
-}: {
-  names: LangWatchQLNames;
-  password: string;
-}): string {
-  assertNames(names);
-  return (
-    `CREATE USER OR REPLACE ${names.restrictedUser} ` +
-    `IDENTIFIED WITH sha256_password BY ${clickHouseLiteral(password)} ` +
-    `SETTINGS PROFILE ${names.settingsProfile}`
-  );
-}
-
-/**
- * `SELECT` on one LangWatchQL object, every column. The identity is granted
- * nothing else.
- *
- * Whole-object rather than column-scoped, because the objects granted this way
- * are the LangWatchQL views themselves and the key map — things whose entire
- * column list is the exposed surface by construction. Source tables are granted
- * column by column instead; see `lwqlSourceColumnGrantStatement`.
- */
-export function lwqlGrantStatement({
-  names,
-  table,
-  database,
-}: {
-  names: LangWatchQLNames;
-  table: string;
-  /** Defaults to {@link LangWatchQLNames.database}. */
-  database?: string;
-}): string {
-  assertNames(names);
-  return `GRANT SELECT ON ${qualified(names, table, database)} TO ${names.restrictedUser}`;
-}
-
-/**
- * The tenant predicate, single-sourced across languages (ADR-101).
- *
- * The predicate is defined once, as SQL text with `{placeholder}` slots, in
- * `./lwqlTenantPredicate.sql`. The Go config renderer
- * (`infra/clickhouse-serverless/internal/render/lwql.go`) embeds that same file,
- * and `__tests__/lwqlPredicateParity.unit.test.ts` fails when this constant and
- * the file drift apart — so the row policy this app self-provisions and the row
- * filter the chart renders can never silently diverge into "zero rows" or
- * "over-broad rows" on a chart-managed server.
- *
- * The predicate is a *set* membership as of #8085: the tenant capability carries
- * a comma-joined set of per-project key hashes (see {@link lwqlTenantCapabilitySet}
- * in `../capability.ts`), and a row is admitted when its tenant is the one — and
- * only the one — an in-set hash maps to. `splitByChar(',', getSetting(...))` on
- * the empty default yields `['']`, which no 64-hex key hash matches, so an
- * absent or empty capability still reads zero rows.
- */
-export const LWQL_TENANT_PREDICATE_TEMPLATE =
-  "{tenantColumn} IN (SELECT any({tenantId}) FROM {keyMap} WHERE has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash}) GROUP BY {keyHash} HAVING uniqExact({tenantId}) = 1)";
-
-/**
- * The key map's self-policy expression, single-sourced across languages the same
- * way (`./lwqlKeyMapSelfFilter.sql`).
- *
- * It has to be set membership too, not a bare equality: ClickHouse applies the
- * key map's own row policy to *every* read of that table, including the subquery
- * inside {@link LWQL_TENANT_PREDICATE_TEMPLATE}. Left as `KeyHash = getSetting(...)`
- * it would compare a hash against the whole comma-joined set string, match no
- * row, and starve the tenant predicate of every tenant — the whole model would
- * return zero rows.
- */
-export const LWQL_KEY_MAP_SELF_FILTER_TEMPLATE =
-  "has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash})";
-
-/**
- * Substitutes the `{placeholder}` slots of a single-sourced predicate template.
- *
- * Every value here is already a validated identifier or a `database.table`
- * built from validated identifiers, so this only assembles text — it adds no
- * escaping of its own, and must never be handed a caller-supplied value.
- */
-function renderLwqlPredicateTemplate(
-  template: string,
-  substitutions: Readonly<Record<string, string>>,
-): string {
-  return Object.entries(substitutions).reduce(
-    (rendered, [name, value]) => rendered.split(`{${name}}`).join(value),
-    template,
-  );
-}
-
-/**
- * The `USING` expression every LangWatchQL row policy shares: the row's tenant
- * must be one — and only one — the request's key-hash set maps to.
- *
- * The `HAVING`, now under `GROUP BY {keyHash}`, is still the load-bearing part,
- * and it is here because the key map cannot enforce the invariant itself.
- * `MergeTree ORDER BY KeyHash` sorts by that key, it does not make it unique,
- * and nothing in this application writes the table: the rows arrive out of band.
- * So a hash mapped to two tenants is representable, and a bare `IN` over the
- * matching rows would admit both — one bad row would hand a caller another
- * tenant's data.
- *
- * Grouping by the hash evaluates each in-set hash on its own, so
- * `HAVING uniqExact(...) = 1` fails that hash closed while every other hash in
- * the set still contributes:
- *
- * - no rows        — the hash contributes no group, nothing is admitted for it
- * - one tenant     — admitted, however many duplicate rows carry it
- * - two or more    — that hash's group is dropped, and *neither* tenant is admitted
- *
- * The third case is the point: a conflicting map revokes that hash's access
- * rather than widening it. `any()` is safe under the `HAVING` because it only
- * ever runs on a group already proven to hold exactly one distinct tenant.
- */
-function tenantPredicate({
-  names,
-  tenantColumn,
-  sourceDatabase,
-}: {
-  names: LangWatchQLNames;
-  tenantColumn: string;
-  /** Database the key-map table actually lives in. Defaults to {@link LangWatchQLNames.database}. */
-  sourceDatabase?: string;
-}): string {
-  return renderLwqlPredicateTemplate(LWQL_TENANT_PREDICATE_TEMPLATE, {
-    tenantColumn: assertIdentifier(tenantColumn, "tenantColumn"),
-    tenantId: KEY_MAP_COLUMNS.tenantId,
-    keyHash: KEY_MAP_COLUMNS.keyHash,
-    keyMap: qualified(names, names.keyMapTable, sourceDatabase),
-    tenantSetting: names.tenantSetting,
-  });
-}
-
-/** Policy name for a LangWatchQL object, derived so it is stable across runs. */
-function policyName(table: string): string {
-  return `${assertIdentifier(table, "table")}_tenant`;
-}
-
-/** Policy name of the key map's self-policy. */
-function keyMapPolicyName(keyMapTable: string): string {
-  return `${assertIdentifier(keyMapTable, "keyMapTable")}_self`;
-}
-
-/**
- * The key map polices itself: the restricted identity sees exactly the row its
- * own hash matches, so it can neither enumerate other tenants' hashes nor
- * confirm a guessed one.
- */
-export function lwqlKeyMapRowPolicyStatement({
-  names,
-  sourceDatabase,
-}: {
-  names: LangWatchQLNames;
-  /** Database the key-map table actually lives in. Defaults to {@link LangWatchQLNames.database}. */
-  sourceDatabase?: string;
-}): string {
-  assertNames(names);
-  return (
-    `CREATE ROW POLICY OR REPLACE ${keyMapPolicyName(names.keyMapTable)} ` +
-    `ON ${qualified(names, names.keyMapTable, sourceDatabase)}\n` +
-    `  USING ${renderLwqlPredicateTemplate(LWQL_KEY_MAP_SELF_FILTER_TEMPLATE, {
-      keyHash: KEY_MAP_COLUMNS.keyHash,
-      tenantSetting: names.tenantSetting,
-    })}\n` +
-    `  TO ${names.restrictedUser}`
-  );
-}
-
-/**
- * One row policy per LangWatchQL object.
- *
- * ClickHouse applies row policies before any user predicate and inside every
- * query shape — CTE, `UNION ALL`, both join sides, subqueries, and `merge()` —
- * so the policy, not the submitted SQL, is what bounds the read.
- */
-export function lwqlRowPolicyStatement({
-  names,
-  lwqlTable,
-  sourceDatabase,
-}: {
-  names: LangWatchQLNames;
-  lwqlTable: LangWatchQLTable;
-  /** Database the key-map table actually lives in. Defaults to {@link LangWatchQLNames.database}. */
-  sourceDatabase?: string;
-}): string {
-  assertNames(names);
-  return (
-    `CREATE ROW POLICY OR REPLACE ${policyName(lwqlTable.table)} ` +
-    `ON ${qualified(names, lwqlTable.table, lwqlTable.database)}\n` +
-    `  USING ${tenantPredicate({ names, tenantColumn: lwqlTable.tenantColumn, sourceDatabase })}\n` +
-    `  TO ${names.restrictedUser}`
-  );
-}
-
-/** Drops one LangWatchQL object's row policy. Used to prove the policy is load-bearing. */
-export function dropLangWatchQLRowPolicyStatement({
-  names,
-  table,
-  database,
-}: {
-  names: LangWatchQLNames;
-  table: string;
-  /** Defaults to {@link LangWatchQLNames.database}. */
-  database?: string;
-}): string {
-  assertNames(names);
-  return `DROP ROW POLICY IF EXISTS ${policyName(table)} ON ${qualified(names, table, database)}`;
-}
-
-/**
- * Every statement that provisions the LangWatchQL access model, in dependency
- * order.
- *
- * Order is load-bearing, not cosmetic: `CREATE USER OR REPLACE` mints a new
- * access-entity id, so any grant or policy created before it would still point
- * at the replaced user. Grants and policies must always follow the user.
- *
- * The LangWatchQL objects themselves (fact tables, PostgreSQL-engine tables) are
- * NOT created here — they come from migrations and from the PG mapping. This
- * function provisions only the access model over them.
- *
- * Two callers, two ownership models. Self-hosted deployments run this for
- * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
- * so it is a production path. On cloud the same access model is owned by
- * infra (langwatch-saas#1126) and this stays the reference implementation
- * terraform must match — keep it and its tests in sync with both.
- */
-export function lwqlClickHouseSetupStatements({
-  names,
-  password,
-  lwqlTables,
-  limits = DEFAULT_LWQL_RESOURCE_LIMITS,
-  sourceDatabase,
-}: {
-  names: LangWatchQLNames;
-  password: string;
-  lwqlTables: LangWatchQLTable[];
-  limits?: LangWatchQLResourceLimits;
-  /**
-   * Database the key-map table actually lives in. Defaults to
-   * {@link LangWatchQLNames.database}, matching the test harness's convention
-   * of provisioning its own key map alongside the rest of the suite. A real
-   * deploy must pass the app's ClickHouse database here — migration 00084
-   * creates the key-map table there, not in `names.database`, and every
-   * statement below that reads or writes the key map (the table itself, its
-   * grant, its self-policy, and every LangWatchQL row policy's tenant lookup)
-   * has to agree on which database that is, or the policies resolve against
-   * an empty table and every governed query returns zero rows.
-   */
-  sourceDatabase?: string;
-}): string[] {
-  assertNames(names);
-  return [
-    `CREATE DATABASE IF NOT EXISTS ${names.database}`,
-    lwqlKeyMapTableStatement({ names, sourceDatabase }),
-    lwqlSettingsProfileStatement({ names, limits }),
-    lwqlRestrictedUserStatement({ names, password }),
-    // Each table's row policy before its grant, and the order is load-bearing.
-    // A table carrying a SELECT grant and no row policy returns every row in
-    // ClickHouse, so granting first opens a window in which the restricted
-    // identity reads across every tenant — and this list is executed statement
-    // by statement, not atomically. A caller that dies partway (a dropped
-    // connection, one refused statement) leaves that window standing, and
-    // `provisionLwql`'s self-provisioning path deliberately swallows the error
-    // and continues booting, so nothing downstream would close it.
-    //
-    // Policy-first inverts the failure: a partial run leaves the identity
-    // policed but not yet granted, which refuses reads rather than widening
-    // them. Safe because every table named already exists by this point — the
-    // key map is created above, and `lwqlTables` are migration-owned.
-    lwqlKeyMapRowPolicyStatement({ names, sourceDatabase }),
-    ...lwqlTables.map((lwqlTable) =>
-      lwqlRowPolicyStatement({ names, lwqlTable, sourceDatabase }),
-    ),
-    lwqlGrantStatement({
-      names,
-      table: names.keyMapTable,
-      database: sourceDatabase,
-    }),
-    ...lwqlTables.map((lwqlTable) =>
-      lwqlGrantStatement({ names, table: lwqlTable.table }),
-    ),
-  ];
-}
-
-/**
  * Audits the LangWatchQL database for views that would void the model.
  *
  * A view declared `SQL SECURITY DEFINER` reads its source tables as its definer,
@@ -684,6 +355,34 @@ export function lwqlPolicyCoverageQuery({
  */
 export function auditedSettingValue(value: string): string {
   return `'${value}'`;
+}
+
+/**
+ * Audits that the restricted identity holds no function-management grant.
+ *
+ * The third audit beside {@link lwqlPolicyCoverageQuery} and
+ * {@link definerViewAuditQuery}, neither of which looks at functions at all.
+ * Calling a SQL UDF needs no grant — measured: the restricted identity's 30
+ * grant rows hold nothing matching `%FUNCTION%` and the call still works under
+ * `readonly = 1` — so there is never a reason for this identity to hold one,
+ * and a grant that appeared here would let customer-written SQL replace the
+ * very projection UDFs the hydration stage trusts. Returns rows of
+ * `{ access_type }`; empty is the healthy state. Run as an administrative user.
+ *
+ * @see ./appFunctionStatements.ts — the functions this audit is about
+ */
+export function lwqlAppFunctionGrantAuditQuery({
+  names,
+}: {
+  names: LangWatchQLNames;
+}): string {
+  assertNames(names);
+  return (
+    `SELECT access_type FROM system.grants\n` +
+    `WHERE user_name = ${clickHouseLiteral(names.restrictedUser)}\n` +
+    `  AND access_type ILIKE '%FUNCTION%'\n` +
+    `ORDER BY access_type`
+  );
 }
 
 /**

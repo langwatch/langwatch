@@ -21,7 +21,10 @@ import {
   lwqlAllowedTables,
   lwqlGatedColumns,
 } from "../catalog/types";
-import { describeLangWatchQLSchema } from "../schema";
+import {
+  BOUNDABLE_TIME_COLUMN_TYPE,
+  describeLangWatchQLSchema,
+} from "../schema";
 import { validateLangWatchQL } from "../validation/validate";
 import {
   GATED_DATASET,
@@ -52,6 +55,22 @@ function columnsOf(protections: Protections) {
   return schemaFor(protections).views.flatMap((dataset) =>
     dataset.columns.map((column) => ({ dataset: dataset.name, ...column })),
   );
+}
+
+/**
+ * A dataset's time column can only bound an example query's lookback when
+ * it is temporal or numeric — a derived model with no `CreatedAt` and no
+ * `DateTime64` column falls back to an opaque key (e.g. a String id), which
+ * cannot be compared to a date.
+ */
+function hasBoundableTimeColumn(dataset: {
+  timeColumn: string | null;
+  columns: readonly { name: string; type: string }[];
+}) {
+  const timeColumn = dataset.columns.find(
+    (column) => column.name === dataset.timeColumn,
+  );
+  return !!timeColumn && BOUNDABLE_TIME_COLUMN_TYPE.test(timeColumn.type);
 }
 
 function policyFor(protections: Protections) {
@@ -312,9 +331,37 @@ describe("given the LangWatchQL schema catalog", () => {
 
     it("filters on the column that prunes the dataset's partitions", () => {
       for (const dataset of schemaFor(FULLY_PERMITTED).views) {
+        if (!hasBoundableTimeColumn(dataset)) continue;
         expect(dataset.exampleSql, dataset.name).toContain(
           `WHERE ${dataset.timeColumn} >=`,
         );
+      }
+    });
+
+    /** @scenario "The schema's example query for a dataset without a time column is runnable" */
+    it("orders by the time column instead of filtering it, when the time column cannot be bounded", () => {
+      const unboundable = schemaFor(FULLY_PERMITTED).views.filter(
+        (dataset) => !hasBoundableTimeColumn(dataset),
+      );
+      // Guards against a vacuous pass: the shipped catalog must actually
+      // carry a dataset whose time column is an opaque key.
+      expect(
+        unboundable.length,
+        "expected at least one shipped dataset with an unboundable time column",
+      ).toBeGreaterThan(0);
+      for (const dataset of unboundable) {
+        expect(dataset.exampleSql, dataset.name).not.toContain("WHERE");
+        if (dataset.timeColumn === null) {
+          // No temporal column at all: nothing to order by either, so the
+          // example is a bare projection with a LIMIT rather than
+          // `ORDER BY null`.
+          expect(dataset.exampleSql, dataset.name).not.toContain("ORDER BY");
+        } else {
+          // A present-but-unboundable time column (an opaque key) still orders.
+          expect(dataset.exampleSql, dataset.name).toContain(
+            `ORDER BY ${dataset.timeColumn} DESC`,
+          );
+        }
       }
     });
 

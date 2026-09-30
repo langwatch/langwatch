@@ -104,6 +104,15 @@ function detail(overrides: Record<string, unknown> = {}) {
           isExpired: true,
         },
       ],
+      domainClaims: [
+        {
+          connectionId: "ssoc_acme",
+          organizationId: "org_acme",
+          organizationName: "Acme",
+          domain: "acme.com",
+          waitingSinceMs: NOW - 3 * DAY,
+        },
+      ],
       isEmpty: false,
     },
     history: [
@@ -191,7 +200,7 @@ describe("given an operator who has opened a person from the lookup", () => {
     });
 
     /** @scenario "Everything waiting on a human is on one panel" */
-    it("puts waiting sign-ins and invitations on one panel", () => {
+    it("puts waiting sign-ins, invitations and domain claims on one panel", () => {
       renderDrawer();
 
       expect(screen.getByText("Waiting")).toBeInTheDocument();
@@ -203,6 +212,7 @@ describe("given an operator who has opened a person from the lookup", () => {
       ).toBeInTheDocument();
       // Past its expiry says so rather than looking live.
       expect(screen.getByText(/^Expired /)).toBeInTheDocument();
+      expect(screen.getByText(/Domain claim on acme.com/)).toBeInTheDocument();
     });
 
     /** @scenario "The most recent identity history is shown newest first" */
@@ -245,6 +255,7 @@ describe("given an operator who has opened a person from the lookup", () => {
           waiting: {
             proposals: [],
             invitations: [],
+            domainClaims: [],
             isEmpty: true,
           },
         }),

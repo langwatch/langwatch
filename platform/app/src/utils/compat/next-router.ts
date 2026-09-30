@@ -29,6 +29,7 @@ const ROUTE_PATTERNS = [
   "/auth/signin",
   "/auth/signup",
   "/auth/error",
+  "/auth/sso-test-complete",
   "/admin",
   "/authorize",
   "/invite/accept",

@@ -51,6 +51,13 @@ describe("better-auth config", () => {
       expect(options?.session?.storeSessionInDatabase).toBe(true);
     });
 
+    it("stores SAML replay reservations in the primary database", async () => {
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+
+      expect(options?.verification?.storeInDatabase).toBe(true);
+    });
+
     /** @scenario Credentials-only on-prem mode */
     // The scenario that used to bind here retired at D06 (the legacy
     // impersonation pair in phase-1-better-auth-config.feature, and with it
@@ -369,11 +376,12 @@ describe("better-auth config", () => {
 
   describe("SSO precedence — re-login must not overwrite an uploaded avatar", () => {
     // A user-uploaded avatar (User.image) must survive later SSO sign-ins.
-    // better-auth's `mapProfileToUser` runs only on user *create*; it overwrites
-    // profile fields on subsequent sign-ins ONLY if a provider opts in (e.g.
-    // `overrideUserInfoOnSignIn: true`). Lock that no provider ever does — the
-    // check is name-agnostic so any future override/update-user-info flag set to
-    // `true` trips it. Spec: specs/settings/user-avatar.feature
+    // better-auth calls `mapProfileToUser` on every sign-in, but the fields it
+    // maps are written to the user only on *create*; a later sign-in writes
+    // them ONLY if a provider opts in (e.g. `overrideUserInfoOnSignIn: true`).
+    // Lock that no provider ever does; the check is name-agnostic so any future
+    // override/update-user-info flag set to `true` trips it.
+    // Spec: specs/settings/user-avatar.feature
     const overrideFlags = (config: unknown): string[] =>
       Object.entries(config as Record<string, unknown>)
         .filter(([k, v]) => /override|updateuserinfo/i.test(k) && v === true)

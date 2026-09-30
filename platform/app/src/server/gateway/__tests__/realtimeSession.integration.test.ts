@@ -24,6 +24,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 
 /**
  * The gateway spend pipeline and the trace collector are stubbed so the two
@@ -285,6 +286,57 @@ describe("given a virtual key that brokers realtime voice sessions", () => {
     // The mint's model, not the billing id: two names for one call would put
     // the cost under a model the trace never mentions.
     expect(spanAttr(written, "gen_ai.request.model")).toBe("elevenlabs/convai");
+  });
+
+  /** @scenario Two settlements arriving together write one span */
+  it("writes no span for a settlement that waited on the row while another closed it", async () => {
+    // The overlap a replay does not stage: one report closes the row while
+    // the other is parked on its lock. The second close has to re-read the
+    // status as the first left it, or the same call settles into the trace
+    // twice. The first close is a settlement's own write, held open in a
+    // transaction; the second runs the real path.
+    const vk = await keyWithCap(`vk-overlap-${nanoid(6)}`, null);
+    const sessionId = `ov-${nanoid(6)}`;
+    await reserveRealtimeSession(
+      reservation(vk, sessionId, `trace-${nanoid(10)}`),
+    );
+    const session = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    await raceOnOneRow<string>({
+      prisma,
+      table: "GatewayRealtimeSession",
+      first: async (tx) => {
+        await tx.gatewayRealtimeSession.updateMany({
+          where: { id: sessionId, projectId: PROJECT_ID },
+          data: {
+            status: "CLOSED",
+            closedAt: new Date(),
+            closeReason: "first report",
+          },
+        });
+        return "closed";
+      },
+      second: async () => {
+        await closeAndConfirmRealtimeSession({
+          session,
+          usage: { audio_ms: 4000 },
+          durationMs: 4000,
+          reason: "second report",
+        });
+        return "reported";
+      },
+    });
+
+    const row = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+    expect(row.status).toBe("CLOSED");
+    expect(row.closeReason).toBe("first report");
+    // The confirmation goes out before the close and is deduplicated by the
+    // spend pipeline; the span is gated on the close and must not be written.
+    expect(ingestedSpans).toHaveLength(0);
   });
 
   /** @scenario A settlement delivered twice is written into the trace once */

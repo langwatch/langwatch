@@ -64,6 +64,8 @@ import {
   startLangWatchQLPostgres,
 } from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
 import { LWQL_VIEW_CATALOG } from "~/server/analytics/lwql/catalog/lwqlViews";
+import { lwqlPostgresViews } from "~/server/analytics/lwql/catalog/types";
+import { LWQL_EXAMPLES } from "~/server/analytics/lwql/examples";
 import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
@@ -76,6 +78,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -160,9 +163,10 @@ describe("given the /api/v1/query REST family", () => {
   let database: string;
   let facts: string;
 
-  /** The two paths this family serves. */
+  /** The paths this family serves. */
   const runPath = "/api/v1/query";
   const schemaPath = "/api/v1/query/schema";
+  const referencePath = "/api/v1/query/reference";
 
   const authHeaders = (token?: string | null) => ({
     "Content-Type": "application/json",
@@ -201,6 +205,15 @@ describe("given the /api/v1/query REST family", () => {
     }
     return body;
   };
+
+  const readReference = async (project: Project) =>
+    succeed(
+      await app.request(referencePath, {
+        method: "GET",
+        headers: authHeaders(project.apiKey),
+      }),
+      "GET /api/v1/query/reference",
+    );
 
   /** Reads the queryable schema as one project, asserting it answered. */
   const readSchema = async (project: Project) =>
@@ -269,9 +282,17 @@ describe("given the /api/v1/query REST family", () => {
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole catalog, from the single
+    // access-model emitter (#8258) — the view statements are structural only.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: facts,
+    });
 
     await resetApp();
+    const eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -425,6 +446,110 @@ describe("given the /api/v1/query REST family", () => {
       const result = await readSchema(projectA);
 
       expect(result.functions).toEqual([...LWQL_ALLOWED_FUNCTION_NAMES]);
+    });
+
+    /** @scenario "The self-describing catalog output names every derived view" */
+    it("names every derived PostgreSQL-resident view with its columns", async () => {
+      const result = await readSchema(projectA);
+      const views: any[] = result.views;
+      const byName = new Map(views.map((view) => [view.name, view] as const));
+
+      for (const postgresView of lwqlPostgresViews(LWQL_VIEW_CATALOG)) {
+        const qualified = `${database}.${postgresView.name}`;
+        expect(byName.has(qualified), qualified).toBe(true);
+      }
+
+      const columnNamesOf = (viewName: string) => {
+        const view = byName.get(`${database}.${viewName}`);
+        expect(view, `${database}.${viewName}`).toBeDefined();
+        return view.columns.map((column: any) => column.name);
+      };
+
+      expect(columnNamesOf("topics")).toEqual(
+        expect.arrayContaining(["TopicId", "TopicName", "TenantId"]),
+      );
+      expect(columnNamesOf("virtual_keys")).toEqual(
+        expect.arrayContaining(["TenantId"]),
+      );
+    });
+  });
+
+  describe("every LangWatchQL example the reference publishes", () => {
+    /**
+     * A test value for one declared parameter, by its declared type.
+     *
+     * The examples publish a type and a description rather than a value, so
+     * this binds the smallest thing each type accepts. What is under test is
+     * that the statement runs at all, not what it returns: the seeded rows
+     * belong to the suites above and pinning counts here would make this a
+     * second, worse copy of them.
+     */
+    const bind = (type: string): string | number => {
+      if (type.startsWith("DateTime")) return "1970-01-01 00:00:00.000";
+      if (/^U?Int|^Float|^Decimal/.test(type)) return 1;
+      return "";
+    };
+
+    /** @scenario "Every published statement runs against the real catalog" */
+    it.each(
+      LWQL_EXAMPLES.map((example) => [example.id, example] as const),
+    )("runs %s", async (_id, example) => {
+      const parameters = Object.fromEntries(
+        example.parameters.map((parameter) => [
+          parameter.name,
+          bind(parameter.type),
+        ]),
+      );
+      const reference = await readReference(projectA);
+      const published = reference.examples.find(
+        (candidate: any) => candidate.id === example.id,
+      );
+      expect(published).toBeDefined();
+      const body = await run({
+        project: projectA,
+        sql: published.text,
+        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+      });
+      expect(Array.isArray(body.rows)).toBe(true);
+    });
+  });
+
+  describe("when the reference door is called", () => {
+    /** @scenario "A key holding analytics:view reads the reference" */
+    it("describes both query languages in one payload", async () => {
+      const response = await app.request(referencePath, {
+        method: "GET",
+        headers: authHeaders(projectA.apiKey),
+      });
+      const result = await succeed(response, "GET /api/v1/query/reference");
+
+      expect(result.lwql.schema.database).toBe(database);
+      expect(result.lwql.endpoints.length).toBeGreaterThan(0);
+      expect(result.traceFilter.fields.length).toBeGreaterThan(0);
+      expect(result.traceFilter.syntax).toContain("trace.attribute.");
+      expect(result.decisionTable.length).toBeGreaterThan(0);
+
+      const languages = new Set(
+        result.examples.map((example: any) => example.language),
+      );
+      expect([...languages].sort()).toEqual(["lwql", "trace-filter"]);
+    });
+
+    /**
+     * The reference embeds the schema, so a caller reading it must see the same
+     * datasets `/schema` publishes for the same credential — the alternative
+     * being two answers to one question and no way to tell which is current.
+     */
+    it("embeds the same datasets the schema door publishes", async () => {
+      const response = await app.request(referencePath, {
+        method: "GET",
+        headers: authHeaders(projectA.apiKey),
+      });
+      const [reference, schema] = await Promise.all([
+        succeed(response, "GET reference"),
+        readSchema(projectA),
+      ]);
+      expect(reference.lwql.schema).toEqual(schema);
     });
   });
 

@@ -2,13 +2,9 @@ import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState } from "react";
 import { LuChevronDown, LuChevronUp } from "react-icons/lu";
+import type { ConversationTurn } from "~/shared/traces/transcript/types";
 import { ThreadedTurnView } from "./ThreadedTurnView";
-import {
-  type ChatLayout,
-  type ConversationTurn,
-  LONG_THREAD_THRESHOLD,
-  VIRTUALIZE_AT,
-} from "./types";
+import { type ChatLayout, LONG_THREAD_THRESHOLD, VIRTUALIZE_AT } from "./types";
 
 // When a thread runs longer than this we hide all but the tail behind a
 // "Show N earlier turns" expander. Each LLM call carries the prior context

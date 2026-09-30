@@ -1,6 +1,6 @@
+import { PrismaScimReconciliationRepository } from "@ee/scim/scim-reconciliation.prisma.repository";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-
 import {
   applySessionCeiling,
   reapExpiredCliLoginKeys,
@@ -8,6 +8,7 @@ import {
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { PrismaSystemMigrationEnrollmentRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-enrollment.prisma.repository";
 import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
+
 import type { GuardParams } from "../dbGuardMiddleware";
 import {
   guardOrganizationId,
@@ -26,6 +27,116 @@ async function runGuard(params: GuardParams): Promise<unknown> {
   const next = vi.fn(async () => "ok");
   return guardOrganizationId(params, next);
 }
+
+describe("SCIM tenant records", () => {
+  it("preserves explicitly bounded organization lists and refuses invalid or open-ended filters", async () => {
+    await expect(
+      runGuard({
+        model: "ScimUserResource",
+        action: "deleteMany",
+        args: { where: { organizationId: { in: ["org-a", "org-b"] } } },
+      }),
+    ).resolves.toBe("ok");
+    for (const organizationId of [
+      {},
+      { in: [] },
+      { in: ["org-a", void 0] },
+      { in: [null] },
+      { in: [""] },
+      { not: "org-a" },
+      { equals: void 0 },
+    ]) {
+      await expect(
+        runGuard({
+          model: "ScimUserResource",
+          action: "findMany",
+          args: { where: { organizationId } },
+        }),
+      ).rejects.toThrow();
+    }
+  });
+  it.each([
+    null,
+    void 0,
+    "",
+    "   ",
+    false,
+    0,
+  ])("rejects invalid organization scope %j in direct and composite predicates", async (organizationId) => {
+    for (const where of [
+      { organizationId },
+      { organizationId_userId: { organizationId, userId: "shared-user" } },
+    ]) {
+      await expect(
+        runGuard({
+          model: "ScimUserResource",
+          action: "findMany",
+          args: { where },
+        }),
+      ).rejects.toThrow();
+    }
+    await expect(
+      runGuard({
+        model: "ScimUserResource",
+        action: "create",
+        args: { data: { organizationId, userId: "shared-user" } },
+      }),
+    ).rejects.toThrow();
+  });
+  it.each([
+    "ScimUserResource",
+    "ScimDirectoryUser",
+    "ScimExternalId",
+  ])("requires organization scope for %s even when a global user is named", async (model) => {
+    await expect(
+      runGuard({
+        model,
+        action: "findMany",
+        args: { where: { userId: "shared-user" } },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      runGuard({
+        model,
+        action: "findMany",
+        args: { where: { organizationId: "org-a", userId: "shared-user" } },
+      }),
+    ).resolves.toBe("ok");
+    await expect(
+      runGuard({
+        model,
+        action: "create",
+        args: { data: { userId: "shared-user" } },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it.each([
+    [
+      "ScimDirectoryUser",
+      "connectionId_userId",
+      { connectionId: "conn-a", userId: "shared-user" },
+    ],
+    [
+      "ScimExternalId",
+      "connectionId_externalId",
+      { connectionId: "conn-a", externalId: "directory-user" },
+    ],
+    [
+      "ScimUserResource",
+      "organizationId_userId",
+      { organizationId: "org-a", userId: "shared-user" },
+    ],
+  ] as const)("accepts the owning composite key for %s", async (model, key, value) => {
+    await expect(
+      runGuard({
+        model,
+        action: "findUnique",
+        args: { where: { [key]: value } },
+      }),
+    ).resolves.toBe("ok");
+  });
+});
 
 describe("guardOrganizationId — original three models preserved", () => {
   describe("when querying OrganizationUser by the userId_organizationId composite", () => {
@@ -535,7 +646,9 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
           calls.push(args);
           return guardOrganizationId(
             { model: "ApiKey", action: "updateMany", args },
-            async () => ({ count: rowsAffected }),
+            async () => ({
+              count: rowsAffected,
+            }),
           );
         },
       },
@@ -939,6 +1052,207 @@ describe("guardOrganizationId — the migration rollout's enrollment rows", () =
           },
         }),
       ).rejects.toThrow();
+    });
+  });
+});
+
+/**
+ * "What am I waiting on?" — bounded by SUBJECT rather than by tenant.
+ *
+ * The regime exists to refuse an unbounded sweep across every organization,
+ * and a person's own pending join requests span every organization they asked,
+ * which is the whole question. So the read is bounded to ONE USER, named in
+ * the clause, and that is what makes it admissible.
+ *
+ * This was a live outage of the feature and not a hypothetical: the guard
+ * refused the query with a plain Error, the boundary degraded it to "unknown
+ * error", and nobody could see a request they had made — including on the
+ * screen that exists to tell them their request is with an administrator.
+ */
+describe("guardOrganizationId — a join request bounded by its subject", () => {
+  describe("when somebody reads their own pending requests", () => {
+    it("allows a findMany named by userId, across whichever organizations they asked", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { userId: "user_sam", state: "PENDING" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a query names no subject and no organization", () => {
+    it("still refuses the sweep over everybody's pending requests", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { state: "PENDING" } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when an administrator lists one organization's queue", () => {
+    it("allows it, which is the ordinary org-bounded read", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { organizationId: "org_acme", state: "PENDING" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the refusal is about tenancy rather than anything else", () => {
+    it("says so, so a later change cannot pass by refusing differently", async () => {
+      // A bare `rejects.toThrow()` passes for ANY throw — an unknown-model
+      // path, or a typo in the model key that makes the whole entry
+      // unreachable. This is the one case that tells "refused for tenancy"
+      // apart from "refused at all".
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { state: "PENDING" } },
+        } as GuardParams),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+});
+
+/**
+ * The two entries this wave added and did not pin.
+ *
+ * `ScimRequestLog` is admitted for a PLATFORM-scoped `findMany`, because the
+ * retention sweep spans every tenant by definition — and its delete is held
+ * to named ids, so an unbounded one cannot drop every customer's log at once.
+ * `SsoCredential` is admitted by `connectionId`, which is what a read already
+ * holds; a bare read over every tenant's client secrets is what it must
+ * refuse.
+ *
+ * Neither had a test, so widening `platformScopeActions` to include the
+ * delete, or dropping the id predicate, was a silent edit.
+ */
+describe("guardOrganizationId — the directory log and the credential vault", () => {
+  describe("when the retention sweep scans for what has aged out", () => {
+    it("admits the platform-scoped read", async () => {
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "findMany",
+          args: { where: { occurredAt: { lt: new Date() } } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+
+    it("refuses a delete that names no rows", async () => {
+      // The scan spans every tenant; the delete that follows it must not.
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "deleteMany",
+          args: { where: { occurredAt: { lt: new Date() } } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+
+    it("allows the delete bounded to the ids the scan returned", async () => {
+      await expect(
+        runGuard({
+          model: "ScimRequestLog",
+          action: "deleteMany",
+          args: { where: { id: { in: ["log_1", "log_2"] } } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when the credential vault is read", () => {
+    it("allows a read bounded to one connection", async () => {
+      await expect(
+        runGuard({
+          model: "SsoCredential",
+          action: "findMany",
+          args: { where: { connectionId: "ssoc_acme" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+
+    it("refuses a read over every tenant's client secrets", async () => {
+      await expect(
+        runGuard({
+          model: "SsoCredential",
+          action: "findMany",
+          args: { where: { kind: "oidc-client-secret" } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+  });
+});
+
+/**
+ * The operator's directory-sync list (specs/identity/
+ * scim-reconciliation-surfaces.feature) reads every customer's sync state at
+ * once, by design. Its service test stubs the repository, so the guard never
+ * met the query the repository really sends — and in production it refused
+ * it, which the back office showed as an unknown error.
+ *
+ * Driven through the repository rather than restated here, so a change to the
+ * query is a change to what this proves.
+ */
+describe("guardOrganizationId — the operator's directory-sync list", () => {
+  function guardedRepository() {
+    const guarded =
+      (action: string, result: unknown) => async (args: unknown) => {
+        await runGuard({ model: "ScimSyncState", action, args } as GuardParams);
+        return result;
+      };
+    return new PrismaScimReconciliationRepository({
+      scimSyncState: {
+        findMany: guarded("findMany", []),
+        count: guarded("count", 0),
+      },
+    } as unknown as PrismaClient);
+  }
+
+  describe("when an operator lists every customer's syncs", () => {
+    /** @scenario "Every customer's connections are one operator list" */
+    it("admits the list and its total", async () => {
+      await expect(
+        guardedRepository().findAllSyncs({ page: 0, pageSize: 25 }),
+      ).resolves.toEqual({ syncs: [], total: 0 });
+    });
+
+    it("admits the searched list", async () => {
+      await expect(
+        guardedRepository().findAllSyncs({
+          page: 0,
+          pageSize: 25,
+          search: "error",
+        }),
+      ).resolves.toEqual({ syncs: [], total: 0 });
+    });
+  });
+
+  describe("when a write names no organization", () => {
+    it("refuses it, since only the reads span customers", async () => {
+      await expect(
+        runGuard({
+          model: "ScimSyncState",
+          action: "deleteMany",
+          args: { where: {} },
+        } as GuardParams),
+      ).rejects.toThrow(/organizationId/);
+      await expect(
+        runGuard({
+          model: "ScimSyncState",
+          action: "updateMany",
+          args: { where: { state: "ERROR" }, data: { state: "REVOKED" } },
+        } as GuardParams),
+      ).rejects.toThrow(/organizationId/);
     });
   });
 });

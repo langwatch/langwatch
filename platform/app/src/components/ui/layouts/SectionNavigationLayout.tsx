@@ -1,5 +1,5 @@
 import { Box, HStack, Link, Spacer, Stack, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useLayoutEffect, useRef } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { ProductPageFrame } from "~/features/navigation/shell/ProductPageFrame";
 import NextLink from "~/utils/compat/next-link";
@@ -70,6 +70,9 @@ export function SectionNavigationLayout({
           padding={4}
           maxW="1600px"
           width="full"
+          height="full"
+          minHeight={0}
+          overflow="hidden"
           data-testid="section-navigation-container"
         >
           <SectionNavigationFrame
@@ -102,73 +105,84 @@ export function SectionNavigationFrame({
   navigationItems,
   sidebarFooter,
 }: SectionNavigationFrameProps) {
-  return (
-    /* NO PADDING, NO WIDTH CAP. This frame used to nest a second container —
-       1600px and another padding — inside whatever already framed the page.
-       Inside SettingsLayout that is a 1280px container with its own padding,
-       so the cap could never be reached and the gutter was drawn twice. The
-       inset now belongs to whoever mounts the frame: SettingsLayout on the
-       settings pages, SectionNavigationLayout on the dashboard path. */
-    <Box width="full" data-testid="section-navigation-layout">
-      <Stack
-        direction={{ base: "column", md: "row" }}
-        alignItems={{ base: "stretch", md: "start" }}
-        gap={{ base: 3, md: 6 }}
-        width="full"
-      >
-        <Box
-          as="nav"
-          aria-label={`${sectionLabel} navigation`}
-          width={{ base: "full", md: "220px" }}
-          minWidth={{ base: 0, md: "220px" }}
-          flexShrink={0}
-          borderRightWidth={{ base: 0, md: "1px" }}
-          borderRightColor="border.muted"
-          borderBottomWidth={{ base: "1px", md: 0 }}
-          borderBottomColor="border.muted"
-          paddingRight={{ base: 0, md: 4 }}
-          paddingBottom={{ base: 2, md: 0 }}
-        >
-          <Text
-            data-testid="section-navigation-title"
-            display={{ base: "none", md: "block" }}
-            fontSize="xs"
-            fontWeight="semibold"
-            color="fg.muted"
-            paddingX={3}
-            paddingTop={1}
-            paddingBottom={2}
-            textTransform="uppercase"
-            letterSpacing="wider"
-          >
-            {sectionLabel}
-          </Text>
-          <Stack
-            data-testid="section-navigation-links"
-            direction={{ base: "row", md: "column" }}
-            alignItems="stretch"
-            gap={1}
-            overflowX={{ base: "auto", md: "visible" }}
-            paddingBottom={{ base: 1, md: 0 }}
-          >
-            {navigationItems.map((item) => (
-              // Each link keeps its intrinsic width in the horizontal
-              // strip. Without it the links shrink to fit the viewport
-              // instead of overflowing, so the strip never scrolls and the
-              // labels are squeezed.
-              <Box key={`${item.href}:${item.label}`} flexShrink={0}>
-                <RailLink item={item} />
-              </Box>
-            ))}
-          </Stack>
-          {sidebarFooter}
-        </Box>
+  const pathname = usePathname();
+  const contentRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [pathname]);
 
-        <Box flex={1} minWidth={0} data-testid="section-navigation-content">
-          {children}
-        </Box>
-      </Stack>
-    </Box>
+  return (
+    <Stack
+      direction={{ base: "column", md: "row" }}
+      alignItems="stretch"
+      gap={{ base: 3, md: 6 }}
+      width="full"
+      height="full"
+      minHeight={0}
+      overflow="hidden"
+      data-testid="section-navigation-layout"
+    >
+      <Box
+        as="nav"
+        aria-label={`${sectionLabel} navigation`}
+        width={{ base: "full", md: "220px" }}
+        minWidth={{ base: 0, md: "220px" }}
+        flexShrink={0}
+        overflowY="auto"
+        borderRightWidth={{ base: 0, md: "1px" }}
+        borderRightColor="border.muted"
+        borderBottomWidth={{ base: "1px", md: 0 }}
+        borderBottomColor="border.muted"
+        paddingRight={{ base: 0, md: 4 }}
+        paddingBottom={{ base: 2, md: 0 }}
+      >
+        <Text
+          data-testid="section-navigation-title"
+          display={{ base: "none", md: "block" }}
+          fontSize="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          paddingX={3}
+          paddingTop={1}
+          paddingBottom={2}
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          {sectionLabel}
+        </Text>
+        <Stack
+          data-testid="section-navigation-links"
+          direction={{ base: "row", md: "column" }}
+          alignItems="stretch"
+          gap={1}
+          overflowX={{ base: "auto", md: "visible" }}
+          paddingBottom={{ base: 1, md: 0 }}
+        >
+          {navigationItems.map((item) => (
+            // Each link keeps its intrinsic width in the horizontal
+            // strip. Without it the links shrink to fit the viewport
+            // instead of overflowing, so the strip never scrolls and the
+            // labels are squeezed.
+            <Box key={`${item.href}:${item.label}`} flexShrink={0}>
+              <RailLink item={item} />
+            </Box>
+          ))}
+        </Stack>
+        {sidebarFooter}
+      </Box>
+
+      <Box
+        ref={contentRef}
+        flex={1}
+        minWidth={0}
+        minHeight={0}
+        overflow="auto"
+        paddingBottom={16}
+        data-testid="section-navigation-content"
+      >
+        {children}
+      </Box>
+    </Stack>
   );
 }
 

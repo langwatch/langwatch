@@ -418,7 +418,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/table-display.feature",
   "specs/experiments-v3/undo-redo.feature",
   "specs/features/agent-cli.feature",
-  "specs/features/analytics-cli.feature",
   "specs/features/annotation-cli.feature",
   "specs/features/dashboard-cli.feature",
   "specs/features/dataset-python-sdk.feature",
@@ -464,7 +463,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-command-bar-activation.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
-  "specs/langy/langy-event-sourced-conversations.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
@@ -604,8 +602,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/metrics.feature",
   "specs/traces-v2/model-chip-interactive-card.feature",
   "specs/traces-v2/multiplayer-presence.feature",
-  "specs/traces-v2/onboarding-empty-state.feature",
-  "specs/traces-v2/origin-badge-filter.feature",
   "specs/traces-v2/prompt-facets.feature",
   "specs/traces-v2/prompt-integration.feature",
   "specs/traces-v2/skill-invocation-highlight.feature",
@@ -614,7 +610,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/span-view.feature",
   "specs/traces-v2/tour-visibility-and-persistence.feature",
   "specs/traces-v2/trace-drawer-panes.feature",
-  "specs/traces-v2/trace-drawer-shell.feature",
   "specs/traces-v2/trace-header-full-content-resolution.feature",
   "specs/traces-v2/trace-peek.feature",
   "specs/traces-v2/trace-table.feature",
@@ -669,6 +664,14 @@ const LEGACY_INERT: string[] = [
  *   - Every entry must still be partially tagged.
  */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
+  // and the unknown-metric refusal, which its three new scenarios enforce.
+  // The six older scenarios describe the query presets and stay untagged.
+  "specs/features/analytics-cli.feature",
+  // Reason: left LEGACY_INERT when deep links started carrying the partition
+  // hint; the "Deep links carry the partition hint" rule is enforced. The
+  // rest of the drawer shell is described here and tested elsewhere, untagged.
+  "specs/traces-v2/trace-drawer-shell.feature",
   "sdks/typescript/specs/cli/daemon.feature",
   // Reason: the gateway half of this file is still unwritten and stays
   // @unimplemented. It left LEGACY_INERT because the trail now enforces one
@@ -823,6 +826,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/skills/skills-testing.feature",
   "specs/suites/suite-model-selection.feature",
   "specs/topic-clustering/event-sourced-scheduling.feature",
+  // Reason: the first-trace poll scenario is the one the Trace Explorer
+  // binds; the other scenarios describe the onboarding journey, which no
+  // test on this branch is tagged against.
+  "specs/traces-v2/onboarding-empty-state.feature",
   "specs/traces-v2/annotations.feature",
   "specs/traces-v2/bulk-actions.feature",
   "specs/traces-v2/code-block-language-fallback.feature",

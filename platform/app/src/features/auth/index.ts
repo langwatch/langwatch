@@ -12,6 +12,7 @@ export { AuthValuePanel } from "./components/AuthValuePanel";
 export { IdentifierFirstSignIn } from "./components/IdentifierFirstSignIn";
 export { InviteLanding } from "./components/InviteLanding";
 export { JoinBeforeCreateInterstitial } from "./components/JoinBeforeCreateInterstitial";
+export { JoinInsteadNotice } from "./components/JoinInsteadNotice";
 export { SignInMethodPicker } from "./components/SignInMethodPicker";
 export { VerificationFirstSignUp } from "./components/VerificationFirstSignUp";
 export type {

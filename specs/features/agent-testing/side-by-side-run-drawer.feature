@@ -85,6 +85,14 @@ Feature: The wide run detail drawer
     And no empty "Passed criteria" heading is shown
 
   @integration
+  Scenario: Criteria the judge could not decide read apart from the failed ones
+    Given a finished run whose judge met one criterion, missed one and could not decide one
+    When the results are read
+    Then an "Inconclusive criteria" section reads between the failed and the passed sections
+    And the undecided criterion is listed there and not under "Failed criteria"
+    And its row carries a grey dashed circle
+
+  @integration
   Scenario: The messages carry no heading and no line beside the results
     Given a finished run open in the wide drawer
     When the drawer is read

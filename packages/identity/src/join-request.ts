@@ -68,11 +68,18 @@ export const joinResolverSchema = z.object({
 export type JoinResolver = z.infer<typeof joinResolverSchema>;
 
 /**
- * How the requester's domain was matched. One value today; the field exists
- * because a second rule (a claimed-and-verified connection domain, say) would
- * otherwise be indistinguishable on the audit page from this one.
+ * How the requester's domain was matched. The second rule this field was
+ * built for is here: `sso-connection-domain` is somebody who arrived THROUGH
+ * a connection, on a domain that connection proved, and whose answer to "who
+ * gets in" was that arrivals wait for approval. Nobody typed a request — the
+ * sign-in made it — so the audit page must be able to say which of the two
+ * this was, and an administrator reading a queue must be able to tell a
+ * colleague who asked from a colleague their identity provider sent.
  */
-export const JOIN_MATCH_KINDS = ["verified-identifier-domain"] as const;
+export const JOIN_MATCH_KINDS = [
+  "verified-identifier-domain",
+  "sso-connection-domain",
+] as const;
 export const joinMatchKindSchema = z.enum(JOIN_MATCH_KINDS);
 export type JoinMatchKind = z.infer<typeof joinMatchKindSchema>;
 
@@ -112,6 +119,10 @@ export const joinRequestedPayloadSchema = z.object({
    *  than computed at fold time, so a redelivered event cannot drift the
    *  deadline the requester was actually promised. */
   expiresAtMs: z.number().int().nonnegative(),
+  /** Automatic policy approvals suppress the waiting notice; all other
+   * requests derive it from this event so the handoff cannot be lost between
+   * the command and a service-side callback. */
+  notifyAdmins: z.boolean().default(true),
   actor: identityActorSchema,
 });
 export type JoinRequestedPayload = z.infer<typeof joinRequestedPayloadSchema>;
@@ -152,7 +163,7 @@ export type JoinRequestFactInput =
   | { type: typeof JOIN_EXPIRED_EVENT_TYPE; data: JoinExpiredPayload }
   | { type: typeof JOIN_WITHDRAWN_EVENT_TYPE; data: JoinWithdrawnPayload };
 
-export const joinRequestFactInputSchema = z.discriminatedUnion("type", [
+const joinRequestFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(JOIN_REQUESTED_EVENT_TYPE),
     data: joinRequestedPayloadSchema,
@@ -223,7 +234,7 @@ export function emptyJoinRequest({
 }
 
 /** PENDING is the only state anything can be done from. */
-export function isPendingJoinRequest(state: JoinRequestState): boolean {
+function isPendingJoinRequest(state: JoinRequestState): boolean {
   return state === "PENDING";
 }
 

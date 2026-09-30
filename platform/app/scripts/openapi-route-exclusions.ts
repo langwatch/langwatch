@@ -81,6 +81,11 @@ export const UNPUBLISHED = [
     why: "control-plane calls from the gateway and langy workers, authenticated by an internal shared secret",
   },
   {
+    match: "/api/connect/v1",
+    category: "internal",
+    why: "the connect host a self-hosted install syncs its license and its anonymous statistics to; the caller is the install's own worker and the contract is ADR-141, not something a customer writes by hand",
+  },
+  {
     match: "/api/admin",
     category: "internal",
     why: "LangWatch staff back-office, including impersonation; publishing it would advertise a surface no customer may call",
@@ -149,6 +154,11 @@ export const UNPUBLISHED = [
     match: "/api/bug-reports",
     category: "internal",
     why: "in-app report form intake",
+  },
+  {
+    match: "/api/v1/onboarding/guided",
+    category: "internal",
+    why: "the guided onboarding state of the caller's organization, read and completed by Langy through the CLI. It reports on the organization an application runs inside rather than on the application's own data, so it is not exported from the client SDK's public index and there is nothing for an API-key caller to do with it",
   },
   {
     match: "/api/unsubscribe",

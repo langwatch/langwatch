@@ -2,7 +2,7 @@
  * Overrides for the governance/OCSF views (#8085 / #8116 Part B, user
  * decision: visibility is decided by the row policy, not by omission — see the
  * coordinator scope addition dropping `governance_*` from
- * {@link ../skippedTables#matchesSkipPattern}).
+ * a `*_mv`/`.inner` materialised-view internal).
  *
  * Every row of these four tables is written under the org's hidden
  * `internal_governance` project (`00026_create_governance_ocsf_events.sql`),

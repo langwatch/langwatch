@@ -17,6 +17,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+
 import { DepartmentService } from "../department/department.service";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../pullers/dataverseEnvironment";
@@ -124,7 +125,12 @@ describe("Feature: directory departments land on the entities we already have", 
       },
     });
     await prisma.scimExternalId.create({
-      data: { connectionId, externalId: JONAS_OID, userId: jonasUserId },
+      data: {
+        organizationId,
+        connectionId,
+        externalId: JONAS_OID,
+        userId: jonasUserId,
+      },
     });
   });
 

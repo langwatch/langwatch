@@ -1,5 +1,6 @@
 import type { LedgerActor } from "@langwatch/actor";
 import type { Team, TeamUserRole } from "~/generated/prisma/client";
+import type { TeamScopedMemberBinding } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 
 export interface CreateTeamInput {
   id: string;
@@ -37,6 +38,10 @@ export interface TeamRepository {
    * drive this listing the way it drives every other one.
    */
   findProjectsInTeam(params: { teamId: string }): Promise<TeamProjectListing[]>;
+  listMembers(params: {
+    organizationId: string;
+    teamId: string;
+  }): Promise<TeamScopedMemberBinding[]>;
   findAllByOrganization(params: {
     organizationId: string;
     page: number;

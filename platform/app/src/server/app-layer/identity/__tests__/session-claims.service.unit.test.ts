@@ -209,6 +209,25 @@ describe("session claims from an identity-provider callback", () => {
     ]);
   });
 
+  it("makes the SSO resolveUser account available before deferred account after-hooks", async () => {
+    const assertions = new VerifiedCallbackProviderAssertions();
+
+    await assertions.runWithScope(async () => {
+      assertions.recordAuthenticatedSsoAccount({
+        providerId: "ssoc_acme",
+        providerAccountId: "subject-123",
+      });
+
+      await expect(
+        assertions.authenticatedAccountFor({ providerId: "ssoc_acme" }),
+      ).resolves.toEqual({
+        providerAccountId: "subject-123",
+        assertedFactors: [],
+        verifiedTokenClaims: false,
+      });
+    });
+  });
+
   /** @scenario Unbound token claims earn no authentication credit */
   it("ignores verified evidence for a different callback provider", async () => {
     const assertions = new VerifiedCallbackProviderAssertions();

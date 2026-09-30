@@ -222,14 +222,9 @@ describe("identity service layering", () => {
             /prisma\/client/.test(specifier),
         ),
       );
-      expect(
-        ratchet(offenders, [
-          // Legacy Auth0/SSO callbacks stay byte-for-byte compatible until
-          // the connection cutover lands in its own PR.
-          "server/better-auth/hooks.ts",
-          "server/better-auth/index.ts",
-        ]),
-      ).toEqual(CLEAN);
+      // The cutover landed: the two legacy callback owners ask a repository
+      // now, so the allowance they held is spent rather than inherited.
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
 
     /** @scenario "better-auth never opens the database itself" */
@@ -266,15 +261,9 @@ describe("identity service layering", () => {
       const offenders = offendersOf(files, (file, source) =>
         isRepositoryTier(file) ? [] : linesMatching(source, QUERY),
       );
-      expect(
-        ratchet(offenders, [
-          // Both are pre-existing SSO compatibility owners. The ratchet
-          // prevents a third owner while the connection cutover replaces
-          // them in its own migration.
-          "server/app-layer/identity/sso-connection-backoffice.service.ts",
-          "server/better-auth/hooks.ts",
-        ]),
-      ).toEqual(CLEAN);
+      // Both compatibility owners have been replaced by the connection
+      // cutover, so neither needs an allowance any more.
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
 
     /** @scenario "Prisma is spelled in the repository tier only" */
@@ -390,11 +379,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(scope, (_file, source) =>
         linesMatching(source, /mode:\s*["']insensitive["']/),
       );
-      expect(
-        ratchet(offenders, [
-          "server/app-layer/identity/sso-connection-backoffice.service.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
 
     /** @scenario "A question about the data is asked in one place" */
@@ -402,9 +387,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(scope, (_file, source) =>
         linesMatching(source, /where:\s*\{\s*ssoDomain\b/),
       );
-      expect(ratchet(offenders, ["server/better-auth/hooks.ts"])).toEqual(
-        CLEAN,
-      );
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
 
     /** @scenario "A question about the data is asked in one place" */

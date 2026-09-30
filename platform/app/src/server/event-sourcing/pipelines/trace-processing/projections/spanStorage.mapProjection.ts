@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   enrichRagContextIds,
@@ -13,6 +14,7 @@ import {
   spanReceivedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
+import { isStorableSpanReceived } from "../utils/storableSpanTime";
 import { deriveSpanCost } from "./services/span-cost.derivation";
 import { SpanCostService } from "./services/span-cost.service";
 import {
@@ -25,6 +27,8 @@ const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
 );
 
 const spanCostService = new SpanCostService();
+
+const logger = createLogger("langwatch:trace-processing:span-storage-map");
 
 const spanEvents = [spanReceivedEventSchema] as const;
 
@@ -55,7 +59,16 @@ export class SpanStorageMapProjection
     this.store = deps.store;
   }
 
-  mapTraceSpanReceived(event: SpanReceivedEvent): NormalizedSpan {
+  mapTraceSpanReceived(event: SpanReceivedEvent): NormalizedSpan | null {
+    // Before normalization, because normalization is where an unstorable time
+    // throws: the span's record id is a KSUID over its start SECONDS, so a
+    // value orders of magnitude out fails `uint48` there. The event is already
+    // stored and the throw retries, so skipping is what keeps one span from
+    // blocking the project's whole storage lane.
+    if (!isStorableSpanReceived({ event, logger, consumer: this.name })) {
+      return null;
+    }
+
     const span = spanNormalizationPipelineService.normalizeSpanReceived(
       event.tenantId,
       event.data.span,

@@ -76,6 +76,39 @@ export const LWQL_VIOLATION_CODES = [
   "NESTING_TOO_DEEP",
   /** The default-deny fallthrough: syntax the validator does not recognise. */
   "UNSUPPORTED_SYNTAX",
+  /**
+   * An app function was called somewhere other than the top-level SELECT list.
+   *
+   * Its own code, and the one refusal in this list that is a *correctness*
+   * rule rather than a policy one. The database holds each app function as a
+   * projection UDF over its key, so ClickHouse will happily evaluate
+   * `WHERE conversation(ConversationId) = 'x'` and compare the raw
+   * conversation id — answering with the wrong rows rather than with an error.
+   * Nothing downstream can detect that, so the refusal has to happen here.
+   */
+  "APP_FUNCTION_POSITION",
+  /**
+   * An app function was called without an alias.
+   *
+   * Required so the hydration stage can find the call by output column name.
+   * Without one the column is named after the call text itself, quoting and
+   * all, and locating it would mean parsing a column name back into a call.
+   */
+  "APP_FUNCTION_ALIAS_REQUIRED",
+  /** An app function's arguments do not match its one signature. */
+  "APP_FUNCTION_ARGUMENT",
+  /** An app function was called without the permissions it requires. */
+  "APP_FUNCTION_GATED",
+  /**
+   * An app function was called with a spelling other than the catalogued one.
+   *
+   * The statement is never rewritten and ClickHouse resolves a SQL UDF by its
+   * exact name, so `CONVERSATION(x)` would reach the database as an unknown
+   * function. The name is recognised here anyway, case-insensitively, so the
+   * refusal can name the spelling to use instead of reporting a function the
+   * caller can see in the schema as not allowed.
+   */
+  "APP_FUNCTION_NAME_CASE",
 ] as const;
 
 export type LangWatchQLViolationCode = (typeof LWQL_VIOLATION_CODES)[number];

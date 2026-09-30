@@ -23,13 +23,15 @@ Langy asks which way to use the first time a request needs a code change. Reques
     ![The code access card in the Langy chat, with the options Share my local folder and Use GitHub](/images/langy/local-development/code-access-card.png)
   </Step>
   <Step title="Run the command in the folder">
-    Pick **Share my local folder**. The card shows one command. Run it in the folder you want Langy to work in:
+    Pick **Share local folder**. The card shows one command. Run it in the folder you want Langy to work in:
 
     ```bash
     npx langwatch@latest langy --share-control
     ```
 
     This signs you in if you are not signed in yet, then shows the request from your conversation. Press Enter to approve it. The request expires after 15 minutes.
+
+    The command acts as you, so the only credential it uses is your `langwatch login` on this machine. A `LANGWATCH_API_KEY` in the folder's `.env` or in your shell is never used here and is left as it is. When the login is missing or no longer valid, the command runs the browser sign-in first and then continues.
   </Step>
   <Step title="Langy works in the folder">
     Once approved, the card shows the connected folder and the branch, and Langy starts. It explores the project, creates a branch from the latest default branch, makes the change, runs the project's own checks, commits in your git identity, pushes, and opens the pull request when `gh` is signed in. When `gh` is not signed in, Langy reports the branch name instead.
@@ -56,11 +58,13 @@ Every action runs on your machine, inside the shared folder, through the CLI. La
 | Read a file, list a directory, search for text or files | No |
 | Edit a file, write a new file | No |
 | Run a read-only command (`ls`, `cat`, `git status`, `git diff`, `git log`, `node -v`, and similar) | No |
-| Run any other command (`pnpm test`, `git push`, `rm`) | Yes |
+| Run git in the folder (`git add`, `git commit`, `git checkout`, `git branch`, `git fetch`, `git pull`, `git push`, `git merge`, `git rebase`, `git stash`, and similar) | No |
+| Run a git command that throws work away or rewrites history the remote already has (`git push --force`, `git push --delete`, `git reset --hard`, `git clean -fd`, `git checkout -- <path>`, `git restore <path>`, `git branch -D`, `git stash drop`, `git filter-branch`, `git rm -f`, `git config --global`) | Yes |
+| Run any other command (`pnpm test`, `pnpm install`, `rm`) | Yes |
 | Read a secret file (`.env`, `.envrc`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `.netrc`, `.npmrc`, `.git-credentials`, and similar) | Yes, even to read |
 | Reach a path outside the folder, or use `sudo` | Refused in every mode |
 
-Edits inside the folder run without a question because Langy works on its own branch: your working state and your default branch stay untouched, and the pull request is where you review the change.
+Edits and git run without a question because Langy works on its own branch: it commits in your git identity on a `langy/*` branch, your working state and your default branch stay untouched, and the pull request is where you review the change. Which git form asks is decided by reading the command itself, not by what Langy says about it.
 
 When the CLI refuses an action, it tells Langy why, so Langy finds another way inside the folder or says what it could not do.
 

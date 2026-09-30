@@ -13,15 +13,33 @@ vi.mock("~/server/featureFlag", () => ({
 
 vi.mock("~/server/tracer/collector/piiCheck", () => ({
   batchPresidioClearPII: vi.fn(),
+  NAME_AND_PLACE_ENTITIES: new Set(["PERSON", "LOCATION"]),
   googleDLPClearPII: vi.fn(),
-  PRESIDIO_STRICT_ENTITIES: ["PERSON", "LOCATION", "EMAIL_ADDRESS"],
+  PRESIDIO_STRICT_ENTITIES: [
+    "PERSON",
+    "LOCATION",
+    "EMAIL_ADDRESS",
+    "AU_MEDICARE",
+  ],
+  presidioDefaultEntities: () => [
+    "PERSON",
+    "LOCATION",
+    "EMAIL_ADDRESS",
+    "PHONE_NUMBER",
+  ],
 }));
 
+import {
+  batchPresidioClearPII,
+  googleDLPClearPII,
+} from "~/server/tracer/collector/piiCheck";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import { OtlpSpanPiiRedactionService } from "../span-pii-redaction.service";
 import {
   attr,
   DECIMAL_TRACE_ID_READ_AS_A_PHONE_NUMBER,
   makeService,
+  resolverFor,
   resourceAttr,
   STRICT_POLICY,
   shortTokenCorpus,
@@ -216,6 +234,241 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
 
       expect(attr(span, key)).toBe(traceId);
       expect(attr(span, "app.unreserved_ref")).toBe("[PHONE_NUMBER]");
+    });
+  });
+
+  // Strict mode offers every attribute to the name detector, and a bare
+  // Anthropic model id reads to it as a first name, so `claude-sonnet-4-6` is
+  // stored as `[PERSON]`, and so are some tool names. Model and tool names are chosen by the
+  // developer and the provider, never typed by the end user, so the names
+  // below spare them that pass -- and only that pass.
+  describe("given a model or tool name attribute", () => {
+    /** @scenario "A model or tool name attribute is never redacted as a name" */
+    it.each([
+      ["ai.model.id", "claude-sonnet-4-6"],
+      ["ai.response.model", "claude-sonnet-4-6"],
+      ["gen_ai.request.model", "claude-sonnet-4-6"],
+      ["gen_ai.response.model", "claude-haiku-4-5-20251001"],
+      ["ai.model.provider", "anthropic.messages"],
+      ["gen_ai.system", "anthropic"],
+      ["gen_ai.provider.name", "anthropic"],
+      ["llm.model_name", "anthropic/claude-sonnet-4"],
+      ["ai.toolCall.name", "getWeatherForecast"],
+      ["gen_ai.tool.name", "search_documents"],
+    ])("drops name findings on %s = %s and stores it unchanged", async (key, value) => {
+      const {
+        service,
+        batchSpy,
+        submittedForNames,
+        sparedNames,
+        namesEverything,
+      } = makeService();
+      namesEverything();
+      const span = spanWith({
+        [key]: value,
+        "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,
+      });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submittedForNames()).toContain(PROSE_THAT_MUST_BE_ANALYSED);
+      expect(submittedForNames()).not.toContain(value);
+      expect(sparedNames(value)).toBe(true);
+      // One call carries both: the model name is still scanned for everything.
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      expect(attr(span, key)).toBe(value);
+      expect(attr(span, "app.support_note")).toBe("[PERSON]");
+    });
+
+    // The control: the same value under a name nobody reserved still goes to
+    // name detection, so the name is what the test above measures.
+    it("still submits the same model id under an unreserved name", async () => {
+      const { service, submittedForNames } = makeService();
+      const span = spanWith({ "app.preferred_model": "claude-sonnet-4-6" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submittedForNames()).toContain("claude-sonnet-4-6");
+    });
+
+    // The names are not a namespace anyone owns: a sender can write anything
+    // under `gen_ai.request.model`. Only a single token is spared, so prose
+    // and an email address are still redacted.
+    /** @scenario "Prose written under a model name attribute is still sent for analysis" */
+    it("still submits prose written under a model name", async () => {
+      const { service, submittedForNames } = makeService();
+      const span = spanWith({ "gen_ai.request.model": "Jane Doe" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submittedForNames()).toContain("Jane Doe");
+    });
+
+    /** @scenario "An email address written under a model name attribute is still redacted" */
+    it("still redacts an email address written under a model name", async () => {
+      const { service, submitted } = makeService();
+      const span = spanWith({ "ai.model.id": "jane@example.com" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(attr(span, "ai.model.id")).toBe("[EMAIL_ADDRESS]");
+      expect(submitted()).not.toContain("jane@example.com");
+
+      // The native pass caught it above. Without that pass, the value is still
+      // not spared: it goes to the full detector, names included.
+      const fallback = makeService();
+      await fallback.service.redactSpan(
+        spanWith({ "ai.model.id": "jane@example.com" }),
+        null,
+        "STRICT",
+      );
+      expect(fallback.submittedForNames()).toContain("jane@example.com");
+    });
+
+    /** @scenario "A phone number written under a model name attribute is still redacted" */
+    it("still redacts a phone number written under a model name", async () => {
+      const { service } = makeService();
+      const span = spanWith({ "ai.model.id": "+1-234-567-8901" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(attr(span, "ai.model.id")).toBe("[PHONE_NUMBER]");
+    });
+
+    // With no tenant (or the kill switch, or a failed policy lookup) the native
+    // pass never runs and the analysis batch is the only redaction. A model
+    // name is still scanned there for everything but names and places.
+    /** @scenario "Without a resolved policy a model name attribute is still scanned for other identifiers" */
+    it.each([
+      ["no tenant", undefined],
+      ["a failed policy lookup", TENANT],
+    ] as const)("still scans a model name attribute for a phone number when the native pass did not run (%s)", async (_why, tenant) => {
+      const { service, batchSpy, sparedNames } = makeService(STRICT_POLICY, {
+        getResolvedForProject: async () => {
+          throw new Error("policy store unavailable");
+        },
+      });
+      const span = spanWith({ "ai.model.id": "+1-234-567-8901" });
+
+      await service.redactSpan(span, null, "STRICT", tenant);
+
+      const call = batchSpy.mock.calls.find(([texts]) =>
+        texts.includes("+1-234-567-8901"),
+      );
+      expect(call?.[1].entities ?? ["PHONE_NUMBER"]).toContain("PHONE_NUMBER");
+      expect(sparedNames("+1-234-567-8901")).toBe(true);
+    });
+
+    // Logs and metrics batch through their own record path; it applies the
+    // same exemption.
+    it("spares a model name on a log record the same way", async () => {
+      const { service, submitted, submittedForNames } = makeService();
+      const log = {
+        body: "",
+        attributes: { "gen_ai.request.model": "claude-sonnet-4-6" },
+        resourceAttributes: {},
+      };
+
+      await service.redactLog(log, "STRICT", TENANT);
+
+      expect(submittedForNames()).not.toContain("claude-sonnet-4-6");
+      expect(submitted()).toContain("claude-sonnet-4-6");
+      expect(log.attributes["gen_ai.request.model"]).toBe("claude-sonnet-4-6");
+    });
+
+    // A resolved policy can leave the native pass nothing to do: a custom
+    // level that selects only analysis-service identifiers, with secrets off.
+    // The model name is still scanned for the non-name identifier selected.
+    /** @scenario "A model name attribute is still scanned for the non-name identifiers a custom level selects" */
+    it("still scans a model name attribute for an analysis-only identifier under a custom level", async () => {
+      const { service, batchSpy, submittedForNames, sparedNames } = makeService(
+        {
+          ...STRICT_POLICY,
+          pii: {
+            level: "custom",
+            entities: ["PERSON", "AU_MEDICARE"],
+            exceptPatterns: [],
+          },
+          secrets: { enabled: false, customPatterns: [] },
+        },
+      );
+      const span = spanWith({ "ai.model.id": "claude-sonnet-4-6" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      const call = batchSpy.mock.calls.find(([texts]) =>
+        texts.includes("claude-sonnet-4-6"),
+      );
+      expect(call?.[1].entities).toContain("AU_MEDICARE");
+      expect(sparedNames("claude-sonnet-4-6")).toBe(true);
+      expect(submittedForNames()).not.toContain("claude-sonnet-4-6");
+    });
+
+    // Nothing is left to look for once names and places are removed, so the
+    // model name is not submitted at all and stays as the native pass left it.
+    /** @scenario "A model name attribute is not submitted when only names are selected" */
+    it("does not submit a model name attribute when a custom level selects only names", async () => {
+      const { service, submitted, namesEverything } = makeService({
+        ...STRICT_POLICY,
+        pii: { level: "custom", entities: ["PERSON"], exceptPatterns: [] },
+        secrets: { enabled: false, customPatterns: [] },
+      });
+      namesEverything();
+      const span = spanWith({ "ai.model.id": "claude-sonnet-4-6" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).not.toContain("claude-sonnet-4-6");
+      expect(attr(span, "ai.model.id")).toBe("claude-sonnet-4-6");
+    });
+
+    // The model name rides in the same call as everything else: sparing it
+    // costs no extra request.
+    /** @scenario "A model name attribute costs no extra analysis request" */
+    it("sends a model name and the rest of the span in one call", async () => {
+      const { service, batchSpy } = makeService();
+      const span = spanWith({
+        "ai.model.id": "claude-sonnet-4-6",
+        "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,
+      });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      expect(batchSpy.mock.calls[0]?.[0]).toEqual(
+        expect.arrayContaining([
+          "claude-sonnet-4-6",
+          PROSE_THAT_MUST_BE_ANALYSED,
+        ]),
+      );
+    });
+
+    describe("when the analysis service fails", () => {
+      /** @scenario "The fallback detector also keeps a model name's name findings" */
+      it("asks the fallback detector to spare names on the model name only", async () => {
+        vi.mocked(batchPresidioClearPII).mockRejectedValueOnce(
+          new Error("analysis service unavailable"),
+        );
+        const service = new OtlpSpanPiiRedactionService({
+          isLangevalsConfigured: true,
+          isProduction: false,
+          dataPrivacyResolver: resolverFor(STRICT_POLICY),
+        });
+        const span = spanWith({
+          "ai.model.id": "claude-sonnet-4-6",
+          "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,
+        });
+
+        await service.redactSpan(span, null, "STRICT", TENANT);
+
+        const sparedFor = (text: string) =>
+          vi
+            .mocked(googleDLPClearPII)
+            .mock.calls.find(([args]) => args.currentObject.value === text)?.[0]
+            .spareNamesAndPlaces;
+        expect(sparedFor("claude-sonnet-4-6")).toBe(true);
+        expect(sparedFor(PROSE_THAT_MUST_BE_ANALYSED)).toBe(false);
+      });
     });
   });
 

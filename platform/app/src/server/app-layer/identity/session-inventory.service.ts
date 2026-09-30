@@ -1,6 +1,11 @@
 import { HandledError } from "@langwatch/handled-error";
 import { signInProvedSecondFactor } from "@langwatch/identity";
+
 import { signInMethodLabelFor } from "./session-claims";
+import type {
+  RevocableSession,
+  SessionRevocationService,
+} from "./session-revocation.service";
 
 /**
  * Somebody asked to end the session they are reading from.
@@ -27,9 +32,8 @@ export class SessionIsCurrentError extends HandledError {
  * without ending them all (D06).
  *
  * Two jobs, one subject: the list a person reads on their devices tab, and
- * per-identifier revocation - ending every session one sign-in method minted
- * and leaving the rest untouched. They belong together because they are the
- * same question asked twice: which sessions did this method mint.
+ * the scoped requests that ask the revocation service to end sessions one
+ * sign-in method minted while leaving the rest untouched.
  *
  * Per-identifier revocation is a NARROWER instrument than the revoke-all a
  * password reset performs, never a replacement for it. A reset still ends
@@ -84,25 +88,11 @@ export interface SessionRecordsPort {
     userId: string;
     identifierId: string;
   }): Promise<readonly SessionRecord[]>;
-  /** Ends exactly the named sessions. Answers how many rows went. */
-  deleteByIds(args: { ids: readonly string[] }): Promise<number>;
-}
-
-/**
- * The session cache better-auth reads before the database. Clearing it is
- * what makes a revocation take effect now rather than at the cache's TTL,
- * which is thirty days.
- */
-export interface SessionCachePort {
-  dropTokens(args: {
-    userId: string;
-    tokens: readonly string[];
-  }): Promise<void>;
 }
 
 export interface SessionInventoryServiceDeps {
   records: SessionRecordsPort;
-  cache: SessionCachePort;
+  revocation: SessionRevocationService;
 }
 
 export class SessionInventoryService {
@@ -147,8 +137,8 @@ export class SessionInventoryService {
    * the screen: signing yourself out is a different act with a different
    * button, and a revoke that silently logged you out would read as a bug.
    *
-   * Cache first, then the row — the ordering `endSessionsForIdentifier`
-   * explains.
+   * The revocation service clears the cache before the row — the ordering
+   * `endSessionsForIdentifier` explains.
    */
   async endSession({
     userId,
@@ -167,12 +157,10 @@ export class SessionInventoryService {
     const session = sessions.find((candidate) => candidate.id === sessionId);
     if (!session) return { ended: 0 };
 
-    await this.deps.cache.dropTokens({
+    return this.deps.revocation.revokeSessions({
       userId,
-      tokens: [session.sessionToken],
+      sessions: [this.#revocableSession(session)],
     });
-    const ended = await this.deps.records.deleteByIds({ ids: [session.id] });
-    return { ended };
   }
 
   /**
@@ -183,8 +171,8 @@ export class SessionInventoryService {
    * cannot end somebody else's sessions by naming an identifier that is not
    * theirs.
    *
-   * The cache is cleared BEFORE the rows go, so there is no window in which
-   * the row is gone and better-auth still answers from the cache.
+   * The rows are deleted before cache invalidation, matching single-session
+   * logout. Cache failures are logged by the revocation service.
    */
   async endSessionsForIdentifier({
     userId,
@@ -199,13 +187,13 @@ export class SessionInventoryService {
     });
     if (sessions.length === 0) return { ended: 0 };
 
-    await this.deps.cache.dropTokens({
+    return this.deps.revocation.revokeSessions({
       userId,
-      tokens: sessions.map((session) => session.sessionToken),
+      sessions: sessions.map((session) => this.#revocableSession(session)),
     });
-    const ended = await this.deps.records.deleteByIds({
-      ids: sessions.map((session) => session.id),
-    });
-    return { ended };
+  }
+
+  #revocableSession(session: SessionRecord): RevocableSession {
+    return { id: session.id, sessionToken: session.sessionToken };
   }
 }

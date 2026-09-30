@@ -1,11 +1,20 @@
 import { createLogger } from "@langwatch/observability";
 import { getPrivateClickHouseUrls } from "../server/clickhouse/clickhouseClient";
-import { runMigrations } from "../server/clickhouse/goose";
+import { runMigrations, waitForClickHouse } from "../server/clickhouse/goose";
+import { withClickHouseMigrationLock } from "../server/clickhouse/migrationLock";
 import { reconcileTTL } from "../server/clickhouse/ttlReconciler";
+import { prisma } from "../server/db";
 
 const logger = createLogger("langwatch:task:clickhouseMigrate");
 
 export default async function execute() {
+  // Wait for a booting ClickHouse before queueing on the lock, so a pod that
+  // is only waiting for the server never holds up the pods behind it.
+  await waitForClickHouse();
+  await withClickHouseMigrationLock({ prisma }, migrateAll);
+}
+
+async function migrateAll() {
   // Run migrations on the shared instance (from CLICKHOUSE_URL)
   await runMigrations({ verbose: true });
   await reconcileTTL({ verbose: true });

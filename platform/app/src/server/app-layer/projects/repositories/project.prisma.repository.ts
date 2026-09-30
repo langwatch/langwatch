@@ -8,6 +8,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
@@ -104,6 +105,8 @@ export class PrismaProjectRepository implements ProjectRepository {
             organization: {
               select: {
                 id: true,
+                createdAt: true,
+                signupData: true,
                 members: {
                   where: { role: "ADMIN" },
                   select: { userId: true },
@@ -124,6 +127,8 @@ export class PrismaProjectRepository implements ProjectRepository {
       firstMessage: project.firstMessage,
       organizationId: org?.id ?? null,
       adminUserId: org?.members?.[0]?.userId ?? null,
+      onboardingVariant: parseOnboardingVariant(org?.signupData),
+      organizationCreatedAt: org?.createdAt ?? null,
     };
   }
 

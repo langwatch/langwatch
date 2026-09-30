@@ -358,6 +358,17 @@ export const RETENTION_MANAGED_TABLES = Object.keys(
 export const INDEFINITE_DEFAULT_RETENTION_TABLES = [
   "governance_cost_rollup_1d",
   "governance_cost_rollup_restatement_index",
+  // An Instant Eval judgement carries no customer content, only a probability,
+  // a score or a label, never the text it judged, so none of the reasons above
+  // applies to it either: there is no trace-shaped category to map it to, a
+  // 49-day floor would delete the answer to a question about last quarter, and
+  // there is nothing to bill as storage. Migration 00097 creates the table with
+  // this clause already in place.
+  "instant_eval_judgments",
+  // The run's own row: its counters and the caller's statement. Deleting it on
+  // a timer would orphan the judgements it explains, so it keeps the same
+  // indefinite default. Migration 00098.
+  "instant_eval_runs",
 ] as const;
 
 export type IndefiniteDefaultRetentionTable =

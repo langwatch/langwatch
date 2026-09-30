@@ -2,7 +2,7 @@ import { test as setup, expect } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import { closeDb, findUserIdByEmail } from "./front-door/db";
-import { requestSignUpAddressProof } from "./front-door/steps";
+import { registerConfirmedAccount } from "./front-door/steps";
 
 const AUTH_DIR = path.join(__dirname, "..", ".auth");
 const AUTH_FILE = path.join(AUTH_DIR, "user.json");
@@ -35,30 +35,7 @@ setup("authenticate", async ({ page, request }) => {
   try {
     const existingUserId = await findUserIdByEmail(TEST_USER.email);
     if (existingUserId === null) {
-      const addressProof = await requestSignUpAddressProof(
-        request,
-        TEST_USER.email,
-      );
-      const registerResponse = await request.post(
-        "/api/trpc/user.register?batch=1",
-        {
-          data: {
-            "0": {
-              json: {
-                name: TEST_USER.name,
-                email: TEST_USER.email,
-                password: TEST_USER.password,
-                addressProof,
-              },
-            },
-          },
-        },
-      );
-      if (!registerResponse.ok()) {
-        throw new Error(
-          `Test user registration failed (${registerResponse.status()}): ${(await registerResponse.text()).slice(0, 500)}`,
-        );
-      }
+      await registerConfirmedAccount(request, TEST_USER);
       console.log("Test user created successfully");
     } else {
       console.log("Test user already exists, proceeding with log in");
@@ -103,6 +80,29 @@ setup("authenticate", async ({ page, request }) => {
   if (!dismissNudgeResponse.ok() || dismissNudgeData?.["0"]?.error) {
     throw new Error(
       `dismissSecureAccountNudge failed: ${JSON.stringify(dismissNudgeData).slice(0, 500)}`,
+    );
+  }
+
+  // Same reasoning as the nudge above, for the other modal the shell can open
+  // over a reused session. `JoinYourTeamTakeover` offers this account the
+  // organizations already on its verified address's domain — and every account
+  // the front-door suite confirms is `@langwatch.ai`, the same domain as this
+  // one, so by the time the later suites run there is always something to
+  // offer. It is a cover-size modal, so leaving it open does not merely
+  // obstruct clicks: `aria-modal` takes the rest of the page out of the
+  // accessibility tree, and every `getByRole` in every unrelated suite then
+  // fails as "element(s) not found".
+  const dismissJoinOfferResponse = await page.request.post(
+    "/api/trpc/joinRequests.dismissOffer?batch=1",
+    { data: { "0": { json: {} } } },
+  );
+  const dismissJoinOfferData = await dismissJoinOfferResponse
+    .json()
+    .catch(() => null);
+
+  if (!dismissJoinOfferResponse.ok() || dismissJoinOfferData?.["0"]?.error) {
+    throw new Error(
+      `joinRequests.dismissOffer failed: ${JSON.stringify(dismissJoinOfferData).slice(0, 500)}`,
     );
   }
 

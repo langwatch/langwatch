@@ -1330,7 +1330,11 @@ function CostTotalPanel({
     [measured],
   );
   return (
-    <CostPanel title="Cost over time" sample={showSample}>
+    <CostPanel
+      title="Cost over time"
+      sample={showSample}
+      tourId="gov-cost-over-time"
+    >
       {!showSample && hasFailure ? (
         <CostPanelUnrefreshed />
       ) : (
@@ -1530,7 +1534,11 @@ function BreakdownGrid({
         interval={interval}
         showSample={showSample}
       />
-      <CostPanel title="Cost by department" sample={showSample}>
+      <CostPanel
+        title="Cost by department"
+        sample={showSample}
+        tourId="gov-cost-by-department"
+      >
         {unrefreshed("byDepartment") ? (
           <CostPanelUnrefreshed />
         ) : (

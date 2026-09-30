@@ -362,6 +362,13 @@ describe("isClickHouseUnknownIdentifierError", () => {
       "Code: 47. DB::Exception: Unknown expression identifier `trace_idd` in scope SELECT trace_idd FROM traces. (UNKNOWN_IDENTIFIER)",
     ],
     [
+      // Verbatim from a real 25.8 server: a name passed to a function gets
+      // the longer "expression or function" sentence.
+      "the analyzer's sentence for a name used as a function argument",
+      { code: "47", type: "UNKNOWN_IDENTIFIER" },
+      "Unknown expression or function identifier `trace_idd` in scope SELECT arrayJoin(trace_idd) AS label, count() AS n FROM traces GROUP BY label ORDER BY n DESC. Maybe you meant: ['label']. ",
+    ],
+    [
       "the older non-analyzer path, which single-quotes",
       {},
       "Code: 47. DB::Exception: Missing columns: 'trace_idd' while processing query: 'SELECT trace_idd FROM traces', required columns: 'trace_idd'. (UNKNOWN_IDENTIFIER)",
@@ -373,6 +380,7 @@ describe("isClickHouseUnknownIdentifierError", () => {
       expect(isClickHouseUnknownIdentifierError(raised())).toBe(true);
     });
 
+    /** @scenario "A missing column passed to a function is named in the refusal" */
     it("names the column, and nothing else from the message", () => {
       expect(unknownIdentifierFromError(raised())).toBe("trace_idd");
     });

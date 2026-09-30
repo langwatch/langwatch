@@ -91,6 +91,7 @@ const UNKNOWN_IDENTIFIER: ServerError = {
 const UNKNOWN_TABLE: ServerError = { code: "60", name: "UNKNOWN_TABLE" };
 const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
 const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
+const UNKNOWN_FUNCTION: ServerError = { code: "46", name: "UNKNOWN_FUNCTION" };
 
 /**
  * Whether `error` is one of `variants`, by any of the three forms a server
@@ -155,6 +156,23 @@ export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
 }
 
 /**
+ * True when the server refused because the query called a function it does not
+ * have: UNKNOWN_FUNCTION (46).
+ *
+ * Not mapped inside {@link translateClickHouseQueryError}, like its two
+ * siblings above: on the application's own connection every function name is
+ * one this repository wrote, so a rejected one is a plain bug and must degrade
+ * to "unknown" (ADR-045). Exported for the LangWatchQL executor, whose
+ * validator admits a function name only from its own allowlist or from the
+ * app-function catalog — so there, this means the server is missing the
+ * projection UDFs that catalog declares.
+ */
+export function isClickHouseUnknownFunctionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [UNKNOWN_FUNCTION] });
+}
+
+/**
  * A single identifier, as ClickHouse writes one: a leading letter or
  * underscore, then word characters, optionally qualified by a table alias.
  * Anything else is not something to hand back.
@@ -176,12 +194,16 @@ const IDENTIFIER_SHAPE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
  * while processing query: ...` with single quotes, so both delimiters are
  * accepted and the shape check below decides what is usable.
  *
+ * A name used as a function argument (`arrayJoin(Labels)`) gets a longer
+ * sentence, `Unknown expression or function identifier `Labels``, since the
+ * analyzer cannot tell which of the two the name was meant to be.
+ *
  * Either delimiter opens and closes, rather than a matched pair: an identifier
  * can contain neither, so a mismatched pair cannot smuggle anything past
  * {@link IDENTIFIER_SHAPE}.
  */
 const IDENTIFIER_PATTERNS: readonly RegExp[] = [
-  /Unknown (?:expression |table |column )?identifier [`'"]([^`'"]{1,128})[`'"]/,
+  /Unknown (?:expression or function |expression |table |column )?identifier [`'"]([^`'"]{1,128})[`'"]/,
   /Missing columns: [`'"]([^`'"]{1,128})[`'"]/,
 ];
 

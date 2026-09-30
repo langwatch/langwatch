@@ -32,6 +32,7 @@ import {
 } from "./constants";
 import { AgentPayloadTooLargeError, AgentRegisterRefusedError } from "./errors";
 import {
+  type ConnectedAgentScope,
   deriveScope,
   identityKeyOf,
   isValidEnvironment,
@@ -54,6 +55,7 @@ import {
   type RefusedCode,
   type RefusedFrame,
   type RegisteredFrame,
+  type RegisteredScope,
   type RegisterFrame,
   type ResultFrame,
 } from "./protocol";
@@ -241,6 +243,7 @@ export class AgentSessionCore {
             agentType: "connected",
           }),
           parameterNotes: agent.notes,
+          scope: wireScope(agent.scope),
         })),
         heartbeatIntervalMs,
         instanceId: session.instanceId,
@@ -257,16 +260,9 @@ export class AgentSessionCore {
     frame: RegisterFrame;
     projectId: string;
     userId: string | null;
-  }): Promise<
-    { id: string; name: string; environment: string; notes: string[] }[]
-  > {
+  }): Promise<RegisteredAgentRow[]> {
     const service = AgentService.create(this.prisma);
-    const registered: {
-      id: string;
-      name: string;
-      environment: string;
-      notes: string[];
-    }[] = [];
+    const registered: RegisteredAgentRow[] = [];
     for (const agent of frame.agents) {
       const environment = sanitizeEnvironment(agent.environment);
       if (!isValidEnvironment(environment)) {
@@ -317,6 +313,7 @@ export class AgentSessionCore {
         name: row.name,
         environment,
         notes: normalized.notes,
+        scope,
       });
     }
     return registered;
@@ -584,4 +581,24 @@ function tooLarge(
     instanceId: session.instanceId,
     error: { code: error.code, message: error.message, payload: violation },
   };
+}
+
+interface RegisteredAgentRow {
+  id: string;
+  name: string;
+  environment: string;
+  notes: string[];
+  scope: ConnectedAgentScope;
+}
+
+/** The scope as the registered frame carries it: the owner's id stays here. */
+function wireScope(scope: ConnectedAgentScope): RegisteredScope {
+  switch (scope.kind) {
+    case "shared":
+      return { kind: "shared" };
+    case "owner":
+      return { kind: "owner" };
+    case "host":
+      return { kind: "host", hostLabel: scope.hostLabel };
+  }
 }

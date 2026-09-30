@@ -224,4 +224,24 @@ describe("the password section", () => {
       expect(container.querySelector("section")).toBeNull();
     });
   });
+
+  describe("given a self-hosted deployment behind an enterprise provider", () => {
+    /** @scenario A self-hosted passkey-only administrator can still set a password */
+    it("offers to set a password to a passkey-only account, though the provider is not email", () => {
+      // Self-hosted issues its own passwords even behind an enterprise IdP, so
+      // the server reports EMAIL_PASSWORD_ENABLED true; a passkey-only admin
+      // needs the offer to set the password break-glass go-live asks for.
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "auth0",
+        EMAIL_PASSWORD_ENABLED: true,
+      };
+      hasPasswordRef.current = false;
+      accountsRef.current = [];
+      renderSection();
+
+      expect(screen.getByTestId("password-action").textContent).toMatch(
+        /Set a password/i,
+      );
+    });
+  });
 });

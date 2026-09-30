@@ -131,7 +131,10 @@ vi.mock("~/utils/compat/next-link", () => ({
   ),
 }));
 
-import { LAST_USED_METHOD_STORAGE_KEY } from "../../logic/lastUsedMethod";
+import {
+  LAST_USED_METHOD_STORAGE_KEY,
+  promotePendingMethod,
+} from "../../logic/lastUsedMethod";
 import { IdentifierFirstSignIn } from "../IdentifierFirstSignIn";
 
 const passwordMethod: SignInMethod = {
@@ -295,6 +298,27 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
+  /** @scenario "A sole SSO provider waits for a sign-in gesture" */
+  it("waits for an explicit click before using the sole provider", async () => {
+    routeMock.mockResolvedValue({
+      outcome: "redirect_to_connection",
+      connectionId: "org:acme",
+      methodSet: [oktaMethod],
+      reasonCode: "sole_connection",
+    });
+    renderScreen();
+    const continueButton = await screen.findByRole("button", {
+      name: /continue with okta/i,
+    });
+    expect(signInMock).not.toHaveBeenCalled();
+    await userEvent.click(continueButton);
+    expect(signInMock).toHaveBeenCalledTimes(1);
+    expect(signInMock).toHaveBeenCalledWith(
+      "okta",
+      expect.objectContaining({ callbackUrl: undefined }),
+    );
+  });
+
   describe("when an address routes to an identity provider", () => {
     /** @scenario The email step renders the routed outcome */
     /** @scenario "The address typed on our screen rides along to the identity provider" */
@@ -320,6 +344,30 @@ describe("given the identifier-first sign-in screen", () => {
       expect(
         await screen.findByTestId("routed-to-connection"),
       ).toHaveTextContent(/okta/i);
+    });
+
+    /** @scenario "A provider my address was routed to is badged once it lets me in" */
+    it("parks the provider it dials, so the landing can badge it", async () => {
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+      await waitFor(() => expect(signInMock).toHaveBeenCalled());
+
+      // Nothing is badged by the dial itself: the provider may still refuse.
+      expect(
+        window.localStorage.getItem(LAST_USED_METHOD_STORAGE_KEY),
+      ).toBeNull();
+      // The landing is what promotes it, exactly as the session fetch does.
+      promotePendingMethod();
+      expect(window.localStorage.getItem(LAST_USED_METHOD_STORAGE_KEY)).toBe(
+        oktaMethod.id,
+      );
     });
 
     /** @scenario Wrong-method guidance points at the method my account holds */

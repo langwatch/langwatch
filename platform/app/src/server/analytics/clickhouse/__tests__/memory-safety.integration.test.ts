@@ -305,7 +305,7 @@ describe("memory-safety integration", () => {
         traceCount: 1000,
       });
       wideDataSeeded = true;
-    }, 120_000);
+    }, 600_000);
 
     afterAll(async () => {
       if (wideDataSeeded) {

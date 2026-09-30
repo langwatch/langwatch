@@ -723,15 +723,19 @@ function AgentsPage() {
             onSortChange={(value) => setFilter("sort", value)}
           />
         )}
-        <AgentsPane
-          rows={rows}
-          filters={filters}
-          layout={layout}
-          sample={sample.active}
-          isLoading={isLoading}
-          noAgents={noAgents}
-          onClearFilters={clearFilters}
-        />
+        {/* The guided tour's target on this page: the list, whatever state
+            it is in. */}
+        <Box data-tour="gov-agents">
+          <AgentsPane
+            rows={rows}
+            filters={filters}
+            layout={layout}
+            sample={sample.active}
+            isLoading={isLoading}
+            noAgents={noAgents}
+            onClearFilters={clearFilters}
+          />
+        </Box>
       </VStack>
       {/* No drawer is mounted here. `CurrentDrawer` at the app root owns the
           mount and the address owns which one is open, so this page only ever

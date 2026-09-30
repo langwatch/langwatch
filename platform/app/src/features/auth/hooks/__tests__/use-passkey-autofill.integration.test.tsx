@@ -42,6 +42,7 @@ function Door({
     <div>
       <input aria-label="Email" autoComplete="username webauthn" />
       <input aria-label="Name" autoComplete="name" />
+      <button type="button">Continue</button>
     </div>
   );
 }
@@ -136,6 +137,29 @@ describe("given a deployment that offers passkeys", () => {
     });
   });
 
+  /**
+   * Where the focus is is the wrong question to ask of a pointer. Focus moves
+   * AFTER `pointerdown`, so at that moment it still names whatever somebody is
+   * clicking away from — the address field, on a screen that autofocuses it.
+   * Reading it there armed the offer from a click on any control on the card,
+   * "Continue" included, and Continue runs a passkey ceremony of its own. Two
+   * ceremonies share one server-side challenge: the second overwrites the
+   * first and both assertions are turned down, which reached an end-to-end run
+   * as "We couldn't use that passkey" for a passkey that was perfectly good.
+   */
+  describe("when I click a button while the entrance holds focus in the field", () => {
+    /** @scenario Clicking a button on the card is not reaching for the address field */
+    it("starts nothing, because the pointer was not aimed at the field", async () => {
+      const { getByLabelText, getByRole } = render(<Door enabled />);
+      getByLabelText("Email").focus();
+
+      fireEvent.pointerDown(getByRole("button", { name: "Continue" }));
+      await flush();
+
+      expect(passkeyMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when my gestures land anywhere else", () => {
     /** @scenario The passkey offer waits until I reach for the address field */
     it("starts nothing", async () => {
@@ -208,7 +232,7 @@ describe("given a deployment that offers passkeys", () => {
         error: onError.mock.calls[0]?.[0],
         fallbackTitle: "Could not use a passkey",
       });
-      expect(copy.title).toBe("We couldn't use that passkey");
+      expect(copy.title).toBe("That passkey isn't one we recognize");
       expect(copy.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
       expect(navigateMock).not.toHaveBeenCalled();
     });
@@ -316,7 +340,7 @@ describe("given a deployment that offers passkeys", () => {
         error: onError.mock.calls[0]?.[0],
         fallbackTitle: "Could not use a passkey",
       });
-      expect(copy.title).toBe("We couldn't use that passkey");
+      expect(copy.title).toBe("That passkey isn't one we recognize");
     });
   });
 

@@ -1,14 +1,10 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { formatDuration, formatRelativeTime } from "~/shared/format/time";
 import type { DensityTokens } from "../../../../../hooks/useDensityTokens";
 import type { TraceListItem } from "../../../../../types/trace";
-import {
-  formatCost,
-  formatDuration,
-  formatRelativeTime,
-  formatTokens,
-} from "../../../../../utils/formatters";
+import { formatCost, formatTokens } from "../../../../../utils/formatters";
 import { formatPreview } from "../../../../../utils/previewFormatter";
 import { MonoCell } from "../../../MonoCell";
 import { ROW_STYLES, rowVariantFor, StatusDot } from "../../../StatusRow";
