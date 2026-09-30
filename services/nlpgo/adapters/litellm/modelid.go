@@ -42,7 +42,7 @@ var providersNeedingDotToDash = map[string]bool{
 // names like `openai/co3-thing` or `vertex_ai/o1-pretender-mini` don't
 // false-match in Go where they correctly didn't in Python. Apply via
 // IsReasoningModel which extracts the basename first.
-var reasoningModelPattern = regexp.MustCompile(`(?i)^(o[1345]|gpt-5)(?:-(mini|nano))?`)
+var reasoningModelPattern = regexp.MustCompile(`(?i)^(o[1345]|gpt-(?:[5-9]|[1-9][0-9]))(?:-(mini|nano))?`)
 
 // reasoningMaxTokensFloor is the minimum max_tokens we will send to the
 // gateway for a reasoning model. Lower values commonly produce truncated
@@ -96,7 +96,7 @@ func GatewayProviderForModel(provider string) string {
 }
 
 // IsReasoningModel reports whether the model id matches the reasoning class
-// (o1/o3/o4/o5/gpt-5*). Matches against the model basename so a provider
+// (o1/o3/o4/o5, gpt-5 and every later gpt generation). Matches against the model basename so a provider
 // prefix can't influence the answer — `openai/o1-mini` and bare `o1-mini`
 // give the same result, and `provider/co3-finder` doesn't false-match
 // the way a substring scan against the full id would.

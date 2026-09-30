@@ -14,13 +14,15 @@ import (
 // like insufficient_quota after the stream is already 200-established).
 //
 // Status-based retry cutting (see handleLLM's ModifyResponse) never sees these
-// failures: the SDK's retry re-opens a fresh 200 stream and dies identically,
-// forever. The sniffer closes that gap on the SAME strike rules, a hard-limit
-// discriminant latches on the first event, anything else latches at
-// rateLimitCutAfter consecutive strikes, by arming llmStreamCut, which makes
-// handleLLM answer the conversation's NEXT call with a terminal 400 carrying
-// the provider's own error payload. A stream that ends cleanly (EOF with no
-// error event) clears the capture, mirroring the 2xx-clears-capture rule.
+// failures. A hard-limit discriminant latches on the first event by arming
+// llmStreamCut, which makes handleLLM answer the conversation's NEXT call with
+// a terminal 400 carrying the provider's own error payload: every retry would
+// be answered the same way. Any other in-stream error (an overloaded provider,
+// a server error) is only captured: the worker retries it a bounded number of
+// times (services/langyworker/src/model-retry.ts), and a cut here would end
+// those retries with a 400 of the relay's own making. A stream that ends
+// cleanly (EOF with no error event) clears the capture, mirroring the
+// 2xx-clears-capture rule.
 //
 // One more shape rides under the SSE content type: the gateway can forward an
 // upstream REJECTION as a 200 whose body is a single bare JSON error object
@@ -167,12 +169,12 @@ func (s *llmStreamSniffer) inspectPayload(payload []byte) {
 	e := decodeProviderErrorBody(payload, 0, "text/event-stream")
 	s.entry.setLLMError(e)
 
-	hard := hasHardLimitReason(e)
-	strikes := s.entry.strikeRateLimit()
-	if !hard && strikes < rateLimitCutAfter {
+	// The consecutive-429 count is left to the status path: an in-stream error
+	// is not a rejected call, and counting it would let a later burst of 429s
+	// reach the cut sooner and end the worker's retries.
+	if !hasHardLimitReason(e) {
 		s.logger.Info("otelrelay llm in-stream error event captured",
-			zap.String("conversation", s.entry.info.ConversationID),
-			zap.Int("consecutive", strikes))
+			zap.String("conversation", s.entry.info.ConversationID))
 		return
 	}
 
@@ -186,6 +188,5 @@ func (s *llmStreamSniffer) inspectPayload(payload []byte) {
 	s.entry.latchLLMStreamCut(cutBody)
 	s.logger.Info("otelrelay llm in-stream failure latched for retry cut",
 		zap.String("conversation", s.entry.info.ConversationID),
-		zap.Bool("hard_limit", hard),
-		zap.Int("consecutive", strikes))
+		zap.Bool("hard_limit", true))
 }

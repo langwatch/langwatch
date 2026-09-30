@@ -18,6 +18,11 @@ export type SessionEventLike = {
   [key: string]: unknown;
 };
 
+/** A session event field read as a number, or 0 when it is not one. */
+function numberField(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 type ContentBlock = { type?: string; text?: string };
 
 /** Concatenate the text blocks of a tool result content array. */
@@ -156,6 +161,21 @@ export class TurnEventMapper {
         }
         return events;
       }
+      case "auto_retry_start":
+        return [
+          {
+            type: "retrying",
+            turnId: this.turnId,
+            attempt: numberField(event.attempt),
+            maxAttempts: numberField(event.maxAttempts),
+            delayMs: numberField(event.delayMs),
+          },
+        ];
+      case "auto_retry_end":
+        // Every end clears the retry line: an answered call, the last retry
+        // failing or a stop during the wait. The error terminal that follows a
+        // failed end does not clear the status on its own.
+        return [{ type: "retry_settled", turnId: this.turnId }];
       default:
         return [];
     }
