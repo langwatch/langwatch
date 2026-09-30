@@ -327,3 +327,363 @@
 - {"id": "workflows-code-completion-refuses-no-key", "endpoint": "POST /api/workflows/code-completion", "auth": "none", "request": {"path": "/api/workflows/code-completion", "body": {}}, "expect": {"status": [400, 401, 422]}}
 - {"id": "workflows-code-completion-empty-body", "endpoint": "POST /api/workflows/code-completion", "request": {"path": "/api/workflows/code-completion", "body": {}}, "expect": {"status": [400, 401, 422]}}
 - {"id": "workflows-health-answers", "endpoint": "GET /api/health/workflows", "request": {"path": "/api/health/workflows"}, "expect": {"status": [200, 404, 500, 502, 503]}}
+
+# ---- cov-readback: writes read back (workflows have no create route, so they borrow the first listed workflow) ----
+
+- id: workflows-get-reads-listed-workflow
+  endpoint: GET /api/workflows/{id}
+  setup:
+    - request: GET /api/workflows
+      capture: { wfId: "0.id", wfName: "0.name" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}" }
+  expect: { status: 200, body: { id: "{wfId}", name: "{wfName}", platformUrl: "<any>", isEvaluator: "<any>", createdAt: "<any>" } }
+
+- id: workflows-update-name-reads-back
+  endpoint: PATCH /api/workflows/{id}
+  shard: serial
+  setup:
+    - request: GET /api/workflows
+      capture: { wfId: "0.id", wfName: "0.name" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}", body: { name: "renamed-{uid}" } }
+  expect: { status: 200, body: { id: "{wfId}", name: "renamed-{uid}" } }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      expect: { status: 200, body: { id: "{wfId}", name: "renamed-{uid}" } }
+    - request: GET /api/workflows
+      expect: { status: 200, contains: "renamed-{uid}" }
+    - request: PATCH /api/workflows/{wfId}
+      body: { name: "{wfName}" }
+      expect: { status: 200, body: { name: "{wfName}" } }
+    - request: GET /api/workflows/{wfId}
+      expect: { status: 200, body: { name: "{wfName}" } }
+
+- id: workflows-update-description-reads-back
+  endpoint: PATCH /api/workflows/{id}
+  shard: serial
+  setup:
+    - request: GET /api/workflows
+      capture: { wfId: "0.id", wfName: "0.name", wfDescription: "0.description" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}", body: { description: "described-{uid}", icon: "🧪" } }
+  expect: { status: 200, body: { id: "{wfId}", description: "described-{uid}", icon: "🧪", name: "{wfName}" } }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      expect: { status: 200, body: { description: "described-{uid}", icon: "🧪", name: "{wfName}" } }
+    - request: PATCH /api/workflows/{wfId}
+      body: { description: "{wfDescription}" }
+      expect: { status: 200 }
+    - request: GET /api/workflows/{wfId}
+      expect: { status: 200, body: { description: "{wfDescription}" } }
+
+- id: workflows-update-empty-name-leaves-name
+  endpoint: PATCH /api/workflows/{id}
+  setup:
+    - request: GET /api/workflows
+      capture: { wfId: "0.id", wfName: "0.name" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}", body: { name: "" } }
+  expect: { status: [400, 422] }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      expect: { status: 200, body: { name: "{wfName}" } }
+
+- id: workflows-update-refuses-no-key-leaves-name
+  endpoint: PATCH /api/workflows/{id}
+  auth: none
+  setup:
+    - request: GET /api/workflows
+      auth: project
+      capture: { wfId: "0.id", wfName: "0.name" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}", body: { name: "refused-{uid}" } }
+  expect: { status: 401 }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      auth: project
+      expect: { status: 200, body: { name: "{wfName}" }, notContains: "refused-{uid}" }
+
+- id: workflows-update-refuses-readonly-key-leaves-name
+  endpoint: PATCH /api/workflows/{id}
+  auth: restricted
+  setup:
+    - request: GET /api/workflows
+      auth: project
+      capture: { wfId: "0.id", wfName: "0.name" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}", body: { name: "refused-{uid}" } }
+  expect: { status: [401, 403] }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      auth: project
+      expect: { status: 200, body: { name: "{wfName}" }, notContains: "refused-{uid}" }
+
+- id: workflows-update-wrong-project-leaves-name
+  endpoint: PATCH /api/workflows/{id}
+  auth: project-b
+  setup:
+    - request: GET /api/workflows
+      auth: project
+      capture: { wfId: "0.id", wfName: "0.name" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}", body: { name: "hijacked-{uid}" } }
+  expect: { status: 404 }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      auth: project
+      expect: { status: 200, body: { name: "{wfName}" }, notContains: "hijacked-{uid}" }
+
+- id: workflows-delete-refuses-no-key-leaves-workflow
+  endpoint: DELETE /api/workflows/{id}
+  auth: none
+  setup:
+    - request: GET /api/workflows
+      auth: project
+      capture: { wfId: "0.id" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}" }
+  expect: { status: 401 }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      auth: project
+      expect: { status: 200, body: { id: "{wfId}" } }
+
+- id: workflows-delete-refuses-readonly-key-leaves-workflow
+  endpoint: DELETE /api/workflows/{id}
+  auth: restricted
+  setup:
+    - request: GET /api/workflows
+      auth: project
+      capture: { wfId: "0.id" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}" }
+  expect: { status: [401, 403] }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      auth: project
+      expect: { status: 200, body: { id: "{wfId}" } }
+
+- id: workflows-delete-wrong-project-leaves-workflow
+  endpoint: DELETE /api/workflows/{id}
+  auth: project-b
+  setup:
+    - request: GET /api/workflows
+      auth: project
+      capture: { wfId: "0.id" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}" }
+  expect: { status: 404 }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      auth: project
+      expect: { status: 200, body: { id: "{wfId}" } }
+
+- id: experiments-create-reads-back-fields
+  endpoint: POST /api/experiments
+  request: { path: /api/experiments, body: { name: "exp-{uid}" } }
+  capture: { expSlug: slug, expId: id }
+  expect: { status: 200, body: { id: "<any>", slug: "<any>", version: 1 } }
+  verify:
+    - request: GET /api/experiments/{expSlug}
+      expect: { status: 200, body: { id: "{expId}", slug: "{expSlug}", name: "exp-{uid}", type: EVALUATIONS_V3, runsCount: 0 } }
+    - request: GET /api/experiments/{expSlug}/versions
+      expect: { status: 200, path: versions, length: 1 }
+
+- id: experiments-create-refuses-no-key-writes-nothing
+  endpoint: POST /api/experiments
+  auth: none
+  request: { path: /api/experiments, body: { name: "refused-{uid}" } }
+  expect: { status: 401 }
+  verify:
+    - request: { method: GET, path: /api/experiments, auth: project, query: { pageSize: 100 } }
+      auth: project
+      expect: { status: 200, notContains: "refused-{uid}" }
+
+- id: experiments-create-refuses-readonly-key-writes-nothing
+  endpoint: POST /api/experiments
+  auth: restricted
+  request: { path: /api/experiments, body: { name: "refused-{uid}" } }
+  expect: { status: [401, 403] }
+  verify:
+    - request: { method: GET, path: /api/experiments, query: { pageSize: 100 } }
+      auth: project
+      expect: { status: 200, notContains: "refused-{uid}" }
+
+- id: experiments-create-other-project-does-not-leak
+  endpoint: POST /api/experiments
+  request: { path: /api/experiments, body: { name: "exp-{uid}" } }
+  capture: { expSlug: slug }
+  expect: { status: 200 }
+  verify:
+    - request: GET /api/experiments/{expSlug}
+      auth: project-b
+      expect: { status: 404 }
+
+- id: experiments-wbstate-put-invalid-state-writes-nothing
+  endpoint: PUT /api/experiments/{slug}/workbench-state
+  setup:
+    - request: POST /api/experiments
+      body: { name: "exp-{uid}" }
+      capture: { expSlug: slug }
+  request: { path: "/api/experiments/{expSlug}/workbench-state", body: { state: {}, commitMessage: "apidiff-{uid}" } }
+  expect: { status: 400 }
+  verify:
+    - request: GET /api/experiments/{expSlug}/workbench-state
+      expect: { status: 200, body: { slug: "{expSlug}", name: "exp-{uid}", state: { name: "exp-{uid}" } } }
+    - request: GET /api/experiments/{expSlug}/versions
+      expect: { status: 200, path: versions, length: 1, notContains: "apidiff-{uid}" }
+
+- id: experiments-wbstate-put-refuses-readonly-key-writes-nothing
+  endpoint: PUT /api/experiments/{slug}/workbench-state
+  auth: restricted
+  setup:
+    - request: POST /api/experiments
+      auth: project
+      body: { name: "exp-{uid}" }
+      capture: { expSlug: slug }
+  request: { path: "/api/experiments/{expSlug}/workbench-state", body: { state: {}, commitMessage: "refused-{uid}" } }
+  expect: { status: [401, 403] }
+  verify:
+    - request: GET /api/experiments/{expSlug}/versions
+      auth: project
+      expect: { status: 200, path: versions, length: 1, notContains: "refused-{uid}" }
+
+- id: experiments-restore-current-version-reads-back
+  endpoint: POST /api/experiments/{slug}/versions/{version}/restore
+  setup:
+    - request: POST /api/experiments
+      body: { name: "exp-{uid}" }
+      capture: { expSlug: slug }
+  request: { path: "/api/experiments/{expSlug}/versions/1/restore" }
+  expect: { status: [200, 201, 400, 409] }
+  verify:
+    - request: GET /api/experiments/{expSlug}
+      expect: { status: 200, body: { slug: "{expSlug}", name: "exp-{uid}" } }
+    - request: GET /api/experiments/{expSlug}/versions
+      expect: { status: 200 }
+
+- id: experiments-restore-refuses-readonly-key-changes-nothing
+  endpoint: POST /api/experiments/{slug}/versions/{version}/restore
+  auth: restricted
+  setup:
+    - request: POST /api/experiments
+      auth: project
+      body: { name: "exp-{uid}" }
+      capture: { expSlug: slug }
+  request: { path: "/api/experiments/{expSlug}/versions/1/restore" }
+  expect: { status: [401, 403] }
+  verify:
+    - request: GET /api/experiments/{expSlug}/versions
+      auth: project
+      expect: { status: 200, path: versions, length: 1 }
+
+- id: experiment-init-is-idempotent-reads-one
+  endpoint: POST /api/experiment/init
+  setup:
+    - request: POST /api/experiment/init
+      body: { experiment_slug: "init-{uid}", experiment_type: BATCH_EVALUATION_V2 }
+  request: { path: /api/experiment/init, body: { experiment_slug: "init-{uid}", experiment_type: BATCH_EVALUATION_V2 } }
+  expect: { status: 200, body: { slug: "init-{uid}" } }
+  verify:
+    - request: GET /api/experiments/init-{uid}
+      expect: { status: 200, body: { slug: "init-{uid}" } }
+
+- id: experiment-init-refuses-no-key-writes-nothing
+  endpoint: POST /api/experiment/init
+  auth: none
+  request: { path: /api/experiment/init, body: { experiment_slug: "refused-{uid}", experiment_type: BATCH_EVALUATION_V2 } }
+  expect: { status: 401 }
+  verify:
+    - request: GET /api/experiments/refused-{uid}
+      auth: project
+      expect: { status: 404 }
+
+- id: evaluations-batch-log-run-reads-back-fields
+  endpoint: POST /api/evaluations/batch/log_results
+  request:
+    path: /api/evaluations/batch/log_results
+    body:
+      run_id: "run-{uid}"
+      experiment_slug: "batch3-{uid}"
+      name: "batch3-{uid}"
+      dataset: [{ index: 0, entry: { input: "a-{uid}" }, predicted: { output: "b-{uid}" } }]
+      evaluations: [{ evaluator: exact_match, status: processed, index: 0, score: 1, passed: true }]
+  expect: { status: [200, 201] }
+  verify:
+    - request: GET /api/experiments/batch3-{uid}
+      eventually: 60s
+      expect: { status: 200, body: { slug: "batch3-{uid}" } }
+    - request: { method: GET, path: /api/experiments/runs, query: { experimentSlug: "batch3-{uid}" } }
+      eventually: 60s
+      expect: { status: 200, contains: "run-{uid}" }
+
+- id: evaluations-batch-log-refuses-no-key-writes-nothing
+  endpoint: POST /api/evaluations/batch/log_results
+  auth: none
+  request:
+    path: /api/evaluations/batch/log_results
+    body: { run_id: "run-{uid}", experiment_slug: "refused-{uid}", name: "refused-{uid}", dataset: [{ index: 0, entry: { input: a } }] }
+  expect: { status: 401 }
+  verify:
+    - request: GET /api/experiments/refused-{uid}
+      auth: project
+      expect: { status: 404 }
+
+- id: evaluations-batch-log-refuses-readonly-key-writes-nothing
+  endpoint: POST /api/evaluations/batch/log_results
+  auth: restricted
+  request:
+    path: /api/evaluations/batch/log_results
+    body: { run_id: "run-{uid}", experiment_slug: "refused-{uid}", name: "refused-{uid}", dataset: [{ index: 0, entry: { input: a } }] }
+  expect: { status: [401, 403] }
+  verify:
+    - request: GET /api/experiments/refused-{uid}
+      auth: project
+      expect: { status: 404 }
+
+# ---- cov-readback: fuzz 5xx reproductions (main's status from origin/main's handlers) ----
+
+- id: fuzz-dataset-record-patch-empty-entry-unknown-dataset
+  endpoint: PATCH /api/dataset/{slugOrId}/records/{recordId}
+  request: { path: "/api/dataset/fuzzer-{uid}/records/fuzzer", body: { entry: {} } }
+  expect: { status: 404 }
+
+- id: fuzz-dataset-record-patch-empty-entry-creates-record
+  endpoint: PATCH /api/dataset/{slugOrId}/records/{recordId}
+  setup:
+    - request: POST /api/dataset
+      body: { name: "ds-{uid}", columnTypes: [{ name: input, type: string }] }
+      capture: { datasetId: id }
+  request: { path: "/api/dataset/{datasetId}/records/fuzzer-{uid}", body: { entry: {} } }
+  expect: { status: 201, body: { id: "fuzzer-{uid}" } }
+  verify:
+    - request: GET /api/dataset/{datasetId}/records
+      expect: { status: 200, contains: "fuzzer-{uid}" }
+
+- id: fuzz-dataset-create-nul-name
+  endpoint: POST /api/dataset
+  request: { path: /api/dataset, body: { name: "😀\u0000\ufffd\u202e中文" } }
+  expect: { status: [422, 500] }
+
+- id: fuzz-dataset-patch-nul-name-unknown-dataset
+  endpoint: PATCH /api/dataset/{slugOrId}
+  request: { path: "/api/dataset/fuzzer-{uid}", body: { columnTypes: [{ name: fuzzer, type: string }], name: "😀\u0000\ufffd\u202e中文" } }
+  expect: { status: 404 }
+
+- id: fuzz-dataset-patch-nul-name-known-dataset
+  endpoint: PATCH /api/dataset/{slugOrId}
+  setup:
+    - request: POST /api/dataset
+      body: { name: "ds-{uid}", columnTypes: [{ name: input, type: string }] }
+      capture: { datasetId: id }
+  request: { path: "/api/dataset/{datasetId}", body: { name: "😀\u0000\ufffd\u202e中文" } }
+  expect: { status: [422, 500] }
+  verify:
+    - request: GET /api/dataset/{datasetId}
+      expect: { status: 200, body: { name: "ds-{uid}" } }
+
+- id: fuzz-dataset-imports-nul-stored-object-unknown-dataset
+  endpoint: POST /api/dataset/{slugOrId}/imports
+  request: { path: "/api/dataset/fuzzer-{uid}/imports", body: { storedObjectId: "😀\u0000\ufffd\u202e中文" } }
+  expect: { status: [404, 400, 422] }

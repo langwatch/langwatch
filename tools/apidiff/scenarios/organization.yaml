@@ -7807,3 +7807,174 @@
     path: "/api/user-avatar/{projectId}/nope-{uid}"
   expect: {"status": [401, 403, 404]}
 
+
+# ---- cov-readback: teams and scim-tokens writes read back; fuzz 5xx reproductions ----
+- id: "team-create-reads-back-fields"
+  endpoint: "POST /api/teams"
+  auth: "org"
+  request: {"path": "/api/teams", "body": {"name": "vd-{uid}"}}
+  capture: {"teamId": "id", "teamSlug": "slug"}
+  expect: {"status": 201, "body": {"name": "vd-{uid}", "id": "<any>", "slug": "<any>", "organizationId": "{orgId}"}}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "expect": {"status": 200, "body": {"id": "{teamId}", "name": "vd-{uid}", "slug": "{teamSlug}", "organizationId": "{orgId}"}}}
+- id: "team-create-refuses-no-key-writes-nothing"
+  endpoint: "POST /api/teams"
+  auth: "none"
+  request: {"path": "/api/teams", "body": {"name": "refused-{uid}"}}
+  expect: {"status": 401}
+  verify:
+    - {"request": {"method": "GET", "path": "/api/teams", "query": {"limit": 1000}}, "auth": "org", "expect": {"status": 200, "notContains": "refused-{uid}"}}
+- id: "team-create-refuses-project-key-writes-nothing"
+  endpoint: "POST /api/teams"
+  auth: "project"
+  request: {"path": "/api/teams", "body": {"name": "refused-{uid}"}}
+  expect: {"status": [401, 403]}
+  verify:
+    - {"request": {"method": "GET", "path": "/api/teams", "query": {"limit": 1000}}, "auth": "org", "expect": {"status": 200, "notContains": "refused-{uid}"}}
+- id: "team-create-refuses-read-only-key-writes-nothing"
+  endpoint: "POST /api/teams"
+  auth: "restricted"
+  request: {"path": "/api/teams", "body": {"name": "refused-{uid}"}}
+  expect: {"status": 403}
+  verify:
+    - {"request": {"method": "GET", "path": "/api/teams", "query": {"limit": 1000}}, "auth": "org", "expect": {"status": 200, "notContains": "refused-{uid}"}}
+- id: "team-create-overlong-name-writes-nothing"
+  endpoint: "POST /api/teams"
+  auth: "org"
+  request: {"path": "/api/teams", "body": {"name": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"}}
+  expect: {"status": [400, 422]}
+  verify:
+    - {"request": {"method": "GET", "path": "/api/teams", "query": {"limit": 1000}}, "expect": {"status": 200, "notContains": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"}}
+- id: "team-update-refuses-no-key-keeps-name"
+  endpoint: "PATCH /api/teams/{teamId}"
+  auth: "none"
+  setup:
+    - {"auth": "org", "request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}", "body": {"name": "refused-{uid}"}}
+  expect: {"status": 401}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "auth": "org", "expect": {"status": 200, "body": {"name": "vd-{uid}"}}}
+- id: "team-update-refuses-project-key-keeps-name"
+  endpoint: "PATCH /api/teams/{teamId}"
+  auth: "project"
+  setup:
+    - {"auth": "org", "request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}", "body": {"name": "refused-{uid}"}}
+  expect: {"status": [401, 403]}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "auth": "org", "expect": {"status": 200, "body": {"name": "vd-{uid}"}}}
+- id: "team-update-refuses-read-only-key-keeps-name"
+  endpoint: "PATCH /api/teams/{teamId}"
+  auth: "restricted"
+  setup:
+    - {"auth": "org", "request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}", "body": {"name": "refused-{uid}"}}
+  expect: {"status": 403}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "auth": "org", "expect": {"status": 200, "body": {"name": "vd-{uid}"}}}
+- id: "team-update-overlong-name-keeps-name"
+  endpoint: "PATCH /api/teams/{teamId}"
+  auth: "org"
+  setup:
+    - {"request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}", "body": {"name": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL"}}
+  expect: {"status": [400, 422]}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "expect": {"status": 200, "body": {"name": "vd-{uid}"}}}
+- id: "team-update-reads-back-in-list-and-get"
+  endpoint: "PATCH /api/teams/{teamId}"
+  auth: "org"
+  setup:
+    - {"request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}", "body": {"name": "renamed-{uid}"}}
+  expect: {"status": 200, "body": {"id": "{teamId}", "name": "renamed-{uid}"}}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "expect": {"status": 200, "body": {"id": "{teamId}", "name": "renamed-{uid}"}}}
+    - {"request": {"method": "GET", "path": "/api/teams", "query": {"limit": 1000}}, "eventually": "15s", "expect": {"status": 200, "contains": "renamed-{uid}"}}
+- id: "team-archive-then-get-is-not-found"
+  endpoint: "DELETE /api/teams/{teamId}"
+  auth: "org"
+  setup:
+    - {"request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}"}
+  expect: {"status": 200}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "expect": {"status": 404}}
+    - {"request": {"method": "GET", "path": "/api/teams", "query": {"limit": 1000}}, "expect": {"status": 200, "notContains": "vd-{uid}"}}
+- id: "team-archive-refuses-no-key-keeps-team"
+  endpoint: "DELETE /api/teams/{teamId}"
+  auth: "none"
+  setup:
+    - {"auth": "org", "request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}"}
+  expect: {"status": 401}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "auth": "org", "expect": {"status": 200, "body": {"id": "{teamId}", "name": "vd-{uid}"}}}
+- id: "team-archive-refuses-project-key-keeps-team"
+  endpoint: "DELETE /api/teams/{teamId}"
+  auth: "project"
+  setup:
+    - {"auth": "org", "request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}"}
+  expect: {"status": [401, 403]}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "auth": "org", "expect": {"status": 200, "body": {"id": "{teamId}", "name": "vd-{uid}"}}}
+- id: "team-archive-refuses-read-only-key-keeps-team"
+  endpoint: "DELETE /api/teams/{teamId}"
+  auth: "restricted"
+  setup:
+    - {"auth": "org", "request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}"}
+  expect: {"status": 403}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "auth": "org", "expect": {"status": 200, "body": {"id": "{teamId}", "name": "vd-{uid}"}}}
+- id: "scim-tokens-create-refuses-no-key-writes-nothing"
+  endpoint: "POST /api/scim-tokens"
+  auth: "none"
+  request: {"path": "/api/scim-tokens", "body": {"description": "refused-{uid}", "connectionId": "conn-{uid}"}}
+  expect: {"status": 401}
+  verify:
+    - {"request": "GET /api/scim-tokens", "auth": "org", "expect": {"status": 200, "notContains": "refused-{uid}"}}
+- id: "scim-tokens-create-refuses-project-key-writes-nothing"
+  endpoint: "POST /api/scim-tokens"
+  auth: "project"
+  request: {"path": "/api/scim-tokens", "body": {"description": "refused-{uid}", "connectionId": "conn-{uid}"}}
+  expect: {"status": [401, 403]}
+  verify:
+    - {"request": "GET /api/scim-tokens", "auth": "org", "expect": {"status": 200, "notContains": "refused-{uid}"}}
+- id: "scim-tokens-create-refuses-read-only-key-writes-nothing"
+  endpoint: "POST /api/scim-tokens"
+  auth: "restricted"
+  request: {"path": "/api/scim-tokens", "body": {"description": "refused-{uid}", "connectionId": "conn-{uid}"}}
+  expect: {"status": 403}
+  verify:
+    - {"request": "GET /api/scim-tokens", "auth": "org", "expect": {"status": 200, "notContains": "refused-{uid}"}}
+- id: "scim-tokens-create-unknown-connection-writes-nothing"
+  endpoint: "POST /api/scim-tokens"
+  auth: "org"
+  request: {"path": "/api/scim-tokens", "body": {"description": "unknown-{uid}", "connectionId": "conn-{uid}"}}
+  expect: {"status": [400, 403, 404, 409, 422]}
+  verify:
+    - {"request": "GET /api/scim-tokens", "expect": {"status": 200, "notContains": "unknown-{uid}"}}
+
+- id: "fuzz-teams-create-nul-name"
+  endpoint: "POST /api/teams"
+  auth: "org"
+  request: {"path": "/api/teams", "body": {"name": "😀\u0000\ufffd\u202e中文"}}
+  expect: {"status": [422, 500]}
+- id: "fuzz-teams-update-nul-name-keeps-name"
+  endpoint: "PATCH /api/teams/{teamId}"
+  auth: "org"
+  setup:
+    - {"request": "POST /api/teams", "body": {"name": "vd-{uid}"}, "capture": {"teamId": "id"}}
+  request: {"path": "/api/teams/{teamId}", "body": {"name": "😀\u0000\ufffd\u202e中文"}}
+  expect: {"status": [422, 500]}
+  verify:
+    - {"request": "GET /api/teams/{teamId}", "expect": {"status": 200, "body": {"name": "vd-{uid}"}}}
+- id: "fuzz-scim-tokens-create-nul-connection-id"
+  endpoint: "POST /api/scim-tokens"
+  auth: "org"
+  request: {"path": "/api/scim-tokens", "body": {"connectionId": "😀\u0000\ufffd\u202e中文", "description": "fuzzer-{uid}"}}
+  expect: {"status": [422, 500]}
+  verify:
+    - {"request": "GET /api/scim-tokens", "expect": {"status": 200, "notContains": "fuzzer-{uid}"}}
