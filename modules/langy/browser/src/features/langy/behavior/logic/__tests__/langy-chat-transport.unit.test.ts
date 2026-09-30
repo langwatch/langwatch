@@ -340,11 +340,6 @@ describe("createLangyChatTransport", () => {
       // worker sends before its first output is not one: on a turn that already
       // shows a card, the panel hides readiness statuses, and the retry line
       // would vanish with it.
-      const onSignal = vi.fn();
-      const { transport } = makeTransport({ conversationId: null }, { onSignal });
-      await transport.sendMessages(options());
-      const { onData } = streamHandlers();
-
       onData({ type: "status", status: "Thinking…" });
       onData({ type: "status", status: "Retrying (1 of 5)" });
       onData({ type: "status", status: "" });

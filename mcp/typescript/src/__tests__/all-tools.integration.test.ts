@@ -1428,7 +1428,7 @@ describe("All MCP tools integration", () => {
       /** @scenario An id-shaped query is still executed as a search */
       it("still executes a search and never a single-trace lookup", async () => {
         const { handleSearchTraces } = await import("../tools/search-traces.ts");
-        delete lastRequests["GET /api/traces/63dc535cea6335c506bc81ef3543a07d"];
+        delete lastRequests["GET /api/v1/traces/63dc535cea6335c506bc81ef3543a07d"];
 
         await handleSearchTraces({
           query: "63dc535cea6335c506bc81ef3543a07d",
@@ -1438,7 +1438,7 @@ describe("All MCP tools integration", () => {
         expect(search).toBeDefined();
         const requestBody = traceSearchRequestSchema.parse(JSON.parse(search!.body));
         expect(requestBody.query).toBe("63dc535cea6335c506bc81ef3543a07d");
-        expect(lastRequests["GET /api/traces/63dc535cea6335c506bc81ef3543a07d"]).toBeUndefined();
+        expect(lastRequests["GET /api/v1/traces/63dc535cea6335c506bc81ef3543a07d"]).toBeUndefined();
       });
     });
 

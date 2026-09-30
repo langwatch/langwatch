@@ -39,7 +39,7 @@ describe("CLI request attribution", () => {
       });
 
       expect(requests).toHaveLength(1);
-      expect(requests[0]?.url).toContain("/api/monitors");
+      expect(requests[0]?.url).toContain("/api/v1/monitors");
       expect(requests[0]?.headers.get("authorization")).toBe("Bearer sk-lw-test");
       expect(requests[0]?.headers.get("x-langwatch-surface")).toBe("cli");
       expect(requests[0]?.headers.get("x-langwatch-sdk-language")).toBe("typescript");
