@@ -522,3 +522,87 @@ targetRules = ["generic-api-key"]
 condition = "AND"
 paths = ['''platform/app/ee/admin/backoffice/resources/instances/types\.ts''']
 regexes = ['''^scenario_runs_28d$''']
+
+# Test literals and public handles that `generic-api-key` reads as credentials:
+# `0123456789abcdef...` gateway secrets, `tok_abc123def456` reset tokens,
+# `conversation-1` process keys, `sk-lw-...` echoes. None was issued by anyone.
+# Scoped to this rule and to each exact file, so provider rules still apply.
+[[allowlists]]
+description = "Test literals and public handles in current-tree fixture files"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^apps/api/src/app/__tests__/api-trpc-collaborators\.agent-group\.integration\.test\.ts$''',
+  '''^apps/haven-web/src/home/__tests__/stack-home\.integration\.test\.tsx$''',
+  '''^apps/tasks/src/storage-seed/seed-license\.ts$''',
+  '''^enterprise/modules/governance/process/src/services/__tests__/governance-mcp-tools\.service\.unit\.test\.ts$''',
+  '''^enterprise/modules/governance/process/src/services/__tests__/personal-ingestion-key\.service\.unit\.test\.ts$''',
+  '''^enterprise/modules/governance/server/src/transport/__tests__/governance-ingest\.rest\.unit\.test\.ts$''',
+  '''^modules/auth/process/src/app/__tests__/password-reset-sender\.unit\.test\.ts$''',
+  '''^modules/gateway/process/src/app/__tests__/gateway-installation\.unit\.test\.ts$''',
+  '''^modules/gateway/server/src/transport/__tests__/gateway-internal-config-route\.integration\.test\.ts$''',
+  '''^modules/gateway/server/src/transport/__tests__/gateway-internal-spend-ingest\.integration\.test\.ts$''',
+  '''^modules/gateway/server/src/transport/__tests__/gateway-internal-virtual-key-expiry\.integration\.test\.ts$''',
+  '''^modules/gateway/server/src/transport/__tests__/gateway-internal-virtual-key-lifecycle\.integration\.test\.ts$''',
+  '''^modules/gateway/server/src/transport/__tests__/gateway-platform\.rest\.integration\.test\.ts$''',
+  '''^modules/gateway/server/src/transport/__tests__/support/gateway-internal-rest\.harness\.ts$''',
+  '''^modules/ops/process/src/app/__tests__/ops\.app\.checkup-audience\.unit\.test\.ts$''',
+  '''^modules/ops/process/src/services/__tests__/ops-checkup\.service\.unit\.test\.ts$''',
+  '''^modules/ops/process/src/services/__tests__/usage-report-collection\.service\.unit\.test\.ts$''',
+  '''^modules/ops/process/src/services/__tests__/usage-report\.service\.unit\.test\.ts$''',
+  '''^modules/trace/process/src/transport/__tests__/otlp-ingest\.rest\.declaration\.unit\.test\.ts$''',
+  '''^packages/mail/src/templates/__tests__/__snapshots__/mail-templates\.unit\.test\.tsx\.snap$''',
+  '''^packages/mail/src/templates/__tests__/growth-hooks\.unit\.test\.tsx$''',
+  '''^packages/mail/src/templates/reset-password-email\.tsx$''',
+  '''^specs/langy/langy-frame-auth\.vectors\.gen\.mjs$''',
+  '''^tools/visualdiff/publish_test\.go$''',
+  '''^tools/visualdiff/runner/src/__tests__/totp\.unit\.test\.ts$''',
+]
+
+# The same kind of literal in paths the branch history carried before the tree
+# was restructured. gitleaks scans every commit in the range, so the old paths
+# still need naming. The billing files hold public Stripe `lookupKey` handles.
+# Scoped to this rule and to each exact file, as above.
+[[allowlists]]
+description = "Test literals and public handles in fixture files at their pre-restructure paths"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^dev/docs/plans/core-application-feature-extraction-plan\.md$''',
+  '''^packages/enterprise/features/billing/contract/src/stripe-catalog\.json$''',
+  '''^packages/enterprise/features/billing/server/src/services/subscription-item-calculator\.service\.ts$''',
+  '''^packages/eventing/src/server/adapters/postgres/__tests__/prisma-process-store\.integration\.test\.ts$''',
+  '''^packages/features/automation/web/tests/graph-series\.unit\.test\.ts$''',
+  '''^packages/features/gateway/server/src/adapters/__tests__/jwt\.gateway-token\.adapter\.unit\.test\.ts$''',
+  '''^packages/features/gateway/server/src/transport/api-rest/__tests__/gateway-internal-config-route\.integration\.test\.ts$''',
+  '''^packages/features/gateway/server/src/transport/api-rest/__tests__/gateway-internal-spend-ingest\.integration\.test\.ts$''',
+  '''^packages/features/gateway/server/src/transport/api-rest/__tests__/gateway-internal-virtual-key-expiry\.integration\.test\.ts$''',
+  '''^packages/features/gateway/server/src/transport/api-rest/__tests__/gateway-internal-virtual-key-lifecycle\.integration\.test\.ts$''',
+  '''^packages/features/model-provider/web/src/model/__tests__/connection-verdict-copy\.unit\.test\.ts$''',
+  '''^packages/features/stored-object/contract/src/__tests__/storage-uri\.unit\.test\.ts$''',
+  '''^packages/features/stored-object/contract/tests/storage-uri\.unit\.test\.ts$''',
+  '''^packages/features/stored-object/server/src/adapters/__tests__/azure-blob\.stored-object-driver\.unit\.test\.ts$''',
+  '''^platform/app/src/server/event-sourcing/adapters/postgres/__tests__/prismaProcessStore\.integration\.test\.ts$''',
+  '''^platform/app/src/server/mailer/__tests__/resetPasswordEmail\.unit\.test\.tsx$''',
+]
+
+# Placeholder JWTs with an invented `.signature` or `abcDEF123456` tail: the
+# licence email preview fixtures and the redactor's own corpus. Nothing signed
+# them and nothing verifies them. Scoped to `jwt` and to these two exact files.
+[[allowlists]]
+description = "Placeholder JWTs in the licence email preview fixtures and the redaction corpus"
+targetRules = ["jwt"]
+paths = [
+  '''^packages/mail/src/templates/license-email\.tsx$''',
+  '''^packages/redaction/src/__tests__/secrets\.unit\.test\.ts$''',
+]
+
+# `sk_test_composition`, a placeholder Stripe key the billing adapter tests pass
+# to a stubbed client. Never issued by Stripe. Scoped to `stripe-access-token`
+# and to the two exact test files, so a real `sk_live_` here is still caught by
+# every other rule.
+[[allowlists]]
+description = "Placeholder Stripe keys handed to stubbed clients in billing tests"
+targetRules = ["stripe-access-token"]
+paths = [
+  '''^apps/api/src/app/__tests__/api-billing-webhook\.composition\.unit\.test\.ts$''',
+  '''^packages/enterprise/features/billing/server/src/adapters/__tests__/stripe\.usage-reporting\.adapter\.unit\.test\.ts$''',
+]
