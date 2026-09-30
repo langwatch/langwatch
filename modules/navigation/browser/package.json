@@ -42,6 +42,7 @@
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/user-browser-kit": "workspace:*",
     "lucide-react": "catalog:",
     "next-themes": "catalog:",
     "react-error-boundary": "catalog:",

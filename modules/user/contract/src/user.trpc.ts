@@ -10,6 +10,7 @@ import {
   personalUsageRollupSchema,
 } from "@langwatch/enterprise-governance-contract";
 
+import { userAvatarRestParamsSchema } from "./user-rest.schemas.ts";
 import {
   userApiBudgetIncreaseRequestedSchema,
   userApiHasPasswordSchema,
@@ -45,6 +46,7 @@ import {
   userAccountInfoSchema,
   userSecureAccountOfferSchema,
   userAvatarResultSchema,
+  userAvatarUrlSchema,
   userSsoStatusSchema,
   userTourPreferenceSchema,
 } from "./user.ts";
@@ -55,6 +57,12 @@ export const userTrpc = defineTrpcContract("user")
   .mutation("register")
   .withInput(userApiRegisterInputSchema)
   .withOutput(createdUserSchema)
+
+  // The address an uploaded avatar's `image` carries (`/api/user-avatar/:projectId/:userAvatarId`),
+  // answered with the signed URL the browser renders it from (Alex, 2026-09-30).
+  .query("getAvatarUrl")
+  .withInput(userAvatarRestParamsSchema)
+  .withOutput(userAvatarUrlSchema)
 
   .query("getTraceExplorerTourPreference")
   .withInput(userApiEmptyInputSchema)

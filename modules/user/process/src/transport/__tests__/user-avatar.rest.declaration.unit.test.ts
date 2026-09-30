@@ -23,8 +23,8 @@ describe("the user-avatar REST family", () => {
       ]);
     });
 
-    it("answers behind the browser's own door, which a project key opens too", () => {
-      expect(declaration.credential).toBe("browser");
+    it("answers behind the project-key door, since REST authenticates with API keys only", () => {
+      expect(declaration.credential).toBe("project");
     });
 
     it("asks no permission and resolves no scope: the object's own tags are the gate", () => {

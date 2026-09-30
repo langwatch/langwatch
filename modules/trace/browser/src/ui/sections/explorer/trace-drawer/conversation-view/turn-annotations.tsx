@@ -7,6 +7,7 @@ import {
   readableDate,
   useAnnotationQueueSessionStore,
 } from "@langwatch/trace-browser-kit";
+import { UserAvatar } from "@langwatch/user-browser-kit";
 import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
@@ -16,7 +17,6 @@ import {
   HoverActionButton,
   HoverActionCluster,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster.tsx";
-import { UserAvatar } from "../../../../elements/user-avatar.tsx";
 import {
   openTraceEditorFromConversation,
   tracePartitionHint,

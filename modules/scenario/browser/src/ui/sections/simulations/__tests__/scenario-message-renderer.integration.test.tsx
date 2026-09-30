@@ -9,6 +9,13 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
+vi.mock("@langwatch/stored-object-browser-kit", () => ({
+  useStoredObjectUrl: ({ reference }: { reference: string }) => ({
+    status: "ready",
+    url: reference,
+  }),
+}));
+
 // Trace lends the thread; a synchronous stand-in keeps this suite on what this module wires.
 vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -345,7 +352,7 @@ describe("<ScenarioMessageRenderer/>", () => {
       // The filename query gives downloads from the opened viewer the
       // original name (stored objects are content-addressed, no name of
       // their own).
-      expect(chip).toHaveAttribute("href", "/api/files/proj_test/so_123?filename=document.pdf");
+      expect(chip).toHaveAttribute("href", "/api/files/proj_test/so_123");
       expect(chip).toHaveAttribute("target", "_blank");
       expect(chip).toHaveAttribute("rel", "noopener noreferrer");
       expect(chip).not.toHaveAttribute("download");

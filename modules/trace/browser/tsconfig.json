@@ -105,6 +105,9 @@
       "path": "../../share/contract/tsconfig.build.json"
     },
     {
+      "path": "../../stored-object/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../suite/browser/tsconfig.build.json"
     },
     {
@@ -121,6 +124,9 @@
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

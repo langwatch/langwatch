@@ -5,8 +5,8 @@
  */
 import { Readable } from "node:stream";
 
+import { ProjectMissingCredentialsError } from "@langwatch/api";
 import { createRestRuntime } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   StoredObjectNotFoundError,
@@ -30,12 +30,6 @@ const BYTES = Buffer.from("audio bytes");
 class ProjectPermissionDeniedTestError extends HandledError {
   constructor() {
     super("project_permission_denied", "denied", { httpStatus: 403, fault: "customer" });
-  }
-}
-
-class ApiKeyPermissionDeniedTestError extends HandledError {
-  constructor() {
-    super("api_key_permission_denied", "denied", { httpStatus: 403, fault: "customer" });
   }
 }
 
@@ -175,35 +169,33 @@ describe("given the /api/files family", () => {
     });
   });
 
-  describe("when the caller is authenticated for a different project than the owner", () => {
+  describe("when the key belongs to a different project than the owner", () => {
     /** @scenario "GET /api/files/:id enforces project ownership through the shared permission check" */
-    /** @scenario "GET /api/files/:id resolves the owning project from the row id before applying the membership check" */
-    it("resolves the owner from the row, refuses on the shared permission check, and streams nothing", async () => {
+    /** @scenario "GET /api/files/:id resolves the owning project from the row id before pinning the key to it" */
+    /** @scenario "A key reading stored bytes is pinned to the project it authenticated as" */
+    it("resolves the owner from the row, refuses the foreign key, and reads nothing", async () => {
       const read = vi.fn(async () => availableRead());
-      const permissionCheck = vi.fn<StoredObjectFileGate["assertProjectPermission"]>(
-        async ({ projectId }) => {
-          if (projectId !== "project-of-the-caller") {
-            throw new ProjectPermissionDeniedTestError();
-          }
-        },
-      );
-      const api = mount({
-        read,
-        caller: { userId: "user-1" },
-        assertProjectPermission: permissionCheck,
-      });
+      const owner = vi.fn(async () => ({ projectId: OWNER_PROJECT }));
+      const api = mount({ read, owner });
 
-      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`, keyFor("project-other"));
+
+      expect(response.status).toBe(403);
+      expect(owner).toHaveBeenCalled();
+      expect(read).not.toHaveBeenCalled();
+    });
+
+    it("refuses the foreign key on the project-scoped URL too", async () => {
+      const read = vi.fn(async () => availableRead());
+      const api = mount({ read });
+
+      const response = await api.fetch(
+        `/api/files/${OWNER_PROJECT}/${OBJECT_ID}`,
+        keyFor("project-other"),
+      );
 
       expect(response.status).toBe(403);
       expect(read).not.toHaveBeenCalled();
-      // The gate was applied to the project the ROW says owns the object, not
-      // to anything the caller supplied.
-      expect(permissionCheck.mock.calls.map(([args]) => args.projectId)).toEqual([
-        OWNER_PROJECT,
-        OWNER_PROJECT,
-        OWNER_PROJECT,
-      ]);
     });
   });
 
@@ -226,14 +218,28 @@ describe("given the /api/files family", () => {
   });
 
   describe("when the caller presents a browser session and no API key", () => {
-    /** @scenario "GET /api/files/:id authenticates a browser via session cookie when no API key header is present" */
-    it("authorizes through the session user's project permission and streams the bytes", async () => {
-      const permissionCheck = vi.fn<StoredObjectFileGate["assertProjectPermission"]>(
-        async () => undefined,
-      );
+    /** @scenario "GET /api/files/:id refuses a session cookie, since REST authenticates with API keys only" */
+    it("answers 401 and reads nothing", async () => {
+      const read = vi.fn(async () => availableRead());
+      const api = mount({ read });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`, {
+        cookie: "better-auth.session_token=a-live-session",
+      });
+
+      expect(response.status).toBe(401);
+      expect(read).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the key reads an object of its own project whose purpose it may not view", () => {
+    /** @scenario "An API key reads every stored object of its own project, whatever the purpose" */
+    it("streams the bytes and asks no permission", async () => {
+      const permissionCheck = vi.fn<StoredObjectFileGate["assertProjectPermission"]>(async () => {
+        throw new ProjectPermissionDeniedTestError();
+      });
       const api = mount({
         read: async () => availableRead(),
-        caller: { userId: "user-1" },
         assertProjectPermission: permissionCheck,
       });
 
@@ -241,87 +247,7 @@ describe("given the /api/files family", () => {
 
       expect(response.status).toBe(200);
       await expect(response.text()).resolves.toBe(BYTES.toString("utf8"));
-      expect(permissionCheck).toHaveBeenCalled();
-    });
-  });
-
-  describe("when the key names the owning project but its own scope does not reach it", () => {
-    /** @scenario "A scoped key reading another project's bytes is refused by its own ceiling" */
-    it("refuses on the key's ceiling with its own code, and reads nothing", async () => {
-      const read = vi.fn(async () => availableRead());
-      const api = mount({
-        read,
-        caller: { apiKeyProjectId: OWNER_PROJECT },
-        apiKeyCeiling: async () => {
-          throw new ApiKeyPermissionDeniedTestError();
-        },
-      });
-
-      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
-
-      expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toEqual({ error: "api_key_permission_denied" });
-      expect(read).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the key holds only one of the two file-view categories", () => {
-    /** @scenario "A scoped key reading another project's bytes is refused by its own ceiling" */
-    it("passes on the category it holds rather than requiring both", async () => {
-      const asked: AuthzPermission[] = [];
-      const api = mount({
-        read: async () => availableRead(),
-        caller: { apiKeyProjectId: OWNER_PROJECT },
-        apiKeyCeiling: async (permission) => {
-          asked.push(permission);
-          if (permission === "traces:view") {
-            throw new ApiKeyPermissionDeniedTestError();
-          }
-        },
-      });
-
-      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
-
-      expect(response.status).toBe(200);
-      // The first two are the pre-read gate trying each category; the third is
-      // the post-read gate asking for the one this object's purpose maps to.
-      expect(asked).toEqual(["traces:view", "scenarios:view", "scenarios:view"]);
-    });
-  });
-
-  describe("when the key holds trace access only and the object it names is scenario media", () => {
-    /** @scenario "An API key reading a stored object is held to the permission its purpose maps to" */
-    it("refuses on the purpose gate with the key's own code, and streams nothing", async () => {
-      const api = mount({
-        read: async () => availableRead(),
-        caller: { apiKeyProjectId: OWNER_PROJECT },
-        apiKeyCeiling: async (permission) => {
-          if (permission !== "traces:view") throw new ApiKeyPermissionDeniedTestError();
-        },
-      });
-
-      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
-
-      expect(response.status).toBe(403);
-      await expect(response.json()).resolves.toEqual({ error: "api_key_permission_denied" });
-    });
-  });
-
-  describe("when the key holds trace access only and the object it names is trace media", () => {
-    /** @scenario "An API key reading a stored object is held to the permission its purpose maps to" */
-    it("answers 200, because the purpose maps to the permission the key holds", async () => {
-      const api = mount({
-        read: async () => traceContentRead(),
-        caller: { apiKeyProjectId: OWNER_PROJECT },
-        apiKeyCeiling: async (permission) => {
-          if (permission !== "traces:view") throw new ApiKeyPermissionDeniedTestError();
-        },
-      });
-
-      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
-
-      expect(response.status).toBe(200);
-      await expect(response.text()).resolves.toBe(BYTES.toString("utf8"));
+      expect(permissionCheck).not.toHaveBeenCalled();
     });
   });
 
@@ -332,8 +258,7 @@ describe("given the /api/files family", () => {
         async () => undefined,
       );
       const api = mount({
-        read: async () => availableRead(),
-        caller: { apiKeyProjectId: OWNER_PROJECT },
+        read: async () => traceContentRead(),
         assertProjectPermission: permissionCheck,
       });
 
@@ -364,26 +289,19 @@ describe("given the /api/files family", () => {
 // Harness
 // ---------------------------------------------------------------------------
 
-/** The family over one process's byte reads, verifier, counter and gate. */
+/** The key a request presents, as the project door reads it: the bearer names its project. */
+function keyFor(projectId: string): Record<string, string> {
+  return { authorization: `Bearer key-for:${projectId}` };
+}
+
+/** The family over one process's byte reads, counter and gate, behind a project-key door. */
 function mount(options: {
   read?: () => Promise<StoredObjectFileStreamRead>;
   owner?: () => Promise<{ projectId: string }>;
-  caller?: { apiKeyProjectId?: string; userId?: string };
-  apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;
   assertProjectPermission?: StoredObjectFileGate["assertProjectPermission"];
   rateLimit?: StoredObjectFileGate["countRead"];
 }) {
-  const caller = options.caller ?? { apiKeyProjectId: OWNER_PROJECT };
   const files = StoredObjectFileReadService.create({
-    identify: async () => ({
-      ...(caller.apiKeyProjectId
-        ? {
-            apiKeyProjectId: caller.apiKeyProjectId,
-            apiKeyCeiling: options.apiKeyCeiling ?? (async () => undefined),
-          }
-        : {}),
-      ...(caller.userId ? { userId: caller.userId } : {}),
-    }),
     countRead: options.rateLimit ?? (async () => ({ allowed: true, resetAt: 0 })),
     assertProjectPermission: options.assertProjectPermission ?? (async () => undefined),
     resolveOwner: options.owner ?? (async () => ({ projectId: OWNER_PROJECT })),
@@ -396,21 +314,24 @@ function mount(options: {
       authenticate: () => {
         throw new Error("A byte read asks no permission of its credential.");
       },
-      identify: () => ({
-        actor: caller.userId ? ({ type: "user", id: caller.userId } as const) : null,
-        scope: null,
-      }),
+      identify: ({ request }) => {
+        const bearer = request.headers.get("authorization")?.replace("Bearer key-for:", "");
+        if (!bearer) throw new ProjectMissingCredentialsError();
+
+        return { actor: null, scope: { tier: "project", id: bearer } };
+      },
     },
   });
 
   const hono = runtime.mount(storedObjectFileRest.router(), {
     app: () => api,
-    credential: "browser",
+    credential: "project",
     onError: renderHandled,
   });
 
   return {
-    fetch: (path: string) => hono.fetch(new Request(`http://api.test${path}`)),
+    fetch: (path: string, headers: Record<string, string> = keyFor(OWNER_PROJECT)) =>
+      hono.fetch(new Request(`http://api.test${path}`, { headers })),
   };
 }
 

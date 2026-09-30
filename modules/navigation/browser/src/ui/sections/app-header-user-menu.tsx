@@ -6,6 +6,7 @@
 
 import { Box, Button, HStack, Portal } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
+import { UserAvatar } from "@langwatch/user-browser-kit";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 
 import {
@@ -20,7 +21,6 @@ import {
   type NavigationUser,
 } from "../../model/navigation-host.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
-import { UserAvatar } from "../elements/user-avatar.tsx";
 
 const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
   "product-switcher": "Product switcher",

@@ -8,7 +8,11 @@ import type { MediaProbeResult } from "@langwatch/scenario-contract";
 import type { MediaPartData } from "@langwatch/trace-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mint } = vi.hoisted(() => ({ mint: vi.fn() }));
+
+vi.mock("@langwatch/stored-object-browser-kit", () => ({ useStoredObjectUrl: mint }));
 
 import { MediaPart } from "../media-part.tsx";
 
@@ -53,6 +57,13 @@ function ProbeHarness({
 }
 
 describe("<MediaPart/>", () => {
+  beforeEach(() => {
+    mint.mockImplementation(({ reference }: { reference: string }) => ({
+      status: "ready",
+      url: reference,
+    }));
+  });
+
   afterEach(() => {
     cleanup();
   });
@@ -552,6 +563,79 @@ describe("<MediaPart/>", () => {
       } finally {
         vi.unstubAllGlobals();
       }
+    });
+  });
+  describe("when the media is a stored-object reference", () => {
+    const MINTED = "/api/stored-objects/so_1/content?sig=abc";
+    const stored = (type: "audio" | "image" | "video"): MediaPartData => ({
+      type,
+      source: { type: "url", value: "/api/files/proj_test/so_1", mimeType: `${type}/x` },
+    });
+
+    it.each([
+      ["audio", "media-part-audio"],
+      ["image", "media-part-image"],
+      ["video", "media-part-video"],
+    ] as const)("loads the %s element from the minted URL", (type, testId) => {
+      mint.mockReturnValue({ status: "ready", url: MINTED });
+      render(<MediaPart projectId={TEST_PROJECT_ID} part={stored(type)} />, { wrapper: Wrapper });
+
+      expect(mint).toHaveBeenCalledWith({
+        reference: "/api/files/proj_test/so_1",
+        projectId: TEST_PROJECT_ID,
+      });
+      expect(screen.getByTestId(testId)).toHaveAttribute("src", MINTED);
+    });
+
+    it("opens an attachment chip at the URL minted under its filename", () => {
+      mint.mockReturnValue({ status: "ready", url: MINTED });
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "binary",
+            mimeType: "application/pdf",
+            url: "/api/files/proj_test/so_1",
+            filename: "report.pdf",
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(mint).toHaveBeenCalledWith(expect.objectContaining({ filename: "report.pdf" }));
+      expect(screen.getByRole("link")).toHaveAttribute("href", MINTED);
+    });
+
+    it("mounts no media element while the URL mints", () => {
+      mint.mockReturnValue({ status: "pending" });
+      render(<MediaPart projectId={TEST_PROJECT_ID} part={stored("image")} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByTestId("media-part-image")).toBeNull();
+      expect(screen.getByTestId("media-part-probing")).toBeInTheDocument();
+    });
+
+    it("asks the probe and lands on the unavailable state when the mint fails", async () => {
+      mint.mockReturnValue({ status: "failed" });
+      const onId = vi.fn();
+      render(<ProbeHarness part={stored("audio")} answer={{ status: "not_found" }} onId={onId} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByTestId("media-part-audio")).toBeNull();
+      await waitFor(() => expect(screen.getByTestId("media-part-missing")).toBeInTheDocument());
+      expect(onId).toHaveBeenCalledWith("so_1");
+    });
+
+    it("shows the error state when the mint fails and no probe is wired", async () => {
+      mint.mockReturnValue({ status: "failed" });
+      render(<MediaPart projectId={TEST_PROJECT_ID} part={stored("image")} />, {
+        wrapper: Wrapper,
+      });
+
+      await waitFor(() => expect(screen.getByTestId("media-part-error")).toBeInTheDocument());
+      expect(screen.queryByTestId("media-part-image")).toBeNull();
     });
   });
 });

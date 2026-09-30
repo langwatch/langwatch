@@ -7,7 +7,8 @@ import { Box, Button, HStack, IconButton, Spinner, Text } from "@chakra-ui/react
 import { describeError } from "@langwatch/browser-host/errors";
 import type { DatasetAttachmentSlot } from "@langwatch/dataset-browser-kit";
 import { attachmentDisplayName, isDatasetAttachmentRef } from "@langwatch/dataset-contract";
-import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
+import { getImageUrl } from "@langwatch/design-system/external-image";
+import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { ImageIcon, Paperclip, Trash2, Upload } from "lucide-react";
 
 import { useAttachmentUpload } from "../../behavior/use-attachment-upload.ts";
@@ -99,7 +100,7 @@ function AttachmentBody({
     return (
       <HStack gap={1} align="start">
         {filled.kind === "image" ? (
-          <ExternalImage
+          <StoredObjectImage
             src={filled.src}
             minWidth="24px"
             minHeight="24px"

@@ -249,12 +249,11 @@ Feature: Hono API endpoint authorization and tenant isolation
       # named a sibling passed it. The key's own bindings are the fence now.
 
     @unit
-    Scenario: A scoped key reading another project's bytes is refused by its own ceiling
+    Scenario: A key reading stored bytes is pinned to the project it authenticated as
       Given a project API key authenticated on the stored-object byte route
-      When it reads an object owned by the project it authenticated as
-      Then the key's ceiling is checked for the file-view permissions
-      And a key holding neither is refused with the permission-denied code
-      # The route compared the caller's own header against the owner and passed.
+      When it reads an object owned by another project
+      Then it is refused and no bytes are read
+      # Main's rule (Alex, 2026-09-30): the pin is the whole gate; no permission ceiling is asked.
 
     @unit
     Scenario: An organization or team key still selects a project it covers

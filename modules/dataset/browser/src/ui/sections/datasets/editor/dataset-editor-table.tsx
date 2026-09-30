@@ -36,12 +36,13 @@ import type {
   InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
+import { getImageUrl } from "@langwatch/design-system/external-image";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 import {
   type ColumnDef,
@@ -109,7 +110,7 @@ const renderImage = (value: string): ReactNode | null => {
   }
 
   return (
-    <ExternalImage
+    <StoredObjectImage
       src={imageUrl}
       minWidth="24px"
       minHeight="24px"

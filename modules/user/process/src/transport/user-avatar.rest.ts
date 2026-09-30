@@ -1,5 +1,5 @@
 /**
- * `/api/user-avatar/:projectId/:id` — readable by any authenticated caller
+ * `/api/user-avatar/:projectId/:id` — readable by a key of that project
  * only when BOTH purpose and owner kind are the avatar ones; every other
  * outcome answers the same refusal. Spec: specs/settings/user-avatar-upload.feature.
  */
@@ -30,14 +30,14 @@ const AVATAR_READS_PER_MINUTE = 240;
 const AVATAR_MEDIA_TYPES = "image/*";
 
 const OWNER_IS_IN_THE_PATH =
-  "any authenticated caller may read any avatar, so the door authenticates and resolves no scope; " +
+  "a key reads the avatars its own project stores, which the runtime pins; " +
   "the object's purpose and owner kind are what gate the bytes";
 
 export const userAvatarRest = defineRestRouter(UserAvatarFileApi)
   .withNamespace("user-avatar")
   .withVersion(MANAGEMENT_API_VERSION)
-  // The browser's own door: a project API key opens the same one.
-  .withCredential("browser")
+  // REST is the API key's (ARCHITECTURE.md §8): the UI reads avatars through tRPC.
+  .withCredential("project")
   .withAddressing("literal", { v1Twin: false })
 
   .get("/api/user-avatar/:projectId/:userAvatarId", "readUserAvatarBytes")

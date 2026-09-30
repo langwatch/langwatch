@@ -84,6 +84,9 @@
       "path": "../../../../modules/user/browser/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/user/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/vitest-config/tsconfig.build.json"
     }
   ]

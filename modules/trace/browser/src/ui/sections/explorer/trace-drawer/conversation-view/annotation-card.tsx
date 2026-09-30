@@ -1,6 +1,7 @@
+import { UserAvatar } from "@langwatch/user-browser-kit";
+
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { AnnotationCard as PackageAnnotationCard } from "../../../../blocks/explorer/trace-drawer/annotation-card.tsx";
-import { UserAvatar } from "../../../../elements/user-avatar.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import { useJumpToAnnotationAnchor } from "../../hooks/use-jump-to-annotation-anchor.ts";
 

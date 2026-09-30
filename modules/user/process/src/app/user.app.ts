@@ -76,6 +76,8 @@ import type {
   UserApiBudgetOverviewInput,
   UserApiPersonalUsageInput,
   UserUsageCount,
+  UserAvatarRestParams,
+  UserAvatarUrl,
 } from "@langwatch/user-contract";
 import {
   EmailAlreadyRegisteredError,
@@ -1053,6 +1055,14 @@ export class UserApp implements UserApi {
     if (!isServableUserAvatar(read)) throw new UserAvatarNotFoundError(input.id);
 
     return read;
+  }
+
+  /** The signed URL any signed-in person renders an uploaded avatar from. */
+  getAvatarUrl(input: UserAvatarRestParams): Promise<UserAvatarUrl> {
+    return this.#members.avatarObjects.getReadUrl({
+      projectId: input.projectId,
+      id: input.userAvatarId,
+    });
   }
 
   // -- private -------------------------------------------------------------

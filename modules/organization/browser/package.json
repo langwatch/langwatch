@@ -47,6 +47,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/user-browser-kit": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",

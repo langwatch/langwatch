@@ -163,7 +163,10 @@ export function createUserTestInfrastructure(
         breakdownByModel: [],
       })),
     },
-    avatarObjects: { findById: vi.fn(async () => null) },
+    avatarObjects: {
+      findById: vi.fn(async () => null),
+      getReadUrl: vi.fn(async () => ({ url: "/api/stored-objects/avatar/content?sig=test" })),
+    },
     ...overrides,
   };
 }

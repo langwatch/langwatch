@@ -637,6 +637,9 @@
       "path": "modules/share/process/tsconfig.json"
     },
     {
+      "path": "modules/stored-object/browser-kit/tsconfig.json"
+    },
+    {
       "path": "modules/stored-object/contract/tsconfig.json"
     },
     {
@@ -701,6 +704,9 @@
     },
     {
       "path": "modules/user/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/user/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/user/contract/tsconfig.json"

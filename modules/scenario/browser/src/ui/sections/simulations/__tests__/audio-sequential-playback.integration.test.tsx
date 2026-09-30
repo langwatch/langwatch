@@ -11,6 +11,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
+vi.mock("@langwatch/stored-object-browser-kit", () => ({
+  useStoredObjectUrl: ({ reference }: { reference: string }) => ({
+    status: "ready",
+    url: reference,
+  }),
+}));
+
 // Trace lends the thread; a synchronous stand-in keeps this suite on what this module wires.
 vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
   ...(await importOriginal<object>()),

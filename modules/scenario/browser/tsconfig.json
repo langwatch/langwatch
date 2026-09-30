@@ -81,6 +81,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../stored-object/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../suite/browser-kit/tsconfig.build.json"
     },
     {

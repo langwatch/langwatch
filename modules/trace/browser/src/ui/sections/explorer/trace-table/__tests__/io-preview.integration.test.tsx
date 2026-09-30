@@ -6,9 +6,20 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { TraceMediaRef } from "@langwatch/trace-contract";
 import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IOPreview } from "../io-preview.tsx";
+
+const { mint } = vi.hoisted(() => ({ mint: vi.fn() }));
+
+vi.mock("@langwatch/stored-object-browser-kit", () => ({ useStoredObjectUrl: mint }));
+
+beforeEach(() => {
+  mint.mockImplementation(({ reference }: { reference: string }) => ({
+    status: "ready",
+    url: `/minted${reference}`,
+  }));
+});
 
 // Compact vs comfortable is gated by the density store; force compact so
 // the row path under test is the one in the screenshot.
@@ -117,11 +128,29 @@ describe("IOPreview media badges", () => {
     it("renders the thumbnail below the preview text, drawer-style", () => {
       const { getByTestId, getByText } = renderPreview(imageInput, null);
       const thumb = getByTestId("io-preview-thumbnail");
-      expect(thumb).toHaveAttribute("src", "/api/files/p1/img1");
+      expect(thumb).toHaveAttribute("src", "/minted/api/files/p1/img1");
       // Text first, image after it in document order — the same
       // text-then-media order the drawer renders.
       const text = getByText(/what is in this picture\?/);
       expect(text.compareDocumentPosition(thumb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
+  describe("given the thumbnail's URL is still minting", () => {
+    it("draws no thumbnail, so no broken image shows", () => {
+      mint.mockReturnValue({ status: "pending" });
+      const { queryByTestId, getByText } = renderPreview(imageInput, null);
+      expect(queryByTestId("io-preview-thumbnail")).toBeNull();
+      expect(getByText(/what is in this picture\?/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given the thumbnail's URL cannot be minted", () => {
+    it("drops the thumbnail and keeps the row text", () => {
+      mint.mockReturnValue({ status: "failed" });
+      const { queryByTestId, getByText } = renderPreview(imageInput, null);
+      expect(queryByTestId("io-preview-thumbnail")).toBeNull();
+      expect(getByText(/what is in this picture\?/)).toBeInTheDocument();
     });
   });
 
@@ -136,7 +165,10 @@ describe("IOPreview media badges", () => {
         input: [{ kind: "image", url: "/api/files/p1/child-img", role: "user" }],
       });
 
-      expect(getByTestId("io-preview-thumbnail")).toHaveAttribute("src", "/api/files/p1/child-img");
+      expect(getByTestId("io-preview-thumbnail")).toHaveAttribute(
+        "src",
+        "/minted/api/files/p1/child-img",
+      );
     });
 
     it("marks audio and attachments from the refs too", () => {

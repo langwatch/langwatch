@@ -1,10 +1,11 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The avatar door through its real declaration: bytes, the module's refusal,
  * and the throttle that runs before any lookup.
  * Spec: specs/settings/user-avatar-upload.feature
  */
+import { ProjectMissingCredentialsError } from "@langwatch/api";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { UserAvatarNotFoundError } from "@langwatch/user-contract";
 import type { ErrorHandler } from "hono";
@@ -40,6 +41,37 @@ describe("given the avatar route", () => {
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toMatchObject({ error: "avatar_not_found" });
+    });
+  });
+
+  describe("when the request carries a session cookie and no API key", () => {
+    it("answers 401, since REST authenticates with API keys only", async () => {
+      let looked = false;
+      const api = mountAvatars({
+        read: async () => {
+          looked = true;
+          return available();
+        },
+      });
+
+      const response = await api.fetch("/api/user-avatar/project-9/object-1", {
+        cookie: "better-auth.session_token=a-live-session",
+      });
+
+      expect(response.status).toBe(401);
+      expect(looked).toBe(false);
+    });
+  });
+
+  describe("when the key belongs to another project than the one the address names", () => {
+    it("answers 403, since the runtime pins a key to its own project", async () => {
+      const api = mountAvatars({ read: async () => available() });
+
+      const response = await api.fetch("/api/user-avatar/project-9/object-1", {
+        authorization: "Bearer key-for:project-other",
+      });
+
+      expect(response.status).toBe(403);
     });
   });
 
@@ -90,7 +122,7 @@ function available(): ServableUserAvatar {
   };
 }
 
-/** The family over a session-authenticated caller, counted by a limiter the case decides. */
+/** The family behind a project-key door, counted by a limiter the case decides. */
 function mountAvatars(options: { read: UserAvatarFileApi["getAvatarBytes"]; allowed?: boolean }) {
   const app = createApiFixture<UserAvatarFileApi>({ getAvatarBytes: options.read });
 
@@ -99,19 +131,27 @@ function mountAvatars(options: { read: UserAvatarFileApi["getAvatarBytes"]; allo
       authenticate: () => {
         throw new Error("An avatar read asks no permission of its credential.");
       },
-      identify: () => ({ actor: { type: "user", id: "user-1" } as const, scope: null }),
+      identify: ({ request }) => {
+        const projectId = request.headers.get("authorization")?.replace("Bearer key-for:", "");
+        if (!projectId) throw new ProjectMissingCredentialsError();
+
+        return { actor: null, scope: { tier: "project", id: projectId } };
+      },
     },
     rateLimiter: { check: async () => ({ allowed: options.allowed ?? true }) },
   });
 
   const hono = runtime.mount(userAvatarRest.router(), {
     app: () => app,
-    credential: "browser",
+    credential: "project",
     onError: renderHandled,
   });
 
   return {
-    fetch: (path: string) => hono.fetch(new Request(`http://api.test${path}`)),
+    fetch: (
+      path: string,
+      headers: Record<string, string> = { authorization: "Bearer key-for:project-9" },
+    ) => hono.fetch(new Request(`http://api.test${path}`, { headers })),
   };
 }
 

@@ -9,7 +9,7 @@ import numeral from "numeral";
 import type { GovernanceIngestionSourceView } from "../../../behavior/governance-api.ts";
 import { useGovernanceRouter } from "../../../behavior/governance-router.ts";
 import { Link } from "../../../ui/elements/governance-link.tsx";
-import { UserAvatar } from "../../../ui/elements/user-avatar.tsx";
+import { UserAvatar } from "@langwatch/user-browser-kit";
 import { SOURCE_TYPE_LABEL } from "../../ingestion-sources/model/ingestion-source-catalog.ts";
 import { MATCH_EVIDENCE_KIND } from "../model/match-evidence-kind.ts";
 import { SPEND_WINDOW_LABEL } from "../model/people-filters.ts";

@@ -1,4 +1,5 @@
 import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useStoredObjectUrl } from "@langwatch/stored-object-browser-kit";
 import {
   collectMediaParts,
   type MediaPartData,
@@ -347,22 +348,26 @@ const RowMediaIndicators: React.FC<{ media: RowMedia }> = ({ media }) => {
  * same text-then-media order the drawer uses. Height-capped with natural
  * aspect ratio; a width cap crops runaway panoramas.
  */
-const RowThumbnail: React.FC<{ src: string; height: string }> = ({ src, height }) => (
-  <img
-    data-testid="io-preview-thumbnail"
-    src={src}
-    alt=""
-    loading="lazy"
-    style={{
-      height,
-      width: "auto",
-      maxWidth: "160px",
-      objectFit: "cover",
-      borderRadius: "4px",
-      display: "block",
-    }}
-  />
-);
+const RowThumbnail: React.FC<{ src: string; height: string }> = ({ src, height }) => {
+  const resolved = useStoredObjectUrl({ reference: src });
+  if (resolved.status !== "ready") return null;
+  return (
+    <img
+      data-testid="io-preview-thumbnail"
+      src={resolved.url}
+      alt=""
+      loading="lazy"
+      style={{
+        height,
+        width: "auto",
+        maxWidth: "160px",
+        objectFit: "cover",
+        borderRadius: "4px",
+        display: "block",
+      }}
+    />
+  );
+};
 
 function buildRow(
   raw: string | null,

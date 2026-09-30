@@ -1,14 +1,10 @@
+import { ProjectMissingCredentialsError } from "@langwatch/api";
 /**
  * @vitest-environment node
  * @see modules/stored-object/specs/stored-object-file-routes.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  BearerIdentity,
-  BrowserSessionIdentity,
-  RestHost,
-  SessionReader,
-} from "@langwatch/api/rest";
+import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createApp } from "@langwatch/kernel";
@@ -55,21 +51,30 @@ function installed({ authz, allowed = true }: Scripted) {
     .boot();
 }
 
-function restHost(authz: AuthzApi): RestHost {
+/** The process's project door, reduced to its answer: the bearer names the key's project. */
+const projectDoor: RestIdentity = {
+  authenticate: () => {
+    throw new Error("A byte read asks no permission of its key.");
+  },
+  identify: ({ request }) => {
+    const projectId = request.headers.get("authorization")?.replace("Bearer key-for:", "");
+    if (!projectId) throw new ProjectMissingCredentialsError();
+
+    return { actor: null, scope: { tier: "project", id: projectId } };
+  },
+};
+
+function restHost(): RestHost {
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
-  const sessions = SessionReader.create({
-    verify: async (request) =>
-      request.headers.get("cookie") === "session=user-1" ? { userId: "user-1" } : null,
-  });
 
   return RestHost.create({
     identities: {
-      project: closed,
+      project: projectDoor,
       organization: closed,
       apiKey: closed,
       scimToken: closed,
       "instance-admin": closed,
-      browser: BrowserSessionIdentity.create({ sessions, authz, publicBaseUrl: void 0 }),
+      browser: closed,
     },
     bearers: () => closed,
     audit: { record: async () => undefined },
@@ -80,18 +85,16 @@ async function readThroughInstalledModule({
   authz,
   allowed,
   path,
-  cookie = "session=user-1",
-}: Scripted & { path: string; cookie?: string }) {
+  headers = { authorization: `Bearer key-for:${PROJECT}` },
+}: Scripted & { path: string; headers?: Record<string, string> }) {
   const runtime = await installed({ authz, ...(allowed === undefined ? {} : { allowed }) });
 
   try {
-    const host = restHost(authz);
+    const host = restHost();
     const provided = runtime.module(storedObjectServer).provided;
     host.mount(storedObjectFileRest.router(), () => provided);
 
-    const response = await host.app.request(
-      new Request(`http://api.test${path}`, { headers: { cookie } }),
-    );
+    const response = await host.app.request(new Request(`http://api.test${path}`, { headers }));
 
     return {
       status: response.status,
@@ -107,8 +110,8 @@ const permitted = () =>
   createApiFixture<AuthzApi>({ authorizeProjectPermission: async () => undefined });
 
 describe("given the stored-object module installed over memory stores", () => {
-  describe("when a signed-in member with the permission reads an object by project and id", () => {
-    /** @scenario "the installed module answers a file read through the process's verifier" */
+  describe("when a project key reads an object by project and id", () => {
+    /** @scenario "the installed module answers a file read through the process's project door" */
     it("reaches the read and answers 404 for an object the project does not hold", async () => {
       const read = await readThroughInstalledModule({
         authz: permitted(),
@@ -122,8 +125,8 @@ describe("given the stored-object module installed over memory stores", () => {
     });
   });
 
-  describe("when the same member reads it by the legacy id-only URL", () => {
-    /** @scenario "the installed module answers a file read through the process's verifier" */
+  describe("when the same key reads it by the legacy id-only URL", () => {
+    /** @scenario "the installed module answers a file read through the process's project door" */
     it("answers 404 when no owner resolves", async () => {
       const read = await readThroughInstalledModule({
         authz: permitted(),
@@ -154,16 +157,29 @@ describe("given the stored-object module installed over memory stores", () => {
     });
   });
 
-  describe("when the request carries no session", () => {
-    /** @scenario "the installed module refuses a file read with no credential" */
+  describe("when the request carries a session cookie and no key", () => {
+    /** @scenario "the installed module refuses a file read with no key" */
     it("answers 401 at the door", async () => {
       const read = await readThroughInstalledModule({
         authz: permitted(),
-        cookie: "",
+        headers: { cookie: "session=user-1" },
         path: `/api/files/${PROJECT}/${OBJECT_ID}`,
       });
 
       expect(read.status).toBe(401);
+    });
+  });
+
+  describe("when a key for another project reads through a URL naming this one", () => {
+    /** @scenario "the installed module refuses a key of another project" */
+    it("answers 403 and reads nothing", async () => {
+      const read = await readThroughInstalledModule({
+        authz: permitted(),
+        headers: { authorization: "Bearer key-for:project_2" },
+        path: `/api/files/${PROJECT}/${OBJECT_ID}`,
+      });
+
+      expect(read.status).toBe(403);
     });
   });
 });

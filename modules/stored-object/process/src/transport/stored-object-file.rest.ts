@@ -1,9 +1,9 @@
 /**
- * `/api/files` — the bytes of one stored object, for the page that renders it
- * and for the project key that fetches it. An object is addressed by its id,
- * so the owning project is resolved by the module, not by the door.
+ * `/api/files` — the bytes of one stored object, for a project key. The key is
+ * pinned to its own project and reads every file there, as on main; the owner
+ * is resolved by the module and must be the key's project.
  */
-import { deferredScope } from "@langwatch/api/access";
+import { anyAuthenticated } from "@langwatch/api/access";
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
@@ -26,9 +26,9 @@ export interface StoredObjectFileApi {
 
 export const StoredObjectFileApi = moduleApi<StoredObjectFileApi>()("stored-object");
 
-const OWNER_RESOLVED_IN_HANDLER =
-  "an object is addressed by its id, so the project that owns it is a read this handler " +
-  "makes; the caller is then authorized against the owner it found";
+const KEY_PINNED_TO_OWNER =
+  "an object is addressed by its id, so the project that owns it is a read the module " +
+  "makes; the key is then refused unless that owner is its own project";
 
 /**
  * The object's own media type where the readback allowlist admits it, and
@@ -44,24 +44,22 @@ const SERVED_MEDIA_TYPES = "*/*";
 export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   .withNamespace("files")
   .withVersion(MANAGEMENT_API_VERSION)
-  // The browser's own door: an `<img>` or `<audio>` fires with a cookie and no
-  // headers, so no API client can present what opens this family and it
-  // publishes no operation. A project API key opens the SAME door.
-  .withCredential("browser")
+  // REST is the API key's (ARCHITECTURE.md §8): the UI reads media through tRPC.
+  .withCredential("project")
   .withAddressing("literal", { v1Twin: true })
 
   // The last segment of a dataset attachment reference names the file, so the
   // browser downloads it under its own name; the bytes are the scoped route's.
   .get("/api/files/:projectId/:storedObjectId/:filename", "readNamedProjectStoredObjectBytes")
   .withParams(storedObjectFileRouteNamedParamsSchema)
-  .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
+  .withAccess(anyAuthenticated({ reason: KEY_PINNED_TO_OWNER }))
   .withResponse("bytes", { produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])
-  .handle(async ({ app, input, actor, response }) =>
+  .handle(async ({ app, input, scope, response }) =>
     served({
       response,
       file: await app.readFile({
-        actor,
+        caller: { apiKeyProjectId: scope.id },
         id: input.storedObjectId,
         claimedProjectId: input.projectId,
         requestedFilename: input.filename,
@@ -72,14 +70,14 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   .get("/api/files/:projectId/:storedObjectId", "readProjectStoredObjectBytes")
   .withParams(storedObjectFileRouteScopedParamsSchema)
   .withQuery(storedObjectFileRouteFilenameQuerySchema)
-  .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
+  .withAccess(anyAuthenticated({ reason: KEY_PINNED_TO_OWNER }))
   .withResponse("bytes", { produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])
-  .handle(async ({ app, input, actor, response }) =>
+  .handle(async ({ app, input, scope, response }) =>
     served({
       response,
       file: await app.readFile({
-        actor,
+        caller: { apiKeyProjectId: scope.id },
         id: input.storedObjectId,
         claimedProjectId: input.projectId,
         requestedFilename: input.filename,
@@ -90,14 +88,14 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   .get("/api/files/:storedObjectId", "readStoredObjectBytes")
   .withParams(storedObjectFileRouteIdParamsSchema)
   .withQuery(storedObjectFileRouteFilenameQuerySchema)
-  .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
+  .withAccess(anyAuthenticated({ reason: KEY_PINNED_TO_OWNER }))
   .withResponse("bytes", { produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])
-  .handle(async ({ app, input, actor, response }) =>
+  .handle(async ({ app, input, scope, response }) =>
     served({
       response,
       file: await app.readFile({
-        actor,
+        caller: { apiKeyProjectId: scope.id },
         id: input.storedObjectId,
         requestedFilename: input.filename,
       }),

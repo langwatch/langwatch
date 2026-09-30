@@ -38,6 +38,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/user-browser-kit": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "lucide-react": "catalog:",

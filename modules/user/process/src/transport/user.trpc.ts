@@ -16,6 +16,10 @@ import { UserApi, userTrpc, type UserCaller } from "@langwatch/user-contract";
 /** Why every account procedure below asks for no permission. */
 const OWN_ACCOUNT = "operates on the session user's own account, so no tenant scope applies";
 
+/** Why the avatar URL asks for no permission. */
+const ANY_SIGNED_IN =
+  "a photo shows wherever a person is shown, across organizations; the object's purpose and owner kind gate it";
+
 /** Why the two lifecycle procedures decide standing in the application. */
 const SELF_OR_OPERATOR =
   "self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant";
@@ -54,6 +58,10 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
       callerAddress: callerAddress ?? "unknown",
     }),
   )
+
+  .procedure("getAvatarUrl")
+  .noPermission({ reason: ANY_SIGNED_IN })
+  .handle(({ app, input }) => app.getAvatarUrl(input))
 
   .procedure("getTraceExplorerTourPreference")
   .noPermission({ reason: OWN_ACCOUNT })

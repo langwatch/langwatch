@@ -34,6 +34,7 @@ describe("the stored-objects REST family", () => {
           "project:update",
         ],
         ["put", "/uploads/:storedObjectId/content", "putStoredObjectUploadContent", undefined],
+        ["get", "/:storedObjectId/content", "getStoredObjectContent", undefined],
         ["get", "/:storedObjectId", "getStoredObject", "project:view"],
         ["delete", "/:storedObjectId", "deleteStoredObject", "project:manage"],
       ]);
@@ -45,7 +46,10 @@ describe("the stored-objects REST family", () => {
           route.operation,
           route.params !== undefined || route.input !== undefined || route.query !== undefined,
         ]).toEqual([route.operation, true]);
-        expect([route.operation, route.output !== undefined]).toEqual([route.operation, true]);
+        expect([
+          route.operation,
+          route.output !== undefined || route.response?.kind === "bytes",
+        ]).toEqual([route.operation, true]);
       }
     });
   });

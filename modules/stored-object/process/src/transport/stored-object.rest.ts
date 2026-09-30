@@ -62,6 +62,23 @@ export const storedObjectRest = defineRestRouter(StoredObjectApi)
     return { ok: true as const };
   })
 
+  // The signed URL `storedObjects.getReadUrl` mints: any backend's bytes, local disk included.
+  .get("/:storedObjectId/content", "getStoredObjectContent")
+  .withParams(storedObjectParamsSchema)
+  .withQuery(z.object({ sig: storedObjectUploadSignatureSchema }))
+  .withAccess(publicRoute({ reason: SIGNED_URL }))
+  .withResponse("bytes", { produces: "*/*" })
+  .methods(["GET", "HEAD"])
+  .withDocs({ hide: true })
+  .handle(async ({ app, input, response }) => {
+    const content = await app.getSignedContent({
+      objectId: input.storedObjectId,
+      signature: input.sig,
+    });
+
+    return response.stream(content.stream, content);
+  })
+
   .get("/:storedObjectId", "getStoredObject")
   .withParams(z.object({ storedObjectId: storedObjectsGetInputSchema.shape.id }))
   .withQuery(storedObjectsGetInputSchema.pick({ projectId: true, audience: true }))

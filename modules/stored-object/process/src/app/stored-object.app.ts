@@ -3,7 +3,6 @@
  * and they are not one operation: the portable capability answers metadata and
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
-import type { RequestActor } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { ProcessMembers, RateLimiter } from "@langwatch/process-stores/members";
@@ -18,6 +17,8 @@ import {
   type StoreStoredObjectFromBytesResult,
   type StoredObjectFileViewPermission,
   type StoredObjectHead,
+  type StoredObjectReadUrl,
+  type StoredObjectReadUrlInput,
   type StoredObjectMetadata,
   type StoredObjectOwnerResolver,
   type StoredObjectReference,
@@ -41,7 +42,6 @@ import { ImageProxyService } from "../services/image-proxy.service.ts";
 import {
   StoredObjectFileReadService,
   type StoredObjectFileAllowance,
-  type StoredObjectFileCaller,
 } from "../services/stored-object-file-read.service.ts";
 import type { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
@@ -176,7 +176,6 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
     this.#rateLimiter = parts.rateLimiter;
     this.#images = parts.images;
     this.#files = StoredObjectFileReadService.create({
-      identify: (input) => this.identify(input),
       countRead: (input) => this.countRead(input),
       assertProjectPermission: (input) => this.assertProjectPermission(input),
       resolveOwner: (input) => this.resolveOwner(input),
@@ -192,11 +191,6 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
   /** `GET /api/image-proxy`: an outside picture fetched behind the egress fence. */
   proxyImage(input: ImageProxyRequest): Promise<Response> {
     return this.#images.proxy(input);
-  }
-
-  /** Who the process's own browser verifier admitted: the session's person, when there is one. */
-  async identify({ actor }: { actor: RequestActor | null }): Promise<StoredObjectFileCaller> {
-    return actor?.type === "user" ? { userId: actor.id } : {};
   }
 
   /** One fixed-window count of the caller's reads, on the process's own limiter. */
@@ -257,6 +251,29 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
     by: Readonly<{ id: string }>,
   ): Promise<StoredObjectHead> {
     return this.#storage.headById(input, by);
+  }
+
+  /** A signed read URL for a session viewer, held to the object's purpose permission. */
+  getReadUrl(
+    input: StoredObjectReadUrlInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<StoredObjectReadUrl> {
+    return this.#storage.getReadUrl(input, by);
+  }
+
+  /** A signed read URL for a peer that gates its own readers by purpose and owner kind. */
+  getReadUrlForPurpose(input: {
+    projectId: string;
+    id: string;
+    purpose: string;
+    ownerKind: string;
+  }): Promise<StoredObjectReadUrl> {
+    return this.#storage.getReadUrlForPurpose(input);
+  }
+
+  /** The bytes a signed read URL names. */
+  getSignedContent(input: { objectId: string; signature: string }): Promise<StoredObjectFileBytes> {
+    return this.#storage.getSignedContent(input);
   }
 
   /** One object's row and, when the bytes are there, a stream of them. */

@@ -15,7 +15,11 @@ import type {
   StoredObjectsGetInput,
   StoredObjectsGetOutput,
 } from "./stored-object.commands.ts";
-import type { StoredObjectHead } from "./stored-object.trpc.ts";
+import type {
+  StoredObjectHead,
+  StoredObjectReadUrl,
+  StoredObjectReadUrlInput,
+} from "./stored-object.trpc.ts";
 import type {
   StoredObjectsConfirmUploadInput,
   StoredObjectsCreateUploadInput,
@@ -83,6 +87,14 @@ export type StoredObjectFileRead =
   | { row: StoredObjectFileRow; stream: StoredObjectByteStream }
   | { row: StoredObjectFileRow; status: "missing" };
 
+/** One object's bytes as a signed read serves them: safe media type, length and headers. */
+export interface StoredObjectSignedContent {
+  stream: StoredObjectByteStream;
+  mediaType: string;
+  byteLength: number;
+  headers: Readonly<Record<string, string>>;
+}
+
 export interface DeleteProjectStoredObjectsResult {
   projectId: StoredObjectProjectId;
   deletedObjectCount: number;
@@ -122,6 +134,29 @@ export interface StoredObjectApi {
     input: { projectId: string; id: string },
     by: Readonly<{ id: string }>,
   ): Promise<StoredObjectHead>;
+  /**
+   * A signed read URL for `by`, held to any file-view permission by the
+   * transport and to the object's purpose permission here.
+   */
+  getReadUrl(
+    input: StoredObjectReadUrlInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<StoredObjectReadUrl>;
+  /**
+   * A signed read URL for a peer that gates its own readers, minted only when
+   * the object carries the purpose and owner kind named; not found otherwise.
+   */
+  getReadUrlForPurpose(input: {
+    projectId: string;
+    id: string;
+    purpose: string;
+    ownerKind: string;
+  }): Promise<StoredObjectReadUrl>;
+  /** Internal: called only by the signed read route. The signature is the credential. */
+  getSignedContent(input: {
+    objectId: string;
+    signature: string;
+  }): Promise<StoredObjectSignedContent>;
   /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
   readById(input: { projectId: string; id: string }): Promise<StoredObjectFileRead>;
   /** Throws `StoredObjectNotFoundError` when no instance holds the id. */

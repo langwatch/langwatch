@@ -43,6 +43,7 @@
     "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
+    "@langwatch/stored-object-browser-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",

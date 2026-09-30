@@ -32,7 +32,9 @@ async function* bytesOf(chunk: Uint8Array): AsyncIterable<Uint8Array> {
   yield chunk;
 }
 
-function appOver(storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById">) {
+function appOver(
+  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">,
+) {
   return createUserTestApp({
     members: createUserTestInfrastructure(avatarObjectStore(storedObjects)),
   });
@@ -118,6 +120,38 @@ describe("avatar objects over the stored-object store", () => {
 
       await expect(
         app.getAvatarBytes({ projectId: "project-1", id: "obj-missing" }),
+      ).rejects.toBeInstanceOf(UserAvatarNotFoundError);
+    });
+  });
+
+  describe("when a signed-in person asks for an avatar's URL", () => {
+    /** @scenario "A signed-in person gets a signed URL only for an uploaded avatar" */
+    it("asks for a signed URL held to the avatar purpose and owner kind", async () => {
+      const getReadUrlForPurpose = vi.fn<StoredObjectApi["getReadUrlForPurpose"]>(async () => ({
+        url: "/api/stored-objects/obj-1/content?sig=sealed",
+      }));
+      const app = appOver(createApiFixture<StoredObjectApi>({ getReadUrlForPurpose }));
+
+      await expect(
+        app.getAvatarUrl({ projectId: "project-1", userAvatarId: "obj-1" }),
+      ).resolves.toEqual({ url: "/api/stored-objects/obj-1/content?sig=sealed" });
+      expect(getReadUrlForPurpose).toHaveBeenCalledWith({
+        projectId: "project-1",
+        id: "obj-1",
+        purpose: "user_avatar",
+        ownerKind: "user",
+      });
+    });
+
+    /** @scenario "A signed-in person gets a signed URL only for an uploaded avatar" */
+    it("refuses anything that is not an avatar as the avatar door does", async () => {
+      const getReadUrlForPurpose = async (): Promise<{ url: string }> => {
+        throw new StoredObjectNotFoundError();
+      };
+      const app = appOver(createApiFixture<StoredObjectApi>({ getReadUrlForPurpose }));
+
+      await expect(
+        app.getAvatarUrl({ projectId: "project-1", userAvatarId: "trace-media" }),
       ).rejects.toBeInstanceOf(UserAvatarNotFoundError);
     });
   });

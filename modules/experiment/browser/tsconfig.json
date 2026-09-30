@@ -73,6 +73,9 @@
       "path": "../../prompt/browser-kit/tsconfig.build.json"
     },
     {
+      "path": "../../stored-object/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {

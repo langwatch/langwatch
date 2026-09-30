@@ -194,6 +194,10 @@ export type RemoveUserAvatarInput = z.infer<typeof removeUserAvatarInputSchema>;
 export const userAvatarResultSchema = z.object({ image: z.string() }).strict();
 export type UserAvatarResult = z.infer<typeof userAvatarResultSchema>;
 
+/** A same-origin signed URL an uploaded avatar renders from; it lapses after a few minutes. */
+export const userAvatarUrlSchema = z.object({ url: z.string() }).strict();
+export type UserAvatarUrl = z.infer<typeof userAvatarUrlSchema>;
+
 /**
  * Who is asking. `id` is the SUBJECT — the account read and written, even
  * while an operator browses as them — and `operatorId` is whose preferences

@@ -562,12 +562,13 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
 
   @integration
-  Scenario: GET /api/files/:id authenticates a browser via session cookie when no API key header is present
+  Scenario: GET /api/files/:id refuses a session cookie, since REST authenticates with API keys only
+    # Alex, 2026-09-30: REST is the API key's and tRPC the session's; the UI reads media through tRPC.
     Given a stored_objects row with id F exists for project A
     And the caller has an active session cookie for a user with scenarios:view on project A
     When the caller GETs /api/files/F with the cookie and no API key header
-    Then the response is 200
-    And the bytes stream back unchanged
+    Then the response is 401
+    And no bytes are streamed
 
   @integration
   Scenario: GET /api/files/:id authenticates via API key header when no session cookie is present
@@ -586,9 +587,9 @@ Feature: Externalize event byte content to stored_objects
     And the project membership check is never run
 
   @integration
-  Scenario: GET /api/files/:id resolves the owning project from the row id before applying the membership check
+  Scenario: GET /api/files/:id resolves the owning project from the row id before pinning the key to it
     Given a stored_objects row with id F exists for project A
-    And the caller has an active session for a user in project B but not project A
+    And the caller presents an API key for project B
     When the caller GETs /api/files/F
     Then the response is 403
     And the bytes are not streamed
@@ -885,10 +886,10 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: Binary part variant rejects parts that carry data plus an explicit id or url
   # AC26 "Compensating storage cleanup on DB insert failure"                 -> Scenario: DB insert failure after a successful storage PUT triggers compensating storage delete
   #                                                                          -> Scenario: ClickHouse insert errors surface synchronously to the caller
-  # AC27 "Dual-auth on /api/files/:id (session cookie OR API key)"          -> Scenario: GET /api/files/:id authenticates a browser via session cookie when no API key header is present
+  # AC27 "Key-only auth on /api/files/:id (Alex, 2026-09-30)"               -> Scenario: GET /api/files/:id refuses a session cookie, since REST authenticates with API keys only
   #                                                                          -> Scenario: GET /api/files/:id authenticates via API key header when no session cookie is present
   # AC28 "404 not_found is distinct from 404 missing"                        -> Scenario: GET /api/files/:id returns 404 with status not_found when no row exists for the id
-  # AC29 "Cross-tenant id->project resolve runs before auth gate"            -> Scenario: GET /api/files/:id resolves the owning project from the row id before applying the membership check
+  # AC29 "Cross-tenant id->project resolve runs before auth gate"            -> Scenario: GET /api/files/:id resolves the owning project from the row id before pinning the key to it
   #                                                                          -> Scenario: Cross-tenant owner lookup fans out to every ClickHouse instance
   #                                                                          -> Scenario: Cross-tenant owner lookup isolates failures across instances
   #                                                                          -> Scenario: Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed

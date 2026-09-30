@@ -5,7 +5,6 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import { ExternalImage } from "@langwatch/design-system/external-image";
 import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
 import {
   describeCellFailure,
@@ -29,6 +28,7 @@ import {
   useResultsGrouping,
 } from "@langwatch/experiment-browser-kit";
 import type { Experiment } from "@langwatch/experiment-contract";
+import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -361,7 +361,7 @@ const renderEvaluatorResult: RenderBatchEvaluatorResult = ({ result }) => (
 const renderTracePeek: RenderTracePeek = ({ traceId }) => <TraceIdPeek traceId={traceId} />;
 
 const renderDatasetImage: RenderDatasetImage = ({ src }) => (
-  <ExternalImage
+  <StoredObjectImage
     src={src}
     minWidth="24px"
     minHeight="24px"

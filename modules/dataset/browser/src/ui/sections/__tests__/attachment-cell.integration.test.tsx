@@ -25,6 +25,14 @@ const fetchMock = vi.fn();
 const createUpload = vi.fn<StoredObjectUploadTransport["createUpload"]>();
 const confirmUpload = vi.fn<StoredObjectUploadTransport["confirmUpload"]>();
 const uploadTransport: StoredObjectUploadTransport = { createUpload, confirmUpload };
+vi.mock("@langwatch/stored-object-browser-kit", async () => {
+  const { ExternalImage } = await import("@langwatch/design-system/external-image");
+  return {
+    StoredObjectImage: ({ src, ...props }: { src: string }) => (
+      <ExternalImage {...props} src={src.startsWith("/api/files/") ? `/minted${src}` : src} />
+    ),
+  };
+});
 vi.mock("../../../behavior/use-stored-object-upload.ts", () => ({
   useStoredObjectUploadTransport: () => uploadTransport,
 }));
@@ -213,7 +221,7 @@ describe("AttachmentCell", () => {
           value: storedPicture.url,
         }),
       );
-      expect(await screen.findByRole("img")).toHaveAttribute("src", storedPicture.url);
+      expect(await screen.findByRole("img")).toHaveAttribute("src", `/minted${storedPicture.url}`);
 
       expect(createUpload).toHaveBeenCalledWith(
         expect.objectContaining({ projectId: "proj-1", purpose: "dataset_attachment" }),

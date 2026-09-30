@@ -49,6 +49,9 @@
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
+      "path": "../../user/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]

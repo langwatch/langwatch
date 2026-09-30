@@ -45,6 +45,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/user-browser": "workspace:*",
+    "@langwatch/user-browser-kit": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "lucide-react": "catalog:",
     "motion": "catalog:",

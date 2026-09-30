@@ -19,6 +19,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   USER_AVATAR_OWNER_KIND,
   USER_AVATAR_PURPOSE,
+  UserAvatarNotFoundError,
   UserCapabilityUnavailableError,
 } from "@langwatch/user-contract";
 import { hash, compare } from "bcrypt";
@@ -41,7 +42,7 @@ export function buildUserInfrastructure(input: {
   governance: Pick<GovernanceRestApi, "personalUsage">;
   mail: MailSender;
   publicBaseUrl: string | undefined;
-  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById">;
+  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 }): UserInfrastructure {
   const { prisma, redis, organizations, enterpriseGateway, gateway } = input;
   const { auth, projects, governance, mail, publicBaseUrl, storedObjects } = input;
@@ -95,7 +96,7 @@ const AVATAR_AUDIENCE = "project:view";
  * the avatar door turns that into its one refusal.
  */
 export function avatarObjectStore(
-  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById">,
+  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">,
 ): Pick<UserInfrastructure, "avatarStorage" | "avatarObjects"> {
   return {
     avatarStorage: {
@@ -133,6 +134,18 @@ export function avatarObjectStore(
 
         return { status: "available", metadata, stream: ReadableStream.from(read.stream) };
       },
+      getReadUrl: (input) =>
+        storedObjects
+          .getReadUrlForPurpose({
+            ...input,
+            purpose: USER_AVATAR_PURPOSE,
+            ownerKind: USER_AVATAR_OWNER_KIND,
+          })
+          .catch((error: unknown) => {
+            if (HandledError.isHandled(error) && error.code === "stored_object_not_found")
+              throw new UserAvatarNotFoundError(input.id);
+            throw error;
+          }),
     },
   };
 }

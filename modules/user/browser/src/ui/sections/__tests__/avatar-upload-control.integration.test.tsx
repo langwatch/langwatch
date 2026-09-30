@@ -9,11 +9,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
-import { UserAvatar } from "../../elements/user-avatar.tsx";
 import { AvatarUploadControl } from "../avatar-upload-control.tsx";
 
 const CROPPED = "data:image/png;base64,Y3JvcHBlZA==";
-const UPLOADED = "/api/user-avatar/project-1/object-1";
 const SSO_PHOTO = "https://cdn.identity.test/photos/carol.png";
 
 /** What the control sends, and all these need to record is THAT it sent. */
@@ -32,6 +30,12 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   },
 }));
 
+vi.mock("@langwatch/user-browser-kit", () => ({
+  UserAvatar: ({ image }: { image?: string | null }) => (
+    <span>{image ? <img src={image} alt="" /> : null}</span>
+  ),
+}));
+
 vi.mock("../../../model/process-avatar-image.ts", () => ({
   processAvatarImage: vi.fn<(file: File) => Promise<string>>(async () => CROPPED),
 }));
@@ -42,11 +46,6 @@ function renderControl(image: string | null) {
   });
   renderWithPersonalWorkspaceHost(<AvatarUploadControl organizationId="org-1" />, { host });
   return host;
-}
-
-/** The photo an avatar element is currently showing, or nothing when it fell back. */
-function shownPhoto(): string | null {
-  return document.querySelector("img")?.getAttribute("src") ?? null;
 }
 
 /**
@@ -83,50 +82,6 @@ describe("given a signed-in user on their profile settings", () => {
       await waitFor(() => expect(shownPhotos()).toContain(CROPPED));
       expect(screen.getByRole("button", { name: "Save photo" })).toBeTruthy();
       expect(setAvatar).not.toHaveBeenCalled();
-    });
-  });
-});
-
-/**
- * UserAvatar tests: fallback chain of image -> initials -> silhouette.
- */
-describe("given the element every person-avatar surface renders", () => {
-  describe("when the person has uploaded a photo", () => {
-    /** @scenario "The uploaded photo renders wherever a person is shown" */
-    it("displays the photo rather than their initials", () => {
-      renderWithPersonalWorkspaceHost(<UserAvatar name="Carol Danvers" image={UPLOADED} />, {
-        host: fakePersonalWorkspaceHost(),
-      });
-
-      expect(shownPhoto()).toBe(UPLOADED);
-    });
-  });
-
-  describe("when the person has no photo at all", () => {
-    /** @scenario "A user without a photo still shows their initials everywhere" */
-    it("displays their initials, with no image element to break", () => {
-      renderWithPersonalWorkspaceHost(<UserAvatar name="Carol Danvers" image={null} />, {
-        host: fakePersonalWorkspaceHost(),
-      });
-
-      expect(shownPhoto()).toBeNull();
-      expect(screen.getByText("CD")).toBeTruthy();
-    });
-  });
-
-  describe("when a removal has cleared the photo", () => {
-    /** @scenario "Removing the photo reverts to the fallback avatar" */
-    it("falls back to the initials the way a person who never uploaded one does", () => {
-      const { rerender } = renderWithPersonalWorkspaceHost(
-        <UserAvatar name="Carol Danvers" image={UPLOADED} />,
-        { host: fakePersonalWorkspaceHost() },
-      );
-      expect(shownPhoto()).toBe(UPLOADED);
-
-      rerender(<UserAvatar name="Carol Danvers" image={null} />);
-
-      expect(shownPhoto()).toBeNull();
-      expect(screen.getByText("CD")).toBeTruthy();
     });
   });
 });

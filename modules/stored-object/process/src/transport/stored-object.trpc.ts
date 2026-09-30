@@ -20,6 +20,14 @@ export const storedObjectTrpcTransport: TrpcRouterDeclaration<
     app.headById({ projectId: input.projectId, id: input.id }, actor),
   )
 
+  /** The same two-step check, then a short-lived signed URL the browser renders from. */
+  .procedure("getReadUrl")
+  .withPermission({
+    kind: "permission-any",
+    permissions: ["traces:view", "scenarios:view", "datasets:view"],
+  })
+  .handle(async ({ app, input, actor }) => app.getReadUrl(input, actor))
+
   .procedure("createUpload")
   .withPermission("project:update")
   .handle(async ({ app, input }) => app.createUpload(input))

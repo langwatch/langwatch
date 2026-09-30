@@ -140,7 +140,8 @@ Feature: Permissions are resolved at the scope of the resource acted on
     Then the config is saved
 
   @integration
-  Scenario: An API key reading a stored object is held to the permission its purpose maps to
+  Scenario: An API key reads every stored object of its own project, whatever the purpose
+    # Main's rule (Alex, 2026-09-30): a key is pinned to its project and reads every file there.
     Given an API key that may view traces but not simulations
-    When it reads a stored object whose purpose is simulation media
-    Then the request is refused, and a trace-media object of the same project still streams
+    When it reads a stored object of its own project whose purpose is simulation media
+    Then the bytes stream, and no permission of the key is asked

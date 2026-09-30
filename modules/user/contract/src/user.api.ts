@@ -12,7 +12,12 @@ import type {
 } from "@langwatch/organization-contract";
 
 import type { UserCodeAccessPreference } from "./user-code-access.ts";
-import type { MeProject, MePersonalCredential, MeUsage } from "./user-rest.schemas.ts";
+import type {
+  MeProject,
+  MePersonalCredential,
+  MeUsage,
+  UserAvatarRestParams,
+} from "./user-rest.schemas.ts";
 import type {
   UserBrowserSession,
   UserBrowserSessionEnded,
@@ -50,6 +55,7 @@ import type {
   UpdateUserProfileInput,
   UserAccountInfo,
   UserAvatarResult,
+  UserAvatarUrl,
   UserIdInput,
   UserFullProfile,
   UserProfilesInput,
@@ -148,6 +154,8 @@ export interface UserApi {
   /** Throttles, then stores the caller's own uploaded photo. */
   setOwnAvatar(input: SetOwnAvatarInput): Promise<UserAvatarResult>;
   removeAvatar(input: RemoveUserAvatarInput): Promise<void>;
+  /** A signed URL for an uploaded avatar; anything that is not one is refused as not found. */
+  getAvatarUrl(input: UserAvatarRestParams): Promise<UserAvatarUrl>;
   ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace>;
   findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
   findLastHomePath(input: UserIdInput): Promise<string | null>;

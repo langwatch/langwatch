@@ -37,6 +37,7 @@ describe("the storedObjects tRPC declaration", () => {
         Object.entries(storedObjectTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
         ["headById", "query"],
+        ["getReadUrl", "query"],
         ["createUpload", "mutation"],
         ["confirmUpload", "mutation"],
       ]);
@@ -46,6 +47,10 @@ describe("the storedObjects tRPC declaration", () => {
     /** @scenario "A viewer with trace access can probe trace media" */
     it("admits any file viewer to the probe and leaves the purpose check to the service", () => {
       expect(accessOf(storedObjectTrpcTransport)).toEqual([
+        {
+          kind: "permission-any",
+          permissions: ["traces:view", "scenarios:view", "datasets:view"],
+        },
         {
           kind: "permission-any",
           permissions: ["traces:view", "scenarios:view", "datasets:view"],

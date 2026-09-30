@@ -30,6 +30,18 @@ export const storedObjectHeadSchema = z.discriminatedUnion("status", [
 ]);
 export type StoredObjectHead = z.infer<typeof storedObjectHeadSchema>;
 
+export const storedObjectReadUrlInputSchema = z.object({
+  projectId: z.string(),
+  storedObjectId: z.string(),
+  /** The name the bytes download under; the object's id when absent. */
+  filename: z.string().optional(),
+});
+export type StoredObjectReadUrlInput = z.infer<typeof storedObjectReadUrlInputSchema>;
+
+/** A same-origin URL whose signature is the credential; it lapses after a few minutes. */
+export const storedObjectReadUrlSchema = z.object({ url: z.string() }).strict();
+export type StoredObjectReadUrl = z.infer<typeof storedObjectReadUrlSchema>;
+
 export const storedObjectTrpc = defineTrpcContract("storedObjects")
   /**
    * Probes whether a stored object's row AND bytes exist. The renderer maps
@@ -38,6 +50,10 @@ export const storedObjectTrpc = defineTrpcContract("storedObjects")
   .query("headById")
   .withInput(storedObjectHeadInputSchema)
   .withOutput(storedObjectHeadSchema)
+  /** A short-lived signed URL the browser renders an object's bytes from (Alex, 2026-09-30). */
+  .query("getReadUrl")
+  .withInput(storedObjectReadUrlInputSchema)
+  .withOutput(storedObjectReadUrlSchema)
   .mutation("createUpload")
   .withInput(storedObjectsCreateUploadInputSchema)
   .withOutput(storedObjectsCreateUploadOutputSchema)

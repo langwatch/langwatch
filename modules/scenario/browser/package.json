@@ -51,6 +51,7 @@
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/stored-object-browser-kit": "workspace:*",
     "@langwatch/suite-browser-kit": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

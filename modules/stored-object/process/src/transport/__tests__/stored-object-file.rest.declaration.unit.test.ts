@@ -17,8 +17,8 @@ describe("the files REST family", () => {
       expect(declaration.v1Twin).toBe(true);
     });
 
-    it("answers behind the browser's own door, which publishes no operation", () => {
-      expect(declaration.credential).toBe("browser");
+    it("answers behind the project-key door, since REST authenticates with API keys only", () => {
+      expect(declaration.credential).toBe("project");
     });
 
     it("keeps every path, operation id and method", () => {
@@ -35,9 +35,9 @@ describe("the files REST family", () => {
       ]);
     });
 
-    it("resolves the owning scope in the handler rather than at the door", () => {
+    it("hands the handler the key's project and asks no permission at the door", () => {
       for (const route of declaration.routes) {
-        expect([route.operation, route.access?.kind]).toEqual([route.operation, "deferred"]);
+        expect([route.operation, route.access?.kind]).toEqual([route.operation, "authenticated"]);
         expect([route.operation, route.permission]).toEqual([route.operation, undefined]);
       }
     });

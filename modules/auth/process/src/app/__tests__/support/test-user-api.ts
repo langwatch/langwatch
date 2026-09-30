@@ -158,6 +158,8 @@ export class TestUserApi implements UserApi {
 
   removeAvatar: UserApi["removeAvatar"] = (input) =>
     this.overrides.removeAvatar?.(input) ?? this.unimplemented("removeAvatar");
+  getAvatarUrl: UserApi["getAvatarUrl"] = (input) =>
+    this.overrides.getAvatarUrl?.(input) ?? this.unimplemented("getAvatarUrl");
 
   ensurePersonalWorkspace: UserApi["ensurePersonalWorkspace"] = (input) =>
     this.overrides.ensurePersonalWorkspace?.(input) ??

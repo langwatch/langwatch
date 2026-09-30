@@ -19,6 +19,8 @@ import {
   type StoredObjectHead,
   type StoredObjectId,
   type StoredObjectMetadata,
+  type StoredObjectReadUrl,
+  type StoredObjectReadUrlInput,
   type StoredObjectReference,
   type StoredObjectStorageDestination,
   type StoredObjectStorageUsage,
@@ -31,6 +33,7 @@ import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type {
   StoredObjectDelivery,
+  StoredObjectFileBytes,
   StoredObjectFileReader,
   StoredObjectFileStreamRead,
   StoredObjectProbe,
@@ -43,11 +46,15 @@ import type {
 } from "../repositories/stored-object-record.repository.ts";
 import { requiredPermissionForPurpose } from "../rules/stored-object-purpose-permission.rules.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
+import { StoredObjectFileReadService } from "./stored-object-file-read.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
 
 /** The peer decision a probe asks once the row names its purpose. */
 export type StoredObjectPermissions = Pick<AuthzApi, "getDecision">;
+
+/** How long a signed read URL answers, as long as an upload URL does (ADR-158 §4). */
+const READ_URL_EXPIRY_MS = 15 * 60 * 1000;
 
 export type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
@@ -202,6 +209,67 @@ export class StoredObjectService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Main's two-step read gate, then a signed URL: the transport admitted any
+   * file viewer, and the row's purpose names the permission `by` needs here.
+   */
+  async getReadUrl(
+    input: StoredObjectReadUrlInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<StoredObjectReadUrl> {
+    const object = { projectId: input.projectId, id: input.storedObjectId };
+    const head = await this.headById(object, by);
+    if (head.status === "not_found") throw new StoredObjectNotFoundError();
+
+    return this.readUrlOf({ ...object, filename: input.filename });
+  }
+
+  /** A signed URL for a peer that gates its own readers, for the purpose and owner kind named. */
+  async getReadUrlForPurpose(input: {
+    projectId: string;
+    id: string;
+    purpose: string;
+    ownerKind: string;
+  }): Promise<StoredObjectReadUrl> {
+    // ponytail: opens the bytes to read the row; a row-only read when avatar lists grow hot.
+    const read = await this.readById(input);
+    if ("stream" in read) read.stream.destroy();
+    if (read.row.purpose !== input.purpose || read.row.owner_kind !== input.ownerKind) {
+      throw new StoredObjectNotFoundError();
+    }
+
+    return this.readUrlOf(input);
+  }
+
+  /** The bytes a signed read URL names, once its seal opens; the seal is the whole credential. */
+  async getSignedContent(input: {
+    objectId: string;
+    signature: string;
+  }): Promise<StoredObjectFileBytes> {
+    const claims = this.options.signer.openRead({ ...input, now: this.now() });
+    const read = await this.readById({ projectId: claims.projectId, id: input.objectId });
+    if (!("stream" in read)) {
+      throw new StoredObjectBytesMissingError(claims.projectId, input.objectId);
+    }
+
+    return StoredObjectFileReadService.bytesOf({ found: read, requestedFilename: claims.filename });
+  }
+
+  private readUrlOf(input: {
+    projectId: string;
+    id: string;
+    filename?: string | undefined;
+  }): StoredObjectReadUrl {
+    const url = this.options.signer.readPathFor({
+      projectId: input.projectId,
+      objectId: input.id,
+      filename: input.filename,
+      expiresAt: this.now().add({ milliseconds: READ_URL_EXPIRY_MS }),
+    });
+
+    return { url };
   }
 
   async getMetadata(input: { projectId: string; id: string }): Promise<StoredObjectMetadata> {

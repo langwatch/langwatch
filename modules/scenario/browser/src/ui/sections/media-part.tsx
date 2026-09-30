@@ -3,6 +3,7 @@
  */
 import { Box, Icon, Text, VStack } from "@chakra-ui/react";
 import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contract";
+import { useStoredObjectUrl } from "@langwatch/stored-object-browser-kit";
 import type { MediaPartData } from "@langwatch/trace-contract";
 import { ExternalLink, File, FileText } from "lucide-react";
 import {
@@ -148,9 +149,15 @@ export function MediaPart({
     probe,
     onProbeRequired,
   });
+  const filename = part.type === "binary" ? part.filename : undefined;
+  const minted = useStoredObjectUrl({ reference: src, projectId, filename });
+  const playSrc = minted.status === "ready" ? minted.url : "";
+  useEffect(() => {
+    if (minted.status === "failed") handleError();
+  }, [minted.status, handleError]);
   const rawUrlFormat =
     storedObjectId && category === "audio" ? resolveRawPcmFormat(void 0, mimeType) : null;
-  const wrappedSrc = useRawPcmSource(src, rawUrlFormat, handleError);
+  const wrappedSrc = useRawPcmSource(playSrc, playSrc ? rawUrlFormat : null, handleError);
 
   if (notCaptured) {
     return (
@@ -171,8 +178,10 @@ export function MediaPart({
     return <MediaUnavailable category={category} state="error" />;
   }
 
-  // The element failed and the probe has not answered yet.
-  if (status === "probing") {
+  // The element failed, or the URL could not be minted, and the probe has not answered yet.
+  const awaitingUrl =
+    minted.status === "pending" || (minted.status === "failed" && status === "loading");
+  if (status === "probing" || awaitingUrl) {
     return <MediaProbing />;
   }
 
@@ -190,7 +199,7 @@ export function MediaPart({
         <audio
           data-testid="media-part-audio"
           controls
-          src={rawUrlFormat ? (wrappedSrc ?? undefined) : src}
+          src={rawUrlFormat ? (wrappedSrc ?? undefined) : playSrc}
           // `onLoad` does not fire on <audio>/<video>; the right hook is
           // `onLoadedData` (metadata + first frame ready) — fires only
           // after the browser has actually decoded enough to play, so
@@ -212,7 +221,7 @@ export function MediaPart({
     return (
       <img
         data-testid="media-part-image"
-        src={src}
+        src={playSrc}
         alt={mimeType ?? "image"}
         onLoad={handleLoad}
         onError={handleError}
@@ -235,7 +244,7 @@ export function MediaPart({
         <video
           data-testid="media-part-video"
           controls
-          src={src}
+          src={playSrc}
           // See audio above — `onLoad` does not fire on <video>.
           onLoadedData={handleLoad}
           onError={handleError}
@@ -247,39 +256,27 @@ export function MediaPart({
     );
   }
 
-  return (
-    <MediaAttachment
-      part={part}
-      src={src}
-      storedObjectId={storedObjectId}
-      mimeType={mimeType}
-      isUrlBased={isUrlBased}
-    />
-  );
+  return <MediaAttachment part={part} src={playSrc} mimeType={mimeType} isUrlBased={isUrlBased} />;
 }
 
 function MediaAttachment({
   part,
   src,
-  storedObjectId,
   mimeType,
   isUrlBased,
 }: {
   part: MediaPartData;
   src: string;
-  storedObjectId: string | null;
   mimeType: string | undefined;
   isUrlBased: boolean;
 }) {
   // binary fallback — attachment chip.
   const filename = part.type === "binary" ? part.filename : undefined;
-  const chipHref =
-    filename && storedObjectId ? `${src}?filename=${encodeURIComponent(filename)}` : src;
   const isDocumentLike = mimeType === "application/pdf" || (mimeType?.startsWith("text/") ?? false);
   return (
     <Box asChild data-testid="media-part-binary">
       <a
-        href={chipHref}
+        href={src}
         {...(isUrlBased
           ? { target: "_blank", rel: "noopener noreferrer" }
           : { download: filename ?? "" })}

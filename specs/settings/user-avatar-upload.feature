@@ -127,6 +127,14 @@ Feature: Uploading a custom avatar photo
     Then the refusal is the same one a foreign object gets
     And they learn nothing about whether an object with that address exists
 
+  @unit
+  Scenario: A signed-in person gets a signed URL only for an uploaded avatar
+    # Alex, 2026-09-30: the browser renders avatars through user.getAvatarUrl, not the key-only REST route.
+    Given the address an uploaded avatar's image carries
+    When a signed-in person asks user.getAvatarUrl for it
+    Then they get a signed URL held to the avatar purpose and owner kind
+    And an object that is not an avatar is refused as there being no photo at that address
+
   @integration
   Scenario: The avatar route is left off a process that cannot authenticate an image request
     Given a deployment whose photo route cannot accept a browser's own credentials

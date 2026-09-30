@@ -20,6 +20,8 @@ export interface UserAvatarStorage {
 /** The avatar bytes, by project and content-addressed id. Owner: stored-object (`readById`). */
 export interface UserAvatarObjects {
   findById(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead>;
+  /** A signed read URL, only for an avatar object; `UserAvatarNotFoundError` otherwise. */
+  getReadUrl(input: { projectId: string; id: string }): Promise<{ url: string }>;
 }
 
 /**

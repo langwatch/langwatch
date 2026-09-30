@@ -5,11 +5,11 @@
  */
 import { Box, Button, HStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { ExternalImage } from "@langwatch/design-system/external-image";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { cellPictureUrl } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -82,7 +82,7 @@ const datasetColumn = ({
         const img = cellPictureUrl(val);
         if (img) {
           return (
-            <ExternalImage
+            <StoredObjectImage
               src={img}
               minWidth="24px"
               minHeight="24px"

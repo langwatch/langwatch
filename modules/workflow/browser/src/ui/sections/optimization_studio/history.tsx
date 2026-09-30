@@ -14,6 +14,7 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
+import { UserAvatar } from "@langwatch/user-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -21,7 +22,6 @@ import { FormProvider, useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
-import { UserAvatar } from "../../elements/user-avatar.tsx";
 import { useVersionState } from "./use-version-state.ts";
 import { NewVersionFields } from "./version-to-be-used.tsx";
 
