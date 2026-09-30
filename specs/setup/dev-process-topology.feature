@@ -161,6 +161,65 @@ Feature: The local development process topology
     # Probes are written and deleted seconds apart. Boot is slower than that
     # gap, so a stack shared with a probing session never finished starting.
 
+  # An agent writes one file per tool call, seconds apart, so a short window
+  # sees every edit as its own burst. The window restarts on each change, which
+  # would starve the restart under a steady trickle: the max wait bounds it.
+  @unit
+  Scenario: A steady trickle of edits still restarts within the max wait
+    Given the backend lane running under a debounced watch
+    When files keep changing so the quiet window never elapses
+    Then the restart fires once the max wait since the first change has passed
+
+  # `haven hmr on --ttl` writes the marker the UI's HMR gate reads (apps/ui/
+  # .haven-hmr-gate, unix-ms expiry). An agent's PostToolUse hook renewing it
+  # per write and its Stop hook clearing it gives "reload after the turn".
+  # Installing those hooks is opt-in: see ADR-168.
+  @unit
+  Scenario: An agent mid-turn holds the restart until it is released
+    Given the backend lane running under a debounced watch
+    And the agent-turn hold marker names an expiry in the future
+    When the quiet window elapses
+    Then no restart happens while the marker holds
+    And exactly one restart happens once the marker is released or expires
+    And a hold never defers a restart past 60 seconds
+
+  # Only the packages the backend can load matter. pnpm resolves declared
+  # dependencies only, so a workspace package that no backend dependency reaches
+  # (design-system, browser-host) cannot be on its import graph.
+  @unit
+  Scenario: A browser-only package leaves the backend lane alone
+    Given the backend lane running under a debounced watch
+    When a file changes in a workspace package the backend does not depend on
+    Then the change is not worth a restart
+
+  @unit
+  Scenario: Prose, specs and tool config leave the backend lane alone
+    Given the backend lane running under a debounced watch
+    When a markdown file, a feature file or a tsconfig changes
+    Then the change is not worth a restart
+
+  # --- One reload at a time ---
+
+  # 44% of restarts landed mid-boot, and the second one ran beside the first:
+  # two backends, one port, EADDRINUSE. A change while a reload is running is
+  # queued and answered by exactly one follow-up when that boot settles (the
+  # child says "backend ready", exits, or LANGWATCH_DEV_BOOT_SETTLE_MS passes).
+  @unit
+  Scenario: Changes during a reload queue exactly one follow-up
+    Given the backend lane is booting after a restart
+    When several files change before the boot settles
+    Then no second backend starts beside the first
+    And exactly one follow-up restart happens after the boot settles, naming every file
+
+  # A half-written import crashes boot. Exiting would end the lane: haven
+  # respawns it every second, and `pnpm dev`'s concurrently takes the stack down.
+  @unit
+  Scenario: A crashed boot waits for the next change instead of ending the lane
+    Given the backend lane running under a debounced watch
+    When the backend exits non-zero
+    Then the supervisor stays up and says once that it is waiting for a change
+    And the next change starts the backend again
+
   # --- The worker drains before a restart takes it down ---
 
   # A restart is a takedown-and-respawn: SIGTERM, then SIGKILL only after a

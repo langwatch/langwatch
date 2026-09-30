@@ -1,4 +1,4 @@
-// How the Access tab reads a grant and which roles the grant dialog can offer.
+// How a grant list reads a grant and which roles the grant dialog can offer.
 // specs/rbac/roles-and-access-ui.feature
 
 import { builtinRolePermissions } from "@langwatch/authz-contract";

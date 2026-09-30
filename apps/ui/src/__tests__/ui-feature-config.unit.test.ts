@@ -46,6 +46,21 @@ describe("browser feature configuration", () => {
     });
   });
 
+  describe("when auth names a public URL that differs from BASE_HOST", () => {
+    /** @scenario "The browser deployment prefers the public URL over BASE_HOST" */
+    it("hands the public URL to every setup snippet", () => {
+      const deployment = uiDeploymentOf({
+        config: parseUiFeatureConfig({
+          ...served,
+          auth: { ...served.auth, publicUrl: "https://langwatch.acme.example" },
+        }),
+        origin: "https://page.langwatch.test",
+      });
+
+      expect(deployment.appBaseUrl).toBe("https://langwatch.acme.example");
+    });
+  });
+
   describe("given a slice its owner's schema refuses", () => {
     /** @scenario "The browser validates its configuration before the first render" */
     it("throws naming the owner rather than handing a feature a value it cannot act on", () => {

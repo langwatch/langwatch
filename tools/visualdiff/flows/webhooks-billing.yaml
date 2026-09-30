@@ -15,7 +15,7 @@ flows:
       - action: fill
         with:
           testId: webhook-url-input
-          value: 'https://example.com/vd-{uid}'
+          value: "https://example.com/vd-{uid}"
       - action: click
         with:
           testId: webhook-family-toggle-gateway
@@ -37,21 +37,21 @@ flows:
           selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
       - action: expect
         with:
           testId: webhook-secret-dialog
-          equals: '0'
+          equals: "0"
       - action: go
         with:
           path: /gateway/webhooks
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
       - action: expect
         with:
           testId: webhook-secret-value
-          equals: '0'
+          equals: "0"
 
   - id: webhook-endpoint-edit-url
     title: Edit an endpoint's URL and see the new address after a reload
@@ -65,7 +65,7 @@ flows:
       - action: fill
         with:
           testId: webhook-url-input
-          value: 'https://example.com/vd-{uid}'
+          value: "https://example.com/vd-{uid}"
       - action: click
         with:
           testId: webhook-family-toggle-gateway
@@ -83,7 +83,7 @@ flows:
           selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
       - action: click
         with:
           selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
@@ -94,19 +94,19 @@ flows:
       - action: fill
         with:
           testId: webhook-url-input
-          value: 'https://example.com/vd-{uid}-edited'
+          value: "https://example.com/vd-{uid}-edited"
       - action: click
         with:
           testId: webhook-save
       - action: expect
         with:
-          text: 'vd-{uid}-edited'
+          text: "vd-{uid}-edited"
       - action: go
         with:
           path: /gateway/webhooks
       - action: expect
         with:
-          text: 'vd-{uid}-edited'
+          text: "vd-{uid}-edited"
 
   - id: webhook-endpoint-disable-enable
     title: Disable an endpoint, see it marked disabled after a reload, enable it again
@@ -120,7 +120,7 @@ flows:
       - action: fill
         with:
           testId: webhook-url-input
-          value: 'https://example.com/vd-{uid}'
+          value: "https://example.com/vd-{uid}"
       - action: click
         with:
           testId: webhook-family-toggle-gateway
@@ -138,7 +138,7 @@ flows:
           selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
       - action: click
         with:
           selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
@@ -165,17 +165,17 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
-          equals: '0'
+          equals: "0"
       - action: go
         with:
           path: /gateway/webhooks
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
       - action: expect
         with:
           count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
-          equals: '0'
+          equals: "0"
 
   - id: webhook-endpoint-roll-secret
     title: Roll an endpoint's signing secret and read the new one once
@@ -189,7 +189,7 @@ flows:
       - action: fill
         with:
           testId: webhook-url-input
-          value: 'https://example.com/vd-{uid}'
+          value: "https://example.com/vd-{uid}"
       - action: click
         with:
           testId: webhook-family-toggle-gateway
@@ -211,7 +211,7 @@ flows:
           selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
       - action: click
         with:
           selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
@@ -238,10 +238,10 @@ flows:
       - action: expect
         with:
           testId: webhook-secret-dialog
-          equals: '0'
+          equals: "0"
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
 
   - id: webhook-endpoint-delete
     title: Delete an endpoint and see it gone after a reload
@@ -255,7 +255,7 @@ flows:
       - action: fill
         with:
           testId: webhook-url-input
-          value: 'https://example.com/vd-{uid}'
+          value: "https://example.com/vd-{uid}"
       - action: click
         with:
           testId: webhook-family-toggle-gateway
@@ -273,7 +273,7 @@ flows:
           selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
       - action: click
         with:
           selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
@@ -286,8 +286,8 @@ flows:
           text: Delete endpoint
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
-          equals: '0'
+          text: "example.com/vd-{uid}"
+          equals: "0"
       - action: go
         with:
           path: /gateway/webhooks
@@ -296,8 +296,8 @@ flows:
           testId: webhook-new
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
-          equals: '0'
+          text: "example.com/vd-{uid}"
+          equals: "0"
 
   - id: webhook-endpoint-deliveries-drawer
     title: Open a new endpoint's delivery log and health strip
@@ -311,7 +311,7 @@ flows:
       - action: fill
         with:
           testId: webhook-url-input
-          value: 'https://example.com/vd-{uid}'
+          value: "https://example.com/vd-{uid}"
       - action: click
         with:
           testId: webhook-family-toggle-gateway
@@ -329,7 +329,7 @@ flows:
           selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
+          text: "example.com/vd-{uid}"
       - action: click
         with:
           selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
@@ -352,7 +352,7 @@ flows:
       - action: expect
         with:
           testId: webhook-dlq-badge
-          equals: '0'
+          equals: "0"
 
   - id: webhook-endpoint-refuses-insecure-url
     title: An http URL is refused and no endpoint is created
@@ -366,7 +366,7 @@ flows:
       - action: fill
         with:
           testId: webhook-url-input
-          value: 'http://example.com/vd-{uid}'
+          value: "http://example.com/vd-{uid}"
       - action: click
         with:
           testId: webhook-family-toggle-gateway
@@ -375,14 +375,14 @@ flows:
           testId: webhook-save
       - action: wait
         with:
-          millis: '2500'
+          millis: "2500"
       - action: expect
         with:
           testId: webhook-save
       - action: expect
         with:
           testId: webhook-secret-dialog
-          equals: '0'
+          equals: "0"
       - action: go
         with:
           path: /gateway/webhooks
@@ -391,8 +391,8 @@ flows:
           testId: webhook-new
       - action: expect
         with:
-          text: 'example.com/vd-{uid}'
-          equals: '0'
+          text: "example.com/vd-{uid}"
+          equals: "0"
 
   - id: webhook-endpoint-sqs-refuses-bad-queue-url
     title: An SQS endpoint with a queue URL that is not a queue is refused
@@ -409,7 +409,7 @@ flows:
       - action: fill
         with:
           testId: webhook-sqs-queue-url
-          value: 'not-a-queue-{uid}'
+          value: "not-a-queue-{uid}"
       - action: click
         with:
           testId: webhook-family-toggle-gateway
@@ -418,14 +418,14 @@ flows:
           testId: webhook-save
       - action: wait
         with:
-          millis: '2500'
+          millis: "2500"
       - action: expect
         with:
           testId: webhook-save
       - action: expect
         with:
           testId: webhook-secret-dialog
-          equals: '0'
+          equals: "0"
       - action: go
         with:
           path: /gateway/webhooks
@@ -434,8 +434,8 @@ flows:
           testId: webhook-new
       - action: expect
         with:
-          text: 'not-a-queue-{uid}'
-          equals: '0'
+          text: "not-a-queue-{uid}"
+          equals: "0"
 
   - id: license-page-shows-licence-and-seats
     title: The licence page names the plan, the licensed organisation, the seats and the end date, with no upload form

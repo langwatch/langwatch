@@ -21,6 +21,24 @@ Feature: Shared Dashboard service
     Then the graph is assigned grid row 3
 
   @unit
+  Scenario: A new graph is placed below the bottom edge of the tallest chart
+    Given the dashboard has a chart at grid row 0 spanning three rows
+    When the Dashboard service creates a graph without a row
+    Then the graph is assigned grid row 3
+
+  @unit
+  Scenario: A graph created without a size lands at the grid's default size
+    When the Custom Graph page creates a graph on a dashboard without a size
+    Then the graph spans half the grid's width and three rows
+
+  @unit
+  Scenario: A graph can be resized across the whole eight-column grid
+    Given a graph on a dashboard
+    When the grid resizes it to span all eight columns
+    Then the new size is stored and read back
+    And a size that runs past the grid's right edge is refused
+
+  @unit
   Scenario: A graph created with an empty dashboard id is placed on no dashboard
     When the Dashboard service creates a graph with an empty dashboard id
     Then the graph belongs to no dashboard

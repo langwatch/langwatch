@@ -639,6 +639,21 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And I can go back to the address step for a mistyped address
 
   @integration
+  Scenario: An address with no account on an installation that cannot send email goes to the password step
+    Given the installation has no email provider configured
+    When I enter an email address no account holds on the log-in screen
+    And I continue with the sign-up it offers
+    Then no confirmation link is sent and I am not told to check my email
+    And the sign-up door opens on the password step for that address, marked unconfirmed
+
+  @integration
+  Scenario: A late instance-methods answer does not undo the carried address routing
+    Given the sign-up door opened with an address carried from the log-in screen
+    And it asked the router about the instance's methods and about that address
+    When the answer for the address arrives before the answer for the methods
+    Then the screen keeps the routing decision for the address
+
+  @integration
   Scenario: An account with a passkey is asked for it, not offered a button
     Given my account holds a passkey
     When I submit my email address

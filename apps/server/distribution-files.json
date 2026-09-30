@@ -38,5 +38,11 @@
   "apps/mailsim-web/package.json",
   "dev/tests/agentic-e2e/package.json",
   "dev/tests/e2e-stack/package.json",
-  "tools/visualdiff/runner/package.json"
+  "tools/visualdiff/runner/package.json",
+  "apps/analyticssim-web/package.json",
+  "apps/llmsim-web/package.json",
+  "apps/storagesim-web/package.json",
+  "apps/voicesim-web/package.json",
+  "tools/fuzz/runner/package.json",
+  "tools/interactionsimulator/package.json"
 ]

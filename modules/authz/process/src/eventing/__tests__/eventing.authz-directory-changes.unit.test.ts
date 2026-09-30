@@ -34,7 +34,14 @@ describe("given the directory has attached and taken back grants", () => {
   it("answers both, newest first, capped at the limit asked for", async () => {
     const { repository, findMany } = repositoryOver({
       attached: [{ id: "grant_new", principalId: "user_1", createdAt: new Date(3000) }],
-      removed: [{ id: "grant_old", principalId: "user_2", createdAt: new Date(1000), revokedAt: new Date(5000) }],
+      removed: [
+        {
+          id: "grant_old",
+          principalId: "user_2",
+          createdAt: new Date(1000),
+          revokedAt: new Date(5000),
+        },
+      ],
     });
 
     const changes = await repository.findDirectoryCausedChanges({
@@ -60,7 +67,14 @@ describe("given the directory has attached and taken back grants", () => {
         { id: "grant_a", principalId: "user_1", createdAt: new Date(4000) },
         { id: "grant_b", principalId: "user_2", createdAt: new Date(3000) },
       ],
-      removed: [{ id: "grant_c", principalId: "user_3", createdAt: new Date(1000), revokedAt: new Date(2000) }],
+      removed: [
+        {
+          id: "grant_c",
+          principalId: "user_3",
+          createdAt: new Date(1000),
+          revokedAt: new Date(2000),
+        },
+      ],
     });
 
     const changes = await repository.findDirectoryCausedChanges({

@@ -43,27 +43,62 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
   }
 
   async setReportSwitches({
-    optionalMetricsOptOut,
-    hostnameOptOut,
-  }: InstanceReportSwitches): Promise<void> {
-    await this.prisma.instanceIdentity.updateMany({
-      where: { id: ROW_ID },
-      data: {
-        ...(optionalMetricsOptOut === undefined ? {} : { optionalMetricsOptOut }),
-        ...(hostnameOptOut === undefined ? {} : { hostnameOptOut }),
-      },
-    });
+    switches: { optionalMetricsOptOut, hostnameOptOut },
+    instanceIdIfMissing,
+  }: {
+    switches: InstanceReportSwitches;
+    instanceIdIfMissing: string;
+  }): Promise<void> {
+    const data = {
+      ...(optionalMetricsOptOut === undefined ? {} : { optionalMetricsOptOut }),
+      ...(hostnameOptOut === undefined ? {} : { hostnameOptOut }),
+    };
+    if (Object.keys(data).length === 0) return;
+    await this.upsertRow({ instanceIdIfMissing, data });
   }
 
-  async recordReport({ error, at }: { error: string | null; at: Instant }): Promise<void> {
-    await this.prisma.instanceIdentity.updateMany({
-      where: { id: ROW_ID },
+  async recordReport({
+    error,
+    at,
+    instanceIdIfMissing,
+  }: {
+    error: string | null;
+    at: Instant;
+    instanceIdIfMissing: string;
+  }): Promise<void> {
+    await this.upsertRow({
+      instanceIdIfMissing,
       data: error
         ? { lastReportError: error }
         : { lastReportAt: toDate(at), lastReportError: null },
     });
   }
+
+  /**
+   * One statement on the fixed key, which Prisma runs as Postgres's native
+   * `INSERT ... ON CONFLICT (id) DO UPDATE`: racing first writes land on one row.
+   */
+  private async upsertRow({
+    instanceIdIfMissing,
+    data,
+  }: {
+    instanceIdIfMissing: string;
+    data: RowWrite;
+  }): Promise<void> {
+    await this.prisma.instanceIdentity.upsert({
+      where: { id: ROW_ID },
+      create: { id: ROW_ID, instanceId: instanceIdIfMissing, ...data },
+      update: data,
+    });
+  }
 }
+
+type RowWrite = Partial<
+  Pick<
+    InstanceIdentity,
+    "optionalMetricsOptOut" | "hostnameOptOut" | "lastReportAt" | "lastReportError"
+  >
+>;
 
 function rowOf(row: InstanceIdentity): InstanceIdentityRecord {
   return {

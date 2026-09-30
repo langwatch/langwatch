@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
+    "dev": "LANGWATCH_DEV_READY_PATTERN='\"msg\":\"backend ready\"' node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
     "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
     "typecheck": "tsc -b",
     "test": "vitest run"

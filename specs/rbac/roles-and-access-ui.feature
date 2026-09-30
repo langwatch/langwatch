@@ -120,3 +120,13 @@ Feature: Roles & access settings page
     Given custom roles, one of which shares a built-in role's id
     When the grant dialog lists the roles
     Then Admin, Member and Viewer come first and each appears once
+
+  # ============================================================================
+  # Plans: granting is on every plan; only creating a custom role is Enterprise
+  # ============================================================================
+
+  @integration
+  Scenario: Any plan grants and changes roles, with or without an end date
+    Given the organization is on a plan below Enterprise
+    When I grant role "member" to a member on a team with an end date, then change it to "viewer"
+    Then both succeed and the end date is kept

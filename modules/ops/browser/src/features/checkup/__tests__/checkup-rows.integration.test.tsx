@@ -169,7 +169,7 @@ describe("UsageReportSection", () => {
 describe("given the checkup answered verdicts only", () => {
   describe("when the page renders a failing row and the usage report", () => {
     /** @scenario "The checkup page tells an organization member who can see the details" */
-    it("says the install administrator can see the details, and shows the organization's figures without switches", () => {
+    it("says an organization admin can see the details, and shows the organization's figures without switches", () => {
       renderRows(
         CHECK_DEFINITIONS.map((definition) => ({
           ...definition,
@@ -188,7 +188,7 @@ describe("given the checkup answered verdicts only", () => {
       );
 
       expect(screen.getByTestId("checkup-details-withheld-email")).toHaveTextContent(
-        "Your install administrator can see what this check found",
+        "An organization admin can see what this check found",
       );
       expect(screen.queryByTestId("checkup-details-withheld-app")).not.toBeInTheDocument();
       expect(screen.getByTestId("checkup-row-email").querySelector("a")).toBeNull();

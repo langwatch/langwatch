@@ -131,7 +131,11 @@ function VirtualKeyIdentitySection({
         </HStack>
       </DetailRow>
       <DetailRow label="Status">
-        <Badge colorPalette={statusPalette(vk)} data-testid="vk-detail-status">
+        <Badge
+          colorPalette={statusPalette(vk)}
+          textTransform="capitalize"
+          data-testid="vk-detail-status"
+        >
           {vk.status === "active" && isExpired(vk.expiresAt) ? "expired" : vk.status}
         </Badge>
       </DetailRow>

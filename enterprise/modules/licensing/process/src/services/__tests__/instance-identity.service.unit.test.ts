@@ -85,4 +85,34 @@ describe("what the install remembers about its own reporting", () => {
     expect(row?.lastReportError).toBe("connect_unreachable");
     expect((await repository.findRow())?.lastReportError).toBe("connect_unreachable");
   });
+
+  describe("when the switches are written before any identity row exists", () => {
+    /** @scenario "The usage report switches persist on an install with no identity row yet" */
+    it("creates the row holding them, under a freshly minted id", async () => {
+      const { service } = identity();
+
+      await service.setReportSwitches({ optionalMetricsOptOut: true, hostnameOptOut: true });
+
+      const [row] = await service.findIdentity();
+      expect(row).toMatchObject({
+        instanceId: "instance-1",
+        optionalMetricsOptOut: true,
+        hostnameOptOut: true,
+      });
+      expect(await service.getInstanceId()).toBe("instance-1");
+    });
+  });
+
+  describe("when a report lands on an install whose operator named the id", () => {
+    /** @scenario "A usage report sent before any identity row existed is still recorded" */
+    it("creates the row under the named id with the time the report landed", async () => {
+      const { service } = identity({ override: "named-by-the-operator" });
+
+      await service.recordReport({ error: null, at: NOW });
+
+      const [row] = await service.findIdentity();
+      expect(row?.instanceId).toBe("named-by-the-operator");
+      expect(row?.lastReportAt?.toString()).toBe(NOW.toString());
+    });
+  });
 });

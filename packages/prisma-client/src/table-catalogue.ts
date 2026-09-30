@@ -53,6 +53,7 @@ export const prismaTableCatalogue = {
   "CustomGraph": "CustomGraph",
   "BatchEvaluation": "BatchEvaluation",
   "Trigger": "Trigger",
+  "SlackIntegration": "SlackIntegration",
   "WebhookEndpoint": "WebhookEndpoint",
   "WebhookEndpointDelivery": "WebhookEndpointDelivery",
   "Experiment": "Experiment",
@@ -72,6 +73,7 @@ export const prismaTableCatalogue = {
   "LangyMessageProjection": "LangyMessageProjection",
   "ProjectSecret": "ProjectSecret",
   "TriggerSent": "TriggerSent",
+  "TriggerLatestEvaluation": "TriggerLatestEvaluation",
   "EmailSuppression": "EmailSuppression",
   "AnnotationScore": "AnnotationScore",
   "AnnotationQueue": "AnnotationQueue",
@@ -1076,8 +1078,27 @@ export const prismaModelFieldCatalogue = {
     "traceDebounceMs",
     "TriggerSent",
     "webhookDeliveries",
+    "latestEvaluation",
     "customGraphId",
     "customGraph"
+  ],
+  "SlackIntegration": [
+    "id",
+    "name",
+    "kind",
+    "scopeType",
+    "scopeId",
+    "organizationId",
+    "botTokenEncrypted",
+    "webhookUrlEncrypted",
+    "secretFingerprint",
+    "secretHint",
+    "slackTeamId",
+    "slackTeamName",
+    "createdById",
+    "updatedById",
+    "createdAt",
+    "updatedAt"
   ],
   "WebhookEndpoint": [
     "id",
@@ -1395,6 +1416,19 @@ export const prismaModelFieldCatalogue = {
     "resolvedAt",
     "openIncidentKey",
     "createdAt",
+    "updatedAt"
+  ],
+  "TriggerLatestEvaluation": [
+    "triggerId",
+    "trigger",
+    "projectId",
+    "evaluatedAt",
+    "verdict",
+    "observedValue",
+    "threshold",
+    "operator",
+    "timePeriodMinutes",
+    "skipCode",
     "updatedAt"
   ],
   "EmailSuppression": [
@@ -2910,8 +2944,10 @@ export const prismaRelationCatalogue = {
     "project": "Project",
     "TriggerSent": "TriggerSent",
     "webhookDeliveries": "WebhookEndpointDelivery",
+    "latestEvaluation": "TriggerLatestEvaluation",
     "customGraph": "CustomGraph"
   },
+  "SlackIntegration": {},
   "WebhookEndpoint": {
     "organization": "Organization",
     "deliveries": "WebhookEndpointDelivery"
@@ -2966,6 +3002,9 @@ export const prismaRelationCatalogue = {
   "TriggerSent": {
     "customGraph": "CustomGraph",
     "project": "Project",
+    "trigger": "Trigger"
+  },
+  "TriggerLatestEvaluation": {
     "trigger": "Trigger"
   },
   "EmailSuppression": {

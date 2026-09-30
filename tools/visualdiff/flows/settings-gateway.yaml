@@ -67,8 +67,8 @@ flows:
           text: Create new secret key
       - action: fill
         with:
-          field: 'e.g., CI Pipeline, Local Dev'
-          value: 'vd-key-{uid}'
+          field: "e.g., CI Pipeline, Local Dev"
+          value: "vd-key-{uid}"
       - action: click
         with:
           text: /^\s*Create secret key\s*$/
@@ -81,7 +81,7 @@ flows:
       - action: capture
         with:
           selector: pre
-          hasText: 'Authorization: Bearer'
+          hasText: "Authorization: Bearer"
           match: Bearer\s+(\S+)
           as: apiKeyToken
       - action: expect
@@ -116,8 +116,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -142,8 +142,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-revoke-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-revoke-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -182,7 +182,7 @@ flows:
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: 'sk-ant-vd-{uid}'
+          value: "sk-ant-vd-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -192,7 +192,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("Anthropic")'
-          min: '1'
+          min: "1"
 
   - id: model-provider-delete
     title: Delete a model provider from its row menu and see it gone after a reload
@@ -211,7 +211,7 @@ flows:
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: 'sk-ant-vd-{uid}'
+          value: "sk-ant-vd-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -234,7 +234,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("Anthropic")'
-          equals: '0'
+          equals: "0"
 
   - id: project-create
     title: Create a project from the switcher and see it in the switcher after a reload
@@ -252,7 +252,7 @@ flows:
       - action: fill
         with:
           field: AI Project
-          value: 'vd-project-{uid}'
+          value: "vd-project-{uid}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -276,7 +276,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-team-{uid}'
+          value: "vd-team-{uid}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -300,7 +300,7 @@ flows:
       - action: fill
         with:
           field: Group name
-          value: 'vd-group-{uid}'
+          value: "vd-group-{uid}"
       - action: click
         with:
           text: /^\s*Create group\s*$/
@@ -324,7 +324,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-role-{uid}'
+          value: "vd-role-{uid}"
       - action: click
         with:
           testId: "permission-area-Data and analysis"
@@ -353,12 +353,12 @@ flows:
           text: Add Secret
       - action: fill
         with:
-          field: 'e.g., OPENAI_API_KEY'
-          value: 'vdsecret{uid}'
+          field: "e.g., OPENAI_API_KEY"
+          value: "vdsecret{uid}"
       - action: fill
         with:
           field: Enter secret value
-          value: 'sv-{uid}'
+          value: "sv-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -368,7 +368,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("vdsecret{uid}")'
-          min: '1'
+          min: "1"
       - action: expect
         with:
           text: sv-{uid}
@@ -389,7 +389,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("vdsecret{uid}")'
-          equals: '0'
+          equals: "0"
 
   # Coverage round 2. The steps below use only handles both trees draw: button words, form
   # placeholders, the test ids main already carries (add-config-button, empty-state-add-config,

@@ -4,6 +4,7 @@
  * Spec: modules/ops/specs/checkup-audience.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { CheckupAnswer, CheckupResult, OpsOperator } from "@langwatch/ops-contract";
@@ -20,6 +21,7 @@ import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
 
 const STAFF: OpsOperator = { id: "user_staff", email: OPS_STAFF_ADDRESS };
 const MEMBER: OpsOperator = { id: "user_member", email: "member@acme.test" };
+const MANAGER: OpsOperator = { id: "user_manager", email: "manager@acme.test" };
 const INSTALL_WIDE_KEYS = [
   "instance_id",
   "version",
@@ -102,10 +104,26 @@ function checkupService(): OpsCheckupService {
   });
 }
 
-function app() {
+/** Who holds organization:manage in org-1; nobody else holds anything. */
+function authzWithManagers(managers: readonly string[]): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    hasPermission: async (check) =>
+      check.permission === "organization:manage" &&
+      "organizationId" in check &&
+      check.organizationId === "org-1" &&
+      managers.includes(check.userId),
+  });
+}
+
+function app({
+  managers = [],
+  adminEmails = true,
+}: { managers?: readonly string[]; adminEmails?: boolean } = {}) {
   return createOpsTestApp({
     checkup: checkupService(),
     projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org-1" }),
+    authz: authzWithManagers(managers),
+    ...(adminEmails ? {} : { capability: { isAdmin: () => false } }),
   }).app;
 }
 
@@ -186,7 +204,58 @@ describe("given the caller is on the ops back-office list", () => {
   });
 });
 
-describe("given the caller is signed in and not on the ops back-office list", () => {
+describe("given the install sets no ADMIN_EMAILS and the caller manages the organization", () => {
+  const managerApp = () => app({ managers: [MANAGER.id], adminEmails: false });
+
+  describe("when the checkup is read and its paid checks are run", () => {
+    /** @scenario "An organization manager reads what each check found with no ADMIN_EMAILS set" */
+    it("answers every row with its detail and the whole install's report", async () => {
+      const opsApp = managerApp();
+
+      const read = rowsOf(await opsApp.getCheckup({ organizationId: "org-1", operator: MANAGER }));
+      const ran = rowsOf(
+        await opsApp.runCheckup({
+          organizationId: "org-1",
+          operator: MANAGER,
+          checks: ["reach_connect_host"],
+        }),
+      );
+      const report = await opsApp.getUsageReport({ organizationId: "org-1", operator: MANAGER });
+
+      expect(read.every((row) => typeof row.verdict.detail === "string")).toBe(true);
+      expect(ran.every((row) => typeof row.verdict.detail === "string")).toBe(true);
+      expect(report).toMatchObject({
+        deployment: "self-hosted",
+        endpoint: "https://app.langwatch.ai/api/track_usage",
+        switches: { optional: true, hostname: true },
+        payload: { organizations: 2, projects: 3 },
+      });
+    });
+  });
+
+  describe("when the usage report switches are changed", () => {
+    /** @scenario "An organization manager changes what the install reports" */
+    it("writes the switches", async () => {
+      await managerApp().setUsageReportSwitches({
+        organizationId: "org-1",
+        operator: MANAGER,
+        hostnameOptOut: true,
+      });
+
+      expect(switchWrites).toEqual([{ hostnameOptOut: true }]);
+    });
+  });
+
+  describe("when the manager reads another organization's checkup", () => {
+    it("answers verdicts only, since the grant is in org-1", async () => {
+      expectVerdictsOnly(
+        rowsOf(await managerApp().getCheckup({ organizationId: "org-2", operator: MANAGER })),
+      );
+    });
+  });
+});
+
+describe("given the caller is signed in, not on the ops back-office list and not an organization manager", () => {
   describe("when the checkup is read and its paid checks are run", () => {
     /** @scenario "An organization member reads each check's verdict and nothing more" */
     it("answers each row's name, group, cost and outcome only", async () => {

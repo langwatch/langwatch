@@ -10,8 +10,8 @@ one sentence about fan-out — see Context #3), §1 (the append-only registry,
 whose freeze exists for this), §4 (the `{actor, subject}` shape).
 
 **Paired with:** [ADR-161](161-an-agent-session-is-a-principal.md), written the
-same day on the same branch. ADR-161 decides *what an agent session is*; this
-decides *what crosses the wire when one runs*. Neither is implementable
+same day on the same branch. ADR-161 decides _what an agent session is_; this
+decides _what crosses the wire when one runs_. Neither is implementable
 without the other, and neither restates the other: ADR-161 §4 says the
 passport is the credential and states what that costs; this says what a
 passport is, how it is verified, and how a revocation reaches it.
@@ -47,12 +47,12 @@ ADR-092 §12 describes a three-rung ladder. Two rungs are live code:
   `:60-72`), and the cache defaults on since PR #7532.
 - **The bitset core.** `encodePermissionBitset` / `bitsetHasPermission` are
   real, and on the browser-safe barrel (`packages/authz/src/bitset.ts`). The
-  registry is append-only *because of this ADR* — the rule is written at
+  registry is append-only _because of this ADR_ — the rule is written at
   `packages/authz/src/registry.ts:20-24` ("bitset indices (stage F passports)
   are derived from declaration order") and again at `:208-212`, and it is
   enforced twice: sentinel indices, and the **full serialization order**,
-  whose test comment says why in one line — *"bitset indices ship inside
-  signed passports"*
+  whose test comment says why in one line — _"bitset indices ship inside
+  signed passports"_
   (`platform/app/src/server/app-layer/authz/__tests__/registry.unit.test.ts:99-119`).
   126 permissions is a **16-byte** bitset. A principal's whole per-scope
   answer fits in a header.
@@ -76,11 +76,11 @@ bearer in its environment
 **something bearer-shaped must cross that boundary** — ADR-161 argues this at
 length and this ADR takes it as given. What crosses today is a stored `ApiKey`
 row with a six-hour TTL, and the sprawl it produces is measured in our own
-source: *"41 keys minted, 14 ever used"*
+source: _"41 keys minted, 14 ever used"_
 (`platform/app/src/server/app-layer/langy/LangyCredentialService.ts`, the
 `getOrProvision` docstring), managed by a name-and-tenant-gated system
 revocation path (`langyApiKey.ts:128-182`) and an expiry reaper (`:202-224`).
-Meanwhile the actor rides the same wire as an *unsigned JSON field* —
+Meanwhile the actor rides the same wire as an _unsigned JSON field_ —
 `actorUserId` in the turn payload
 (`services/langyagent/transport/rpc/rpc.go:51`,
 `transport/rpc/handlers.go:65,139`) — beside a credential that knows nothing
@@ -110,7 +110,7 @@ it, and "cannot read the epoch" degrades safely to "collect fresh from
 Postgres" (`epoch.ts:18-29`). It is not available to L2. A verifier that could
 read Postgres would not need a passport.
 
-The good news is that the fan-out is *also* already built, in the one place
+The good news is that the fan-out is _also_ already built, in the one place
 that needs it. The Go gateway runs an org-scoped **change feed**: a monotonic
 per-org revision in Postgres (`GatewayChangeEvent`,
 `platform/app/src/server/gateway/changeEvent.repository.ts:1-6`), long-polled
@@ -183,8 +183,8 @@ strings** (§2, Rationale).
 ```
 
 **This is the central decision of the ADR, and it is the one §12 does not
-make.** A passport's job is to say *who is asking, provably, without a
-lookup*. Carrying the answer as well is an optimization for verifiers that
+make.** A passport's job is to say _who is asking, provably, without a
+lookup_. Carrying the answer as well is an optimization for verifiers that
 cannot compute one — not part of the definition. Splitting the two lets
 ADR-161 have a signed principal with live grants, which closes Context #3(b),
 without giving the collector a database connection.
@@ -236,7 +236,7 @@ refusal, never a best-effort parse.
 **HS256 with a dedicated `AUTHZ_PASSPORT_SECRET`** — the variable
 `packages/authz/README.md:327` already reserves.
 
-- *Alternative: reuse `LW_GATEWAY_JWT_SECRET` and the gateway's signer.* Fewer
+- _Alternative: reuse `LW_GATEWAY_JWT_SECRET` and the gateway's signer._ Fewer
   secrets to manage, and the Go verifier is already constructed
   (`services/aigateway/deps.go:121-126`). Rejected on blast radius: the two
   tokens have different lifetimes, different revocation models and different
@@ -245,8 +245,8 @@ refusal, never a best-effort parse.
   dedicated secret makes that structural rather than vigilant. It also means
   rotating one does not rotate the other, which matters because the passport
   secret will rotate on a shorter cadence than a gateway secret ever has.
-- *Alternative: a bespoke compact format (`lwp1.<payload>.<mac>`) with no
-  `alg` field at all.* Genuinely attractive: it deletes the
+- _Alternative: a bespoke compact format (`lwp1.<payload>.<mac>`) with no
+  `alg` field at all._ Genuinely attractive: it deletes the
   algorithm-confusion class by construction rather than by pinning, and the
   verify is one HMAC, one `timingSafeEqual` and one `JSON.parse`. Rejected
   because `pkg/jwtverify` exists, pins the HMAC method inside its `Keyfunc`
@@ -255,7 +255,7 @@ refusal, never a best-effort parse.
   existing one handles. The pinning is not optional in either language and
   gets its own scenario — a passport signed `alg: none`, or with an
   asymmetric key, must fail in TypeScript and in Go.
-- *Alternative: asymmetric (Ed25519), so a verifier holds no minting key.* The
+- _Alternative: asymmetric (Ed25519), so a verifier holds no minting key._ The
   right end state if a passport ever has to be verified somewhere we do not
   operate. Nothing on the ship list (§7) is outside our own deployment, and
   HMAC is the cheaper verify on a path measured in microseconds. Named here
@@ -288,7 +288,7 @@ they are not interchangeable:
                 projection writer — "the write IS the bump"    amendment, 2026-08-17
 ```
 
-ADR-092's 2026-08-17 amendment says the version integer *should* become the
+ADR-092's 2026-08-17 amendment says the version integer _should_ become the
 projection cursor, and that the Redis epoch keeps being bumped unchanged until
 the contract PR retires it. So the source will change **while passports are in
 flight**, and two integers from different counters compared as though they
@@ -318,7 +318,7 @@ evicted the counter climbs again from a lower number, and a passport stamped
 under the older, higher value would satisfy `epo >= mine`. Two things contain
 it. `getAuthzEpoch` deliberately reads a missing key as `null` and not as 0
 (`epoch.ts:18-29`, where the reasoning is already written out), so the reset
-window is *absent knowledge*, which fails closed; and `exp ≤ 60s` bounds
+window is _absent knowledge_, which fails closed; and `exp ≤ 60s` bounds
 anything that slips through. The durable cursor removes the hazard entirely,
 which is one more reason the amendment's direction is right.
 
@@ -421,7 +421,7 @@ which is the fan-out problem again with worse failure modes. What that gives
 up, precisely:
 
 - **Killing one bearer without changing a grant.** An operator who wants to
-  stop *one* runaway agent turn and leave every other session alone cannot.
+  stop _one_ runaway agent turn and leave every other session alone cannot.
   ADR-161 §4 concedes exactly this and names the shape of the answer if it is
   ever needed — a per-conversation nonce checked alongside the epoch, which is
   the one piece of session-shaped state we would then store. Neither ADR
@@ -432,7 +432,7 @@ up, precisely:
   the reason it is acceptable is arithmetic: what made it necessary was a
   six-hour lifetime, and sixty seconds does not need a reaper.
 
-What is *better* than today, and worth saying because the trade is not
+What is _better_ than today, and worth saying because the trade is not
 one-way: revoking alice kills every passport minted for her, everywhere, at
 once, with nobody enumerating credentials — as against killing the rows
 somebody remembered to look up.
@@ -458,7 +458,7 @@ call.
 
 Renewal is a **push over the channel that already carries the turn**, never a
 credential-issuing endpoint the worker can call: ADR-161's containment
-property — *the manager can revoke but cannot mint*
+property — _the manager can revoke but cannot mint_
 (`langyApiKey.ts:119-122`) — survives only if nothing downstream of the
 control plane can ask for authority. The manager relays bytes; it signs none.
 
@@ -478,8 +478,8 @@ same trade as the revocation window — a credential that keeps working while
 nothing can revoke it is precisely what a short `exp` exists to prevent. It
 belongs in Consequences, not in a footnote.
 
-*Alternative considered: a longer `exp` for the agent tier (15 minutes, the
-gateway's number) and no renewal.* Simpler, and it matches the precedent. It
+_Alternative considered: a longer `exp` for the agent tier (15 minutes, the
+gateway's number) and no renewal._ Simpler, and it matches the precedent. It
 re-opens a fifteen-minute orphan window on the exact credential ADR-161 exists
 to stop orphaning, and it makes "how long is a passport valid" a per-audience
 question instead of a property of the format. One ceiling, one answer, and
@@ -537,7 +537,7 @@ request — and a bit test against a set membership over strings. The cost is th
 append-only registry, and it is already paid: the rule is written, the full
 order is pinned, and the pin's own comment says it exists for passports
 (`registry.unit.test.ts:112-119`). Freezing the order was the cheapest thing
-to promise *before* the first passport existed; this ADR is the moment that
+to promise _before_ the first passport existed; this ADR is the moment that
 promise starts being load-bearing rather than prospective.
 
 **Why not role names in the claim, the way most systems do it?** A role name

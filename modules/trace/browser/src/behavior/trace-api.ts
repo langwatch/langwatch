@@ -851,6 +851,11 @@ export type TraceApiMap = {
   };
 
   project: {
+    /** Whether the project has ever received a trace; polled while it has not. */
+    getHasFirstMessage: {
+      query: { input: ProjectScope; output: { firstMessage: boolean } };
+    };
+
     getFieldRedactionStatus: {
       query: {
         input: ProjectScope;

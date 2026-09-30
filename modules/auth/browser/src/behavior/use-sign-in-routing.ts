@@ -1,5 +1,5 @@
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { authApi as api } from "./auth-api.ts";
 
@@ -24,6 +24,10 @@ export function useSignInRouting(): {
   const route = api.auth.route.useMutation();
   const [decision, setDecision] = useState<RoutingDecision | null>(null);
   const [identifier, setIdentifier] = useState<string | null>(null);
+  // Requests can overlap (the instance's methods and a carried address), and
+  // their answers can land in either order. Only the latest one commits; an
+  // older answer still goes back to its own caller.
+  const latestRequest = useRef(0);
 
   const decide = useCallback(
     async ({
@@ -33,13 +37,16 @@ export function useSignInRouting(): {
       identifier: string | null;
       breakGlass?: boolean;
     }) => {
+      const request = ++latestRequest.current;
       try {
         const answered = await route.mutateAsync({
           identifier: submitted,
           breakGlass,
         });
-        setDecision(answered);
-        setIdentifier(submitted);
+        if (request === latestRequest.current) {
+          setDecision(answered);
+          setIdentifier(submitted);
+        }
         return answered;
       } catch {
         // The failure is on the mutation, which the screen renders through the
@@ -52,6 +59,7 @@ export function useSignInRouting(): {
   );
 
   const clear = useCallback(() => {
+    latestRequest.current += 1;
     setDecision(null);
     setIdentifier(null);
   }, []);

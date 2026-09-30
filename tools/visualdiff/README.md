@@ -262,13 +262,13 @@ A flow ends in `expect` steps; each takes exactly one form and polls up to
 
 ```yaml
 - action: expect
-  with: { text: VD Alert }                          # visible text; role/name scope it
+  with: { text: VD Alert } # visible text; role/name scope it
 - action: expect
-  with: { count: "role=row", min: "3" }             # or equals
+  with: { count: "role=row", min: "3" } # or equals
 - action: expect
   with: { url: /simulations/scenarios }
 - action: expect
-  with: { api: /api/triggers, contains: VD Alert }  # field, min, equals too
+  with: { api: /api/triggers, contains: VD Alert } # field, min, equals too
 ```
 
 An expect can also name an element (`testId`, `testIdPrefix`, `label`, with
@@ -278,11 +278,11 @@ An expect can also name an element (`testId`, `testIdPrefix`, `label`, with
 - action: expect
   with: { testId: trace-row, min: "2" }
 - action: expect
-  with: { text: Gone, equals: "0" }                 # absent
+  with: { text: Gone, equals: "0" } # absent
 - action: expect
-  with: { api: /api/traces, status: "401", auth: none }   # or auth: "{apiKey}"
+  with: { api: /api/traces, status: "401", auth: none } # or auth: "{apiKey}"
 - action: expect
-  with: { text: Shared trace, anonymous: "true" }   # in a fresh cookieless context
+  with: { text: Shared trace, anonymous: "true" } # in a fresh cookieless context
 ```
 
 An expect failing on the candidate alone is `broken`. Each run writes
@@ -309,25 +309,25 @@ page pool, so every name a flow creates ends in `{uid}`.
 Steps click and fill by test id, never by text; text only asserts outcomes.
 A click that misses fails the flow: `optional: "true"` is for tours and nudges.
 
-| step | arguments |
-| --- | --- |
-| `click` | `testId` or `testIdPrefix` or `label` or `selector`, or `text`; `hasText`, `optional` |
-| `fill` | `testId` or `label` or `field`, `value` |
-| `select` | `testId`, or `field` (the label beside the select), `option`; native or combobox |
-| `type` | `testId` or `placeholder`, `text`, `submit` |
-| `upload` | `fixture` (a file in `fixtures/`), `testId` or `selector` (default `input[type=file]`) |
-| `drag` | `from`, `to` (test ids), or `fromSelector`, `toSelector` (CSS) |
-| `download` | the click's target (`testId`, `label`, `selector`, `text`), `contains` (in the file), `filename` (regex), `timeout` |
-| `hover` | `testId`, `label` or `selector`: the pointer rests on it, so a control shown on hover can be clicked |
-| `capture` | `testId` or `selector`, `as`, `match` (regex, first group kept); stored as `{as}` |
-| `mail` | `to`, `subject`, `as` (default `mailLink`); the newest message's first link, from the side's mailsim |
-| `acceptInvite` | `link` (a mailed invite link), `email`, `name`; signs that person up in a cookieless page and joins by the invite, leaving the signed-in page as it was |
-| `passkey` | none; opens a WebAuthn virtual authenticator (CTAP2, internal, resident keys, user verification) on the step's page, once, so passkey create, sign-in, rename and delete run headless; `anonymous` picks the context |
-| `totp` | `secret` (a captured value) or `from` (test id) / `fromSelector` (CSS) of the element showing it; `as` (default `totpCode`) keeps the current RFC 6238 code; with `testId`, `selector`, `label` or `placeholder` it types it there (`submit`) |
-| `request` | `path` (`{slug}` fills), `method` (default POST), `body` (JSON text), `auth` (a key sent as X-Auth-Token; unset sends the page's session), `status` (default any 2xx), `field` with `equals` / `contains` / `min`, `as` (keeps `field`, else the body) |
-| `go` | `path` (an absolute `{mailLink}` keeps its path and query); `anonymous: "true"` opens it in a fresh cookieless context; any other name (`anonymous: second`) is a further cookieless context of its own, kept for the flow |
-| `expect` | see above |
-| `wait`, `signIn`, `dismissTour` | as before; `signIn` takes `email` and `password` to sign in as an account the flow made |
+| step                            | arguments                                                                                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `click`                         | `testId` or `testIdPrefix` or `label` or `selector`, or `text`; `hasText`, `optional`                                                                                                                                                                  |
+| `fill`                          | `testId` or `label` or `field`, `value`                                                                                                                                                                                                                |
+| `select`                        | `testId`, or `field` (the label beside the select), `option`; native or combobox                                                                                                                                                                       |
+| `type`                          | `testId` or `placeholder`, `text`, `submit`                                                                                                                                                                                                            |
+| `upload`                        | `fixture` (a file in `fixtures/`), `testId` or `selector` (default `input[type=file]`)                                                                                                                                                                 |
+| `drag`                          | `from`, `to` (test ids), or `fromSelector`, `toSelector` (CSS)                                                                                                                                                                                         |
+| `download`                      | the click's target (`testId`, `label`, `selector`, `text`), `contains` (in the file), `filename` (regex), `timeout`                                                                                                                                    |
+| `hover`                         | `testId`, `label` or `selector`: the pointer rests on it, so a control shown on hover can be clicked                                                                                                                                                   |
+| `capture`                       | `testId` or `selector`, `as`, `match` (regex, first group kept); stored as `{as}`                                                                                                                                                                      |
+| `mail`                          | `to`, `subject`, `as` (default `mailLink`); the newest message's first link, from the side's mailsim                                                                                                                                                   |
+| `acceptInvite`                  | `link` (a mailed invite link), `email`, `name`; signs that person up in a cookieless page and joins by the invite, leaving the signed-in page as it was                                                                                                |
+| `passkey`                       | none; opens a WebAuthn virtual authenticator (CTAP2, internal, resident keys, user verification) on the step's page, once, so passkey create, sign-in, rename and delete run headless; `anonymous` picks the context                                   |
+| `totp`                          | `secret` (a captured value) or `from` (test id) / `fromSelector` (CSS) of the element showing it; `as` (default `totpCode`) keeps the current RFC 6238 code; with `testId`, `selector`, `label` or `placeholder` it types it there (`submit`)          |
+| `request`                       | `path` (`{slug}` fills), `method` (default POST), `body` (JSON text), `auth` (a key sent as X-Auth-Token; unset sends the page's session), `status` (default any 2xx), `field` with `equals` / `contains` / `min`, `as` (keeps `field`, else the body) |
+| `go`                            | `path` (an absolute `{mailLink}` keeps its path and query); `anonymous: "true"` opens it in a fresh cookieless context; any other name (`anonymous: second`) is a further cookieless context of its own, kept for the flow                             |
+| `expect`                        | see above                                                                                                                                                                                                                                              |
+| `wait`, `signIn`, `dismissTour` | as before; `signIn` takes `email` and `password` to sign in as an account the flow made                                                                                                                                                                |
 
 Any argument may hold `{uid}` (unique per run and flow, equal on both sides),
 `{slug}`, `{isolatedSlug}`, a seeded fixture (`{dataset}`, `{graph}`, `{monitor}`,

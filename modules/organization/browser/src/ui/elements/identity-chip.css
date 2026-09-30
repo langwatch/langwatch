@@ -14,39 +14,39 @@
  */
 
 .lw-chip-shimmer {
-	position: relative;
-	overflow: hidden;
-	/* The sweep is drawn on top, so the chip's own text must not be painted
+  position: relative;
+  overflow: hidden;
+  /* The sweep is drawn on top, so the chip's own text must not be painted
 	   over by its stacking context. */
-	isolation: isolate;
+  isolation: isolate;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.lw-chip-shimmer::after {
-		content: "";
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		background: linear-gradient(
-			100deg,
-			transparent 30%,
-			color-mix(in srgb, currentColor 22%, transparent) 50%,
-			transparent 70%
-		);
-		transform: translateX(-100%);
-		animation: lw-chip-sweep 2.6s ease-in-out infinite;
-	}
+  .lw-chip-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      100deg,
+      transparent 30%,
+      color-mix(in srgb, currentColor 22%, transparent) 50%,
+      transparent 70%
+    );
+    transform: translateX(-100%);
+    animation: lw-chip-sweep 2.6s ease-in-out infinite;
+  }
 }
 
 @keyframes lw-chip-sweep {
-	0% {
-		transform: translateX(-100%);
-	}
-	/* Most of the cycle is the pause. A sweep that runs end to end without
+  0% {
+    transform: translateX(-100%);
+  }
+  /* Most of the cycle is the pause. A sweep that runs end to end without
 	   rest reads as a loading bar — as something in progress rather than as
 	   something waiting for you. */
-	45%,
-	100% {
-		transform: translateX(100%);
-	}
+  45%,
+  100% {
+    transform: translateX(100%);
+  }
 }

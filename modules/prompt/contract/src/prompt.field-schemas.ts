@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { SchemaVersion, datasetColumnTypeSchema } from "./prompt.enums.ts";
 
-/** Postgres text columns refuse U+0000 (22021), so it is refused at the boundary as a 400. */
+/** Postgres text columns refuse U+0000 (22021), so the boundary refuses it as invalid. */
 export const nulFreeStringSchema = z
   .string()
   .refine((value) => !value.includes("\u0000"), "Must not contain a null byte");

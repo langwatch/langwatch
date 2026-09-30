@@ -7,7 +7,8 @@ import { ComponentNode } from "./workflow-nodes.tsx";
 
 type WorkflowDragPreviewState = {
   isDragging: boolean;
-  item: WorkflowNodeDragItem;
+  /** Null whenever nothing is being dragged, which includes the first render. */
+  item: WorkflowNodeDragItem | null;
   currentOffset: XYPosition | null;
 };
 
@@ -24,14 +25,14 @@ export function WorkflowDragPreview() {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (item.node && ref.current) {
+    if (item?.node && ref.current) {
       const { width, height } = ref.current.getBoundingClientRect();
       item.node.width = width;
       item.node.height = height;
     }
   }, [isDragging, item]);
 
-  if (!isDragging) {
+  if (!isDragging || !item?.node) {
     return null;
   }
 

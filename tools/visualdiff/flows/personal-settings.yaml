@@ -19,8 +19,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-pn-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-pn-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -124,8 +124,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-ps-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-ps-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -449,8 +449,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-pk-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-pk-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -496,7 +496,7 @@ flows:
           anonymous: member
       - action: go
         with:
-          path: '/settings/security'
+          path: "/settings/security"
           anonymous: member
       - action: expect
         with:
@@ -506,7 +506,7 @@ flows:
           anonymous: member
       - action: click
         with:
-          label: '/^Actions for /'
+          label: "/^Actions for /"
           anonymous: member
       - action: click
         with:
@@ -529,7 +529,7 @@ flows:
           anonymous: member
       - action: go
         with:
-          path: '/settings/security'
+          path: "/settings/security"
           anonymous: member
       - action: expect
         with:
@@ -538,7 +538,7 @@ flows:
           anonymous: member
       - action: click
         with:
-          label: '/^Open user menu/'
+          label: "/^Open user menu/"
           anonymous: member
       - action: click
         with:
@@ -546,7 +546,7 @@ flows:
           anonymous: member
       - action: go
         with:
-          path: '/auth/signin'
+          path: "/auth/signin"
           anonymous: member
       - action: click
         with:
@@ -559,7 +559,7 @@ flows:
           anonymous: member
       - action: go
         with:
-          path: '/settings/security'
+          path: "/settings/security"
           anonymous: member
       - action: expect
         with:
@@ -568,7 +568,7 @@ flows:
           anonymous: member
       - action: click
         with:
-          label: '/^Actions for /'
+          label: "/^Actions for /"
           anonymous: member
       - action: click
         with:
@@ -586,7 +586,7 @@ flows:
           anonymous: member
       - action: go
         with:
-          path: '/settings/security'
+          path: "/settings/security"
           anonymous: member
       - action: expect
         with:
@@ -626,8 +626,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-ts-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-ts-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -661,7 +661,7 @@ flows:
       - action: fill
         with:
           testId: two-factor-password
-          value: '{actorPassword}'
+          value: "{actorPassword}"
           anonymous: member
       - action: click
         with:
@@ -679,7 +679,7 @@ flows:
           anonymous: member
       - action: totp
         with:
-          secret: '{totpSecret}'
+          secret: "{totpSecret}"
           testId: two-factor-code
           anonymous: member
       - action: click
@@ -702,7 +702,7 @@ flows:
           anonymous: member
       - action: go
         with:
-          path: '/settings/security'
+          path: "/settings/security"
           anonymous: member
       - action: expect
         with:
@@ -717,11 +717,11 @@ flows:
       - action: fill
         with:
           testId: turn-off-password
-          value: '{actorPassword}'
+          value: "{actorPassword}"
           anonymous: member
       - action: totp
         with:
-          secret: '{totpSecret}'
+          secret: "{totpSecret}"
           testId: turn-off-code
           anonymous: member
       - action: click
@@ -730,7 +730,7 @@ flows:
           anonymous: member
       - action: go
         with:
-          path: '/settings/security'
+          path: "/settings/security"
           anonymous: member
       - action: expect
         with:

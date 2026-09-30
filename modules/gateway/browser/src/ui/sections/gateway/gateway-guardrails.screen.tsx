@@ -1,7 +1,6 @@
 import {
   Badge,
   Button,
-  Card,
   Field,
   HStack,
   Input,
@@ -232,19 +231,15 @@ function GuardrailsPage() {
 
 function GuardrailsEmptyState({ hasGuardrailEvaluators }: { hasGuardrailEvaluators: boolean }) {
   return (
-    <Card.Root>
-      <Card.Body>
-        <NoDataInfoBlock
-          title="No guardrails yet"
-          description={
-            hasGuardrailEvaluators
-              ? "Click New guardrail to bind one of your project evaluators as a pre / post / stream_chunk hook."
-              : "No project evaluators are marked as guardrails. Open Evaluations, edit an evaluator, and switch its execution mode to AS_GUARDRAIL before binding it here."
-          }
-          icon={<Shield size={36} />}
-        />
-      </Card.Body>
-    </Card.Root>
+    <NoDataInfoBlock
+      title="No guardrails yet"
+      description={
+        hasGuardrailEvaluators
+          ? "Click New guardrail to bind one of your project evaluators as a pre / post / stream_chunk hook."
+          : "No project evaluators are marked as guardrails. Open Evaluations, edit an evaluator, and switch its execution mode to AS_GUARDRAIL before binding it here."
+      }
+      icon={<Shield size={36} />}
+    />
   );
 }
 

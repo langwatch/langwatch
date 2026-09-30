@@ -83,6 +83,8 @@ export const authWebConfigSchema = z.strictObject({
   identityFrontDoor: z.boolean(),
   /** `AUTH_PROVIDER` (or its NextAuth-era name): a provider id, never a credential. */
   authProvider: z.string().min(1).optional(),
+  /** `NEXTAUTH_URL`: the address readers reach this installation on, for copy-paste snippets. */
+  publicUrl: z.string().min(1).optional(),
 });
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
@@ -93,10 +95,12 @@ export const authBrowserConfig = defineBrowserConfig({
   project: (config: AuthServerConfig) => {
     const authProvider =
       config.signInProviders.authProvider ?? config.signInProviders.legacyProvider;
+    const publicUrl = config.sessionUrl?.trim();
     return {
       passkeys: config.passkeysEnabled,
       identityFrontDoor: true,
       ...(authProvider ? { authProvider } : {}),
+      ...(publicUrl ? { publicUrl } : {}),
     };
   },
 });

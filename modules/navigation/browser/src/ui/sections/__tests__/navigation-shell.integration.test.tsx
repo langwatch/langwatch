@@ -6,7 +6,6 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type FlagQueryInput = { flag: string; organizationIds: string[] };
@@ -31,16 +30,12 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
       recordWorkspaceView: { useMutation: () => ({ mutate: vi.fn() }) },
     },
     user: { getSsoStatus: { useQuery: () => ({}) } },
-    identity: {
-      myTestArrival: { useQuery: () => ({ data: { testing: false }, isLoading: false }) },
-    },
   },
 }));
 
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
 import { WithStubNavigationHost, type StubNavigationReadings } from "../../../testing.tsx";
 import { NavigationShell } from "../navigation-shell.tsx";
-import LandingScreen from "../navigation/landing.screen.tsx";
 
 const teamA = {
   id: "team_1",
@@ -140,11 +135,9 @@ const BASE_READINGS: StubNavigationReadings = {
 function renderShell({
   readings,
   personalScope = false,
-  page = <div data-testid="page-body" />,
 }: {
   readings?: Partial<StubNavigationReadings>;
   personalScope?: boolean;
-  page?: ReactNode;
 } = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -157,7 +150,9 @@ function renderShell({
           openDrawer: openDrawerMock,
         }}
       >
-        <NavigationShell personalScope={personalScope}>{page}</NavigationShell>
+        <NavigationShell personalScope={personalScope}>
+          <div data-testid="page-body" />
+        </NavigationShell>
       </WithStubNavigationHost>
     </ChakraProvider>,
   );
@@ -230,41 +225,6 @@ describe("an address naming a project the reader does not have", () => {
     renderShell({ readings: { projectParam: "demo", pathname: "/demo/traces" } });
 
     expect(replaceMock).not.toHaveBeenCalled();
-  });
-});
-
-describe("given a signed-in reader who belongs to no organization", () => {
-  const ORGLESS: Partial<StubNavigationReadings> = {
-    pathname: "/",
-    organizations: [],
-    organization: undefined,
-    team: undefined,
-    project: undefined,
-    openableTeams: [],
-    waiting: <div data-testid="waiting" />,
-  };
-
-  afterEach(() => {
-    cleanup();
-    replaceMock.mockReset();
-  });
-
-  describe("when they open /", () => {
-    /** @scenario "A signed-in reader in no organization is sent from / to create or join one" */
-    it("sends them to the screen that creates or joins an organization", async () => {
-      renderShell({ readings: ORGLESS, page: <LandingScreen /> });
-
-      await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/onboarding/welcome"));
-    });
-  });
-
-  describe("when their organization list has not answered yet", () => {
-    it("waits rather than deciding they have none", () => {
-      renderShell({ readings: { ...ORGLESS, isLoading: true }, page: <LandingScreen /> });
-
-      expect(screen.getByTestId("waiting")).toBeTruthy();
-      expect(replaceMock).not.toHaveBeenCalled();
-    });
   });
 });
 

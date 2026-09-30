@@ -48,7 +48,7 @@ export function NavigationShell({
 
   if (state.status === "not-found") return <>{host.notFound()}</>;
   if (state.status === "loading") return <>{host.waiting()}</>;
-  if (state.status === "without-chrome") return <>{children}</>;
+  if (state.status === "chromeless") return <>{children}</>;
 
   const isIconRail = mode === "icon-rail";
 

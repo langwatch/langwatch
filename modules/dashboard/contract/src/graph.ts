@@ -1,3 +1,7 @@
+import {
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
+} from "@langwatch/analytics-contract/chart-grid";
 import { z } from "zod";
 
 /** The house id scheme's kind for a chart-builder graph. */
@@ -11,14 +15,14 @@ export const graphNameSchema = z.string().trim().min(1);
 export const graphPayloadSchema = z.record(z.string(), z.unknown());
 export const graphFiltersSchema = z.record(z.string(), z.unknown());
 
-export const graphLayoutSchema = z
-  .object({
-    gridColumn: z.number().int().min(0).max(1),
-    gridRow: z.number().int().min(0),
-    colSpan: z.number().int().min(1).max(2),
-    rowSpan: z.number().int().min(1).max(2),
-  })
-  .strict();
+/** Where a graph sits on the dashboard's chart grid, within each bound of the grid. */
+export const graphLayoutSchema = chartGridPlacementSchema.strict();
+
+/** A layout the grid can draw: its column and span also stay inside the right edge. */
+export const graphPlacementSchema = graphLayoutSchema.refine(fitsChartGridWidth, {
+  message: "gridColumn + colSpan must not exceed the grid's columns",
+  path: ["colSpan"],
+});
 
 export const graphCreateInputSchema = z
   .object({

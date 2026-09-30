@@ -90,7 +90,7 @@ class FakeRepository implements SavedWorkbenchChartRepository {
       unplaced?: SavedWorkbenchChartRecord | undefined;
       deleted?: number;
       dashboard?: (DashboardRecord & { graphs: GraphRecord[] }) | undefined;
-      lastGridRow?: number | undefined;
+      nextFreeGridRow?: number;
     } = {},
   ) {}
 
@@ -133,9 +133,9 @@ class FakeRepository implements SavedWorkbenchChartRepository {
     this.note("findDashboard", input);
     return this.answers.dashboard;
   }
-  async findLastGraphGridRow(input: unknown) {
-    this.note("findLastGraphGridRow", input);
-    return this.answers.lastGridRow;
+  async findNextFreeGridRow(input: unknown) {
+    this.note("findNextFreeGridRow", input);
+    return this.answers.nextFreeGridRow ?? 0;
   }
 }
 
@@ -463,10 +463,10 @@ describe("SavedWorkbenchChartService", () => {
       /**
        * @scenario "Placing a chart requires a dashboard id and accepts an optional grid position"
        */
-      it("places it on the row after the last one", async () => {
+      it("places it on the first row below every card", async () => {
         const repository = new FakeRepository({
           dashboard: dashboardRecord(),
-          lastGridRow: 4,
+          nextFreeGridRow: 5,
           placed: record(),
         });
         const { service } = build({ repository });
@@ -486,7 +486,7 @@ describe("SavedWorkbenchChartService", () => {
       it("places it on the first row", async () => {
         const repository = new FakeRepository({
           dashboard: dashboardRecord(),
-          lastGridRow: undefined,
+          nextFreeGridRow: 0,
           placed: record(),
         });
         const { service } = build({ repository });
@@ -520,7 +520,7 @@ describe("SavedWorkbenchChartService", () => {
           gridRow: 2,
         });
 
-        expect(repository.calls.some((c) => c.method === "findLastGraphGridRow")).toBe(false);
+        expect(repository.calls.some((c) => c.method === "findNextFreeGridRow")).toBe(false);
         const call = repository.calls.find((c) => c.method === "placeSavedWorkbenchChart");
         expect((call?.input as { gridRow: number } | undefined)?.gridRow).toBe(2);
       });

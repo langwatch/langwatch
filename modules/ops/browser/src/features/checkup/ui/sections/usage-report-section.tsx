@@ -60,7 +60,7 @@ export function UsageReportSection({
             {report.nextReportAt
               ? `Next report at ${report.nextReportAt}. Schema version ${report.schemaVersion}.`
               : `Schema version ${report.schemaVersion}.`}{" "}
-            <Link href={DOCS_URL} target="_blank" rel="noopener noreferrer" color="blue.600">
+            <Link href={DOCS_URL} target="_blank" rel="noopener noreferrer" color="orange.fg">
               Every field explained <ExternalLink size={12} />
             </Link>
           </Text>
@@ -86,7 +86,7 @@ export function UsageReportSection({
   );
 }
 
-/** The two opt-outs, shown to an install admin, who reads the whole install's report. */
+/** The two opt-outs, shown to an organization or install admin, who reads the whole report. */
 function UsageReportSwitchRows({
   switches,
   canManage,
@@ -142,7 +142,7 @@ function UsageReportSwitchRows({
 
 function descriptionOf(report: UsageReportPreview): string {
   if (!report.switches || report.endpoint === undefined) {
-    return "Your organization's figures in the daily usage report. Your install administrator sees the whole report and where it goes.";
+    return "Your organization's figures in the daily usage report. An organization admin sees the whole report and where it goes.";
   }
   if (report.disabled) {
     return "Usage reporting is switched off with DISABLE_USAGE_STATS. This is the report that would be sent.";

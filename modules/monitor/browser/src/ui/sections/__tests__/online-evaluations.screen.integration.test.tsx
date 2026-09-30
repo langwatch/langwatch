@@ -103,7 +103,9 @@ describe("given a project with no online evaluations", () => {
       state.monitors = [];
       renderWithMonitorHost(<OnlineEvaluationsScreen />);
 
-      expect(screen.getByText("No online evaluations yet")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "No online evaluations yet" }),
+      ).toBeInTheDocument();
       expect(screen.queryByRole("table")).toBeNull();
     });
   });

@@ -4,6 +4,7 @@
  */
 
 import type { UiJoinOfferProps, UiLangyKickoff } from "@langwatch/browser-host/declarations";
+import type { TimeInput } from "@langwatch/time";
 import { createContext, useContext, type ComponentType } from "react";
 
 /** One project, as narrowly as these screens read one. */
@@ -11,6 +12,8 @@ export type OnboardingProject = {
   readonly id: string;
   readonly name: string;
   readonly slug: string;
+  /** When the project was made, so a screen with no `projectSlug` can pick the newest. */
+  readonly createdAt?: TimeInput | null;
 };
 
 /** One team in the reader's graph, as the welcome redirect walks it. */
@@ -165,10 +168,11 @@ export abstract class OnboardingHostApi {
   }): Promise<boolean>;
 
   /**
-   * The project's legacy base key, or `undefined` when the reader may not hold
-   * it. See the module docblock: this is a separate question on purpose.
+   * A project's legacy base key (the active scope's without `projectId`), or
+   * `undefined` when the reader may not hold it. Separate from the scope graph
+   * on purpose, see the module docblock.
    */
-  abstract revealProjectApiKey(): string | undefined;
+  abstract revealProjectApiKey(projectId?: string): string | undefined;
 
   /** Whether this reader asked their operating system for less motion. */
   abstract prefersReducedMotion(): boolean;

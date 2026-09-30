@@ -242,6 +242,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/gateway-internal-url.sh
 
+      - name: "assert the app knows the control plane address its gateway dials"
+        if: "!cancelled()"
+        run: ./tests/gateway-control-plane-url.sh
+
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing
       # in the app can decide to call LangWatch. A wrong `{{- if }}` emits the

@@ -1378,7 +1378,9 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
   describe("when a caller tries to widen or steer its tenant scope", () => {
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
     it("reads only the authenticated tenant, however the request names another", async () => {
-      expect(await foreignRowCount("trace_summaries", "OccurredAt", DAY.latency)).toBeGreaterThan(0);
+      expect(await foreignRowCount("trace_summaries", "OccurredAt", DAY.latency)).toBeGreaterThan(
+        0,
+      );
       const tenantsOf = (answer: { status: number; text: string }) => {
         expect(answer.status, answer.text).toBeLessThan(500);
         return answer.status === 200 ? json(answer).rows.map((row: any) => row.TenantId) : [];

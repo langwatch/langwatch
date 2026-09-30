@@ -53,6 +53,18 @@ describe("auth server configuration", () => {
     });
   });
 
+  describe("when the installation names the public URL readers sign in on", () => {
+    /** @scenario "The served page carries the public URL readers sign in on" */
+    it("hands that URL to the page, and omits it when none is named", async () => {
+      await expect(
+        authBrowserConfig.project(read({ NEXTAUTH_URL: "https://langwatch.acme.example" }), void 0),
+      ).resolves.toMatchObject({ publicUrl: "https://langwatch.acme.example" });
+      await expect(authBrowserConfig.project(read({}), void 0)).resolves.not.toHaveProperty(
+        "publicUrl",
+      );
+    });
+  });
+
   describe("given only one half of the browser session identity is named", () => {
     /** @scenario "A cross-field rule refuses a half-configured feature at boot" */
     it("refuses the configuration and names both variables", () => {

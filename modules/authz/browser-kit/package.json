@@ -19,7 +19,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:"
   },
   "devDependencies": {

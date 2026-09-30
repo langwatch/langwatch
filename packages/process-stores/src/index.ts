@@ -77,6 +77,7 @@ export {
   PipelineParticipation,
   ProducerPipelines,
   ConsumerPipelines,
+  type PipelineSettings,
 } from "./pipeline-selection.ts";
 export { openProcessStores } from "./open-stores.ts";
 export { clickhouseRoutesOf } from "./clickhouse-routes.ts";

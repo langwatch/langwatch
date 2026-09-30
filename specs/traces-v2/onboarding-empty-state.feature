@@ -34,6 +34,19 @@ Rule: Onboarding empty state
     Then the empty-state journey is rendered in place of the trace results pane
     And the journey starts on the `welcome` stage
 
+  @integration
+  Scenario: The trace explorer learns from the project record that it has no trace yet
+    Given the organization graph lists the project with `firstMessage` false
+    When the trace explorer mounts for that project
+    Then the explorer knows the project has never received a trace
+    And it shows the setup panel instead of an empty table
+
+  @integration
+  Scenario: The trace explorer follows the presence switches on the project record
+    Given the organization turned presence off for its projects
+    When the trace explorer mounts for one of them
+    Then the explorer reads presence as turned off by the organization
+
   Scenario: Page chrome stays visible but inert while the journey is active
     When the Observe page loads with zero traces and the journey not dismissed
     Then the search bar is rendered with reduced opacity, `pointer-events: none`, and the `inert` attribute

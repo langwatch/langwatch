@@ -55,6 +55,7 @@ export function uiDeploymentOf({
   return deriveUiDeployment({
     process: config.process,
     origin,
+    ...(config.auth.publicUrl ? { publicUrl: config.auth.publicUrl } : {}),
     ...config.authz,
     ...config.billing,
     hasLangevals: config.evaluation.langevals,

@@ -107,7 +107,7 @@ export class StoredObjectStorageService extends StoredObjectStorage {
   }
 
   async probe(input: { projectId: string }): Promise<void> {
-    const key = `${input.projectId}/checkup/${generate("stored-object").toString()}.txt`;
+    const key = `${input.projectId}/checkup/${generate("checkup").toString()}.txt`;
     const body = new TextEncoder().encode("checkup");
     await this.objects.write({ projectId: input.projectId, key }, bodyOf(body), {
       byteLength: body.byteLength,
