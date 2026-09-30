@@ -127,6 +127,8 @@ Usage is a module of its own and owns all counting: the counters, their enforcem
 thresholds, the billable-events meter projection and its table, and the trace count it takes itself.
 Entitlement keeps plans and features only; every other module checks a limit or reads a roll-up through
 `UsageApi`, and no trace-usage or billing-usage cycle forms (Alex, 2026-09-29).
+Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` stay listed in the
+peer-cycle baseline until usage lands.
 
 ```
 modules/trace/
