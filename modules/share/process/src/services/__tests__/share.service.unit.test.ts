@@ -115,6 +115,7 @@ describe("ShareService", () => {
         vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
       });
 
+      /** @scenario One viewing session counts as a single view */
       it("does not consume another view", async () => {
         vi.mocked(cache.isNewViewing).mockResolvedValue(false);
 
@@ -344,6 +345,7 @@ describe("ShareService", () => {
 
     describe("given a single-view link", () => {
       /** @scenario A single-view link resolves exactly once */
+      /** @scenario One page load counts as one view */
       it("grants the first view through the atomic consume", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 0 }));
 
