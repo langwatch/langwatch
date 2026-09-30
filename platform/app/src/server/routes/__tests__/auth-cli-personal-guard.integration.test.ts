@@ -528,6 +528,7 @@ describe("CLI login personal-project guards", () => {
       );
 
       /** @scenario CLI login refuses a shared project for a Developer */
+      /** @scenario project-login approval refuses a shared project for a Developer, naming the seat */
       it("refuses a shared project, naming the seat", async () => {
         const userCode = await mintDeviceCode("project_api_key");
 
@@ -542,6 +543,7 @@ describe("CLI login personal-project guards", () => {
       });
 
       /** @scenario A Developer works inside their own project */
+      /** @scenario project-login approval honours a Developer's own personal project */
       it("still honours their own personal project", async () => {
         const userCode = await mintDeviceCode("project_api_key");
 

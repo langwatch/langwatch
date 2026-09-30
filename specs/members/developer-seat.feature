@@ -117,11 +117,6 @@ Feature: Developer seat
     When a sync arrives that places the person in an ordinary member group
     Then the person is still a Developer
 
-  Scenario: Directory sync can still promote a Developer to administrator
-    Given a Developer in an organisation synced from a customer directory
-    When a sync arrives that places the person in an administrator group
-    Then the person becomes an administrator
-
   # ============================================================================
   # Public API
   # ============================================================================

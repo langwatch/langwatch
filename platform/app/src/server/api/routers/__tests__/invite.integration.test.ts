@@ -14,6 +14,7 @@ import {
   afterAll,
   afterEach,
   beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
@@ -454,6 +455,45 @@ describe("Invite router integration", () => {
           where: { userId: user.id, organizationId },
         });
         expect(memberships).toBe(1);
+        const orgBindings = await prisma.roleBinding.count({
+          where: {
+            userId: user.id,
+            organizationId,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+          },
+        });
+        expect(orgBindings).toBe(1);
+      });
+    });
+
+    describe("when the organisation's joiner seat is Developer (ADR-143)", () => {
+      beforeEach(async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { joinerRole: OrganizationUserRole.DEVELOPER },
+        });
+      });
+      afterEach(async () => {
+        await prisma.organization.update({
+          where: { id: organizationId },
+          data: { joinerRole: OrganizationUserRole.MEMBER },
+        });
+      });
+
+      /** @scenario The joiner seat setting never applies to invitations */
+      it("lands the invited person on the seat the invitation names", async () => {
+        const email = `invitee-${testNamespace}-invited-full@acme.com`;
+        const invite = await createPendingInvite(email);
+        const { user, caller } = await createInvitee(email);
+
+        await caller.invite.acceptInvite({ inviteCode: invite.inviteCode });
+
+        const membership = await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: { userId: user.id, organizationId },
+          },
+        });
+        expect(membership?.role).toBe(OrganizationUserRole.MEMBER);
         const orgBindings = await prisma.roleBinding.count({
           where: {
             userId: user.id,
