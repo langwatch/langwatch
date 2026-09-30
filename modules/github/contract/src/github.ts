@@ -4,9 +4,9 @@ import { z } from "zod";
 export const githubWebhookEnvelopeSchema = z.record(z.string(), z.unknown());
 export type GithubWebhookEnvelope = z.infer<typeof githubWebhookEnvelopeSchema>;
 
-/** Query values accepted by the browser's installation-start redirect. */
+/** The installation-start redirect's query; its permission is checked at `organizationId`. */
 export const githubInstallStartQuerySchema = z.object({
-  organizationId: z.string().optional(),
+  organizationId: z.string(),
   account: z.string().optional(),
   installationId: z.string().optional(),
   mode: z.string().optional(),

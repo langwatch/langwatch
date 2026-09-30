@@ -45,6 +45,12 @@ Rule: Connection state is visible to members, managed by organization managers
     Then the request is refused
 
   @integration
+  Scenario: Starting an installation without naming an organization is refused as invalid
+    Given the instance has the GitHub App configured
+    When a signed-in person starts an installation without an organization
+    Then the request is refused as invalid rather than failing on the server
+
+  @integration
   Scenario: Connecting is not gated by the Langy rollout
     Given the instance has the GitHub App configured
     And the "acme" organization has no access to Langy

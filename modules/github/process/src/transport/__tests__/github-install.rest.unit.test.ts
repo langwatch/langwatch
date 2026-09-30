@@ -300,6 +300,18 @@ describe("given the GitHub installation routes", () => {
     });
   });
 
+  describe("when the start names no organization", () => {
+    /** @scenario Starting an installation without naming an organization is refused as invalid */
+    it("answers 422 before the installation operation can run", async () => {
+      const api = mount();
+
+      const response = await api.install("mode=popup");
+
+      expect(response.status).toBe(422);
+      expect(api.githubReads.count).toBe(0);
+    });
+  });
+
   describe("when the caller lacks organization management", () => {
     /** @scenario Starting an installation requires organization management */
     it("refuses before the installation operation can run", async () => {
