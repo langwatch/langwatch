@@ -8,12 +8,19 @@ import {
 } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
 import { MemoryCliDeviceSessionRepository } from "../../repositories/memory/memory.cli-device-session.repository.ts";
 import { CliDeviceSessionService } from "../cli-device-session.service.ts";
 
 function setup() {
   const store = MemoryCliDeviceSessionRepository.create();
-  return { store, sessions: CliDeviceSessionService.create({ store }) };
+  return {
+    store,
+    sessions: CliDeviceSessionService.create({
+      store,
+      settlements: MemoryCliDeviceSettlementChannel.create(),
+    }),
+  };
 }
 
 const clientInfo = { hostname: "host", platform: "darwin", session_started_at: 100 };

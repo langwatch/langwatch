@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
 import { fromDate } from "@langwatch/time";
 /**
  * Unit coverage for the CLI login key mint mechanics: re-login and racing logins never
@@ -165,6 +166,29 @@ describe("given a CLI login key mint", () => {
       expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ id: staleKey.id }));
       expect(revoke).not.toHaveBeenCalledWith(expect.objectContaining({ id: secondKey.id }));
       expect(revoke).not.toHaveBeenCalledWith(expect.objectContaining({ id: firstKey.id }));
+    });
+  });
+
+  describe("when a racing login already revoked the previous key", () => {
+    /** @scenario "a previous key a racing login already revoked does not fail the re-login" */
+    it("still answers with the new key", async () => {
+      const { service, revoke, created } = serviceWith({
+        findForUser: () => Promise.resolve([OLD_KEY]),
+        revoke: (input) =>
+          input.id === OLD_KEY.id
+            ? Promise.reject(new ApiKeyAlreadyRevokedError(input.id))
+            : Promise.resolve(revokedKey(input.id)),
+      });
+
+      const minted = await service.mintCliLoginKey({
+        userId: "user-1",
+        organizationId: "org-1",
+        deviceLabel: "laptop",
+        selection: { bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }], permissions: [] },
+      });
+
+      expect(minted.apiKeyId).toBe(created.id);
+      expect(revoke).not.toHaveBeenCalledWith(expect.objectContaining({ id: created.id }));
     });
   });
 

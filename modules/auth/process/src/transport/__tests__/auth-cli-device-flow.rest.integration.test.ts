@@ -16,6 +16,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { AuthDirectory } from "../../app/auth.members.ts";
+import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
 import {
   CliDeviceFlowService,
@@ -127,6 +128,76 @@ describe("given a CLI starting a device login", () => {
 
       expect(second.status).toBe(429);
       await expect(second.json()).resolves.toMatchObject({ error: "slow_down" });
+    });
+  });
+
+  describe("when the CLI polls a settled code inside the interval", () => {
+    /** @scenario A poll on a settled device code is answered, not rate limited */
+    it("answers the settled outcome instead of slow_down", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+
+      const pending = await api.post("/api/auth/cli/exchange", { device_code: grant.device_code });
+
+      expect(pending.status).toBe(428);
+
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+      });
+      const settled = await api.post("/api/auth/cli/exchange", { device_code: grant.device_code });
+
+      expect(settled.status).toBe(200);
+    });
+  });
+
+  describe("when the CLI waits on the approval stream", () => {
+    const approvalOf = (api: ReturnType<typeof mount>, deviceCode: string) =>
+      api.get(`/api/auth/cli/device-approval?device_code=${encodeURIComponent(deviceCode)}`);
+
+    /** @scenario The approval stream tells the CLI to poll the moment the browser settles the code */
+    it("emits the approval of a code that was pending when the stream opened", async () => {
+      const api = mount(deviceFlowWorld());
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+
+      const stream = await approvalOf(api, grant.device_code);
+      const frames = stream.text();
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+      });
+
+      expect(stream.status).toBe(200);
+      expect(stream.headers.get("content-type")).toContain("text/event-stream");
+      expect(await frames).toBe(`data: ${JSON.stringify({ status: "approved" })}\n\n`);
+    });
+
+    it("emits a code denied before the stream opened at once", async () => {
+      const api = mount(deviceFlowWorld());
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+      await api.post("/api/auth/cli/deny", { user_code: grant.user_code });
+
+      const stream = await approvalOf(api, grant.device_code);
+
+      expect(await stream.text()).toBe(`data: ${JSON.stringify({ status: "denied" })}\n\n`);
+    });
+
+    it("reports an unknown code as expired rather than holding the stream open", async () => {
+      const api = mount(deviceFlowWorld());
+
+      const stream = await approvalOf(api, "never-minted");
+
+      expect(await stream.text()).toBe(`data: ${JSON.stringify({ status: "expired" })}\n\n`);
     });
   });
 
@@ -875,7 +946,10 @@ function deviceFlowWorld(
         : Promise.resolve(world.project),
   };
 
-  const sessions = CliDeviceSessionService.create({ store });
+  const sessions = CliDeviceSessionService.create({
+    store,
+    settlements: MemoryCliDeviceSettlementChannel.create(),
+  });
 
   const collaborators: CliDeviceFlowCollaborators = {
     sessions: () => sessions,
@@ -965,6 +1039,7 @@ function deviceFlowWorld(
     approveCliDeviceCode: (input) => flow.approveDeviceCode(input),
     denyCliDeviceCode: (input) => flow.denyDeviceCode(input),
     endCliDeviceSession: (input) => flow.endSession(input),
+    watchCliDeviceApproval: (input) => flow.watchDeviceApproval(input),
   };
 
   return Object.assign(world, { door });

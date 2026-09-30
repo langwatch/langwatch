@@ -75,7 +75,7 @@ func TestWidgetRoutesAreRetargetedAtTheWidgetProject(t *testing.T) {
 }
 
 func TestMintCLISessionWalksTheDeviceFlowPerSide(t *testing.T) {
-	var approvedWith string
+	var approvedWith, exchangedLabel string
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/auth/sign-in/email", func(writer http.ResponseWriter, request *http.Request) {
 		var body map[string]string
@@ -94,7 +94,14 @@ func TestMintCLISessionWalksTheDeviceFlowPerSide(t *testing.T) {
 		approvedWith = request.Header.Get("Cookie")
 		writeJSON(writer, http.StatusOK, `{}`)
 	})
-	mux.HandleFunc("/api/auth/cli/exchange", func(writer http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/api/auth/cli/exchange", func(writer http.ResponseWriter, request *http.Request) {
+		var body struct {
+			ClientInfo struct {
+				DeviceLabel string `json:"device_label"`
+			} `json:"client_info"`
+		}
+		_ = json.NewDecoder(request.Body).Decode(&body)
+		exchangedLabel = body.ClientInfo.DeviceLabel
 		writeJSON(writer, http.StatusOK, `{"access_token":"minted"}`)
 	})
 	server := httptest.NewServer(mux)
@@ -104,6 +111,9 @@ func TestMintCLISessionWalksTheDeviceFlowPerSide(t *testing.T) {
 	engine.mintCLISession(server.URL, engine.credsA)
 	if engine.credsA[credCLIToken] != "minted" || approvedWith != "better-auth.session_token=signed" {
 		t.Fatalf("credentials = %v, approved with %q", engine.credsA, approvedWith)
+	}
+	if exchangedLabel != "apidiff-fixture" {
+		t.Errorf("exchange device_label = %q, want the fixture label", exchangedLabel)
 	}
 }
 

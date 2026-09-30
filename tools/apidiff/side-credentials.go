@@ -210,6 +210,10 @@ func (engine *probeEngine) adminEmailsFor(baseURL string) []string {
 	return seededAdminEmails
 }
 
+// cliFixtureDeviceLabel keeps the fixture login key apart from every scenario
+// exchange, so a scenario's re-login cannot revoke it.
+const cliFixtureDeviceLabel = "apidiff-fixture"
+
 // mintCLISession signs the seeded admin in on one side and walks the device
 // flow the CLI uses (device-code, approve, exchange), filing the browser
 // session and the minted access token into that side's credentials.
@@ -234,7 +238,7 @@ func (engine *probeEngine) mintCLISession(baseURL string, credentials sideCreden
 		headers: map[string]string{"Cookie": credentials[credSessionCookie], "Origin": origin},
 		body:    map[string]any{"user_code": userCode, "organization_id": seededOrganizationID}})
 	exchange := engine.fixtureRequest(fixtureCall{method: http.MethodPost, url: baseURL + "/api/auth/cli/exchange",
-		body: map[string]any{"device_code": deviceCode}})
+		body: map[string]any{"device_code": deviceCode, "client_info": map[string]any{"device_label": cliFixtureDeviceLabel}}})
 	if token, ok := exchange.body["access_token"].(string); ok && token != "" {
 		credentials[credCLIToken] = token
 	}

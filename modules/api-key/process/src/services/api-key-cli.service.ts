@@ -252,13 +252,21 @@ export class ApiKeyCliService {
       // deciding to kill it, so the ingest keys under it may re-mint under
       // the session that replaced theirs (see the cause-remap in
       // ApiKeyLifecycleService.revoke).
-      await this.lifecycle.revoke({
-        id: key.id,
-        callerUserId: input.userId,
-        callerIsAdmin: false,
-        organizationId: input.organizationId,
-        cause: "rotation",
-      });
+      try {
+        await this.lifecycle.revoke({
+          id: key.id,
+          callerUserId: input.userId,
+          callerIsAdmin: false,
+          organizationId: input.organizationId,
+          cause: "rotation",
+        });
+      } catch (error) {
+        if (error instanceof ApiKeyNotFoundError || error instanceof ApiKeyAlreadyRevokedError) {
+          continue;
+        }
+
+        throw error;
+      }
     }
   }
 

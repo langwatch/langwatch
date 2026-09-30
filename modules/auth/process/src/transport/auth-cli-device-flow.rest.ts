@@ -10,7 +10,7 @@ import {
   type RestProtocolRefusal,
   type RestAnswer,
 } from "@langwatch/api/rest";
-import { lookupQuerySchema } from "@langwatch/auth-contract";
+import { deviceApprovalQuerySchema, lookupQuerySchema } from "@langwatch/auth-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { z } from "zod";
@@ -33,6 +33,10 @@ export interface AuthCliDeviceFlowApi {
   approveCliDeviceCode(input: { raw: string; headers: Headers }): Promise<CliDeviceFlowAnswer>;
   denyCliDeviceCode(input: { raw: string; headers: Headers }): Promise<CliDeviceFlowAnswer>;
   endCliDeviceSession(input: { raw: string }): Promise<CliDeviceFlowAnswer>;
+  watchCliDeviceApproval(input: {
+    deviceCode: string;
+    signal: AbortSignal | undefined;
+  }): Promise<AsyncIterable<Readonly<{ event?: "ping"; data: string }>>>;
 }
 
 export const AuthCliDeviceFlowApi = moduleApi<AuthCliDeviceFlowApi>()("auth");
@@ -156,5 +160,18 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
   .withResponse("protocol", CLI_DEVICE_FLOW_PROTOCOL)
   .handle(async ({ app, raw, response }) =>
     protocolAnswer(response, await app.endCliDeviceSession({ raw })),
+  )
+
+  /**
+   * The stream `langwatch login` waits on so it need not sit out its poll
+   * interval. The device code is the credential, as on `/exchange`, and the
+   * stream carries no tokens: the CLI still exchanges.
+   */
+  .get("/api/auth/cli/device-approval", "watchCliDeviceApproval")
+  .withQuery(deviceApprovalQuerySchema)
+  .withAccess(CLI_DEVICE_FLOW_DOOR)
+  .withResponse("sse", {})
+  .handle(async ({ app, input, signal, response }) =>
+    response.events(await app.watchCliDeviceApproval({ deviceCode: input.device_code, signal })),
   )
   .build();

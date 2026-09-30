@@ -54,3 +54,6 @@ export const logoutRequestSchema = z.object({
 });
 
 export const lookupQuerySchema = z.object({ user_code: z.string().optional() });
+
+/** The approval stream the CLI waits on: its device code is the whole credential. */
+export const deviceApprovalQuerySchema = z.object({ device_code: z.string().min(1) });

@@ -203,6 +203,13 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       Then each mint revokes only the keys created before its own
       And the key the last exchange handed to the CLI is still active
 
+    @unit
+    Scenario: a previous key a racing login already revoked does not fail the re-login
+      Given two logins from the same device label are exchanged at the same time
+      And the other login revokes the previous key first
+      When this login's mint reaches the same previous key
+      Then the exchange still answers with its new key
+
     @integration
     Scenario: logout revokes the CLI key
       Given the user holds an active CLI key from this login

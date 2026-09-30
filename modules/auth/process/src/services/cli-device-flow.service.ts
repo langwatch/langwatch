@@ -28,6 +28,10 @@ import type * as zodModule from "zod";
 
 import type { AuthDirectory } from "../app/auth.members.ts";
 import {
+  type CliDeviceApprovalFrame,
+  CliDeviceApprovalService,
+} from "./cli-device-approval.service.ts";
+import {
   DEVICE_CODE_TTL_SECONDS,
   MIN_POLL_INTERVAL_SECONDS,
   type CliClientInfo,
@@ -107,9 +111,11 @@ export interface CliDeviceFlowCollaborators {
 /** The device grant's operations, each one route of `/api/auth/cli`, over its collaborators. */
 export class CliDeviceFlowService {
   readonly #flow: CliDeviceFlowCollaborators;
+  readonly #approvals: CliDeviceApprovalService;
 
   private constructor(flow: CliDeviceFlowCollaborators) {
     this.#flow = flow;
+    this.#approvals = CliDeviceApprovalService.create({ sessions: flow.sessions });
   }
 
   static create({
@@ -147,6 +153,34 @@ export class CliDeviceFlowService {
   endSession({ raw }: { raw: string }): Promise<CliDeviceFlowAnswer> {
     return logout({ flow: this.#flow, raw });
   }
+
+  watchDeviceApproval(input: {
+    deviceCode: string;
+    signal: AbortSignal | undefined;
+  }): Promise<AsyncIterable<CliDeviceApprovalFrame>> {
+    return this.#approvals.watch(input);
+  }
+}
+
+/**
+ * A settled code skips the poll window: that poll is the one the approval
+ * stream just told the CLI to make. An unknown code still claims it, then 408s.
+ */
+function settledDeviceCode({
+  flow,
+  deviceCode,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  deviceCode: string;
+}) {
+  return flow
+    .sessions()
+    .getDeviceCode(deviceCode)
+    .then((found) => (found.status === "pending" ? undefined : found))
+    .catch((error: unknown) => {
+      if (error instanceof CliDeviceFlowRefusedError) return undefined;
+      throw error;
+    });
 }
 
 /**
@@ -167,13 +201,15 @@ async function exchange({
 
   const { device_code } = parsed.data;
 
+  const settled = await settledDeviceCode({ flow, deviceCode: device_code });
+
   // Per-device polling rate limit, claimed atomically: RFC 8628 says clients
   // respect the server-issued interval, but a defensive server enforces it.
-  if (!(await flow.sessions().claimPollWindow(device_code))) {
+  if (!settled && !(await flow.sessions().claimPollWindow(device_code))) {
     throw refused("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
   }
 
-  const record = await flow.sessions().getDeviceCode(device_code);
+  const record = settled ?? (await flow.sessions().getDeviceCode(device_code));
 
   await assertExchangeable({ flow, record, deviceCode: device_code });
 

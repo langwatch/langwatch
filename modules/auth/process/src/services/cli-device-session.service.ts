@@ -16,6 +16,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { nowInstant } from "@langwatch/time";
 
+import type { CliDeviceSettlementChannel } from "../channels/cli-device-settlement.channel.ts";
 import type { CliDeviceSessionRepository } from "../repositories/cli-device-session.repository.ts";
 
 /** Redis key prefix for device-code records. */
@@ -205,6 +206,8 @@ export class CliDeviceSessionService {
 
   static create(options: {
     store: CliDeviceSessionRepository;
+    /** Where a settled code is announced to the approval stream the CLI waits on. */
+    settlements: CliDeviceSettlementChannel;
     /**
      * Refresh-token lifetime for this deployment, in seconds. Shorten it when
      * a stolen `~/.langwatch/config.json` needs to go stale sooner than the
@@ -215,12 +218,14 @@ export class CliDeviceSessionService {
     return new CliDeviceSessionService(
       options.store,
       options.refreshTokenTtlSeconds ?? DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+      options.settlements,
     );
   }
 
   private constructor(
     private readonly store: CliDeviceSessionRepository,
     readonly refreshTokenTtlSeconds: number,
+    private readonly settlements: CliDeviceSettlementChannel,
   ) {}
 
   // -- the device code ------------------------------------------------------
@@ -379,6 +384,7 @@ export class CliDeviceSessionService {
       key_selection: input.keySelection,
     };
     await this.rewriteDeviceCode(updated);
+    await this.settlements.publish({ deviceCode: input.deviceCode, status: "approved" });
 
     return { approved: true };
   }
@@ -397,6 +403,15 @@ export class CliDeviceSessionService {
     }
 
     await this.rewriteDeviceCode({ ...record, status: "denied" });
+    await this.settlements.publish({ deviceCode: record.device_code, status: "denied" });
+  }
+
+  /** Hears the next settlement of one device code; resolves once live, with its release. */
+  listenForSettlement(input: {
+    deviceCode: string;
+    onSettled: (status: string) => void;
+  }): Promise<() => void> {
+    return this.settlements.listen(input);
   }
 
   /** Rewrites a device code in place, preserving what is left of its lifetime. */

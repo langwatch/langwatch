@@ -77,6 +77,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import { auth0PasswordChannels } from "../channels/auth0-password-channels.registry.ts";
+import { cliDeviceSettlementChannels } from "../channels/cli-device-settlement-channels.registry.ts";
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
 import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
@@ -101,6 +102,7 @@ import {
 } from "../services/auth-lifecycle-notice.service.ts";
 import { AuthProviderService } from "../services/auth-provider.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
+import type { CliDeviceApprovalFrame } from "../services/cli-device-approval.service.ts";
 import {
   CliDeviceFlowService,
   type CliBrowserSession,
@@ -437,7 +439,12 @@ export class AuthApp implements AuthApiContract {
       now,
     });
 
-    const cliSessions = CliDeviceSessionService.create({ store: repositories.cliSessions });
+    const cliSessions = CliDeviceSessionService.create({
+      store: repositories.cliSessions,
+      settlements: members.redis
+        ? cliDeviceSettlementChannels.live.create(members.redis)
+        : cliDeviceSettlementChannels.memory.create(),
+    });
 
     const app = new AuthApp({
       sessions,
@@ -851,6 +858,13 @@ export class AuthApp implements AuthApiContract {
 
   endCliDeviceSession(input: { raw: string }): Promise<CliDeviceFlowAnswer> {
     return this.#cliDeviceFlow.endSession(input);
+  }
+
+  watchCliDeviceApproval(input: {
+    deviceCode: string;
+    signal: AbortSignal | undefined;
+  }): Promise<AsyncIterable<CliDeviceApprovalFrame>> {
+    return this.#cliDeviceFlow.watchDeviceApproval(input);
   }
 
   /** The person a browser cookie names, for the approval page's three routes. */
