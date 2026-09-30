@@ -515,18 +515,29 @@ function buildWorkerProbeArgs({
   conversationId,
   model,
   credentials,
+  disabledSkillIds,
 }: {
   projectId: string;
   actorUserId: string;
   conversationId: string;
   model: string;
   credentials: LangyCredentials;
+  /**
+   * The flag-gated skill ids the turn will send (`credentials.disabledSkillIds`).
+   * Passed explicitly because the turn resolves them after the probe starts,
+   * and the manager keys the worker signature on them: a probe without them
+   * says "alive" for a worker the dispatch then replaces with a keyless spawn.
+   */
+  disabledSkillIds: readonly string[];
 }): Parameters<LangyWorkerPort["probe"]>[0] {
   return {
     projectId,
     actorUserId,
     conversationId,
     model,
+    ...(disabledSkillIds.length > 0
+      ? { disabledSkillIds: [...disabledSkillIds] }
+      : {}),
     hasGithubAuth: !!credentials.githubToken,
     ...(credentials.githubRepoScopeKey
       ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
@@ -796,6 +807,18 @@ export class LangyTurnService {
 
     await this.applyWarmPrCapParity({ credentials, userId });
 
+    // Signature parity with the turn, which sends the same list: a warm
+    // worker booted without it is replaced by the first real turn.
+    const disabledSkills = await resolveDisabledSkillIds({
+      ids: LANGY_SKILL_CATALOGUE_IDS,
+      userId,
+      projectId,
+      organizationId: credentials.organizationId,
+    });
+    if (disabledSkills.length > 0) {
+      credentials.disabledSkillIds = disabledSkills;
+    }
+
     const alive = await worker.probe(
       buildWorkerProbeArgs({
         projectId,
@@ -803,6 +826,7 @@ export class LangyTurnService {
         conversationId,
         model: warmModel,
         credentials,
+        disabledSkillIds: disabledSkills,
       }),
     );
     if (alive) {
@@ -1023,7 +1047,18 @@ export class LangyTurnService {
       // conversation state, never from a caller-supplied "new" flag.
       const mintedRunToken = conversation.isNew ? mintRunToken() : null;
 
-      const probeWorker = () =>
+      // Started here so the probe can carry it: the disabled skills are part of
+      // the worker signature, and a probe that leaves them out answers for a
+      // worker the dispatch will not accept. Never rejects (a flag error reads
+      // as gated off, see `resolveDisabledSkillIds`).
+      const disabledSkillsPromise = resolveDisabledSkillIds({
+        ids: LANGY_SKILL_CATALOGUE_IDS,
+        userId,
+        projectId,
+        organizationId: credentials.organizationId,
+      });
+
+      const probeWorker = async () =>
         worker.probe(
           buildWorkerProbeArgs({
             projectId,
@@ -1031,6 +1066,7 @@ export class LangyTurnService {
             conversationId: conversation.id,
             model: turnModel,
             credentials,
+            disabledSkillIds: await disabledSkillsPromise,
           }),
         );
 
@@ -1310,12 +1346,7 @@ export class LangyTurnService {
       // to hide from the model so it never even offers one this caller can't
       // use. Costs nothing on the overwhelmingly common turn (no gated skill
       // in the catalogue's current flag state): see `resolveDisabledSkillIds`.
-      const disabledSkills = await resolveDisabledSkillIds({
-        ids: LANGY_SKILL_CATALOGUE_IDS,
-        userId,
-        projectId,
-        organizationId: credentials.organizationId,
-      });
+      const disabledSkills = await disabledSkillsPromise;
       const requestedSkillIds = new Set(
         (turnContext.skills ?? []).map((skill) => skill.id),
       );

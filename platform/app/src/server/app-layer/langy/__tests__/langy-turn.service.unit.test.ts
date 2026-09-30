@@ -381,6 +381,30 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
   });
 
+  /** @scenario The warm and the turn's probe carry the same disabled skills */
+  it("probes for a worker with the same disabled skills the dispatch sends", async () => {
+    // Flag off => `dashboard-widgets` is gated off for every turn.
+    const flags = vi
+      .spyOn(featureFlagService, "isEnabled")
+      .mockResolvedValue(false);
+    try {
+      await LangyTurnService.create(deps).startConversationTurn(input());
+
+      const probeArgs = mocks.probe.mock.calls[0]![0] as {
+        disabledSkillIds?: string[];
+      };
+      const dispatched = mocks.dispatch.mock.calls[0]![0] as unknown as {
+        credentials: { disabledSkillIds?: string[] };
+      };
+      expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
+      expect(probeArgs.disabledSkillIds).toEqual(
+        dispatched.credentials.disabledSkillIds,
+      );
+    } finally {
+      flags.mockRestore();
+    }
+  });
+
   it("finalizes the GitHub permit before probing the worker signature", async () => {
     const order: string[] = [];
     (
