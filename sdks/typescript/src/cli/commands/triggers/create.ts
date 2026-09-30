@@ -1,17 +1,14 @@
 import chalk from "chalk";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { scopedApiKey } from "@/internal/credentialContext";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
-
-import { resolveCredentials } from "../../utils/apiKey.ts";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
-import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
-import { redactTriggerSecrets } from "./redact.ts";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { parseJsonFlags } from "./parseJsonObject.ts";
+import { slackShorthands } from "./slackShorthands.ts";
+import { summariseSlackConnection, type TriggerRecord } from "./summary.ts";
+import { triggerRequest } from "./triggerRequest.ts";
 
 /**
  * Returns the created trigger rather than printing it: the output port renders
@@ -22,54 +19,50 @@ export const createTriggerCommand = async (
   options: {
     action: string;
     filters?: string;
+    filterQuery?: string;
     message?: string;
     alertType?: string;
     slackWebhook?: string;
+    slackConnection?: string;
+    slackChannel?: string;
+    actionParams?: string;
+    customGraphId?: string;
+    graphAlert?: string;
+    report?: string;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const validActions = [
-    "SEND_EMAIL",
-    "ADD_TO_DATASET",
-    "ADD_TO_ANNOTATION_QUEUE",
-    "SEND_SLACK_MESSAGE",
-  ];
+  const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"];
   if (!validActions.includes(options.action)) {
     reportCommandError({
-      error: commandValidationError(`--action must be one of: ${validActions.join(", ")}`),
+      error: commandValidationError(
+        `--action must be one of: ${validActions.join(", ")}`,
+      ),
     });
     process.exit(1);
   }
 
-  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = resolveControlPlaneUrl();
-
   const spinner = createSpinner(`Creating trigger "${name}"...`).start();
+  const flags = parseJsonFlags({ options, spinner, action: "create trigger" });
+  // `--slack-webhook` is legacy: the server stores the URL as a connection.
+  const actionParams = { ...flags.actionParams, ...slackShorthands(options) };
 
   try {
-    let filters: Record<string, unknown> = {};
-    if (options.filters) {
-      filters = JSON.parse(options.filters) as Record<string, unknown>;
-    }
-
-    const actionParams: Record<string, unknown> = {};
-    if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
-
-    const response = await langwatchFetch(`${endpoint}/api/v1/triggers`, {
+    const response = await triggerRequest({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({
+      body: {
         name,
         action: options.action,
-        filters,
+        filters: flags.filters,
+        filterQuery: options.filterQuery,
         actionParams,
         message: options.message,
         alertType: options.alertType,
-      }),
+        customGraphId: options.customGraphId,
+        graphAlert: flags.graphAlert,
+        report: flags.report,
+      },
     });
 
     if (!response.ok) {
@@ -77,21 +70,20 @@ export const createTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = (await response.json()) as {
-      id: string;
-      name: string;
-      action: string;
-      platformUrl?: string;
-    };
+    const trigger: TriggerRecord = await response.json();
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {
-      // See ./redact.ts — actionParams is plaintext and never shown to humans.
-      data: redactTriggerSecrets(trigger),
+      // The API redacts delivery credentials before it answers, so machine
+      // output is the response exactly as it arrived.
+      data: trigger,
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
         console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
+        if (trigger.kind) console.log(`  ${chalk.gray("Kind:")}   ${trigger.kind}`);
+        const slack = summariseSlackConnection({ actionParams: trigger.actionParams });
+        if (slack) console.log(`  ${chalk.gray("Slack:")}  ${slack}`);
         if (trigger.platformUrl) {
           console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
         }
@@ -103,10 +95,7 @@ export const createTriggerCommand = async (
     // prints nothing in --json/--jq/agent mode (spinners are silent there).
     failSpinner({
       spinner,
-      error:
-        error instanceof SyntaxError
-          ? commandValidationError("--filters must be valid JSON")
-          : error,
+      error,
       action: "create trigger",
     });
     process.exit(1);

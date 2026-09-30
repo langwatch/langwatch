@@ -21,10 +21,13 @@ modules/langy/process/src/rules/setup-skill-bodies.rules.ts linguist-generated=t
 modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js linguist-generated=true
 modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.d.ts linguist-generated=true
 modules/langy/browser/src/model/shared/langy/feature-map.generated.json linguist-generated=true
-skills/_compiled/native/**/SKILL.md linguist-generated=true
+skills/_compiled/native/**              linguist-generated=true
 apps/api/src/features/discovery/openapi-document.json linguist-generated=true
-**/*.generated.json                     linguist-generated=true
-**/*.generated.ts                       linguist-generated=true
+**/*.generated.*                        linguist-generated=true
+sdks/typescript/src/internal/generated/**/*.ts linguist-generated=true
+docs/self-hosting/usage-report-dictionary.mdx linguist-generated=true
+services/langyagent/internal/assets/skills/** linguist-generated=true
+**/__snapshots__/**                     linguist-generated=true
 mcp/typescript/src/__tests__/fixtures/*.json linguist-generated=true
 # Unified diffs prefix upstream tab-indented context with a required space.
 patches/*.patch                        whitespace=-space-before-tab

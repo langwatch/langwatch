@@ -2,6 +2,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import type { InternalConfig } from "@/client-sdk/types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
@@ -48,6 +49,7 @@ export class TriggersApiService {
         status: response?.status ?? extractStatusFromResponse(error),
       },
     });
+    throwIfHandledError({ operation, error, message });
     throw new TriggersApiError(message, operation, error);
   }
 

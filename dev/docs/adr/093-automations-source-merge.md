@@ -116,7 +116,7 @@ Most bound scenarios in the automations corpus pin behaviour the merge does not 
 
 The spec accompanying this ADR (`source-merge.feature`) covers the merged surface and ships `@unimplemented` until the reference implementation binds it.
 
-One dangling citation gets corrected on the way through: the schema comments at `prisma/schema.prisma:792` and `:815` attribute `TriggerKind` to "ADR-042", which is the local observability stack; the deciding record is ADR-044's discriminator section. R0 fixes the comment — a comment edit, not a change to any deployed migration.
+One dangling citation gets corrected on the way through: the schema comments at `platform/app/prisma/schema.prisma:792` and `:815` attribute `TriggerKind` to "ADR-042", which is the local observability stack; the deciding record is ADR-044's discriminator section. R0 fixes the comment — a comment edit, not a change to any deployed migration.
 
 ### 4. The composer becomes a wizard — linear to create, hub-and-spoke to edit
 
@@ -234,6 +234,32 @@ Most-specific-first is deliberate, and it is the safety property: an existing au
 
 This also strengthens the deferred multi-channel story: a future delivery row that needs Slack only needs a channel id, not a credential.
 
+### 5a. Amendment (2026-09-28): Slack connections are named and many
+
+§5's one-integration-per-project did not survive use: teams post to more than one workspace, some automations use incoming webhooks, and the same bot token was pasted into dozens of automations across projects. §5 is superseded where it disagrees with this section; its safety property (a connection is never silently retargeted) and its "the token never leaves the server" rule stand.
+
+**Model.** `SlackIntegration` is a named connection. An organization holds any number. Each has a `kind` (`BOT`: token over the Web API, any channel it is invited to, every block renders; `INCOMING_WEBHOOK`: one URL, one channel, charts and tables degrade) and a scope chosen per connection: `ORGANIZATION` (every project may use it; `scopeId` = organization id) or `PROJECT` (`scopeId` = project id). The secret is `encrypt()` ciphertext in `botTokenEncrypted` or `webhookUrlEncrypted`, matching the kind. `secretFingerprint` = HMAC-SHA256 of the plaintext keyed by `CREDENTIALS_SECRET`, unique per `(organizationId, scopeType, scopeId)`: **one secret is one connection per scope**, and a save never widens a connection's scope; only an explicit organization-scoped create or move makes an organization connection. A project-scoped create is refused when its organization's connection already holds the secret. `secretHint` = last four characters, shown as `••••abcd`. Bot tokens are validated with `auth.test` on save and pin `slackTeamId`/`slackTeamName`; webhooks store no team.
+
+**Access.** A project can use: its `PROJECT` connections plus its organization's `ORGANIZATION` connections. Listing needs `project:view`. Creating, editing or deleting a `PROJECT` connection needs `project:update` at that project; an `ORGANIZATION` connection needs `organization:manage`. Moving scope needs the permission at both ends. Saving a secret that already exists in the organization refuses with `slack_connection_exists` (409), naming the existing connection, instead of storing a second copy. Deleting a connection that active automations use refuses with `slack_connection_in_use` (409, carries the count) unless the caller passes `force: true`; forced deletion leaves those automations failing with `slack_integration_missing`, which the drawer states before confirming.
+
+**Automations.** Slack `actionParams` gain `slackIntegrationId`. A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. The composer writes `{ slackIntegrationId, slackDelivery: "bot" | "webhook" (derived from the kind), slackChannelId? }` and never a token or URL. The API, MCP and CLI accept `slackIntegrationId` (+ `slackChannelId`); a legacy `slackWebhook` or `slackBotToken` input is still accepted for one release and reuses a connection holding that secret which the project can already use (its own, else its organization's), or else creates a project-scoped one; another project's connection is never reused or widened, so no new row carries its own secret.
+
+**Resolution at dispatch** (trace settlement, graph alerts, reports, API and dashboard test fires, channel discovery):
+
+```text
+1. slackIntegrationId set  → load it; must be usable by the trigger's project
+                             (same org, ORGANIZATION or matching PROJECT scope);
+                             missing or out of scope → slack_integration_missing
+2. else legacy own secret  → actionParams.slackBotToken / slackWebhook   (one release)
+3. else                    → slack_integration_missing
+```
+
+Nothing writes the legacy fields any more, and no read returns them. A save of an automation not yet migrated that keeps its secret (the kept sentinel, the `[redacted]` read-back, or no secret typed) moves the stored secret into a connection by the same reuse-or-create rule instead of writing it back. Every read, dashboard and API alike, returns only `slackIntegrationId`, `slackDelivery` and `slackChannelId` from the Slack fields, so Slack has no redaction left; this supersedes §5's kept-token and redaction paragraphs. The dispatch resolver still reads the legacy fields of a row nobody has saved or migrated, for one release (expand/contract), then they are removed. `POST /api/trigger/slack` takes `slack_connection_id` (+ `slack_channel_id` for a bot) as well as `slack_webhook`, exactly one of them.
+
+**One-off migration** (`migrateSlackConnections`, idempotent, dry-run by default, `--apply` writes). For each organization, every Slack automation without a `slackIntegrationId` is grouped by its project and its decrypted secret (bot token or webhook URL), and bot automations that carried no token (they posted through their project's §5 row) join that row's group. Each group reuses a connection holding the secret that the project can already use (its own, else its organization's), the same rule a save follows, or else becomes a new `PROJECT` connection. The migration never creates an organization connection and never widens or borrows another project's: a secret shared by two projects becomes one connection in each. Name: the §5 row's workspace name if there is one, else `Slack bot ••••abcd` / `Slack webhook ••••abcd`. Each automation then gets `slackIntegrationId` and loses its legacy fields (`slackWebhook`, `slackBotToken`, `slackBotTokenSet`); an automation an earlier run linked with its legacy fields kept has them cleared. Undecryptable secrets are counted and skipped, never guessed. The run reports connections created, reused, automations linked and skipped.
+
+**Surface.** Settings → Integrations shows a Slack section listing every connection the project can use (name, kind, scope badge, workspace or hint, automations using it) with "Add Slack connection". Add and edit share one routed drawer, `slackConnection` (kind choice on create, name, scope via `ScopeChipPicker` with `allowedScopeTypes={["ORGANIZATION","PROJECT"]}` + `singleSelect`, secret field that shows the hint and is replaced only when typed, delete with the in-use count). The automation drawer's Slack step picks a connection, then (for a bot) a channel; its "New Slack connection" opens the same drawer and returns with the new connection selected, the way dataset creation does (`keepDraftOnSubFlowReturn` + `goBack`). The legacy-token census and "Use the project integration" nudges are removed: the migration replaces them.
+
 ### 6. Use-case templates ship their graph
 
 The #6716 finding: pick "Error spike" and the automation still has no graph behind it — the template saves no work. In the merged flow, graph-watching use-case cards (`AutomationsEducation.tsx`) carry a **graph specification** in their prefill, not just a name and an action. The Watch step shows it as a pre-filled rule over a graph that does not exist yet ("Creates graph: _Error rate_"), editable like any other. Saving creates the graph and the automation in **one Prisma transaction**: both writes are Postgres rows through Prisma (`CustomGraph`, `Trigger`), so the mechanism is a transaction, not a compensating delete — a refused automation write rolls the graph back with it, and a template can never strand an orphan graph (#6896 tracks orphan graphs as a defect class).
@@ -311,7 +337,11 @@ Phase-2 structure per the bug-bash plan: **one reference PR first, no fan-out un
 | F6   | Unified list interactivity: filter/graph + delivery filter chips, row-action coherence with the View drawer, the legacy-token row nudge. (The delete-noun and Overview-menu rebinding this unit used to own ships in R0 — with no flag, the old copy dies at merge and its scenarios cannot wait) | `pages/[project]/automations.tsx`, `features/automations/components/page/**`                                                                                                                                                                                            | R0 (+#6899 landed; the nudge's data needs F2) |
 | F7   | Spec binding: upgrade the remaining `@unimplemented` scenarios as each unit lands (one PR per unit's scenarios, riding that unit). R0 binds its own — the wizard, edit-on-overview, the cap-advice seats and the unified list                                                                     | the unit's own test files                                                                                                                                                                                                                                               | each unit                                     |
 
-Sequencing: R0 → F1 ∥ F2 ∥ F5 ∥ F6 → F3 → F4.
+Sequencing: R0 → F1 ∥ F2 ∥ F5 ∥ F6 → F3 → F4. F6's list interactivity needs only R0; its one F2-dependent subtask — the legacy-token row nudge — waits for F2 and lands as a follow-up inside the F6 files.
+
+### Status
+
+R0 has landed, and its scenarios in `specs/automations/source-merge.feature` are bound: the wizard, the edit-on-overview rule, the cap-advice seats and the unified list. The Slack project integration and the legacy-token migration (F2–F4) have landed and bind theirs too. What is still `@unimplemented` there is what the remaining units own — the list's filter chips (F6), the template that ships its graph (F5), and the wire `source` alias (F1) — each binding as its unit lands, per F7 above.
 
 ## References
 

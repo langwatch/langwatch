@@ -19,28 +19,24 @@ Feature: Staged automation authoring drawer
 
   Rule: The drawer reveals sections progressively
 
-    Scenario: A new automation starts at identity, then picks a type
+    # The merged wizard replaced this opening (ADR-093 §1, §4): there is no
+    # identity row and no kind picker, and the first step asks what to watch.
+    # Its own scenarios live in source-merge.feature, bound.
+    Scenario: A new automation opens on what it should watch
       When the user opens the automation drawer
-      Then the identity row (name + alert type) is visible at the top
-      And the When section is visible
-      And the type picker is visible
-      And Setup, Cadence, and Test sections are not yet available
+      Then the name field is visible at the top
+      And the first step asks what the automation should watch
+      And delivery and review are steps the author has not reached yet
 
-    Scenario: Choosing a category offers the matching types
+    Scenario: The delivery step offers channels grouped by what they do
       Given the user is creating an automation
-      When the user opens the type picker
-      Then the picker offers Slack and email under Notification
-      And the picker offers add-to-dataset and add-to-annotation-queue under Action
+      When the user reaches the delivery step
+      Then Slack and email are offered under Notify
+      And add-to-dataset and add-to-annotation-queue are offered under Actions
 
-    Scenario: A completed section collapses to a one-line summary
-      Given the user has chosen a type and configured a destination
-      When the user returns to the main drawer pane
-      Then earlier sections show a one-line summary of their state
-      And the user can reopen any section to change it
-
-    Scenario: Changing the type clears configuration that no longer applies
+    Scenario: Changing the delivery channel clears configuration that no longer applies
       Given the user has configured an email notification
-      When the user changes the type to Slack
+      When the user changes the delivery channel to Slack
       Then the email-specific configuration is cleared
       And the Slack configuration secondary opens empty
 
@@ -55,6 +51,56 @@ Feature: Staged automation authoring drawer
       Given the user opened the drawer from a filtered traces view
       When the When section is shown
       Then it is pre-filled with the active trace filters
+
+    # A brand-new drawer used to show zero condition rows plus an
+    # "Add at least one condition." line — reading as broken rather than
+    # empty. One blank, editable row makes the surface read as ready to
+    # fill in; it still doesn't count as a condition until it's filled in,
+    # so save-gating on an untouched draft is unchanged.
+    @integration
+    Scenario: A fresh trace automation starts with one editable condition
+      Given the user opened the drawer from automation settings
+      When the When section is shown
+      Then one empty, editable condition row is already there
+      And the automation still cannot be saved until it is filled in
+
+    # The requirement is pointed at the way the Name field does it: only once
+    # the rest of the setup is done. Before that the empty row is guidance,
+    # so a fresh drawer reads as empty, not broken.
+    @integration
+    Scenario: The missing condition is only flagged once the delivery is set up
+      Given the user opened the drawer from automation settings
+      When the When section is shown before any delivery is set up
+      Then the empty condition reads as guidance, not as an error
+      And once the delivery is set up the missing condition is flagged
+
+  Rule: The condition builder can target a custom attribute
+
+    A trace's custom attributes (`trace.attribute.<key>`, `span.attribute.<key>`,
+    `event.attribute.<key>`) were only reachable from the Code editor — the
+    Builder dropped them, so a condition on a custom attribute forced the
+    author into raw query syntax with no field picker to guide them.
+
+    @unit
+    Scenario: A builder condition on a custom attribute round-trips to the code editor
+      Given the user picks the trace attribute field in the condition builder
+      And types "user_id" as the attribute key and "premium" as the value
+      When the condition builder serialises the row
+      Then the query reads "trace.attribute.user_id:premium"
+      And parsing that query back recognises the same attribute and key
+
+    # The key is the one place raw keystrokes flow straight into the query's
+    # field position, which the query language never escapes. A key with a
+    # space, a colon, or a quote can silently retarget what the clause
+    # matches instead of failing loudly, so it is rejected before it ever
+    # reaches the saved query — with the reason shown on the row, not a
+    # silent drop.
+    @unit
+    Scenario: An attribute key that would change the meaning of the filter is rejected
+      Given the user picks the trace attribute field in the condition builder
+      When the user types a key containing a space, a colon, or a quote
+      Then the row is not saved into the query
+      And the row shows why the key can't be saved
 
   Rule: No API can create an automation that fires on every trace
 
@@ -147,6 +193,13 @@ Feature: Staged automation authoring drawer
       When the app resolves that URL
       Then it opens the automation authoring drawer
 
+    @integration
+    Scenario: A link to an automation that does not exist says so
+      Given a link to view an automation that does not exist or was deleted
+      When the user opens it
+      Then the drawer says the automation no longer exists
+      And it offers no Edit button
+
     # The link is minted into a message that has already left the product, so a
     # name that does not resolve cannot be corrected afterwards: every alert we
     # have ever sent lands on the automations list with nothing open, and the
@@ -192,6 +245,35 @@ Feature: Staged automation authoring drawer
       Given the automation viewer is open on an automation
       Then it is given a way to open the editor on the same automation
 
+  Rule: An alert needs a custom graph to watch
+
+    An alert's Subject is a series on a custom graph — there is nothing to
+    watch until one exists. A project with none used to show the picker
+    anyway: a bare "Select a graph…" with no options and an error, with no
+    way out. This is also where the #6716 "a template opens the drawer with
+    no graph attached" case lands, since it is the same empty list.
+
+    @integration
+    Scenario: A project with no custom graphs offers to create one
+      Given the user is creating an alert
+      And the project has no custom graphs yet
+      When the Subject section is shown
+      Then the user sees an explanation instead of an empty graph picker
+      And a link to create a custom graph
+      And the link opens in a new tab so the alert draft is not lost
+
+    # A fetch failure is not the same fact as "the project has no graphs" —
+    # telling the author to go create one they may already have is wrong,
+    # and unlike the genuine empty state there's something to retry.
+    @integration
+    Scenario: A failed graph list shows a retry, not the empty-project state
+      Given the user is creating an alert
+      And the graph list request fails
+      When the Subject section is shown
+      Then the user sees that the graphs could not be loaded
+      And no link to create a custom graph is offered
+      And the user can retry the request
+
   Rule: Notifications configure templates; actions configure destinations
 
     Scenario: An email notification configures recipients and templates
@@ -212,6 +294,16 @@ Feature: Staged automation authoring drawer
       Given the user is configuring an add-to-dataset action
       Then the user selects the target dataset
       And no template section is shown
+
+    # The mapping decides what each row carries; no other screen edits an
+    # automation's mapping, so the delivery step has to.
+    @integration
+    Scenario: The dataset delivery step edits the column mapping it saves
+      Given the user is configuring an add-to-dataset action on a dataset with columns
+      When the dataset is chosen
+      Then a mapping editor shows each column with the trace field that fills it, starting from the automatic match
+      And the columns still filled from the metadata key of the same name are named
+      And an edited mapping is saved with the automation and shown again when it is reopened
 
     # A project with no dataset has nothing to select, so the create
     # affordance is the only way out of the section. Creation is the dataset
@@ -249,6 +341,29 @@ Feature: Staged automation authoring drawer
       And the user starts a new automation later
       Then the new automation starts empty
 
+  Rule: A dataset delivery is named by its dataset
+
+    @unit
+    Scenario: The dataset delivery summary names the dataset
+      Given an automation that adds matched traces to a dataset
+      When the delivery summary is shown
+      Then it names the dataset by its name, never its id
+
+  Rule: A report is described by its schedule, not by matching traces
+
+    @integration
+    Scenario: Report delivery options describe sending on a schedule
+      Given the user is choosing where a report is delivered
+      Then the Slack option says it posts the report on its schedule
+      And it does not say it acts when a trace matches
+
+    @integration
+    Scenario: A report that has not been sent yet says it sends on its schedule
+      Given a report with no sends yet
+      When the user views it
+      Then its history says it sends on its schedule
+      And it does not mention traces matching its conditions
+
   Rule: The Slack channel list never claims to be complete when it isn't
 
     The picker is populated from what the bot token can see, and there are
@@ -284,6 +399,13 @@ Feature: Staged automation authoring drawer
       When the author enters the channel themselves
       Then it is accepted as the destination
 
+    @integration
+    Scenario: A channel-list failure names its cause in the form
+      Given the user is configuring a Slack notification with a bot connection
+      And the channel listing request fails
+      Then the failure is named in the hint under the channel field
+      And the author is told they can still type the channel themselves
+
   Rule: Cadence and debounce apply per trigger
 
     Scenario: The cadence section is hidden for action triggers
@@ -291,16 +413,28 @@ Feature: Staged automation authoring drawer
       Then no cadence section is shown
       And the trace-settle wait setting is still available inside the cadence-equivalent surface
 
+    @integration
     Scenario: The cadence section is shown for notification triggers
       Given the user is authoring an email notification
       Then the cadence section is available
-      And it exposes the delivery-cadence dropdown
+      And it asks whether to receive one message per matching trace or batches on a schedule
       And it exposes the trace-settle wait setting
+      And it explains that messages wait for the trace to settle rather than sending instantly
 
+    @integration
     Scenario: Cadence defaults to a 5-minute digest for new notifications
       Given the user is creating a new email automation
       When the cadence section opens
-      Then the cadence is "Every 5 minutes" by default
+      Then "In batches, every 5 minutes" is the pre-picked answer
+
+    # A Slack notification's templates depend on the receive choice, so there
+    # the chooser lives beside the templates it filters (see "The receive
+    # choice decides which layouts are offered") and the cadence section must
+    # not offer a competing second control.
+    @integration
+    Scenario: The receive choice is not duplicated when the channel hosts it
+      Given the user is authoring a Slack notification
+      Then the cadence section offers only the trace-settle wait setting
 
     Scenario: A new notification cannot be saved until the cadence is reviewed
       Given the user is creating a new notification automation
@@ -351,6 +485,37 @@ Feature: Staged automation authoring drawer
       Then the default Slack notification is previewed instead
       And the operator is warned that the template fell back to the default
 
+    @unit
+    Scenario: A bot-token delivery posts Block Kit
+      Given a Slack notification delivers over a bot connection
+      And the author has not customised the Slack message
+      When the notification is delivered
+      Then it is posted as Block Kit blocks, not the plain-text default
+
+    @integration
+    Scenario: The layout list previews the layout the author lands on
+      Given the user is choosing the Slack message layout
+      Then the layout the automation already uses is previewed beside the list
+      And the preview shows its structure, what one message contains, and what it is for
+
+    @integration
+    Scenario: A layout that needs a Slack app connection is previewed but cannot be picked
+      Given the notification delivers over an incoming webhook
+      When the user opens a layout that needs a Slack app connection
+      Then the preview says the layout needs a Slack app connection
+      And picking it leaves the automation's layout unchanged
+
+    # The receive chooser (one message per matching trace, or batches on a
+    # schedule) sits beside the layout list and is the one cadence control:
+    # the list never offers the other mode's layouts alongside, so picking a
+    # layout can never silently switch the automation's cadence.
+    @integration
+    Scenario: The receive choice decides which layouts are offered
+      Given a Slack notification set to one message per matching trace
+      Then only the per-trace layouts are listed
+      When the author switches to receiving batches
+      Then only the digest layouts are listed
+
     Scenario: Test fire sends a banner-marked notification before saving
       Given the user has configured a notification with a destination
       When the user test-fires the automation before saving it
@@ -360,6 +525,20 @@ Feature: Staged automation authoring drawer
     Scenario: Test fire is unavailable until a destination is configured
       Given the user has not yet set a destination
       Then test fire is unavailable
+
+    @integration
+    Scenario: Email delivery setup warns when the installation cannot send email
+      Given the installation has no email provider configured
+      When the user sets up email delivery
+      Then the setup warns that this installation cannot send email
+      And the automation can still be saved
+
+    @unit
+    Scenario: An email test on an installation without email says email is not set up
+      Given the installation has no email provider configured
+      When the user sends a test email
+      Then it is refused with the machine-readable email-not-configured code
+      And the message says email is not set up on this installation
 
   Rule: Saving persists the whole automation at once
 
@@ -374,10 +553,19 @@ Feature: Staged automation authoring drawer
       Then saving is blocked with the template error
       And no template change is persisted
 
-    Scenario: Abandoning the drawer persists nothing
-      Given the user has partially configured a new automation
-      When the user closes the drawer without saving
-      Then no automation is created
+    # #6716: leaving the name blank used to block Save with no visible reason
+    # on the form itself — the only clue was a tooltip on a disabled button.
+    @integration
+    Scenario: Saving without a name points at the name field
+      Given the user has completed every section except the name
+      When the user tries to save
+      Then the name field shows that a name is required
+
+    @integration
+    Scenario: Saving with an unfinished delivery names what is missing
+      Given the automation delivers to an annotation queue with no annotator chosen
+      When the user tries to save
+      Then the reason asks for at least one annotator rather than to complete the setup
 
   Rule: Editing reuses the same staged drawer
 
@@ -385,6 +573,41 @@ Feature: Staged automation authoring drawer
       Given an existing email automation
       When the user edits it
       Then the same staged drawer opens with the identity, conditions, configuration, cadence, debounce, and templates pre-filled
+
+  Rule: What a save writes is what the next open shows
+
+    Edits in progress are never overwritten by data arriving in the background
+    while the drawer is open, and reopening the drawer always shows the values
+    that were last saved. The same rule covers what the drawer offers to pick
+    from — a graph created moments ago has to be on the list of graphs a new
+    alert can watch.
+
+    @integration
+    Scenario: Editing an automation shows the values that were last saved
+      Given a saved automation the user has opened for editing
+      When the user changes a value, saves, and opens that automation again
+      Then the drawer shows the value that was saved
+      And the value it replaced is gone
+
+    @integration
+    Scenario: A newly created graph is offered to a new alert without reloading
+      Given the user has just created a custom graph
+      When the user starts a new alert in the same session
+      Then the new graph is offered as the graph to watch
+
+  Rule: Creating an automation offers a way straight to it
+
+    Saving closes the drawer, and the author lands back wherever they started
+    — often not the automations list. The confirmation is the only moment the
+    app knows exactly which automation was just written, so it carries the way
+    to open it rather than leaving the author to find it by name.
+
+    @integration
+    Scenario: The creation toast links to the created automation
+      Given the user has completed every required section of a new automation
+      When the user creates it
+      Then the confirmation offers to open the automation that was created
+      And taking that offer opens that automation
 
   Rule: The settings list shows dispatch health
 
@@ -432,3 +655,19 @@ Feature: Staged automation authoring drawer
       When a REST patch renames it and pauses it
       Then the edit is applied
       And no delivery settings are forwarded to the write
+
+  Rule: The trace query is only marked answered when it can match
+
+    @integration
+    Scenario: A trace-explorer link opens the automation drawer with only the filter it carries
+      Given a trace-explorer link to "/traces?drawer.open=automation&drawer.initialFilterQuery=status%3Aerror#simplified"
+      When the user follows it
+      Then the automation drawer opens with the condition "status:error"
+      And the "#simplified" fragment is not part of the condition
+
+    @unit @integration
+    Scenario: The Code tab only marks a query answered when it parses
+      Given the user is editing the trace condition as code
+      When the query cannot parse, names an unknown field, or names a value its field never has
+      Then the reason shows under the editor
+      And "Which traces" shows no answered check until the query is clean

@@ -87,7 +87,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Datasets                     |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
 | **Cross-cutting**            |        |        |        |     |              |     |     |                  |     |      |
 | Dashboards                   |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
-| Triggers                     |   ✅   |   ✅   |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
+| Triggers                     |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  —   |
 | **AI Gateway**               |        |        |        |     |              |     |     |                  |     |      |
 | Virtual Keys                 |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
 | Budgets                      |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |

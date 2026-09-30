@@ -4,7 +4,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
-import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
@@ -27,8 +27,7 @@ export const deleteGraphCommand = async (id: string): Promise<CommandResult | vo
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: `delete graph "${id}"` });
+      await failSpinnerFromResponse({ spinner, response, action: `delete graph "${id}"` });
       process.exit(1);
     }
 
