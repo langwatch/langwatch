@@ -442,6 +442,9 @@
       "path": "services/langyworker/tsconfig.json"
     },
     {
+      "path": "apps/llmsim-web/tsconfig.json"
+    },
+    {
       "path": "modules/log/contract/tsconfig.json"
     },
     {
@@ -646,6 +649,12 @@
       "path": "modules/share/process/tsconfig.json"
     },
     {
+      "path": "packages/sim-console/tsconfig.json"
+    },
+    {
+      "path": "apps/storagesim-web/tsconfig.json"
+    },
+    {
       "path": "modules/stored-object/browser-kit/tsconfig.json"
     },
     {
@@ -728,6 +737,9 @@
     },
     {
       "path": "packages/vitest-config/tsconfig.json"
+    },
+    {
+      "path": "apps/voicesim-web/tsconfig.json"
     },
     {
       "path": "modules/webhook/contract/tsconfig.json"

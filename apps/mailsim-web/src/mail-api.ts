@@ -1,3 +1,4 @@
+import { simFetch } from "@langwatch/sim-console";
 import { z } from "zod";
 
 // The sink's CSP refuses eval. Set before any schema is built: Zod probes for
@@ -74,9 +75,8 @@ const request = async ({
 const messagePath = ({ id }: { id: string }) => `/api/messages/${encodeURIComponent(id)}`;
 
 export const mailApi = {
-  inbox: async () => inboxSchema.parse(await (await request({ path: "/api/inbox" })).json()),
-  list: async () =>
-    messageListSchema.parse(await (await request({ path: "/api/messages" })).json()).messages,
+  inbox: () => simFetch({ path: "/api/inbox", schema: inboxSchema }),
+  list: async () => (await simFetch({ path: "/api/messages", schema: messageListSchema })).messages,
   /** Undefined when the inbox no longer holds the message. */
   get: async ({ id }: { id: string }) => {
     const response = await fetch(messagePath({ id }), {

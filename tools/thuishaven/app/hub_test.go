@@ -219,18 +219,26 @@ func (f *fakeSystem) OrphanedWorkers(marker string) []int {
 func (f *fakeSystem) ProcessSamples() []ProcessSample { return f.procSamples }
 func (f *fakeSystem) Kill(pid int)                    { f.killed = append(f.killed, pid) }
 
-type fakeProxy struct{ removed []string }
+// fakeProxy is safe for concurrent calls: provision and teardown route in parallel.
+type fakeProxy struct {
+	mu      sync.Mutex
+	removed []string
+}
 
 func (f *fakeProxy) Register(string, string, int) error { return nil }
-func (f *fakeProxy) Remove(service, slug string)        { f.removed = append(f.removed, service+"."+slug) }
-func (f *fakeProxy) Running() bool                      { return true }
-func (f *fakeProxy) Installed() bool                    { return true }
-func (f *fakeProxy) EnsureReady() error                 { return nil }
-func (f *fakeProxy) Endpoint() (string, int)            { return "https", 443 }
-func (f *fakeProxy) CACertPath() string                 { return "" }
-func (f *fakeProxy) Shutdown() error                    { return nil }
-func (f *fakeProxy) Install() error                     { return nil }
-func (f *fakeProxy) Version() string                    { return domain.PortlessVersion }
+func (f *fakeProxy) Remove(service, slug string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.removed = append(f.removed, service+"."+slug)
+}
+func (f *fakeProxy) Running() bool           { return true }
+func (f *fakeProxy) Installed() bool         { return true }
+func (f *fakeProxy) EnsureReady() error      { return nil }
+func (f *fakeProxy) Endpoint() (string, int) { return "https", 443 }
+func (f *fakeProxy) CACertPath() string      { return "" }
+func (f *fakeProxy) Shutdown() error         { return nil }
+func (f *fakeProxy) Install() error          { return nil }
+func (f *fakeProxy) Version() string         { return domain.PortlessVersion }
 
 type fakeDBServer struct {
 	databases []string

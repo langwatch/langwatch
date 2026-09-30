@@ -264,7 +264,7 @@ func (d *discovery) unknownApplications(apps string) {
 			continue
 		}
 		d.add(Violation{Policy: "application-layout", File: manifest, Message: fmt.Sprintf("Unknown application workspace apps/%s.", dir),
-			Allowed: "The fixed application roots are ui, api, worker, server, and tasks, beside the standalone scenario-child program and the internal consoles haven-web, idpsim-web and mailsim-web (ADR-160)."})
+			Allowed: "The fixed application roots are ui, api, worker, server, and tasks, beside the standalone scenario-child program and the internal consoles haven-web, idpsim-web, llmsim-web, mailsim-web, storagesim-web and voicesim-web (ADR-160)."})
 	}
 }
 

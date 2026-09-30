@@ -1,4 +1,5 @@
-import { EmptyState, List, ListItem, Panel } from "@langwatch/design-system-internal";
+import { List, ListItem, Panel } from "@langwatch/design-system-internal";
+import { SimEmpty } from "@langwatch/sim-console";
 import type { ReactNode } from "react";
 
 import type { Summary } from "./mail-api.ts";
@@ -32,9 +33,9 @@ export const MessageList = ({
   return (
     <Panel title="Messages" meta={meta} actions={actions}>
       {messages.length === 0 ? (
-        <EmptyState
+        <SimEmpty
           title={filtered ? "No messages match" : "No messages yet"}
-          description={
+          hint={
             filtered
               ? "Try another search or recipient."
               : "Trigger an invite or sign-in email in your app and it appears here."

@@ -1,0 +1,96 @@
+/* The shell's layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
+
+.sim-console {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.sim-console[data-sim="mail"] {
+  --sim-accent: var(--brand);
+}
+
+.sim-console[data-sim="idp"] {
+  --sim-accent: var(--moss);
+}
+
+.sim-console[data-sim="storage"] {
+  --sim-accent: var(--amber);
+}
+
+.sim-console[data-sim="llm"] {
+  --sim-accent: var(--brand-deep);
+}
+
+.sim-console[data-sim="voice"] {
+  --sim-accent: var(--rust);
+}
+
+.sim-console .ds-topbar-mark {
+  background: var(--sim-accent);
+}
+
+.sim-console > .ds-topbar,
+.sim-console-tabs {
+  flex: none;
+}
+
+.sim-console-tabs {
+  width: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--space-8));
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-8) 0;
+}
+
+.sim-console-main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sim-split {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* The list pane is resized by its native handle; the detail takes what is left. */
+.sim-split-list {
+  flex: none;
+  width: 40%;
+  min-width: 16rem;
+  max-width: 70%;
+  resize: horizontal;
+  overflow: auto;
+}
+
+.sim-split-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.sim-json > summary {
+  cursor: pointer;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+  padding-bottom: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .sim-console-tabs {
+    padding: var(--space-2) var(--space-4) 0;
+  }
+
+  .sim-split {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sim-split-list {
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    resize: none;
+  }
+}

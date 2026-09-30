@@ -47,6 +47,25 @@ const DesignSystemService = "design-system"
 // Its lane is called mail-room too.
 const MailRoomService = "mail-room"
 
+// LangevalsService is the Python evaluator service (services/langevals) the
+// app calls for monitors and evaluations. Off by default: its import alone
+// holds gigabytes. Routed at langevals.<slug>.langwatch.localhost.
+const LangevalsService = "langevals"
+
+// StorageService is the local S3 stand-in (services/storagesim), routed at
+// storage.<slug>.langwatch.localhost. On by default, like mail.
+const StorageService = "storage"
+
+// VoiceService is the voice provider stand-in (services/voicesim) a scenario
+// voice call talks to, routed at voice.<slug>.langwatch.localhost. Opt-in:
+// it replaces a real provider endpoint, so nobody lands on it by surprise.
+const VoiceService = "voice"
+
+// LLMService is the LLM provider stand-in (services/llmsim), routed at
+// llm.<slug>.langwatch.localhost. Opt-in like voice: it answers every model
+// call the stack makes with seeded Markov text, so nothing costs money.
+const LLMService = "llm"
+
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the
 // same-origin app.<slug>.../api path (Vite's own proxy to Stack.APIPort)

@@ -75,6 +75,6 @@ const written = await captureScreens({
   views,
   outDir,
   waitUntil: "load",
-  ready: '.mail-status .ds-dot[data-state="live"]',
+  ready: '.sim-console [role="status"] .ds-dot[data-state="live"]',
 });
 process.stdout.write(`${written.length} screenshots in ${outDir}\n`);

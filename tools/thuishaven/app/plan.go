@@ -94,6 +94,31 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			}
 		}
 	}
+	// The product's object storage, pointed at storagesim unless the developer
+	// chose one (see domain.StorageS3Env). Beside mail's, for the same reason.
+	if opts.Selection.Storage {
+		for _, svc := range st.Services {
+			if svc.Name == domain.StorageService && svc.Port != 0 {
+				base = append(base, domain.StorageS3Env(resolvedDevEnv(repoDir), svc.Port)...)
+			}
+		}
+	}
+	// The voice provider stand-in, opt-in (see domain.VoiceProviderEnv).
+	if opts.Selection.Voice {
+		for _, svc := range st.Services {
+			if svc.Name == domain.VoiceService && svc.Port != 0 {
+				base = append(base, domain.VoiceProviderEnv(resolvedDevEnv(repoDir), svc.Port)...)
+			}
+		}
+	}
+	// The LLM provider stand-in, opt-in (see domain.LLMProviderEnv).
+	if opts.Selection.LLM {
+		for _, svc := range st.Services {
+			if svc.Name == domain.LLMService && svc.Port != 0 {
+				base = append(base, domain.LLMProviderEnv(resolvedDevEnv(repoDir), svc.Port)...)
+			}
+		}
+	}
 	port := func(name string) int {
 		for _, s := range st.Services {
 			if s.Name == name {
@@ -111,7 +136,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	nodeEnv := func(lane string) []string {
 		env := append(domain.LaneDatabaseEnv(base, lane),
 			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
-			"NODE_COMPILE_CACHE="+filepath.Join(o.cfg.Home, "node-compile-cache", st.Slug))
+			o.compileCacheEnv(st.Slug))
 		if lane == "ui" {
 			env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
 		}
@@ -213,6 +238,15 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			Env:   mailEnv,
 		})
 	}
+	if opts.Selection.Storage {
+		out = append(out, o.storageChild(st, opts.RepoRoot, base))
+	}
+	if opts.Selection.Voice {
+		out = append(out, o.voiceChild(st, opts.RepoRoot, base))
+	}
+	if opts.Selection.LLM {
+		out = append(out, o.llmChild(st, opts.RepoRoot, base))
+	}
 	// The two developer tools. Neither is a Node LANE — nothing in the product
 	// degrades without them — so they are planned like the Go services: only
 	// when the worktree has selected them, and never counted among the three.
@@ -238,6 +272,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 				MailPackage, port(domain.MailRoomService)),
 			Env: nodeEnv(domain.MailRoomService),
 		})
+	}
+	if opts.Selection.Langevals {
+		out = append(out, langevalsChild(repoDir, port(domain.LangevalsService), base, logPath(domain.LangevalsService)))
 	}
 	if opts.Selection.Langy {
 		langy := o.langyChild(st, opts, base, port("langyagent"), langyDockerHost)

@@ -22,6 +22,11 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
+The five simulators (`mail`, `idp`, `storage`, `llm`, `voice`) each serve a
+console at `<name>.<slug>.langwatch.localhost`. `mail`, `idp` and `storage` run
+by default; `llm` and `voice` need `haven up +llm +voice`. `haven logs <name>`
+reads any of them.
+
 Two more are there only when the worktree asked for them (`haven up
 +design-system +mail-room`) — developer tools rather than parts of the product:
 
@@ -94,9 +99,9 @@ haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch project tabs; the logs tab has per-service streams. q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
-                 sticks (+langy, -nlp, -gateway, +design-system, +mail-room); a fresh
+                 sticks (+langy, +langevals, -nlp, -gateway, +design-system, +mail-room); a fresh
                  worktree runs ui + api + workers + nlp + gateway + idp, with
-                 langy and the two developer tools off. -w watches
+                 langy, langevals and the two developer tools off. -w watches
                  the Go services via
                  air; -d detaches without the view; --rebuild forces images
 haven down       stop this worktree's stack and its Nx daemon — data is always kept;
@@ -176,13 +181,57 @@ worktree (`.haven.json`), shown by `status`, remembered across terminals and
 reboots. A running stack reconciles: matching selection is a no-op, a changed
 one replaces the stack in place. langy is off by default (it costs a container
 image and a hard memory cap); the worktrees that need it say `+langy` once.
+langevals — the Python evaluator service monitors and evaluations call — is
+off by default too (its imports hold a few GiB). `haven up +langevals` runs
+`services/langevals` with `uv` on an allocated port, routed at
+`langevals.<slug>.langwatch.localhost`, and sets `LANGEVALS_ENDPOINT` to its
+loopback port for every lane; without it `.env`'s value stands. diffsuite's
+`-langevals` passes `+langevals` to the branch stack it starts with `-up`.
 idp — the identity-provider simulator (`services/idpsim`: a range of OIDC +
 SAML + SCIM tenants with DNS/HTTP domain verification, routed at
 `idp.<slug>.langwatch.localhost`) — runs by default; a worktree that does not
 want it says `haven up -idp` once. `haven idp` runs the simulator alone —
 no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
 
-Mail and IdP are bundled into the installed Haven binary. Each stack runs its
+storage — the S3 stand-in (`services/storagesim`) — runs by default too, as
+the `storage` lane routed at `storage.<slug>.langwatch.localhost`; a worktree
+that does not want it says `haven up -storage` once. It answers only the S3
+calls the product makes (path-style PUT/GET/HEAD/DELETE object, HEAD bucket),
+checks SigV4 signatures against haven's dev key as S3 does, answers `NoSuchKey` on a missing
+GET and a bare 404 on a missing HEAD, and allows CORS from the stack's app
+origin. The overlay sets `STORED_OBJECTS_BACKEND=s3`, `S3_BUCKET_NAME`,
+`S3_ENDPOINT` (its loopback port) and dummy S3 credentials, unless the
+environment already names `STORED_OBJECTS_BACKEND`, `S3_BUCKET_NAME`,
+`S3_ENDPOINT` or `LANGWATCH_LOCAL_STORAGE_PATH`: the root `.env` beats the
+overlay, so haven stays out of a storage choice rather than half-overriding it.
+Objects persist in `storage/<slug>/` under Haven's home.
+
+llm — the LLM provider stand-in (`services/llmsim`) — is opt-in: `haven up
++llm` runs it as the `llm` lane routed at `llm.<slug>.langwatch.localhost`. It
+answers OpenAI chat completions (JSON and SSE), embeddings and models, and
+Anthropic messages, from a seeded Markov chain, so the same prompt gets the
+same answer and nothing costs money; see its README for structured output,
+tool calls, Langy's echo mode and forced errors. The overlay sets
+`OPENAI_BASE_URL` (its port plus `/v1`) and `ANTHROPIC_BASE_URL`, and
+`OPENAI_API_KEY`/`ANTHROPIC_API_KEY=llmsim` where no key is set, skipping any
+provider whose base URL `.env` already names. The storage seed then writes
+those into the seeded OpenAI and Anthropic model providers, so the gateway,
+the nlp service and LiteLLM all reach llmsim. Gemini, Vertex, Azure, xAI and
+Groq have no base-URL override and still reach the real provider if `.env`
+holds their key. Its console at the lane's URL lists the last 500 calls.
+
+voice — the voice provider stand-in (`services/voicesim`) — is opt-in: `haven
+up +voice` once runs the `voice` lane, routed at
+`voice.<slug>.langwatch.localhost`. It fakes what a scenario voice call needs
+from ElevenLabs (the signed-URL mint and the Conversational AI socket, with a
+scripted agent that answers each caller turn) and from OpenAI (`pcm` speech
+and transcription), with tones for audio and fixed text, and checks no key.
+The overlay sets `ELEVENLABS_BASE_URL` to its loopback port unless the
+environment already names one; it never sets `OPENAI_BASE_URL`, because every
+OpenAI model call in the stack falls back to it. Its console, at the lane's
+own URL, lists recent calls with their turns and protocol events.
+
+Mail, IdP, storage and voice are bundled into the installed Haven binary. Each stack runs its
 own supervised simulator processes with its own ports. Under Haven's home
 (`~/.langwatch/portless`, or `LANGWATCH_PORTLESS_HOME`), mail persists in `mail/<slug>/` and
 IdP state in `idp/<slug>/`. `haven up -f`, `haven restart`, and `haven down`

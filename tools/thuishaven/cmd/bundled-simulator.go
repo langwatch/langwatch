@@ -8,7 +8,10 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
+	llmsim "github.com/langwatch/langwatch/services/llmsim/cmd"
 	mailsim "github.com/langwatch/langwatch/services/mailsim/cmd"
+	storagesim "github.com/langwatch/langwatch/services/storagesim/cmd"
+	voicesim "github.com/langwatch/langwatch/services/voicesim/cmd"
 )
 
 // The supervising parent outlives its children, including when go run owns the
@@ -23,7 +26,7 @@ func simulatorArgv() []string {
 
 func runBundledSimulator(ctx context.Context, _ deps, inv invocation) error {
 	if len(inv.args) != 1 {
-		return fmt.Errorf("haven simulator requires mail or idp")
+		return fmt.Errorf("haven simulator requires mail, idp, storage, voice or llm")
 	}
 
 	var run func(context.Context, []string) error
@@ -33,8 +36,14 @@ func runBundledSimulator(ctx context.Context, _ deps, inv invocation) error {
 		run, service = mailsim.Root, "mailsim"
 	case "idp":
 		run, service = idpsim.Root, "idpsim"
+	case "storage":
+		run, service = storagesim.Root, "storagesim"
+	case "voice":
+		run, service = voicesim.Root, "voicesim"
+	case "llm":
+		run, service = llmsim.Root, "llmsim"
 	default:
-		return fmt.Errorf("unknown simulator %q — use mail or idp", inv.args[0])
+		return fmt.Errorf("unknown simulator %q — use mail, idp, storage, voice or llm", inv.args[0])
 	}
 
 	info := *contexts.MustGetServiceInfo(ctx)

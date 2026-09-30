@@ -37,6 +37,15 @@ dist/
 !/services/idpsim/web/dist/
 /services/idpsim/web/dist/*
 !/services/idpsim/web/dist/.gitkeep
+!/services/storagesim/web/dist/
+/services/storagesim/web/dist/*
+!/services/storagesim/web/dist/.gitkeep
+!/services/voicesim/web/dist/
+/services/voicesim/web/dist/*
+!/services/voicesim/web/dist/.gitkeep
+!/services/llmsim/web/dist/
+/services/llmsim/web/dist/*
+!/services/llmsim/web/dist/.gitkeep
 /dev/.cache/
 
 langwatch_server/

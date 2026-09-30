@@ -1,3 +1,4 @@
+import type { SimStatus } from "@langwatch/sim-console";
 import { useCallback, useEffect, useState } from "react";
 import type { z } from "zod";
 
@@ -25,4 +26,17 @@ export const useAnswer = <Data>({ path, schema }: { path: string; schema: z.ZodT
 
   const reload = useCallback(() => setGeneration((value) => value + 1), []);
   return { data, refusal, reload };
+};
+
+/** The console header's state for a page read from one answer. */
+export const answerStatus = ({
+  loaded,
+  refused,
+}: {
+  loaded: boolean;
+  refused: boolean;
+}): SimStatus => {
+  if (refused) return { tone: "error", text: "Refused" };
+  if (loaded) return { tone: "ok", text: "Serving" };
+  return { tone: "warn", text: "Loading" };
 };

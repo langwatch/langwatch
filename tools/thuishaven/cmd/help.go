@@ -31,6 +31,8 @@ EXAMPLES
     haven up                     # stack up in the background + attached log view
     haven up +langy              # add a service here, now and from now on
     haven up +design-system +mail-room  # add the design-system Storybook + mail studio
+    haven up +langevals          # run the evaluators monitors and evaluations call
+    haven up +llm                # answer every model call from llmsim, at no cost
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
@@ -56,6 +58,12 @@ hostname through the portless proxy:
     gateway.portless.langwatch.localhost     AI Gateway (Go)
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
+
+The five simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp and storage run by default; llm and voice come with "haven up +llm +voice".
+Read one's output with "haven logs <name>".
+
+    mail|idp|storage|llm|voice.portless.langwatch.localhost
 
 Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
 

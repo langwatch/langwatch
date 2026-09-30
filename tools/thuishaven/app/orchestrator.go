@@ -212,6 +212,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if p.UntrustedCheckout {
 		st.NxPrivateDir = o.nxPrivateDir(slug)
 	}
+	var routes []func()
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
 			Name: r.Name, Role: r.Role, Port: ports[i],
@@ -257,13 +258,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		}
 		st.Services = append(st.Services, svc)
 		if svc.Port != 0 && !o.cfg.PortlessDisabled {
-			if err := o.proxy.Register(svc.Name, slug, svc.Port); err != nil {
-				o.log.Warn("alias registration failed", zap.String("host", svc.Hostname), zap.Error(err))
-			}
+			routes = append(routes, o.registerRoute(svc.Name, slug, svc.Port))
 			for _, alias := range domain.ServiceHostAliases[r.Name] {
-				if err := o.proxy.Register(alias, slug, svc.Port); err != nil {
-					o.log.Warn("alias registration failed", zap.String("host", o.cfg.Naming.Hostname(alias, slug)), zap.Error(err))
-				}
+				routes = append(routes, o.registerRoute(alias, slug, svc.Port))
 			}
 		}
 	}
@@ -284,11 +281,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		apiSvc.URL = o.cfg.Naming.URL(domain.APIService, slug, scheme, port)
 		st.Services = append(st.Services, apiSvc)
 		if !o.cfg.PortlessDisabled {
-			if err := o.proxy.Register(domain.APIService, slug, apiSvc.Port); err != nil {
-				o.log.Warn("alias registration failed", zap.String("host", apiSvc.Hostname), zap.Error(err))
-			}
+			routes = append(routes, o.registerRoute(domain.APIService, slug, apiSvc.Port))
 		}
 	}
+	inParallel(routes)
 	if shouldManageDBs {
 		o.ensureClickHouse(ctx, &st)
 		o.ensurePostgres(ctx, &st)
@@ -303,12 +299,14 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	}
 	cleanup := func() {
 		if !o.cfg.PortlessDisabled {
+			var removals []func()
 			for _, s := range st.Services {
-				o.proxy.Remove(s.Name, slug)
+				removals = append(removals, func() { o.proxy.Remove(s.Name, slug) })
 				for _, alias := range domain.ServiceHostAliases[s.Name] {
-					o.proxy.Remove(alias, slug)
+					removals = append(removals, func() { o.proxy.Remove(alias, slug) })
 				}
 			}
+			inParallel(removals)
 		}
 		o.store.RemoveStack(slug)
 	}
@@ -583,7 +581,7 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
 	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
-	env := append(append(st.OverlayEnv(), o.credentialEnv(st.Slug, p.WorktreeDir)...), "DOTENV_CONFIG_QUIET=true")
+	env := append(append(st.OverlayEnv(), o.credentialEnv(st.Slug, p.WorktreeDir)...), "DOTENV_CONFIG_QUIET=true", o.compileCacheEnv(st.Slug))
 	if err := o.ensureDeps(ctx, p.WorktreeDir, depsInstall{WithLifecycleScripts: !p.UntrustedCheckout, Env: nxEnv(st)}); err != nil {
 		return err
 	}
@@ -603,6 +601,13 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	}
 	o.runSeed(ctx, p, seedRun{Slug: st.Slug, Env: env, Shell: jobs.Seed})
 	return nil
+}
+
+// compileCacheEnv points Node at the stack's compile cache. The one-shot jobs
+// share it with the lanes: Node 24 caches the TypeScript transform as well as
+// V8 code, which is most of every cold `--experimental-transform-types` start.
+func (o *Orchestrator) compileCacheEnv(slug string) string {
+	return "NODE_COMPILE_CACHE=" + filepath.Join(o.cfg.Home, "node-compile-cache", slug)
 }
 
 // prepShells is which one-shot job an up runs for a layout, by script.
@@ -822,12 +827,13 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 // kernel has since reissued.
 func (o *Orchestrator) removeStackRoutes(slug string, services []domain.Service) {
 	seen := make(map[string]bool)
+	var removals []func()
 	remove := func(name string) {
 		if name == "" || seen[name] {
 			return
 		}
 		seen[name] = true
-		o.proxy.Remove(name, slug)
+		removals = append(removals, func() { o.proxy.Remove(name, slug) })
 	}
 	removeWithAliases := func(name string) {
 		remove(name)
@@ -843,6 +849,28 @@ func (o *Orchestrator) removeStackRoutes(slug string, services []domain.Service)
 	}
 	remove(domain.ClickHouseService)
 	remove(domain.PostgresService)
+	inParallel(removals)
+}
+
+// registerRoute is one route registration, deferred so provision can run them
+// all at once. A failure only warns: the service still runs on its own port.
+func (o *Orchestrator) registerRoute(name, slug string, port int) func() {
+	return func() {
+		if err := o.proxy.Register(name, slug, port); err != nil {
+			o.log.Warn("alias registration failed", zap.String("host", o.cfg.Naming.Hostname(name, slug)), zap.Error(err))
+		}
+	}
+}
+
+// inParallel runs every call at once and waits for all of them. Each portless
+// call is a Node CLI start (0.3s idle, seconds under load) and portless locks
+// its route store, so a stack's dozen routes need not queue behind each other.
+func inParallel(calls []func()) {
+	var wg sync.WaitGroup
+	for _, call := range calls {
+		wg.Go(call)
+	}
+	wg.Wait()
 }
 
 // Down tears the current worktree's stack down from anywhere: it stops a live
@@ -1096,6 +1124,14 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.DesignSystem
 	case domain.MailRoomService:
 		return opts.Selection.MailRoom
+	case domain.LangevalsService:
+		return opts.Selection.Langevals
+	case domain.StorageService:
+		return opts.Selection.Storage
+	case domain.VoiceService:
+		return opts.Selection.Voice
+	case domain.LLMService:
+		return opts.Selection.LLM
 	default:
 		return true
 	}

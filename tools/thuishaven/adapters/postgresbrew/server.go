@@ -50,9 +50,13 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("brew is not installed — haven manages Postgres via `brew services` (install: https://brew.sh)")
 	}
 
-	if isRunning, _ := runningPostgresFormula(ctx); !isRunning {
-		if err := s.start(ctx); err != nil {
-			return 0, err
+	// A server already answering is reused without asking brew: `brew services
+	// list` costs seconds on a loaded machine, pg_isready a few milliseconds.
+	if !s.ready(ctx) {
+		if isRunning, _ := runningPostgresFormula(ctx); !isRunning {
+			if err := s.start(ctx); err != nil {
+				return 0, err
+			}
 		}
 	}
 

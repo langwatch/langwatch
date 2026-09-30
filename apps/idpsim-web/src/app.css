@@ -22,3 +22,10 @@
 .idp-status {
   display: block;
 }
+
+/* The account picker is a form: one centred column, as a narrow page was. */
+.idp-narrow {
+  width: 100%;
+  max-width: var(--page-narrow);
+  margin: 0 auto;
+}

@@ -172,8 +172,12 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{"langyagent", "Langy agent manager (Go)"},
 	{"idp", "IdP simulator (Go)"},
 	{MailService, "Mail sink (mailsim)"},
+	{StorageService, "Object storage (storagesim)"},
+	{VoiceService, "Voice providers (voicesim)"},
+	{LLMService, "LLM providers (llmsim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
+	{LangevalsService, "Evaluators (Python)"},
 }
 
 // ServiceHostAliases are extra hostnames routed to the same listener as a

@@ -1,22 +1,19 @@
 import {
   Button,
   ConfirmButton,
-  consoleLinks,
-  EmptyState,
   IconButton,
   IconRefresh,
   Inline,
   Input,
-  Page,
   Panel,
+  Section,
   Select,
   Stack,
-  StatusDot,
   Text,
-  TopBar,
   useToast,
 } from "@langwatch/design-system-internal";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { SimConsole, SimEmpty, SimSplit, type SimStatus } from "@langwatch/sim-console";
+import { useCallback, useEffect, useState } from "react";
 
 import { InboxDetails } from "./inbox-details.tsx";
 import { filterMessages, recipientCounts } from "./inbox-filter.ts";
@@ -39,7 +36,11 @@ const CONNECTION_LABEL: Record<Connection, string> = {
   down: "Disconnected, retrying",
 };
 
-const CONNECTION_DOT = { starting: "starting", live: "live", down: "down" } as const;
+const CONNECTION_TONE: Record<Connection, SimStatus["tone"]> = {
+  starting: "warn",
+  live: "ok",
+  down: "error",
+};
 
 const describeError = ({ error }: { error: unknown }) =>
   error instanceof Error ? error.message : String(error);
@@ -83,24 +84,24 @@ const OpenedPane = ({
     case "none":
       return (
         <Panel>
-          <EmptyState
+          <SimEmpty
             title="Select a message"
-            description="Its preview, plain text, headers and links open here."
+            hint="Its preview, plain text, headers and links open here."
           />
         </Panel>
       );
     case "loading":
       return (
         <Panel>
-          <EmptyState title="Opening message" />
+          <SimEmpty title="Opening message" />
         </Panel>
       );
     case "missing":
       return (
         <Panel>
-          <EmptyState
+          <SimEmpty
             title="This message is not in the inbox"
-            description="It was deleted, or the inbox was cleared."
+            hint="It was deleted, or the inbox was cleared."
           />
         </Panel>
       );
@@ -126,7 +127,6 @@ export const Inbox = () => {
   const [query, setQuery] = useState("");
   const [recipient, setRecipient] = useState("");
   const [busy, setBusy] = useState(false);
-  const chrome = useMemo(() => consoleLinks({ location: window.location }), []);
 
   useEffect(() => {
     mailApi
@@ -175,17 +175,14 @@ export const Inbox = () => {
   }, [notify, toast]);
 
   return (
-    <Page
-      nav={
-        <TopBar
-          name="Mail"
-          slug={info?.stack || chrome.slug}
-          homeHref={chrome.homeHref}
-          links={chrome.links}
-        />
-      }
-      title="Inbox"
-      subtitle="Every email this stack sends lands here and is never relayed to its recipients."
+    <SimConsole
+      sim="mail"
+      title="Mail"
+      stackSlug={info?.stack}
+      tabs={[]}
+      activeTab=""
+      onTab={() => undefined}
+      status={{ tone: CONNECTION_TONE[connection], text: CONNECTION_LABEL[connection] }}
       actions={
         <>
           <Button
@@ -209,61 +206,76 @@ export const Inbox = () => {
         </>
       }
     >
-      <Stack gap={4}>
-        <Inline gap={3} wrap>
-          <div className="mail-search">
-            <Input
-              label="Search inbox"
-              hideLabel
-              type="search"
-              placeholder="Subject, recipient or sender"
-              autoComplete="off"
-              value={query}
-              onChange={setQuery}
-            />
-          </div>
-          <div className="mail-recipient">
-            <Select
-              label="Recipient"
-              hideLabel
-              value={recipient}
-              onChange={setRecipient}
-              options={[
-                { value: "", label: `All recipients (${recipients.length})` },
-                ...recipients.map(({ address, count }) => ({
-                  value: address,
-                  label: `${address} (${count})`,
-                })),
-              ]}
-            />
-          </div>
-          <span className="mail-status" title={error}>
-            <StatusDot state={CONNECTION_DOT[connection]} label={CONNECTION_LABEL[connection]} />
-          </span>
-        </Inline>
-        <div className="mail-layout">
-          <MessageList
-            messages={shown}
-            total={all.length}
-            filtered={query.trim() !== "" || recipient !== ""}
-            openId={openId}
-            onOpen={open}
-            actions={
-              <IconButton
-                label="Refresh"
-                icon={<IconRefresh />}
-                size="sm"
-                onClick={() => void refresh()}
+      <Section
+        title="Inbox"
+        description="Every email this stack sends lands here and is never relayed to its recipients."
+      >
+        <Stack gap={4}>
+          <Inline gap={3} wrap>
+            <div className="mail-search">
+              <Input
+                label="Search inbox"
+                hideLabel
+                type="search"
+                placeholder="Subject, recipient or sender"
+                autoComplete="off"
+                value={query}
+                onChange={setQuery}
+              />
+            </div>
+            <div className="mail-recipient">
+              <Select
+                label="Recipient"
+                hideLabel
+                value={recipient}
+                onChange={setRecipient}
+                options={[
+                  { value: "", label: `All recipients (${recipients.length})` },
+                  ...recipients.map(({ address, count }) => ({
+                    value: address,
+                    label: `${address} (${count})`,
+                  })),
+                ]}
+              />
+            </div>
+            {error !== undefined && (
+              <Text size="sm" tone="muted">
+                {error}
+              </Text>
+            )}
+          </Inline>
+          <SimSplit
+            list={
+              <MessageList
+                messages={shown}
+                total={all.length}
+                filtered={query.trim() !== "" || recipient !== ""}
+                openId={openId}
+                onOpen={open}
+                actions={
+                  <IconButton
+                    label="Refresh"
+                    icon={<IconRefresh />}
+                    size="sm"
+                    onClick={() => void refresh()}
+                  />
+                }
+              />
+            }
+            detail={
+              <OpenedPane
+                opened={opened}
+                onDelete={(input) => void deleteOne(input)}
+                deleting={busy}
               />
             }
           />
-          <OpenedPane opened={opened} onDelete={(input) => void deleteOne(input)} deleting={busy} />
-        </div>
-        {info !== undefined && <InboxDetails inbox={info} />}
-        <Text size="sm" tone="muted">
-          Captured locally. Messages are never relayed to their recipients.
-        </Text>
-      </Stack>
-    </Page>
+          {info !== undefined && <InboxDetails inbox={info} />}
+          <Text size="sm" tone="muted">
+            Captured locally. Messages are never relayed to their recipients.
+          </Text>
+        </Stack>
+      </Section>
+    </SimConsole>
   );
 };

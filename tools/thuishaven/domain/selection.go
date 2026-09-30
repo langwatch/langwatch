@@ -42,17 +42,34 @@ type Selection struct {
 	// a tool for the person writing an email template, not a service the
 	// application talks to, so nothing else in the stack degrades without it.
 	MailRoom bool `json:"mail-room"`
+	// Langevals is the evaluator service monitors and evaluations call. Off by
+	// default like Langy: it is a Python process whose imports alone hold a
+	// few GiB, and most worktrees never run an evaluator. `haven up
+	// +langevals` once, and the overlay points LANGEVALS_ENDPOINT at it.
+	Langevals bool `json:"langevals"`
+	// Storage is the local S3 stand-in (storagesim), on by default like Mail:
+	// one small Go process, and the presigned upload flow works with no S3.
+	// The overlay points the product's S3 config at it unless .env chose one.
+	Storage bool `json:"storage"`
+	// Voice is the voice provider stand-in (voicesim). Off by default: it
+	// replaces ElevenLabs for the stack, which a developer testing a real
+	// agent must never get by surprise. `haven up +voice` once.
+	Voice bool `json:"voice"`
+	// LLM is the LLM provider stand-in (llmsim). Off by default: it answers
+	// in place of OpenAI and Anthropic, which a developer judging real model
+	// output must never get by surprise. `haven up +llm` once.
+	LLM bool `json:"llm"`
 }
 
 // DefaultSelection is a fresh worktree's lean default: the two Node lanes,
-// gateway, nlp, the idp simulator and the mail sink — no langy, and neither of
-// the two developer tools (design-system, mail-room).
+// gateway, nlp, the idp simulator and the mail sink — no langy, no langevals,
+// and neither of the two developer tools (design-system, mail-room).
 func DefaultSelection() Selection {
-	return Selection{Gateway: true, NLP: true, IDP: true, Mail: true}
+	return Selection{Gateway: true, NLP: true, IDP: true, Mail: true, Storage: true}
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "design-system", "mail-room"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "design-system", "mail-room", "langevals"}
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
@@ -138,6 +155,14 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.DesignSystem = on
 	case "mail-room":
 		sel.MailRoom = on
+	case LangevalsService:
+		sel.Langevals = on
+	case StorageService:
+		sel.Storage = on
+	case VoiceService:
+		sel.Voice = on
+	case LLMService:
+		sel.LLM = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -165,6 +190,14 @@ func SelectionFromStack(st Stack) Selection {
 			sel.DesignSystem = local
 		case MailRoomService:
 			sel.MailRoom = local
+		case LangevalsService:
+			sel.Langevals = local
+		case StorageService:
+			sel.Storage = local
+		case VoiceService:
+			sel.Voice = local
+		case LLMService:
+			sel.LLM = local
 		}
 	}
 	return sel
@@ -224,8 +257,12 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.Langy, "langy")
 	add(s.IDP, "idp")
 	add(s.Mail, "mail")
+	add(s.Storage, StorageService)
+	add(s.Voice, VoiceService)
+	add(s.LLM, LLMService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
+	add(s.Langevals, LangevalsService)
 	out := "services: " + strings.Join(on, " · ")
 	if len(off) > 0 {
 		out += "   off: " + strings.Join(off, " · ")

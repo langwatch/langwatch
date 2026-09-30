@@ -31,7 +31,7 @@ describe("the account picker", () => {
         },
       },
     });
-    render(<SignIn nav={null} tenantId={1} query={query} />);
+    render(<SignIn tenantId={1} query={query} />);
 
     const admin = await screen.findByRole("link", { name: /Ada Admin/u });
     expect(admin.getAttribute("href")).toBe(hinted);
@@ -58,7 +58,7 @@ describe("the account picker", () => {
         },
       },
     });
-    render(<SignIn nav={null} tenantId={2} query={query} />);
+    render(<SignIn tenantId={2} query={query} />);
 
     expect(await screen.findByText("That redirect address is not registered")).toBeTruthy();
     expect(

@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+	"os"
+	"path/filepath"
 )
 
 // seedPreset is one seed variant: env switches for prisma:seed plus which
@@ -129,12 +131,16 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, preset string) e
 		}
 		fmt.Printf("dropped postgres database %q\n", db)
 	}
+	if err := os.RemoveAll(filepath.Join(o.cfg.Home, "storage", slug)); err != nil {
+		return fmt.Errorf("removing storagesim objects: %w", err)
+	}
+	fmt.Printf("removed storagesim objects for %q\n", slug)
 
 	env, err := o.managedStackEnv(ctx, slug)
 	if err != nil {
 		return err
 	}
-	env = append(env, "DOTENV_CONFIG_QUIET=true")
+	env = append(env, "DOTENV_CONFIG_QUIET=true", o.compileCacheEnv(slug))
 	env = append(env, pre.env...)
 	if err := o.sup.RunOnce(ctx, "prepare", p.WorktreeDir, prepareDBShell, env); err != nil {
 		return fmt.Errorf("migrations failed on the fresh database: %w", err)

@@ -80,7 +80,7 @@ endif
 # runs it first; a console that fails to build (--no-bail keeps the others)
 # serves a page naming this target instead.
 haven-web:
-	@pnpm --no-bail --filter @langwatch/haven-web --filter @langwatch/mailsim-web --filter @langwatch/idpsim-web build
+	@pnpm --no-bail --filter @langwatch/haven-web --filter @langwatch/mailsim-web --filter @langwatch/idpsim-web --filter @langwatch/storagesim-web --filter @langwatch/voicesim-web --filter @langwatch/llmsim-web build
 
 # =============================================================================
 # LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)

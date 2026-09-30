@@ -28,7 +28,7 @@ describe("a tenant's page", () => {
         "POST /api/t/1/apps": { status: 201, body: app },
       },
     });
-    render(<TenantPage nav={null} tenantId={1} />);
+    render(<TenantPage tenantId={1} />);
     await screen.findByText("Register an application");
     expect(screen.getByText(/\{connection\} segment matches/u)).toBeTruthy();
 
@@ -67,7 +67,7 @@ describe("a tenant's page", () => {
       },
     });
     window.history.replaceState(null, "", "/t/1/#provisioning");
-    render(<TenantPage nav={null} tenantId={1} />);
+    render(<TenantPage tenantId={1} />);
     await screen.findByText("Provision into LangWatch");
 
     fireEvent.change(screen.getByRole("textbox", { name: "SCIM address" }), {
@@ -94,7 +94,7 @@ describe("a tenant's page", () => {
         },
       },
     });
-    render(<TenantPage nav={null} tenantId={9} />);
+    render(<TenantPage tenantId={9} />);
     await waitFor(() => expect(screen.getByText("There is no tenant 9")).toBeTruthy());
   });
 });

@@ -16,8 +16,11 @@ import (
 	aigateway "github.com/langwatch/langwatch/services/aigateway/cmd"
 	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
 	langyagent "github.com/langwatch/langwatch/services/langyagent/cmd"
+	llmsim "github.com/langwatch/langwatch/services/llmsim/cmd"
 	mailsim "github.com/langwatch/langwatch/services/mailsim/cmd"
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo/cmd"
+	storagesim "github.com/langwatch/langwatch/services/storagesim/cmd"
+	voicesim "github.com/langwatch/langwatch/services/voicesim/cmd"
 )
 
 // Version is set via ldflags at build time.
@@ -49,8 +52,11 @@ var services = map[string]ServiceBoot{
 	"aigateway":  aigateway.Root,
 	"idpsim":     idpsim.Root,
 	"langyagent": langyagent.Root,
+	"llmsim":     llmsim.Root,
 	"mailsim":    mailsim.Root,
 	"nlpgo":      nlpgo.Root,
+	"storagesim": storagesim.Root,
+	"voicesim":   voicesim.Root,
 	// The development topology (ADR-004, 2026-09-07): the Go data-plane
 	// services in one process. Never a deployment — each service is still its
 	// own container in production.

@@ -154,6 +154,11 @@ func (s Stack) OverlayEnv() []string {
 	if sb := s.svc(DesignSystemService); sb.Port != 0 {
 		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
 	}
+	// The evaluator service, when this stack runs one (or falls back to a
+	// baseline's). Without it the app keeps .env's value, where nothing listens.
+	if lev := s.svc(LangevalsService); lev.Port != 0 {
+		env = append(env, fmt.Sprintf("LANGEVALS_ENDPOINT=http://127.0.0.1:%d", lev.Port))
+	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
 	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch
@@ -387,6 +392,65 @@ func MailSMTPEnv(resolved map[string]string, smtpPort int) []string {
 		fmt.Sprintf("SMTP_PORT=%d", smtpPort),
 		"SMTP_SECURE=false",
 	}
+}
+
+// StorageProviderEnvVars are the env keys that mean a developer chose where
+// objects go: a named backend, a bucket, an endpoint, or a filesystem root.
+// Any one set means haven points nothing at storagesim.
+var StorageProviderEnvVars = []string{
+	"STORED_OBJECTS_BACKEND", "S3_BUCKET_NAME", "S3_ENDPOINT", "LANGWATCH_LOCAL_STORAGE_PATH",
+}
+
+// StorageS3Env points the product's S3 object storage at storagesim on port,
+// path-style (the product's default with an endpoint) under dummy credentials,
+// or nil when the developer already chose object storage.
+func StorageS3Env(resolved map[string]string, port int) []string {
+	for _, key := range StorageProviderEnvVars {
+		if resolved[key] != "" {
+			return nil
+		}
+	}
+	return []string{
+		"STORED_OBJECTS_BACKEND=s3",
+		"S3_BUCKET_NAME=langwatch",
+		fmt.Sprintf("S3_ENDPOINT=http://127.0.0.1:%d", port),
+		"S3_ACCESS_KEY_ID=storagesim",
+		"S3_SECRET_ACCESS_KEY=storagesim",
+	}
+}
+
+// VoiceProviderEnv points the scenario SDK's ElevenLabs client at voicesim on
+// port, or nil when the developer already named ELEVENLABS_BASE_URL. The SDK
+// reads it in the scenario child, which gets it only once the product forwards
+// it (see specs/setup/haven-voicesim.feature). OPENAI_BASE_URL is deliberately
+// not set: the product falls back to it for every OpenAI model call.
+func VoiceProviderEnv(resolved map[string]string, port int) []string {
+	if resolved["ELEVENLABS_BASE_URL"] != "" {
+		return nil
+	}
+	return []string{fmt.Sprintf("ELEVENLABS_BASE_URL=http://127.0.0.1:%d", port)}
+}
+
+// LLMProviderEnv points the product's OpenAI and Anthropic providers at llmsim
+// on port: the base URL the seed, the gateway and LiteLLM read, plus a dummy
+// key when none is set. A provider whose base URL .env already names is left
+// alone (see specs/setup/haven-llmsim.feature). The gateway appends /v1 itself.
+func LLMProviderEnv(resolved map[string]string, port int) []string {
+	base := fmt.Sprintf("http://127.0.0.1:%d", port)
+	var env []string
+	for _, p := range []struct{ key, url, value string }{
+		{"OPENAI_API_KEY", "OPENAI_BASE_URL", base + "/v1"},
+		{"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", base},
+	} {
+		if resolved[p.url] != "" {
+			continue
+		}
+		env = append(env, p.url+"="+p.value)
+		if resolved[p.key] == "" {
+			env = append(env, p.key+"=llmsim")
+		}
+	}
+	return env
 }
 
 // EnvMap turns KEY=VALUE lines into a map, for callers that need to look a

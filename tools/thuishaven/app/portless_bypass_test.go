@@ -36,6 +36,8 @@ func (p *recordingProxy) EnsureReady() error {
 }
 
 func (p *recordingProxy) Register(service, slug string, port int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.registered = append(p.registered, service+"."+slug)
 	return nil
 }

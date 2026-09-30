@@ -19,6 +19,9 @@
   "references": [
     {
       "path": "../../packages/design-system-internal/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/sim-console/tsconfig.build.json"
     }
   ]
 }

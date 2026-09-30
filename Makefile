@@ -137,7 +137,7 @@ setup-hooks:
 DEV_ENV_FILE ?= .env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
-	@case "$(svc)" in mailsim|idpsim) test -f services/$(svc)/web/dist/index.html \
+	@case "$(svc)" in mailsim|idpsim|storagesim|voicesim|llmsim) test -f services/$(svc)/web/dist/index.html \
 		|| pnpm --silent --filter @langwatch/$(svc)-web build || echo "$(svc)-web did not build; its console names the fix" ;; esac
 	@_snap=$$(export -p) && \
 		{ test -f $(DEV_ENV_FILE) \
@@ -146,7 +146,8 @@ service:
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
-		if [ -n "$$LANGWATCH_LANE" ]; then exec go run ./cmd/service $(svc) $(args); else \
+		if [ -n "$$LANGWATCH_LANE" ]; then mkdir -p .bin/$(svc) && go build -o .bin/$(svc)/$(svc) ./cmd/service \
+			&& exec .bin/$(svc)/$(svc) $(svc) $(args); else \
 			set -o pipefail; go run ./cmd/service $(svc) $(args) 2>&1 \
 				| node dev/scripts/log-render.mjs $(svc) --color; fi
 
@@ -255,7 +256,7 @@ lint-rules-test:
 # which is why "run the Go checks before pushing" quietly stopped happening.
 # Always resolve the pinned version rather than trusting PATH.
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
-GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/mailsim/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
+GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/mailsim/... ./services/nlpgo/... ./services/storagesim/... ./services/voicesim/... ./services/llmsim/... ./pkg/... ./cmd/... ./tools/...
 
 # golangci-lint reads package export data through whatever `go` it finds, and
 # the pinned linter (built with Go 1.25, upstream ships "latest-1") cannot
@@ -264,6 +265,11 @@ GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/ma
 # Pinning GOTOOLCHAIN to go.mod's version makes both environments identical.
 GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
 
+# A slot bounds how many runs, not how many cores each takes: locally the linter
+# and its `go list` builds get 2 cores, CI (CI=true) every core. Override: GO_LINT_JOBS=8.
+GO_LINT_JOBS ?= $(if $(CI),$(shell getconf _NPROCESSORS_ONLN),2)
+GO_LINT_ENV := env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) GOMAXPROCS=$(GO_LINT_JOBS) GOFLAGS="$(GOFLAGS) -p=$(GO_LINT_JOBS)"
+
 # golangci-lint saturates cores the same way a whole-tree typecheck does, so it
 # takes a slot from the same machine-wide counter (`haven slot run`) before it
 # runs, and queues behind a typecheck already running rather than piling onto
@@ -271,7 +277,7 @@ GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
 # edits, not the whole tree, and is not the cost this queue exists for.
 go-lint-slot:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
-	@$(HAVEN) slot run --label golangci-lint --timeout 10m -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --allow-serial-runners $(GO_LINT_PKGS)
+	@$(HAVEN) slot run --label golangci-lint --timeout 10m -- $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners $(GO_LINT_PKGS)
 
 go-lint: go-lint-slot
 
@@ -279,11 +285,11 @@ go-lint: go-lint-slot
 # reports only issues on those lines; it never diffs against a branch.
 go-lint-changed:
 	@pkgs=$$( { git diff --name-only HEAD -- '*.go'; git ls-files -o --exclude-standard -- '*.go'; } \
-		| grep -E '^(services/(aigateway|idpsim|langyagent|mailsim|nlpgo)|pkg|cmd|tools)/' | grep -v '/testdata/' \
+		| grep -E '^(services/(aigateway|idpsim|langyagent|llmsim|mailsim|nlpgo|storagesim|voicesim)|pkg|cmd|tools)/' | grep -v '/testdata/' \
 		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "./$$d"; done); \
 	if [ -z "$$pkgs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
 	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$pkgs" | wc -l | tr -d ' ') packages)"; \
-	$(HAVEN) slot run --label golangci-lint --timeout 10m -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --allow-serial-runners --new-from-rev=HEAD $$pkgs
+	$(HAVEN) slot run --label golangci-lint --timeout 10m -- $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners --new-from-rev=HEAD $$pkgs
 
 # Stop all services
 down:

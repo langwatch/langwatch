@@ -57,6 +57,59 @@ beside the API, so `haven logs api` and `haven logs worker` each show one of
 them, and `haven logs go` shows the gateway and NLP engine. Restarting any of
 them means restarting the lane.
 
+Monitors and evaluations need langevals, which is off by default: its imports
+hold a few GiB. `haven up +langevals` (sticky) runs `services/langevals` with
+`uv` (install it with `brew install uv`) on a port haven allocates, and points
+`LANGEVALS_ENDPOINT` at it for every lane. Without it, `.env`'s
+`LANGEVALS_ENDPOINT` stands, and nothing listens there unless you run
+`make -C services/langevals start` yourself. The first start syncs the Python
+dependencies, which takes a few minutes. diffsuite's `-langevals` does the same
+for a branch stack it starts with `-up`.
+
+The five simulators (`mail`, `idp`, `storage`, `llm`, `voice`) each serve a console
+at `<name>.<slug>.langwatch.localhost`, appear as rows in the hub and the stack home,
+and log through `haven logs <name>`. `mail`, `idp` and `storage` run by default
+(`-mail`, `-idp`, `-storage` turn them off); `llm` and `voice` are opt-in
+(`+llm`, `+voice`).
+
+Uploads need S3, which `storagesim` stands in for. It runs by default as the
+`storage` lane (`haven up -storage` turns it off), stores objects under haven's
+home in `storage/<slug>/`, and answers only the calls the product makes:
+path-style PUT, GET, HEAD and DELETE of an object, plus HEAD bucket. It checks
+SigV4 (header and presigned) against haven's dev key and refuses as S3 does
+(services/storagesim/README.md). haven sets `STORED_OBJECTS_BACKEND=s3`,
+`S3_BUCKET_NAME=langwatch`, `S3_ENDPOINT=http://127.0.0.1:<port>` and dummy
+`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` for every lane. It sets none of them
+when `.env` or your shell already names `STORED_OBJECTS_BACKEND`,
+`S3_BUCKET_NAME`, `S3_ENDPOINT` or `LANGWATCH_LOCAL_STORAGE_PATH`, because the
+root `.env` beats haven's overlay and a half-applied S3 config would mix the
+two. Only the stack's own app origin may call it from a browser (CORS).
+
+Model calls can cost nothing: `haven up +llm` (sticky, off by default) runs
+`llmsim`, which answers OpenAI chat completions, embeddings and models and
+Anthropic messages with seeded Markov text (same prompt, same answer), JSON
+that fits a requested schema, and tool calls built from the tool's schema.
+haven sets `OPENAI_BASE_URL=http://127.0.0.1:<port>/v1` and
+`ANTHROPIC_BASE_URL=http://127.0.0.1:<port>`, plus `OPENAI_API_KEY` and
+`ANTHROPIC_API_KEY=llmsim` where `.env` sets no key. A provider whose base URL
+`.env` names is left alone. The seeded model providers then carry those
+values, so the playground, evaluators, scenario runs and Langy reach llmsim
+through the gateway, the nlp service and LiteLLM alike. A model name
+containing `langy-echo` switches to Langy's echo mode, and one containing
+`error-429` or `error-500` forces that error; `services/llmsim/README.md` has
+the rest. Gemini, Vertex, Azure, xAI and Groq still reach the real provider
+when `.env` holds their key.
+
+Scenario voice calls can run against `voicesim` instead of ElevenLabs and
+OpenAI: `haven up +voice` (sticky, off by default because it replaces a real
+provider). It answers the ElevenLabs signed-URL mint and conversation socket
+with a scripted agent, and OpenAI's `pcm` speech and transcription with tones
+and a fixed transcript, keeping no key. haven sets `ELEVENLABS_BASE_URL` for
+every lane unless `.env` or your shell names one, and never `OPENAI_BASE_URL`.
+Its console at `voice.<slug>.langwatch.localhost` shows each call's turns.
+The scenario child does not yet receive either base URL, so a voice run still
+reaches the real providers until the product forwards them.
+
 `https://langwatch.localhost` is the cross-worktree dashboard;
 `observability.langwatch.localhost` proxies local Grafana;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. When

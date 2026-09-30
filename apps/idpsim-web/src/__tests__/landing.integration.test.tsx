@@ -24,7 +24,7 @@ describe("the landing page", () => {
   /** @scenario "The landing page says what to do before it lists the providers" */
   it("names the three steps before the providers, with the base address copyable and the control API folded", async () => {
     fakeSimulator({ routes: { "GET /api/tenants": { body: index } } });
-    render(<Landing nav={null} />);
+    render(<Landing />);
     await screen.findByText("acme1.test");
 
     const text = document.body.textContent ?? "";
@@ -44,7 +44,7 @@ describe("the landing page", () => {
   /** @scenario "A provider that already has an application registered is marked as such" */
   it("marks only the provider that already has an application", async () => {
     fakeSimulator({ routes: { "GET /api/tenants": { body: index } } });
-    render(<Landing nav={null} />);
+    render(<Landing />);
     await screen.findByText("acme2.test");
 
     expect(screen.getAllByText("1 registered")).toHaveLength(1);
@@ -54,7 +54,7 @@ describe("the landing page", () => {
 
   it("filters the providers by number or domain", async () => {
     fakeSimulator({ routes: { "GET /api/tenants": { body: index } } });
-    render(<Landing nav={null} />);
+    render(<Landing />);
     await screen.findByText("acme1.test");
     fireEvent.change(screen.getByRole("searchbox", { name: "Find a provider" }), {
       target: { value: "acme3" },
