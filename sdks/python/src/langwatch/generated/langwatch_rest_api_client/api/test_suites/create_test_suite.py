@@ -61,8 +61,9 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: CreateTestSuiteBody,
 ) -> Response[CreateTestSuiteResponse201]:
-    """Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a
-    run goes against are sent with the run.
+    """Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the
+    targets a run goes against are sent with the run. It may declare fields and attach evaluators from
+    the start.
 
     Args:
         body (CreateTestSuiteBody):
@@ -91,8 +92,9 @@ def sync(
     client: AuthenticatedClient,
     body: CreateTestSuiteBody,
 ) -> CreateTestSuiteResponse201 | None:
-    """Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a
-    run goes against are sent with the run.
+    """Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the
+    targets a run goes against are sent with the run. It may declare fields and attach evaluators from
+    the start.
 
     Args:
         body (CreateTestSuiteBody):
@@ -116,8 +118,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: CreateTestSuiteBody,
 ) -> Response[CreateTestSuiteResponse201]:
-    """Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a
-    run goes against are sent with the run.
+    """Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the
+    targets a run goes against are sent with the run. It may declare fields and attach evaluators from
+    the start.
 
     Args:
         body (CreateTestSuiteBody):
@@ -144,8 +147,9 @@ async def asyncio(
     client: AuthenticatedClient,
     body: CreateTestSuiteBody,
 ) -> CreateTestSuiteResponse201 | None:
-    """Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a
-    run goes against are sent with the run.
+    """Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the
+    targets a run goes against are sent with the run. It may declare fields and attach evaluators from
+    the start.
 
     Args:
         body (CreateTestSuiteBody):

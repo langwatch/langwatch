@@ -2,8 +2,8 @@ import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
-import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import { INITIAL_TIME_RANGE } from "../../stores/querySlice";
 import { useOnboardingStore } from "../store/onboardingStore";
 import { useOnboardingActive } from "./useOnboardingActive";
 
@@ -87,8 +87,8 @@ export function useTourEntryPoints(): OnboardingEntryState {
     // `useSamplePreview` substring-matches on `debouncedQueryText`,
     // and the time-range filters real fetches once preview ends —
     // both need to be at defaults.
-    useViewStore.getState().selectLens("all-traces");
-    const filter = useFilterStore.getState();
+    useExplorerStore.getState().selectLens("all-traces");
+    const filter = useExplorerStore.getState();
     filter.clearAll();
     filter.setTimeRange(INITIAL_TIME_RANGE);
     // `clearAll` only updates `queryText` — `debouncedQueryText` (the

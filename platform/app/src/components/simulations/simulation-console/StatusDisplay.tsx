@@ -20,6 +20,7 @@ const STATUS_COLOR_MAP: Record<ScenarioRunStatus, Tokens["colors"]> = {
   [ScenarioRunStatus.STALLED]: "yellow.400",
   [ScenarioRunStatus.QUEUED]: "blue.400",
   [ScenarioRunStatus.RUNNING]: "yellow.400",
+  [ScenarioRunStatus.PENDING_EVALUATION]: "yellow.400",
 };
 
 /**

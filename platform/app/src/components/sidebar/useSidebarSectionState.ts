@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { trackEvent } from "~/utils/tracking";
+import { useSidebarSectionOverrides } from "./sidebarSectionOverrides";
 
 export const getSidebarSectionStorageKey = (id: string) =>
   `langwatch:main-sidebar-section:${id}:expanded:v1`;
@@ -17,6 +18,9 @@ export const useSidebarSectionState = ({
   projectId?: string;
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  // The guided tour folds and opens a group without touching the user's
+  // preference; while an override is set it is what the section shows.
+  const override = useSidebarSectionOverrides((s) => s.overrides[id]);
 
   useEffect(() => {
     const savedPreference = window.localStorage.getItem(
@@ -43,5 +47,5 @@ export const useSidebarSectionState = ({
     });
   };
 
-  return { isExpanded, toggleSection };
+  return { isExpanded: override ?? isExpanded, toggleSection };
 };

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
+import {
+  type GrantFixtureQuery,
+  grantRowsForKeyResult,
+} from "./api-key-grant-fixture";
 
 // Mock the token generator to produce deterministic values
 vi.mock("../api-key-token.utils", () => ({
@@ -14,25 +18,25 @@ vi.mock("../api-key-token.utils", () => ({
 }));
 
 // Mock the role binding permission check
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: vi.fn().mockResolvedValue(true),
-  // These cases are about the binding path; the legacy fallback grants
-  // nothing so the binding decision is the only one under test.
-  resolveLegacyCeiling: vi.fn().mockResolvedValue({ grants: () => false }),
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
+  checkPrincipalPermission: vi.fn().mockResolvedValue(true),
 }));
 
 // Mock the custom role permissions module
-vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/server/rbac/custom-role-permissions")
-    >();
-  return {
-    ...actual,
-    parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
-    MalformedCustomRolePermissionsError: class extends Error {},
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/custom-role-permissions",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/custom-role-permissions")
+      >();
+    return {
+      ...actual,
+      parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
+      MalformedCustomRolePermissionsError: class extends Error {},
+    };
+  },
+);
 
 // Grants and role definitions are ledger commands since ADR-092
 // delivery-plan PR 2, so the writer is the seam these cases observe.
@@ -64,6 +68,8 @@ vi.mock("@langwatch/observability", () => ({
  * stays as an alias so the cases read the same stubs either way.
  */
 function createMockPrisma() {
+  /** What the fenced revoke wrote, so the read-back returns the same row. */
+  const revokeState: { row: Record<string, unknown> | null } = { row: null };
   const client = {
     apiKey: {
       create: vi.fn().mockResolvedValue({
@@ -91,12 +97,24 @@ function createMockPrisma() {
         const created = await client.apiKey.create.mock.results.at(-1)?.value;
         return { ...(created ?? { id: args.where.id }), ...args.data };
       }),
+      findUniqueOrThrow: vi.fn().mockImplementation(async (args: any) => {
+        const created = await client.apiKey.create.mock.results.at(-1)?.value;
+        return {
+          ...(created ?? { id: args.where.id }),
+          ...(revokeState.row ?? {}),
+        };
+      }),
     },
     roleBinding: {
       findFirst: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
       // Nothing but this key holds the key's private role.
       count: vi.fn().mockResolvedValue(0),
+    },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue({ organizationId: "org_1" }),
     },
     // The personal-workspace guard reads the scopes a binding names.
     team: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -110,6 +128,32 @@ function createMockPrisma() {
       findFirst: vi.fn().mockResolvedValue({ userId: "user_1" }),
     },
   };
+
+  /**
+   * A revoke writes through the fenced SQL statement and reads the row back.
+   * The statement binds the cause, then the key id; `revokedAt` is set by the
+   * database, so the fake stamps it itself.
+   */
+  const executeRaw = vi
+    .fn()
+    .mockImplementation(
+      async (_sql: TemplateStringsArray, ...values: unknown[]) => {
+        revokeState.row = {
+          ...(revokeState.row ?? {}),
+          revokedAt: new Date(),
+          revocationCause: values[0],
+        };
+        return 1;
+      },
+    );
+  (client as Record<string, unknown>).$executeRaw = executeRaw;
+
+  client.grant.findMany.mockImplementation(
+    async (args: GrantFixtureQuery = {}) => {
+      const lastResult = client.apiKey.findUnique.mock.results.at(-1)?.value;
+      return grantRowsForKeyResult(lastResult, args);
+    },
+  );
 
   return { ...client, _mockTx: client } as any;
 }
@@ -150,7 +194,11 @@ describe("ApiKeyService", () => {
         expect(result.apiKey.id).toBe("ak_1");
         expect(prisma.organizationUser.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
-            where: { userId: "user_1", organizationId: "org_1" },
+            where: {
+              userId: "user_1",
+              organizationId: "org_1",
+              disabledAt: null,
+            },
           }),
         );
       });
@@ -247,11 +295,11 @@ describe("ApiKeyService", () => {
   describe("create() ceiling validation ordering", () => {
     describe("when ceiling check rejects permissions", () => {
       it("does not create a CustomRole", async () => {
-        const { checkRoleBindingPermission } = await import(
-          "~/server/rbac/role-binding-resolver"
+        const { checkPrincipalPermission } = await import(
+          "~/server/app-layer/authz/credential-permissions"
         );
         (
-          checkRoleBindingPermission as ReturnType<typeof vi.fn>
+          checkPrincipalPermission as ReturnType<typeof vi.fn>
         ).mockResolvedValue(false);
 
         await expect(
@@ -274,7 +322,7 @@ describe("ApiKeyService", () => {
         expect(ledger.defineRole).not.toHaveBeenCalled();
 
         (
-          checkRoleBindingPermission as ReturnType<typeof vi.fn>
+          checkPrincipalPermission as ReturnType<typeof vi.fn>
         ).mockResolvedValue(true);
       });
     });
@@ -409,7 +457,7 @@ describe("ApiKeyService", () => {
     describe("when owner revokes their own key", () => {
       it("sets revokedAt", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -421,12 +469,54 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.apiKey.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: "ak_1" },
-            data: expect.objectContaining({ revokedAt: expect.any(Date) }),
-          }),
-        );
+        // Fenced on the row still being live, so a second revocation cannot
+        // restate the cause the first one recorded.
+        expect(prisma._mockTx.$executeRaw).toHaveBeenCalledTimes(1);
+        const [statement, ...bound] = prisma._mockTx.$executeRaw.mock.calls[0];
+        expect(statement.join("?")).toMatch(/"revokedAt" IS NULL/);
+        expect(bound).toEqual(["user", "ak_1"]);
+      });
+
+      /** @scenario "A revoke from the API keys page records a person as its cause" */
+      it("records a person as the cause when none is given", async () => {
+        prisma.apiKey.findUnique.mockResolvedValue(existingKey);
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
+          ...existingKey,
+          revokedAt: new Date(),
+        });
+
+        await service.revoke({
+          id: "ak_1",
+          callerUserId: "user_1",
+          callerIsAdmin: false,
+          organizationId: "org_1",
+        });
+
+        expect(prisma._mockTx.$executeRaw.mock.calls[0]?.slice(1)).toEqual([
+          "user",
+          "ak_1",
+        ]);
+      });
+
+      it("records the cause the platform names", async () => {
+        prisma.apiKey.findUnique.mockResolvedValue(existingKey);
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
+          ...existingKey,
+          revokedAt: new Date(),
+        });
+
+        await service.revoke({
+          id: "ak_1",
+          callerUserId: "user_1",
+          callerIsAdmin: false,
+          organizationId: "org_1",
+          cause: "cap",
+        });
+
+        expect(prisma._mockTx.$executeRaw.mock.calls[0]?.slice(1)).toEqual([
+          "cap",
+          "ak_1",
+        ]);
       });
     });
 
@@ -451,7 +541,7 @@ describe("ApiKeyService", () => {
           ...existingKey,
           userId: null,
         });
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           userId: null,
           revokedAt: new Date(),
@@ -464,7 +554,7 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.apiKey.update).toHaveBeenCalled();
+        expect(prisma._mockTx.$executeRaw).toHaveBeenCalled();
       });
     });
 
@@ -520,7 +610,7 @@ describe("ApiKeyService", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
         prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -556,7 +646,7 @@ describe("ApiKeyService", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
         prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -600,7 +690,7 @@ describe("ApiKeyService", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithSharedRole);
         prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithSharedRole);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -635,7 +725,7 @@ describe("ApiKeyService", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithAdminOnly);
         prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithAdminOnly);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });

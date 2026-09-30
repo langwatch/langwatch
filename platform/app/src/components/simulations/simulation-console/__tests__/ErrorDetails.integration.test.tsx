@@ -39,6 +39,32 @@ describe("<ErrorDetails />", () => {
   afterEach(cleanup);
 
   describe("given the SDK's serialized {name,message,stack} cert error", () => {
+    /**
+     * The end of the lw#3439 chain. The adapter's message contains the
+     * customer's own traceback, which contains the words the infra classifier
+     * scans for — so before the user-code rule this rendered as "Simulation
+     * timed out": LangWatch taking the blame for the customer's bug.
+     */
+    /** @scenario The drawer tells the user it was their agent's code, not LangWatch */
+    it("names the agent's code, not our infrastructure, when the agent's code raised", () => {
+      const adapterMessage = [
+        "SerializedCodeAgentAdapter: user code raised an error during execution.",
+        "  type: TimeoutException",
+        "  user code error:",
+        '    File "<code-block>", line 3, in execute',
+        "    httpx.TimeoutException: The read operation timed out",
+      ].join("\n");
+
+      renderError(
+        encodeScenarioError(classifyScenarioInfraError(adapterMessage)),
+      );
+
+      expect(screen.getByText(/The agent's code failed/)).toBeTruthy();
+      expect(screen.getByText(/TimeoutException/)).toBeTruthy();
+      expect(screen.queryByText(/The simulation timed out/)).toBeNull();
+      expect(screen.queryByText(/<code-block>/)).toBeNull();
+    });
+
     /** @scenario "The drawer renders the handled error, not a raw dump" */
     it("renders the handled-error title and actionable hint", () => {
       renderError(SDK_CERT_ERROR);

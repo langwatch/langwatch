@@ -15,6 +15,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";
@@ -118,23 +119,19 @@ describe("Reading a trace correction", () => {
         },
       ],
     });
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          organizationId,
-          userId: adminUserId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: project.teamId,
-        },
-        {
-          organizationId,
-          userId: memberUserId,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: project.teamId,
-        },
-      ],
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: adminUserId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: project.teamId,
+    });
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: memberUserId,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: project.teamId,
     });
 
     await privacy.setForScope({
@@ -166,6 +163,7 @@ describe("Reading a trace correction", () => {
       await cleanupTestRows(prisma, [
         ["traceEditOverlay", { projectId: project.id }],
         ["dataPrivacyPolicy", { organizationId }],
+        ["grant", { organizationId }],
         [
           "roleBinding",
           { userId: { in: [adminUserId, memberUserId] }, organizationId },

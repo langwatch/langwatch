@@ -9,7 +9,7 @@ import {
   API_KEY_PERMISSION_MODES,
   refineRestrictedPermissions,
 } from "~/server/api-key/restricted-permissions";
-import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+import { permissionFormatSchema } from "~/server/app-layer/authz/custom-role-permissions";
 
 function mapApiKeyHandledError(error: unknown): never {
   if (HandledError.isHandled(error)) {
@@ -101,7 +101,10 @@ export const apiKeyRouter = createTRPCRouter({
         activeProjectIds,
         projectName,
         customRoleName,
-      } = await apiKeyService.enrichBindingsWithNames({ bindings });
+      } = await apiKeyService.enrichBindingsWithNames({
+        bindings,
+        organizationId: input.organizationId,
+      });
 
       return bindings
         .filter(
@@ -192,6 +195,7 @@ export const apiKeyRouter = createTRPCRouter({
       const allBindings = apiKeys.flatMap((k) => k.roleBindings);
       const { orgName, teamName, projectName, customRoleName, customRoles } =
         await apiKeyService.enrichBindingsWithNames({
+          organizationId: input.organizationId,
           bindings: allBindings.map((rb) => ({
             id: rb.id,
             role: rb.role,
@@ -237,8 +241,12 @@ export const apiKeyRouter = createTRPCRouter({
         ingestSourceType: apiKey.ingestSourceType,
         ingestionTemplateId: apiKey.ingestionTemplateId,
         // Human label of the CLI device session that minted this ingestion key
-        // ("Rogerio's MacBook Pro"); null for keys without device provenance.
+        // ("Design MacBook Pro"); null for keys without device provenance.
         createdByDeviceLabel: apiKey.createdByDeviceLabel,
+        // The CLI login key of the session that minted this ingestion key, so
+        // a key with no label of its own can still be shown against the
+        // machine it came from. Null for keys minted outside a CLI session.
+        parentApiKeyId: apiKey.parentApiKeyId,
         roleBindings: apiKey.roleBindings.map((rb) => ({
           id: rb.id,
           role: rb.role,

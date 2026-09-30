@@ -523,6 +523,9 @@ export const AnnotationsTable = ({
   const refreshQueues = useCallback(async () => {
     await Promise.all([
       utils.annotation.getOptimizedAnnotationQueues.invalidate(),
+      // The walk reads the same items one at a time, so removing rows here
+      // moves the ground under a reviewer standing in them.
+      utils.annotation.getQueueWalkStep.invalidate(),
       utils.annotation.getPendingItemsCount.invalidate(),
       utils.annotation.getAssignedItemsCount.invalidate(),
       utils.annotation.getQueueItemsCounts.invalidate(),

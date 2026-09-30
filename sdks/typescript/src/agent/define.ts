@@ -15,7 +15,6 @@ import {
   resolveEnabled,
   resolveEnvironment,
   resolveInstanceLabel,
-  DEFAULT_ENVIRONMENT,
 } from "./identity";
 import type { AgentMessage, AgentParameterValue, JsonSchemaObject } from "./protocol";
 import type { AgentTransport } from "./transport";
@@ -34,6 +33,7 @@ import {
 /** The default call timeout, and the cap the platform enforces. */
 export const DEFAULT_TIMEOUT_MS = 120_000;
 export const MAX_TIMEOUT_MS = 300_000;
+export const DEFAULT_CONCURRENCY = 10;
 
 /** What a handler may return: a string, one message, a list of messages, or an output with a session. */
 export type AgentOutput = string | AgentMessage | AgentMessage[];
@@ -93,7 +93,11 @@ export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinit
   instanceLabel?: string;
   /** Per call, default 120000, at most 300000. */
   timeoutMs?: number;
-  /** Calls in flight per instance, default 1 in development and 4 elsewhere. */
+  /**
+   * Calls in flight per instance, default 10. A test suite sends several
+   * scenarios at once; the ceiling is there because the model providers rate
+   * limit the calls behind them.
+   */
   concurrency?: number;
   /** Keep every turn of a thread on the instance that answered the first one. */
   sticky?: boolean;
@@ -204,10 +208,7 @@ export function connectAgent(
   const parameters = toParameterSchema(options.parameters);
   const specs = parameterSpecsFromSchema(parameters);
   const timeoutMs = clampTimeout({ timeoutMs: options.timeoutMs, logger, name });
-  const concurrency = Math.max(
-    1,
-    Math.floor(options.concurrency ?? (environment === DEFAULT_ENVIRONMENT ? 1 : 4)),
-  );
+  const concurrency = Math.max(1, Math.floor(options.concurrency ?? DEFAULT_CONCURRENCY));
 
   const runHandler = async (call: AgentCall<Record<string, AgentParameterValue>>): Promise<AgentResult> =>
     normalizeReply(await handler(call));

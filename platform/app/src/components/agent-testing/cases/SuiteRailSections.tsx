@@ -94,7 +94,7 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
                 scenarioIds={props.scenarioIdsBySuiteId.get(suite.id) ?? []}
                 onNewTestCase={props.onNewTestCase}
                 onRunSuite={props.onRunSuite}
-                onRenameSuite={props.onRenameSuite}
+                onEditSuite={props.onEditSuite}
                 onArchiveSuite={() => props.onRequestArchive(suite)}
               />
             )

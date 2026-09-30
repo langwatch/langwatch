@@ -66,12 +66,35 @@ func newGithubGate(hasCredential bool, cancel func()) *githubGate {
 // alone answers "what ran, and how did it end?".
 type gateToolFrame struct {
 	Type  string `json:"type"`
+	Name  string `json:"name"`
 	Phase string `json:"phase"`
 	Input struct {
 		Command string `json:"command"`
 	} `json:"input"`
 	Output  string `json:"output"`
 	IsError *bool  `json:"isError"`
+	// Local: the call ran in the developer's shared folder, whatever the
+	// tool is named. The worker sets it on every call that went through the
+	// local control path, the shell named `bash` included.
+	Local bool `json:"local"`
+}
+
+// localToolPrefix names the tools that do not run in the worker at all: they
+// run in the folder the developer shared from their own machine (ADR-129),
+// with their own git identity and their own `gh` login. The GitHub App is not
+// in that path, so a `git push` or a `gh pr create` there needs nothing from
+// the platform and must never trip this gate. Without the carve-out the whole
+// local-control path dies on `git fetch origin` with an install card the
+// developer has no reason to act on. The shell the model reaches for by its
+// standard name delegates to the folder too while one is connected, under the
+// name `bash`, so the frame's `local` marker is read beside the prefix: where
+// the command ran decides, not what the tool is called.
+const localToolPrefix = "local_"
+
+// ranInFolder reports whether the settled call ran in the developer's shared
+// folder: a local_* tool, or any tool whose end frame carries the marker.
+func ranInFolder(tf gateToolFrame) bool {
+	return strings.HasPrefix(tf.Name, localToolPrefix) || tf.Local
 }
 
 // Observe inspects one emitted frame. Inspect-only from the sink's point of
@@ -90,6 +113,9 @@ func (g *githubGate) Observe(f frames.Frame) {
 		return
 	}
 	if tf.Type != "tool" || tf.Phase != "end" || tf.Input.Command == "" {
+		return
+	}
+	if ranInFolder(tf) {
 		return
 	}
 	if !commandNeedsGithubAuth(tf.Input.Command) {

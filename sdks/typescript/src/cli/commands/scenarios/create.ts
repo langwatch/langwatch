@@ -1,8 +1,10 @@
 import chalk from "chalk";
+import type { SuiteFieldDefinition } from "@/client-sdk/services/test-suites";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags";
 import { createCliScenariosService } from "./cli-scenarios-service";
 import {
   resolveSuiteReference,
@@ -16,14 +18,18 @@ export const createScenarioCommand = async (
     criteria?: string;
     labels?: string;
     testSuite?: string;
+    /** `--field identifier=value`, one per occurrence. */
+    field?: string[];
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   // The test suite is resolved before anything is created, so a reference that
-  // names nothing leaves no half-filed scenario behind.
+  // names nothing leaves no half-filed scenario behind. Its field definitions
+  // settle how each `--field` value is read.
   let testSuiteId: string | undefined;
   let testSuiteName: string | undefined;
+  let fieldDefinitions: SuiteFieldDefinition[] | undefined;
   if (options.testSuite !== undefined) {
     try {
       const testSuite = await resolveSuiteReference({
@@ -31,6 +37,7 @@ export const createScenarioCommand = async (
       });
       testSuiteId = testSuite.id;
       testSuiteName = testSuite.name;
+      fieldDefinitions = testSuite.fields ?? [];
     } catch (error) {
       if (error instanceof SuiteReferenceError) {
         console.error(chalk.red(`Error: ${error.message}`));
@@ -39,6 +46,11 @@ export const createScenarioCommand = async (
       throw error;
     }
   }
+
+  const fields = parseScenarioFieldFlags({
+    pairs: options.field,
+    definitions: fieldDefinitions,
+  });
 
   const service = createCliScenariosService();
   const spinner = createSpinner(`Creating scenario "${name}"...`).start();
@@ -57,6 +69,7 @@ export const createScenarioCommand = async (
       criteria,
       labels,
       ...(testSuiteId !== undefined && { testSuiteId }),
+      ...(fields !== undefined && { fields }),
     });
 
     spinner.succeed(

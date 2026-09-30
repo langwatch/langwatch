@@ -80,6 +80,9 @@ const USAGE = {
   output_audio_tokens: 0,
   input_chars: 0,
   audio_ms: 0,
+  input_image_tokens: 0,
+  output_image_tokens: 0,
+  image_count: 0,
 };
 
 const ADMITTED = {

@@ -35,6 +35,10 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 import { isDispatchableProvider } from "~/server/modelProviders/registry";
+import {
+  MANAGED_MODELS,
+  platformSharedModelProviders,
+} from "./connectManagedModels";
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 
 export type EligibleModelProvider = ModelProvider;
@@ -85,24 +89,76 @@ export async function eligibleModelProvidersForVk(
 ): Promise<EligibleModelProvider[]> {
   const client = tx ?? prisma;
 
+  // A license token never reaches the customer organization's own provider
+  // credentials: hosted services run on LangWatch's providers (ADR-141). A
+  // license whose contract includes managed models dispatches to those
+  // providers instead, and one without the entitlement to nothing at all.
+  if (vk.purpose === "CONNECT") {
+    return (await licenseEntitledToManagedModels(client, vk))
+      ? platformSharedModelProviders(vk.organizationId)
+      : [];
+  }
+
   const candidates = await scopeReachableModelProvidersForVk(prisma, vk, tx);
   if (candidates.length === 0) return [];
 
   if (vk.routingPolicyId) {
-    const policy = await client.routingPolicy.findUnique({
-      where: { id: vk.routingPolicyId },
-      select: { modelProviderIds: true, organizationId: true },
-    });
-    if (!policy || policy.organizationId !== vk.organizationId) return [];
-    const orderedIds = parseModelProviderIds(policy.modelProviderIds);
-    if (orderedIds.length === 0) return [];
-    const byId = new Map(candidates.map((mp) => [mp.id, mp]));
-    return orderedIds
-      .map((id) => byId.get(id))
-      .filter((mp): mp is ModelProvider => Boolean(mp));
+    return await policyOrderedProviders(client, { vk, candidates });
   }
 
   return candidates.sort(deterministicMpOrder);
+}
+
+/**
+ * The candidates a key's routing policy keeps, in the order the policy names.
+ * A policy that is gone, belongs to another organization, or names nothing
+ * leaves the key with no chain rather than with an order nobody chose.
+ */
+async function policyOrderedProviders(
+  client: PrismaClient | Prisma.TransactionClient,
+  {
+    vk,
+    candidates,
+  }: { vk: VirtualKeyWithScopes; candidates: EligibleModelProvider[] },
+): Promise<EligibleModelProvider[]> {
+  const policy = await client.routingPolicy.findUnique({
+    where: { id: vk.routingPolicyId ?? "" },
+    select: { modelProviderIds: true, organizationId: true },
+  });
+  if (!policy || policy.organizationId !== vk.organizationId) return [];
+  const orderedIds = parseModelProviderIds(policy.modelProviderIds);
+  if (orderedIds.length === 0) return [];
+  const byId = new Map(candidates.map((mp) => [mp.id, mp]));
+  return orderedIds
+    .map((id) => byId.get(id))
+    .filter((mp): mp is ModelProvider => Boolean(mp));
+}
+
+/**
+ * Whether the license this managed key runs under includes managed models.
+ *
+ * Read off the registry row rather than off the key, because the entitlement
+ * is a term of the contract and the key is only where its traffic is counted.
+ * The organization is pinned as well as the key id: a row naming another
+ * customer's organization is not this key's license, whatever it points at.
+ * Revoked, superseded and out-of-term licenses entitle nothing, the same three
+ * states `statusOfIssuedLicense` calls anything other than active.
+ */
+async function licenseEntitledToManagedModels(
+  client: PrismaClient | Prisma.TransactionClient,
+  vk: VirtualKeyWithScopes,
+): Promise<boolean> {
+  const license = await client.issuedLicense.findFirst({
+    where: {
+      virtualKeyId: vk.id,
+      organizationId: vk.organizationId,
+      revokedAt: null,
+      supersededAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    select: { services: true },
+  });
+  return license?.services.includes(MANAGED_MODELS) ?? false;
 }
 
 function deterministicMpOrder(a: ModelProvider, b: ModelProvider): number {

@@ -23,6 +23,7 @@ import httpx
 from tqdm import tqdm
 import pandas as pd
 
+from langwatch.http_client import create_async_client, create_client
 from langwatch.types import Money
 from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
@@ -137,7 +138,7 @@ class BatchEvaluation:
         dataset = get_dataset(self.dataset)
 
         print("Starting batch evaluation...")
-        with httpx.Client(timeout=60) as client:
+        with create_client(timeout=60) as client:
             response = client.post(
                 f"{langwatch.get_endpoint()}/api/experiment/init",
                 headers=build_auth_headers(langwatch.get_api_key() or ""),
@@ -364,12 +365,12 @@ class BatchEvaluation:
         reraise=True,
     )
     def post_results(cls, api_key: str, body: dict):
-        response = httpx.post(
-            f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
-            headers=build_auth_headers(api_key),
-            json=body,
-            timeout=60,
-        )
+        with create_client(timeout=60) as client:
+            response = client.post(
+                f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
+                headers=build_auth_headers(api_key),
+                json=body,
+            )
         better_raise_for_status(response)
 
     def wait_for_completion(self):
@@ -414,7 +415,7 @@ async def run_evaluation(
 
         start_time = time.time()
 
-        async with httpx.AsyncClient(timeout=900) as client:
+        async with create_async_client(timeout=900) as client:
             response = await client.post(**request_params)
             better_raise_for_status(response)
 
@@ -462,7 +463,7 @@ def get_dataset(
         "headers": build_auth_headers(str(langwatch.get_api_key() or "")),
     }
 
-    with httpx.Client(timeout=300) as client:
+    with create_client(timeout=300) as client:
         response = client.get(**request_params)
         better_raise_for_status(response)
 

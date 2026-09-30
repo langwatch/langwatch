@@ -10,6 +10,7 @@ import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export const runWorkflowCommand = async ({
   id,
@@ -47,7 +48,7 @@ export const runWorkflowCommand = async ({
     const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
-    const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
+    const response = await langwatchFetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -68,6 +68,20 @@ type Usage struct {
 	InputAudioTokens  int
 	OutputAudioTokens int
 
+	// Image token counts, for the image models that bill the pixels they
+	// read and write far above text: OpenAI charges $40 per million output
+	// image tokens on gpt-image against $10 for text output, and a
+	// 1024x1024 answer is about 1600 of them. Both counts are DISJOINT from
+	// PromptTokens and CompletionTokens, which is what SplitImageTokens
+	// keeps true, so every consumer prices each bucket exactly once.
+	InputImageTokens  int
+	OutputImageTokens int
+
+	// ImageCount is how many images the response carried. Some vendors
+	// price an image call per image rather than per token, and a caller
+	// asking for n images pays n times.
+	ImageCount int
+
 	// ReasoningTokens is the portion of CompletionTokens the model spent
 	// thinking. The provider already bills those tokens inside the
 	// completion total, so this count is reported and never priced.
@@ -107,6 +121,29 @@ type AudioTokenSplit struct {
 	OutputText  int
 }
 
+// ImageTokenSplit is one provider's image/text token breakdown, as reported
+// on an image response. Text counts are zero when the provider states only
+// the image side.
+type ImageTokenSplit struct {
+	InputImage  int
+	InputText   int
+	OutputImage int
+	OutputText  int
+}
+
+// SplitImageTokens records the image token counts and takes them out of the
+// prompt and completion totals, on the same terms SplitAudioTokens states for
+// audio: providers report image tokens INSIDE those totals, and pricing the
+// totals at the text rate with the image counts on top charges the image
+// portion twice at rates that differ by four times.
+func (u Usage) SplitImageTokens(split ImageTokenSplit) Usage {
+	u.InputImageTokens, u.PromptTokens = resolveModalitySplit(
+		split.InputImage, split.InputText, u.PromptTokens)
+	u.OutputImageTokens, u.CompletionTokens = resolveModalitySplit(
+		split.OutputImage, split.OutputText, u.CompletionTokens)
+	return u
+}
+
 // SplitAudioTokens records the audio token counts and takes them out of the
 // prompt and completion totals.
 //
@@ -127,34 +164,35 @@ type AudioTokenSplit struct {
 // audio prices at the text rate, which is too little for audio and never less
 // than the tokens the request really used.
 func (u Usage) SplitAudioTokens(split AudioTokenSplit) Usage {
-	u.InputAudioTokens, u.PromptTokens = resolveAudioSplit(
+	u.InputAudioTokens, u.PromptTokens = resolveModalitySplit(
 		split.InputAudio, split.InputText, u.PromptTokens)
-	u.OutputAudioTokens, u.CompletionTokens = resolveAudioSplit(
+	u.OutputAudioTokens, u.CompletionTokens = resolveModalitySplit(
 		split.OutputAudio, split.OutputText, u.CompletionTokens)
 	return u
 }
 
-// resolveAudioSplit answers one side of the split: the audio count to keep
-// and the text total that is left once the audio is out of it.
-func resolveAudioSplit(audio, text, total int) (int, int) {
-	if audio <= 0 {
+// resolveModalitySplit answers one side of a split: the non-text count to
+// keep and the text total that is left once it is out. Shared by the audio
+// and the image splits, which follow the same rule.
+func resolveModalitySplit(modality, text, total int) (int, int) {
+	if modality <= 0 {
 		return 0, total
 	}
 	// The provider's text count is trusted only when the two account for the
-	// whole total. A total carrying image or reasoning tokens as well leaves a
-	// remainder this split cannot name, and keeping only text plus audio would
-	// bill neither.
+	// whole total. A total carrying a third modality or reasoning tokens as
+	// well leaves a remainder this split cannot name, and keeping only text
+	// plus the stated modality would bill neither.
 	if text > 0 {
-		if text+audio == total {
-			return audio, text
+		if text+modality == total {
+			return modality, text
 		}
 		return 0, total
 	}
-	// No text count reported: everything that is not audio is the text side,
-	// whatever modality it really is. Nothing is lost, and any other modality
-	// keeps pricing at the text rate exactly as it did before.
-	if remainder := total - audio; remainder >= 0 {
-		return audio, remainder
+	// No text count reported: everything that is not the stated modality is
+	// the text side, whatever it really is. Nothing is lost, and any other
+	// modality keeps pricing at the text rate exactly as it did before.
+	if remainder := total - modality; remainder >= 0 {
+		return modality, remainder
 	}
 	return 0, total
 }

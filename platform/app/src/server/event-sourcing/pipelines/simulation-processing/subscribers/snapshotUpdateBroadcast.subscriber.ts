@@ -23,10 +23,12 @@ export interface SnapshotUpdateBroadcastSubscriberDeps {
  * the fold writes, e.g. under queue backlog.
  *
  * Mid-run that self-corrects, because another event follows and broadcasts
- * again. On `finished` nothing follows — it is the last event — so the
- * correction there is not a later broadcast but the payload: `finished`
- * carries `status`, so a client that refetches early still learns the
- * terminal state from the message rather than from what it read back.
+ * again. On `finished` and `evaluated` nothing is sure to follow, so the
+ * correction there is not a later broadcast but the payload: both carry
+ * `status`, so a client that refetches early still learns the terminal state
+ * from the message rather than from what it read back. `evaluated` lands
+ * after `finished`, once the run's evaluators reported, and is what makes a
+ * results page that already shows the run read it again.
  *
  * Broadcast failure is swallowed — it must not block the pipeline.
  */
@@ -40,6 +42,7 @@ export function createSnapshotUpdateBroadcastSubscriber(
       SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
       SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END,
       SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      SIMULATION_RUN_EVENT_TYPES.EVALUATED,
       SIMULATION_RUN_EVENT_TYPES.DELETED,
       SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
     ],

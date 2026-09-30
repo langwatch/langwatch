@@ -11,7 +11,7 @@
  * organization-scoped rule, which is the whole chain a stub could only agree
  * with. What the pair below can hold without one is its *ordering*.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";

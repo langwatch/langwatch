@@ -10,6 +10,49 @@ import {
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+/**
+ * The quantities one priced request or rollup carries. Every field is always
+ * present; a bucket the request never used reports 0.
+ *
+ * The token buckets are disjoint, not nested. An image generation reports its
+ * render under `output_image_tokens` with `output_tokens` at 0, so reading
+ * `output_tokens` alone sees none of the image traffic.
+ *
+ * Every priced quantity is charged once at its own rate. `reasoning_tokens`
+ * is a subset of `output_tokens` and `image_count` is a count of images, so
+ * no rate prices either and neither belongs in a cost sum.
+ */
+export interface SpendUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  reasoning_tokens: number;
+  input_image_tokens: number;
+  output_image_tokens: number;
+  image_count: number;
+}
+
+/**
+ * Fill the image quantities a server older than the release that added them
+ * does not send.
+ *
+ * `SpendUsage` declares the three because a current server always sends them.
+ * The cast is what a response from a deployment one release behind actually
+ * looks like: three integers that are genuinely zero there, worth defaulting
+ * rather than handing a caller `undefined` in the middle of a spend page.
+ */
+function spendUsageFromWire(usage: SpendUsage): SpendUsage {
+  const wire = usage as Partial<SpendUsage>;
+  return {
+    ...usage,
+    input_image_tokens: wire.input_image_tokens ?? 0,
+    output_image_tokens: wire.output_image_tokens ?? 0,
+    image_count: wire.image_count ?? 0,
+  };
+}
 
 export interface SpendEvent {
   id: string;
@@ -38,13 +81,7 @@ export interface SpendEvent {
     model_provider_id: string | null;
     request_type: string | null;
     /** Null on settled events: unknown is not zero. */
-    usage: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_read_input_tokens: number;
-      cache_creation_input_tokens: number;
-      reasoning_tokens: number;
-    } | null;
+    usage: SpendUsage | null;
     /** Null on settled events: unknown is not zero. */
     cost: {
       total_usd: string;
@@ -77,13 +114,7 @@ export interface SpendSummaryRow {
   event_count: number;
   /** Unpriced settled requests, counted separately: never in cost sums. */
   settled_count: number;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens: number;
-    cache_creation_input_tokens: number;
-    reasoning_tokens: number;
-  };
+  usage: SpendUsage;
   cost: { total_usd: string; nano_usd: number };
 }
 
@@ -256,13 +287,7 @@ export interface EndUserSpend {
   to: string;
   cost: { total_usd: string; nano_usd?: number };
   request_count: number;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens: number;
-    cache_creation_input_tokens: number;
-    reasoning_tokens: number;
-  };
+  usage: SpendUsage;
   /**
    * The attributed-user template caps that apply to this end user, each
    * with its boundary-aware current-period spend. Empty when the
@@ -331,7 +356,7 @@ export class SpendEventsApiService {
     path: string,
     init?: RequestInit,
   ): Promise<T> {
-    const response = await fetch(`${this.endpoint}${path}`, {
+    const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...init,
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),
@@ -389,10 +414,23 @@ export class SpendEventsApiService {
     if (options.limit !== undefined) params.set("limit", String(options.limit));
     appendSpendFilters({ params, filters: options });
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
-    return await this.request<SpendEventsPage>(
+    const page = await this.request<SpendEventsPage>(
       "list spend events",
       `/api/gateway/v1/spend-events${qs}`,
     );
+    return {
+      ...page,
+      data: page.data.map((event) => ({
+        ...event,
+        data: {
+          ...event.data,
+          usage:
+            event.data.usage === null
+              ? null
+              : spendUsageFromWire(event.data.usage),
+        },
+      })),
+    };
   }
 
   /**
@@ -458,10 +496,17 @@ export class SpendEventsApiService {
     appendSpendFilters({ params, filters: options });
     if (options.cursor) params.set("cursor", options.cursor);
     if (options.limit !== undefined) params.set("limit", String(options.limit));
-    return await this.request<SpendSummariesPage>(
+    const page = await this.request<SpendSummariesPage>(
       "read spend summaries",
       `/api/gateway/v1/spend-summaries?${params.toString()}`,
     );
+    return {
+      ...page,
+      data: page.data.map((row) => ({
+        ...row,
+        usage: spendUsageFromWire(row.usage),
+      })),
+    };
   }
 
   /**
@@ -544,6 +589,6 @@ export class SpendEventsApiService {
       "read end-user spend",
       `/api/gateway/v1/end-users/${encodeURIComponent(endUserId)}/spend${qs}`,
     );
-    return res.data;
+    return { ...res.data, usage: spendUsageFromWire(res.data.usage) };
   }
 }

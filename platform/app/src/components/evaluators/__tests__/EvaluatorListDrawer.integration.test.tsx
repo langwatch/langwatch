@@ -104,6 +104,7 @@ describe("EvaluatorListDrawer", () => {
       title: string;
       createLabel: string;
       itemLabel: string;
+      hiddenEvaluatorIds: string[];
     }> = {},
   ) =>
     render(<EvaluatorListDrawer open={true} onSelect={onSelect} {...props} />, {
@@ -216,6 +217,21 @@ describe("EvaluatorListDrawer", () => {
         screen.queryByTestId(
           `evaluator-card-${mockLegacyPairwiseEvaluator.id}`,
         ),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when every evaluator the project has is hidden from this list", () => {
+    /** @scenario "The empty state distinguishes no evaluators from all hidden" */
+    it("says every evaluator is already attached, with no create-first prompt", async () => {
+      evaluatorsData = [mockEvaluator];
+      renderDrawer({ hiddenEvaluatorIds: [mockEvaluator.id] });
+
+      expect(
+        await screen.findByText("Every evaluator is already attached"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("create-first-evaluator-button"),
       ).not.toBeInTheDocument();
     });
   });

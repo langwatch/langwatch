@@ -78,8 +78,34 @@ export interface LangyChatTransportDeps {
    * lookup all live in the panel's orchestration (`executeUiAction`).
    */
   onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
+  /**
+   * A card the developer has to answer while the turn runs (ADR-129) — a
+   * permission ask, or a question. Bare passthrough like `onUiAction`: the
+   * durable `user_wait_started` event is the truth, and this is the fast path
+   * that puts the card on screen before the tail arrives.
+   */
+  onLocalWait?: (
+    entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
+  ) => void;
+  /** The shared folder came or went while the turn ran. */
+  onLocalWorkspace?: (
+    entry: Extract<LangyStreamEntry, { type: "local_workspace" }>,
+  ) => void;
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
+  /**
+   * The turn a resume should reattach to: the one the durable record named
+   * and this tab adopted without dispatching it (a turn started server-side
+   * when the shared folder connected, another tab's send, or a page refresh
+   * mid-turn). `null` means nothing to reattach to, and `reconnectToStream`
+   * tells useChat so. Read at resume time, never captured, for the same
+   * reason `getContext` is a getter.
+   */
+  getResumeTarget?: () => {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  } | null;
   /**
    * Every wire entry, unfiltered and before any interpretation — the tap the
    * developer drawer's tape records from. Deliberately a plain observer: it
@@ -166,21 +192,40 @@ export function createLangyChatTransport(
         projectId: ctx.projectId,
         conversationId,
         turnId,
-        onSignal: deps.onSignal,
-        ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
-        ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
-        onSettled: deps.onTurnSettled,
-        ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
+        ...streamCallbacks(deps),
         abortSignal: options.abortSignal,
       });
     },
 
-    // Resume is a re-subscribe + a fold-query reconcile, driven by the panel on
-    // remount — not a transport-level reconnect. Returning null tells useChat
-    // there is nothing to auto-reconnect to.
+    // A turn this tab did not dispatch has no stream here until something
+    // subscribes to it. The durable fold hands the tab the turn's tool calls
+    // and waits, but the live-only entries (navigate, ui, the text as it is
+    // written) reach a tab only through `onTurnStream`. The subscription
+    // replays the buffered prefix first, so a resume sees the whole turn, and
+    // the panel's dedup keeps a replayed navigate from firing twice.
     async reconnectToStream() {
-      return null;
+      const target = deps.getResumeTarget?.();
+      if (!target) return null;
+      return subscribeTurnStream({
+        ...target,
+        ...streamCallbacks(deps),
+      });
     },
+  };
+}
+
+/** The entry handlers both a dispatched and a resumed stream route through. */
+function streamCallbacks(deps: LangyChatTransportDeps) {
+  return {
+    onSignal: deps.onSignal,
+    ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
+    ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
+    ...(deps.onLocalWait ? { onLocalWait: deps.onLocalWait } : {}),
+    ...(deps.onLocalWorkspace
+      ? { onLocalWorkspace: deps.onLocalWorkspace }
+      : {}),
+    onSettled: deps.onTurnSettled,
+    ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
   };
 }
 
@@ -195,6 +240,8 @@ function subscribeTurnStream({
   onSignal,
   onNavigate,
   onUiAction,
+  onLocalWait,
+  onLocalWorkspace,
   onSettled,
   onWireEntry,
   abortSignal,
@@ -205,6 +252,12 @@ function subscribeTurnStream({
   onSignal: (signal: LangyTurnSignalEntry) => void;
   onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
   onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
+  onLocalWait?: (
+    entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
+  ) => void;
+  onLocalWorkspace?: (
+    entry: Extract<LangyStreamEntry, { type: "local_workspace" }>,
+  ) => void;
   onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
   abortSignal?: AbortSignal;
@@ -313,6 +366,16 @@ function subscribeTurnStream({
             // handler execution.
             onUiAction?.(entry);
             return;
+          case "local_permission":
+          case "question":
+            // A card the turn is waiting on. It never retires the cold-start
+            // status, because a turn that is waiting for a person has produced
+            // no output yet and the status line still reads correctly.
+            onLocalWait?.(entry);
+            return;
+          case "local_workspace":
+            onLocalWorkspace?.(entry);
+            return;
           case "error":
             controller.enqueue({ type: "error", errorText: entry.error });
             finish("error");
@@ -354,6 +417,16 @@ function subscribeTurnStream({
   });
 }
 
+/**
+ * Where a settled call ran, in the one metadata slot a settled AI-SDK tool
+ * chunk carries onto the part (`resultProviderMetadata`). The marker only
+ * exists on the end frame, and the input chunk is long gone by then, so this is
+ * how the live edge learns that a `bash` was really the developer's own shell
+ * in the folder they shared. The durable part carries the same fact as a plain
+ * `local` field; `LangyToolActivity` reads either.
+ */
+const LANGY_TOOL_METADATA_NAMESPACE = "langwatch";
+
 /** Map a live tool entry onto the AI-SDK tool chunks the renderers consume. */
 function enqueueToolChunk(
   controller: ReadableStreamDefaultController<UIMessageChunk>,
@@ -368,11 +441,16 @@ function enqueueToolChunk(
     });
     return;
   }
+  const providerMetadata =
+    entry.local === true
+      ? { [LANGY_TOOL_METADATA_NAMESPACE]: { local: true } }
+      : undefined;
   if (entry.isError) {
     controller.enqueue({
       type: "tool-output-error",
       toolCallId: entry.id,
       errorText: entry.output ?? "Tool call failed",
+      ...(providerMetadata ? { providerMetadata } : {}),
     });
     return;
   }
@@ -380,5 +458,6 @@ function enqueueToolChunk(
     type: "tool-output-available",
     toolCallId: entry.id,
     output: entry.output ?? "",
+    ...(providerMetadata ? { providerMetadata } : {}),
   });
 }

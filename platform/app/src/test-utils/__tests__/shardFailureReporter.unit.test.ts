@@ -9,11 +9,9 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  hardFloorReport,
-  resolveHardFloorMs,
-} from "../../test-unit-global-setup";
+import { resolveHardFloorMs } from "../../test-unit-global-setup";
 import ShardFailureReporter, {
+  hardFloorReport,
   recordShardSelection,
   resetShardState,
   shardModuleTally,
@@ -110,7 +108,7 @@ describe("given a shard the finalize wedge is holding open", () => {
       );
       expect(lines[2]).toContain("never completed");
       expect(lines[3]).toBe("[unit globalSetup]   src/hangs.unit.test.tsx");
-      expect(lines[4]).toContain("pnpm test:unit run <file>");
+      expect(lines[4]).toContain("Run each incomplete file separately");
     });
 
     it("counts every such file when more than one hangs", () => {
@@ -136,6 +134,15 @@ describe("given a shard the finalize wedge is holding open", () => {
   });
 
   describe("when the shard still had files left to start", () => {
+    it("stays red when the floor fires between files before the next one starts", () => {
+      const reporter = new ShardFailureReporter();
+      reporter.onTestRunStart([module("a.test.ts"), module("b.test.ts")]);
+      reporter.onTestModuleQueued(module("a.test.ts"));
+      reporter.onTestModuleEnd(module("a.test.ts"));
+      expect(shardModuleTally().unreportedFiles).toEqual([]);
+      expect(report().exitCode).toBe(1);
+    });
+
     /** @scenario "The floor says how much of the shard it cut off" */
     it("counts the shard and calls it too slow rather than wedged", () => {
       const reporter = new ShardFailureReporter();
@@ -244,6 +251,14 @@ describe("given a shard the finalize wedge is holding open", () => {
       expect(shardSawFailure()).toBe(true);
     });
 
+    it("does not turn an interrupted run green", () => {
+      const reporter = new ShardFailureReporter();
+      reporter.onTestRunStart([module("src/a.unit.test.ts")]);
+      reporter.onTestRunEnd([], [], "interrupted");
+
+      expect(report().exitCode).toBe(1);
+    });
+
     it("still records an unhandled error", () => {
       const reporter = new ShardFailureReporter();
       reporter.onTestRunEnd([], [new Error("boom")], "passed");
@@ -273,6 +288,7 @@ describe("given the counters behind the floor's log line", () => {
 
       expect(shardModuleTally()).toEqual({
         selected: 1,
+        finished: false,
         shardSelected: null,
         started: 0,
         reported: 0,
@@ -293,6 +309,7 @@ describe("given the counters behind the floor's log line", () => {
 
       expect(shardModuleTally()).toEqual({
         selected: 1,
+        finished: false,
         shardSelected: null,
         started: 1,
         reported: 0,

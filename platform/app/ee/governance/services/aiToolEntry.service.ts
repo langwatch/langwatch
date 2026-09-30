@@ -68,6 +68,13 @@ export type AiToolScope = (typeof SUPPORTED_SCOPES)[number] | "team";
  */
 export const SUPPORTED_ASSISTANT_KINDS = [
   "claude_code",
+  // Cowork is a tool, not a source. It was offered by the drawer's picker
+  // long before it was accepted here, so choosing it failed the write with
+  // `invalid_enum_value` on save — the picker's options come from
+  // `ASSISTANT_PRESETS` while this enum gates the write, and nothing linked
+  // the two. Absent from `ASSISTANT_KIND_TO_TOOL_SLUG` below on purpose:
+  // there is no `langwatch cowork` wrapper.
+  "claude_cowork",
   "codex",
   "gemini",
   "opencode",
@@ -80,9 +87,10 @@ export type AssistantKind = (typeof SUPPORTED_ASSISTANT_KINDS)[number];
 /**
  * Maps a coding-assistant tile's `assistantKind` to the CLI tool slug the
  * `langwatch <tool>` wrapper uses (and the slug PlatformToolPolicy keyed on).
- * Only the wrapped tools map; kinds with no CLI wrapper (custom) are absent
- * and contribute no toolPolicies entry. cliBootstrap reads this to derive
- * the login `toolPolicies` map from tile config.
+ * Only the wrapped tools map; kinds with no CLI wrapper (custom, and
+ * claude_cowork, which is a desktop product rather than a CLI) are absent and
+ * contribute no toolPolicies entry. cliBootstrap reads this to derive the
+ * login `toolPolicies` map from tile config.
  */
 export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<
   Record<AssistantKind, PlatformToolSlug>

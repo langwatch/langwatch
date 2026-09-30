@@ -6,6 +6,7 @@ class ListRunPlansResponse200ItemTargetsItemType(str, Enum):
     CONNECTED = "connected"
     HTTP = "http"
     PROMPT = "prompt"
+    VOICE = "voice"
     WORKFLOW = "workflow"
 
     def __str__(self) -> str:

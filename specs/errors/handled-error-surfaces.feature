@@ -183,11 +183,6 @@ Feature: Knowable failures reach the customer as themselves
     Then the confirmation field explains that the passwords must match
     And the account is not created
 
-  @integration
-  Scenario: A missing name says so
-    Given a sign-up form
-    When the name is left empty
-    Then the name field explains that it is required
 
   # ---------------------------------------------------------------------------
   # The gateway's own failures

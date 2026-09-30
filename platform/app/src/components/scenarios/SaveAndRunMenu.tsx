@@ -26,7 +26,7 @@ import { Tooltip } from "../ui/tooltip";
 import type { TargetValue } from "./TargetSelector";
 import {
   isAgentTarget,
-  ownerOnlyCopy,
+  notRunnableCopy,
   type ScenarioAgent,
   useFilteredAgents,
 } from "./useFilteredScenarioTargets";
@@ -346,7 +346,7 @@ function AgentRow({
 
   if (agent.isRunnable) return row;
   return (
-    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+    <Tooltip content={notRunnableCopy(agent)}>
       <Box>{row}</Box>
     </Tooltip>
   );
