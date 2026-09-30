@@ -661,3 +661,19 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When I inspect the cache keyset
       Then the key is the 64-char hex SHA-256 of the raw VK
       And the raw VK value is not stored anywhere in the cache entries
+
+  Rule: A provider change reaches every key of its organization
+
+    # A new provider, or one enabled or granted a wider scope, is in no cached
+    # bundle yet, so matching the event on the provider id alone evicts nothing.
+    # A key resolved before the change would keep answering
+    # model_provider_not_bound for the new provider (for example Langy's
+    # managed key after OpenAI is added next to Bedrock) until revalidation.
+
+    @unit
+    Scenario: A provider added to the organization reaches keys already cached
+      Given a key of organization "acme" cached while it had only a Bedrock provider
+      And a key of another organization is cached
+      When the change feed reports a new model provider for "acme"
+      Then the "acme" key is evicted so its next request sees the new provider
+      And the other organization's key stays cached

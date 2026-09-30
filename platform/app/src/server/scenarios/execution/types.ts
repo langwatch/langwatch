@@ -339,9 +339,14 @@ export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 // ============================================================================
 
 /** LiteLLM proxy parameters for model access */
+/**
+ * Params from `prepareLitellmParams`. `api_key` is optional because Bedrock
+ * (AWS access keys) and Vertex (service account credentials) authenticate
+ * through their own fields, which ride the catchall.
+ */
 export const LiteLLMParamsSchema = z
   .object({
-    api_key: z.string(),
+    api_key: z.string().optional(),
     model: z.string(),
   })
   .catchall(z.string());
@@ -540,3 +545,20 @@ export const ChildProcessJobDataSchema = z
     }
   });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;
+
+/**
+ * One line naming each rejected field of a job payload. A ZodError's own
+ * message is its issues as pretty-printed JSON, and the run's failure reason
+ * shows only its first line, which is "[".
+ */
+export function describeJobDataParseError(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return error.issues
+      .map((issue) => {
+        const path = issue.path.join(".");
+        return path ? `${path}: ${issue.message}` : issue.message;
+      })
+      .join("; ");
+  }
+  return error instanceof Error ? error.message : String(error);
+}

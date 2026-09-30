@@ -47,7 +47,11 @@ import {
 import { buildRemoteTraceRunConfig } from "./remote-trace-run-config";
 import { createAdapter } from "./serialized-adapter.registry";
 import { SerializedConnectedAgentAdapter } from "./serialized-adapters/connected-agent.adapter";
-import { type ChildProcessJobData, ChildProcessJobDataSchema } from "./types";
+import {
+  type ChildProcessJobData,
+  ChildProcessJobDataSchema,
+  describeJobDataParseError,
+} from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
 
@@ -101,7 +105,11 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
         // three layers into model construction (issue #6634).
         resolve(ChildProcessJobDataSchema.parse(JSON.parse(data)));
       } catch (error) {
-        reject(new Error(`Failed to parse job data: ${error}`));
+        reject(
+          new Error(
+            `Failed to parse job data: ${describeJobDataParseError(error)}`,
+          ),
+        );
       }
     });
     process.stdin.on("error", reject);

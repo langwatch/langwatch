@@ -62,12 +62,8 @@ func credExtra(cred domain.Credential, keys ...string) string {
 // to the VPC endpoint, using the static AWS credentials carried on the
 // credential's Extra map.
 func newBedrockRuntimeClient(cred domain.Credential, endpoint string) *bedrockruntime.Client {
-	region := credExtra(cred, "region", "aws_region_name")
-	if region == "" {
-		region = "us-east-1"
-	}
 	cfg := aws.Config{
-		Region: region,
+		Region: bedrockRegion(cred),
 		Credentials: credentials.NewStaticCredentialsProvider(
 			credExtra(cred, "access_key", "aws_access_key_id"),
 			credExtra(cred, "secret_key", "aws_secret_access_key"),
@@ -129,6 +125,46 @@ func bedrockVPCEEndpoint(cred domain.Credential) (string, error) {
 		return "", err
 	}
 	return endpoint, nil
+}
+
+// bedrockConverseEndpoint decides which Bedrock requests leave bifrost for
+// the SDK Converse lane, and the endpoint that lane dispatches through. A
+// credential carrying a runtime VPC endpoint always goes through it. Without
+// one, OpenAI models (gpt-5.x via the global.openai.* inference profiles,
+// gpt-oss) still take the Converse lane over the public regional runtime
+// host: bifrost sends every model id containing "gpt-" to the separate
+// bedrock-mantle endpoint, which needs the bedrock-mantle:CreateInference
+// permission, while a Bedrock credential is normally granted
+// bedrock:InvokeModel only. Converse serves the same models with that grant.
+// Returns "" to stay on bifrost.
+func bedrockConverseEndpoint(cred domain.Credential, model string) (string, error) {
+	endpoint, err := bedrockVPCEEndpoint(cred)
+	if err != nil || endpoint != "" {
+		return endpoint, err
+	}
+	if cred.ProviderID != domain.ProviderBedrock || !bedrockMantleModel(bedrockModelID(model, cred)) {
+		return "", nil
+	}
+	public := "https://bedrock-runtime." + bedrockRegion(cred) + ".amazonaws.com"
+	if err := validateBedrockEndpoint(public); err != nil {
+		return "", err
+	}
+	return public, nil
+}
+
+// bedrockMantleModel mirrors bifrost's isMantleModel: the model ids bifrost
+// routes to the bedrock-mantle endpoint instead of bedrock-runtime.
+func bedrockMantleModel(model string) bool {
+	return strings.Contains(model, "gpt-")
+}
+
+// bedrockRegion is the credential's AWS region, us-east-1 when unset (the
+// same default bifrost applies).
+func bedrockRegion(cred domain.Credential) string {
+	if region := credExtra(cred, "region", "aws_region_name"); region != "" {
+		return region
+	}
+	return "us-east-1"
 }
 
 // bedrockModelID resolves the public model id to the provider-specific

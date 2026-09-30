@@ -1,6 +1,8 @@
 import {
   explainHandledError,
   type HandledErrorShape,
+  PROVIDER_CREDENTIAL_REASONS,
+  PROVIDER_MODEL_MISSING_REASONS,
   readHandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "~/features/errors";
@@ -232,6 +234,11 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
  * it reuses that copy rather than restating it here.
  */
 const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
+  // The proxy's own code for "the provider answered with a failure". Its
+  // reason beneath is the provider's discriminant, which may be one no list
+  // here names (Bedrock's "access_denied"), so the code itself is what says
+  // the provider refused.
+  "llm_upstream_error",
   "upstream_stream_error",
   "upstream_bad_request",
   "upstream_unauthorized",
@@ -647,6 +654,25 @@ export function explainLangyError(
       // still landing on `langy_agent_errored` is a rejection we cannot name,
       // so the registry's line plus the trace id is the honest answer.
       return { ...copy, render: "card", action: retry, ...debug };
+    }
+
+    case "llm_upstream_error": {
+      // The provider was reached and refused. A refused key or a model it
+      // does not serve fails the same way every time, so the card offers the
+      // model settings; anything else (a rate limit, an outage) can pass, so
+      // it offers another try.
+      const deterministic =
+        hasReasonKind(domain.reasons, PROVIDER_CREDENTIAL_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS);
+      return {
+        ...copy,
+        render: "card",
+        action: deterministic
+          ? { label: "Configure model", kind: "configure-model" }
+          : retry,
+        traceId: domain.traceId,
+        ...debug,
+      };
     }
 
     case "langy_worker_spawn_failed":
