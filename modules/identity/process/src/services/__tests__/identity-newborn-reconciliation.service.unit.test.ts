@@ -75,6 +75,8 @@ describe("the newborn reconciliation sweep", () => {
   describe("given an address lock whose fact never landed", () => {
     describe("when the sweep runs", () => {
       /** @scenario "An address lock whose fact never landed is reaped" */
+      /** @scenario An orphaned address lock is released so the address can be taken again */
+      /** @scenario A lock whose ceremony is still in flight is left alone */
       it("reaps it behind the same horizon the streams use", async () => {
         const { service, reapOrphans } = harness({ locksReaped: 2 });
 
