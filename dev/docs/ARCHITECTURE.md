@@ -1592,6 +1592,11 @@ modules register everything — screens, drawers, api bindings — via
 their declarations; the app contributes only the shell chrome
 (`src/{main.tsx, shell/, styles/}`).
 
+**Visual parity judges features, not main's inconsistencies** (Alex, 2026-09-30). Where the branch
+looks more solid and consistent than main (one section rail, one page header, one back link, one
+branded card; main's dark gold sidebar gone), the drift is accepted. A missing control, state or
+feature is still a defect. A screen takes the design system's shared piece over a hand-rolled copy.
+
 **The declaration is the module's one browser export that matters** (landed
 2026-09-18): a browser package's `exports` map lists `./declaration` only
 (§3.4 — every sibling entry is a side door, and 23 packages grew one),
