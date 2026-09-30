@@ -311,7 +311,6 @@ flows:
         with:
           text: vd-group-{uid}
 
-  # branch-only: the permission step (authz-permission-*): main's role dialog composes permissions with different controls.
   - id: custom-role-create
     title: Create a custom role and see it listed after a reload
     isolated: true
@@ -328,7 +327,10 @@ flows:
           value: 'vd-role-{uid}'
       - action: click
         with:
-          testIdPrefix: authz-permission-
+          testId: "permission-area-Data and analysis"
+      - action: click
+        with:
+          text: /^\s*Read\s*$/
       - action: click
         with:
           text: /^\s*Create role\s*$/i

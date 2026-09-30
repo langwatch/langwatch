@@ -12,6 +12,7 @@ import {
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
@@ -49,6 +50,12 @@ import {
 import type { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
 
 const logger = createLogger("langwatch:authz:ledger");
+
+const storedRoleRowSchema = z.object({
+  name: z.string(),
+  description: z.string().nullish(),
+  permissions: z.unknown(),
+});
 
 /**
  * Which writer authored a runtime fact — the event's `source` field.
@@ -778,12 +785,13 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       // here: a deleted row confirms nothing, and the compat CustomRole rows
       // can carry a definition the fold never authored.
       check: async () => {
-        const row = (await liveRoles(this.options.database).findFirst({
+        const found = await liveRoles(this.options.database).findFirst({
           where: { id: roleId, organizationId },
           select: { name: true, description: true, permissions: true },
-        })) as { name: string; description?: string | null; permissions: unknown } | null;
+        });
+        const row = storedRoleRowSchema.safeParse(found).data;
         return (
-          row != null &&
+          row !== undefined &&
           row.name === name &&
           (row.description ?? null) === (description || null) &&
           samePermissions({

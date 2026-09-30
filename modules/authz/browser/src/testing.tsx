@@ -16,6 +16,7 @@ import {
   AuthzHostProvider,
   type AuthzFailureNotice,
   type AuthzHostScope,
+  type AuthzOrganizationStructure,
   type AuthzPlanReading,
   type AuthzRouteReading,
   type AuthzSuccessNotice,
@@ -32,6 +33,7 @@ export class FakeAuthzHost extends AuthzHostApi {
       grants?: ReadonlySet<string>;
       plan?: AuthzPlanReading;
       query?: Readonly<Record<string, string | undefined>>;
+      structure?: AuthzOrganizationStructure;
     } = {},
   ) {
     super();
@@ -51,6 +53,10 @@ export class FakeAuthzHost extends AuthzHostApi {
 
   route(): AuthzRouteReading {
     return { query: this.options.query ?? {} };
+  }
+
+  organizationStructure(): AuthzOrganizationStructure {
+    return this.options.structure ?? { organizationName: "Acme", teams: [], projects: [] };
   }
 
   setQuery(next: Readonly<Record<string, string | undefined>>): void {

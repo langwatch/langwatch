@@ -43,6 +43,13 @@ export type AuthzFailureNotice = {
   id?: string;
 };
 
+/** The organization's teams and projects, which the role preview's scope picker offers. */
+export type AuthzOrganizationStructure = {
+  organizationName: string | undefined;
+  teams: readonly { id: string; name: string }[];
+  projects: readonly { id: string; name: string; teamId: string }[];
+};
+
 /** The one thing the screens are handed. */
 export abstract class AuthzHostApi {
   /** The organization these pages are about. */
@@ -55,6 +62,9 @@ export abstract class AuthzHostApi {
   abstract plan(): AuthzPlanReading;
 
   abstract route(): AuthzRouteReading;
+
+  /** The organization's teams and projects, empty until they have arrived. */
+  abstract organizationStructure(): AuthzOrganizationStructure;
 
   /** Replaces the whole query string; a key left out is a key removed. */
   abstract setQuery(

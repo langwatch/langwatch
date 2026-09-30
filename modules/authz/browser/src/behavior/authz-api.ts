@@ -3,7 +3,7 @@
  * load-bearing for React Query cache key consistency (ADR-004 exception).
  */
 
-import { createModuleApi } from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { AuthzManagedOrganizationBinding, AuthzPermission } from "@langwatch/authz-contract";
 import type { Role } from "@langwatch/role-contract";
 
@@ -64,6 +64,23 @@ export type AuthzApiMap = {
     };
   };
 
+  organization: {
+    /**
+     * The workspace graph the shell already reads, narrowed to what the role
+     * preview's scope picker offers; the same key, so no second request.
+     */
+    getAll: {
+      query: {
+        input: { isDemo?: boolean };
+        output: {
+          id: string;
+          name: string;
+          teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
+        }[];
+      };
+    };
+  };
+
   limits: {
     /**
      * The organization's plan, narrowed to the one fact these pages ask of it:
@@ -81,3 +98,6 @@ export type AuthzApiMap = {
  * INTERNAL by convention: screens call it, the shell mounts `authzApi.Provider`.
  */
 export const authzApi = createModuleApi<AuthzApiMap>();
+
+/** What each procedure answers, as the wire carries it (dates as strings). */
+export type RouterOutputs = OutputsFromMap<AuthzApiMap>;

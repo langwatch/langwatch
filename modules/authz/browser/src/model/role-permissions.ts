@@ -472,3 +472,15 @@ export function permissionTakesEffectAt({
 }): boolean {
   return bindingScopeCanGrantPermission({ scopeType, permission });
 }
+
+/** Permissions grouped by the part of the product they are about, each group sorted. */
+export function permissionsByArea(
+  permissions: readonly string[],
+): { area: PermissionArea; permissions: string[] }[] {
+  return PERMISSION_AREAS.map((area) => ({
+    area,
+    permissions: permissions
+      .filter((permission) => resourceCopy(splitPermission(permission).resource).area === area)
+      .sort(),
+  })).filter((group) => group.permissions.length > 0);
+}

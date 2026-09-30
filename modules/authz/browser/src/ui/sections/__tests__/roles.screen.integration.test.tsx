@@ -4,9 +4,9 @@
  */
 
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FakeAuthzHost, renderWithAuthzHost } from "../../../testing.tsx";
 
 type MutationOptions = {
   onSuccess?: () => void;
@@ -18,8 +18,6 @@ const { api, state } = vi.hoisted(() => {
     roles: [] as Record<string, unknown>[],
     bindings: undefined as Record<string, unknown>[] | undefined,
     rolesLoading: false,
-    detail: null as Record<string, unknown> | null,
-    detailError: null as unknown,
     createOptions: null as MutationOptions | null,
     updateOptions: null as MutationOptions | null,
     deleteOptions: null as MutationOptions | null,
@@ -27,24 +25,22 @@ const { api, state } = vi.hoisted(() => {
     update: vi.fn(),
     remove: vi.fn(),
     invalidate: vi.fn(),
+    invalidateBindings: vi.fn(),
   };
 
   const api = {
     useUtils: () => ({
-      role: {
-        getAll: { invalidate: state.invalidate },
-        getById: {
-          fetch: () =>
-            state.detailError ? Promise.reject(state.detailError) : Promise.resolve(state.detail),
-        },
-      },
+      role: { getAll: { invalidate: state.invalidate } },
+      roleBinding: { listForOrg: { invalidate: state.invalidateBindings } },
     }),
     roleBinding: {
-      listForOrg: { useQuery: () => ({ data: state.bindings }) },
+      listForOrg: {
+        useQuery: () => ({ data: state.bindings, isLoading: false, isError: false }),
+      },
     },
     role: {
       getAll: {
-        useQuery: () => ({ data: state.roles, isLoading: state.rolesLoading }),
+        useQuery: () => ({ data: state.roles, isLoading: state.rolesLoading, isError: false }),
       },
       create: {
         useMutation: (options: MutationOptions) => {
@@ -72,6 +68,9 @@ const { api, state } = vi.hoisted(() => {
 
 vi.mock("../../../behavior/authz-api.ts", () => ({ authzApi: api }));
 
+// Isolation is off: reload so the screen binds this file's mock, not a sibling suite's.
+vi.resetModules();
+const { FakeAuthzHost, renderWithAuthzHost } = await import("../../../testing.tsx");
 const { default: RolesScreen } = await import("../roles.screen.tsx");
 
 const ANALYST_ROLE = {
@@ -81,18 +80,18 @@ const ANALYST_ROLE = {
   description: "Reads, never writes",
   permissions: ["traces:view", "analytics:view"],
   kind: "custom",
+  createdAt: "2026-03-12T12:00:00.000Z",
 };
 
 beforeEach(() => {
   state.roles = [];
   state.bindings = [];
   state.rolesLoading = false;
-  state.detail = null;
-  state.detailError = null;
   state.create.mockReset();
   state.update.mockReset();
   state.remove.mockReset();
   state.invalidate.mockReset();
+  state.invalidateBindings.mockReset();
 });
 
 describe("the Roles screen", () => {
@@ -180,8 +179,8 @@ describe("the Roles screen", () => {
       renderWithAuthzHost(<RolesScreen />);
 
       expect(
-        screen.getByText("No custom roles yet. Create your first custom role to get started."),
-      ).toBeInTheDocument();
+        screen.getByText(/^No custom roles yet\. Write one when somebody needs/),
+      ).toBeVisible();
     });
 
     it("counts each custom role's permissions", () => {
@@ -189,7 +188,7 @@ describe("the Roles screen", () => {
       renderWithAuthzHost(<RolesScreen />);
 
       expect(screen.getByText("Data Analyst")).toBeInTheDocument();
-      expect(screen.getByText("2 permissions")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "See all 2 permissions" })).toBeInTheDocument();
     });
 
     /** @scenario A built-in role's permissions come from the authorization contract */
@@ -202,10 +201,9 @@ describe("the Roles screen", () => {
         }),
       );
 
-      expect(await screen.findByText(/^View Permissions - Viewer$/)).toBeInTheDocument();
-      // The viewer reads, so its rows are views and never a manage.
-      expect(screen.getAllByText("View").length).toBeGreaterThan(0);
-      expect(screen.queryByText("Manage (Create, Update, Delete)")).not.toBeInTheDocument();
+      expect(await screen.findByText("View traces")).toBeInTheDocument();
+      // The viewer reads, so its lines are views and never full access.
+      expect(screen.queryByText(/^Full access to/)).not.toBeInTheDocument();
     });
 
     /** @scenario A reader without the grant cannot create a role */
@@ -222,22 +220,18 @@ describe("the Roles screen", () => {
     it("files the new role against the organization in scope", async () => {
       renderWithAuthzHost(<RolesScreen />);
 
-      fireEvent.click(screen.getByRole("button", { name: /New role/ }));
-
-      const nameField = await screen.findByPlaceholderText("e.g., Data Analyst");
-      fireEvent.change(nameField, { target: { value: "Auditor" } });
-
-      const matrix = screen.getByText("auditLog", { selector: "p" }).closest("fieldset");
-      fireEvent.click(within(matrix as HTMLElement).getByRole("checkbox"));
-
-      fireEvent.click(screen.getByRole("button", { name: "Create Role" }));
+      await userEvent.click(screen.getByRole("button", { name: /New role/ }));
+      await userEvent.type(await screen.findByRole("textbox", { name: /Name/ }), "Auditor");
+      await userEvent.click(screen.getByTestId("permission-area-Data and analysis"));
+      await userEvent.click(within(screen.getByTestId("access-level-traces")).getByText("Read"));
+      await userEvent.click(screen.getByRole("button", { name: "Create role" }));
 
       await waitFor(() => expect(state.create).toHaveBeenCalledTimes(1));
       expect(state.create.mock.calls[0]?.[0]).toEqual({
         organizationId: "org-1",
         name: "Auditor",
         description: "",
-        permissions: ["auditLog:view"],
+        permissions: ["traces:view"],
       });
     });
 
@@ -249,17 +243,20 @@ describe("the Roles screen", () => {
 
       state.createOptions?.onError?.(refusal);
 
-      expect(host.failures).toEqual([{ error: refusal, fallbackTitle: "Couldn't create role" }]);
+      expect(host.failures).toEqual([
+        { error: refusal, fallbackTitle: "Couldn't create this role" },
+      ]);
       expect(host.successes).toEqual([]);
     });
 
-    it("confirms a create and refreshes the list", () => {
+    it("confirms a create and refreshes the roles and who holds them", () => {
       const { host } = renderWithAuthzHost(<RolesScreen />);
 
       state.createOptions?.onSuccess?.();
 
       expect(state.invalidate).toHaveBeenCalledTimes(1);
-      expect(host.successes).toEqual([{ title: "Role created successfully" }]);
+      expect(state.invalidateBindings).toHaveBeenCalledTimes(1);
+      expect(host.successes).toEqual([{ title: "Role created" }]);
     });
 
     /** @scenario Deleting a custom role is confirmed first */
@@ -267,30 +264,18 @@ describe("the Roles screen", () => {
       state.roles = [ANALYST_ROLE];
       renderWithAuthzHost(<RolesScreen />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Delete Data Analyst" }));
+      fireEvent.click(screen.getByRole("button", { name: "Delete this role" }));
 
-      expect(await screen.findByText("Delete role")).toBeInTheDocument();
       expect(
-        screen.getByText('Are you sure you want to delete the role "Data Analyst"?'),
+        await screen.findByText(
+          'Everyone holding "Data Analyst" loses what it grants them. This cannot be undone.',
+        ),
       ).toBeInTheDocument();
       expect(state.remove).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
       expect(state.remove.mock.calls[0]?.[0]).toEqual({ roleId: "role-1" });
-    });
-
-    /** @scenario A role whose details cannot be read reports the failure */
-    it("reports a failed detail read rather than opening an empty editor", async () => {
-      state.roles = [ANALYST_ROLE];
-      state.detailError = new Error("not_found");
-      const { host } = renderWithAuthzHost(<RolesScreen />);
-
-      fireEvent.click(screen.getByRole("button", { name: "Edit Data Analyst" }));
-
-      await waitFor(() => expect(host.failures).toHaveLength(1));
-      expect(host.failures[0]?.fallbackTitle).toBe("Couldn't load role details");
-      expect(screen.queryByText("Edit Role")).not.toBeInTheDocument();
     });
   });
 });

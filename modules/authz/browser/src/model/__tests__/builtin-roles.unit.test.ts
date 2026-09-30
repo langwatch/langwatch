@@ -11,10 +11,11 @@ import {
   builtinRoleGrantedPermissions,
   peopleHoldingBuiltinRole,
 } from "../builtin-roles.ts";
-import { ORDERED_RESOURCES, permissionsForResource } from "../permission-catalogue.ts";
+import { ORDERED_RESOURCES } from "../permission-catalogue.ts";
 import type { RoleBinding } from "../role-binding-principals.ts";
+import { offeredPermissions } from "../role-permissions.ts";
 
-const OFFERED = ORDERED_RESOURCES.flatMap((resource) => permissionsForResource(resource));
+const OFFERED = ORDERED_RESOURCES.flatMap((resource) => offeredPermissions(resource));
 
 describe("the built-in roles", () => {
   describe.each(BUILTIN_ROLE_CARDS)("given the $name role", (card) => {

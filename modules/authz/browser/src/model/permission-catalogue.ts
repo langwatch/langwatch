@@ -1,7 +1,5 @@
 // Permission editor vocabulary; family-local copy bounded by registry.
 
-import { type AuthzPermission, isRegistryPermission } from "@langwatch/authz-contract";
-
 /** Core actions that can be performed on resources. */
 export const AUTHZ_ACTIONS = {
   VIEW: "view",
@@ -75,35 +73,4 @@ export function validActionsForResource(resource: AuthzResource): AuthzAction[] 
     AUTHZ_ACTIONS.UPDATE,
     AUTHZ_ACTIONS.DELETE,
   ];
-}
-
-/**
- * One resource's offerable permissions. The registry is the vocabulary the
- * engine grants from, so the per-resource action table above produces the
- * full resource x action cross product, filtered to what the registry allows.
- */
-export function permissionsForResource(resource: AuthzResource): AuthzPermission[] {
-  return validActionsForResource(resource)
-    .map((action) => `${resource}:${action}`)
-    .filter(isRegistryPermission);
-}
-
-/** Every resource's offerable permissions, in editor order. */
-export function permissionsByResource(): Record<AuthzResource, AuthzPermission[]> {
-  const grouped = {} as Record<AuthzResource, AuthzPermission[]>;
-  for (const resource of ORDERED_RESOURCES) {
-    grouped[resource] = permissionsForResource(resource);
-  }
-  return grouped;
-}
-
-/** The action half of a permission string, or undefined when it has none. */
-export function actionOf(permission: string): AuthzAction | undefined {
-  const action = permission.split(":")[1];
-  return action === void 0 ? void 0 : (action as AuthzAction);
-}
-
-/** The resource half of a permission string. */
-export function resourceOf(permission: string): AuthzResource {
-  return permission.split(":")[0] as AuthzResource;
 }

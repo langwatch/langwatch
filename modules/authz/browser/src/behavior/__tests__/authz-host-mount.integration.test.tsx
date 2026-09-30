@@ -21,8 +21,10 @@ type UsageAnswer = { data?: { activePlan: { type: string } }; isLoading: boolean
 
 const usage = vi.fn((): UsageAnswer => ({ isLoading: true }));
 const usageOptions = vi.fn();
+const organizations = vi.fn((): { data?: unknown[] } => ({}));
 vi.mock("../authz-api.ts", () => ({
   authzApi: {
+    organization: { getAll: { useQuery: () => organizations() } },
     limits: {
       getUsage: {
         useQuery: (input: unknown, options: unknown) => {
@@ -85,6 +87,13 @@ function harness({ grants }: { grants: readonly string[] }) {
       </UiCapabilityContextProvider>
     );
   };
+}
+
+/** Stands in for the role preview, which offers these teams and projects as scopes. */
+function StructureReader() {
+  const structure = useAuthzHost().organizationStructure();
+
+  return <span data-testid="structure">{JSON.stringify(structure)}</span>;
 }
 
 /** Stands in for the roles and role-bindings pages, which branch on exactly this reading. */
@@ -152,6 +161,41 @@ describe("given an authz host above the roles pages", () => {
         { organizationId: ORGANIZATION_ID },
         expect.objectContaining({ enabled: false }),
       );
+    });
+  });
+
+  describe("when the role preview asks for the organization's teams and projects", () => {
+    /** @scenario The preview says which permissions do nothing at that scope */
+    it("answers them from the organization in scope only", () => {
+      usage.mockReturnValue({ isLoading: false });
+      organizations.mockReturnValue({
+        data: [
+          {
+            id: "org-other",
+            name: "Other",
+            teams: [{ id: "team-x", name: "Elsewhere", projects: [] }],
+          },
+          {
+            id: ORGANIZATION_ID,
+            name: "Acme",
+            teams: [
+              {
+                id: "team-1",
+                name: "Platform",
+                projects: [{ id: "project-1", name: "support-copilot" }],
+              },
+            ],
+          },
+        ],
+      });
+
+      render(<StructureReader />, { wrapper: harness({ grants: ["organization:view"] }) });
+
+      expect(JSON.parse(screen.getByTestId("structure").textContent ?? "")).toEqual({
+        organizationName: "Acme",
+        teams: [{ id: "team-1", name: "Platform" }],
+        projects: [{ id: "project-1", name: "support-copilot", teamId: "team-1" }],
+      });
     });
   });
 });

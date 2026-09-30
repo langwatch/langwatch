@@ -17,6 +17,7 @@ import {
   AuthzHostProvider,
   type AuthzFailureNotice,
   type AuthzHostScope,
+  type AuthzOrganizationStructure,
   type AuthzPlanReading,
   type AuthzRouteReading,
   type AuthzSuccessNotice,
@@ -30,6 +31,7 @@ class CapabilityAuthzHost extends AuthzHostApi {
       session: UiSession;
       feedback: UiFeedback;
       plan: AuthzPlanReading;
+      structure: AuthzOrganizationStructure;
       route: AuthzRouteReading;
       setQuery: AuthzHostApi["setQuery"];
     },
@@ -51,6 +53,10 @@ class CapabilityAuthzHost extends AuthzHostApi {
 
   route(): AuthzRouteReading {
     return this.deps.route;
+  }
+
+  organizationStructure(): AuthzOrganizationStructure {
+    return this.deps.structure;
   }
 
   setQuery(
@@ -88,6 +94,19 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
     () => ({ isEnterprise: planType === "ENTERPRISE", isLoading: usage.isLoading }),
     [planType, usage.isLoading],
   );
+  // The shell's own workspace read, under the same cache key: no second request.
+  const organizations = authzApi.organization.getAll.useQuery({ isDemo: false });
+  const structure = useMemo(() => {
+    const organization = organizations.data?.find((candidate) => candidate.id === organizationId);
+    const teams = organization?.teams ?? [];
+    return {
+      organizationName: organization?.name,
+      teams: teams.map((team) => ({ id: team.id, name: team.name })),
+      projects: teams.flatMap((team) =>
+        team.projects.map((project) => ({ id: project.id, name: project.name, teamId: team.id })),
+      ),
+    };
+  }, [organizations.data, organizationId]);
   const host = useMemo(
     () =>
       new CapabilityAuthzHost({
@@ -95,10 +114,11 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
         session,
         feedback,
         plan,
+        structure,
         route: { query },
         setQuery: (next, options) => route.setQuery(next, options),
       }),
-    [organizationId, session, feedback, plan, query, route],
+    [organizationId, session, feedback, plan, structure, query, route],
   );
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;
 }
