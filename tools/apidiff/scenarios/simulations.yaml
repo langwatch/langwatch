@@ -9883,7 +9883,7 @@
   "auth": "project",
   "request": {
     "method": "DELETE",
-    "path": "/api/prompts/tags/production"
+    "path": "/api/prompts/tags/latest"
   },
   "expect": {
     "status": [
@@ -9898,7 +9898,7 @@
       "request": "GET /api/prompts/tags",
       "expect": {
         "status": 200,
-        "contains": "production"
+        "contains": "latest"
       }
     }
   ]
