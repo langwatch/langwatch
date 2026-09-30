@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.19.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.18.1...langwatch@v3.19.0) (2026-09-30)
+
+
+### Features
+
+* **automations:** one automation flow: wizard composer, Slack connections, always-on webhooks and API parity ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
+* **automations:** run the Slack connection migration automatically ([#8365](https://github.com/langwatch/langwatch/issues/8365)) ([fcb0e17](https://github.com/langwatch/langwatch/commit/fcb0e171af7f7bfa0d6d745bc00204b577b23837))
+* **sdk:** list the Slack connections a project can use, through GET /api/slack-connections, langwatch slack-connection list, Python list_slack_connections and Go SlackConnections ([c8da609](https://github.com/langwatch/langwatch/commit/c8da609f5b2c73963fe8089de3534d948ec20004))
+
+
+### Bug Fixes
+
+* 3.18.1 self-host dogfood findings (sign-up origin gate, default model, Langy card and worker reuse, checkup SMTP copy) ([#8360](https://github.com/langwatch/langwatch/issues/8360)) ([3ca36ef](https://github.com/langwatch/langwatch/commit/3ca36ef7372f929c98e88818ec252897918727c2))
+* **gateway:** keep serving keys through slow config fetches, name health probe causes ([#8356](https://github.com/langwatch/langwatch/issues/8356)) ([02103b7](https://github.com/langwatch/langwatch/commit/02103b750c38b069160401f2336899279a82c9fd))
+* **langy:** write the project credentials without asking, and retry a transient model failure ([#8325](https://github.com/langwatch/langwatch/issues/8325)) ([9eb281d](https://github.com/langwatch/langwatch/commit/9eb281d953227f8cfaebff4c44df441890ff15aa))
+
 ## [3.18.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.18.0...langwatch@v3.18.1) (2026-09-29)
 
 
