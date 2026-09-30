@@ -168,6 +168,9 @@ const spendUsagePayloadSchema = z.object({
   output_audio_tokens: z.number().int().min(0).default(0),
   input_chars: z.number().int().min(0).default(0),
   audio_ms: z.number().int().min(0).default(0),
+  input_image_tokens: z.number().int().min(0).default(0),
+  output_image_tokens: z.number().int().min(0).default(0),
+  image_count: z.number().int().min(0).default(0),
 });
 
 /** Everything the deliver executor needs to rate, build the envelope, and
@@ -299,6 +302,9 @@ export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
     tokensCacheRead: usage.cache_read_input_tokens,
     tokensCacheWrite: usage.cache_creation_input_tokens,
     tokensReasoning: usage.reasoning_tokens,
+    tokensInputImage: usage.input_image_tokens,
+    tokensOutputImage: usage.output_image_tokens,
+    imageCount: usage.image_count,
     costNanoUsd: payload.cost_nano_usd,
     costUsd: nanoUsdToDecimalString(payload.cost_nano_usd),
     rateVersion: payload.rate_version,

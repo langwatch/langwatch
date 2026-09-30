@@ -213,6 +213,64 @@ describe("loginCommand", () => {
     });
   });
 
+  describe("given an endpoint on loopback", () => {
+    let previousCliConfig: string | undefined;
+
+    beforeEach(() => {
+      setTTY(false);
+      previousCliConfig = process.env.LANGWATCH_CLI_CONFIG;
+      delete process.env.LANGWATCH_CLI_CONFIG;
+    });
+
+    afterEach(() => {
+      if (previousCliConfig === undefined) {
+        delete process.env.LANGWATCH_CLI_CONFIG;
+      } else {
+        process.env.LANGWATCH_CLI_CONFIG = previousCliConfig;
+      }
+    });
+
+    const warningsFrom = (): string =>
+      (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls
+        .flat()
+        .join("\n");
+
+    /** @scenario "Logging in against a local instance says the machine's global config now points there" */
+    it("warns that the global config now points local, and names the isolation env vars", async () => {
+      await loginCommand({ endpoint: "http://localhost:5580", device: true });
+
+      const warned = warningsFrom();
+      expect(warned).toContain("local instance");
+      expect(warned).toContain("LANGWATCH_CLI_CONFIG");
+      expect(warned).toContain("CLAUDE_CONFIG_DIR");
+      expect(warned).toContain("CODEX_HOME");
+      // A warning, never a refusal: QA against a local instance is a real
+      // thing to do, so it interrupts nothing.
+      expect(runDeviceFlowLogin).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A login shell that already relocated the CLI config hears nothing" */
+    it("says nothing when LANGWATCH_CLI_CONFIG already points elsewhere", async () => {
+      process.env.LANGWATCH_CLI_CONFIG = "/tmp/dogfood/langwatch-config.json";
+
+      await loginCommand({ endpoint: "http://localhost:5580", device: true });
+
+      expect(warningsFrom()).not.toContain("LANGWATCH_CLI_CONFIG");
+      expect(runDeviceFlowLogin).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A self-hosted endpoint on another host is not a local instance" */
+    it("says nothing for a self-hosted endpoint on another host", async () => {
+      await loginCommand({
+        endpoint: "https://lw.acme.internal",
+        device: true,
+      });
+
+      expect(warningsFrom()).not.toContain("local instance");
+      expect(runDeviceFlowLogin).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given the --project flag", () => {
     describe("when the command is invoked with --project on a TTY", () => {
       beforeEach(() => setTTY(true));

@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  assertActorCanCreateScopes,
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
   type RBACContext,
@@ -94,6 +95,101 @@ describe("assertCanManageAllScopes", () => {
         { code: "FORBIDDEN" },
       );
       expect(orgPerm).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("assertActorCanCreateScopes", () => {
+  const actorCtx = {
+    prisma: ctx.prisma,
+    actor: { kind: "session" as const, session: ctx.session },
+  };
+
+  describe("when the only scope is the caller's own project", () => {
+    /** @scenario "A key that can create but not manage mints a key for its own project" */
+    it("asks for virtualKeys:create there and nothing more", async () => {
+      projectPerm.mockImplementation(
+        async (_ctx, _id, permission) => permission === "virtualKeys:create",
+      );
+
+      await expect(
+        assertActorCanCreateScopes(actorCtx, {
+          scopes: [PROJECT_DEMO],
+          callerProjectId: PROJECT_DEMO.scopeId,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(projectPerm).toHaveBeenCalledWith(
+        expect.anything(),
+        PROJECT_DEMO.scopeId,
+        "virtualKeys:create",
+      );
+      expect(projectPerm).not.toHaveBeenCalledWith(
+        expect.anything(),
+        PROJECT_DEMO.scopeId,
+        "virtualKeys:manage",
+      );
+    });
+
+    it("throws FORBIDDEN naming virtualKeys:create when the caller lacks it", async () => {
+      await expect(
+        assertActorCanCreateScopes(actorCtx, {
+          scopes: [PROJECT_DEMO],
+          callerProjectId: PROJECT_DEMO.scopeId,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: "permission_denied: virtualKeys:create at PROJECT:proj_demo",
+      });
+    });
+  });
+
+  describe("when a scope reaches beyond the caller's own project", () => {
+    /** @scenario "A key that can create but not manage cannot mint above its project" */
+    it("requires virtualKeys:manage on a team scope", async () => {
+      projectPerm.mockResolvedValue(true);
+
+      await expect(
+        assertActorCanCreateScopes(actorCtx, {
+          scopes: [TEAM_PLATFORM],
+          callerProjectId: PROJECT_DEMO.scopeId,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: "permission_denied: virtualKeys:manage at TEAM:team_platform",
+      });
+    });
+
+    it("requires virtualKeys:manage on another project", async () => {
+      projectPerm.mockImplementation(
+        async (_ctx, _id, permission) => permission === "virtualKeys:create",
+      );
+
+      await expect(
+        assertActorCanCreateScopes(actorCtx, {
+          scopes: [{ scopeType: "PROJECT", scopeId: "proj_other" }],
+          callerProjectId: PROJECT_DEMO.scopeId,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: "permission_denied: virtualKeys:manage at PROJECT:proj_other",
+      });
+    });
+
+    it("requires virtualKeys:manage on every scope once there are several", async () => {
+      projectPerm.mockImplementation(
+        async (_ctx, _id, permission) => permission === "virtualKeys:create",
+      );
+
+      await expect(
+        assertActorCanCreateScopes(actorCtx, {
+          scopes: [PROJECT_DEMO, TEAM_PLATFORM],
+          callerProjectId: PROJECT_DEMO.scopeId,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: "permission_denied: virtualKeys:manage at PROJECT:proj_demo",
+      });
     });
   });
 });

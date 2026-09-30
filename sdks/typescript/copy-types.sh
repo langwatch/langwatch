@@ -45,6 +45,33 @@ cp ../../services/langevals/ts-integration/evaluators.generated.ts src/internal/
 # list; a new input here needs a COPY line there too.
 cp ../../platform/app/src/server/evaluations/evaluators.native.ts src/internal/generated/types/evaluators.native.ts
 
+# Suite fields and evaluator attachments are the Zod-first contract modules the
+# platform validates a test suite against, and the CLI reads them to parse
+# `--field`, to infer the mappings of `--evaluator` and to validate
+# `--evaluators-json`. Copied verbatim, except for the one component TYPE
+# import the attachments module carries: the CLI has no React tree, so the two
+# picker types are declared inline. Both are build inputs for the Dockerfiles'
+# curated COPY lists, like evaluators.native.ts above.
+cp ../../platform/app/src/server/scenarios/suite-fields.ts src/internal/generated/types/suite-fields.ts
+node -e "
+const fs = require('fs');
+const src = fs.readFileSync('../../platform/app/src/server/scenarios/evaluator-attachments.ts', 'utf8');
+const importBlock = /import type \\{\\s*AvailableSource,\\s*NestedField,\\s*\\} from \"~\\/components\\/variables\\/VariableMappingInput\";\\n/;
+if (!importBlock.test(src)) {
+  console.error('evaluator-attachments.ts: the mapping picker type import was not found');
+  process.exit(1);
+}
+const inline = [
+  '// The two mapping picker types the platform imports from its component,',
+  '// declared inline so this copy needs no React tree.',
+  'type NestedField = { name: string; label?: string; type: string; children?: NestedField[] };',
+  'type AvailableSource = { id: string; name: string; type: string; fields: NestedField[] };',
+  '',
+].join('\\n');
+fs.writeFileSync('src/internal/generated/types/evaluator-attachments.ts', src.replace(importBlock, inline));
+console.log('Wrote src/internal/generated/types/evaluator-attachments.ts');
+"
+
 # Default prompt model — derive the newest plain `openai/gpt-<major>.<minor>`
 # flagship from the same llmModels.json the platform reads, so `langwatch
 # prompt create` and the platform stay in lock-step without a hand-edited

@@ -205,6 +205,38 @@ func TestHasToolInput(t *testing.T) {
 	}
 }
 
+// The local tools and the two tools that talk to the person carry a title of
+// ours, because pi sends none: without it the panel row reads "Local_bash"
+// instead of saying the call runs on the developer's machine. Every other tool
+// keeps the empty title and the card falls back to the tool name.
+func TestToolTitle(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		want string
+	}{
+		{"code_access", "Code access"},
+		{"question", "Question"},
+		{"say", "Say"},
+		{"secret_snippet", "Secret snippet"},
+		{"local_read", "Read on your machine"},
+		{"local_write", "Write on your machine"},
+		{"local_edit", "Edit on your machine"},
+		{"local_bash", "Run on your machine"},
+		{"local_grep", "Search on your machine"},
+		{"local_find", "Find on your machine"},
+		{"local_ls", "List on your machine"},
+		{"LOCAL_LS", "List on your machine"},
+		{" local_ls ", "List on your machine"},
+		{"bash", ""},
+		{"todowrite", ""},
+		{"", ""},
+	} {
+		if got := ToolTitle(tc.name); got != tc.want {
+			t.Errorf("ToolTitle(%q) = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // The tracker guarantees exactly one start and one end per call id, and the
 // settle of a non-plan call feeds the measured-progress batch timing.
 func TestToolCallTracker_DeDupeAndMeasuredTiming(t *testing.T) {
@@ -258,12 +290,36 @@ func TestToolCallTracker_PlanToolSettleContributesNoTiming(t *testing.T) {
 	tracker.EndIfNew("plan_1", "todowrite")
 
 	frame, ok := tracker.MeasuredProgressFromPlan([]frames.PlanItem{
-		{Content: "Scanning — 1/10", Status: "in_progress"},
+		{Content: "Scanning - 1/10", Status: "in_progress"},
 	})
 	if !ok {
 		t.Fatalf("expected a measured progress frame")
 	}
 	if strings.Contains(frame.JSON(), "batchDurationMs") {
 		t.Fatalf("todowrite settle timing leaked into the sample: %s", frame.JSON())
+	}
+}
+
+// A line said to the person is not work either: its settle contributes no
+// timing, and it carries a title so the frame names it.
+func TestToolCallTracker_SayToolSettleContributesNoTiming(t *testing.T) {
+	now := time.Unix(100, 0)
+	tracker := NewToolCallTrackerWithClock(func() time.Time { return now })
+
+	tracker.StartIfNew("say_1")
+	now = now.Add(5 * time.Second)
+	tracker.EndIfNew("say_1", "say")
+
+	frame, ok := tracker.MeasuredProgressFromPlan([]frames.PlanItem{
+		{Content: "Scanning - 1/10", Status: "in_progress"},
+	})
+	if !ok {
+		t.Fatalf("expected a measured progress frame")
+	}
+	if strings.Contains(frame.JSON(), "batchDurationMs") {
+		t.Fatalf("say settle timing leaked into the sample: %s", frame.JSON())
+	}
+	if !IsSayTool("Say") || IsSayTool("bash") {
+		t.Fatalf("IsSayTool must match the say tool by name, case-insensitively")
 	}
 }

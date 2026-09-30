@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { usePageVisibility } from "~/hooks/usePageVisibility";
 import { useDrawerStore } from "../stores/drawerStore";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import { getPresetById } from "../utils/timeRangePresets";
 
 // Each tick rolls the live time range forward, which invalidates every
@@ -22,7 +22,7 @@ export function useRollingTimeRange(): void {
     if (!isVisible || drawerOpen) return;
 
     const tick = () => {
-      const state = useFilterStore.getState();
+      const state = useExplorerStore.getState();
       const range = state.timeRange;
       if (!range.presetId) return;
       const preset = getPresetById(range.presetId);

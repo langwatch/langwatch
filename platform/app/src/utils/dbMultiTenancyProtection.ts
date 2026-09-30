@@ -55,6 +55,14 @@ const GLOBAL_MODELS = [
   // and claimed BEFORE any user is known to hold it, which is the whole
   // point - it is what decides who gets to.
   "IdentifierReservation",
+  // The sign-in lock-out counter (GAC-09): keyed on an HMAC of the address
+  // that was TYPED, and deliberately not on a user. An address with no
+  // account behind it is counted, locked and refused exactly like one that
+  // resolves — which is the whole point, because answering the two
+  // differently would make the door an oracle for who has an account here.
+  // There is therefore no tenant in hand when the row is read: it is read
+  // before the address has been resolved to anybody at all.
+  "SignInAttemptLock",
   // Credential tables, per-user in exactly the sense `Account` is. A passkey
   // and a TOTP enrollment belong to a person, not to a project — and the
   // ceremonies that read them are keyed by credential id BEFORE any user is
@@ -69,12 +77,6 @@ const GLOBAL_MODELS = [
   // The MFA aggregate's projection is keyed `tenantId = userId` (D06), so it
   // is per-user by construction like the identity projections above.
   "MfaEnrollment",
-  // The directory's `(connectionId, externalId) -> userId` map (D08). Not
-  // project-scoped and carries no organizationId; a SCIM push resolves a
-  // person through it before anything org-shaped is in hand. Cross-org safety
-  // comes from the token's connection scope, which is checked at the endpoint
-  // rather than here.
-  "ScimExternalId",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",
@@ -106,6 +108,17 @@ const RELATIONAL_PARENT_SCOPED = [
   // Annotation-queue join tables, written through the parent queue.
   "AnnotationQueueMembers",
   "AnnotationQueueScores",
+  // The install's own identity (ADR-141, section 10): one row, at the fixed id
+  // "self", naming the deployment rather than anything inside it. It has no
+  // tenant to constrain on, because it is what the whole install is.
+  "InstanceIdentity",
+  // The history of usage reports received from self-hosted installs (ADR-141,
+  // section 10). Written by a public route that holds no tenant at all, and
+  // read by the backoffice for one instance id at a time. Its sibling
+  // `SelfHostedInstance` carries an organizationId and so is classified by the
+  // org guard; this one carries no id of ours. It holds no customer content:
+  // counts, dates, a release and aggregated email domains.
+  "SelfHostedInstanceReport",
 ] as const;
 
 /**
@@ -277,6 +290,167 @@ const parentEntryScoped = (): ScopedModelConfig => ({
 const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   AiToolEntryTeam: parentEntryScoped(),
   AiToolEntryDepartment: parentEntryScoped(),
+  // Operational scheduling state owned by one SSO connection. The sweep
+  // writes the table directly, so every read or write must name the parent
+  // connection rather than receiving a blanket parent-table exemption.
+  SsoConnectionReproofCursor: {
+    validateWhere: (where) => {
+      const reason = "requires a connectionId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.connectionId === "string" ||
+          (c.connectionId &&
+            Array.isArray(c.connectionId.in) &&
+            c.connectionId.in.length > 0),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.connectionId !== "string") {
+          return "create requires a connectionId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // What a mid-term seat change of one connected license owes (ADR-141). It
+  // carries no organizationId: the reissued `IssuedLicense` row names the
+  // customer, and the `ConnectedBillingAccount` row it is invoiced against
+  // does too. The daily tick retries the rows still in `intent`, which is the
+  // one read that names neither; it is bounded by that state.
+  ConnectedSeatChange: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, licenseId, accountId or state in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.licenseId === "string" ||
+          (c.licenseId &&
+            Array.isArray(c.licenseId.in) &&
+            c.licenseId.in.length > 0) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.state === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.licenseId !== "string") {
+          return "create requires a licenseId in the data payload";
+        }
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // A paid credit at the payment provider (ADR-141). Its parent
+  // `ConnectedBillingAccount` row carries the organizationId; a grant is
+  // otherwise addressed by the provider's own id, which names one customer.
+  ConnectedCreditGrant: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, accountId or stripeCreditGrantId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.stripeCreditGrantId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // An invoice raised for a connected customer (ADR-141). Scoped like the
+  // grants above; the provider's invoice id is the other bounded way in,
+  // which is how a webhook finds the row for the invoice it was told about.
+  ConnectedInvoice: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, accountId or stripeInvoiceId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.stripeInvoiceId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // The monthly statement one connected customer was sent (ADR-141). Its
+  // parent `ConnectedBillingAccount` row carries the organizationId, so every
+  // query here names the account.
+  ConnectedStatement: {
+    validateWhere: (where) => {
+      const reason = "requires a row id or accountId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          // The compound unique, as `findUnique` spells it.
+          typeof c.accountId_month?.accountId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   // Idempotency receipts carry their tenancy on `scopeId` alone: the project
   // on the gateway platform's creates, the organization on the webhook
   // platform's. Every query names either the row id just claimed or the
@@ -710,7 +884,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         (c) =>
           typeof c.tenantId === "string" ||
           typeof c.migrationName_tenantId?.tenantId === "string" ||
-          (!bulkWrite && typeof c.migrationName === "string"),
+          // A finite list of migrations is as bounded as one: the periodic
+          // re-drive asks about every registered migration in a single read.
+          (!bulkWrite && isScopeIdValue(c.migrationName)),
       );
       return ok ? null : reason;
     },

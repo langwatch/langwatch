@@ -69,6 +69,30 @@ func TestAccumulator_AssemblesToolCallsInOrder(t *testing.T) {
 	}
 }
 
+// The local marker of an end frame survives into the durable tool call, and a
+// sandbox call carries none.
+func TestAccumulator_KeepsTheLocalMarker(t *testing.T) {
+	acc := New()
+	for _, f := range []frames.Frame{
+		ff(frames.ToolStart("a", "bash", "", "", nil)),
+		ff(frames.ToolEndLocal("a", "bash", nil, false, "pushed", 0)),
+		ff(frames.ToolStart("b", "bash", "", "", nil)),
+		ff(frames.ToolEnd("b", "bash", nil, false, "ok", 0)),
+	} {
+		acc.Observe(f)
+	}
+	_, tools := acc.Result()
+	if len(tools) != 2 {
+		t.Fatalf("expected two tool calls, got %d", len(tools))
+	}
+	if !tools[0].Local {
+		t.Errorf("the folder call must keep its local marker: %+v", tools[0])
+	}
+	if tools[1].Local {
+		t.Errorf("the sandbox call must carry no local marker: %+v", tools[1])
+	}
+}
+
 func TestAccumulator_DropsPreToolNarration(t *testing.T) {
 	acc := New()
 	feed(acc,

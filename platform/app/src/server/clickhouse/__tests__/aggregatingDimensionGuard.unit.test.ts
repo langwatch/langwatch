@@ -33,19 +33,19 @@ const MIGRATIONS_DIR = resolve(
   "src/server/clickhouse/migrations",
 );
 
-const CONVERGE_MIGRATION = "00087_aggregating_rollup_dimension_columns.sql";
+const CONVERGE_MIGRATION = "00088_aggregating_rollup_dimension_columns.sql";
 
 /** Column names that never carry a merge rule of their own. */
 const NON_COLUMN_PREFIXES = ["INDEX", "CONSTRAINT", "PROJECTION", "PRIMARY"];
 
 /**
- * The columns that were declared without a merge rule before 00087, and the
+ * The columns that were declared without a merge rule before 00088, and the
  * merged migrations that still create them that way.
  *
  * These files have run somewhere, so they cannot change: `migration-order`
  * fails a branch that edits a migration already on main. A new install still
  * replays them, so on a server that enforces the check goose.ts runs them with
- * `allow_dimensions_outside_sorting_key` relaxed and 00087 converts the tables
+ * `allow_dimensions_outside_sorting_key` relaxed and 00088 converts the tables
  * immediately after. Every install therefore ends on the same schema.
  *
  * DO NOT add entries. A new migration runs without the compatibility setting,
@@ -104,7 +104,7 @@ const HISTORICAL_DIMENSIONS: {
   },
 ];
 
-/** The live tables 00087 converts, and the column each one converts. */
+/** The live tables 00088 converts, and the column each one converts. */
 const CONVERGED_COLUMNS = [
   { table: "gateway_budget_scope_totals", column: "UpdatedAt" },
   { table: "trace_analytics_rollup", column: "_retention_days" },

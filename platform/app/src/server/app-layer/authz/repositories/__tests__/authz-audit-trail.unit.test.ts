@@ -27,6 +27,7 @@ function makePrisma() {
 
 describe("PrismaAuthzAuditTrailRepository", () => {
   describe("when a row is inserted", () => {
+    /** @scenario "A grant write is recorded on the grants path" */
     it("writes the AuditLog columns the subscriber derived", async () => {
       const { prisma, createMany } = makePrisma();
       await new PrismaAuthzAuditTrailRepository(prisma).insert(ROW);

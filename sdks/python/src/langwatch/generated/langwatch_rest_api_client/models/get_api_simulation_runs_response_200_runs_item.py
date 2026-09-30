@@ -29,7 +29,9 @@ class GetApiSimulationRunsResponse200RunsItem:
         scenario_run_id (str):
         name (None | str):
         description (None | str):
-        status (str):
+        status (str): Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided,
+            but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail
+            the run. Wait for another status before reading the verdict as final.
         results (GetApiSimulationRunsResponse200RunsItemResultsType0 | None):
         messages (list[GetApiSimulationRunsResponse200RunsItemMessagesItem]):
         timestamp (float):

@@ -79,10 +79,26 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
     });
   });
 
-  it("given an invalid bucket width, refuses the save on the edit path too", () => {
+  it("given an unparseable start date, refuses the save on the edit path too", () => {
     // A real token, deliberately: with a blank one this would return null
-    // whether or not the bucket width was ever checked, and the test would
-    // keep passing with the validation removed.
+    // whether or not the start date was ever checked, and the test would keep
+    // passing with the validation removed.
+    const config = buildAnthropicAdminPullConfig(
+      composer({
+        credentialsToken: "sk-ant-admin-test",
+        report: "usage",
+        startingAt: "not-a-date",
+      }),
+      { shouldRequireCredentials: false },
+    );
+
+    expect(config).toBeNull();
+  });
+
+  it("given a bucket width it cannot honour, saves without it rather than refusing", () => {
+    // The form no longer asks for a width, so refusing here would block an
+    // edit over a control the admin cannot see to correct. `5m` is outside the
+    // adapter's domain, and daily is what this source runs at either way.
     const config = buildAnthropicAdminPullConfig(
       composer({
         credentialsToken: "sk-ant-admin-test",
@@ -92,7 +108,7 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
       { shouldRequireCredentials: false },
     );
 
-    expect(config).toBeNull();
+    expect(config).toMatchObject({ bucketWidth: "1d" });
   });
 
   it("still requires the secret on the create path", () => {
@@ -119,9 +135,9 @@ describe("buildEditedParserConfig", () => {
   it("clears a field the admin emptied instead of leaving the old value", () => {
     // The regression this exists for: merging the rebuilt config over the
     // stored one with a plain spread leaves an omitted key untouched, so
-    // clearing a bucket width saved successfully and changed nothing.
+    // clearing a start date saved successfully and changed nothing.
     const rebuilt = buildAnthropicAdminPullConfig(
-      composer({ credentialsToken: "", report: "usage", bucketWidth: "" }),
+      composer({ credentialsToken: "", report: "usage", startingAt: "" }),
       { shouldRequireCredentials: false },
     );
 
@@ -132,8 +148,28 @@ describe("buildEditedParserConfig", () => {
       ottlStatements: [],
     });
 
-    expect(next).not.toHaveProperty("bucketWidth");
     expect(next).not.toHaveProperty("startingAt");
+  });
+
+  it("keeps carrying the hourly width of a source that already reads at one", () => {
+    // The same merge, in the direction that matters now the form has stopped
+    // asking. The width is a declared-but-hidden field, so it is seeded from
+    // storage, deleted from the stored config before the re-spread, and put
+    // back only because the builder carried it — and an admin editing a name
+    // has not asked to be moved to daily.
+    const rebuilt = buildAnthropicAdminPullConfig(
+      composer({ credentialsToken: "", report: "usage", bucketWidth: "1h" }),
+      { shouldRequireCredentials: false },
+    );
+
+    expect(
+      buildEditedParserConfig({
+        sourceType: "anthropic_admin",
+        storedParserConfig: stored,
+        rebuiltPullConfig: rebuilt,
+        ottlStatements: [],
+      }),
+    ).toMatchObject({ bucketWidth: "1h" });
   });
 
   it("keeps adapter bookkeeping the form does not own", () => {
@@ -248,14 +284,14 @@ describe("buildEditSubmission", () => {
   });
 
   it("given a pull field the adapter cannot parse, refuses the save", () => {
-    // Nothing validates pullConfig server-side, so a bad bucket width saved
-    // here would sit in the row looking fine and fail on every pull.
+    // Nothing validates pullConfig server-side, so a bad start date saved here
+    // would sit in the row looking fine and fail on every pull.
     expect(
       submit({
         parserConfig: {
           credentialsToken: "",
           report: "usage",
-          bucketWidth: "5m",
+          startingAt: "not-a-date",
         },
       }),
     ).toBeNull();

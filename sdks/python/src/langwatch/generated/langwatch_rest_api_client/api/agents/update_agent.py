@@ -65,8 +65,7 @@ def sync_detailed(
     body: UpdateAgentBody,
 ) -> Response[UpdateAgentResponse200]:
     """Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH
-    and PUT alike. A connected agent takes only a new description; anything else answers 422
-    agent_register_only.
+    and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.
 
     Args:
         id (str):
@@ -99,8 +98,7 @@ def sync(
     body: UpdateAgentBody,
 ) -> UpdateAgentResponse200 | None:
     """Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH
-    and PUT alike. A connected agent takes only a new description; anything else answers 422
-    agent_register_only.
+    and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.
 
     Args:
         id (str):
@@ -128,8 +126,7 @@ async def asyncio_detailed(
     body: UpdateAgentBody,
 ) -> Response[UpdateAgentResponse200]:
     """Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH
-    and PUT alike. A connected agent takes only a new description; anything else answers 422
-    agent_register_only.
+    and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.
 
     Args:
         id (str):
@@ -160,8 +157,7 @@ async def asyncio(
     body: UpdateAgentBody,
 ) -> UpdateAgentResponse200 | None:
     """Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH
-    and PUT alike. A connected agent takes only a new description; anything else answers 422
-    agent_register_only.
+    and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.
 
     Args:
         id (str):

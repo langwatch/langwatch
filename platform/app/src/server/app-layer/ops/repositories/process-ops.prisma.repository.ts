@@ -49,7 +49,9 @@ function escapeLike(term: string): string {
  * reads and every write stay on guarded Prisma queries that carry projectId.
  */
 export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient,
+  ) {}
 
   async countByProcessName(params: {
     now: number;
@@ -457,23 +459,25 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     });
     if (!message) return null;
     // Guarded on status in the WHERE too: a dispatch racing this click must
-    // not have its bookkeeping clobbered by the reset.
-    const updated = await this.prisma.processManagerOutbox.updateMany({
-      where: {
-        id: params.messageId,
-        projectId: params.ref.projectId,
-        status: "dead",
-      },
-      data: {
-        status: "pending",
-        attempts: 0,
-        nextAttemptAt: new Date(params.now),
-        leasedUntil: null,
-        leaseToken: null,
-        updatedAt: new Date(params.now),
-      },
-    });
-    if (updated.count === 0) return null;
+    // not have its bookkeeping clobbered by the reset. On the UPDATE itself,
+    // as in the bulk siblings below: through `updateMany` the guard sits in
+    // a subquery, and a statement that waited on the row lock re-checks only
+    // the outer id predicate, so a discard that landed while this was
+    // waiting would be overwritten.
+    const now = new Date(params.now);
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "status" = 'pending',
+             "attempts" = 0,
+             "nextAttemptAt" = ${now},
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "updatedAt" = ${now}
+       WHERE "id" = ${params.messageId}
+         AND "projectId" = ${params.ref.projectId}
+         AND "status" = 'dead'
+    `;
+    if (updated === 0) return null;
     return { messageKey: message.messageKey };
   }
 
@@ -496,18 +500,15 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     // A mark, not a delete: the row is retained as its own audit trail.
     // Guarded on status in the WHERE, same as the redrive: only a dead row
     // can be discarded, so a racing redrive keeps its win.
-    const updated = await this.prisma.processManagerOutbox.updateMany({
-      where: {
-        id: params.messageId,
-        projectId: params.ref.projectId,
-        status: "dead",
-      },
-      data: {
-        status: "discarded",
-        updatedAt: new Date(params.now),
-      },
-    });
-    if (updated.count === 0) return null;
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "status" = 'discarded',
+             "updatedAt" = ${new Date(params.now)}
+       WHERE "id" = ${params.messageId}
+         AND "projectId" = ${params.ref.projectId}
+         AND "status" = 'dead'
+    `;
+    if (updated === 0) return null;
     return { messageKey: message.messageKey };
   }
 

@@ -28,6 +28,17 @@ vi.mock("~/server/analytics/lwql/access", () => ({
   LWQL_FLAG: "release_lwql_workbench",
 }));
 
+// The playground gate is stubbed for the same reason as the workbench gate:
+// this suite pins the count clause per flag answer, not how either flag
+// resolves. Held off here so the clause stays the pre-playground pair the
+// assertions expect; `access.ts`'s own tests own its resolution.
+const customChartPlaygroundEnabledMock = vi.fn();
+vi.mock("~/server/analytics/dashboard-widgets/access", () => ({
+  customChartPlaygroundEnabled: (args: unknown) =>
+    customChartPlaygroundEnabledMock(args),
+  CUSTOM_CHART_PLAYGROUND_FLAG: "release_custom_chart_playground",
+}));
+
 const findMany = vi.fn();
 
 const createService = () => {
@@ -44,6 +55,7 @@ const countKindClauseOf = (spy: ReturnType<typeof vi.fn>): unknown =>
 beforeEach(() => {
   vi.clearAllMocks();
   findMany.mockResolvedValue([]);
+  customChartPlaygroundEnabledMock.mockResolvedValue(false);
 });
 
 describe("the dashboard list's card count", () => {

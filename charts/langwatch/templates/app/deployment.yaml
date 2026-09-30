@@ -148,6 +148,11 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
 
+            {{- with .Values.app.trustedProxyAddresses }}
+            - name: TRUSTED_PROXY_ADDRESSES
+              value: {{ . | quote }}
+            {{- end }}
+
             {{/* NEXTAUTH_URL comes from langwatch.sharedEnv: every process
                  needs the same answer for what this installation is called. */}}
             - name: NEXTAUTH_URL_INTERNAL
@@ -235,10 +240,10 @@ spec:
             {{- end }}
 
             {{- if (index .Values "langyagent").chartManaged }}
-            # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
+            # Langy agent pod. The app POSTs chats to LANGY_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
             # against the same Secret. Subchart values key read via index (aliased subchart).
-            - name: OPENCODE_AGENT_URL
+            - name: LANGY_AGENT_URL
               value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
@@ -302,10 +307,24 @@ spec:
                    error naming this variable. */}}
             {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
 
-            # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
-            # every app-image consumer needs it, see _helpers.tpl)
-            - name: NEXTAUTH_PROVIDER
+            # Auth configuration (NEXTAUTH_SECRET lives in sharedEnv —
+            # every app-image consumer needs it, see _helpers.tpl).
+            # AUTH_PROVIDER is the app's supported name for this setting;
+            # the values key keeps its NextAuth-era path for compatibility.
+            # An operator who selects the provider in app.extraEnvs, under
+            # either name, owns the setting: rendering AUTH_PROVIDER from the
+            # values key would outrank a NEXTAUTH_PROVIDER there and silently
+            # put an SSO install into email mode.
+            {{- $providerFromExtraEnvs := false }}
+            {{- range .Values.app.extraEnvs }}
+            {{- if has (toString .name) (list "AUTH_PROVIDER" "NEXTAUTH_PROVIDER") }}
+            {{- $providerFromExtraEnvs = true }}
+            {{- end }}
+            {{- end }}
+            {{- if not $providerFromExtraEnvs }}
+            - name: AUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
+            {{- end }}
 
             # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github,
             # gitlab, google, okta, onelogin, oidc).
@@ -349,12 +368,19 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
+          # 40 minutes (15s x 160). Serving starts only after the database
+          # migrations and the system-migration preflight finish, and that
+          # preflight is designed to take up to ~27 minutes before it gives up
+          # (25 passes, each waiting up to 60s for its queue work to settle,
+          # 5s between them). A budget shorter than the design turns a slow or
+          # non-converging preflight into CrashLoopBackOff, which hides the
+          # error the preflight would otherwise report by name.
           startupProbe:
             httpGet:
               path: /api/health
               port: http
-            failureThreshold: 30
-            periodSeconds: 10
+            failureThreshold: 160
+            periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /api/health

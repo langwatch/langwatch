@@ -53,7 +53,7 @@ const asMock = (fn: unknown): ReturnType<typeof vi.fn> =>
 const personalCredential = {
   token: "ik-lw-personal00000000_secret",
   prefix: undefined,
-  endpoint: "http://app.example.com/api/otel",
+  endpoint: "https://app.example.com/api/otel",
   minted: false,
   scope: "personal" as const,
 };
@@ -71,8 +71,8 @@ beforeEach(() => {
   prevKeyEnv = process.env.LANGWATCH_INGEST_KEY;
   delete process.env.LANGWATCH_INGEST_KEY;
   cfg = {
-    gateway_url: "http://gw.example.com",
-    control_plane_url: "http://app.example.com",
+    gateway_url: "https://gw.example.com",
+    control_plane_url: "https://app.example.com",
     access_token: "tok",
   };
   asMock(configMod.loadConfig).mockReturnValue(cfg);
@@ -97,6 +97,116 @@ afterEach(() => {
 });
 
 describe("instrumentCommand", () => {
+
+  describe("given changed wiring and a running langwatch code launcher", () => {
+    it("prints the restart advice returned by the installer", async () => {
+      const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
+      asMock(installTelemetryWiring).mockReturnValue({
+        labels: ["~/.zshrc"], warnings: [notice], requiredFailures: [],
+      });
+
+      await instrumentCommand("code", {});
+
+      expect(writtenTo(stderrSpy)).toContain(notice);
+    });
+  });
+  describe("given an endpoint that carries the ingest key in the clear", () => {
+    const withEndpoint = (endpoint: string) =>
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        endpoint,
+      });
+
+    /** @scenario "A plain http endpoint to another host warns and still wires" */
+    it("names the host the key travels to unencrypted, and wires anyway", async () => {
+      withEndpoint("http://lw.acme.dev/api/otel");
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).toContain(
+        "the ingest key will travel unencrypted to lw.acme.dev",
+      );
+      // A warning, never a refusal: the wiring still lands and the command
+      // reports success, so no flag is needed to allow a private network.
+      expect(installTelemetryWiring).toHaveBeenCalled();
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+
+    /** @scenario "An https endpoint is wired without a word about the scheme" */
+    it("says nothing about the scheme for https", async () => {
+      withEndpoint("https://lw.acme.dev/api/otel");
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("unencrypted");
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+
+    /** @scenario "A loopback endpoint over http is not worth warning about" */
+    it("says nothing for http to loopback, which local development runs on", async () => {
+      withEndpoint("http://localhost:5570/api/otel");
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("unencrypted");
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+  });
+
+  describe("given a local instance behind the wiring this command writes", () => {
+    let prevCliConfig: string | undefined;
+
+    beforeEach(() => {
+      prevCliConfig = process.env.LANGWATCH_CLI_CONFIG;
+      delete process.env.LANGWATCH_CLI_CONFIG;
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        endpoint: "http://localhost:5610/api/otel",
+      });
+    });
+
+    afterEach(() => {
+      if (prevCliConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+      else process.env.LANGWATCH_CLI_CONFIG = prevCliConfig;
+    });
+
+    /** @scenario "Instrumenting against a local instance names the isolation env vars" */
+    it("names the global config it rewrites and the env vars that isolate a QA shell", async () => {
+      await instrumentCommand("claude", {});
+
+      const err = writtenTo(stderrSpy);
+      expect(err).toContain("local instance");
+      expect(err).toContain("LANGWATCH_CLI_CONFIG");
+      expect(err).toContain("CLAUDE_CONFIG_DIR");
+      expect(err).toContain("CODEX_HOME");
+      // A warning, never a refusal: the wiring still lands.
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+
+    /** @scenario "A shell that already relocated the CLI config hears nothing" */
+    it("says nothing when LANGWATCH_CLI_CONFIG already points elsewhere", async () => {
+      process.env.LANGWATCH_CLI_CONFIG = "/tmp/dogfood/langwatch-config.json";
+
+      await instrumentCommand("claude", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("LANGWATCH_CLI_CONFIG");
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A remote endpoint is not a local instance" */
+    it("says nothing for an endpoint on another host", async () => {
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        endpoint: "https://lw.acme.dev/api/otel",
+      });
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("local instance");
+    });
+  });
+
   describe("given a companion write the wiring depends on failed", () => {
     it("fails instead of reporting a wired tool", async () => {
       asMock(installTelemetryWiring).mockReturnValue({
@@ -113,6 +223,26 @@ describe("instrumentCommand", () => {
         "could not enable opencode's OpenTelemetry flag",
       );
       expect(writtenTo(stdoutSpy)).not.toContain("runs now send telemetry to");
+    });
+  });
+
+  describe("given a platform that refuses the device session", () => {
+    /** @scenario "A signed-out device is told its wiring was not confirmed" */
+    it("wires the cached key and says the machine is signed out", async () => {
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        sessionExpired: true,
+      });
+
+      await instrumentCommand("claude", {});
+
+      // The wiring is worth writing: the cached key may still work. What is
+      // not acceptable is the success line alone, which reads as a confirmed
+      // setup on a machine that cannot confirm anything.
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+      const err = writtenTo(stderrSpy);
+      expect(err).toContain("signed out");
+      expect(err).toContain("langwatch login --device");
     });
   });
 
@@ -275,7 +405,7 @@ describe("instrumentCommand", () => {
         asMock(pinToolToProject).mockResolvedValue({ label: "acme-app" });
         asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
           token: "ik-lw-proj00000000000_secret",
-          endpoint: "http://app.example.com/api/otel",
+          endpoint: "https://app.example.com/api/otel",
           minted: false,
           scope: "project" as const,
           projectLabel: "acme-app",
@@ -313,7 +443,7 @@ describe("instrumentCommand", () => {
       cfg.tool_project_keys = { codex: { secret: "sk-lw-pinned" } };
       asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
         token: "sk-lw-pinned",
-        endpoint: "http://app.example.com/api/otel",
+        endpoint: "https://app.example.com/api/otel",
         minted: false,
         scope: "project" as const,
         projectLabel: undefined,

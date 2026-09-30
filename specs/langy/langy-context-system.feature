@@ -64,3 +64,10 @@ Feature: Langy captures what I am viewing as turn context
     Given I have removed a context chip
     When I start a new chat
     Then the dismissed context chips return for the fresh turn
+
+  @unit
+  Scenario: The dataset page offers its dataset by name
+    Given the user is on a dataset's page
+    When the page has loaded the dataset
+    Then the dataset chip Langy offers carries the dataset's name and its id
+    And it replaces the route's chip, which only knows the id

@@ -107,6 +107,44 @@ Feature: Test agent with one scripted run
       When "POST /api/v1/agents/:id/test" is called with a project key
       Then the answer carries the scenario run id and the batch run id
 
+  Rule: A connected agent no process is holding cannot be tested
+
+    # A test run against an offline connected agent would only fail on its
+    # first turn, so it is refused before a run exists. Only connected agents
+    # have a presence: an HTTP, code or workflow agent is never offline.
+
+    @unit
+    Scenario: An offline connected agent is refused before a run exists
+      Given a connected agent with no process connected
+      When a test run of it is scheduled
+      Then the run is refused as offline
+      And nothing is queued
+
+    @unit
+    Scenario: An online connected agent is scheduled
+      Given a connected agent with a process connected
+      When a test run of it is scheduled
+      Then one run is queued against the agent
+
+    @unit
+    Scenario: An HTTP agent is never offline
+      When a test run of the HTTP agent is scheduled
+      Then no presence is read
+      And one run is queued against the agent
+
+    @integration
+    Scenario: The API refuses to test an offline connected agent
+      Given a connected agent row with no process connected
+      When "Test agent" is requested for it through the API
+      Then the request is refused with "agent_offline"
+
+    @integration
+    Scenario: Test agent is disabled for an offline connected agent
+      Given the agents page with an offline connected agent
+      When the card menu is opened
+      Then "Test agent" is disabled
+      And it says on hover that the agent is offline
+
   # ---------------------------------------------------------------------------
   # Results lists and the run drawer
   # ---------------------------------------------------------------------------
@@ -184,6 +222,36 @@ Feature: Test agent with one scripted run
     Scenario: A draft has no test panel
       Given the HTTP agent editor drawer open for a new agent
       Then no "Test agent" panel is shown
+
+  Rule: A test turn overrides the code defaults with values typed for it
+
+    # A connected agent registers the defaults its code declares. The panel
+    # keeps them as the baseline and takes per-turn overrides on one line,
+    # the way the Run dialog does for a scenario. A name left out reads the
+    # code default; a name the agent does not declare, or a value outside
+    # its options, is refused by name before any instance is reached.
+
+    @integration
+    Scenario: The connected agent drawer test turn takes parameter overrides
+      Given an online connected agent that declares a parameter with a default
+      When the test panel is opened
+      Then a parameters field suggests the declared name and its default
+      And starting the test with "model=gpt-5" typed sends the turn with that value
+      And starting the test with the field empty sends the turn with no parameter, so the code default applies
+
+    @unit
+    Scenario: A test turn naming an undeclared parameter is refused
+      Given a connected agent that declares the parameter model
+      When a test turn is sent with a value for a parameter it does not declare
+      Then the turn is refused as scenario_parameter_unknown
+      And no instance is reached
+
+    @unit
+    Scenario: A test turn value outside the declared options is refused
+      Given a connected agent whose model parameter has options gpt-4 and gpt-5
+      When a test turn is sent with model=gpt-6
+      Then the turn is refused as scenario_parameter_option_invalid
+      And no instance is reached
 
   Rule: A turn answers inside the platform call deadline
 

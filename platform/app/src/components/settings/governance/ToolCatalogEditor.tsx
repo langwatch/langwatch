@@ -1,8 +1,10 @@
 import {
+  Badge,
   Box,
   Button,
   Heading,
   HStack,
+  SimpleGrid,
   Spinner,
   Text,
   VStack,
@@ -19,9 +21,9 @@ import {
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import {
   arrayMove,
+  rectSortingStrategy,
   SortableContext,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -35,7 +37,13 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import type { AiToolEntry } from "~/components/me/tiles/types";
+import { TileIcon } from "~/components/me/tiles/TileIcon";
+import type {
+  AiToolEntry,
+  CodingAssistantConfig,
+  ExternalToolConfig,
+} from "~/components/me/tiles/types";
+import { useAiToolCatalog } from "~/components/settings/governance/useAiToolCatalog";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
@@ -48,6 +56,13 @@ const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
   coding_assistant: "Coding assistants",
   model_provider: "Model providers",
   external_tool: "Internal tools",
+};
+
+/** The one-tile form of each section heading, for the card's type badge. */
+const TYPE_LABELS: Record<AiToolEntry["type"], string> = {
+  coding_assistant: "Coding assistant",
+  model_provider: "Model provider",
+  external_tool: "Internal tool",
 };
 
 const SECTION_ORDER: AiToolEntry["type"][] = [
@@ -69,15 +84,17 @@ export function ToolCatalogEditor({
 }: Props) {
   const utils = api.useUtils();
 
-  // Delete is permanent, so it routes through a confirm dialog. `null`
-  // means no pending deletion; a non-null entry is the tile awaiting
-  // confirmation.
-  const [pendingDelete, setPendingDelete] = useState<AiToolEntry | null>(null);
-
-  const adminListQuery = api.aiTools.adminList.useQuery(
-    { organizationId },
-    { enabled: !!organizationId, refetchOnWindowFocus: false },
-  );
+  /**
+   * The registry read, the publish toggle and the permanent delete, shared
+   * with the Inventory page's Catalog pane. Reordering and the starter-pack
+   * import stay here: this is the only screen that has either.
+   */
+  const catalog = useAiToolCatalog({ organizationId });
+  const { entries, isLoading, pendingDelete, setPendingDelete } = catalog;
+  // Only for the `setData` write below, which needs the router's own payload
+  // type. Reading `data` or `isLoading` off it again would be the second copy
+  // the hook exists to prevent.
+  const adminListQuery = catalog.query;
 
   const departmentsQuery = api.departments.list.useQuery(
     { organizationId },
@@ -88,32 +105,12 @@ export function ToolCatalogEditor({
     [departmentsQuery.data],
   );
 
-  const setEnabledMutation = api.aiTools.setEnabled.useMutation({
-    onSuccess: () => {
-      void utils.aiTools.adminList.invalidate({ organizationId });
-      void utils.aiTools.list.invalidate({ organizationId });
-    },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't update tile" }),
-  });
-
-  const removeMutation = api.aiTools.remove.useMutation({
-    onSuccess: () => {
-      void utils.aiTools.adminList.invalidate({ organizationId });
-      void utils.aiTools.list.invalidate({ organizationId });
-      toaster.create({ title: "Tile deleted", type: "success" });
-      setPendingDelete(null);
-    },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't delete tile" }),
-  });
-
   const reorderMutation = api.aiTools.reorder.useMutation({
     onSuccess: () => {
       void utils.aiTools.list.invalidate({ organizationId });
     },
     onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tiles" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tools" }),
   });
 
   const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
@@ -124,10 +121,10 @@ export function ToolCatalogEditor({
         title:
           created === 0
             ? "Starter pack already published"
-            : `Imported ${created} ${created === 1 ? "tile" : "tiles"}`,
+            : `Imported ${created} ${created === 1 ? "tool" : "tools"}`,
         description:
           skipped > 0
-            ? `${skipped} ${skipped === 1 ? "tile was" : "tiles were"} already published and skipped.`
+            ? `${skipped} ${skipped === 1 ? "tool was" : "tools were"} already published and skipped.`
             : "Coding assistants and model providers are now visible to your team on /me.",
         type: "success",
       });
@@ -157,7 +154,7 @@ export function ToolCatalogEditor({
     .filter((t) => !unchecked[t.slug])
     .map((t) => t.slug);
 
-  if (adminListQuery.isLoading) {
+  if (isLoading) {
     return (
       <HStack padding={6} justifyContent="center">
         <Spinner size="sm" />
@@ -167,8 +164,6 @@ export function ToolCatalogEditor({
       </HStack>
     );
   }
-
-  const entries = (adminListQuery.data ?? []) as unknown as AiToolEntry[];
 
   const grouped: Record<AiToolEntry["type"], AiToolEntry[]> = {
     coding_assistant: [],
@@ -267,9 +262,9 @@ export function ToolCatalogEditor({
                 {isCatalogEmpty
                   ? "Pick the tools to publish at org scope so every member " +
                     "sees them on /me. You can rename, reorder, disable, or " +
-                    "remove individual tiles afterwards. Re-running is safe; " +
+                    "remove individual tools afterwards. Re-running is safe; " +
                     "only new slugs get added."
-                  : "Adds starter tiles the catalog never had. Tiles already " +
+                  : "Adds starter tools the catalog never had. Tools already " +
                     "present, archived ones included, are skipped."}
               </Text>
               <VStack align="start" gap={2} paddingTop={1} width="full">
@@ -339,7 +334,7 @@ export function ToolCatalogEditor({
                 marginLeft="auto"
                 onClick={() => onAddTile(type)}
               >
-                <Plus size={14} /> Add tile
+                <Plus size={14} /> Add tool
               </Button>
             </HStack>
 
@@ -353,7 +348,7 @@ export function ToolCatalogEditor({
               >
                 <Text fontSize="xs" color="fg.muted">
                   No {SECTION_LABELS[type].toLowerCase()} configured. Click{" "}
-                  <strong>Add tile</strong> to publish one.
+                  <strong>Add tool</strong> to publish one.
                 </Text>
               </Box>
             ) : (
@@ -363,18 +358,13 @@ export function ToolCatalogEditor({
                 onDragEnd={handleSectionDragEnd(type)}
                 onEdit={onEditTile}
                 onToggleEnabled={(entry) =>
-                  setEnabledMutation.mutate({
-                    organizationId,
+                  catalog.setEnabled({
                     id: entry.id,
                     enabled: !entry.enabled,
                   })
                 }
                 onDelete={(entry) => setPendingDelete(entry)}
-                togglePendingId={
-                  setEnabledMutation.isPending
-                    ? setEnabledMutation.variables?.id
-                    : undefined
-                }
+                togglePendingId={catalog.togglePendingId}
               />
             )}
           </VStack>
@@ -396,7 +386,7 @@ export function ToolCatalogEditor({
             </Dialog.Header>
             <Dialog.Body>
               <Text fontSize="sm" color="fg.muted">
-                This permanently removes the tile from the catalog and from
+                This permanently removes the tool from the catalog and from
                 every member&apos;s /me portal. It cannot be undone. To hide it
                 without losing its configuration, use Disable instead.
               </Text>
@@ -407,15 +397,10 @@ export function ToolCatalogEditor({
               </Button>
               <Button
                 colorPalette="red"
-                loading={removeMutation.isPending}
-                onClick={() =>
-                  removeMutation.mutate({
-                    organizationId,
-                    id: pendingDelete.id,
-                  })
-                }
+                loading={catalog.isRemoving}
+                onClick={catalog.confirmDelete}
               >
-                Delete tile
+                Delete tool
               </Button>
             </Dialog.Footer>
           </Dialog.Content>
@@ -454,11 +439,14 @@ function SortableSection({
     >
       <SortableContext
         items={items.map((e) => e.id)}
-        strategy={verticalListSortingStrategy}
+        strategy={rectSortingStrategy}
       >
-        <VStack align="stretch" gap={1}>
+        {/* Sized to the container, not the viewport: with the assistant
+            panel open the pane is half the window, and three fixed
+            columns would squeeze every name into an ellipsis. */}
+        <SimpleGrid minChildWidth="260px" gap={3}>
           {items.map((entry) => (
-            <SortableCatalogRow
+            <SortableCatalogCard
               key={entry.id}
               entry={entry}
               departmentNameById={departmentNameById}
@@ -468,13 +456,13 @@ function SortableSection({
               isPending={togglePendingId === entry.id}
             />
           ))}
-        </VStack>
+        </SimpleGrid>
       </SortableContext>
     </DndContext>
   );
 }
 
-function SortableCatalogRow({
+function SortableCatalogCard({
   entry,
   departmentNameById,
   onEdit,
@@ -506,7 +494,7 @@ function SortableCatalogRow({
   };
 
   return (
-    <CatalogRow
+    <CatalogCard
       entry={entry}
       departmentNameById={departmentNameById}
       onEdit={onEdit}
@@ -546,7 +534,31 @@ function scopeChipsFor(
   }));
 }
 
-function CatalogRow({
+/**
+ * The CLI path policy a coding-assistant tile carries, in the words the
+ * tile drawer uses for the two switches. Both default to allowed when the
+ * config does not say (the same reading `cliBootstrap` makes).
+ */
+export function cliPathsLine(entry: AiToolEntry): string | null {
+  if (entry.type !== "coding_assistant") return null;
+  const config = entry.config as CodingAssistantConfig;
+  const gateway = config.allowVk !== false;
+  const direct = config.allowOtelDirect !== false;
+  if (gateway && direct) return "CLI paths: gateway · direct";
+  if (gateway) return "CLI paths: gateway only";
+  if (direct) return "CLI paths: direct only";
+  return "CLI paths: none";
+}
+
+/** The one line under the scope chips that says what the tile points at. */
+function detailLine(entry: AiToolEntry): string | null {
+  if (entry.type === "external_tool") {
+    return (entry.config as ExternalToolConfig).linkUrl || null;
+  }
+  return cliPathsLine(entry);
+}
+
+function CatalogCard({
   entry,
   departmentNameById,
   onEdit,
@@ -569,72 +581,104 @@ function CatalogRow({
   dragListeners?: SyntheticListenerMap;
   dragAttributes?: DraggableAttributes;
 }) {
+  const detail = detailLine(entry);
   return (
-    <HStack
+    <VStack
       ref={dragRef}
       style={style}
+      align="stretch"
+      gap={3}
       borderWidth="1px"
       borderColor="border.muted"
-      borderRadius="sm"
-      padding={2}
-      gap={2}
+      borderRadius="md"
+      padding={4}
       backgroundColor="bg.panel"
-      data-testid={`catalog-row-${entry.id}`}
+      data-testid={`catalog-card-${entry.id}`}
     >
-      <Box
-        color="fg.muted"
-        cursor="grab"
-        {...(dragListeners ?? {})}
-        {...(dragAttributes ?? {})}
-        aria-label="Drag to reorder"
-      >
-        <GripVertical size={16} />
-      </Box>
-      <Text fontSize="sm" flex={1} fontWeight="medium">
-        {entry.displayName}
-      </Text>
+      <HStack alignItems="start" gap={2}>
+        <Box
+          color="fg.muted"
+          cursor="grab"
+          paddingTop="2px"
+          {...(dragListeners ?? {})}
+          {...(dragAttributes ?? {})}
+          aria-label="Drag to reorder"
+        >
+          <GripVertical size={16} />
+        </Box>
+        <VStack align="start" gap={1} flex={1} minWidth={0}>
+          <Text fontSize="sm" fontWeight="semibold" lineClamp={2}>
+            {entry.displayName}
+          </Text>
+          <HStack gap={1} wrap="wrap">
+            <Badge size="sm" variant="surface">
+              {TYPE_LABELS[entry.type]}
+            </Badge>
+            {!entry.enabled && (
+              <Badge size="sm" variant="surface" colorPalette="gray">
+                Disabled
+              </Badge>
+            )}
+          </HStack>
+        </VStack>
+        <TileIcon
+          iconAsset={entry.iconAsset}
+          iconKey={entry.iconKey}
+          type={entry.type}
+          size={32}
+        />
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Actions for ${entry.displayName}`}
+            >
+              <MoreVertical size={14} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item
+              value="edit"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit();
+              }}
+            >
+              <Pencil size={14} /> Edit
+            </Menu.Item>
+            <Menu.Item
+              value="toggle"
+              disabled={isPending}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleEnabled();
+              }}
+            >
+              <Power size={14} /> {entry.enabled ? "Disable" : "Enable"}
+            </Menu.Item>
+            <Menu.Item
+              value="delete"
+              color="red.500"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Trash2 size={14} /> Delete
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      </HStack>
       <ProviderScopeChips
         size="xs"
         scopes={scopeChipsFor(entry, departmentNameById)}
       />
-      <Menu.Root>
-        <Menu.Trigger asChild>
-          <Button variant="ghost" size="xs" aria-label="Tile actions">
-            <MoreVertical size={14} />
-          </Button>
-        </Menu.Trigger>
-        <Menu.Content>
-          <Menu.Item
-            value="edit"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit();
-            }}
-          >
-            <Pencil size={14} /> Edit
-          </Menu.Item>
-          <Menu.Item
-            value="toggle"
-            disabled={isPending}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleEnabled();
-            }}
-          >
-            <Power size={14} /> {entry.enabled ? "Disable" : "Enable"}
-          </Menu.Item>
-          <Menu.Item
-            value="delete"
-            color="red"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Trash2 size={14} /> Delete
-          </Menu.Item>
-        </Menu.Content>
-      </Menu.Root>
-    </HStack>
+      {detail && (
+        <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+          {detail}
+        </Text>
+      )}
+    </VStack>
   );
 }

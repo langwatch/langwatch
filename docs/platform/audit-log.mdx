@@ -1,27 +1,63 @@
 ---
 title: "Audit Log"
-description: "Track user actions and changes in LangWatch"
+description: "Every change made through the LangWatch settings, API and AI Gateway, with who did it, from where, and what changed."
 sidebarTitle: Audit Log
-keywords: audit log, langwatch, llm, ai, audit log
+keywords: audit log, compliance, csv export, langwatch
 ---
 
 <Note>
-  **Available on Enterprise plans.** Reading the audit log needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Without one the audit log is refused, whoever asks for it. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** Reading the audit log needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Without one the page shows an upgrade notice and the API refuses the query. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
-LangWatch provides an audit log to track user actions and changes in the platform. This allows you to monitor and audit the activities of your users and ensure compliance with your organization's policies.
+## What is logged
 
-## Overview
+The audit log is at **Settings > Audit Log**. It keeps one row per action, for the whole organization, and rows are never deleted.
 
-The audit log is a record of all actions performed in the platform. It is stored in a database and can be queried to find specific actions and changes.
+LangWatch writes a row for:
 
-You can search the audit log by:
-- **Name**: Filter by user name or identifier
-- **Action**: Filter by specific action types
-- **Date**: Filter by date range to find actions within a specific time period
+- Every change made in the settings pages or through the app: creating, updating, archiving or deleting an organization, a team, a project, a member, an invite, a role, a role binding, a group, an API key, a secret, a model provider, a data retention rule or an SSO connection. Both the successful call and the refused one are logged, with the error on the refused one.
+- Every LangWatch AI Gateway change: virtual keys, budgets, cache rules and guardrails, including the state before and after the change.
+- Every call to the management API on members, invites, SCIM tokens and API keys.
+- Support impersonation, with the impersonating operator recorded on the row.
 
-Additionally, you can download the audit log data as a CSV file for further analysis or compliance reporting.
+Sign-ins are not logged. Reads of product data (opening a trace, running a search) are not logged.
+
+## What a row contains
+
+| Column | Content |
+|--------|---------|
+| Timestamp | When the action ran |
+| Source | **Platform** for a settings or API change, **Gateway** for a LangWatch AI Gateway change |
+| User | Name and email of the person who acted |
+| Action | The action name, for example `organization.updateMemberRole`, `role.create` or `gateway.virtual_key.rotated` |
+| Target | The kind and id of the changed object on Gateway rows, for example `virtual_key` |
+| Project | The project the action applied to, when it applied to one |
+| IP Address | The client address of the request |
+| Error | The error message when the action was refused |
+
+The CSV export adds the user agent, the request arguments, and the before and after state of Gateway rows. Secret values in the arguments are replaced by `[redacted]`.
 
 <Frame>
-<img src="/images/audit-log.png" alt="LangWatch Audit Log" />
+<img src="/images/platform/audit-log.png" alt="Settings > Audit Log with the filters and a page of rows" />
 </Frame>
+
+## Filters
+
+| Filter | Behavior |
+|--------|----------|
+| Search by User | Matches one member by name or email |
+| Filter by Action | Case-insensitive substring match on the action name. `virtual_key` matches every virtual key action |
+| Project | One project, or all. Rows with no project are always included |
+| Select Date | A date range or a preset period. The default is the last 30 days |
+
+Every filter is in the page URL, so you can share a filtered view. A virtual key or a budget page links here with its own target already filtered.
+
+## Export
+
+Click **Export CSV** to download every row that matches the current filters as `audit_logs_<date>.csv`. JSON columns (arguments, before, after) are cut at 4096 characters per cell, and a cut cell ends with a marker that gives the number of characters removed.
+
+## Who can see it
+
+Opening **Settings > Audit Log** needs `organization:manage`. Querying the log needs `auditLog:view`, which every built-in team role holds except the Lite Member cap. A custom role can grant `auditLog:view` on its own.
+
+**Also check:** [Access Control (RBAC)](/platform/rbac).

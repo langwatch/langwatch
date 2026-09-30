@@ -64,13 +64,24 @@ vi.mock("~/hooks/useRequiredSession", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useQueries: (build: (tools: unknown) => unknown[]) =>
+      build({
+        authz: {
+          effectivePermissions: ({ projectId }: { projectId: string }) => ({
+            data: {
+              permissions:
+                projectId === TARGET_PROJECT_ID ? ["evaluations:manage"] : [],
+            },
+          }),
+        },
+      }),
     evaluators: {
       copy: {
         useMutation: () => ({
           mutateAsync: vi.fn(async (args: typeof copyMutateArgs) => {
             copyMutateArgs = args;
           }),
-          isLoading: false,
+          isPending: false,
         }),
       },
     },

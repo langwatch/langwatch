@@ -30,7 +30,9 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
@@ -87,15 +89,13 @@ async function makeAdminUser(organization: Organization, team: Team) {
   await prisma.teamUser.create({
     data: { userId: user.id, teamId: team.id, role: TeamUserRole.ADMIN },
   });
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: organization.id,
-      userId: user.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId: organization.id,
+    userId: user.id,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organization.id,
   });
   return user;
 }
@@ -297,9 +297,27 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
       // before/after contrast without the write ever having worked.
       expect((await writeRequest()).status).toBe(200);
 
-      await prisma.roleBinding.updateMany({
-        where: { organizationId: orgA.id, userId: owner.id },
-        data: { role: TeamUserRole.VIEWER },
+      const ownerGrant = await prisma.grant.findFirst({
+        where: {
+          organizationId: orgA.id,
+          principalType: "USER",
+          principalId: owner.id,
+          scopeType: "ORGANIZATION",
+          scopeId: orgA.id,
+          roleKey: "admin",
+          revokedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!ownerGrant) {
+        throw new Error("owner organization grant was not seeded");
+      }
+      await grantsLedgerWriter().changeBindingRole({
+        organizationId: orgA.id,
+        bindingId: ownerGrant.id,
+        role: TeamUserRole.VIEWER,
+        customRoleId: null,
+        actor: { type: "user", id: owner.id },
       });
 
       expect((await writeRequest()).status).toBe(403);

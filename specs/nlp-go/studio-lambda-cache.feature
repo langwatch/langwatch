@@ -87,12 +87,14 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
     And a fresh Lambda resolution flow runs so reconcileProjectLambdaConfig applies the new timeout
     And the stale ceiling is not served for the remainder of the cache TTL
 
+  @integration @unit
   Scenario: An unchanged desired configuration keeps serving from cache, no spurious invalidation
     Given getProjectLambdaArn("projectA") resolved and cached
     When getProjectLambdaArn("projectA") is called again with an identical desired configuration
     Then the configFingerprint matches and the cached ARN is returned
     And no additional AWS calls are made
 
+  @integration @unit
   Scenario: Different projects do not share cache slots
     When getProjectLambdaArn("projectA") and getProjectLambdaArn("projectB") both resolve
     Then the cache holds two independent entries

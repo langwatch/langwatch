@@ -38,6 +38,7 @@ from tenacity import (
 )
 import langwatch
 from langwatch.domain import SpanTimestamps
+from langwatch.http_client import create_async_client, create_client
 from pksuid import PKSUID
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.context import get_current_span
@@ -190,7 +191,7 @@ def evaluate(
         )
         @_retry_evaluator_call
         def _post() -> httpx.Response:
-            with httpx.Client(timeout=900) as client:
+            with create_client(timeout=900) as client:
                 response = client.post(**request_params)
                 better_raise_for_status(response)
                 return response
@@ -255,7 +256,7 @@ async def async_evaluate(
         )
         @_retry_evaluator_call
         async def _post() -> httpx.Response:
-            async with httpx.AsyncClient(timeout=900) as client:
+            async with create_async_client(timeout=900) as client:
                 response = await client.post(**request_params)
                 better_raise_for_status(response)
                 return response

@@ -94,16 +94,16 @@ describe("explainHandledError", () => {
       const { description } = explainHandledError(
         shape({
           code: "lwql_reserved_parameter_supplied",
-          meta: { parameters: ["period_granularity_seconds"] },
+          meta: { parameters: ["dashboard_context_granularity_seconds"] },
         }),
       );
 
-      expect(description).toContain("period_granularity_seconds");
+      expect(description).toContain("dashboard_context_granularity_seconds");
       // The bug this pins: the copy named the window pair unconditionally, so
       // a caller that sent only the step was told to remove two parameters it
       // had never sent.
-      expect(description).not.toContain("period_start");
-      expect(description).not.toContain("period_end");
+      expect(description).not.toContain("dashboard_context_period_start");
+      expect(description).not.toContain("dashboard_context_period_end");
     });
 
     /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
@@ -111,11 +111,18 @@ describe("explainHandledError", () => {
       const { description } = explainHandledError(
         shape({
           code: "lwql_reserved_parameter_supplied",
-          meta: { parameters: ["period_start", "period_end"] },
+          meta: {
+            parameters: [
+              "dashboard_context_period_start",
+              "dashboard_context_period_end",
+            ],
+          },
         }),
       );
 
-      expect(description).toContain("period_start and period_end");
+      expect(description).toContain(
+        "dashboard_context_period_start and dashboard_context_period_end",
+      );
       expect(description).toContain("come from");
       expect(description).toContain("Remove them");
     });
@@ -304,6 +311,40 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a permission card that was already answered", () => {
+    /** @scenario "A card that was already answered says which answer closed it" */
+    it("names the answer that closed it, and never says Langy gave up", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "langy_wait_expired",
+          httpStatus: 410,
+          meta: {
+            waitId: "lwait_1",
+            outcome: "answered",
+            decision: "allow_pattern",
+          },
+        }),
+      );
+
+      expect(description).toContain("allowed this pattern for the session");
+      expect(description).not.toContain("stopped waiting");
+    });
+
+    describe("when nobody answered in time", () => {
+      it("still says Langy stopped waiting", () => {
+        const { description } = explainHandledError(
+          shape({
+            code: "langy_wait_expired",
+            httpStatus: 410,
+            meta: { waitId: "lwait_1", outcome: "expired" },
+          }),
+        );
+
+        expect(description).toContain("stopped waiting");
+      });
+    });
+  });
+
   describe("given a code the registry has never seen", () => {
     /**
      * The fallback used to be `FAULT_TITLES[fault]`, which is a guess dressed
@@ -400,6 +441,20 @@ describe("explainHandledError", () => {
       );
 
       expect(description).toContain("rate-limiting");
+    });
+
+    /** @scenario "A provider rate limit gets its own remediation copy" */
+    it.each([
+      "rate_limit_exceeded",
+      "rate_limit_error",
+      "RESOURCE_EXHAUSTED",
+    ])("explains the provider's own %s code as the same wait-and-retry", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("rate-limiting");
+      expect(description).toContain("pick a model with more room");
     });
 
     /** @scenario "A provider outage gets its own remediation copy" */

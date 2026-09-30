@@ -1,43 +1,14 @@
-Feature: Langy can run a conversation on the pi harness
-  Langy's worker runs on one of two coding-agent harnesses, selected per
-  project. The harness rides the same credential envelope as every other
-  worker-shaping input, so a change replaces the worker instead of quietly
-  reusing one built for the other harness, and a deploy that introduces
-  harness selection does not touch any worker that was running before it.
+Feature: Langy runs a conversation on the pi worker
+  Langy's worker is the langy-worker wrapper around the pi coding agent, driven
+  by the manager over a stdio protocol. This feature covers how the manager
+  configures that worker, drives a turn on it, and keeps the conversation's
+  session across respawns.
 
   # Companion specs:
   #   - specs/langy/langy-minimal-harness.feature  (what the worker's prompt and
-  #     tool surface look like, harness-independent)
+  #     tool surface look like)
   #   - specs/langy/langy-stop-and-resume.feature  (the user-facing stop this
   #     feature's cancel path completes)
-
-  @unit
-  Scenario: A conversation that names no harness keeps its running worker
-    Given a worker is running for a conversation that never named a harness
-    When the next turn arrives naming the default harness explicitly
-    Then the running worker is reused
-    And no worker is replaced just because harness selection was deployed
-
-  @unit
-  Scenario: Selecting the pi harness replaces the conversation's worker
-    Given a worker is running for a conversation on the default harness
-    When the next turn arrives selecting the pi harness
-    Then the running worker does not match and is replaced
-    And the conversation continues on a worker built for the pi harness
-
-  @unit
-  Scenario: An unrecognized harness value falls back to the default harness
-    Given a turn arrives naming a harness this manager does not know
-    When the manager resolves the harness
-    Then the turn runs on the default harness
-    And the unknown value never selects an unfinished or absent harness
-
-  @unit
-  Scenario: The pre-turn probe answers for the harness the turn will use
-    Given the control plane asks whether a matching worker is already running
-    When the probe names the harness the turn would run on
-    Then the answer compares the running worker's harness too
-    And a harness change is a miss, so the turn replaces the worker instead of reusing it
 
   # The wrapper generates pi's model registry from the manager's config. That
   # entry must not LOSE what pi's own catalog knows about the model: Claude 5
@@ -199,7 +170,7 @@ Feature: Langy can run a conversation on the pi harness
     Then the digest is not folded into the prompt
     And the session's own history remains the single copy of the conversation
 
-  # Telemetry: the pi harness exports no OTLP of its own, so the relay retells
+  # Telemetry: the worker exports no OTLP of its own, so the relay retells
   # each mediated LLM call as one gen_ai span. Provider prompt caching serves
   # most of a follow-up's prompt at a fraction of the input price, and a retold
   # span without the cache breakdown reads as a full-price call. See also

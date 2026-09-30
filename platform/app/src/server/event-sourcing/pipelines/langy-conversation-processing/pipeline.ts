@@ -15,8 +15,12 @@ import type { EventSubscriberDefinition } from "../../subscribers/eventSubscribe
 import {
   AcceptAgentTurnCommand,
   ArchiveConversationCommand,
+  ChangeLocalPolicyCommand,
+  ConnectLocalWorkspaceCommand,
   ConsumeTurnHandoffCommand,
   CreateConversationCommand,
+  DisconnectLocalWorkspaceCommand,
+  EndUserWaitCommand,
   FailAgentResponseCommand,
   FailToolCallCommand,
   ForkConversationCommand,
@@ -26,6 +30,8 @@ import {
   RecordAgentResponseCommand,
   RecordMessageCommand,
   RecordTurnHandoffCommand,
+  RequestLocalControlCommand,
+  StartUserWaitCommand,
   SucceedToolCallCommand,
   UpdateConversationMetadataCommand,
   UpdatePlanCommand,
@@ -153,5 +159,11 @@ export function createLangyConversationProcessingPipeline(
     .withCommand("recordTurnHandoff", RecordTurnHandoffCommand)
     .withCommand("consumeTurnHandoff", ConsumeTurnHandoffCommand)
     .withCommand("generateConversationTitle", GenerateConversationTitleCommand)
+    .withCommand("requestLocalControl", RequestLocalControlCommand)
+    .withCommand("connectLocalWorkspace", ConnectLocalWorkspaceCommand)
+    .withCommand("disconnectLocalWorkspace", DisconnectLocalWorkspaceCommand)
+    .withCommand("changeLocalPolicy", ChangeLocalPolicyCommand)
+    .withCommand("startUserWait", StartUserWaitCommand)
+    .withCommand("endUserWait", EndUserWaitCommand)
     .build();
 }

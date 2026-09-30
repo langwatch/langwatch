@@ -56,7 +56,8 @@ All routes on `gateway.langwatch.ai` (or `app.langwatch.ai/v1/**`).
 | POST | `/v1/chat/completions` | OpenAI-compatible chat completions (streaming + non-streaming). Used by Codex, opencode, most SDKs. |
 | POST | `/v1/messages` | Anthropic-compatible messages endpoint. Used by Claude Code, native Anthropic SDKs. Tool-call streaming deltas preserved byte-for-byte (Nexos docs: coding CLIs are picky here). |
 | POST | `/v1/embeddings` | OpenAI-compatible embeddings |
-| POST | `/v1/images/generations` | OpenAI-compatible image generation |
+| POST | `/v1/images/generations` | OpenAI-compatible image generation (non-streaming) |
+| POST | `/v1/images/edits` | OpenAI-compatible image editing, multipart with `image[]` parts (non-streaming) |
 | POST | `/v1/audio/transcriptions` | OpenAI-compatible transcription |
 | POST | `/v1/audio/speech` | OpenAI-compatible TTS |
 | POST | `/v1/moderations` | OpenAI-compatible moderation |

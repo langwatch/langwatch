@@ -29,7 +29,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		return filepath.Join(o.cfg.Home, "logs", st.Slug, name+".log")
 	}
 	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
-	// the app process and the langy worker's opencode (Bun) subprocess otherwise
+	// the app process and the langy worker (Bun) subprocess otherwise
 	// reject the portless HTTPS certs on every gateway/control-plane call ("self
 	// signed certificate in certificate chain"). Point them at the portless Local
 	// CA so those runtimes trust the same hostnames curl/Go/the browser already do.

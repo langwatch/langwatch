@@ -1,0 +1,151 @@
+import { createLogger } from "@langwatch/observability";
+import {
+  GENERIC_SIGN_IN_ERROR_CODE,
+  signInErrorMayCross,
+} from "~/features/auth/logic/signInErrorCodes";
+
+const logger = createLogger("langwatch:better-auth:signin-error-redirect");
+
+/**
+ * The query parameters that survive a withheld failure.
+ *
+ * An allowlist rather than a list of things to strip, because the direction
+ * matters: a parameter better-auth adds in a later version is withheld by
+ * default instead of travelling until somebody notices it. `callbackUrl` is
+ * here because the error card's own recovery action reads it to send somebody
+ * back where they were going.
+ */
+const CARRIED_THROUGH = ["callbackUrl"] as const;
+
+/** Only recognized refusal codes may cross the sign-in error boundary. */
+export function withholdInternalSignInError({
+  response,
+  errorPageUrl,
+  traceId,
+}: {
+  response: Response;
+  /** Where a failed sign-in is sent — `onAPIError.errorURL`. */
+  errorPageUrl: string;
+  /** The request's own trace id, so the log line and the screen agree. */
+  traceId?: string | null;
+}): Response {
+  const target = signInErrorTarget(response, errorPageUrl);
+  if (!target) return response;
+
+  const code = target.searchParams.get("error");
+  if (!code) return response;
+  if (signInErrorMayCross(code)) return response;
+
+  const description = target.searchParams.get("error_description");
+
+  logger.error(
+    { code, description, traceId: traceId ?? null, path: target.pathname },
+    "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
+  );
+
+  const withheld = new URL(errorPageUrl);
+  for (const carried of CARRIED_THROUGH) {
+    const value = target.searchParams.get(carried);
+    if (value !== null) withheld.searchParams.set(carried, value);
+  }
+  withheld.searchParams.set("error", GENERIC_SIGN_IN_ERROR_CODE);
+  // The one thing worth carrying about a cause we will not name: the handle
+  // that ties what the person is looking at to the line we just wrote.
+  if (traceId) withheld.searchParams.set("trace", traceId);
+
+  const headers = new Headers(response.headers);
+  headers.set("location", withheld.toString());
+  return new Response(response.body, { status: response.status, headers });
+}
+
+/**
+ * The paths a browser arrives at from an identity provider: the social
+ * provider callback, the generic OAuth callback, the SSO plugin's OIDC
+ * callback and its SAML assertion consumer. Nothing else under /api/auth is navigated to by a person.
+ */
+const SIGN_IN_CALLBACK_PATH =
+  /^\/api\/auth\/(?:callback\/|oauth2\/callback\/|sso\/callback(?:\/|$)|sso\/saml2\/sp\/acs(?:\/|$))/;
+
+/**
+ * A server error on a sign-in callback, sent to the sign-in error screen.
+ *
+ * better-auth answers an exception thrown during a callback with a bare 500,
+ * and the person who clicked "Continue with ..." sees an empty page. The
+ * callback is a browser navigation, so it gets the same generic refusal an
+ * unrecognized sign-in error gets, with the trace id. Every other auth route
+ * keeps its status, because the callers of those read it.
+ */
+export async function redirectFailedSignInCallback({
+  response,
+  path,
+  errorPageUrl,
+  traceId,
+}: {
+  response: Response;
+  path: string;
+  errorPageUrl: string;
+  traceId?: string | null;
+}): Promise<Response> {
+  if (response.status < 500) return response;
+  if (!SIGN_IN_CALLBACK_PATH.test(path)) return response;
+
+  const cause = await errorCauseOf(response);
+  logger.error(
+    { status: response.status, path, traceId: traceId ?? null, cause },
+    "a sign-in callback failed on the server; the person was sent a generic refusal",
+  );
+
+  const target = new URL(errorPageUrl);
+  target.searchParams.set("error", GENERIC_SIGN_IN_ERROR_CODE);
+  if (traceId) target.searchParams.set("trace", traceId);
+  return new Response(null, {
+    status: 302,
+    headers: { location: target.toString() },
+  });
+}
+
+/**
+ * The stable `code` of better-auth's JSON error body, for the log only. The
+ * message is left out because it can carry an address or a token; the thrower
+ * logs its own error with the same trace id.
+ */
+async function errorCauseOf(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = JSON.parse(await response.text());
+    if (typeof body !== "object" || body === null) return null;
+    const { code } = body as Record<string, unknown>;
+    return typeof code === "string" ? code.slice(0, 100) : null;
+  } catch {
+    return null;
+  }
+}
+
+function signInErrorTarget(
+  response: Response,
+  errorPageUrl: string,
+): URL | null {
+  if (response.status < 300 || response.status >= 400) return null;
+
+  const location = response.headers.get("location");
+  if (!location) return null;
+
+  let target: URL;
+  let errorPage: URL;
+  try {
+    // `errorPageUrl` is absolute, so it is also the base a relative Location
+    // resolves against — better-auth emits both shapes.
+    errorPage = new URL(errorPageUrl);
+    target = new URL(location, errorPage);
+  } catch {
+    // A Location we cannot parse is one we cannot rewrite, and refusing to
+    // serve it would break a redirect that is very probably fine.
+    return null;
+  }
+
+  // Only the sign-in error page. A callback redirecting somebody onward to
+  // the application they were signing in to is not this boundary's business.
+  if (target.origin !== errorPage.origin) return null;
+  if (target.pathname !== errorPage.pathname) return null;
+
+  return target;
+}

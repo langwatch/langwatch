@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
@@ -41,6 +42,7 @@ import {
   traceNameChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
+import { isStorableSpanReceived } from "../utils/storableSpanTime";
 import {
   extractIOFromLogRecord,
   liftCanonicalAttributesFromLogRecord,
@@ -59,6 +61,8 @@ import {
 import { anchorStorageTime } from "./services/storage-anchor";
 
 export type { TraceSummaryData };
+
+const logger = createLogger("langwatch:trace-processing:trace-summary-fold");
 
 // 2026-04-28: trim trailing assistant from chat-shaped input
 const COMPUTED_IO_SCHEMA_VERSION = "2026-04-28" as const;
@@ -700,6 +704,17 @@ export class TraceSummaryFoldProjection
     // fold cost. Derived fields stay frozen at the first MAX_PROCESSED_SPANS.
     if (state.spanCount >= MAX_PROCESSED_SPANS) {
       return { ...state, spanCount: state.spanCount + 1 };
+    }
+
+    // A span whose own times cannot be stored throws inside normalization (the
+    // KSUID over its start SECONDS), which blocks this trace's fold lane on a
+    // permanent failure. Leave the state untouched so the trace's other spans
+    // still fold; `apply` reads the identity back as "nothing contributed" and
+    // anchors nothing.
+    if (
+      !isStorableSpanReceived({ event, logger, consumer: "traceSummaryFold" })
+    ) {
+      return state;
     }
 
     const normalizedSpan =

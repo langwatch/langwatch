@@ -60,6 +60,8 @@ COPY platform/app/src/server/tracer/types.ts              ./platform/app/src/ser
 COPY platform/app/src/server/filters/types.ts             ./platform/app/src/server/filters/types.ts
 COPY platform/app/src/server/evaluations/types.ts         ./platform/app/src/server/evaluations/types.ts
 COPY platform/app/src/server/evaluations/evaluators.native.ts ./platform/app/src/server/evaluations/evaluators.native.ts
+COPY platform/app/src/server/scenarios/suite-fields.ts     ./platform/app/src/server/scenarios/suite-fields.ts
+COPY platform/app/src/server/scenarios/evaluator-attachments.ts ./platform/app/src/server/scenarios/evaluator-attachments.ts
 COPY platform/app/src/server/modelProviders/llmModels.json ./platform/app/src/server/modelProviders/llmModels.json
 COPY platform/app/src/app/api/openapiLangWatch.json       ./platform/app/src/app/api/openapiLangWatch.json
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)

@@ -35,6 +35,8 @@ export function AddIngestionSourceMenu({
   disabledReason,
   hint,
   onPick,
+  open,
+  onOpenChange,
 }: {
   children: React.ReactNode;
   isEnterprise: boolean;
@@ -42,6 +44,12 @@ export function AddIngestionSourceMenu({
   /** Hover hint on the (enabled) trigger, e.g. the plan's source allowance. */
   hint?: string;
   onPick: (sourceType: SourceType) => void;
+  /**
+   * Controlled open state, for a caller that opens the menu itself (the
+   * guided tour ends on it). Left out, the menu opens and closes on its own.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   if (disabledReason) {
     return (
@@ -55,7 +63,12 @@ export function AddIngestionSourceMenu({
   const groups: SourceGroup[] = ["realtime", "scheduled"];
 
   return (
-    <Menu.Root>
+    <Menu.Root
+      open={open}
+      onOpenChange={
+        onOpenChange ? (details) => onOpenChange(details.open) : undefined
+      }
+    >
       <Tooltip content={hint} disabled={!hint}>
         <TriggerAnchor>
           <Menu.Trigger asChild>{children}</Menu.Trigger>

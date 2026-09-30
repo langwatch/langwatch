@@ -152,11 +152,15 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).resolves.toBeUndefined();
     });
 
-    /** @scenario A fresh unlicensed deployment bootstraps via email signup */
-    it("leaves fresh email sign-up open", async () => {
-      await expect(
-        runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
-      ).resolves.toBeUndefined();
+    /** @scenario Raw password sign-up cannot bypass confirmed registration */
+    it.each([
+      "https://host/api/auth/sign-up/email",
+      "https://host/api/auth/sign-up/email/",
+      "https://host/api/auth/sign-up/email?callbackURL=%2F",
+    ])("refuses the raw sign-up route %s", async (url) => {
+      await expect(runBeforeHook(ctxFor(url))).rejects.toMatchObject({
+        statusCode: 404,
+      });
     });
 
     /** @scenario No password can be attached to an SSO account without inbox proof */
@@ -186,7 +190,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
     it("refuses email sign-up, email sign-in, and password reset (v5 BLOCKER)", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
-      ).rejects.toMatchObject({ statusCode: 400 });
+      ).rejects.toMatchObject({ statusCode: 404 });
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-in/email")),
       ).rejects.toMatchObject({ statusCode: 400 });
@@ -224,7 +228,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
     it("refuses trailing-slash variants — the router resolves them to the same handler", async () => {
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email/")),
-      ).rejects.toMatchObject({ statusCode: 400 });
+      ).rejects.toMatchObject({ statusCode: 404 });
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-in/email//")),
       ).rejects.toMatchObject({ statusCode: 400 });
@@ -259,7 +263,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).resolves.toBeUndefined();
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/sign-up/email")),
-      ).resolves.toBeUndefined();
+      ).rejects.toMatchObject({ statusCode: 404 });
       await expect(
         runBeforeHook(ctxFor("https://host/api/auth/request-password-reset")),
       ).resolves.toBeUndefined();

@@ -13,6 +13,7 @@
  */
 
 import { formatDistanceStrict } from "date-fns";
+import type { ConnectedAgentNotSelectableReason } from "~/server/connected-agents/selectable";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 
 /** The SDK that registered an agent, as the card prints it. */
@@ -45,6 +46,9 @@ export interface ConnectedAgentView {
   status: "online" | "offline";
   instances: ConnectedAgentInstance[];
   owner: { userId: string; name: string | null } | null;
+  /** Whether the reader can run this agent; false for another person's. */
+  selectable: boolean;
+  notSelectableReason: ConnectedAgentNotSelectableReason | null;
   parameters: ScenarioParameterDefinition[];
   config: { description?: string; sdk?: ConnectedAgentSdk } & Record<
     string,
@@ -131,6 +135,10 @@ export function instanceCountLabel(agent: ConnectedAgentView): string | null {
  * A development agent registered with a personal key belongs to that person,
  * and one registered with a project key belongs to the machine it runs on.
  * A shared environment belongs to the project and carries no chip.
+ *
+ * Two cards of one name and one environment differ only here, which is why
+ * the chip is drawn on every card that has an owner or a machine and not
+ * only on the ones the reader can run.
  */
 export function scopeOf(agent: ConnectedAgentView): ConnectedAgentScope {
   if (agent.owner) return { kind: "owner", label: agent.owner.name ?? "Owner" };

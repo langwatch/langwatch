@@ -42,7 +42,11 @@ export const codexAgent: CodingAgentDefinition = {
   matches: (signal) => signalSays(signal, "codex"),
   namePrefixes: ["codex."],
 
-  sessionSpanNames: ["session_task.turn"],
+  // `turn/start` is the app-server request span of a helper thread codex ran
+  // for itself (the thread title generator, the recap), admitted at ingestion
+  // only once it carries the helper's thread id under `langwatch.thread.id`;
+  // see app-layer/traces/codex-auxiliary-thread.ts.
+  sessionSpanNames: ["session_task.turn", "turn/start"],
   foldsToolRunsFromEvents: true,
   wrapperToolNames: ["exec"],
   logsRequireSessionKey: true,
@@ -55,8 +59,14 @@ export const codexAgent: CodingAgentDefinition = {
   // spans stamp the tokio worker id ("10") under the same key; those spans
   // are not gated in, but the guard keeps this hook safe if one ever is.
   sessionKeyFromSpan: ({ name, attrs }) => {
-    if (name !== "session_task.turn") return null;
-    const threadId = attrs["thread.id"];
+    // The helper thread's request span names its thread only through the
+    // ingestion stamp; its own `thread.id` is a tokio worker id.
+    const threadId =
+      name === "turn/start"
+        ? attrs["langwatch.thread.id"]
+        : name === "session_task.turn"
+          ? attrs["thread.id"]
+          : null;
     return typeof threadId === "string" && threadId.includes("-")
       ? threadId
       : null;

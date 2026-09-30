@@ -4,7 +4,9 @@
  * The hero's onboarding control, restored: a new project leads with a
  * prominent "Send your first trace" above the ask chips, a populated project
  * keeps the quiet "Onboard your agent" beneath them, and neither renders
- * while the project's reach is still unknown.
+ * while the project's reach is still unknown. And the field's one rule
+ * about conversations: while the panel is open on one, the field stands
+ * down to a line that continues it.
  *
  * Spec: specs/home/langy-home.feature
  *
@@ -12,7 +14,13 @@
  * and store, the ambient dev state, and the project's reach.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,9 +34,18 @@ const canAskMock = vi.fn(() => true);
 vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
   useCanAskLangy: () => canAskMock(),
 }));
+// The store as the hero reads it: what the field does with a question, and
+// whether a conversation is open. A plain object, set per test.
+const langyState = {
+  askLangy: vi.fn(),
+  openPanel: vi.fn(),
+  isOpen: false,
+  activeConversationId: null as string | null,
+  pendingPrompt: null as string | null,
+};
 vi.mock("~/features/langy/stores/langyStore", () => ({
-  useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) =>
-    selector({ askLangy: vi.fn() }),
+  useLangyStore: (selector: (s: typeof langyState) => unknown) =>
+    selector(langyState),
 }));
 vi.mock("../dev/homeDevState", () => ({
   useHomeDevState: () => null,
@@ -44,6 +61,12 @@ vi.mock("../useProjectReach", () => ({
 
 // The pill's menu is `AgentActionsMenu`, which reads the project for its
 // key and fetches the skill the copy hands over.
+// The guided onboarding offer reads its flag and state over tRPC; this
+// suite covers the hero, not the offer.
+vi.mock("~/features/guided-onboarding/home/GuidedOnboardingOffer", () => ({
+  GuidedOnboardingOffer: () => null,
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", apiKey: "sk-lw-home" },
@@ -80,6 +103,9 @@ const onboardingTriggers = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   canAskMock.mockReturnValue(true);
+  langyState.isOpen = false;
+  langyState.activeConversationId = null;
+  langyState.pendingPrompt = null;
 });
 
 const NEW_PROJECT_REACH = {
@@ -207,6 +233,67 @@ describe("LangyHomeHero onboarding control", () => {
       // BENEATH the ask chips: the populated asks precede the quiet pill.
       const chip = screen.getByText("Compare two runs");
       expect(renders_before(chip, pill)).toBe(true);
+    });
+  });
+
+  describe("while the panel is open on a conversation", () => {
+    beforeEach(() => {
+      reachMock.mockReturnValue(POPULATED_REACH);
+      langyState.isOpen = true;
+      langyState.activeConversationId = "conv-open";
+    });
+
+    /** @scenario The field stands down while a conversation is open */
+    it("offers the way back into that conversation instead of a field that starts one", () => {
+      renderHero();
+
+      expect(screen.queryByPlaceholderText("ask")).toBeNull();
+      expect(screen.getByText("Continue your conversation")).toBeDefined();
+      // Hidden in place, not unmounted: the row keeps its height.
+      expect(screen.getByText("Compare two runs")).not.toBeVisible();
+      // The onboarding route needs no conversation, so it stays.
+      expect(screen.getByText("Onboard your agent")).toBeDefined();
+    });
+
+    /** @scenario The field stands down while a conversation is open */
+    it("opens the panel and puts the cursor in its composer", () => {
+      const panel = document.createElement("div");
+      panel.setAttribute("data-langy-composer", "panel");
+      const textarea = document.createElement("textarea");
+      panel.appendChild(textarea);
+      document.body.appendChild(panel);
+      try {
+        renderHero();
+
+        fireEvent.click(screen.getByText("Continue your conversation"));
+
+        expect(langyState.openPanel).toHaveBeenCalledTimes(1);
+        expect(langyState.askLangy).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(textarea);
+      } finally {
+        panel.remove();
+      }
+    });
+
+    it("keeps the field while the panel is open on nothing", () => {
+      langyState.activeConversationId = null;
+      renderHero();
+
+      expect(screen.getByPlaceholderText("ask")).toBeDefined();
+      expect(screen.queryByText("Continue your conversation")).toBeNull();
+      expect(screen.getByText("Compare two runs")).toBeVisible();
+    });
+  });
+
+  describe("while a question handed to Langy is still on its way", () => {
+    /** @scenario The field stands down while a conversation is open */
+    it("stands down the same way, before the conversation has an id", () => {
+      reachMock.mockReturnValue(POPULATED_REACH);
+      langyState.pendingPrompt = "why are my traces failing";
+      renderHero();
+
+      expect(screen.queryByPlaceholderText("ask")).toBeNull();
+      expect(screen.getByText("Continue your conversation")).toBeDefined();
     });
   });
 

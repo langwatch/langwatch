@@ -56,6 +56,8 @@ const KNOWN_UNPRICED: Record<string, string> = {
     "Music generation billed per 30-second clip at $0.04. Both upstream sources report zero per token and the catalog has no per-clip unit.",
   "gemini/lyria-3-pro-preview":
     "Music generation billed per song at $0.08, same missing per-clip unit.",
+  "stealth/space-bunny-alpha":
+    "Anonymous preview model offered free of charge upstream, so zero per token is its real rate.",
 };
 
 const isPricedElsewhere = (modelId: string) =>
@@ -69,6 +71,8 @@ const ONE_OF_EVERYTHING = {
   cacheCreationTokens: 1,
   inputCharacters: 1,
   audioSeconds: 1,
+  inputImageTokens: 1,
+  outputImageTokens: 1,
 };
 
 /** The unit an entry's rates bill in, from the rate fields it carries. */
@@ -79,6 +83,8 @@ function pricedUnits(entry: LLMModelEntry): Set<string> {
     (p.inputCostPerToken ?? 0) > 0 ||
     (p.outputCostPerToken ?? 0) > 0 ||
     (p.audioCostPerToken ?? 0) > 0 ||
+    (p.imageCostPerToken ?? 0) > 0 ||
+    (p.imageOutputCostPerToken ?? 0) > 0 ||
     (p.inputCacheReadPerToken ?? 0) > 0 ||
     (p.inputCacheWritePerToken ?? 0) > 0
   ) {

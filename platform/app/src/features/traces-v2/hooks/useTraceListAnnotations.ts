@@ -4,7 +4,7 @@ import {
   useAnnotationsByTraceIds,
 } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useViewStore } from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import type { TraceListItem } from "../types/trace";
 
 /** A row with nothing said about it, and the shape one carries before its
@@ -37,7 +37,7 @@ export function useTraceListAnnotations({
   isSamplePreview?: boolean;
 }): TraceListItem[] {
   const { project, hasPermission } = useOrganizationTeamProject();
-  const needsAnnotations = useViewStore((state) =>
+  const needsAnnotations = useExplorerStore((state) =>
     state.columnOrder.includes("annotations"),
   );
   const canRead = hasPermission("annotations:view");

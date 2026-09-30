@@ -6,6 +6,13 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.get_agent_response_200_not_selectable_reason_type_1 import GetAgentResponse200NotSelectableReasonType1
+from ..models.get_agent_response_200_not_selectable_reason_type_2_type_1 import (
+    GetAgentResponse200NotSelectableReasonType2Type1,
+)
+from ..models.get_agent_response_200_not_selectable_reason_type_3_type_1 import (
+    GetAgentResponse200NotSelectableReasonType3Type1,
+)
 from ..models.get_agent_response_200_status import GetAgentResponse200Status
 from ..models.get_agent_response_200_type import GetAgentResponse200Type
 
@@ -43,6 +50,12 @@ class GetAgentResponse200:
             offline otherwise, and always for every other kind.
         instances (list[GetAgentResponse200InstancesItem]): The processes currently connected for a connected agent:
             hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind.
+        selectable (bool): Whether the credential making this request can run simulations against the agent. False for a
+            personal development agent that belongs to somebody else, which is listed all the same so it can be told apart
+            from the other agents of the same name.
+        not_selectable_reason (GetAgentResponse200NotSelectableReasonType1 |
+            GetAgentResponse200NotSelectableReasonType2Type1 | GetAgentResponse200NotSelectableReasonType3Type1 | None): Why
+            the agent cannot be run by this credential. Null when it can.
         created_at (str):
         updated_at (str):
         platform_url (str):
@@ -60,6 +73,13 @@ class GetAgentResponse200:
     owner: GetAgentResponse200OwnerType0 | None
     status: GetAgentResponse200Status
     instances: list[GetAgentResponse200InstancesItem]
+    selectable: bool
+    not_selectable_reason: (
+        GetAgentResponse200NotSelectableReasonType1
+        | GetAgentResponse200NotSelectableReasonType2Type1
+        | GetAgentResponse200NotSelectableReasonType3Type1
+        | None
+    )
     created_at: str
     updated_at: str
     platform_url: str
@@ -111,6 +131,18 @@ class GetAgentResponse200:
             instances_item = instances_item_data.to_dict()
             instances.append(instances_item)
 
+        selectable = self.selectable
+
+        not_selectable_reason: None | str
+        if isinstance(self.not_selectable_reason, GetAgentResponse200NotSelectableReasonType1):
+            not_selectable_reason = self.not_selectable_reason.value
+        elif isinstance(self.not_selectable_reason, GetAgentResponse200NotSelectableReasonType2Type1):
+            not_selectable_reason = self.not_selectable_reason.value
+        elif isinstance(self.not_selectable_reason, GetAgentResponse200NotSelectableReasonType3Type1):
+            not_selectable_reason = self.not_selectable_reason.value
+        else:
+            not_selectable_reason = self.not_selectable_reason
+
         created_at = self.created_at
 
         updated_at = self.updated_at
@@ -133,6 +165,8 @@ class GetAgentResponse200:
                 "owner": owner,
                 "status": status,
                 "instances": instances,
+                "selectable": selectable,
+                "notSelectableReason": not_selectable_reason,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
                 "platformUrl": platform_url,
@@ -229,6 +263,52 @@ class GetAgentResponse200:
 
             instances.append(instances_item)
 
+        selectable = d.pop("selectable")
+
+        def _parse_not_selectable_reason(
+            data: object,
+        ) -> (
+            GetAgentResponse200NotSelectableReasonType1
+            | GetAgentResponse200NotSelectableReasonType2Type1
+            | GetAgentResponse200NotSelectableReasonType3Type1
+            | None
+        ):
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                not_selectable_reason_type_1 = GetAgentResponse200NotSelectableReasonType1(data)
+
+                return not_selectable_reason_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                not_selectable_reason_type_2_type_1 = GetAgentResponse200NotSelectableReasonType2Type1(data)
+
+                return not_selectable_reason_type_2_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                not_selectable_reason_type_3_type_1 = GetAgentResponse200NotSelectableReasonType3Type1(data)
+
+                return not_selectable_reason_type_3_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(
+                GetAgentResponse200NotSelectableReasonType1
+                | GetAgentResponse200NotSelectableReasonType2Type1
+                | GetAgentResponse200NotSelectableReasonType3Type1
+                | None,
+                data,
+            )
+
+        not_selectable_reason = _parse_not_selectable_reason(d.pop("notSelectableReason"))
+
         created_at = d.pop("createdAt")
 
         updated_at = d.pop("updatedAt")
@@ -248,6 +328,8 @@ class GetAgentResponse200:
             owner=owner,
             status=status,
             instances=instances,
+            selectable=selectable,
+            not_selectable_reason=not_selectable_reason,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,

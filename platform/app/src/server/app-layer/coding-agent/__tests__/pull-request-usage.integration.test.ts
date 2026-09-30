@@ -15,6 +15,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -23,13 +24,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { Permission } from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import type { CodingAgentSessionEventRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionEvents.mapProjection";
 import {
   type CallerProjectScope,
   resolveCallerProjectScope,
 } from "~/server/organizations/resolveCallerProjectScope";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   startTestContainers,
@@ -89,22 +90,18 @@ async function grant({
   permissions: Permission[];
   name: string;
 }): Promise<void> {
-  const customRole = await prisma.customRole.create({
-    data: {
-      organizationId,
-      name: `${name}-${tag}`,
-      permissions,
-    },
+  const customRole = await seedCustomRole(prisma, {
+    organizationId,
+    name: `${name}-${tag}`,
+    permissions,
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId,
-      userId,
-      role: TeamUserRole.CUSTOM,
-      customRoleId: customRole.id,
-      scopeType: RoleBindingScopeType.PROJECT,
-      scopeId: projectId,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId,
+    role: TeamUserRole.CUSTOM,
+    customRoleId: customRole.id,
+    scopeType: RoleBindingScopeType.PROJECT,
+    scopeId: projectId,
   });
 }
 

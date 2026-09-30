@@ -145,6 +145,7 @@ export function buildPreconditionTraceDataFromFoldState(
     subTopicId: foldState.subTopicId ?? null,
     spanModels: foldState.models.length > 0 ? foldState.models : null,
     customMetadata: extractCustomMetadata(attrs),
+    attributes: attrs,
     annotationIds: foldState.annotationIds,
     events: buildPreconditionEvents(events),
   };
