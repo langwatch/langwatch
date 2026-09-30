@@ -170,11 +170,12 @@ describe("given the derived Postgres catalog", () => {
     });
 
     it("still gates a free-text String body that is not a label", () => {
-      // `agents.Config` is a plain `String` body, not an enum and not a label
-      // suffix, so the widening leaves it gated `output` exactly as before.
-      const config = byName.get("agents")!.columns.find((column) => column.name === "Config")!;
-      expect(config.type).toBe("String");
-      expect(config.gates).toEqual(["output"]);
+      // `monitors.Preconditions` is a plain `String` body, not an enum and not a label.
+      const body = byName
+        .get("monitors")!
+        .columns.find((column) => column.name === "Preconditions")!;
+      expect(body.type).toBe("String");
+      expect(body.gates).toEqual(["output"]);
     });
 
     /**

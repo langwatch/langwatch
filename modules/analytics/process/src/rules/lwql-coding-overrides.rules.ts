@@ -3,16 +3,12 @@
  * `coding_agent_sessions` / `coding_agent_session_events` (#8085 / #8116 Part B, step 5).
  */
 
-import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import type { DatasetOverride } from "./lwql-dataset-derivation.rules.ts";
+import type { UngatedViewDefinition } from "./lwql-field-protection.rules.ts";
 import { LWQL_SOURCE_ALIAS } from "./lwql-source-alias.rules.ts";
 
 export const CODING_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
   coding_agent_trace_sessions: {
-    // The default name is the physical table name, which collides with it (the
-    // view lives in the same ClickHouse database as the fact table on
-    // self-hosted — see `selfProvisioning.ts`'s same-database requirement).
-    name: "coding_trace_sessions",
     description: "Correlates a trace to the coding-agent session it belongs to.",
     grain: "one row per (TenantId, TraceId)",
     timeColumn: "OccurredAt",
@@ -22,16 +18,12 @@ export const CODING_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     dedup: { versionColumn: "UpdatedAt" },
   },
   stored_objects: {
-    name: "objects",
     description: "Stored file objects: what was captured, its size and hash.",
     grain: "one row per id",
     timeColumn: "created_at",
     tenantColumn: "project_id",
     // `ReplacingMergeTree(inserted_at)` (migration 00023).
     dedup: { versionColumn: "inserted_at" },
-    aliases: {
-      TenantId: "project_id",
-    },
     descriptions: {
       TenantId: "Project the object belongs to.",
     },
@@ -42,12 +34,11 @@ export const CODING_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
  * A tool call's printed output: `stored_spans` (one row per `claude_code.tool` span) LEFT-joined to
  * `log_records` (the request body OTel captured for that trace), matched by tenant and trace.
  */
-export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
+export const CODING_TOOL_RESULTS: UngatedViewDefinition = {
   name: "coding_tool_results",
   sourceTable: "stored_spans",
   description:
     "One row per coding-agent tool call, with the text it printed back to " + "the agent.",
-  gates: [],
   grain: "one row per (TenantId, TraceId, SpanId), latest version only",
   grainColumns: ["TenantId", "TraceId", "SpanId"],
   joinKeys: ["TenantId", "TraceId", "SpanId", "SessionId", "ToolUseId"],
@@ -91,35 +82,30 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       name: "TenantId",
       type: "String",
       description: "Project the tool call belongs to.",
-      gates: [],
       sourceColumns: ["TenantId"],
     },
     {
       name: "TraceId",
       type: "String",
       description: "Trace the tool call's span belongs to.",
-      gates: [],
       sourceColumns: ["TraceId"],
     },
     {
       name: "SpanId",
       type: "String",
       description: "The tool-call span's own id.",
-      gates: [],
       sourceColumns: ["SpanId"],
     },
     {
       name: "StartTime",
       type: "DateTime64(3)",
       description: "When the tool-call span started. Filter on this to prune partitions.",
-      gates: [],
       sourceColumns: ["StartTime"],
     },
     {
       name: "SessionId",
       type: "String",
       description: "Coding-agent session the captured request belongs to.",
-      gates: [],
       sourceColumns: [],
       joinedSourceColumns: ["ProviderSessionId"],
       expression: (_source, joined) => joined!("ProviderSessionId"),
@@ -128,7 +114,6 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       name: "ToolUseId",
       type: "String",
       description: "The tool call's id, as the agent's wire protocol assigned it.",
-      gates: [],
       sourceColumns: ["SpanAttributes"],
       expression: (source) => `${source("SpanAttributes")}['tool_use_id']`,
     },
@@ -136,7 +121,6 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       name: "ToolName",
       type: "String",
       description: "Name of the tool that was called.",
-      gates: [],
       sourceColumns: ["SpanAttributes"],
       expression: (source) => `${source("SpanAttributes")}['tool_name']`,
     },
@@ -146,7 +130,6 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       description:
         "1 when the span's status code is not the OTel error code (2), 0 " +
         "when it is, null when the span carries no status code.",
-      gates: [],
       sourceColumns: ["StatusCode"],
       expression: (source) => `${source("StatusCode")} != 2`,
     },
@@ -156,7 +139,6 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       description:
         "What the tool call printed back to the agent. Empty when no " +
         "request body was captured for this trace.",
-      gates: ["output"],
       sourceColumns: ["SpanAttributes"],
       // Its content comes from the joined request body, not from the primary
       // side's `SpanAttributes` map (which it reads only to match `tool_use_id`)
@@ -190,7 +172,6 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       name: "CapturedAt",
       type: "DateTime64(3)",
       description: "When the captured request body was written.",
-      gates: [],
       sourceColumns: [],
       joinedSourceColumns: ["TimeUnixMs"],
       expression: (_source, joined) => joined!("TimeUnixMs"),

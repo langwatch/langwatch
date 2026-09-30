@@ -8113,16 +8113,6 @@
               "available": true
             },
             {
-              "name": "Config",
-              "type": "String",
-              "description": "Config",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
               "name": "WorkflowId",
               "type": "Nullable(String)",
               "description": "WorkflowId",
@@ -9199,16 +9189,6 @@
               "name": "ThresholdConfig",
               "type": "String",
               "description": "Per-rule-type threshold shape.",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
-              "name": "DestinationConfig",
-              "type": "String",
-              "description": "Alert routing per destination.",
               "unit": null,
               "gates": [
                 "output"
@@ -12012,16 +11992,6 @@
               "description": "GitHub installation id (numeric; stored as string).",
               "unit": null,
               "gates": [],
-              "available": true
-            },
-            {
-              "name": "AccountLogin",
-              "type": "String",
-              "description": "The GitHub account the App is installed on.",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
               "available": true
             },
             {
@@ -17184,16 +17154,6 @@
               "description": "TriggerKind",
               "unit": null,
               "gates": [],
-              "available": true
-            },
-            {
-              "name": "ActionParams",
-              "type": "String",
-              "description": "ActionParams",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
               "available": true
             },
             {

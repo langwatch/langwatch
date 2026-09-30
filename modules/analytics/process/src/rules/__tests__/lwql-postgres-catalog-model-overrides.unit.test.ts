@@ -1,19 +1,20 @@
 /**
  * The Postgres catalog's per-model override handling: the six formerly-hand-written views, topic
- * clustering internals, re-admit reasons and name-rule-dodging columns.
+ * clustering internals, the columns the builder refuses and name-rule-dodging columns.
  */
 
 import { describe, expect, it } from "vitest";
 
 import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
+import type { LwqlTableCatalogue } from "../lwql-catalogue.rules.ts";
 import {
   type DerivedPostgresView,
   defineCatalogModel,
-  type PostgresDatasetOverride,
 } from "../lwql-postgres-catalog-model.rules.ts";
 import {
   LWQL_POSTGRES_ALL_OVERRIDES,
   LWQL_POSTGRES_CATALOG,
+  LWQL_POSTGRES_CATALOGUE,
 } from "../lwql-postgres-view-catalog.rules.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
@@ -108,39 +109,32 @@ describe("given the derived Postgres catalog's overrides", () => {
     });
   });
 
-  describe("when an override re-admits a stripped column", () => {
-    /** @scenario "An override that re-admits a stripped column carries a reason" */
-    it("requires a reason and refuses one without", () => {
-      const withReason: PostgresDatasetOverride = {
-        reAdmit: { Email: "the reviewer's own email, opt-in" },
-      };
-      expect(() =>
-        defineCatalogModel({
-          model: "Annotation",
-          override: withReason,
-          overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-        }),
-      ).not.toThrow();
+  describe("when a catalogue entry exposes what the builder refuses", () => {
+    const projects = LWQL_POSTGRES_CATALOGUE.projects;
+    const build = (columns: LwqlTableCatalogue["columns"]) => () =>
+      defineCatalogModel({
+        name: "projects",
+        table: { sourceTable: "Project", columns: { ...projects.columns, ...columns } },
+        overrides: LWQL_POSTGRES_ALL_OVERRIDES,
+      });
 
-      const withoutReason: PostgresDatasetOverride = { reAdmit: { Email: "" } };
-      expect(() =>
-        defineCatalogModel({
-          model: "Annotation",
-          override: withoutReason,
-          overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-        }),
-      ).toThrow(/re-admits/);
+    /** @scenario "A catalogue entry exposing a stripped column fails the build" */
+    it("refuses a secret-named field, even renamed", () => {
+      expect(build({ apiKey: "inherit" })).toThrow(/exposes "apiKey": secret material/);
+      expect(build({ Key: { source: "apiKey" } })).toThrow(/exposes "Key": secret material/);
     });
 
-    it("refuses a skipColumns entry naming a column the model does not have", () => {
-      const badOverride: PostgresDatasetOverride = { skipColumns: { notARealColumn: "made up" } };
-      expect(() =>
-        defineCatalogModel({
-          model: "Annotation",
-          override: badOverride,
-          overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-        }),
-      ).toThrow(/skipColumns names "notARealColumn"/);
+    it("refuses an entry naming a field the model does not have", () => {
+      expect(build({ notARealColumn: "inherit" })).toThrow(/names "notARealColumn"/);
+    });
+
+    it("refuses a TenantId that reads anything but the tenant's own field", () => {
+      expect(build({ TenantId: { source: "teamId" } })).toThrow(/must declare TenantId/);
+    });
+
+    it("refuses a column access the view shape cannot carry yet", () => {
+      const access = { allOf: ["project:update"] } as const;
+      expect(build({ S3Bucket: { source: "s3Bucket", access } })).toThrow(/only cost:view/);
     });
   });
 
@@ -190,6 +184,19 @@ describe("given the derived Postgres catalog's overrides", () => {
       expect(strippingOf({ baseRelation: "IngestionSource", source: "pollerCursor" })).toEqual(
         stripped("IngestionSource.pollerCursor"),
       );
+    });
+
+    it("strips the credential- and identity-bearing bodies the catalogue omits", () => {
+      for (const [baseRelation, source] of [
+        ["Agent", "config"],
+        ["Trigger", "actionParams"],
+        ["AnomalyRule", "destinationConfig"],
+        ["GithubInstallation", "accountLogin"],
+      ] as const) {
+        expect(strippingOf({ baseRelation, source })).toEqual(
+          stripped(`${baseRelation}.${source}`),
+        );
+      }
     });
 
     it("strips ModelProvider.extraHeaders, raw provider auth headers", () => {

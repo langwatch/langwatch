@@ -117,7 +117,11 @@ describe("the LangWatchQL catalog is opt-in", () => {
       const before = LWQL_VIEW_CATALOG.length;
       // It WOULD build a view if it were listed.
       const built = defineCatalogModel({
-        model: "FakeSecretModel",
+        name: "fake_secret_models",
+        table: {
+          sourceTable: "FakeSecretModel",
+          columns: { TenantId: { source: "projectId" }, FakeSecretModelId: { source: "id" } },
+        },
         overrides: LWQL_POSTGRES_ALL_OVERRIDES,
         manifest: FAKE_PG_MANIFEST,
       });

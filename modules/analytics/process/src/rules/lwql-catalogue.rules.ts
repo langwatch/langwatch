@@ -19,7 +19,11 @@ export type LwqlAccess = Readonly<{ allOf: Permissions }> | Readonly<{ anyOf: Pe
 /** Captured content: the project's data-privacy policy decides it, not a grant. */
 export type LwqlContent = "input" | "output";
 
-type LwqlGate = Readonly<{ access?: LwqlAccess; content?: LwqlContent }>;
+/** A column carrying both contents is readable only by a caller who may see both. */
+type LwqlGate = Readonly<{
+  access?: LwqlAccess;
+  content?: LwqlContent | readonly ["input", "output"];
+}>;
 
 /**
  * One exposed name: `"inherit"` (the source column of that name, table access only), `"omit"`
