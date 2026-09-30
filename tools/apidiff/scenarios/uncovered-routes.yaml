@@ -1,0 +1,1293 @@
+# Routes the coverage audit (gap 7) found with no scenario: token and upload surfaces first, then
+# onboarding, agent-cache, dashboard-widgets, saved-workbench-charts, voice, workflow run and studio,
+# OTLP metrics aliases and copilotkit. Paths follow main (legacy /api/<x>, /api/v1 where main is v1-only).
+# Not scripted, with the reason:
+#  - unsubscribe happy path: the token is an HMAC over a secret no public API reveals.
+#  - scim-webhook and elevenlabs-webhook happy path: the shared secret / provider signing secret is
+#    per stack (env or a provider row), so only the refusals are reachable.
+#  - image-proxy happy path: needs an outside image and the egress fence refuses this host.
+#  - workflow-run happy path: a published workflow can only be made through tRPC (session), not REST.
+# Needs a stack that has them on: the dashboard-widgets and analytics-charts happy paths (flags
+# release_custom_chart_playground and lwql; both 403 with the flag's code where they are off), every
+# `auth: session` scenario (the seeded admin must sign in), and every `auth: restricted` one (needs the
+# authz grants projection, so a worker). Where the stack lacks one the harness reports ERROR or the 403.
+# Branch-only routes (main answers 404): stored-objects uploads family (create, confirm, PUT, get, delete).
+# Removed on purpose on the branch (parity-rest.go): /api/copilotkit.
+
+# ---- unsubscribe (RFC 8058 one-click; the ?token= is the credential; 10 per minute per caller) ----
+
+- id: unsub-missing-token-is-400
+  endpoint: POST /api/unsubscribe
+  auth: none
+  request:
+    path: /api/unsubscribe
+  expect:
+    status: 400
+
+- id: unsub-tampered-token-is-400
+  endpoint: POST /api/unsubscribe
+  auth: none
+  request:
+    path: /api/unsubscribe
+    query: { token: "vd-{uid}.tampered" }
+  expect:
+    status: 400
+
+- id: unsub-project-key-does-not-replace-the-token
+  endpoint: POST /api/unsubscribe
+  auth: project
+  request:
+    path: /api/unsubscribe
+    query: { token: "vd-{uid}" }
+  expect:
+    status: 400
+
+- id: unsub-get-is-method-not-allowed
+  endpoint: GET /api/unsubscribe
+  auth: none
+  request:
+    path: /api/unsubscribe
+    query: { token: "vd-{uid}" }
+  expect:
+    status: 405
+
+# ---- files (a stored object's bytes, project key) ----
+
+- id: files-scoped-read-refuses-no-key
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: none
+  request:
+    path: "/api/files/{projectId}/vd-{uid}"
+  expect:
+    status: 401
+
+- id: files-scoped-read-wrong-project-is-403
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: project-b
+  request:
+    path: "/api/files/{projectId}/vd-{uid}"
+  expect:
+    status: 403
+
+- id: files-scoped-read-unknown-object-is-404
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: project
+  request:
+    path: "/api/files/{projectId}/vd-{uid}"
+  expect:
+    status: 404
+
+- id: files-id-only-read-refuses-no-key
+  endpoint: GET /api/files/{storedObjectId}
+  auth: none
+  request:
+    path: "/api/files/vd-{uid}"
+  expect:
+    status: 401
+
+- id: files-id-only-read-unknown-object-is-404
+  endpoint: GET /api/files/{storedObjectId}
+  auth: project
+  request:
+    path: "/api/files/vd-{uid}"
+  expect:
+    status: 404
+
+# ---- stored-objects uploads (branch only: main has no such route and answers 404) ----
+
+- id: stored-objects-create-upload-happy
+  endpoint: POST /api/stored-objects/uploads
+  auth: project
+  request:
+    path: /api/stored-objects/uploads
+    body:
+      projectId: "{projectId}"
+      purpose: dataset_attachment
+      filename: "vd-{uid}.txt"
+      mediaType: text/plain
+      byteLength: 5
+  capture: { objectId: objectId }
+  expect:
+    status: [200, 201]
+    body: { objectId: "<any>", uploadUrl: "<any>", method: PUT, expiresAt: "<any>" }
+
+- id: stored-objects-confirm-before-content-is-refused
+  endpoint: POST /api/stored-objects/uploads/{storedObjectId}/confirmation
+  auth: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "vd-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 5
+      capture: { objectId: objectId }
+  request:
+    path: /api/stored-objects/uploads/{objectId}/confirmation
+    body: { projectId: "{projectId}" }
+  expect:
+    status: [400, 404, 409, 422]
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: [404, 409, 422] }
+
+- id: stored-objects-create-upload-refuses-no-key
+  endpoint: POST /api/stored-objects/uploads
+  auth: none
+  request:
+    path: /api/stored-objects/uploads
+    body:
+      projectId: "{projectId}"
+      purpose: dataset_attachment
+      filename: "vd-{uid}.txt"
+      mediaType: text/plain
+      byteLength: 5
+  expect:
+    status: 401
+
+- id: stored-objects-create-upload-refuses-restricted-key
+  endpoint: POST /api/stored-objects/uploads
+  auth: restricted
+  request:
+    path: /api/stored-objects/uploads
+    body:
+      projectId: "{projectId}"
+      purpose: dataset_attachment
+      filename: "vd-{uid}.txt"
+      mediaType: text/plain
+      byteLength: 5
+  expect:
+    status: 403
+
+- id: stored-objects-create-upload-wrong-project-is-refused
+  endpoint: POST /api/stored-objects/uploads
+  auth: project-b
+  request:
+    path: /api/stored-objects/uploads
+    body:
+      projectId: "{projectId}"
+      purpose: dataset_attachment
+      filename: "vd-{uid}.txt"
+      mediaType: text/plain
+      byteLength: 5
+  expect:
+    status: [403, 404]
+
+- id: stored-objects-create-upload-rejects-missing-filename
+  endpoint: POST /api/stored-objects/uploads
+  auth: project
+  request:
+    path: /api/stored-objects/uploads
+    body: { projectId: "{projectId}", purpose: dataset_attachment, mediaType: text/plain, byteLength: 5 }
+  expect:
+    status: [400, 422]
+
+- id: stored-objects-create-upload-rejects-negative-length
+  endpoint: POST /api/stored-objects/uploads
+  auth: project
+  request:
+    path: /api/stored-objects/uploads
+    body:
+      projectId: "{projectId}"
+      purpose: dataset_attachment
+      filename: "vd-{uid}.txt"
+      mediaType: text/plain
+      byteLength: -1
+  expect:
+    status: [400, 422]
+
+- id: stored-objects-create-upload-rejects-unknown-field
+  endpoint: POST /api/stored-objects/uploads
+  auth: project
+  request:
+    path: /api/stored-objects/uploads
+    body:
+      projectId: "{projectId}"
+      purpose: dataset_attachment
+      filename: "vd-{uid}.txt"
+      mediaType: text/plain
+      byteLength: 5
+      extra: nope
+  expect:
+    status: [400, 422]
+
+- id: stored-objects-create-upload-rejects-purpose-written-only-by-langwatch
+  endpoint: POST /api/stored-objects/uploads
+  auth: project
+  request:
+    path: /api/stored-objects/uploads
+    body:
+      projectId: "{projectId}"
+      purpose: trace_content
+      filename: "vd-{uid}.txt"
+      mediaType: text/plain
+      byteLength: 5
+  expect:
+    status: 422
+
+- id: stored-objects-put-content-bad-signature-is-refused
+  endpoint: PUT /api/stored-objects/uploads/{storedObjectId}/content
+  auth: none
+  request:
+    path: "/api/stored-objects/uploads/vd-{uid}/content"
+    query: { sig: "not-a-real-signature" }
+    body: { hello: world }
+  expect:
+    status: [400, 401, 403, 404]
+
+- id: stored-objects-put-content-missing-signature-is-400
+  endpoint: PUT /api/stored-objects/uploads/{storedObjectId}/content
+  auth: none
+  request:
+    path: "/api/stored-objects/uploads/vd-{uid}/content"
+    body: { hello: world }
+  expect:
+    status: [400, 401, 422]
+
+- id: stored-objects-get-refuses-no-key
+  endpoint: GET /api/stored-objects/{storedObjectId}
+  auth: none
+  request:
+    path: "/api/stored-objects/vd-{uid}"
+    query: { projectId: "{projectId}", audience: "datasets:view" }
+  expect:
+    status: 401
+
+- id: stored-objects-get-unknown-object-is-404
+  endpoint: GET /api/stored-objects/{storedObjectId}
+  auth: project
+  request:
+    path: "/api/stored-objects/vd-{uid}"
+    query: { projectId: "{projectId}", audience: "datasets:view" }
+  expect:
+    status: 404
+
+- id: stored-objects-get-wrong-project-is-refused
+  endpoint: GET /api/stored-objects/{storedObjectId}
+  auth: project-b
+  request:
+    path: "/api/stored-objects/vd-{uid}"
+    query: { projectId: "{projectId}", audience: "datasets:view" }
+  expect:
+    status: [403, 404]
+
+- id: stored-objects-delete-refuses-no-key
+  endpoint: DELETE /api/stored-objects/{storedObjectId}
+  auth: none
+  request:
+    path: "/api/stored-objects/vd-{uid}"
+    query: { projectId: "{projectId}", audience: "datasets:view" }
+  expect:
+    status: 401
+
+- id: stored-objects-delete-refuses-restricted-key
+  endpoint: DELETE /api/stored-objects/{storedObjectId}
+  auth: restricted
+  request:
+    path: "/api/stored-objects/vd-{uid}"
+    query: { projectId: "{projectId}", audience: "datasets:view" }
+  expect:
+    status: 403
+
+# ---- image-proxy (public; the egress fence is the guard) ----
+
+- id: image-proxy-missing-url-is-400
+  endpoint: GET /api/image-proxy
+  auth: none
+  request:
+    path: /api/image-proxy
+  expect:
+    status: 400
+
+- id: image-proxy-refuses-loopback-address
+  endpoint: GET /api/image-proxy
+  auth: none
+  request:
+    path: /api/image-proxy
+    query: { url: "http://127.0.0.1:1/vd-{uid}.png" }
+  expect:
+    status: 500
+
+- id: image-proxy-refuses-cloud-metadata-address
+  endpoint: GET /api/image-proxy
+  auth: none
+  request:
+    path: /api/image-proxy
+    query: { url: "http://169.254.169.254/latest/meta-data/" }
+  expect:
+    status: 500
+
+- id: image-proxy-refuses-non-http-scheme
+  endpoint: GET /api/image-proxy
+  auth: none
+  request:
+    path: /api/image-proxy
+    query: { url: "file:///etc/passwd" }
+  expect:
+    status: 500
+
+# ---- scim-webhook (Auth0 log stream; shared secret in Authorization; 404 when unconfigured) ----
+
+- id: scim-webhook-refuses-no-authorization
+  endpoint: POST /api/webhooks/auth0-scim
+  auth: none
+  request:
+    path: /api/webhooks/auth0-scim
+    body: [{ type: sscim, data: { description: "Create user", details: { userName: "vd-{uid}@example.com" } } }]
+  expect:
+    status: [401, 404]
+
+- id: scim-webhook-refuses-wrong-secret
+  endpoint: POST /api/webhooks/auth0-scim
+  auth: none
+  request:
+    path: /api/webhooks/auth0-scim
+    headers: { Authorization: "wrong-secret-{uid}" }
+    body: [{ type: sscim, data: { description: "Create user", details: { userName: "vd-{uid}@example.com" } } }]
+  expect:
+    status: [401, 404]
+
+- id: scim-webhook-project-key-is-not-the-secret
+  endpoint: POST /api/webhooks/auth0-scim
+  auth: project
+  request:
+    path: /api/webhooks/auth0-scim
+    body: [{ type: sscim, data: { description: "Create user", details: { userName: "vd-{uid}@example.com" } } }]
+  expect:
+    status: [401, 404]
+
+# ---- elevenlabs-webhook (public; per-provider HMAC; an id naming no configured webhook is 404) ----
+
+- id: elevenlabs-webhook-unknown-provider-is-404
+  endpoint: POST /api/elevenlabs/webhook/{modelProviderId}
+  auth: none
+  request:
+    path: "/api/elevenlabs/webhook/mp-vd-{uid}"
+    headers: { ElevenLabs-Signature: "t=1,v0=deadbeef" }
+    body: { type: post_call_transcription, event_timestamp: 1, data: { conversation_id: "vd-{uid}" } }
+  expect:
+    status: 404
+
+- id: elevenlabs-webhook-no-signature-unknown-provider-is-404
+  endpoint: POST /api/elevenlabs/webhook/{modelProviderId}
+  auth: none
+  request:
+    path: "/api/elevenlabs/webhook/mp-vd-{uid}"
+    body: { type: post_call_transcription, event_timestamp: 1, data: { conversation_id: "vd-{uid}" } }
+  expect:
+    status: 404
+
+- id: elevenlabs-webhook-project-key-is-not-a-signature
+  endpoint: POST /api/elevenlabs/webhook/{modelProviderId}
+  auth: project
+  request:
+    path: "/api/elevenlabs/webhook/mp-vd-{uid}"
+    body: { type: post_call_transcription }
+  expect:
+    status: 404
+
+- id: elevenlabs-webhook-empty-payload-unknown-provider-is-404
+  endpoint: POST /api/elevenlabs/webhook/{modelProviderId}
+  auth: none
+  request:
+    path: "/api/elevenlabs/webhook/mp-vd-{uid}"
+    headers: { ElevenLabs-Signature: "t=1,v0=deadbeef" }
+    body: {}
+  expect:
+    status: 404
+
+# ---- onboarding (v1 only on main; project key; the state is the organisation's) ----
+
+- id: onboarding-guided-state-is-readable
+  endpoint: GET /api/v1/onboarding/guided
+  auth: project
+  request:
+    path: /api/v1/onboarding/guided
+  expect:
+    status: 200
+    body: { paths: "<any>", donePaths: "<any>" }
+
+- id: onboarding-guided-refuses-no-key
+  endpoint: GET /api/v1/onboarding/guided
+  auth: none
+  request:
+    path: /api/v1/onboarding/guided
+  expect:
+    status: 401
+
+- id: onboarding-complete-path-reads-back
+  endpoint: POST /api/v1/onboarding/guided/paths/{path}/complete
+  auth: project
+  request:
+    path: /api/v1/onboarding/guided/paths/governance/complete
+  expect:
+    status: 200
+    contains: governance
+  verify:
+    - request: GET /api/v1/onboarding/guided
+      expect: { status: 200, contains: governance }
+
+- id: onboarding-complete-path-is-idempotent
+  endpoint: POST /api/v1/onboarding/guided/paths/{path}/complete
+  auth: project
+  setup:
+    - request: POST /api/v1/onboarding/guided/paths/governance/complete
+      expect: { status: 200 }
+  request:
+    path: /api/v1/onboarding/guided/paths/governance/complete
+  expect:
+    status: 200
+    contains: governance
+
+- id: onboarding-complete-unknown-path-is-422
+  endpoint: POST /api/v1/onboarding/guided/paths/{path}/complete
+  auth: project
+  request:
+    path: "/api/v1/onboarding/guided/paths/vd-{uid}/complete"
+  expect:
+    status: 422
+    contains: guided_onboarding_path_unknown
+
+- id: onboarding-complete-path-refuses-no-key
+  endpoint: POST /api/v1/onboarding/guided/paths/{path}/complete
+  auth: none
+  request:
+    path: /api/v1/onboarding/guided/paths/governance/complete
+  expect:
+    status: 401
+
+# ---- agent-cache (project key with agentCache:manage; entries are per project and expire) ----
+
+- id: agent-cache-put-then-read-back
+  endpoint: PUT /api/agent-cache/{name}
+  auth: project
+  request:
+    method: PUT
+    path: "/api/agent-cache/VD_{UID}"
+    body: { value: "value-{uid}", ttl_seconds: 300 }
+  expect:
+    status: 200
+    body: { name: "VD_{UID}", ttl_seconds: 300 }
+  verify:
+    - request: GET /api/agent-cache/VD_{UID}
+      expect: { status: 200, body: { name: "VD_{UID}", value: "value-{uid}" } }
+
+- id: agent-cache-put-overwrites-the-value
+  endpoint: PUT /api/agent-cache/{name}
+  auth: project
+  setup:
+    - request: PUT /api/agent-cache/VD_{UID}
+      body: { value: "first-{uid}" }
+      expect: { status: 200 }
+  request:
+    method: PUT
+    path: "/api/agent-cache/VD_{UID}"
+    body: { value: "second-{uid}" }
+  expect:
+    status: 200
+  verify:
+    - request: GET /api/agent-cache/VD_{UID}
+      expect: { status: 200, body: { value: "second-{uid}" } }
+
+- id: agent-cache-claim-of-a-held-name-loses-and-keeps-the-value
+  endpoint: POST /api/agent-cache/{name}/claim
+  auth: project
+  setup:
+    - request: PUT /api/agent-cache/VD_{UID}
+      body: { value: "held-{uid}" }
+      expect: { status: 200 }
+  request:
+    path: "/api/agent-cache/VD_{UID}/claim"
+    body: { value: "late-{uid}" }
+  expect:
+    status: 200
+    body: { name: "VD_{UID}", claimed: false }
+  verify:
+    - request: GET /api/agent-cache/VD_{UID}
+      expect: { status: 200, body: { value: "held-{uid}" } }
+
+- id: agent-cache-claim-of-a-free-name-wins
+  endpoint: POST /api/agent-cache/{name}/claim
+  auth: project
+  request:
+    path: "/api/agent-cache/VD_{UID}/claim"
+    body: { value: "won-{uid}" }
+  expect:
+    status: 200
+    body: { name: "VD_{UID}", claimed: true }
+  verify:
+    - request: GET /api/agent-cache/VD_{UID}
+      expect: { status: 200, body: { value: "won-{uid}" } }
+
+- id: agent-cache-delete-removes-the-entry
+  endpoint: DELETE /api/agent-cache/{name}
+  auth: project
+  setup:
+    - request: PUT /api/agent-cache/VD_{UID}
+      body: { value: "gone-{uid}" }
+      expect: { status: 200 }
+  request:
+    method: DELETE
+    path: "/api/agent-cache/VD_{UID}"
+  expect:
+    status: 200
+    body: { name: "VD_{UID}", deleted: true }
+  verify:
+    - request: GET /api/agent-cache/VD_{UID}
+      expect: { status: 404 }
+
+- id: agent-cache-delete-of-a-missing-name-answers-the-same
+  endpoint: DELETE /api/agent-cache/{name}
+  auth: project
+  request:
+    method: DELETE
+    path: "/api/agent-cache/VD_{UID}"
+  expect:
+    status: 200
+
+- id: agent-cache-read-of-a-missing-name-is-404
+  endpoint: GET /api/agent-cache/{name}
+  auth: project
+  request:
+    path: "/api/agent-cache/VD_{UID}"
+  expect:
+    status: 404
+
+- id: agent-cache-entry-is-not-visible-to-another-project
+  endpoint: GET /api/agent-cache/{name}
+  auth: project-b
+  setup:
+    - request: PUT /api/agent-cache/VD_{UID}
+      auth: project
+      body: { value: "mine-{uid}" }
+      expect: { status: 200 }
+  request:
+    path: "/api/agent-cache/VD_{UID}"
+  expect:
+    status: 404
+
+- id: agent-cache-refuses-no-key
+  endpoint: GET /api/agent-cache/{name}
+  auth: none
+  request:
+    path: "/api/agent-cache/VD_{UID}"
+  expect:
+    status: 401
+
+- id: agent-cache-put-refuses-no-key
+  endpoint: PUT /api/agent-cache/{name}
+  auth: none
+  request:
+    method: PUT
+    path: "/api/agent-cache/VD_{UID}"
+    body: { value: "x" }
+  expect:
+    status: 401
+
+- id: agent-cache-put-refuses-restricted-key
+  endpoint: PUT /api/agent-cache/{name}
+  auth: restricted
+  request:
+    method: PUT
+    path: "/api/agent-cache/VD_{UID}"
+    body: { value: "x" }
+  expect:
+    status: 403
+
+- id: agent-cache-put-rejects-lowercase-name
+  endpoint: PUT /api/agent-cache/{name}
+  auth: project
+  request:
+    method: PUT
+    path: "/api/agent-cache/vd_{uid}"
+    body: { value: "x" }
+  expect:
+    status: [400, 422]
+
+- id: agent-cache-put-rejects-missing-value
+  endpoint: PUT /api/agent-cache/{name}
+  auth: project
+  request:
+    method: PUT
+    path: "/api/agent-cache/VD_{UID}"
+    body: { ttl_seconds: 60 }
+  expect:
+    status: [400, 422]
+
+- id: agent-cache-put-rejects-ttl-below-minimum
+  endpoint: PUT /api/agent-cache/{name}
+  auth: project
+  request:
+    method: PUT
+    path: "/api/agent-cache/VD_{UID}"
+    body: { value: "x", ttl_seconds: 1 }
+  expect:
+    status: [400, 422]
+
+- id: agent-cache-put-rejects-ttl-above-maximum
+  endpoint: PUT /api/agent-cache/{name}
+  auth: project
+  request:
+    method: PUT
+    path: "/api/agent-cache/VD_{UID}"
+    body: { value: "x", ttl_seconds: 999999 }
+  expect:
+    status: [400, 422]
+
+- id: agent-cache-claim-rejects-empty-value
+  endpoint: POST /api/agent-cache/{name}/claim
+  auth: project
+  request:
+    path: "/api/agent-cache/VD_{UID}/claim"
+    body: { value: "" }
+  expect:
+    status: [400, 422]
+
+# ---- copilotkit (removed on purpose on the branch; main served it) ----
+
+- id: copilotkit-route-is-removed
+  endpoint: POST /api/copilotkit
+  auth: project
+  request:
+    path: /api/copilotkit
+    body: {}
+  expect:
+    status: 404
+
+# ---- dashboard-widgets and saved-workbench-charts (one flag, release_custom_chart_playground, picks the kind) ----
+
+- id: dashboard-widgets-list-refuses-no-key
+  endpoint: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  auth: none
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  expect:
+    status: 401
+
+- id: dashboard-widgets-list-wrong-project-is-404
+  endpoint: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  auth: project-b
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  expect:
+    status: [403, 404]
+
+- id: dashboard-widgets-create-reads-back
+  endpoint: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  auth: project
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets
+    body:
+      name: "vd-{uid}"
+      code: "export default function Widget() { return null; }"
+      queries: [{ name: q, sql: "SELECT 1 AS one" }]
+  capture: { widgetId: id }
+  expect:
+    status: 201
+    body: { name: "vd-{uid}", id: "<any>" }
+  verify:
+    - request: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+      expect: { status: 200, body: { name: "vd-{uid}" } }
+    - request: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets
+      expect: { status: 200, contains: "vd-{uid}" }
+
+- id: dashboard-widgets-create-refuses-no-key
+  endpoint: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  auth: none
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets
+    body:
+      name: "vd-{uid}"
+      code: "export default function Widget() { return null; }"
+      queries: [{ name: q, sql: "SELECT 1 AS one" }]
+  expect:
+    status: 401
+
+- id: dashboard-widgets-create-wrong-project-is-refused
+  endpoint: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  auth: project-b
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets
+    body:
+      name: "vd-{uid}"
+      code: "export default function Widget() { return null; }"
+      queries: [{ name: q, sql: "SELECT 1 AS one" }]
+  expect:
+    status: [403, 404]
+  verify:
+    - request: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets
+      expect: { status: 200, notContains: "vd-{uid}" }
+
+- id: dashboard-widgets-create-rejects-missing-name
+  endpoint: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  auth: project
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets
+    body:
+      code: "export default function Widget() { return null; }"
+      queries: [{ name: q, sql: "SELECT 1 AS one" }]
+  expect:
+    status: [400, 422]
+
+- id: dashboard-widgets-create-rejects-bad-query-name
+  endpoint: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+  auth: project
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets
+    body:
+      name: "vd-{uid}"
+      code: "export default function Widget() { return null; }"
+      queries: [{ name: "1 bad name", sql: "SELECT 1" }]
+  expect:
+    status: [400, 422]
+
+- id: dashboard-widgets-get-unknown-widget-is-404
+  endpoint: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+  auth: project
+  request:
+    path: "/api/v1/projects/{projectId}/analytics/dashboard-widgets/widget-vd-{uid}"
+  expect:
+    status: 404
+
+- id: dashboard-widgets-patch-renames-and-reads-back
+  endpoint: PATCH /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+  auth: project
+  setup:
+    - request: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+      body:
+        name: "vd-{uid}"
+        code: "export default function Widget() { return null; }"
+        queries: [{ name: q, sql: "SELECT 1 AS one" }]
+      capture: { widgetId: id }
+  request:
+    method: PATCH
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+    body: { name: "vd-renamed-{uid}" }
+  expect:
+    status: 200
+    body: { name: "vd-renamed-{uid}" }
+  verify:
+    - request: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+      expect: { status: 200, body: { name: "vd-renamed-{uid}" } }
+
+- id: dashboard-widgets-patch-rejects-empty-body
+  endpoint: PATCH /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+  auth: project
+  setup:
+    - request: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+      body:
+        name: "vd-{uid}"
+        code: "export default function Widget() { return null; }"
+        queries: [{ name: q, sql: "SELECT 1 AS one" }]
+      capture: { widgetId: id }
+  request:
+    method: PATCH
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+    body: {}
+  expect:
+    status: [400, 422]
+
+- id: dashboard-widgets-delete-removes-and-reads-back
+  endpoint: DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+  auth: project
+  setup:
+    - request: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+      body:
+        name: "vd-{uid}"
+        code: "export default function Widget() { return null; }"
+        queries: [{ name: q, sql: "SELECT 1 AS one" }]
+      capture: { widgetId: id }
+  request:
+    method: DELETE
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+  expect:
+    status: [200, 204]
+  verify:
+    - request: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+      expect: { status: 404 }
+
+- id: dashboard-widgets-delete-refuses-restricted-key
+  endpoint: DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+  auth: restricted
+  request:
+    method: DELETE
+    path: "/api/v1/projects/{projectId}/analytics/dashboard-widgets/widget-vd-{uid}"
+  expect:
+    status: 403
+
+- id: analytics-charts-list-refuses-no-key
+  endpoint: GET /api/v1/projects/{projectId}/analytics/charts
+  auth: none
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts
+  expect:
+    status: 401
+
+- id: analytics-charts-list-wrong-project-is-refused
+  endpoint: GET /api/v1/projects/{projectId}/analytics/charts
+  auth: project-b
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts
+  expect:
+    status: [403, 404]
+
+- id: analytics-charts-create-reads-back
+  endpoint: POST /api/v1/projects/{projectId}/analytics/charts
+  auth: project
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts
+    body:
+      name: "vd-{uid}"
+      definition: { version: 1, sql: "SELECT 1 AS one", parameters: {} }
+  capture: { chartId: id }
+  expect:
+    status: 201
+    body: { name: "vd-{uid}", id: "<any>" }
+  verify:
+    - request: GET /api/v1/projects/{projectId}/analytics/charts/{chartId}
+      expect: { status: 200, body: { name: "vd-{uid}" } }
+
+- id: analytics-charts-create-refuses-no-key
+  endpoint: POST /api/v1/projects/{projectId}/analytics/charts
+  auth: none
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts
+    body:
+      name: "vd-{uid}"
+      definition: { version: 1, sql: "SELECT 1 AS one", parameters: {} }
+  expect:
+    status: 401
+
+- id: analytics-charts-create-rejects-missing-name
+  endpoint: POST /api/v1/projects/{projectId}/analytics/charts
+  auth: project
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts
+    body: { definition: { version: 1, sql: "SELECT 1", parameters: {} } }
+  expect:
+    status: [400, 422]
+
+- id: analytics-charts-get-unknown-chart-is-404
+  endpoint: GET /api/v1/projects/{projectId}/analytics/charts/{chartId}
+  auth: project
+  request:
+    path: "/api/v1/projects/{projectId}/analytics/charts/chart-vd-{uid}"
+  expect:
+    status: 404
+
+- id: analytics-charts-patch-rejects-empty-body
+  endpoint: PATCH /api/v1/projects/{projectId}/analytics/charts/{chartId}
+  auth: project
+  request:
+    method: PATCH
+    path: "/api/v1/projects/{projectId}/analytics/charts/chart-vd-{uid}"
+    body: {}
+  expect:
+    status: [400, 404, 422]
+
+- id: analytics-charts-delete-refuses-restricted-key
+  endpoint: DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}
+  auth: restricted
+  request:
+    method: DELETE
+    path: "/api/v1/projects/{projectId}/analytics/charts/chart-vd-{uid}"
+  expect:
+    status: 403
+
+# ---- scenario-voice (browser session; main answers a project key 401 as it has no session) ----
+
+- id: voice-mint-refuses-no-credential
+  endpoint: POST /api/voice/session
+  auth: none
+  request:
+    path: /api/voice/session
+    body: { projectId: "{projectId}", transport: elevenlabs_convai, agentId: "vd-{uid}" }
+  expect:
+    status: 401
+
+- id: voice-mint-refuses-a-project-key
+  endpoint: POST /api/voice/session
+  auth: project
+  request:
+    path: /api/voice/session
+    body: { projectId: "{projectId}", transport: elevenlabs_convai, agentId: "vd-{uid}" }
+  expect:
+    status: 401
+
+- id: voice-mint-rejects-unknown-transport
+  endpoint: POST /api/voice/session
+  auth: session
+  request:
+    path: /api/voice/session
+    body: { projectId: "{projectId}", transport: carrier-pigeon, agentId: "vd-{uid}" }
+  expect:
+    status: [400, 422]
+
+- id: voice-mint-rejects-missing-agent-id
+  endpoint: POST /api/voice/session
+  auth: session
+  request:
+    path: /api/voice/session
+    body: { projectId: "{projectId}", transport: elevenlabs_convai }
+  expect:
+    status: [400, 422]
+
+- id: voice-mint-unknown-project-is-refused
+  endpoint: POST /api/voice/session
+  auth: session
+  request:
+    path: /api/voice/session
+    body: { projectId: "project-vd-{uid}", transport: elevenlabs_convai, agentId: "vd-{uid}" }
+  expect:
+    status: [403, 404]
+
+- id: voice-finish-refuses-no-credential
+  endpoint: POST /api/voice/session/{sessionId}/finish
+  auth: none
+  request:
+    path: "/api/voice/session/sess-vd-{uid}/finish"
+    body: { projectId: "{projectId}", sessionToken: "vd-{uid}", startedAt: 1, endedAt: 2 }
+  expect:
+    status: 401
+
+- id: voice-finish-invalid-session-token-is-refused
+  endpoint: POST /api/voice/session/{sessionId}/finish
+  auth: session
+  request:
+    path: "/api/voice/session/sess-vd-{uid}/finish"
+    body: { projectId: "{projectId}", sessionToken: "vd-{uid}", startedAt: 1, endedAt: 2 }
+  expect:
+    status: [400, 403, 404]
+
+- id: voice-finish-rejects-missing-token
+  endpoint: POST /api/voice/session/{sessionId}/finish
+  auth: session
+  request:
+    path: "/api/voice/session/sess-vd-{uid}/finish"
+    body: { projectId: "{projectId}", startedAt: 1, endedAt: 2 }
+  expect:
+    status: [400, 422]
+
+- id: voice-session-audio-refuses-no-credential
+  endpoint: GET /api/voice/session/{conversationId}/audio
+  auth: none
+  request:
+    path: "/api/voice/session/conv-vd-{uid}/audio"
+    query: { projectId: "{projectId}" }
+  expect:
+    status: 401
+
+- id: voice-session-audio-rejects-missing-project
+  endpoint: GET /api/voice/session/{conversationId}/audio
+  auth: session
+  request:
+    path: "/api/voice/session/conv-vd-{uid}/audio"
+  expect:
+    status: [400, 422]
+
+- id: voice-session-audio-unknown-project-is-refused
+  endpoint: GET /api/voice/session/{conversationId}/audio
+  auth: session
+  request:
+    path: "/api/voice/session/conv-vd-{uid}/audio"
+    query: { projectId: "project-vd-{uid}" }
+  expect:
+    status: [403, 404]
+
+- id: voice-run-audio-refuses-no-credential
+  endpoint: GET /api/voice/run/{scenarioRunId}/audio
+  auth: none
+  request:
+    path: "/api/voice/run/run-vd-{uid}/audio"
+    query: { projectId: "{projectId}" }
+  expect:
+    status: 401
+
+- id: voice-run-audio-unknown-project-is-refused
+  endpoint: GET /api/voice/run/{scenarioRunId}/audio
+  auth: session
+  request:
+    path: "/api/voice/run/run-vd-{uid}/audio"
+    query: { projectId: "project-vd-{uid}" }
+  expect:
+    status: [403, 404]
+
+# ---- workflow-run (project key with workflows:manage; a workflow that does not exist is 404) ----
+
+- id: workflow-run-unknown-workflow-is-404
+  endpoint: POST /api/workflows/{workflowId}/run
+  auth: project
+  request:
+    path: "/api/workflows/wf-vd-{uid}/run"
+    body: { input: hello }
+  expect:
+    status: 404
+
+- id: workflow-run-refuses-no-key
+  endpoint: POST /api/workflows/{workflowId}/run
+  auth: none
+  request:
+    path: "/api/workflows/wf-vd-{uid}/run"
+    body: { input: hello }
+  expect:
+    status: 401
+
+- id: workflow-run-refuses-restricted-key
+  endpoint: POST /api/workflows/{workflowId}/run
+  auth: restricted
+  request:
+    path: "/api/workflows/wf-vd-{uid}/run"
+    body: { input: hello }
+  expect:
+    status: 403
+
+- id: workflow-run-other-project-key-is-404
+  endpoint: POST /api/workflows/{workflowId}/run
+  auth: project-b
+  request:
+    path: "/api/workflows/wf-vd-{uid}/run"
+    body: { input: hello }
+  expect:
+    status: 404
+
+- id: workflow-run-rejects-non-json-content-type
+  endpoint: POST /api/workflows/{workflowId}/run
+  auth: project
+  request:
+    path: "/api/workflows/wf-vd-{uid}/run"
+    headers: { Content-Type: text/plain }
+  expect:
+    status: 400
+
+- id: workflow-run-version-unknown-workflow-is-404
+  endpoint: POST /api/workflows/{workflowId}/{versionId}/run
+  auth: project
+  request:
+    path: "/api/workflows/wf-vd-{uid}/ver-vd-{uid}/run"
+    body: { input: hello }
+  expect:
+    status: 404
+
+- id: workflow-run-version-refuses-no-key
+  endpoint: POST /api/workflows/{workflowId}/{versionId}/run
+  auth: none
+  request:
+    path: "/api/workflows/wf-vd-{uid}/ver-vd-{uid}/run"
+    body: { input: hello }
+  expect:
+    status: 401
+
+- id: workflow-run-legacy-optimization-path-unknown-workflow-is-404
+  endpoint: POST /api/optimization/{workflowId}/{versionId}
+  auth: project
+  request:
+    path: "/api/optimization/wf-vd-{uid}/ver-vd-{uid}"
+    body: { input: hello }
+  expect:
+    status: 404
+
+- id: workflow-run-legacy-optimization-path-refuses-no-key
+  endpoint: POST /api/optimization/{workflowId}/{versionId}
+  auth: none
+  request:
+    path: "/api/optimization/wf-vd-{uid}/ver-vd-{uid}"
+    body: { input: hello }
+  expect:
+    status: 401
+
+# ---- workflow-studio (browser session; the studio's code completion and event relay) ----
+
+- id: workflow-studio-code-completion-refuses-no-session
+  endpoint: POST /api/workflows/code-completion
+  auth: none
+  request:
+    path: /api/workflows/code-completion
+    query: { projectId: "{projectId}" }
+    body: { completionMetadata: {} }
+  expect:
+    status: 401
+
+- id: workflow-studio-code-completion-refuses-a-project-key
+  endpoint: POST /api/workflows/code-completion
+  auth: project
+  request:
+    path: /api/workflows/code-completion
+    query: { projectId: "{projectId}" }
+    body: { completionMetadata: {} }
+  expect:
+    status: 401
+
+- id: workflow-studio-code-completion-needs-a-project
+  endpoint: POST /api/workflows/code-completion
+  auth: session
+  request:
+    path: /api/workflows/code-completion
+    body: { completionMetadata: {} }
+  expect:
+    status: 400
+
+- id: workflow-studio-code-completion-unknown-project-is-403
+  endpoint: POST /api/workflows/code-completion
+  auth: session
+  request:
+    path: /api/workflows/code-completion
+    query: { projectId: "project-vd-{uid}" }
+    body: { completionMetadata: {} }
+  expect:
+    status: 403
+
+- id: workflow-studio-post-event-refuses-no-session
+  endpoint: POST /api/workflows/post_event
+  auth: none
+  request:
+    path: /api/workflows/post_event
+    body: { projectId: "{projectId}", event: { type: is_alive, payload: {} } }
+  expect:
+    status: 401
+
+- id: workflow-studio-post-event-refuses-a-project-key
+  endpoint: POST /api/workflows/post_event
+  auth: project
+  request:
+    path: /api/workflows/post_event
+    body: { projectId: "{projectId}", event: { type: is_alive, payload: {} } }
+  expect:
+    status: 401
+
+- id: workflow-studio-post-event-rejects-missing-event
+  endpoint: POST /api/workflows/post_event
+  auth: session
+  request:
+    path: /api/workflows/post_event
+    body: { projectId: "{projectId}" }
+  expect:
+    status: [400, 422]
+
+- id: workflow-studio-post-event-rejects-unknown-event-type
+  endpoint: POST /api/workflows/post_event
+  auth: session
+  request:
+    path: /api/workflows/post_event
+    body: { projectId: "{projectId}", event: { type: not_a_studio_event, payload: {} } }
+  expect:
+    status: [400, 422]
+
+- id: workflow-studio-post-event-unknown-project-is-403
+  endpoint: POST /api/workflows/post_event
+  auth: session
+  request:
+    path: /api/workflows/post_event
+    body: { projectId: "project-vd-{uid}", event: { type: is_alive, payload: {} } }
+  expect:
+    status: 403
+
+- id: workflow-studio-post-event-is-alive-streams
+  endpoint: POST /api/workflows/post_event
+  auth: session
+  request:
+    path: /api/workflows/post_event
+    body: { projectId: "{projectId}", event: { type: is_alive, payload: {} } }
+  expect:
+    status: 200
+
+# ---- otel-metrics: the exporter-base aliases and the refusals (the plain path is in observability.yaml) ----
+
+- id: otel-metrics-alias-under-traces-base-is-accepted
+  endpoint: POST /api/otel/v1/traces/v1/metrics
+  auth: project
+  request:
+    path: /api/otel/v1/traces/v1/metrics
+    body: { resourceMetrics: [] }
+  expect:
+    status: 200
+
+- id: otel-metrics-alias-under-collector-base-is-accepted
+  endpoint: POST /api/collector/v1/metrics
+  auth: project
+  request:
+    path: /api/collector/v1/metrics
+    body: { resourceMetrics: [] }
+  expect:
+    status: 200
+
+- id: otel-metrics-alias-with-doubled-slash-is-accepted
+  endpoint: POST /api/otel/v1//metrics
+  auth: project
+  request:
+    path: /api/otel/v1//metrics
+    body: { resourceMetrics: [] }
+  expect:
+    status: 200
+
+- id: otel-metrics-alias-refuses-no-key
+  endpoint: POST /api/otel/v1/traces/v1/metrics
+  auth: none
+  request:
+    path: /api/otel/v1/traces/v1/metrics
+    body: { resourceMetrics: [] }
+  expect:
+    status: 401
+
+- id: otel-metrics-alias-refuses-read-only-key
+  endpoint: POST /api/otel/v1/traces/v1/metrics
+  auth: restricted
+  request:
+    path: /api/otel/v1/traces/v1/metrics
+    body: { resourceMetrics: [] }
+  expect:
+    status: 403
+
+- id: otel-metrics-unrecognised-base-is-404
+  endpoint: POST /api/rum/v1/metrics
+  auth: project
+  request:
+    path: /api/rum/v1/metrics
+    body: { resourceMetrics: [] }
+  expect:
+    status: 404
+
+- id: otel-metrics-unknown-signal-suffix-is-404
+  endpoint: POST /api/otel/v1/traces/v1/profiles
+  auth: project
+  request:
+    path: /api/otel/v1/traces/v1/profiles
+    body: { resourceMetrics: [] }
+  expect:
+    status: 404
+
+- id: otel-metrics-get-is-not-served
+  endpoint: GET /api/otel/v1/metrics
+  auth: project
+  request:
+    path: /api/otel/v1/metrics
+  expect:
+    status: [404, 405]
+
+- id: otel-metrics-gauge-point-is-accepted
+  endpoint: POST /api/otel/v1/metrics
+  auth: project
+  request:
+    path: /api/otel/v1/metrics
+    body:
+      resourceMetrics:
+        - resource:
+            attributes: [{ key: service.name, value: { stringValue: "vd-{uid}" } }]
+          scopeMetrics:
+            - scope: { name: apidiff }
+              metrics:
+                - name: "vd.gauge.{uid}"
+                  unit: "1"
+                  gauge:
+                    dataPoints: [{ asDouble: 1.5, timeUnixNano: "{nowMs}000000" }]
+  expect:
+    status: 200
+
+- id: otel-metrics-trailing-slash-is-accepted
+  endpoint: POST /api/otel/v1/metrics/
+  auth: project
+  request:
+    path: /api/otel/v1/metrics/
+    body: { resourceMetrics: [] }
+  expect:
+    status: 200
