@@ -15,16 +15,13 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { WorkflowNotFoundError, WorkflowNotPublishedError } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import type { NlpPayloadStaging } from "../../channels/nlp-lambda.channel.ts";
-import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
-import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
+import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
+import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import type { WorkflowService } from "../../services/workflow.service.ts";
 import { workflowRunRest } from "../../transport/workflow-run.rest.ts";
-import { WorkflowApp, type NlpLambdaArnCache } from "../workflow.app.ts";
+import { WorkflowApp } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 class NoopTestEncryption {
@@ -37,15 +34,14 @@ class NoopTestEncryption {
   }
 }
 
-async function postRun({ run }: { run: () => never }) {
-  const members = createWorkflowTestInfrastructure({
-    workflows: createApiFixture<WorkflowService>({ run }, "WorkflowService"),
-  });
+async function postRun({ repositories }: { repositories: WorkflowRepositories }) {
+  const members = createWorkflowTestInfrastructure();
   const app = await WorkflowApp.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       encryption: new NoopTestEncryption(),
+      nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl: void 0,
       publicBaseUrl: void 0,
     },
@@ -62,21 +58,10 @@ async function postRun({ run }: { run: () => never }) {
     config: {
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
-      codeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
-    repositories: {
-      workflowRows: members.workflowRows,
-      workflows: createApiFixture<WorkflowRepository>({}, "WorkflowRepository"),
-      projectEnvironment: createApiFixture<WorkflowProjectEnvironmentRepository>(
-        {},
-        "WorkflowProjectEnvironmentRepository",
-      ),
-      lineage: createApiFixture<WorkflowLineageRepository>({}, "WorkflowLineageRepository"),
-      nlpLambdaArns: createApiFixture<NlpLambdaArnCache>({}, "NlpLambdaArnCache"),
-      payloadStaging: createApiFixture<NlpPayloadStaging>({}, "NlpPayloadStaging"),
-    },
+    repositories,
   });
   const runtime = createRestRuntime({
     identity: {
@@ -100,11 +85,7 @@ async function postRun({ run }: { run: () => never }) {
 describe("running a workflow over the public API", () => {
   /** @scenario "Running a nonexistent workflow returns 404" */
   it("answers 404 with workflow_not_found for a workflow that does not exist", async () => {
-    const response = await postRun({
-      run: () => {
-        throw new WorkflowNotFoundError("workflow_1", "project_1");
-      },
-    });
+    const response = await postRun({ repositories: MemoryWorkflowRepositories.create() });
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ code: "workflow_not_found" });
@@ -112,11 +93,16 @@ describe("running a workflow over the public API", () => {
 
   /** @scenario "Running a workflow that has never been published returns 422" */
   it("answers 422 for a workflow that was never published", async () => {
-    const response = await postRun({
-      run: () => {
-        throw new WorkflowNotPublishedError("workflow_1");
-      },
+    const repositories = MemoryWorkflowRepositories.create();
+    await repositories.workflows.createWorkflow({
+      id: "workflow_1",
+      projectId: "project_1",
+      name: "Triage",
+      icon: null,
+      description: null,
     });
+
+    const response = await postRun({ repositories });
 
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({ code: "validation_error" });
@@ -125,8 +111,16 @@ describe("running a workflow over the public API", () => {
   /** @scenario "An untyped runWorkflow error still returns a safe 500, not a leaked message" */
   it("answers 500 without the internal message for an untyped failure", async () => {
     const response = await postRun({
-      run: () => {
-        throw new Error("connect ECONNREFUSED 10.0.0.7:5432");
+      repositories: {
+        ...MemoryWorkflowRepositories.create(),
+        workflows: createApiFixture<WorkflowRepository>(
+          {
+            findById: () => {
+              throw new Error("connect ECONNREFUSED 10.0.0.7:5432");
+            },
+          },
+          "WorkflowRepository",
+        ),
       },
     });
 

@@ -64,12 +64,16 @@ function inMemoryTagDatabase(): PromptTagDatabase {
       ),
     findFirst: (args?: { where?: unknown }) =>
       Promise.resolve(rows.find((row) => matches(row, args?.where)) ?? null),
-    update: (args: { where?: unknown; data?: { name?: string } }) => {
+    update: (args: { where?: unknown; data?: unknown }) => {
       const row = rows.find((candidate) => matches(candidate, args.where));
-      if (!row || typeof args.data?.name !== "string") {
+      const name =
+        typeof args.data === "object" && args.data !== null && "name" in args.data
+          ? args.data.name
+          : undefined;
+      if (!row || typeof name !== "string") {
         return Promise.reject(new Error("unexpected tag update"));
       }
-      row.name = args.data.name;
+      row.name = name;
       return Promise.resolve(row);
     },
     delete: (args: { where?: unknown }) => {

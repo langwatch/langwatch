@@ -57,12 +57,10 @@ export const nlpLambdaFleetFromSecret = z
     return fields.data;
   });
 
-export const workflowConfig = Config.define((c) => ({
+export const workflowConfig = Config.define(() => ({
   /** Above this many bytes a payload is staged rather than sent inline. */
   stagingThresholdBytes: langevalsStagingThresholdBytes,
   stagingTtlSeconds: langevalsStagingTtlSeconds,
-  /** The code-block ceiling every per-project studio function is given; clamped, not refused. */
-  codeBlockTimeoutSeconds: c.env("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", z.string().optional()),
 }));
 
 export type WorkflowServerConfig = ConfigOf<typeof workflowConfig>;

@@ -365,9 +365,10 @@ export type WorkflowHostMembers = Omit<
   | "signals"
 >;
 
-/** The engine address and public origin are process facts, not this module's env spellings. */
+/** The engine address, its code-block ceiling and the public origin are process facts. */
 type WorkflowProcessFacts = Readonly<{
   nlpServiceUrl: string | undefined;
+  nlpCodeBlockTimeoutSeconds: string | undefined;
   publicBaseUrl: string | undefined;
 }>;
 
@@ -447,7 +448,7 @@ function lambdaEngine({
       securityGroupIds: fields.security_group_ids,
     },
     langwatchEndpoint: setup.members.publicBaseUrl ?? "",
-    codeBlockTimeoutRawValue: setup.config.codeBlockTimeoutSeconds,
+    codeBlockTimeoutRawValue: setup.members.nlpCodeBlockTimeoutSeconds,
     stagingThresholdBytesRawValue: setup.config.stagingThresholdBytes,
     stagingTtlSecondsRawValue: setup.config.stagingTtlSeconds,
   });
@@ -621,6 +622,7 @@ export class WorkflowApp implements WorkflowApi {
   static readonly reads = [
     ...reads("prisma", "encryption"),
     "nlpServiceUrl",
+    "nlpCodeBlockTimeoutSeconds",
     "publicBaseUrl",
   ] as const;
   static readonly repositories = workflowRepositories;

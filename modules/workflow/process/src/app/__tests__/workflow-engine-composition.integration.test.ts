@@ -47,6 +47,7 @@ async function appAt({
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       encryption: new NoopTestEncryption(),
+      nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl,
       publicBaseUrl: void 0,
     },
@@ -66,7 +67,6 @@ async function appAt({
     config: {
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
-      codeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

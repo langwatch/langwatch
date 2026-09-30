@@ -51,6 +51,7 @@ export const TIME_PARTITIONED_TABLES = {
   gateway_budget_scope_totals: ["PeriodStart"],
   governance_kpis: ["HourBucket"],
   governance_cost_rollup_1d: ["Day"],
+  governance_cost_rollup_charges: ["Day"],
   automation_audit: ["OccurredAt"],
   langy_analytics_events: ["OccurredAt"],
   langy_messages: ["CreatedAt"],

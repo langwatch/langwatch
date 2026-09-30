@@ -47,6 +47,7 @@ describe("the Agents create schemas", () => {
         unexpected: true,
       }),
     ).toEqual({
+      id: expect.stringMatching(/^agent_/),
       projectId: "project-1",
       name: "Webhook",
       type: "http",

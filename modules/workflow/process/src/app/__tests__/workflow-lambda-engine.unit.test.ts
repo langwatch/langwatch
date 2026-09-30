@@ -96,6 +96,7 @@ function appWith({
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       encryption: new NoopTestEncryption(),
+      nlpCodeBlockTimeoutSeconds: void 0,
       nlpServiceUrl: "http://engine.test:5561",
       publicBaseUrl: "https://app.test",
     },
@@ -115,7 +116,6 @@ function appWith({
     config: {
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
-      codeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(fleetSecret)),
@@ -159,7 +159,9 @@ describe("a deployment that describes its per-project fleet", () => {
       throw new Error("expected one streaming invoke");
     }
     expect(command.input.FunctionName).toBe(FUNCTION_ARN);
-    expect(JSON.parse(String(command.input.Payload))).toMatchObject({
+    const payload = command.input.Payload;
+    expect(typeof payload).toBe("string");
+    expect(JSON.parse(typeof payload === "string" ? payload : "{}")).toMatchObject({
       rawPath: "/go/studio/execute",
     });
     expect(received).toContainEqual(expect.objectContaining({ type: "is_alive_response" }));

@@ -5,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -36,7 +37,9 @@ function process_() {
     workflows: createWorkflowTestService([workflow]),
   });
 
-  return createApp({ role: "api" })
+  const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
+
+  return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(workflowServer)])
     .withConfig({
       workflow: {
@@ -50,6 +53,7 @@ function process_() {
       decrypt: (value: string) => value,
     })
     .withMember("nlpServiceUrl", undefined)
+    .withMember("nlpCodeBlockTimeoutSeconds", undefined)
     .withMember("publicBaseUrl", undefined)
     .provide({
       authz: createApiFixture({}, "AuthzApi"),

@@ -17,7 +17,7 @@ import { MemoryDatasetRepository } from "../../repositories/memory/memory.datase
 import { DatasetService } from "../dataset.service.ts";
 
 const PROJECT_ID = "project-1";
-const columnTypes = [{ name: "input", type: "string" }] as const;
+const columnTypes = [{ name: "input", type: "string" as const }];
 
 function serviceOver(repositoryOverrides: Partial<MemoryDatasetRepository> = {}) {
   const database = MemoryDatasetDatabase.create();
