@@ -90,6 +90,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
+  GATEWAY_CONTROL_PLANE_URL env entry for the app: the address the chart's
+  gateway dials to reach this control plane, computed the way the gateway
+  subchart's ConfigMap computes it. The checkup compares it with the address
+  the gateway reports, so an in-cluster address passes and another install
+  fails. Renders nothing when the chart does not run the gateway.
+*/}}
+{{- define "langwatch.gatewayControlPlaneUrlEnv" -}}
+{{- $gw := .Values.gateway | default dict }}
+{{- if $gw.chartManaged }}
+{{- $url := (($gw.controlPlane) | default dict).baseUrl | default (printf "http://%s-app:5560" .Release.Name) }}
+- name: GATEWAY_CONTROL_PLANE_URL
+  value: {{ $url | quote }}
+{{- end }}
+{{- end -}}
+
+{{/*
   LANGY_WORKER_CALLBACK_URL env entry — the origin the Langy agent's workers dial
   back on: the relay frame push, the durable turn finalize, the session-key
   revoke, and the LANGWATCH_ENDPOINT the langwatch CLI uses for every tool call.

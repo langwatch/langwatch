@@ -314,6 +314,7 @@ spec:
                    the assistant refuses every turn with a credential-resolution
                    error naming this variable. */}}
             {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
+            {{- include "langwatch.gatewayControlPlaneUrlEnv" . | nindent 12 }}
 
             # Auth configuration (NEXTAUTH_SECRET lives in sharedEnv —
             # every app-image consumer needs it, see _helpers.tpl).
