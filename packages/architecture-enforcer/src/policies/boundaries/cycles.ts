@@ -1,19 +1,33 @@
+import { join } from "node:path";
+
 import type { ArchitectureViolation } from "../../types.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+import { readWorkspaceMembers } from "../../workspace/tsconfig-references.ts";
 import { manifestDependencies } from "./manifests.ts";
 
 export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
-  const packages = snapshot.packages;
-
-  const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
-  const graph = new Map<string, string[]>();
+  const manifestPaths = new Map<string, string>();
+  const declared = new Map<string, string[]>();
 
   // devDependencies count: Nx orders `^typecheck` over them too (ADR-150).
-  for (const pkg of packages) {
+  for (const pkg of snapshot.packages) {
     const edges = { ...pkg.manifest.devDependencies, ...manifestDependencies(pkg.manifest) };
+    declared.set(pkg.name, Object.keys(edges));
+    manifestPaths.set(pkg.name, pkg.manifestPath);
+  }
+
+  // `packages/*` is no snapshot package, yet a cycle through one still refuses the task graph.
+  for (const member of readWorkspaceMembers(snapshot.root)) {
+    if (declared.has(member.name)) continue;
+    declared.set(member.name, [...member.dependencies, ...member.developmentDependencies]);
+    manifestPaths.set(member.name, join(member.directory, "package.json"));
+  }
+
+  const graph = new Map<string, string[]>();
+  for (const [name, targets] of declared) {
     graph.set(
-      pkg.name,
-      Object.keys(edges).filter((name) => byName.has(name)),
+      name,
+      targets.filter((target) => declared.has(target)),
     );
   }
 
@@ -45,7 +59,7 @@ export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[]
 
   return [...cycles].toSorted().map((cycle) => ({
     policy: "package-cycle",
-    file: byName.get(cycle.split(" -> ")[0] ?? "")?.manifestPath ?? "package.json",
-    message: `Feature package dependency cycle: ${cycle}`,
+    file: manifestPaths.get(cycle.split(" -> ")[0] ?? "") ?? "package.json",
+    message: `Package dependency cycle: ${cycle}`,
   }));
 }

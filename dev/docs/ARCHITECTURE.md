@@ -146,6 +146,10 @@ the rest stays contained, flattened, in its module (Alex, 2026-09-29).
 contract imports no framework and no other half. Another module imports only
 the owner's **contract** and names the owner's `*Api` token; nobody imports
 another module's service, repository, or browser package.
+A declared dependency is an edge even when nothing imports it: a contract's `package.json` names no raw
+client or process runtime (`eventing`, `group-queue`, `prisma-client`, `clickhouse-client`, `redis-client`,
+`process-*`), and the package-cycle check walks every workspace package, `packages/*` included. The
+`manifests` and `cycles` policies refuse both (2026-09-30).
 
 ### 3.1 The contract
 

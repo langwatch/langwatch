@@ -6833,9 +6833,6 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
-      '@langwatch/eventing':
-        specifier: workspace:*
-        version: link:../../../packages/eventing
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
