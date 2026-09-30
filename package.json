@@ -33,7 +33,7 @@
     "typecheck": "GOMEMLIMIT=2GiB tsc -b --builders 1",
     "sync:references": "bash dev/scripts/devscripts.sh sync-references --write",
     "test:dev-scripts": "TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs",
-    "lint": "pnpm lint:oxlint",
+    "lint": "node dev/nx/lint.mjs",
     "lint:architecture": "pnpm lint:architecture:oxlint && pnpm --filter @langwatch/architecture-enforcer lint",
     "lint:architecture:oxlint": "oxlint --quiet --config .oxlintrc.architecture.jsonc .",
     "lint:oxlint": "oxlint --quiet --config .oxlintrc.jsonc .",
@@ -62,7 +62,6 @@
     "typecheck:all": "nx run-many -t typecheck",
     "typecheck:affected": "nx affected -t typecheck",
     "build:affected": "nx affected -t build",
-    "lint:affected": "nx affected -t lint",
     "lint:types:affected": "nx affected -t lint:types"
   },
   "devDependencies": {

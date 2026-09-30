@@ -19,8 +19,12 @@
     "lintGlobals": [
       "sharedGlobals",
       "{workspaceRoot}/.oxlintrc.jsonc",
-      "{workspaceRoot}/.oxlintrc.architecture.jsonc",
-      "{workspaceRoot}/packages/oxlint-rules/**/*"
+      "{workspaceRoot}/packages/oxlint-rules/**/*",
+      "{workspaceRoot}/packages/architecture-enforcer/oxlint*",
+      "{workspaceRoot}/modules/catalogue.json",
+      "{workspaceRoot}/modules/*/*/package.json",
+      "{workspaceRoot}/enterprise/modules/*/*/package.json",
+      "{workspaceRoot}/docs/api-reference/openapiLangWatch.json"
     ],
     "jsBuild": [
       {
@@ -69,7 +73,7 @@
     ]
   },
   "plugins": [
-    "./dev/nx/lint-types-plugin.mjs",
+    "./dev/nx/lint-plugin.mjs",
     "./dev/nx/go-plugin.mjs",
     "./dev/nx/npm-deps-plugin.mjs",
     "./dev/nx/helm-plugin.mjs",
@@ -217,7 +221,15 @@
     "lint": [
       {
         "cache": true,
-        "inputs": ["default", "lintGlobals", "npmDeps"],
+        "inputs": [
+          "default",
+          "^production",
+          "lintGlobals",
+          {
+            "externalDependencies": ["oxlint"]
+          },
+          "npmDeps"
+        ],
         "outputs": []
       },
       {
