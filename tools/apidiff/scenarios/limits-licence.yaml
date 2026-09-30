@@ -190,7 +190,7 @@
     body: {}
   expect:
     status: 400
-    body: { error: { code: activation_code_malformed } }
+    body: { code: activation_code_malformed }
 
 - id: lim-connect-activate-no-bearer
   endpoint: POST /api/connect/v1/license/activate
@@ -201,7 +201,7 @@
     body: {}
   expect:
     status: 400
-    body: { error: { code: activation_code_malformed } }
+    body: { code: activation_code_malformed }
 
 - id: lim-connect-activate-requires-instance
   endpoint: POST /api/connect/v1/license/activate
@@ -212,7 +212,7 @@
     body: {}
   expect:
     status: 400
-    body: { error: { code: connect_instance_required } }
+    body: { code: connect_instance_required }
 
 - id: lim-connect-activate-unknown-code
   endpoint: POST /api/connect/v1/license/activate
@@ -223,7 +223,7 @@
     body: {}
   expect:
     status: 401
-    body: { error: { code: activation_code_not_found } }
+    body: { code: activation_code_not_found }
 
 - id: lim-connect-activate-lowercase-dashed-code-is-normalised
   endpoint: POST /api/connect/v1/license/activate
@@ -234,7 +234,7 @@
     body: {}
   expect:
     status: 401
-    body: { error: { code: activation_code_not_found } }
+    body: { code: activation_code_not_found }
 
 - id: lim-connect-activate-instance-id-must-be-plain
   endpoint: POST /api/connect/v1/license/activate
@@ -245,7 +245,7 @@
     body: {}
   expect:
     status: 400
-    body: { error: { code: connect_instance_required } }
+    body: { code: connect_instance_required }
 
 # ten guesses at one code are answered as unknown, the eleventh is refused; main's code for it is
 # rate_limited, the branch's is activation_rate_limited, so only the status and wording are held
@@ -286,8 +286,8 @@
     headers: { Authorization: "Bearer lwl_{uidHex32}{uidHex32}", X-LangWatch-Instance: "vd-{uid}" }
     body: { version: "1.0.0" }
   expect:
-    status: 400
-    body: { error: { code: validation_error } }
+    status: 422
+    body: { code: validation_error }
 
 - id: lim-connect-sync-rejects-extra-fields
   endpoint: POST /api/connect/v1/license/sync
@@ -297,8 +297,8 @@
     headers: { Authorization: "Bearer lwl_{uidHex32}{uidHex32}", X-LangWatch-Instance: "vd-{uid}" }
     body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 }, note: extra }
   expect:
-    status: 400
-    body: { error: { code: validation_error } }
+    status: 422
+    body: { code: validation_error }
 
 - id: lim-connect-sync-rejects-negative-seats
   endpoint: POST /api/connect/v1/license/sync
@@ -308,8 +308,8 @@
     headers: { Authorization: "Bearer lwl_{uidHex32}{uidHex32}", X-LangWatch-Instance: "vd-{uid}" }
     body: { version: "1.0.0", seats: { members: -1, liteMembers: 0 } }
   expect:
-    status: 400
-    body: { error: { code: validation_error } }
+    status: 422
+    body: { code: validation_error }
 
 - id: lim-connect-sync-malformed-token
   endpoint: POST /api/connect/v1/license/sync
@@ -320,7 +320,7 @@
     body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 } }
   expect:
     status: 401
-    body: { error: { code: connect_license_token_malformed } }
+    body: { code: connect_license_token_malformed }
 
 - id: lim-connect-sync-no-bearer
   endpoint: POST /api/connect/v1/license/sync
@@ -331,7 +331,7 @@
     body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 } }
   expect:
     status: 401
-    body: { error: { code: connect_license_token_malformed } }
+    body: { code: connect_license_token_malformed }
 
 - id: lim-connect-sync-requires-instance
   endpoint: POST /api/connect/v1/license/sync
@@ -342,7 +342,7 @@
     body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 } }
   expect:
     status: 400
-    body: { error: { code: connect_instance_required } }
+    body: { code: connect_instance_required }
 
 - id: lim-connect-sync-unregistered-licence
   endpoint: POST /api/connect/v1/license/sync
@@ -353,7 +353,7 @@
     body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 } }
   expect:
     status: 401
-    body: { error: { code: connect_license_not_registered } }
+    body: { code: connect_license_not_registered }
 
 # plan gates: a freshly seeded organisation holds no licence, so features sold with one refuse it.
 # Main answers the webhook and spend gates 403 with the same sentence; the branch names a code.
@@ -482,7 +482,7 @@
     path: /api/groups
   expect:
     status: 402
-    body: { error: { code: enterprise_plan_required } }
+    body: { code: enterprise_plan_required }
 
 - id: lim-groups-create-refused-without-plan
   endpoint: POST /api/groups
@@ -493,7 +493,7 @@
     body: { name: "vd-{uid}" }
   expect:
     status: 402
-    body: { error: { code: enterprise_plan_required } }
+    body: { code: enterprise_plan_required }
 
 - id: lim-organization-read-refused-without-plan
   endpoint: GET /api/organization
@@ -503,7 +503,7 @@
     path: /api/organization
   expect:
     status: 402
-    body: { error: { code: enterprise_plan_required } }
+    body: { code: enterprise_plan_required }
 
 - id: lim-organization-update-refused-without-plan
   endpoint: PATCH /api/organization
@@ -514,7 +514,7 @@
     body: { name: "vd-{uid}" }
   expect:
     status: 402
-    body: { error: { code: enterprise_plan_required } }
+    body: { code: enterprise_plan_required }
 
 - id: lim-organization-invites-list-refused-without-plan
   endpoint: GET /api/organization/invites
@@ -524,7 +524,7 @@
     path: /api/organization/invites
   expect:
     status: 402
-    body: { error: { code: enterprise_plan_required } }
+    body: { code: enterprise_plan_required }
 
 - id: lim-organization-members-list-refused-without-plan
   endpoint: GET /api/organization/members
@@ -534,4 +534,4 @@
     path: /api/organization/members
   expect:
     status: 402
-    body: { error: { code: enterprise_plan_required } }
+    body: { code: enterprise_plan_required }

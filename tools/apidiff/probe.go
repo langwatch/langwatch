@@ -15,7 +15,7 @@ import (
 )
 
 // bodyCaptureCap bounds each side's captured response body in a transcript.
-const bodyCaptureCap = 64 << 10
+const bodyCaptureCap = 4 << 20
 
 // Keys are the credentials probing authenticates with. ProjectKey and OrgKey
 // default to the deterministic seed constants. AdminKey is the instance admin

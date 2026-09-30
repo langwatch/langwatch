@@ -6063,11 +6063,11 @@
 },
 {
   "id": "agents-test-unknown-404",
-  "endpoint": "POST /api/agents/{id}/test",
+  "endpoint": "POST /api/v1/agents/{id}/test",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/agents/agent_vd_{uid}/test"
+    "path": "/api/v1/agents/agent_vd_{uid}/test"
   },
   "expect": {
     "status": 404
@@ -6075,7 +6075,7 @@
 },
 {
   "id": "agents-test-refuses-no-key",
-  "endpoint": "POST /api/agents/{id}/test",
+  "endpoint": "POST /api/v1/agents/{id}/test",
   "auth": "none",
   "setup": [
     {
@@ -6098,7 +6098,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/agents/{agentId}/test"
+    "path": "/api/v1/agents/{agentId}/test"
   },
   "expect": {
     "status": 401
@@ -6106,7 +6106,7 @@
 },
 {
   "id": "agents-test-refuses-read-only-key",
-  "endpoint": "POST /api/agents/{id}/test",
+  "endpoint": "POST /api/v1/agents/{id}/test",
   "auth": "restricted",
   "setup": [
     {
@@ -6129,7 +6129,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/agents/{agentId}/test"
+    "path": "/api/v1/agents/{agentId}/test"
   },
   "expect": {
     "status": 403
@@ -6137,7 +6137,7 @@
 },
 {
   "id": "agents-test-other-project-404",
-  "endpoint": "POST /api/agents/{id}/test",
+  "endpoint": "POST /api/v1/agents/{id}/test",
   "auth": "project-b",
   "setup": [
     {
@@ -6160,7 +6160,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/agents/{agentId}/test"
+    "path": "/api/v1/agents/{agentId}/test"
   },
   "expect": {
     "status": 404
@@ -6168,11 +6168,11 @@
 },
 {
   "id": "agents-call-unknown-404",
-  "endpoint": "POST /api/agents/{id}/call",
+  "endpoint": "POST /api/v1/agents/{id}/call",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/agents/agent_vd_{uid}/call",
+    "path": "/api/v1/agents/agent_vd_{uid}/call",
     "body": {
       "messages": [
         {
@@ -6188,7 +6188,7 @@
 },
 {
   "id": "agents-call-rejects-missing-messages",
-  "endpoint": "POST /api/agents/{id}/call",
+  "endpoint": "POST /api/v1/agents/{id}/call",
   "auth": "project",
   "setup": [
     {
@@ -6211,7 +6211,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/agents/{agentId}/call",
+    "path": "/api/v1/agents/{agentId}/call",
     "body": {}
   },
   "expect": {
@@ -6223,7 +6223,7 @@
 },
 {
   "id": "agents-call-refuses-no-key",
-  "endpoint": "POST /api/agents/{id}/call",
+  "endpoint": "POST /api/v1/agents/{id}/call",
   "auth": "none",
   "setup": [
     {
@@ -6246,7 +6246,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/agents/{agentId}/call",
+    "path": "/api/v1/agents/{agentId}/call",
     "body": {
       "messages": [
         {
@@ -6262,7 +6262,7 @@
 },
 {
   "id": "agents-call-refuses-read-only-key",
-  "endpoint": "POST /api/agents/{id}/call",
+  "endpoint": "POST /api/v1/agents/{id}/call",
   "auth": "restricted",
   "setup": [
     {
@@ -6285,7 +6285,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/agents/{agentId}/call",
+    "path": "/api/v1/agents/{agentId}/call",
     "body": {
       "messages": [
         {
@@ -6301,7 +6301,7 @@
 },
 {
   "id": "agents-call-answers-404-for-non-connected-agent",
-  "endpoint": "POST /api/agents/{id}/call",
+  "endpoint": "POST /api/v1/agents/{id}/call",
   "auth": "project",
   "setup": [
     {
@@ -6324,7 +6324,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/agents/{agentId}/call",
+    "path": "/api/v1/agents/{agentId}/call",
     "body": {
       "messages": [
         {
@@ -6343,11 +6343,11 @@
 },
 {
   "id": "agents-connect-register-happy",
-  "endpoint": "POST /api/agents/connect/register",
+  "endpoint": "POST /api/v1/agents/connect/register",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/register",
+    "path": "/api/v1/agents/connect/register",
     "body": {
       "protocol": 1,
       "type": "register",
@@ -6393,11 +6393,11 @@
 },
 {
   "id": "agents-connect-register-rejects-wrong-protocol",
-  "endpoint": "POST /api/agents/connect/register",
+  "endpoint": "POST /api/v1/agents/connect/register",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/register",
+    "path": "/api/v1/agents/connect/register",
     "body": {
       "protocol": 9,
       "type": "register",
@@ -6442,11 +6442,11 @@
 },
 {
   "id": "agents-connect-register-rejects-empty-body",
-  "endpoint": "POST /api/agents/connect/register",
+  "endpoint": "POST /api/v1/agents/connect/register",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/register",
+    "path": "/api/v1/agents/connect/register",
     "body": {}
   },
   "expect": {
@@ -6458,11 +6458,11 @@
 },
 {
   "id": "agents-connect-register-rejects-no-agents",
-  "endpoint": "POST /api/agents/connect/register",
+  "endpoint": "POST /api/v1/agents/connect/register",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/register",
+    "path": "/api/v1/agents/connect/register",
     "body": {
       "protocol": 1,
       "type": "register",
@@ -6489,11 +6489,11 @@
 },
 {
   "id": "agents-connect-register-refuses-no-key",
-  "endpoint": "POST /api/agents/connect/register",
+  "endpoint": "POST /api/v1/agents/connect/register",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/register",
+    "path": "/api/v1/agents/connect/register",
     "body": {
       "protocol": 1,
       "type": "register",
@@ -6535,11 +6535,11 @@
 },
 {
   "id": "agents-connect-register-refuses-read-only-key",
-  "endpoint": "POST /api/agents/connect/register",
+  "endpoint": "POST /api/v1/agents/connect/register",
   "auth": "restricted",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/register",
+    "path": "/api/v1/agents/connect/register",
     "body": {
       "protocol": 1,
       "type": "register",
@@ -6581,11 +6581,11 @@
 },
 {
   "id": "agents-connect-poll-refuses-no-key",
-  "endpoint": "GET /api/agents/connect/poll",
+  "endpoint": "GET /api/v1/agents/connect/poll",
   "auth": "none",
   "request": {
     "method": "GET",
-    "path": "/api/agents/connect/poll"
+    "path": "/api/v1/agents/connect/poll"
   },
   "expect": {
     "status": 401
@@ -6593,11 +6593,11 @@
 },
 {
   "id": "agents-connect-poll-refuses-read-only-key",
-  "endpoint": "GET /api/agents/connect/poll",
+  "endpoint": "GET /api/v1/agents/connect/poll",
   "auth": "restricted",
   "request": {
     "method": "GET",
-    "path": "/api/agents/connect/poll"
+    "path": "/api/v1/agents/connect/poll"
   },
   "expect": {
     "status": 403
@@ -6605,11 +6605,11 @@
 },
 {
   "id": "agents-connect-frames-rejects-empty-body",
-  "endpoint": "POST /api/agents/connect/frames",
+  "endpoint": "POST /api/v1/agents/connect/frames",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/frames",
+    "path": "/api/v1/agents/connect/frames",
     "body": {}
   },
   "expect": {
@@ -6621,11 +6621,11 @@
 },
 {
   "id": "agents-connect-frames-refuses-no-key",
-  "endpoint": "POST /api/agents/connect/frames",
+  "endpoint": "POST /api/v1/agents/connect/frames",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/frames",
+    "path": "/api/v1/agents/connect/frames",
     "body": {
       "frames": [
         {
@@ -6641,11 +6641,11 @@
 },
 {
   "id": "agents-connect-frames-refuses-read-only-key",
-  "endpoint": "POST /api/agents/connect/frames",
+  "endpoint": "POST /api/v1/agents/connect/frames",
   "auth": "restricted",
   "request": {
     "method": "POST",
-    "path": "/api/agents/connect/frames",
+    "path": "/api/v1/agents/connect/frames",
     "body": {
       "frames": [
         {
@@ -13588,7 +13588,7 @@
 },
 {
   "id": "run-plans-list-happy",
-  "endpoint": "GET /api/run-plans",
+  "endpoint": "GET /api/v1/run-plans",
   "auth": "project",
   "setup": [
     {
@@ -13649,7 +13649,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/run-plans"
+    "path": "/api/v1/run-plans"
   },
   "expect": {
     "status": 200
@@ -13657,11 +13657,11 @@
 },
 {
   "id": "run-plans-list-refuses-no-key",
-  "endpoint": "GET /api/run-plans",
+  "endpoint": "GET /api/v1/run-plans",
   "auth": "none",
   "request": {
     "method": "GET",
-    "path": "/api/run-plans"
+    "path": "/api/v1/run-plans"
   },
   "expect": {
     "status": 401
@@ -13669,11 +13669,11 @@
 },
 {
   "id": "run-plans-list-read-only-key-allowed",
-  "endpoint": "GET /api/run-plans",
+  "endpoint": "GET /api/v1/run-plans",
   "auth": "restricted",
   "request": {
     "method": "GET",
-    "path": "/api/run-plans"
+    "path": "/api/v1/run-plans"
   },
   "expect": {
     "status": 200
@@ -13681,7 +13681,7 @@
 },
 {
   "id": "run-plans-list-hides-other-projects",
-  "endpoint": "GET /api/run-plans",
+  "endpoint": "GET /api/v1/run-plans",
   "auth": "project-b",
   "setup": [
     {
@@ -13742,7 +13742,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/run-plans"
+    "path": "/api/v1/run-plans"
   },
   "expect": {
     "status": 200,
@@ -13751,7 +13751,7 @@
 },
 {
   "id": "run-plans-get-happy",
-  "endpoint": "GET /api/run-plans/{id}",
+  "endpoint": "GET /api/v1/run-plans/{id}",
   "auth": "project",
   "setup": [
     {
@@ -13812,7 +13812,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/run-plans/{suiteId}"
+    "path": "/api/v1/run-plans/{suiteId}"
   },
   "expect": {
     "status": 200,
@@ -13824,11 +13824,11 @@
 },
 {
   "id": "run-plans-get-unknown-404",
-  "endpoint": "GET /api/run-plans/{id}",
+  "endpoint": "GET /api/v1/run-plans/{id}",
   "auth": "project",
   "request": {
     "method": "GET",
-    "path": "/api/run-plans/suite_vd_{uid}"
+    "path": "/api/v1/run-plans/suite_vd_{uid}"
   },
   "expect": {
     "status": 404
@@ -13836,7 +13836,7 @@
 },
 {
   "id": "run-plans-get-refuses-no-key",
-  "endpoint": "GET /api/run-plans/{id}",
+  "endpoint": "GET /api/v1/run-plans/{id}",
   "auth": "none",
   "setup": [
     {
@@ -13897,7 +13897,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/run-plans/{suiteId}"
+    "path": "/api/v1/run-plans/{suiteId}"
   },
   "expect": {
     "status": 401
@@ -13905,7 +13905,7 @@
 },
 {
   "id": "run-plans-get-other-project-404",
-  "endpoint": "GET /api/run-plans/{id}",
+  "endpoint": "GET /api/v1/run-plans/{id}",
   "auth": "project-b",
   "setup": [
     {
@@ -13966,7 +13966,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/run-plans/{suiteId}"
+    "path": "/api/v1/run-plans/{suiteId}"
   },
   "expect": {
     "status": 404
@@ -13974,7 +13974,7 @@
 },
 {
   "id": "run-plans-delete-happy",
-  "endpoint": "DELETE /api/run-plans/{id}",
+  "endpoint": "DELETE /api/v1/run-plans/{id}",
   "auth": "project",
   "setup": [
     {
@@ -14035,14 +14035,14 @@
   ],
   "request": {
     "method": "DELETE",
-    "path": "/api/run-plans/{suiteId}"
+    "path": "/api/v1/run-plans/{suiteId}"
   },
   "expect": {
     "status": 200
   },
   "verify": [
     {
-      "request": "GET /api/run-plans/{suiteId}",
+      "request": "GET /api/v1/run-plans/{suiteId}",
       "expect": {
         "status": 404
       }
@@ -14057,11 +14057,11 @@
 },
 {
   "id": "run-plans-delete-unknown-404",
-  "endpoint": "DELETE /api/run-plans/{id}",
+  "endpoint": "DELETE /api/v1/run-plans/{id}",
   "auth": "project",
   "request": {
     "method": "DELETE",
-    "path": "/api/run-plans/suite_vd_{uid}"
+    "path": "/api/v1/run-plans/suite_vd_{uid}"
   },
   "expect": {
     "status": 404
@@ -14069,7 +14069,7 @@
 },
 {
   "id": "run-plans-delete-refuses-no-key",
-  "endpoint": "DELETE /api/run-plans/{id}",
+  "endpoint": "DELETE /api/v1/run-plans/{id}",
   "auth": "none",
   "setup": [
     {
@@ -14130,14 +14130,14 @@
   ],
   "request": {
     "method": "DELETE",
-    "path": "/api/run-plans/{suiteId}"
+    "path": "/api/v1/run-plans/{suiteId}"
   },
   "expect": {
     "status": 401
   },
   "verify": [
     {
-      "request": "GET /api/run-plans/{suiteId}",
+      "request": "GET /api/v1/run-plans/{suiteId}",
       "expect": {
         "status": 200
       }
@@ -14146,7 +14146,7 @@
 },
 {
   "id": "run-plans-delete-refuses-read-only-key",
-  "endpoint": "DELETE /api/run-plans/{id}",
+  "endpoint": "DELETE /api/v1/run-plans/{id}",
   "auth": "restricted",
   "setup": [
     {
@@ -14207,14 +14207,14 @@
   ],
   "request": {
     "method": "DELETE",
-    "path": "/api/run-plans/{suiteId}"
+    "path": "/api/v1/run-plans/{suiteId}"
   },
   "expect": {
     "status": 403
   },
   "verify": [
     {
-      "request": "GET /api/run-plans/{suiteId}",
+      "request": "GET /api/v1/run-plans/{suiteId}",
       "expect": {
         "status": 200
       }
@@ -14223,7 +14223,7 @@
 },
 {
   "id": "run-plans-delete-other-project-404",
-  "endpoint": "DELETE /api/run-plans/{id}",
+  "endpoint": "DELETE /api/v1/run-plans/{id}",
   "auth": "project-b",
   "setup": [
     {
@@ -14284,14 +14284,14 @@
   ],
   "request": {
     "method": "DELETE",
-    "path": "/api/run-plans/{suiteId}"
+    "path": "/api/v1/run-plans/{suiteId}"
   },
   "expect": {
     "status": 404
   },
   "verify": [
     {
-      "request": "GET /api/run-plans/{suiteId}",
+      "request": "GET /api/v1/run-plans/{suiteId}",
       "expect": {
         "status": 200
       }
@@ -14300,11 +14300,11 @@
 },
 {
   "id": "run-plans-run-by-id-unknown-404",
-  "endpoint": "POST /api/run-plans/{id}/run",
+  "endpoint": "POST /api/v1/run-plans/{id}/run",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/suite_vd_{uid}/run",
+    "path": "/api/v1/run-plans/suite_vd_{uid}/run",
     "body": {}
   },
   "expect": {
@@ -14313,7 +14313,7 @@
 },
 {
   "id": "run-plans-run-by-id-refuses-no-key",
-  "endpoint": "POST /api/run-plans/{id}/run",
+  "endpoint": "POST /api/v1/run-plans/{id}/run",
   "auth": "none",
   "setup": [
     {
@@ -14374,7 +14374,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/{suiteId}/run",
+    "path": "/api/v1/run-plans/{suiteId}/run",
     "body": {}
   },
   "expect": {
@@ -14383,7 +14383,7 @@
 },
 {
   "id": "run-plans-run-by-id-refuses-read-only-key",
-  "endpoint": "POST /api/run-plans/{id}/run",
+  "endpoint": "POST /api/v1/run-plans/{id}/run",
   "auth": "restricted",
   "setup": [
     {
@@ -14444,7 +14444,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/{suiteId}/run",
+    "path": "/api/v1/run-plans/{suiteId}/run",
     "body": {}
   },
   "expect": {
@@ -14453,7 +14453,7 @@
 },
 {
   "id": "run-plans-run-by-id-other-project-404",
-  "endpoint": "POST /api/run-plans/{id}/run",
+  "endpoint": "POST /api/v1/run-plans/{id}/run",
   "auth": "project-b",
   "setup": [
     {
@@ -14514,7 +14514,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/{suiteId}/run",
+    "path": "/api/v1/run-plans/{suiteId}/run",
     "body": {}
   },
   "expect": {
@@ -14523,11 +14523,11 @@
 },
 {
   "id": "run-plans-run-rejects-missing-config",
-  "endpoint": "POST /api/run-plans/run",
+  "endpoint": "POST /api/v1/run-plans/run",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/run",
+    "path": "/api/v1/run-plans/run",
     "body": {
       "name": "vd-{uid}"
     }
@@ -14541,11 +14541,11 @@
 },
 {
   "id": "run-plans-run-rejects-invalid-scope",
-  "endpoint": "POST /api/run-plans/run",
+  "endpoint": "POST /api/v1/run-plans/run",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/run",
+    "path": "/api/v1/run-plans/run",
     "body": {
       "name": "vd-{uid}",
       "config": {
@@ -14565,11 +14565,11 @@
 },
 {
   "id": "run-plans-run-rejects-invalid-target-type",
-  "endpoint": "POST /api/run-plans/run",
+  "endpoint": "POST /api/v1/run-plans/run",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/run",
+    "path": "/api/v1/run-plans/run",
     "body": {
       "name": "vd-{uid}",
       "config": {
@@ -14594,11 +14594,11 @@
 },
 {
   "id": "run-plans-run-rejects-empty-body",
-  "endpoint": "POST /api/run-plans/run",
+  "endpoint": "POST /api/v1/run-plans/run",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/run",
+    "path": "/api/v1/run-plans/run",
     "body": {}
   },
   "expect": {
@@ -14610,11 +14610,11 @@
 },
 {
   "id": "run-plans-run-refuses-no-key",
-  "endpoint": "POST /api/run-plans/run",
+  "endpoint": "POST /api/v1/run-plans/run",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/run",
+    "path": "/api/v1/run-plans/run",
     "body": {
       "name": "vd-{uid}",
       "config": {
@@ -14639,11 +14639,11 @@
 },
 {
   "id": "run-plans-run-refuses-read-only-key",
-  "endpoint": "POST /api/run-plans/run",
+  "endpoint": "POST /api/v1/run-plans/run",
   "auth": "restricted",
   "request": {
     "method": "POST",
-    "path": "/api/run-plans/run",
+    "path": "/api/v1/run-plans/run",
     "body": {
       "name": "vd-{uid}",
       "config": {
@@ -14668,11 +14668,11 @@
 },
 {
   "id": "test-suites-create-happy",
-  "endpoint": "POST /api/test-suites",
+  "endpoint": "POST /api/v1/test-suites",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/test-suites",
+    "path": "/api/v1/test-suites",
     "body": {
       "name": "vd-{uid}"
     }
@@ -14689,7 +14689,7 @@
   },
   "verify": [
     {
-      "request": "GET /api/test-suites/{testSuiteId}",
+      "request": "GET /api/v1/test-suites/{testSuiteId}",
       "expect": {
         "status": 200,
         "body": {
@@ -14698,7 +14698,7 @@
       }
     },
     {
-      "request": "GET /api/test-suites",
+      "request": "GET /api/v1/test-suites",
       "expect": {
         "status": 200,
         "contains": "vd-{uid}"
@@ -14709,11 +14709,11 @@
 },
 {
   "id": "test-suites-create-rejects-missing-name",
-  "endpoint": "POST /api/test-suites",
+  "endpoint": "POST /api/v1/test-suites",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/test-suites",
+    "path": "/api/v1/test-suites",
     "body": {
       "description": "vd-{uid}"
     }
@@ -14726,7 +14726,7 @@
   },
   "verify": [
     {
-      "request": "GET /api/test-suites",
+      "request": "GET /api/v1/test-suites",
       "expect": {
         "status": 200,
         "notContains": "vd-{uid}"
@@ -14736,11 +14736,11 @@
 },
 {
   "id": "test-suites-create-rejects-empty-body",
-  "endpoint": "POST /api/test-suites",
+  "endpoint": "POST /api/v1/test-suites",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/test-suites",
+    "path": "/api/v1/test-suites",
     "body": {}
   },
   "expect": {
@@ -14752,11 +14752,11 @@
 },
 {
   "id": "test-suites-create-refuses-no-key",
-  "endpoint": "POST /api/test-suites",
+  "endpoint": "POST /api/v1/test-suites",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/test-suites",
+    "path": "/api/v1/test-suites",
     "body": {
       "name": "vd-{uid}"
     }
@@ -14766,7 +14766,7 @@
   },
   "verify": [
     {
-      "request": "GET /api/test-suites",
+      "request": "GET /api/v1/test-suites",
       "expect": {
         "status": 200,
         "notContains": "vd-{uid}"
@@ -14776,11 +14776,11 @@
 },
 {
   "id": "test-suites-create-refuses-read-only-key",
-  "endpoint": "POST /api/test-suites",
+  "endpoint": "POST /api/v1/test-suites",
   "auth": "restricted",
   "request": {
     "method": "POST",
-    "path": "/api/test-suites",
+    "path": "/api/v1/test-suites",
     "body": {
       "name": "vd-{uid}"
     }
@@ -14790,7 +14790,7 @@
   },
   "verify": [
     {
-      "request": "GET /api/test-suites",
+      "request": "GET /api/v1/test-suites",
       "expect": {
         "status": 200,
         "notContains": "vd-{uid}"
@@ -14800,11 +14800,11 @@
 },
 {
   "id": "test-suites-list-happy",
-  "endpoint": "GET /api/test-suites",
+  "endpoint": "GET /api/v1/test-suites",
   "auth": "project",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -14818,7 +14818,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/test-suites"
+    "path": "/api/v1/test-suites"
   },
   "expect": {
     "status": 200,
@@ -14827,11 +14827,11 @@
 },
 {
   "id": "test-suites-list-refuses-no-key",
-  "endpoint": "GET /api/test-suites",
+  "endpoint": "GET /api/v1/test-suites",
   "auth": "none",
   "request": {
     "method": "GET",
-    "path": "/api/test-suites"
+    "path": "/api/v1/test-suites"
   },
   "expect": {
     "status": 401
@@ -14839,11 +14839,11 @@
 },
 {
   "id": "test-suites-list-hides-other-projects",
-  "endpoint": "GET /api/test-suites",
+  "endpoint": "GET /api/v1/test-suites",
   "auth": "project-b",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -14857,7 +14857,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/test-suites"
+    "path": "/api/v1/test-suites"
   },
   "expect": {
     "status": 200,
@@ -14866,11 +14866,11 @@
 },
 {
   "id": "test-suites-get-happy",
-  "endpoint": "GET /api/test-suites/{id}",
+  "endpoint": "GET /api/v1/test-suites/{id}",
   "auth": "project",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -14884,7 +14884,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/test-suites/{testSuiteId}"
+    "path": "/api/v1/test-suites/{testSuiteId}"
   },
   "expect": {
     "status": 200,
@@ -14895,11 +14895,11 @@
 },
 {
   "id": "test-suites-get-unknown-404",
-  "endpoint": "GET /api/test-suites/{id}",
+  "endpoint": "GET /api/v1/test-suites/{id}",
   "auth": "project",
   "request": {
     "method": "GET",
-    "path": "/api/test-suites/suite_vd_{uid}"
+    "path": "/api/v1/test-suites/suite_vd_{uid}"
   },
   "expect": {
     "status": 404
@@ -14907,11 +14907,11 @@
 },
 {
   "id": "test-suites-get-other-project-404",
-  "endpoint": "GET /api/test-suites/{id}",
+  "endpoint": "GET /api/v1/test-suites/{id}",
   "auth": "project-b",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -14925,7 +14925,7 @@
   ],
   "request": {
     "method": "GET",
-    "path": "/api/test-suites/{testSuiteId}"
+    "path": "/api/v1/test-suites/{testSuiteId}"
   },
   "expect": {
     "status": 404
@@ -14933,11 +14933,11 @@
 },
 {
   "id": "test-suites-patch-happy-renames",
-  "endpoint": "PATCH /api/test-suites/{id}",
+  "endpoint": "PATCH /api/v1/test-suites/{id}",
   "auth": "project",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -14951,7 +14951,7 @@
   ],
   "request": {
     "method": "PATCH",
-    "path": "/api/test-suites/{testSuiteId}",
+    "path": "/api/v1/test-suites/{testSuiteId}",
     "body": {
       "name": "vd-{uid}-renamed"
     }
@@ -14964,7 +14964,7 @@
   },
   "verify": [
     {
-      "request": "GET /api/test-suites/{testSuiteId}",
+      "request": "GET /api/v1/test-suites/{testSuiteId}",
       "expect": {
         "status": 200,
         "body": {
@@ -14976,11 +14976,11 @@
 },
 {
   "id": "test-suites-patch-unknown-404",
-  "endpoint": "PATCH /api/test-suites/{id}",
+  "endpoint": "PATCH /api/v1/test-suites/{id}",
   "auth": "project",
   "request": {
     "method": "PATCH",
-    "path": "/api/test-suites/suite_vd_{uid}",
+    "path": "/api/v1/test-suites/suite_vd_{uid}",
     "body": {
       "name": "vd-{uid}"
     }
@@ -14991,11 +14991,11 @@
 },
 {
   "id": "test-suites-patch-refuses-read-only-key",
-  "endpoint": "PATCH /api/test-suites/{id}",
+  "endpoint": "PATCH /api/v1/test-suites/{id}",
   "auth": "restricted",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15009,7 +15009,7 @@
   ],
   "request": {
     "method": "PATCH",
-    "path": "/api/test-suites/{testSuiteId}",
+    "path": "/api/v1/test-suites/{testSuiteId}",
     "body": {
       "name": "vd-{uid}-x"
     }
@@ -15019,7 +15019,7 @@
   },
   "verify": [
     {
-      "request": "GET /api/test-suites/{testSuiteId}",
+      "request": "GET /api/v1/test-suites/{testSuiteId}",
       "expect": {
         "status": 200,
         "body": {
@@ -15031,11 +15031,11 @@
 },
 {
   "id": "test-suites-patch-refuses-no-key",
-  "endpoint": "PATCH /api/test-suites/{id}",
+  "endpoint": "PATCH /api/v1/test-suites/{id}",
   "auth": "none",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15049,7 +15049,7 @@
   ],
   "request": {
     "method": "PATCH",
-    "path": "/api/test-suites/{testSuiteId}",
+    "path": "/api/v1/test-suites/{testSuiteId}",
     "body": {
       "name": "vd-{uid}-x"
     }
@@ -15060,11 +15060,11 @@
 },
 {
   "id": "test-suites-delete-happy",
-  "endpoint": "DELETE /api/test-suites/{id}",
+  "endpoint": "DELETE /api/v1/test-suites/{id}",
   "auth": "project",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15078,14 +15078,14 @@
   ],
   "request": {
     "method": "DELETE",
-    "path": "/api/test-suites/{testSuiteId}"
+    "path": "/api/v1/test-suites/{testSuiteId}"
   },
   "expect": {
     "status": 200
   },
   "verify": [
     {
-      "request": "GET /api/test-suites/{testSuiteId}",
+      "request": "GET /api/v1/test-suites/{testSuiteId}",
       "expect": {
         "status": 404
       }
@@ -15094,11 +15094,11 @@
 },
 {
   "id": "test-suites-delete-archives-its-scenarios",
-  "endpoint": "DELETE /api/test-suites/{id}",
+  "endpoint": "DELETE /api/v1/test-suites/{id}",
   "auth": "project",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15132,7 +15132,7 @@
   ],
   "request": {
     "method": "DELETE",
-    "path": "/api/test-suites/{testSuiteId}"
+    "path": "/api/v1/test-suites/{testSuiteId}"
   },
   "expect": {
     "status": 200
@@ -15149,11 +15149,11 @@
 },
 {
   "id": "test-suites-delete-unknown-404",
-  "endpoint": "DELETE /api/test-suites/{id}",
+  "endpoint": "DELETE /api/v1/test-suites/{id}",
   "auth": "project",
   "request": {
     "method": "DELETE",
-    "path": "/api/test-suites/suite_vd_{uid}"
+    "path": "/api/v1/test-suites/suite_vd_{uid}"
   },
   "expect": {
     "status": 404
@@ -15161,11 +15161,11 @@
 },
 {
   "id": "test-suites-delete-refuses-read-only-key",
-  "endpoint": "DELETE /api/test-suites/{id}",
+  "endpoint": "DELETE /api/v1/test-suites/{id}",
   "auth": "restricted",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15179,14 +15179,14 @@
   ],
   "request": {
     "method": "DELETE",
-    "path": "/api/test-suites/{testSuiteId}"
+    "path": "/api/v1/test-suites/{testSuiteId}"
   },
   "expect": {
     "status": 403
   },
   "verify": [
     {
-      "request": "GET /api/test-suites/{testSuiteId}",
+      "request": "GET /api/v1/test-suites/{testSuiteId}",
       "expect": {
         "status": 200
       }
@@ -15195,11 +15195,11 @@
 },
 {
   "id": "test-suites-delete-other-project-404",
-  "endpoint": "DELETE /api/test-suites/{id}",
+  "endpoint": "DELETE /api/v1/test-suites/{id}",
   "auth": "project-b",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15213,14 +15213,14 @@
   ],
   "request": {
     "method": "DELETE",
-    "path": "/api/test-suites/{testSuiteId}"
+    "path": "/api/v1/test-suites/{testSuiteId}"
   },
   "expect": {
     "status": 404
   },
   "verify": [
     {
-      "request": "GET /api/test-suites/{testSuiteId}",
+      "request": "GET /api/v1/test-suites/{testSuiteId}",
       "expect": {
         "status": 200
       }
@@ -15229,11 +15229,11 @@
 },
 {
   "id": "test-suites-run-unknown-404",
-  "endpoint": "POST /api/test-suites/{id}/run",
+  "endpoint": "POST /api/v1/test-suites/{id}/run",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/test-suites/suite_vd_{uid}/run",
+    "path": "/api/v1/test-suites/suite_vd_{uid}/run",
     "body": {
       "targets": [
         {
@@ -15249,11 +15249,11 @@
 },
 {
   "id": "test-suites-run-refuses-no-key",
-  "endpoint": "POST /api/test-suites/{id}/run",
+  "endpoint": "POST /api/v1/test-suites/{id}/run",
   "auth": "none",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15267,7 +15267,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/test-suites/{testSuiteId}/run",
+    "path": "/api/v1/test-suites/{testSuiteId}/run",
     "body": {
       "targets": [
         {
@@ -15283,11 +15283,11 @@
 },
 {
   "id": "test-suites-run-refuses-read-only-key",
-  "endpoint": "POST /api/test-suites/{id}/run",
+  "endpoint": "POST /api/v1/test-suites/{id}/run",
   "auth": "restricted",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15301,7 +15301,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/test-suites/{testSuiteId}/run",
+    "path": "/api/v1/test-suites/{testSuiteId}/run",
     "body": {
       "targets": [
         {
@@ -15317,11 +15317,11 @@
 },
 {
   "id": "test-suites-run-other-project-404",
-  "endpoint": "POST /api/test-suites/{id}/run",
+  "endpoint": "POST /api/v1/test-suites/{id}/run",
   "auth": "project-b",
   "setup": [
     {
-      "request": "POST /api/test-suites",
+      "request": "POST /api/v1/test-suites",
       "body": {
         "name": "vd-{uid}"
       },
@@ -15335,7 +15335,7 @@
   ],
   "request": {
     "method": "POST",
-    "path": "/api/test-suites/{testSuiteId}/run",
+    "path": "/api/v1/test-suites/{testSuiteId}/run",
     "body": {
       "targets": [
         {
@@ -15460,11 +15460,11 @@
 },
 {
   "id": "langy-control-requests-list-key-without-person-refused",
-  "endpoint": "GET /api/langy/control/requests",
+  "endpoint": "GET /api/v1/langy/control/requests",
   "auth": "project",
   "request": {
     "method": "GET",
-    "path": "/api/langy/control/requests"
+    "path": "/api/v1/langy/control/requests"
   },
   "expect": {
     "status": 404,
@@ -15475,11 +15475,11 @@
 },
 {
   "id": "langy-control-requests-list-refuses-no-key",
-  "endpoint": "GET /api/langy/control/requests",
+  "endpoint": "GET /api/v1/langy/control/requests",
   "auth": "none",
   "request": {
     "method": "GET",
-    "path": "/api/langy/control/requests"
+    "path": "/api/v1/langy/control/requests"
   },
   "expect": {
     "status": 401
@@ -15487,11 +15487,11 @@
 },
 {
   "id": "langy-control-requests-list-refuses-key-without-langy-view",
-  "endpoint": "GET /api/langy/control/requests",
+  "endpoint": "GET /api/v1/langy/control/requests",
   "auth": "restricted",
   "request": {
     "method": "GET",
-    "path": "/api/langy/control/requests"
+    "path": "/api/v1/langy/control/requests"
   },
   "expect": {
     "status": 403
@@ -15499,11 +15499,11 @@
 },
 {
   "id": "langy-control-approve-unknown-request",
-  "endpoint": "POST /api/langy/control/requests/{id}/approve",
+  "endpoint": "POST /api/v1/langy/control/requests/{id}/approve",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/requests/req_vd_{uid}/approve",
+    "path": "/api/v1/langy/control/requests/req_vd_{uid}/approve",
     "body": {
       "workspace": {
         "root": "/tmp/vd-{uid}",
@@ -15520,11 +15520,11 @@
 },
 {
   "id": "langy-control-approve-refuses-no-key",
-  "endpoint": "POST /api/langy/control/requests/{id}/approve",
+  "endpoint": "POST /api/v1/langy/control/requests/{id}/approve",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/requests/req_vd_{uid}/approve",
+    "path": "/api/v1/langy/control/requests/req_vd_{uid}/approve",
     "body": {
       "workspace": {
         "root": "/tmp/vd-{uid}",
@@ -15539,11 +15539,11 @@
 },
 {
   "id": "langy-control-approve-refuses-read-only-key",
-  "endpoint": "POST /api/langy/control/requests/{id}/approve",
+  "endpoint": "POST /api/v1/langy/control/requests/{id}/approve",
   "auth": "restricted",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/requests/req_vd_{uid}/approve",
+    "path": "/api/v1/langy/control/requests/req_vd_{uid}/approve",
     "body": {
       "workspace": {
         "root": "/tmp/vd-{uid}",
@@ -15558,11 +15558,11 @@
 },
 {
   "id": "langy-control-cancel-unknown-request",
-  "endpoint": "POST /api/langy/control/requests/{id}/cancel",
+  "endpoint": "POST /api/v1/langy/control/requests/{id}/cancel",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/requests/req_vd_{uid}/cancel",
+    "path": "/api/v1/langy/control/requests/req_vd_{uid}/cancel",
     "body": {}
   },
   "expect": {
@@ -15573,11 +15573,11 @@
 },
 {
   "id": "langy-control-cancel-refuses-no-key",
-  "endpoint": "POST /api/langy/control/requests/{id}/cancel",
+  "endpoint": "POST /api/v1/langy/control/requests/{id}/cancel",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/requests/req_vd_{uid}/cancel",
+    "path": "/api/v1/langy/control/requests/req_vd_{uid}/cancel",
     "body": {}
   },
   "expect": {
@@ -15586,11 +15586,11 @@
 },
 {
   "id": "langy-control-cancel-refuses-read-only-key",
-  "endpoint": "POST /api/langy/control/requests/{id}/cancel",
+  "endpoint": "POST /api/v1/langy/control/requests/{id}/cancel",
   "auth": "restricted",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/requests/req_vd_{uid}/cancel",
+    "path": "/api/v1/langy/control/requests/req_vd_{uid}/cancel",
     "body": {}
   },
   "expect": {
@@ -15599,11 +15599,11 @@
 },
 {
   "id": "langy-control-connect-register-rejects-empty-body",
-  "endpoint": "POST /api/langy/control/connect/register",
+  "endpoint": "POST /api/v1/langy/control/connect/register",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/connect/register",
+    "path": "/api/v1/langy/control/connect/register",
     "body": {}
   },
   "expect": {
@@ -15615,11 +15615,11 @@
 },
 {
   "id": "langy-control-connect-register-refuses-no-key",
-  "endpoint": "POST /api/langy/control/connect/register",
+  "endpoint": "POST /api/v1/langy/control/connect/register",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/connect/register",
+    "path": "/api/v1/langy/control/connect/register",
     "body": {
       "protocol": 1,
       "type": "register",
@@ -15650,11 +15650,11 @@
 },
 {
   "id": "langy-control-connect-register-refuses-project-key-not-session-key",
-  "endpoint": "POST /api/langy/control/connect/register",
+  "endpoint": "POST /api/v1/langy/control/connect/register",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/connect/register",
+    "path": "/api/v1/langy/control/connect/register",
     "body": {
       "protocol": 1,
       "type": "register",
@@ -15685,11 +15685,11 @@
 },
 {
   "id": "langy-control-connect-poll-without-instance-token-410",
-  "endpoint": "GET /api/langy/control/connect/poll",
+  "endpoint": "GET /api/v1/langy/control/connect/poll",
   "auth": "none",
   "request": {
     "method": "GET",
-    "path": "/api/langy/control/connect/poll"
+    "path": "/api/v1/langy/control/connect/poll"
   },
   "expect": {
     "status": 410
@@ -15697,11 +15697,11 @@
 },
 {
   "id": "langy-control-connect-frames-rejects-empty-body",
-  "endpoint": "POST /api/langy/control/connect/frames",
+  "endpoint": "POST /api/v1/langy/control/connect/frames",
   "auth": "project",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/connect/frames",
+    "path": "/api/v1/langy/control/connect/frames",
     "body": {}
   },
   "expect": {
@@ -15713,11 +15713,11 @@
 },
 {
   "id": "langy-control-connect-frames-without-instance-token-accepts-none",
-  "endpoint": "POST /api/langy/control/connect/frames",
+  "endpoint": "POST /api/v1/langy/control/connect/frames",
   "auth": "none",
   "request": {
     "method": "POST",
-    "path": "/api/langy/control/connect/frames",
+    "path": "/api/v1/langy/control/connect/frames",
     "body": {
       "frames": []
     }

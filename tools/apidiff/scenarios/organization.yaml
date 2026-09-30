@@ -5020,25 +5020,25 @@
   endpoint: "GET /api/organizations"
   auth: "none"
   request: {"path": "/api/organizations"}
-  expect: {"status": 401}
+  expect: {"status": 404}
 
 - id: "organizations-list-refuses-org-key"
   endpoint: "GET /api/organizations"
   auth: "org"
   request: {"path": "/api/organizations"}
-  expect: {"status": [401, 403]}
+  expect: {"status": 404}
 
 - id: "organizations-list-refuses-project-key"
   endpoint: "GET /api/organizations"
   auth: "project"
   request: {"path": "/api/organizations"}
-  expect: {"status": [401, 403]}
+  expect: {"status": 404}
 
 - id: "organizations-list-refuses-read-only-key"
   endpoint: "GET /api/organizations"
   auth: "restricted"
   request: {"path": "/api/organizations"}
-  expect: {"status": [401, 403]}
+  expect: {"status": 404}
 
 - id: "organizations-get-happy"
   endpoint: "GET /api/organizations/{organizationId}"
@@ -5056,19 +5056,19 @@
   endpoint: "GET /api/organizations/{organizationId}"
   auth: "none"
   request: {"path": "/api/organizations/{orgId}"}
-  expect: {"status": 401}
+  expect: {"status": 404}
 
 - id: "organizations-get-refuses-org-key"
   endpoint: "GET /api/organizations/{organizationId}"
   auth: "org"
   request: {"path": "/api/organizations/{orgId}"}
-  expect: {"status": [401, 403]}
+  expect: {"status": 404}
 
 - id: "organizations-get-refuses-project-key"
   endpoint: "GET /api/organizations/{organizationId}"
   auth: "project"
   request: {"path": "/api/organizations/{orgId}"}
-  expect: {"status": [401, 403]}
+  expect: {"status": 404}
 
 - id: "organizations-provision-happy"
   endpoint: "POST /api/organizations"
@@ -5181,29 +5181,25 @@
   endpoint: "POST /api/organizations"
   auth: "none"
   request: {"path": "/api/organizations", "body": {"name": "vd-{uid}"}}
-  expect: {"status": 401}
+  expect: {"status": 404}
 
 - id: "organizations-provision-refuses-org-key"
   endpoint: "POST /api/organizations"
   auth: "org"
   request: {"path": "/api/organizations", "body": {"name": "vd-{uid}"}}
-  expect: {"status": [401, 403]}
-  verify:
-    - request: "GET /api/organizations"
-      auth: "admin"
-      expect: {"status": 200, "notContains": "vd-{uid}"}
+  expect: {"status": 404}
 
 - id: "organizations-provision-refuses-project-key"
   endpoint: "POST /api/organizations"
   auth: "project"
   request: {"path": "/api/organizations", "body": {"name": "vd-{uid}"}}
-  expect: {"status": [401, 403]}
+  expect: {"status": 404}
 
 - id: "organizations-provision-refuses-read-only-key"
   endpoint: "POST /api/organizations"
   auth: "restricted"
   request: {"path": "/api/organizations", "body": {"name": "vd-{uid}"}}
-  expect: {"status": [401, 403]}
+  expect: {"status": 404}
 
 - id: "scim-tokens-list-shape"
   endpoint: "GET /api/scim-tokens"

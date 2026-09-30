@@ -32,35 +32,35 @@
 - id: annotations-create-rejects-missing-comment
   endpoint: POST /api/annotations/trace/{id}
   request: {"path": "/api/annotations/trace/vd-trace-{uid}", "body": {"isThumbsUp": true}}
-  expect: {"status": 400, "contains": "comment"}
+  expect: {"status": 422, "contains": "comment"}
   verify:
     - {"request": "GET /api/annotations/trace/vd-trace-{uid}", "expect": {"status": 200, "path": "data", "length": 0}}
 
 - id: annotations-create-rejects-empty-comment
   endpoint: POST /api/annotations/trace/{id}
   request: {"path": "/api/annotations/trace/vd-trace-{uid}", "body": {"comment": "", "isThumbsUp": true}}
-  expect: {"status": 400}
+  expect: {"status": 422}
   verify:
     - {"request": "GET /api/annotations/trace/vd-trace-{uid}", "expect": {"status": 200, "path": "data", "length": 0}}
 
 - id: annotations-create-rejects-non-string-comment
   endpoint: POST /api/annotations/trace/{id}
   request: {"path": "/api/annotations/trace/vd-trace-{uid}", "body": {"comment": 123, "isThumbsUp": true}}
-  expect: {"status": 400}
+  expect: {"status": 422}
   verify:
     - {"request": "GET /api/annotations/trace/vd-trace-{uid}", "expect": {"status": 200, "path": "data", "length": 0}}
 
 - id: annotations-create-rejects-missing-thumbs
   endpoint: POST /api/annotations/trace/{id}
   request: {"path": "/api/annotations/trace/vd-trace-{uid}", "body": {"comment": "c-{uid}"}}
-  expect: {"status": 400, "contains": "isThumbsUp"}
+  expect: {"status": 422, "contains": "isThumbsUp"}
   verify:
     - {"request": "GET /api/annotations/trace/vd-trace-{uid}", "expect": {"status": 200, "path": "data", "length": 0}}
 
 - id: annotations-create-rejects-string-thumbs
   endpoint: POST /api/annotations/trace/{id}
   request: {"path": "/api/annotations/trace/vd-trace-{uid}", "body": {"comment": "c-{uid}", "isThumbsUp": "true"}}
-  expect: {"status": 400}
+  expect: {"status": 422}
   verify:
     - {"request": "GET /api/annotations/trace/vd-trace-{uid}", "expect": {"status": 200, "path": "data", "length": 0}}
 
@@ -238,7 +238,7 @@
   setup:
     - {"request": "POST /api/annotations/trace/vd-trace-{uid}", "body": {"comment": "c-{uid}", "isThumbsUp": true, "email": "vd@example.com"}, "capture": {"annotationId": "data.id"}}
   request: {"path": "/api/annotations/{annotationId}", "body": {"isThumbsUp": false}}
-  expect: {"status": 400, "contains": "comment"}
+  expect: {"status": 422, "contains": "comment"}
   verify:
     - {"request": "GET /api/annotations/{annotationId}", "expect": {"status": 200, "body": {"data": {"comment": "c-{uid}", "isThumbsUp": true}}}}
 
@@ -247,7 +247,7 @@
   setup:
     - {"request": "POST /api/annotations/trace/vd-trace-{uid}", "body": {"comment": "c-{uid}", "isThumbsUp": true, "email": "vd@example.com"}, "capture": {"annotationId": "data.id"}}
   request: {"path": "/api/annotations/{annotationId}", "body": {"comment": "x-{uid}", "isThumbsUp": "no"}}
-  expect: {"status": 400}
+  expect: {"status": 422}
   verify:
     - {"request": "GET /api/annotations/{annotationId}", "expect": {"status": 200, "body": {"data": {"comment": "c-{uid}", "isThumbsUp": true}}}}
 
@@ -256,7 +256,7 @@
   setup:
     - {"request": "POST /api/annotations/trace/vd-trace-{uid}", "body": {"comment": "c-{uid}", "isThumbsUp": true, "email": "vd@example.com"}, "capture": {"annotationId": "data.id"}}
   request: {"path": "/api/annotations/{annotationId}", "body": {"comment": "x-{uid}"}}
-  expect: {"status": 400, "contains": "isThumbsUp"}
+  expect: {"status": 422, "contains": "isThumbsUp"}
   verify:
     - {"request": "GET /api/annotations/{annotationId}", "expect": {"status": 200, "body": {"data": {"comment": "c-{uid}", "isThumbsUp": true}}}}
 
