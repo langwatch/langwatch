@@ -62,6 +62,8 @@ export default function ModelCostsScreen() {
         </HStack>
         <Spacer />
         <PageLayout.HeaderButton
+          variant="solid"
+          colorPalette="blue"
           onClick={() => host.openPlatformDrawer({ drawer: "llmModelCost" })}
           disabled={!host.hasPermission(MODEL_COST_MANAGE_PERMISSION)}
         >

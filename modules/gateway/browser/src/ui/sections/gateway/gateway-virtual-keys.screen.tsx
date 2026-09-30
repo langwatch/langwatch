@@ -99,6 +99,43 @@ type CreatedSecret = {
   kind: "create" | "rotate";
 };
 
+/** The page title, its primary action and the onboarding offer under them. */
+function VirtualKeysHeader({
+  canCreate,
+  onCreate,
+  isError,
+  keyCount,
+}: {
+  canCreate: boolean;
+  onCreate: () => void;
+  isError: boolean;
+  keyCount: number | undefined;
+}) {
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
+        <Spacer />
+        {canCreate && (
+          <PageLayout.HeaderButton
+            variant="solid"
+            colorPalette="orange"
+            data-testid="gateway-virtual-key-new"
+            onClick={onCreate}
+          >
+            <Plus size={14} /> New virtual key
+          </PageLayout.HeaderButton>
+        )}
+      </PageLayout.Header>
+      {/* A failed read is unknown, never an empty list: the cache keeps the last one. */}
+      <GuidedOnboardingOffer
+        space="gateway"
+        spaceInUse={isError || keyCount === undefined ? null : keyCount > 0}
+      />
+    </>
+  );
+}
+
 function VirtualKeysPage() {
   const showErrorToast = useShowErrorToast();
   const { organization, hasPermission } = useOrganizationTeamProject();
@@ -215,22 +252,11 @@ function VirtualKeysPage() {
   return (
     <AiGatewayLayout>
       <>
-        <PageLayout.Header>
-          <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
-          <Spacer />
-          {canCreate && (
-            <PageLayout.HeaderButton
-              data-testid="gateway-virtual-key-new"
-              onClick={() => setCreateOpen(true)}
-            >
-              <Plus size={14} /> New virtual key
-            </PageLayout.HeaderButton>
-          )}
-        </PageLayout.Header>
-        {/* A failed read is unknown, never an empty list: the cache keeps the last one. */}
-        <GuidedOnboardingOffer
-          space="gateway"
-          spaceInUse={listQuery.isError || !listQuery.data ? null : listQuery.data.length > 0}
+        <VirtualKeysHeader
+          canCreate={canCreate}
+          onCreate={() => setCreateOpen(true)}
+          isError={listQuery.isError}
+          keyCount={listQuery.data?.length}
         />
 
         <PageLayout.Container>
@@ -680,7 +706,12 @@ function VirtualKeysEmptyState({
         icon={<KeyRound size={32} />}
       >
         {canCreate && (
-          <PageLayout.HeaderButton onClick={onCreate} marginTop={4}>
+          <PageLayout.HeaderButton
+            variant="solid"
+            colorPalette="orange"
+            onClick={onCreate}
+            marginTop={4}
+          >
             <Plus size={14} /> New virtual key
           </PageLayout.HeaderButton>
         )}

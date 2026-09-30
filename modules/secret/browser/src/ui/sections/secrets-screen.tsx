@@ -210,6 +210,8 @@ export default function SecretsScreen() {
         {canManageSecrets && (
           <Tooltip content="Add a new secret for use in code blocks" disabled={false}>
             <PageLayout.HeaderButton
+              variant="solid"
+              colorPalette="blue"
               onClick={() => setIsAddDialogOpen(true)}
               data-testid="secret-add"
             >

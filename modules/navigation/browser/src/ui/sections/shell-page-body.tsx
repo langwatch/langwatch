@@ -83,6 +83,11 @@ function readerMayOpenThePage({
 
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
 
+/** Form pages read at main's Profile measure; tables and lists keep the wider one. */
+const FORM_PAGES = ["/settings", "/settings/profile", "/settings/security"];
+const FORM_MEASURE = "820px";
+const TABLE_MEASURE = "1280px";
+
 /**
  * Settings pages are read at a measure, as main's SettingsLayout framed them;
  * authentication's section rail takes the full width, as main's fullBleed did.
@@ -94,9 +99,10 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
     MEASURED_OPS_PAGES.some((item) => isPathUnder({ pathname, base: item.href }));
   if (!isMeasured) return <>{children}</>;
   const isFullBleed = isPathUnder({ pathname, base: "/settings/authentication" });
+  const measure = FORM_PAGES.includes(pathname) ? FORM_MEASURE : TABLE_MEASURE;
   return (
     <Container
-      maxWidth={isFullBleed ? "full" : "1280px"}
+      maxWidth={isFullBleed ? "full" : measure}
       padding={4}
       paddingBottom={16}
       height="full"
@@ -188,6 +194,43 @@ export const ShellPageBody = ({
     userId: user?.id,
     organizationRole,
   });
+
+  // A refusal is drawn only from an answered organization read, so the body renders
+  // while it is out; `flex: 1` + `minHeight: 0` keep a `height="full"` page inside.
+  const body =
+    userIsPartOfTeam || isOrganizationLoading ? (
+      <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
+        <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
+          <PageMeasure pathname={pathname}>{children}</PageMeasure>
+        </ErrorBoundary>
+      </Box>
+    ) : (
+      (host.teamAccessWaiting({
+        organizationName: organization?.name ?? "your organization",
+      }) ?? (
+        <Alert.Root
+          status="warning"
+          width="full"
+          marginX={4}
+          marginTop={3}
+          maxWidth="calc(100% - 22px)"
+        >
+          <Alert.Indicator />
+          <Alert.Content>
+            <HStack width="full" gap={4}>
+              <Text flex={1}>
+                You are not part of any team in this organization. Ask your administrator to add
+                you, or{" "}
+                <NavigationLink href="/" textDecoration="underline">
+                  go back to your home page
+                </NavigationLink>
+                .
+              </Text>
+            </HStack>
+          </Alert.Content>
+        </Alert.Root>
+      ))
+    );
 
   return (
     <VStack width="full" gap={0} {...props}>
@@ -304,42 +347,13 @@ export const ShellPageBody = ({
         )}
       </VStack>
 
-      {userIsPartOfTeam || isOrganizationLoading ? (
-        // A refusal is drawn only from an answered organization read, so the
-        // body renders while it is out. `flex: 1` + `minHeight: 0` keep a
-        // `height="full"` page from reading the whole stack, banners included.
-        <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
-          <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
-            <PageMeasure pathname={pathname}>{children}</PageMeasure>
-          </ErrorBoundary>
-        </Box>
-      ) : (
-        (host.teamAccessWaiting({
-          organizationName: organization?.name ?? "your organization",
-        }) ?? (
-          <Alert.Root
-            status="warning"
-            width="full"
-            marginX={4}
-            marginTop={3}
-            maxWidth="calc(100% - 22px)"
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <HStack width="full" gap={4}>
-                <Text flex={1}>
-                  You are not part of any team in this organization. Ask your administrator to add
-                  you, or{" "}
-                  <NavigationLink href="/" textDecoration="underline">
-                    go back to your home page
-                  </NavigationLink>
-                  .
-                </Text>
-              </HStack>
-            </Alert.Content>
-          </Alert.Root>
-        ))
-      )}
+      {/* The enrolment gate (D06) swaps the body and leaves the chrome, so the switcher
+          still reaches every organization the reader is not held out of. */}
+      {host.organizationMfaGate({
+        organizationId: organization?.id,
+        isPersonalScope: isPersonalScopeRoute,
+        body,
+      })}
     </VStack>
   );
 };

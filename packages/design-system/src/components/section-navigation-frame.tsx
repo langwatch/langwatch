@@ -50,9 +50,11 @@ function RailLink({
       fontWeight={active ? "medium" : void 0}
       _hover={{ background: "bg.muted", textDecoration: "none" }}
     >
-      <HStack gap={2}>
+      <HStack gap={2} minWidth={0}>
         {link.icon}
-        <Text>{link.label}</Text>
+        <Text fontSize="sm" truncate title={link.label}>
+          {link.label}
+        </Text>
       </HStack>
     </Link>
   );

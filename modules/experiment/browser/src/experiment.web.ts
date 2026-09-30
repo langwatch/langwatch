@@ -11,6 +11,7 @@ export const experimentWeb = defineWebModule("experiment")
   .withHosts({ requires: ["WorkflowHostApi"] })
   .withScreens({
     "pages/[project]/experiments/index": {
+      requires: "experiments:view",
       load: () => import("./ui/sections/experiments/experiments.screen.tsx"),
     },
     "pages/[project]/experiments/workbench/index": {

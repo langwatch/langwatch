@@ -45,6 +45,7 @@ export const MenuLink = ({
       paddingX={paddingX}
       paddingY={1}
       width="full"
+      minWidth={0}
       position="relative"
       borderRadius="lg"
       background={!disabled && isSelected ? "bg.muted" : "transparent"}
@@ -61,9 +62,11 @@ export const MenuLink = ({
         host.navigate(href);
       }}
     >
-      <HStack width="full" gap={2}>
+      <HStack width="full" gap={2} minWidth={0}>
         {icon}
-        <Text>{children}</Text>
+        <Text fontSize="sm" truncate minWidth={0}>
+          {children}
+        </Text>
         <Spacer />
         {menuEnd}
       </HStack>

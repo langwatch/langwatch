@@ -10,8 +10,8 @@ import { RedisStatTile } from "../elements/redis-stat-tile.tsx";
  * with throughput. */
 const LATENCY_BASIS = `Processing time across each queue's last ${LATENCY_SAMPLE_SIZE} completed jobs (a rolling sample, not a time window).`;
 
-/** Headline figures on ONE row. Redis as one tile (three figures read together);
- * avoids orphaning eleventh tile. */
+/** Headline figures, wrapping onto a second row when the page is narrow. Redis as one tile;
+ * its three figures read together. */
 export function StatStrip({ data }: { data: DashboardData }) {
   const totalBlocked = data.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0);
   const totalParked = data.queues.reduce((sum, q) => sum + q.parkedGroupCount, 0);
@@ -27,7 +27,7 @@ export function StatStrip({ data }: { data: DashboardData }) {
   const outboxDead = (outboxDeadQuery.data ?? []).reduce((sum, row) => sum + row.count, 0);
 
   return (
-    <HStack gap={1} align="stretch" overflowX="auto" data-testid="ops-stat-strip">
+    <HStack gap={1} align="stretch" flexWrap="wrap" data-testid="ops-stat-strip">
       <ThroughputStats data={data} />
       <LinkedStat
         label="Blocked"

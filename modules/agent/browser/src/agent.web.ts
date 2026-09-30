@@ -18,6 +18,7 @@ export const agentWeb = defineWebModule("agent")
     // The application's table still names this page by its monolith key; the
     // loader is this module's either way.
     "runtime/ui/features/agent-ui-host.adapter": {
+      requires: "evaluations:view",
       load: () => import("./ui/sections/agent-management-screen.tsx"),
     },
   })

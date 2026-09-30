@@ -605,7 +605,12 @@ export default function ApiKeysScreen() {
           currentTeamId={scope.teamId}
           currentProjectId={scope.projectId}
         />
-        <PageLayout.HeaderButton onClick={onCreateOpen} data-testid="api-key-create">
+        <PageLayout.HeaderButton
+          variant="solid"
+          colorPalette="blue"
+          onClick={onCreateOpen}
+          data-testid="api-key-create"
+        >
           <Plus size={16} />
           Create new secret key
         </PageLayout.HeaderButton>

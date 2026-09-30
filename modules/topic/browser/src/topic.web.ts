@@ -17,6 +17,7 @@ export const topicWeb = defineWebModule("topic")
       path: "/settings/topic-clustering",
       within: "settings",
       label: "Topic Clustering",
+      requires: "project:manage",
       load: () => import("./ui/sections/topic-clustering.screen.tsx"),
     },
   });

@@ -19,6 +19,7 @@ export const notificationWeb = defineWebModule("notification")
       path: "/settings/email-suppressions",
       within: "settings",
       label: "Email Suppressions",
+      requires: "triggers:view",
       load: () => import("./ui/sections/email-suppressions-screen.tsx"),
     },
   });

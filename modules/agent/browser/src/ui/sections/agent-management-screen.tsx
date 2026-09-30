@@ -13,6 +13,7 @@ import {
   type AgentManagementHost,
 } from "../../model/agent-management-host.ts";
 import { getAgentEditorDrawer } from "../../model/get-agent-editor-drawer.ts";
+import { newAgentDrawerFor } from "../../model/new-agent-drawer.ts";
 import { AgentArchiveDialog } from "../blocks/agent-archive-dialog.tsx";
 import { AgentCard } from "../blocks/agent-card.tsx";
 import { AgentPushDialog } from "../blocks/agent-push-dialog.tsx";
@@ -276,7 +277,7 @@ export function AgentManagementScreen() {
           onClose={closeTypeSelector}
           onSelect={(type: AgentType) => {
             closeTypeSelector();
-            host.openAgentEditor({ drawer: getAgentEditorDrawer(type) });
+            host.openAgentEditor({ drawer: newAgentDrawerFor(type) });
           }}
         />
       )}

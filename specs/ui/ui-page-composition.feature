@@ -54,3 +54,21 @@ Feature: One page helper composes every routed page
     Given a module declares a screen with no grant
     When the router loads it
     Then the screen is mounted as the module declared it
+
+  @integration
+  Scenario: A declared screen behind a release flag that is off answers not found
+    Given a module declares a screen behind the flag "release_ui_ai_governance_enabled"
+    When the flag is off for the viewer
+    Then the router shows the not-found fallback instead of the screen
+
+  @integration
+  Scenario: A declared screen behind a release flag that is on opens
+    Given a module declares a screen behind the flag "release_ui_ai_governance_enabled"
+    When the flag is on for the viewer
+    Then the screen renders
+
+  @integration
+  Scenario: A refused viewer reads main's Access Restricted notice
+    Given a module declares a screen that requires "organization:manage"
+    When a viewer without that grant opens it
+    Then the router shows "Access Restricted" and names "organization:manage"

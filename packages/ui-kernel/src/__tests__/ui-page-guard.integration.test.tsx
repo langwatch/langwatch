@@ -13,9 +13,7 @@ import {
   type UiActiveScope,
   type UiActor,
   type UiCapabilities,
-  type UiFailureNotice,
   UiFeedback,
-  type UiSuccessNotice,
 } from "@langwatch/browser-host/capabilities";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -38,8 +36,8 @@ class SilentRoute extends UiRoute {
 }
 
 class SilentFeedback extends UiFeedback {
-  succeeded(_: UiSuccessNotice): void {}
-  failed(_: UiFailureNotice): void {}
+  succeeded(): void {}
+  failed(): void {}
 }
 
 class AnsweringSession extends UiSession {
@@ -282,9 +280,21 @@ describe("given a module declaring a screen that requires a grant", () => {
       requires: "workflows:view",
     },
     "pages/[project]/open": { load: async () => ({ default: Page }) },
+    "pages/[project]/flagged": {
+      load: async () => ({ default: Page }),
+      flags: ["release_ui_ai_governance_enabled"],
+    },
   });
 
-  async function renderDeclared(page: string, permissions: readonly string[]) {
+  async function renderDeclared({
+    page,
+    permissions,
+    flags = {},
+  }: {
+    page: string;
+    permissions: readonly string[];
+    flags?: Record<string, boolean | undefined>;
+  }) {
     const load = installedModuleScreens([probeWeb]).loaders[page];
     if (!load) throw new Error(`no loader for ${page}`);
     const { default: Screen } = await load();
@@ -292,7 +302,7 @@ describe("given a module declaring a screen that requires a grant", () => {
     render(
       <ChakraProvider value={defaultSystem}>
         <UiCapabilityContextProvider
-          value={capabilities(new AnsweringSession({ flags: {}, permissions, settled: true }))}
+          value={capabilities(new AnsweringSession({ flags, permissions, settled: true }))}
         >
           <Screen />
         </UiCapabilityContextProvider>
@@ -302,7 +312,7 @@ describe("given a module declaring a screen that requires a grant", () => {
 
   /** @scenario "A declared screen that requires a grant refuses a viewer without it" */
   it("shows the missing grant instead of the screen to a viewer without it", async () => {
-    await renderDeclared("pages/[project]/probe", []);
+    await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
 
     expect(screen.getByText("Missing permission: workflows:view")).toBeDefined();
     expect(screen.queryByText("the page")).toBeNull();
@@ -310,7 +320,37 @@ describe("given a module declaring a screen that requires a grant", () => {
 
   /** @scenario "A declared screen that requires a grant opens for a viewer holding it" */
   it("opens the screen for a viewer holding the grant", async () => {
-    await renderDeclared("pages/[project]/probe", ["workflows:view"]);
+    await renderDeclared({ page: "pages/[project]/probe", permissions: ["workflows:view"] });
+
+    expect(screen.getByText("the page")).toBeDefined();
+  });
+
+  /** @scenario "A refused viewer reads main's Access Restricted notice" */
+  it("titles the refusal Access Restricted, as main's PermissionAlert did", async () => {
+    await renderDeclared({ page: "pages/[project]/probe", permissions: [] });
+
+    expect(screen.getByText("Access Restricted")).toBeDefined();
+  });
+
+  /** @scenario "A declared screen behind a release flag that is off answers not found" */
+  it("answers not-found for a declared screen whose flag is off", async () => {
+    await renderDeclared({
+      page: "pages/[project]/flagged",
+      permissions: [],
+      flags: { release_ui_ai_governance_enabled: false },
+    });
+
+    expect(screen.getByText("This page is not here")).toBeDefined();
+    expect(screen.queryByText("the page")).toBeNull();
+  });
+
+  /** @scenario "A declared screen behind a release flag that is on opens" */
+  it("opens a declared screen whose flag is on", async () => {
+    await renderDeclared({
+      page: "pages/[project]/flagged",
+      permissions: [],
+      flags: { release_ui_ai_governance_enabled: true },
+    });
 
     expect(screen.getByText("the page")).toBeDefined();
   });

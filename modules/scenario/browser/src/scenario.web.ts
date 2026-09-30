@@ -16,9 +16,11 @@ export const scenarioWeb = defineWebModule("scenario")
       load: () => import("./ui/sections/simulations/agent-testing.screen.tsx"),
     },
     "pages/[project]/simulations/scenarios/index": {
+      requires: "scenarios:view",
       load: () => import("./ui/sections/simulations/scenario-library.screen.tsx"),
     },
     "pages/[project]/simulations/[[...path]]": {
+      requires: "scenarios:view",
       load: () => import("./ui/sections/simulations/simulations.screen.tsx"),
     },
   })

@@ -24,6 +24,7 @@ export const billingWeb = defineWebModule("billing")
       path: "/settings/plans",
       within: "settings",
       label: "Plans",
+      requires: "organization:view",
       load: () => import("./ui/sections/plans.screen.tsx"),
     },
     "pages/settings/subscription": {
@@ -36,6 +37,7 @@ export const billingWeb = defineWebModule("billing")
       path: "/settings/usage",
       within: "settings",
       label: "Usage",
+      requires: "cost:view",
       load: () => import("./ui/sections/usage.screen.tsx"),
     },
   });

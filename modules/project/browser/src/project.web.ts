@@ -26,6 +26,7 @@ export const projectWeb = defineWebModule("project")
       path: "/settings",
       within: "settings",
       label: "Project Settings",
+      requires: "organization:view",
       load: () => import("./ui/sections/project-settings/project-settings-screen.tsx"),
     },
   })

@@ -13,6 +13,7 @@ export const traceWeb = defineWebModule("trace")
   })
   .withScreens({
     "pages/[project]/traces": {
+      requires: "traces:view",
       load: () => import("./ui/sections/traces/traces-screen.tsx"),
     },
     "pages/share/[id]": {

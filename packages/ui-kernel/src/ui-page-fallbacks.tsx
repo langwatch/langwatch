@@ -50,7 +50,7 @@ export function UiPageForbidden({ permission }: { permission: string }) {
             <Lock size={16} aria-hidden />
           </Box>
           <Stack gap={1}>
-            <Text fontWeight="medium">You do not have access to this page</Text>
+            <Text fontWeight="medium">Access Restricted</Text>
             <Text fontSize="sm" color="fg.muted">
               Ask an organization admin to grant you the permission it needs.
             </Text>

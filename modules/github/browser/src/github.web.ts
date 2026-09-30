@@ -17,6 +17,7 @@ export const githubWeb = defineWebModule("github")
       path: "/settings/integrations",
       within: "settings",
       label: "Integrations",
+      requires: "organization:manage",
       load: () => import("./ui/sections/integrations.screen.tsx"),
     },
   })

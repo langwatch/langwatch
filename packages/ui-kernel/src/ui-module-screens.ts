@@ -51,7 +51,7 @@ export function installedModuleScreens(modules: readonly SupplyModule[]): UiModu
 
 /**
  * A declared screen answers with a component, or the composition is wrong. A
- * screen that `requires` a grant renders behind the page guard, for every module.
+ * screen that `requires` a grant or names `flags` renders behind the page guard.
  */
 function screenLoader({
   page,
@@ -67,8 +67,12 @@ function screenLoader({
     if (!isLazyRouteModule(loaded)) {
       throw new Error(`Screen ${JSON.stringify(page)} did not load a component.`);
     }
-    if (screen.requires === void 0) return loaded;
-    const guard = withUiPageGuard({ permission: screen.requires, fallbacks: UI_PAGE_FALLBACKS });
+    if (screen.requires === void 0 && screen.flags === void 0) return loaded;
+    const guard = withUiPageGuard({
+      ...(screen.requires === void 0 ? {} : { permission: screen.requires }),
+      ...(screen.flags === void 0 ? {} : { flags: screen.flags }),
+      fallbacks: UI_PAGE_FALLBACKS,
+    });
     return { default: guard(loaded.default) };
   };
 }

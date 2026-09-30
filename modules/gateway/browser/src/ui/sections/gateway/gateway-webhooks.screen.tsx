@@ -332,7 +332,12 @@ function WebhookEndpointsPanel({
         <PageLayout.Heading>Webhooks</PageLayout.Heading>
         <Spacer />
         {actions.canManage && (
-          <PageLayout.HeaderButton onClick={actions.dialogs.openCreate} data-testid="webhook-new">
+          <PageLayout.HeaderButton
+            variant="solid"
+            colorPalette="orange"
+            onClick={actions.dialogs.openCreate}
+            data-testid="webhook-new"
+          >
             <Plus size={14} /> New endpoint
           </PageLayout.HeaderButton>
         )}

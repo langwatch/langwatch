@@ -335,6 +335,20 @@ export abstract class NavigationHost {
   }
 
   /**
+   * The page body, or user's `organizationMfaGate` in its place while the
+   * organization's second-factor requirement holds the reader (D06).
+   */
+  organizationMfaGate({
+    body,
+  }: {
+    organizationId: string | undefined;
+    isPersonalScope: boolean;
+    body: ReactNode;
+  }): ReactNode {
+    return body;
+  }
+
+  /**
    * Sets the document's title, and hands back the way to put it back.
    * Lives on the host, since a package may not reach for `document`.
    */

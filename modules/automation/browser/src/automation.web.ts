@@ -37,27 +37,32 @@ export const automationWeb = defineWebModule("automation")
       path: "/:project/automations",
       within: "project",
       label: "Automations",
+      requires: "triggers:view",
       load: automationTab("overview"),
     },
     "pages/[project]/automations/automations": {
       path: "/:project/automations/automations",
       within: "project",
+      requires: "triggers:view",
       load: automationTab("automations"),
     },
     "pages/[project]/automations/alerts": {
       path: "/:project/automations/alerts",
       within: "project",
+      requires: "triggers:view",
       load: automationTab("alerts"),
     },
     "pages/[project]/automations/schedules": {
       path: "/:project/automations/schedules",
       within: "project",
+      requires: "triggers:view",
       load: automationTab("schedules"),
     },
     /** Main's activity address re-rendered the overview, whose recent activity it links to. */
     "pages/[project]/automations/activity": {
       path: "/:project/automations/activity",
       within: "project",
+      requires: "triggers:view",
       load: automationTab("overview"),
     },
     /** Reached from an email link, outside the project chrome. */

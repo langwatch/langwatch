@@ -49,6 +49,7 @@ export const onboardingWeb = defineWebModule("onboarding")
     },
     /** The in-project setup guide; the application's table owns the address. */
     "pages/[project]/setup": {
+      requires: "project:view",
       load: () => import("./ui/sections/onboarding/setup.screen.tsx"),
     },
   });

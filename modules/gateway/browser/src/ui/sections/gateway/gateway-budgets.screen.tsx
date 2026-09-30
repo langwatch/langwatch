@@ -198,6 +198,8 @@ function BudgetsPage() {
           <Spacer />
           {canCreate && (
             <PageLayout.HeaderButton
+              variant="solid"
+              colorPalette="orange"
               data-testid="gateway-budget-new"
               onClick={() => setCreateOpen(true)}
             >
@@ -222,7 +224,12 @@ function BudgetsPage() {
               icon={<Gauge size={32} />}
             >
               {canCreate && (
-                <PageLayout.HeaderButton onClick={() => setCreateOpen(true)} marginTop={4}>
+                <PageLayout.HeaderButton
+                  variant="solid"
+                  colorPalette="orange"
+                  onClick={() => setCreateOpen(true)}
+                  marginTop={4}
+                >
                   <Plus size={14} /> New budget
                 </PageLayout.HeaderButton>
               )}

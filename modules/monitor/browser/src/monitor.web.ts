@@ -15,6 +15,7 @@ export const monitorWeb = defineWebModule("monitor")
       path: "/:project/online-evaluations",
       within: "project",
       label: "Online Evaluations",
+      requires: "evaluations:view",
       load: () => import("./ui/sections/online-evaluations.screen.tsx"),
     },
   });

@@ -170,6 +170,8 @@ function GuardrailsPage() {
         <Spacer />
         {canManage && (
           <PageLayout.HeaderButton
+            variant="solid"
+            colorPalette="orange"
             data-testid="gateway-guardrail-new"
             onClick={() => setCreateOpen(true)}
             disabled={guardrailEvaluators.length === 0}

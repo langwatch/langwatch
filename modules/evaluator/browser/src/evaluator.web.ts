@@ -13,6 +13,7 @@ export const evaluatorWeb = defineWebModule("evaluator")
   })
   .withScreens({
     "pages/[project]/evaluators": {
+      requires: "evaluations:view",
       load: () => import("./ui/sections/evaluators.screen.tsx"),
     },
     "pages/[project]/evaluations/[id]/edit": {

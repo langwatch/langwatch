@@ -20,6 +20,7 @@ export const organizationWeb = defineWebModule("organization")
       path: "/settings/audit-log",
       within: "settings",
       label: "Audit Log",
+      requires: "organization:manage",
       load: () => import("./ui/sections/organization/audit-log.screen.tsx"),
     },
     // Members, Teams and Groups are the Directory's tabs; their old addresses redirect.
@@ -33,12 +34,14 @@ export const organizationWeb = defineWebModule("organization")
       path: "/settings/authentication",
       within: "settings",
       label: "Authentication",
+      requires: "sso:view",
       load: () =>
         import("./features/authentication-settings/ui/sections/authentication-settings.screen.tsx"),
     },
     "pages/settings/teams/[team]": {
       path: "/settings/teams/:team",
       within: "settings",
+      requires: "team:view",
       load: () => import("./ui/sections/organization/team-detail.screen.tsx"),
     },
   })

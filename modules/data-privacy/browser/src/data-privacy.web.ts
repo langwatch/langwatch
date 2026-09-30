@@ -19,6 +19,7 @@ export const dataPrivacyWeb = defineWebModule("data-privacy")
       path: "/settings/data-privacy",
       within: "settings",
       label: "Data Privacy",
+      requires: "project:view",
       load: () => import("./ui/sections/data-privacy-screen.tsx"),
     },
   });

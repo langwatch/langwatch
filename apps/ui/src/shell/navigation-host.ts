@@ -22,7 +22,7 @@ import type {
 } from "@langwatch/navigation-browser/navigation";
 import type { ReactNode } from "react";
 
-import { joinOffer, teamAccessWaiting } from "./navigation-host-capabilities";
+import { joinOffer, organizationMfaGate, teamAccessWaiting } from "./navigation-host-capabilities";
 
 /** Everything the shell has already read by the time the chrome draws. */
 export type BrowserNavigationReading = {
@@ -229,6 +229,14 @@ export function browserNavigationHosts(port: typeof NavigationHost): BrowserNavi
     /** "Check again" reloads the page, so a membership granted meanwhile is read afresh. */
     override teamAccessWaiting({ organizationName }: { organizationName: string }): ReactNode {
       return teamAccessWaiting({ organizationName, onCheckAccess: () => window.location.reload() });
+    }
+
+    override organizationMfaGate(input: {
+      organizationId: string | undefined;
+      isPersonalScope: boolean;
+      body: ReactNode;
+    }): ReactNode {
+      return organizationMfaGate(input);
     }
   }
 

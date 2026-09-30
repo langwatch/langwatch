@@ -7,7 +7,7 @@ import { offeredPath } from "../offered-path.ts";
 
 const state = (over: Partial<Parameters<typeof offeredPath>[0]["state"]> = {}) => ({
   variant: "guided" as const,
-  currentPath: null,
+  currentPath: undefined,
   donePaths: [],
   ...over,
 });
@@ -37,7 +37,7 @@ describe("offeredPath", () => {
   describe("given an organization outside the guided variant", () => {
     it("offers nothing", () => {
       expect(offeredPath({ space: "project", state: state({ variant: "classic" }) })).toBeNull();
-      expect(offeredPath({ space: "project", state: state({ variant: null }) })).toBeNull();
+      expect(offeredPath({ space: "project", state: state({ variant: undefined }) })).toBeNull();
     });
   });
 });

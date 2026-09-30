@@ -449,6 +449,8 @@ export default function ModelProvidersScreen() {
           onPick={(providerKey) => openProviderEditor({ providerKey, modelProviderId: "new" })}
         >
           <PageLayout.HeaderButton
+            variant="solid"
+            colorPalette="blue"
             disabled={!!addProviderDisabledReason}
             data-testid="model-provider-add"
           >

@@ -19,6 +19,7 @@ export const dataRetentionWeb = defineWebModule("data-retention")
       path: "/settings/data-retention",
       within: "settings",
       label: "Data Retention",
+      requires: "project:view",
       load: () => import("./ui/sections/data-retention.screen.tsx"),
     },
   });

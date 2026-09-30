@@ -57,7 +57,8 @@ export function RolesPanel({
     { enabled: !!organizationId },
   );
   const assignmentRows = assignments.data ?? NO_ASSIGNMENTS;
-  // Losing the assignments costs the counts and holders, never the roles; null is "unknown", not zero.
+  // Losing the assignments costs the counts and holders, never the roles;
+  // null is "unknown", not zero.
   const assignmentsUnavailable = assignments.isError;
   const countsPending = assignments.isLoading || assignmentsUnavailable;
 
@@ -122,6 +123,7 @@ export function RolesPanel({
             >
               <Button
                 size="sm"
+                colorPalette="blue"
                 onClick={() => setDialog({ kind: "create" })}
                 disabled={!canManage}
                 data-testid="authz-role-create"

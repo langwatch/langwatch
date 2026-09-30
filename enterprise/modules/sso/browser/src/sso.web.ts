@@ -20,6 +20,7 @@ export const ssoWeb = defineWebModule("sso")
       path: "/settings/authentication/provider",
       within: "settings",
       label: "Identity provider",
+      requires: "sso:view",
       load: () => import("./ui/sections/sso-setup.screen.tsx"),
     },
   })

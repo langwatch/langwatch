@@ -29,27 +29,35 @@ export const analyticsWeb = defineWebModule("analytics")
   // moving would duplicate the 1,700-line `CustomGraph` renderer they share.
   .withScreens({
     "pages/[project]/analytics/index": {
+      requires: "analytics:view",
       load: () => import("./ui/sections/analytics/analytics-overview.screen.tsx"),
     },
     "pages/[project]/analytics/evaluations": {
+      requires: "analytics:view",
       load: () => import("./ui/sections/analytics/analytics-evaluations.screen.tsx"),
     },
     "pages/[project]/analytics/metrics": {
+      requires: "analytics:view",
       load: () => import("./ui/sections/analytics/analytics-metrics.screen.tsx"),
     },
     "pages/[project]/analytics/reports": {
+      requires: "analytics:view",
       load: () => import("./ui/sections/analytics/analytics-reports.screen.tsx"),
     },
     "pages/[project]/analytics/topics": {
+      requires: "analytics:view",
       load: () => import("./ui/sections/analytics/analytics-topics.screen.tsx"),
     },
     "pages/[project]/analytics/users": {
+      requires: "analytics:view",
       load: () => import("./ui/sections/analytics/analytics-users.screen.tsx"),
     },
     "pages/[project]/analytics/custom/index": {
+      requires: "analytics:view",
       load: customGraph("new"),
     },
     "pages/[project]/analytics/custom/[id]": {
+      requires: "analytics:view",
       load: customGraph("edit"),
     },
   })

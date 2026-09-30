@@ -35,7 +35,8 @@ export type AgentEditorDrawer =
   | "agentCodeEditor"
   | "agentHttpEditor"
   | "agentWorkflowEditor"
-  | "agentVoiceEditor";
+  | "agentVoiceEditor"
+  | "workflowSelector";
 
 export interface AgentManagementHost {
   project(): AgentHostProject | undefined;

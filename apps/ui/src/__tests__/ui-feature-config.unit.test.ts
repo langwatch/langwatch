@@ -16,7 +16,7 @@ const served: PublicAppConfig = {
   evaluation: { langevals: true },
   gateway: { gatewayBaseUrl: "https://gateway.langwatch.test" },
   notification: { email: true },
-  ops: {},
+  ops: { cloudOps: false },
   rum: { enabled: true, sampleRatio: 0.1 },
 };
 

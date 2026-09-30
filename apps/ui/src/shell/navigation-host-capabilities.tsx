@@ -1,7 +1,7 @@
 /**
  * The module capabilities the chrome draws, by `./declaration` (ARCHITECTURE.md
- * 10.1): organization's join prompts, and user's account-security offer where
- * there is no join offer.
+ * 10.1): organization's join prompts, user's account-security offer where
+ * there is no join offer, and user's second-factor enrolment gate.
  */
 
 import { organizationWeb } from "@langwatch/organization-browser/declaration";
@@ -15,6 +15,8 @@ const secureAccountNudgeChunk = userWeb.installation.capabilities.secureAccountN
 const JoinYourTeamTakeover = lazy(() => joinOfferChunk);
 const SecureAccountNudge = lazy(() => secureAccountNudgeChunk);
 const TeamAccessWaiting = lazy(organizationWeb.installation.capabilities.teamAccessWaiting.load);
+const organizationMfaGateChunk = userWeb.installation.capabilities.organizationMfaGate.load();
+const OrganizationMfaGate = lazy(() => organizationMfaGateChunk);
 
 export function joinOffer({
   currentOrganizationId,
@@ -41,6 +43,25 @@ export function teamAccessWaiting({
   return (
     <Suspense fallback={null}>
       <TeamAccessWaiting organizationName={organizationName} onCheckAccess={onCheckAccess} />
+    </Suspense>
+  );
+}
+
+/** Fetched with the shell, so the body waits on no chunk of its own after the first paint. */
+export function organizationMfaGate({
+  organizationId,
+  isPersonalScope,
+  body,
+}: {
+  organizationId: string | undefined;
+  isPersonalScope: boolean;
+  body: ReactNode;
+}): ReactNode {
+  return (
+    <Suspense fallback={null}>
+      <OrganizationMfaGate organizationId={organizationId} isPersonalScope={isPersonalScope}>
+        {body}
+      </OrganizationMfaGate>
     </Suspense>
   );
 }

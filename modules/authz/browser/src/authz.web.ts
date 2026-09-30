@@ -17,6 +17,7 @@ export const authzWeb = defineWebModule("authz")
       path: "/settings/roles",
       within: "settings",
       label: "Roles",
+      requires: "organization:manage",
       load: () => import("./ui/sections/roles.screen.tsx"),
     },
   });
