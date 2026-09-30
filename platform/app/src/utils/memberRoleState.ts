@@ -167,35 +167,6 @@ export function arePendingTeamRolesEqual(
   });
 }
 
-/**
- * Determines the license limit type that applies when changing between
- * organization roles: the pool the change enters. A move onto a Developer
- * seat enters a pool the plan does not meter (ADR-143), so nothing applies.
- */
-export function getLicenseLimitTypeForRoleChange(params: {
-  previousRole: OrganizationUserRole;
-  nextRole: OrganizationUserRole;
-}): "members" | "membersLite" | null {
-  const { previousRole, nextRole } = params;
-  if (previousRole === nextRole) return null;
-  if (nextRole === OrganizationUserRole.DEVELOPER) return null;
-
-  const enteringFull =
-    nextRole !== OrganizationUserRole.EXTERNAL &&
-    previousRole !== OrganizationUserRole.ADMIN &&
-    previousRole !== OrganizationUserRole.MEMBER;
-  if (enteringFull) return "members";
-
-  if (
-    previousRole !== OrganizationUserRole.EXTERNAL &&
-    nextRole === OrganizationUserRole.EXTERNAL
-  ) {
-    return "membersLite";
-  }
-
-  return null;
-}
-
 /** Applies organization role constraints to all pending team roles (e.g., forces Viewer for EXTERNAL). */
 export function applyOrganizationRoleToPendingTeamRoles(params: {
   organizationRole: OrganizationUserRole;

@@ -4,7 +4,6 @@ import {
   applyOrganizationRoleToPendingTeamRoles,
   arePendingTeamRolesEqual,
   buildInitialPendingTeamRoles,
-  getLicenseLimitTypeForRoleChange,
   getTeamRoleDisplayName,
   getTeamRoleUpdates,
   hasPendingRoleChanges,
@@ -405,83 +404,6 @@ describe("memberRoleState", () => {
         };
 
         expect(arePendingTeamRolesEqual(left, right)).toBe(false);
-      });
-    });
-  });
-
-  describe("getLicenseLimitTypeForRoleChange()", () => {
-    describe("when changing from EXTERNAL to non-EXTERNAL", () => {
-      it("returns 'members'", () => {
-        const result = getLicenseLimitTypeForRoleChange({
-          previousRole: OrganizationUserRole.EXTERNAL,
-          nextRole: OrganizationUserRole.MEMBER,
-        });
-
-        expect(result).toBe("members");
-      });
-    });
-
-    describe("when changing from non-EXTERNAL to EXTERNAL", () => {
-      it("returns 'membersLite'", () => {
-        const result = getLicenseLimitTypeForRoleChange({
-          previousRole: OrganizationUserRole.MEMBER,
-          nextRole: OrganizationUserRole.EXTERNAL,
-        });
-
-        expect(result).toBe("membersLite");
-      });
-    });
-
-    describe("when staying in the same license category", () => {
-      it("returns null for MEMBER to ADMIN", () => {
-        const result = getLicenseLimitTypeForRoleChange({
-          previousRole: OrganizationUserRole.MEMBER,
-          nextRole: OrganizationUserRole.ADMIN,
-        });
-
-        expect(result).toBeNull();
-      });
-
-      it("returns null for EXTERNAL to EXTERNAL", () => {
-        const result = getLicenseLimitTypeForRoleChange({
-          previousRole: OrganizationUserRole.EXTERNAL,
-          nextRole: OrganizationUserRole.EXTERNAL,
-        });
-
-        expect(result).toBeNull();
-      });
-    });
-
-    describe("when a Developer seat is involved", () => {
-      /** @scenario Developers are counted and never capped */
-      it("returns null when moving onto a Developer seat", () => {
-        expect(
-          getLicenseLimitTypeForRoleChange({
-            previousRole: OrganizationUserRole.MEMBER,
-            nextRole: OrganizationUserRole.DEVELOPER,
-          }),
-        ).toBeNull();
-        expect(
-          getLicenseLimitTypeForRoleChange({
-            previousRole: OrganizationUserRole.EXTERNAL,
-            nextRole: OrganizationUserRole.DEVELOPER,
-          }),
-        ).toBeNull();
-      });
-
-      it("returns the pool entered when leaving a Developer seat", () => {
-        expect(
-          getLicenseLimitTypeForRoleChange({
-            previousRole: OrganizationUserRole.DEVELOPER,
-            nextRole: OrganizationUserRole.MEMBER,
-          }),
-        ).toBe("members");
-        expect(
-          getLicenseLimitTypeForRoleChange({
-            previousRole: OrganizationUserRole.DEVELOPER,
-            nextRole: OrganizationUserRole.EXTERNAL,
-          }),
-        ).toBe("membersLite");
       });
     });
   });
