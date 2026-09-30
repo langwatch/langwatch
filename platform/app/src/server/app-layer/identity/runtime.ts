@@ -85,6 +85,7 @@ import {
   InstanceLicenseProof,
   LicenseDomainClaimAuthority,
   LoggingBreakGlassWarningNotifier,
+  PrismaOrganizationCount,
   PrismaSsoDomainReproofTargets,
   PrismaSsoOrganizationMemberLookup,
   SsoSelfServeContextResolver,
@@ -761,6 +762,16 @@ export async function localSignUpDecision(
  * migration and D05's self-service all call these verbs; nothing writes an
  * `SsoConnection` row, because the row is a projection of this log.
  */
+/**
+ * What the installation's licence may decide, and who counts as a platform
+ * operator. Shared by the guards and the setup surface's context, so the
+ * screen and the rule read the same answer.
+ */
+const ssoLicenseAuthority = new LicenseDomainClaimAuthority({
+  organizations: new PrismaOrganizationCount(prisma),
+});
+const ssoPlatformOperators = new AdminEmailPlatformOperators(identityUsers);
+
 export function ssoConnections(): SsoConnectionService {
   return new SsoConnectionService(
     new SsoConnectionGuards({
@@ -768,8 +779,8 @@ export function ssoConnections(): SsoConnectionService {
       registrationSlots: new PrismaSsoConnectionRegistrationRepository(prisma),
       breakGlass: activationBreakGlassPort(),
       stranding: new PrismaSsoConnectionStrandingRepository(prisma),
-      platformOperators: new AdminEmailPlatformOperators(identityUsers),
-      licenseAuthority: new LicenseDomainClaimAuthority(),
+      platformOperators: ssoPlatformOperators,
+      licenseAuthority: ssoLicenseAuthority,
     }),
     new SsoConnectionLedgerWriter({
       projectionStore: new PrismaSsoConnectionProjectionRepository(
@@ -881,7 +892,10 @@ export function ssoSelfServe(): SsoSelfServeService {
     context: new SsoSelfServeContextResolver({
       featureFlags: featureFlagService,
       licenseProof,
+      licenseAuthority: ssoLicenseAuthority,
+      platformOperators: ssoPlatformOperators,
     }),
+    licenseProof,
     proofs: new DnsDomainProofLookup(),
     files: new HttpsDomainProofFileLookup(),
     credentials: ssoCredentials,

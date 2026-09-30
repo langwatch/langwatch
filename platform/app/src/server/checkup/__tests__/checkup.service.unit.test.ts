@@ -90,6 +90,7 @@ function healthyDeps(overrides: Partial<CheckupDeps> = {}): CheckupDeps {
     email: {
       provider: "smtp",
       smtpConfigured: true,
+      smtpSendsCredentials: true,
       verifySmtp: async () => undefined,
     },
     modelProviders: async () => [
@@ -461,6 +462,40 @@ describe("CheckupService", () => {
       expect(verdict.outcome).toBe("unchecked");
       expect(verdict.detail).toContain("42 seconds");
       expect(testModelProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the SMTP relay accepts the connection", () => {
+    const smtpRow = async (smtpSendsCredentials: boolean) => {
+      const { rows } = await new CheckupService(
+        healthyDeps({
+          email: {
+            provider: "smtp",
+            smtpConfigured: true,
+            smtpSendsCredentials,
+            verifySmtp: async () => undefined,
+          },
+        }),
+      ).explicit({ checks: ["smtp_verify"] });
+      return rowOf(rows, "smtp_verify");
+    };
+
+    /** @scenario "The SMTP check mentions credentials only when it sent some" */
+    it("names the credentials when an SMTP user is configured", async () => {
+      const verdict = await smtpRow(true);
+
+      expect(verdict.outcome).toBe("verified");
+      expect(verdict.detail).toBe(
+        "The SMTP server accepted a connection and the credentials.",
+      );
+    });
+
+    /** @scenario "The SMTP check mentions credentials only when it sent some" */
+    it("mentions no credentials when no SMTP user is configured", async () => {
+      const verdict = await smtpRow(false);
+
+      expect(verdict.outcome).toBe("verified");
+      expect(verdict.detail).toBe("The SMTP server accepted a connection.");
     });
   });
 

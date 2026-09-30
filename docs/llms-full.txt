@@ -2176,6 +2176,14 @@ turn it on.
    people who match the verified domains. Select **Confirm choice**.
 7. Select **Go live** when the setup checks are complete.
 
+On a self-hosted installation with an Enterprise license, the domain step is
+named **Add your domain** and a domain you add is verified right away, with no
+DNS record or file to publish. Each domain belongs to one organization per
+installation, so a domain another organization already holds is refused. When
+the installation has more than one organization, only a platform operator
+listed in `ADMIN_EMAILS` adds a domain this way. Other organization
+administrators complete the DNS or file check.
+
 The connection stays in its current setup state when you leave the page. A
 connection that is not active does not route sign-ins yet. An active connection
 routes people who match its verified domains; the local way back in remains
@@ -61059,6 +61067,13 @@ This page also covers the deployment-wide provider configured through
 installation that already uses them. Changing an organization's connection
 and changing the deployment's default provider are separate actions.
 
+On a licensed installation, a domain added in the setup page is verified right
+away, with no DNS record or file to publish. A domain belongs to one
+organization per installation. When the installation has more than one
+organization, only a platform operator listed in `ADMIN_EMAILS` adds a domain
+without proof; other organization administrators still complete the DNS or
+file check.
+
 ## Upgrading an existing installation
 
 Identity and access migrations run automatically as the app starts, one
@@ -61843,7 +61858,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.18.1 # x-release-please-version
+    targetRevision: 3.19.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -61892,7 +61907,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.18.1 # x-release-please-version
+      targetRevision: 3.19.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -62257,7 +62272,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.18.1 # x-release-please-version
+VERSION=3.19.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -62273,13 +62288,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.18.1" # x-release-please-version
+    tag: "3.19.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.18.1" # x-release-please-version
+    tag: "3.19.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.18.1" # x-release-please-version
+    tag: "3.19.0" # x-release-please-version
 
 imagePullSecrets:
   - name: registry-credentials
@@ -66561,7 +66576,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.18.1 \
+  --version 3.19.0 \
   -f values-production.yaml
 # x-release-please-end
 ```

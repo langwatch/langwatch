@@ -5,7 +5,7 @@ import type { SsoVerificationCeremonyMethod } from "./connection";
  * and what it offers them to prove a domain with (D05 tiers 2 and 3).
  *
  * Pure and total, like the sign-in router next door: every branch a reviewer
- * might look for is here, decided from four facts, and a test enumerates the
+ * might look for is here, decided from the context below, and a test enumerates the
  * whole table without a stub in sight. The surfaces call this and render the
  * answer; the guards refuse the same things independently, because a surface
  * is a courtesy and a guard is the rule.
@@ -37,6 +37,12 @@ export interface SsoSelfServeContext {
   licenseActivatedSinceStart: boolean;
   /** Hosted only: whether this organization is opted in to self-serve. */
   optedIn: boolean;
+  /** Self-hosted only: whether the installation holds exactly one
+   *  organization. */
+  singleOrganization: boolean;
+  /** Whether the person asking is a platform operator (ADMIN_EMAILS). Only
+   *  asked where it changes the answer. */
+  actorIsPlatformOperator: boolean;
 }
 
 /** Why setup is not available, in the vocabulary the error codes use. */
@@ -51,7 +57,7 @@ export type SsoSelfServeAvailability =
       /** How this organization proves a domain it claims. */
       proof: SsoVerificationCeremonyMethod;
       /**
-       * Whether a claim waits for a LangWatch operator BY TIER — false
+       * Whether a claim waits for a LangWatch operator BY TIER. False
        * everywhere now, because a licence decides a self-hosted claim and a
        * published record decides a hosted one.
        *
@@ -69,7 +75,9 @@ export type SsoSelfServeAvailability =
 /**
  * The whole table:
  *
- *   self-hosted, licensed at startup     → published proof, nothing queued
+ *   self-hosted, licensed, one organization     → the licence proves it
+ *   self-hosted, licensed, operator asking      → the licence proves it
+ *   self-hosted, licensed, several organizations → published proof
  *   self-hosted, licensed since startup  → refuse, and say a restart is why
  *   self-hosted, never licensed          → refuse, and say a licence is why
  *   hosted, opted in                     → published record decides it
@@ -84,9 +92,16 @@ export function ssoSelfServeAvailability(
 ): SsoSelfServeAvailability {
   if (context.deployment === "self-hosted") {
     if (context.licensed) {
+      // The operator of an installation already decides who has an account
+      // on it, so a DNS record proves nothing they could not do anyway. With
+      // several organizations on one installation, an organization
+      // administrator is not that operator, and proves the domain the way a
+      // hosted customer does.
+      const licenseProves =
+        context.singleOrganization || context.actorIsPlatformOperator;
       return {
         available: true,
-        proof: "dns-txt",
+        proof: licenseProves ? "license-token" : "dns-txt",
         claimWaitsForReview: false,
       };
     }

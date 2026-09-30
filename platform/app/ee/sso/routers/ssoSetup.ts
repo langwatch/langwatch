@@ -253,8 +253,11 @@ export const ssoSetupRouter = createTRPCRouter({
   getSetup: protectedProcedure
     .input(orgInput)
     .permission("sso:view")
-    .query(({ input }) =>
-      ssoSelfServe().getSetup({ organizationId: input.organizationId }),
+    .query(({ ctx, input }) =>
+      ssoSelfServe().getSetup({
+        organizationId: input.organizationId,
+        viewerId: ctx.session.user.id,
+      }),
     ),
 
   getMigrationProgress: protectedProcedure
