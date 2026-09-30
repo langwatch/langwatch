@@ -172,10 +172,9 @@ RUN pnpm start:prepare:files && pnpm ensure:built \
 #
 # CI=true is load-bearing. --prod purges the modules directory, and pnpm
 # refuses to do that without a TTY unless told it is non-interactive
-# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). The root .npmrc also carries
-# confirm-modules-purge=false, so either alone suffices; both are kept because
-# losing this silently would leave a dev-dependency-laden production image,
-# and losing it loudly fails the build here where the cause is obvious.
+# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). Losing this silently would
+# leave a dev-dependency-laden production image; losing it loudly fails the
+# build here where the cause is obvious.
 # --ignore-scripts: this pass exists only to drop devDependencies. Without it
 # the SDK's `prepare` re-runs here and dies — it regenerates types with
 # openapi-typescript, a devDependency this very command is removing. Nothing
@@ -276,6 +275,12 @@ COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
+# pnpm 11+ checks dependencies before every `pnpm run` and installs when they
+# look stale. This stage carries no pnpm-workspace.yaml or lockfile, so the
+# check fails to resolve `catalog:` specs (ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC)
+# and would write into /app, which is read-only under the chart. The dependencies
+# were installed by the builder; every boot and task command is `pnpm run`.
+ENV pnpm_config_verify_deps_before_run=false
 # The api process listens on API_PORT (6560 unset); the image serves on 5560.
 ENV API_PORT=5560
 EXPOSE 5560
@@ -299,5 +304,5 @@ SHELL ["/bin/bash", "-c"]
 # The API process serves the REST, tRPC and SSE families AND the browser bundle
 # it finds at /app/apps/ui/dist/client, so this one container is the whole
 # interactive tier. The worker deployment runs the same image from
-# /app/apps/worker, whose own start script migrates nothing.
+# /app/apps/worker, whose start script runs the same start:prepare:db chain.
 CMD cd /app/apps/api && pnpm --silent run start
