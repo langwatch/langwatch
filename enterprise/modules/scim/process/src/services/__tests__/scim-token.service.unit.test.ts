@@ -176,6 +176,54 @@ describe("ScimService token operations", () => {
     });
   });
 
+  describe("when a connection's token is revoked during rotation", () => {
+    async function connectionWithTwoTokens() {
+      const repository = MemoryScimRepository.create();
+      const tokenFor = (hashedToken: string) =>
+        repository.createToken({
+          hashedToken,
+          organizationId: "org_1",
+          connectionId: "okta-primary",
+          hashScheme: "hmac-sha256",
+          description: null,
+        });
+      const tokenA = await tokenFor("digest-a");
+      const tokenB = await tokenFor("digest-b");
+      return { repository, tokenA, tokenB };
+    }
+
+    /** @scenario "Rotating a token keeps the surviving connection sync live" */
+    it("keeps the sync live while another token on the connection survives", async () => {
+      const { repository, tokenA } = await connectionWithTwoTokens();
+      const lifecycle = new RecordingScimSyncLifecycle();
+
+      await service(repository, lifecycle, entitlementsOn("ENTERPRISE")).revokeToken({
+        organizationId: "org_1",
+        tokenId: tokenA.id,
+      });
+
+      expect(lifecycle.revoked).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Rotating a token keeps the surviving connection sync live" */
+    it("ends the sync when the connection's last token is revoked", async () => {
+      const { repository, tokenA, tokenB } = await connectionWithTwoTokens();
+      const lifecycle = new RecordingScimSyncLifecycle();
+      const scim = service(repository, lifecycle, entitlementsOn("ENTERPRISE"));
+
+      await scim.revokeToken({ organizationId: "org_1", tokenId: tokenA.id });
+      await scim.revokeToken({ organizationId: "org_1", tokenId: tokenB.id });
+
+      expect(lifecycle.revoked).toHaveBeenCalledTimes(1);
+      expect(lifecycle.revoked).toHaveBeenCalledWith({
+        organizationId: "org_1",
+        connectionId: "okta-primary",
+        tokenId: tokenB.id,
+        cause: "revoke",
+      });
+    });
+  });
+
   describe("when a token is exercised", () => {
     const PEPPER = "scim-test-pepper";
     const TOKEN = "a".repeat(64);
