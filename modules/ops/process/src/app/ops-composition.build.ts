@@ -277,6 +277,8 @@ export function buildOpsInfrastructure(input: {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       return OpsOperations.create({
         adminEmails: members.adminEmails,
+        // Without it every queue read answers the empty NullQueueRepository shape.
+        redis: members.redis,
         // Where an organization's connection decides its sign-in, editing
         // the legacy `ssoDomain`/`ssoProvider` strings changes nothing a
         // person experiences, so the backoffice refuses rather than accepting
@@ -405,7 +407,7 @@ export class OpsOperations {
       ? QueueService.create({
           repo: QueueRedisRepository.create({
             redis: this.options.redis,
-            payloads: this.queuePayloads(),
+            ...(this.options.queuePayloads ? { payloads: this.options.queuePayloads } : {}),
           }),
           audit: QueueAuditService.create({ auditLog: this.options.auditLog }),
         })
@@ -444,13 +446,5 @@ export class OpsOperations {
       queues,
       explorers: this.options.explorers,
     });
-  }
-
-  private queuePayloads(): QueuePayloadDecoder {
-    if (!this.options.queuePayloads) {
-      throw new Error("Ops queue composition requires a payload decoder when Redis is configured");
-    }
-
-    return this.options.queuePayloads;
   }
 }

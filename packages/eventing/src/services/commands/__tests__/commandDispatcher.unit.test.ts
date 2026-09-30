@@ -221,6 +221,41 @@ describe("processCommand", () => {
     });
   });
 
+  describe("when the tenant no longer resolves at append", () => {
+    function unknownTenant(): Error {
+      const error = new Error('tenant "organization_gone" has no known organisation');
+      error.name = "UnknownTenantError";
+      return error;
+    }
+
+    it("completes as a no-op instead of throwing", async () => {
+      const storeEventsFn = vi.fn().mockRejectedValue(unknownTenant());
+
+      await expect(processCommand(createDefaultParams({ storeEventsFn }))).resolves.toBeUndefined();
+      expect(storeEventsFn).toHaveBeenCalledTimes(1);
+    });
+
+    it("still throws any other store failure so the queue retries it", async () => {
+      const storeEventsFn = vi.fn().mockRejectedValue(new Error("ClickHouse unavailable"));
+
+      await expect(processCommand(createDefaultParams({ storeEventsFn }))).rejects.toThrow(
+        "ClickHouse unavailable",
+      );
+    });
+
+    it("completes a coalesced batch as a no-op too", async () => {
+      const storeEventsFn = vi.fn().mockRejectedValue(unknownTenant());
+      const payload = { ...validPayload, id: "agg-0" };
+      const params = {
+        ...createDefaultParams({ storeEventsFn }),
+        commandSchema: createMockCommandSchema(),
+        payloads: [payload],
+      };
+
+      await expect(processCommandBatch(params)).resolves.toBeUndefined();
+    });
+  });
+
   // ─── 9. Correct tenantId extraction ────────────────────────────
 
   describe("when extracting tenantId", () => {

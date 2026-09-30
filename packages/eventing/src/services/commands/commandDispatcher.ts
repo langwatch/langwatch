@@ -127,6 +127,40 @@ function validateHandlerEvents(events: unknown, commandType: CommandType): void 
   }
 }
 
+/** The ClickHouse router's refusal for a tenant it cannot resolve, read structurally by name. */
+function isUnknownTenant(error: unknown): boolean {
+  return error instanceof Error && error.name === "UnknownTenantError";
+}
+
+/**
+ * Appends a command's events; a tenant that no longer resolves (its organisation was
+ * deleted before the command ran) can never store, so the command completes as a logged
+ * no-op instead of retrying into a blocked group (Alex, 2026-09-30).
+ */
+async function storeUnlessTenantGone<EventType extends Event>({
+  storeEventsFn,
+  events,
+  tenantId,
+  commandType,
+  log,
+}: {
+  storeEventsFn: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>;
+  events: EventType[];
+  tenantId: TenantId;
+  commandType: CommandType;
+  log: ReturnType<typeof createLogger> | undefined;
+}): Promise<void> {
+  try {
+    await storeEventsFn(events, { tenantId });
+  } catch (error) {
+    if (!isUnknownTenant(error)) throw error;
+    (log ?? dispatchLogger).warn(
+      { tenantId, commandType, dropped: events.length },
+      "Command's tenant no longer resolves; completing it as a no-op",
+    );
+  }
+}
+
 /** Parses a queued payload once, at dispatch; a failure is refused non-retryably (dead-letter). */
 export function parseQueuedCommandPayload<
   EventType extends Event,
@@ -198,7 +232,7 @@ export async function processCommand<EventType extends Event, Payload extends Te
     const events = keyEventsByJob({ events: handled, jobId });
 
     if (events.length > 0) {
-      await storeEventsFn(events, { tenantId });
+      await storeUnlessTenantGone({ storeEventsFn, events, tenantId, commandType, log });
       // ADR-022: Post-store cleanup. Invoked AFTER the event_log INSERT is durable.
       // Best-effort: errors are caught and logged, never rethrown — cleanup failure
       // must not roll back a successfully stored event. The canonical use case is
@@ -359,7 +393,7 @@ async function persistBatch<EventType extends Event, Payload extends TenantScope
     return;
   }
 
-  await storeEventsFn(allEvents, { tenantId });
+  await storeUnlessTenantGone({ storeEventsFn, events: allEvents, tenantId, commandType, log });
   if (handler.cleanupAfterStore) {
     for (const command of handledCommands) {
       try {

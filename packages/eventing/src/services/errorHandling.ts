@@ -162,10 +162,19 @@ export class QueueTenantMismatchError extends NonRetryableGroupQueueError {
   }
 }
 
+/** The issues on the message itself: the group's stored error keeps only the message. */
+function describeIssues(
+  issues: readonly { path: string; code: string; message: string }[],
+): string {
+  return issues
+    .map(({ path, code, message }) => `${path || "(root)"} [${code}] ${message}`)
+    .join("; ");
+}
+
 /**
  * A queued command payload failed its schema at dispatch. It was validated at
  * send, so this is corruption or schema drift and cannot heal on re-delivery:
- * non-retryable, so the queue dead-letters it.
+ * non-retryable, so the GroupQueue skips retries and blocks the group (restageAndBlock).
  */
 export class QueuedCommandPayloadInvalidError extends NonRetryableGroupQueueError {
   override readonly name = "QueuedCommandPayloadInvalidError";
@@ -182,7 +191,7 @@ export class QueuedCommandPayloadInvalidError extends NonRetryableGroupQueueErro
   }) {
     super(
       `Queued payload for command "${params.commandName}" (${params.commandType}) on pipeline ` +
-        `"${params.pipelineName}" failed its schema at dispatch; refusing it so the queue dead-letters it`,
+        `"${params.pipelineName}" failed its schema at dispatch; refusing it: ${describeIssues(params.issues)}`,
     );
     this.pipelineName = params.pipelineName;
     this.commandName = params.commandName;
@@ -192,8 +201,9 @@ export class QueuedCommandPayloadInvalidError extends NonRetryableGroupQueueErro
 }
 
 /**
- * A dequeued job whose payload its lane's schema no longer reads. Non-retryable, so the queue
- * dead-letters it at once (kept and redrivable) instead of retrying into a group quarantine.
+ * A dequeued job whose payload its lane's schema no longer reads. Non-retryable: the GroupQueue
+ * skips retries and blocks the group, the job kept, until an operator unblocks it or moves the
+ * group to the ops DLQ (MoveQueueGroupToDlq), from which it stays redrivable.
  */
 export class QueuedPayloadInvalidError extends NonRetryableGroupQueueError {
   override readonly name = "QueuedPayloadInvalidError";
@@ -205,7 +215,7 @@ export class QueuedPayloadInvalidError extends NonRetryableGroupQueueError {
     issues: { path: string; code: string; message: string }[];
   }) {
     super(
-      `Queued payload for "${params.jobPath}" failed its schema at dispatch; refusing it so the queue dead-letters it`,
+      `Queued payload for "${params.jobPath}" failed its schema at dispatch; refusing it: ${describeIssues(params.issues)}`,
     );
     this.jobPath = params.jobPath;
     this.issues = params.issues;
