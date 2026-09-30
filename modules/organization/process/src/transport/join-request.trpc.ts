@@ -4,7 +4,7 @@
  * handlers reveal nothing about an organization that did not offer itself.
  */
 
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { joinRequestTrpc, OrganizationApi } from "@langwatch/organization-contract";
 
 const NOT_A_MEMBER_YET = {
@@ -43,7 +43,10 @@ const OWN_REQUEST_ONLY = {
   reason: "the requester withdrawing their own request, matched on the session's user id",
 } as const;
 
-export const joinRequestTrpcTransport = defineTrpcRouter(OrganizationApi, joinRequestTrpc)
+export const joinRequestTrpcTransport: TrpcRouterDeclaration<
+  OrganizationApi,
+  typeof joinRequestTrpc
+> = defineTrpcRouter(OrganizationApi, joinRequestTrpc)
   .procedure("lookup")
   .noPermission(NOT_A_MEMBER_YET)
   .handle(({ app, actor }) => app.lookupJoinableOrganizations({ userId: actor.id }))

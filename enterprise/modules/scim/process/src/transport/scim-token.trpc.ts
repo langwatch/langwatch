@@ -17,32 +17,33 @@
  *
  * @see enterprise/modules/scim/specs/scim.feature
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { ScimApi, scimTokenTrpc } from "@langwatch/enterprise-scim-contract";
 
-export const scimTokenTrpcTransport = defineTrpcRouter(ScimApi, scimTokenTrpc)
-  .procedure("list")
-  .withPermission("sso:view")
-  .handle(({ app, input }) => app.listTokens({ organizationId: input.organizationId }))
+export const scimTokenTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimTokenTrpc> =
+  defineTrpcRouter(ScimApi, scimTokenTrpc)
+    .procedure("list")
+    .withPermission("sso:view")
+    .handle(({ app, input }) => app.listTokens({ organizationId: input.organizationId }))
 
-  .procedure("connections")
-  .withPermission("sso:view")
-  .handle(({ app, input }) => app.findConnections({ organizationId: input.organizationId }))
+    .procedure("connections")
+    .withPermission("sso:view")
+    .handle(({ app, input }) => app.findConnections({ organizationId: input.organizationId }))
 
-  .procedure("generate")
-  .withPermission("sso:manage")
-  .handle(({ app, input }) =>
-    app.generateToken({
-      organizationId: input.organizationId,
-      connectionId: input.connectionId,
-      description: input.description,
-      secret: input.secret,
-    }),
-  )
+    .procedure("generate")
+    .withPermission("sso:manage")
+    .handle(({ app, input }) =>
+      app.generateToken({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        description: input.description,
+        secret: input.secret,
+      }),
+    )
 
-  .procedure("revoke")
-  .withPermission("sso:manage")
-  .handle(({ app, input }) =>
-    app.revokeToken({ organizationId: input.organizationId, tokenId: input.tokenId }),
-  )
-  .build();
+    .procedure("revoke")
+    .withPermission("sso:manage")
+    .handle(({ app, input }) =>
+      app.revokeToken({ organizationId: input.organizationId, tokenId: input.tokenId }),
+    )
+    .build();

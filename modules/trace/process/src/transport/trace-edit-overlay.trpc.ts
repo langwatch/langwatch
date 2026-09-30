@@ -3,10 +3,13 @@
  * writing `annotations:update`. Transport only: the viewer's redactions
  * are the app's.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { TraceApi, traceEditOverlayTrpc } from "@langwatch/trace-contract";
 
-export const traceEditOverlayTrpcTransport = defineTrpcRouter(TraceApi, traceEditOverlayTrpc)
+export const traceEditOverlayTrpcTransport: TrpcRouterDeclaration<
+  TraceApi,
+  typeof traceEditOverlayTrpc
+> = defineTrpcRouter(TraceApi, traceEditOverlayTrpc)
   .procedure("getByTraceId")
   .withPermission("traces:view")
   .handle(async ({ app, input, actor }) => {

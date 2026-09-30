@@ -3,7 +3,7 @@
  * plane through the config materialiser, never through here; this is the
  * platform surface for the rules themselves.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   GatewayApi,
   gatewayCacheRuleTrpc,
@@ -44,7 +44,10 @@ function toDto(r: GatewayCacheRuleResource): {
   };
 }
 
-export const gatewayCacheRuleTrpcTransport = defineTrpcRouter(GatewayApi, gatewayCacheRuleTrpc)
+export const gatewayCacheRuleTrpcTransport: TrpcRouterDeclaration<
+  GatewayApi,
+  typeof gatewayCacheRuleTrpc
+> = defineTrpcRouter(GatewayApi, gatewayCacheRuleTrpc)
   .procedure("list")
   .withPermission("gatewayCacheRules:view")
   .handle(async ({ app, input }) => {

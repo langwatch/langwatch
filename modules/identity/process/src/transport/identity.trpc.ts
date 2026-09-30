@@ -3,7 +3,7 @@
  * none is missing — the session proves who the caller is, and every operation acts on that user
  * alone. Spec: specs/identity/identifier-model.feature.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { IdentityApi, identityTrpc } from "@langwatch/identity-contract";
 
 const OWN_VERIFICATION_RECORD =
@@ -21,44 +21,45 @@ const OWN_RESEND_CONFIRMATION =
 const OWN_REMOVE_IDENTIFIER =
   "removes an identifier from the session user's own account; the identity guards decide, and no organization scope applies";
 
-export const identityTrpcTransport = defineTrpcRouter(IdentityApi, identityTrpc)
-  .procedure("completeVerification")
-  .noPermission({ reason: OWN_VERIFICATION_RECORD })
-  .handle(async ({ app, actor, input }) => {
-    await app.completeEmailVerification({ userId: actor.id, ...input });
+export const identityTrpcTransport: TrpcRouterDeclaration<IdentityApi, typeof identityTrpc> =
+  defineTrpcRouter(IdentityApi, identityTrpc)
+    .procedure("completeVerification")
+    .noPermission({ reason: OWN_VERIFICATION_RECORD })
+    .handle(async ({ app, actor, input }) => {
+      await app.completeEmailVerification({ userId: actor.id, ...input });
 
-    return { verified: true as const };
-  })
+      return { verified: true as const };
+    })
 
-  .procedure("myTestArrival")
-  .noPermission({ reason: OWN_TEST_ARRIVAL })
-  .handle(({ app, actor }) => app.ssoTestArrival().standingFor({ userId: actor.id }))
+    .procedure("myTestArrival")
+    .noPermission({ reason: OWN_TEST_ARRIVAL })
+    .handle(({ app, actor }) => app.ssoTestArrival().standingFor({ userId: actor.id }))
 
-  .procedure("myIdentifiers")
-  .noPermission({ reason: OWN_IDENTIFIERS })
-  .handle(({ app, actor }) => app.listAccountIdentifiers({ userId: actor.id }))
+    .procedure("myIdentifiers")
+    .noPermission({ reason: OWN_IDENTIFIERS })
+    .handle(({ app, actor }) => app.listAccountIdentifiers({ userId: actor.id }))
 
-  .procedure("myMethodsLastUsed")
-  .noPermission({ reason: OWN_METHODS_LAST_USED })
-  .handle(({ app, actor }) => app.getMethodsLastUsed({ userId: actor.id }))
+    .procedure("myMethodsLastUsed")
+    .noPermission({ reason: OWN_METHODS_LAST_USED })
+    .handle(({ app, actor }) => app.getMethodsLastUsed({ userId: actor.id }))
 
-  .procedure("addEmailIdentifier")
-  .noPermission({ reason: OWN_ADD_IDENTIFIER })
-  .handle(({ app, actor, input }) => app.addEmailIdentifier({ userId: actor.id, ...input }))
+    .procedure("addEmailIdentifier")
+    .noPermission({ reason: OWN_ADD_IDENTIFIER })
+    .handle(({ app, actor, input }) => app.addEmailIdentifier({ userId: actor.id, ...input }))
 
-  .procedure("resendIdentifierConfirmation")
-  .noPermission({ reason: OWN_RESEND_CONFIRMATION })
-  .handle(async ({ app, actor, input }) => {
-    await app.resendIdentifierConfirmation({ userId: actor.id, ...input });
+    .procedure("resendIdentifierConfirmation")
+    .noPermission({ reason: OWN_RESEND_CONFIRMATION })
+    .handle(async ({ app, actor, input }) => {
+      await app.resendIdentifierConfirmation({ userId: actor.id, ...input });
 
-    return { sent: true as const };
-  })
+      return { sent: true as const };
+    })
 
-  .procedure("removeIdentifier")
-  .noPermission({ reason: OWN_REMOVE_IDENTIFIER })
-  .handle(async ({ app, actor, input }) => {
-    await app.removeIdentifier({ userId: actor.id, identifierId: input.identifierId });
+    .procedure("removeIdentifier")
+    .noPermission({ reason: OWN_REMOVE_IDENTIFIER })
+    .handle(async ({ app, actor, input }) => {
+      await app.removeIdentifier({ userId: actor.id, identifierId: input.identifierId });
 
-    return { removed: true as const };
-  })
-  .build();
+      return { removed: true as const };
+    })
+    .build();

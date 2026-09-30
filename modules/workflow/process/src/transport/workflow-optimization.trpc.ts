@@ -3,13 +3,13 @@
  * over the workflow module's application.
  * Spec: modules/workflow/specs/workflow-service.feature.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { WorkflowApi, workflowOptimizationTrpc } from "@langwatch/workflow-contract";
 
-export const workflowOptimizationTrpcTransport = defineTrpcRouter(
+export const workflowOptimizationTrpcTransport: TrpcRouterDeclaration<
   WorkflowApi,
-  workflowOptimizationTrpc,
-)
+  typeof workflowOptimizationTrpc
+> = defineTrpcRouter(WorkflowApi, workflowOptimizationTrpc)
   /**
    * Running a published workflow spends model budget and executes the graph's
    * code and HTTP nodes, so it is gated on the same permission the public run

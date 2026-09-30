@@ -4,7 +4,7 @@
  * Spec: modules/dataset/specs/dataset-service.feature.
  */
 
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DatasetApi, datasetRecordTrpc } from "@langwatch/dataset-contract";
 
 /**
@@ -14,7 +14,10 @@ import { DatasetApi, datasetRecordTrpc } from "@langwatch/dataset-contract";
  */
 const DATASET_EDITOR_READ_LIMIT_MB = 13;
 
-export const datasetRecordTrpcTransport = defineTrpcRouter(DatasetApi, datasetRecordTrpc)
+export const datasetRecordTrpcTransport: TrpcRouterDeclaration<
+  DatasetApi,
+  typeof datasetRecordTrpc
+> = defineTrpcRouter(DatasetApi, datasetRecordTrpc)
   .procedure("create")
   .withPermission("datasets:create")
   .handle(async ({ app, input }) =>

@@ -4,7 +4,7 @@
  * application with its provider secrets already stripped.
  */
 import { filterFieldsEnum } from "@langwatch/analytics-contract";
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import type { Trigger } from "@langwatch/automation-contract";
 import {
   DashboardApi,
@@ -25,125 +25,126 @@ type AlertActionParams = {
   timePeriod: number;
 };
 
-export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
-  .procedure("create")
-  .withPermission("analytics:create")
-  .handle(async ({ app, input }) =>
-    legacyGraph(
-      await app.createGraph({
-        projectId: input.projectId,
-        name: input.name,
-        graph: JSON.parse(input.graph) as Record<string, unknown>,
-        filters: input.filterParams?.filters ?? {},
-        ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
-        layout: {
-          gridColumn: input.gridColumn ?? 0,
-          ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
-          colSpan: input.colSpan ?? 1,
-          rowSpan: input.rowSpan ?? 1,
-        },
-      }),
-    ),
-  )
-
-  .procedure("getAll")
-  .withPermission("analytics:view")
-  .handle(async ({ app, input }) => {
-    const { projectId, dashboardId } = input;
-    const graphs = await app.listGraphs({
-      projectId,
-      ...(dashboardId === undefined ? {} : { dashboardId }),
-    });
-
-    const triggers = await app.getAlertsForGraphs({
-      projectId,
-      customGraphIds: graphs.map((graph) => graph.id),
-    });
-    const triggerByGraphId = new Map(
-      triggers.flatMap((trigger) =>
-        trigger.customGraphId === null ? [] : [[trigger.customGraphId, trigger] as const],
+export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof graphTrpc> =
+  defineTrpcRouter(DashboardApi, graphTrpc)
+    .procedure("create")
+    .withPermission("analytics:create")
+    .handle(async ({ app, input }) =>
+      legacyGraph(
+        await app.createGraph({
+          projectId: input.projectId,
+          name: input.name,
+          graph: JSON.parse(input.graph) as Record<string, unknown>,
+          filters: input.filterParams?.filters ?? {},
+          ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
+          layout: {
+            gridColumn: input.gridColumn ?? 0,
+            ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
+            colSpan: input.colSpan ?? 1,
+            rowSpan: input.rowSpan ?? 1,
+          },
+        }),
       ),
-    );
+    )
 
-    return graphs.map((graph) => ({
-      ...legacyGraph(graph),
-      trigger: triggerByGraphId.get(graph.id) ?? null,
-    }));
-  })
+    .procedure("getAll")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input }) => {
+      const { projectId, dashboardId } = input;
+      const graphs = await app.listGraphs({
+        projectId,
+        ...(dashboardId === undefined ? {} : { dashboardId }),
+      });
 
-  .procedure("delete")
-  .withPermission("analytics:delete")
-  .handle(async ({ app, input }) =>
-    legacyGraph(await app.deleteGraph({ projectId: input.projectId, graphId: input.id })),
-  )
+      const triggers = await app.getAlertsForGraphs({
+        projectId,
+        customGraphIds: graphs.map((graph) => graph.id),
+      });
+      const triggerByGraphId = new Map(
+        triggers.flatMap((trigger) =>
+          trigger.customGraphId === null ? [] : [[trigger.customGraphId, trigger] as const],
+        ),
+      );
 
-  .procedure("getById")
-  .withPermission("analytics:view")
-  .handle(async ({ app, input }) => {
-    const graph = await app.getGraph({ projectId: input.projectId, graphId: input.id });
+      return graphs.map((graph) => ({
+        ...legacyGraph(graph),
+        trigger: triggerByGraphId.get(graph.id) ?? null,
+      }));
+    })
 
-    const trigger = await app.findAlertForGraph({
-      customGraphId: input.id,
-      projectId: input.projectId,
-    });
+    .procedure("delete")
+    .withPermission("analytics:delete")
+    .handle(async ({ app, input }) =>
+      legacyGraph(await app.deleteGraph({ projectId: input.projectId, graphId: input.id })),
+    )
 
-    const filters = knownFilters(graph.filters);
+    .procedure("getById")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input }) => {
+      const graph = await app.getGraph({ projectId: input.projectId, graphId: input.id });
 
-    return {
-      ...legacyGraph(graph),
-      filters: Object.keys(filters).length > 0 ? filters : undefined,
-      alert: trigger === undefined ? undefined : alertOf(trigger),
-    };
-  })
-
-  .procedure("updateById")
-  .withPermission("analytics:update")
-  .handle(async ({ app, input }) =>
-    legacyGraph(
-      await app.updateGraph({
+      const trigger = await app.findAlertForGraph({
+        customGraphId: input.id,
         projectId: input.projectId,
-        graphId: input.graphId,
-        name: input.name,
-        graph: JSON.parse(input.graph) as Record<string, unknown>,
-        filters: input.filterParams?.filters ?? {},
-      }),
-    ),
-  )
+      });
 
-  .procedure("updateLayout")
-  .withPermission("analytics:update")
-  .handle(async ({ app, input }) =>
-    legacyGraph(
-      await app.updateGraphLayout({
+      const filters = knownFilters(graph.filters);
+
+      return {
+        ...legacyGraph(graph),
+        filters: Object.keys(filters).length > 0 ? filters : undefined,
+        alert: trigger === undefined ? undefined : alertOf(trigger),
+      };
+    })
+
+    .procedure("updateById")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input }) =>
+      legacyGraph(
+        await app.updateGraph({
+          projectId: input.projectId,
+          graphId: input.graphId,
+          name: input.name,
+          graph: JSON.parse(input.graph) as Record<string, unknown>,
+          filters: input.filterParams?.filters ?? {},
+        }),
+      ),
+    )
+
+    .procedure("updateLayout")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input }) =>
+      legacyGraph(
+        await app.updateGraphLayout({
+          projectId: input.projectId,
+          graphId: input.graphId,
+          layout: {
+            gridColumn: input.gridColumn,
+            gridRow: input.gridRow,
+            colSpan: input.colSpan,
+            rowSpan: input.rowSpan,
+          },
+        }),
+      ),
+    )
+
+    .procedure("batchUpdateLayouts")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input }) =>
+      app.batchUpdateGraphLayouts({
         projectId: input.projectId,
-        graphId: input.graphId,
-        layout: {
-          gridColumn: input.gridColumn,
-          gridRow: input.gridRow,
-          colSpan: input.colSpan,
-          rowSpan: input.rowSpan,
-        },
+        layouts: input.layouts.map((layout) => ({
+          graphId: layout.graphId,
+          layout: {
+            gridColumn: layout.gridColumn,
+            gridRow: layout.gridRow,
+            colSpan: layout.colSpan,
+            rowSpan: layout.rowSpan,
+          },
+        })),
       }),
-    ),
-  )
-
-  .procedure("batchUpdateLayouts")
-  .withPermission("analytics:update")
-  .handle(async ({ app, input }) =>
-    app.batchUpdateGraphLayouts({
-      projectId: input.projectId,
-      layouts: input.layouts.map((layout) => ({
-        graphId: layout.graphId,
-        layout: {
-          gridColumn: layout.gridColumn,
-          gridRow: layout.gridRow,
-          colSpan: layout.colSpan,
-          rowSpan: layout.rowSpan,
-        },
-      })),
-    }),
-  )
-  .build();
+    )
+    .build();
 
 /**
  * The alert bell on a card header. The parameters are the ones the application

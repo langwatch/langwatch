@@ -4,79 +4,80 @@
  * not repeated here. Spec: modules/dataset/specs/dataset-service.feature.
  */
 
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DatasetApi, datasetTrpc } from "@langwatch/dataset-contract";
 
-export const datasetTrpcTransport = defineTrpcRouter(DatasetApi, datasetTrpc)
-  .procedure("upsert")
-  .withPermission("datasets:manage")
-  // Borrowing the experiment's name when the caller named one is the
-  // application's rule, not this transport's: the REST patch fills the same
-  // hole from the dataset it is replacing, and one upsert decides both.
-  .handle(async ({ app, input }) =>
-    app.upsertDataset({
-      projectId: input.projectId,
-      name: "name" in input ? input.name : undefined,
-      experimentId: "experimentId" in input ? input.experimentId : undefined,
-      columnTypes: input.columnTypes,
-      datasetId: "datasetId" in input ? input.datasetId : undefined,
-      datasetRecords: input.datasetRecords,
-    }),
-  )
+export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof datasetTrpc> =
+  defineTrpcRouter(DatasetApi, datasetTrpc)
+    .procedure("upsert")
+    .withPermission("datasets:manage")
+    // Borrowing the experiment's name when the caller named one is the
+    // application's rule, not this transport's: the REST patch fills the same
+    // hole from the dataset it is replacing, and one upsert decides both.
+    .handle(async ({ app, input }) =>
+      app.upsertDataset({
+        projectId: input.projectId,
+        name: "name" in input ? input.name : undefined,
+        experimentId: "experimentId" in input ? input.experimentId : undefined,
+        columnTypes: input.columnTypes,
+        datasetId: "datasetId" in input ? input.datasetId : undefined,
+        datasetRecords: input.datasetRecords,
+      }),
+    )
 
-  .procedure("validateDatasetName")
-  .withPermission("datasets:view")
-  .handle(async ({ app, input }) => app.validateDatasetName(input))
+    .procedure("validateDatasetName")
+    .withPermission("datasets:view")
+    .handle(async ({ app, input }) => app.validateDatasetName(input))
 
-  .procedure("getAll")
-  .withPermission("datasets:view")
-  .handle(async ({ app, input }) => {
-    const result = await app.listDatasets({ projectId: input.projectId, page: 1, limit: 200 });
+    .procedure("getAll")
+    .withPermission("datasets:view")
+    .handle(async ({ app, input }) => {
+      const result = await app.listDatasets({ projectId: input.projectId, page: 1, limit: 200 });
 
-    return result.data;
-  })
+      return result.data;
+    })
 
-  .procedure("getById")
-  .withPermission("datasets:view")
-  .handle(async ({ app, input }) =>
-    app.findBySlugOrId({
-      projectId: input.projectId,
-      slugOrId: input.datasetId,
-    }),
-  )
+    .procedure("getById")
+    .withPermission("datasets:view")
+    .handle(async ({ app, input }) =>
+      app.findBySlugOrId({
+        projectId: input.projectId,
+        slugOrId: input.datasetId,
+      }),
+    )
 
-  .procedure("deleteById")
-  .withPermission("datasets:delete")
-  .handle(async ({ app, input }) => app.archiveOrRestoreDataset(input))
+    .procedure("deleteById")
+    .withPermission("datasets:delete")
+    .handle(async ({ app, input }) => app.archiveOrRestoreDataset(input))
 
-  .procedure("updateMapping")
-  .withPermission("datasets:update")
-  .handle(async ({ app, input }) => app.updateMapping(input))
+    .procedure("updateMapping")
+    .withPermission("datasets:update")
+    .handle(async ({ app, input }) => app.updateMapping(input))
 
-  .procedure("findNextName")
-  .withPermission("datasets:view")
-  .handle(async ({ app, input }) => app.findNextAvailableName(input))
+    .procedure("findNextName")
+    .withPermission("datasets:view")
+    .handle(async ({ app, input }) => app.findNextAvailableName(input))
 
-  .procedure("copy")
-  .withPermission("datasets:create")
-  // The declared check covers `projectId`, the TARGET. The source is a second
-  // project the caller also named, and the application probes the caller's
-  // reach into it before reading anything from it.
-  .handle(async ({ app, input, actor }) =>
-    app.copyDatasetForActor({
-      actorId: actor.id,
-      sourceDatasetId: input.datasetId,
-      sourceProjectId: input.sourceProjectId,
-      targetProjectId: input.projectId,
-    }),
-  )
-  .procedure("createFromStoredObject")
-  .withPermission("datasets:create")
-  .handle(({ app, input }) => app.createDatasetFromStoredObject(input))
-  .procedure("appendStoredObject")
-  .withPermission("datasets:update")
-  .handle(({ app, input }) => app.appendStoredObjectToDataset(input))
-  .procedure("retryNormalize")
-  .withPermission("datasets:manage")
-  .handle(({ app, input }) => app.retryNormalize(input))
-  .build();
+    .procedure("copy")
+    .withPermission("datasets:create")
+    // The declared check covers `projectId`, the TARGET. The source is a second
+    // project the caller also named, and the application probes the caller's
+    // reach into it before reading anything from it.
+    .handle(async ({ app, input, actor }) =>
+      app.copyDatasetForActor({
+        actorId: actor.id,
+        sourceDatasetId: input.datasetId,
+        sourceProjectId: input.sourceProjectId,
+        targetProjectId: input.projectId,
+      }),
+    )
+    .procedure("createFromStoredObject")
+    .withPermission("datasets:create")
+    .handle(({ app, input }) => app.createDatasetFromStoredObject(input))
+    .procedure("appendStoredObject")
+    .withPermission("datasets:update")
+    .handle(({ app, input }) => app.appendStoredObjectToDataset(input))
+    .procedure("retryNormalize")
+    .withPermission("datasets:manage")
+    .handle(({ app, input }) => app.retryNormalize(input))
+    .build();

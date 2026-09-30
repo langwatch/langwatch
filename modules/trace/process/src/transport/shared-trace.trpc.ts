@@ -3,7 +3,12 @@
  * drive (ADR-057). Who is asking arrives as facts the process binds.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { callerAddressFact, defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import {
+  callerAddressFact,
+  defineTrpcFact,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { sharedTraceTrpc, TraceApi } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -21,16 +26,17 @@ const TOKEN_IS_THE_AUTHORIZATION = publicRoute({
     "the share token in the input is the whole authorization; audience, expiry, view cap and the kill switch are checked on every read (ADR-057)",
 });
 
-export const sharedTraceTrpcTransport = defineTrpcRouter(TraceApi, sharedTraceTrpc)
-  .procedure("get")
-  .withFacts(callerAddressFact, shareViewerFact)
-  .withAccess(TOKEN_IS_THE_AUTHORIZATION)
-  .handle(({ app, input }, clientIp, viewer) =>
-    app.getSharedTrace({
-      token: input.token,
-      viewerUserId: viewer.userId,
-      clientIp,
-      userAgent: viewer.userAgent,
-    }),
-  )
-  .build();
+export const sharedTraceTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof sharedTraceTrpc> =
+  defineTrpcRouter(TraceApi, sharedTraceTrpc)
+    .procedure("get")
+    .withFacts(callerAddressFact, shareViewerFact)
+    .withAccess(TOKEN_IS_THE_AUTHORIZATION)
+    .handle(({ app, input }, clientIp, viewer) =>
+      app.getSharedTrace({
+        token: input.token,
+        viewerUserId: viewer.userId,
+        clientIp,
+        userAgent: viewer.userAgent,
+      }),
+    )
+    .build();

@@ -3,7 +3,7 @@
  * which tenant handle its BODY names, so each declares `serviceAuthorized`:
  * the app's per-scope `assertCanWrite` is the check; the declaration states it.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   ModelProviderApi,
   modelProviderTrpc,
@@ -40,7 +40,10 @@ const TENANT_FIELDS = {
   organizationId: TENANT_IS_DATA,
 } as const;
 
-export const modelProviderTrpcTransport = defineTrpcRouter(ModelProviderApi, modelProviderTrpc)
+export const modelProviderTrpcTransport: TrpcRouterDeclaration<
+  ModelProviderApi,
+  typeof modelProviderTrpc
+> = defineTrpcRouter(ModelProviderApi, modelProviderTrpc)
   // tRPC answers land in the browser, so every read here goes through the
   // masking operation; decrypted credentials are only for server-internal
   // callers of `getExecutionProviders`.

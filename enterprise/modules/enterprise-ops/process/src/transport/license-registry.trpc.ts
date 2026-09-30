@@ -3,7 +3,7 @@
  * The server half of the license registry (ADR-156), gated inside the
  * application the same not-found way as every other Backoffice resource, as main did.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EnterpriseOpsApi, licenseRegistryTrpc } from "@langwatch/enterprise-ops-contract";
 
 import {
@@ -12,7 +12,10 @@ import {
   STAFF_LIST_FOR_ORGANIZATION,
 } from "./enterprise-ops-operator.trpc.ts";
 
-export const licenseRegistryTrpcTransport = defineTrpcRouter(EnterpriseOpsApi, licenseRegistryTrpc)
+export const licenseRegistryTrpcTransport: TrpcRouterDeclaration<
+  EnterpriseOpsApi,
+  typeof licenseRegistryTrpc
+> = defineTrpcRouter(EnterpriseOpsApi, licenseRegistryTrpc)
   .procedure("getAll")
   .withFacts(operatorFact)
   .noPermission(STAFF_LIST)

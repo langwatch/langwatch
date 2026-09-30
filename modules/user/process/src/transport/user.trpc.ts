@@ -9,6 +9,7 @@ import {
   callerAddressFact,
   defineTrpcRouter,
   type TrpcHandlerActor,
+  type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
 import { UserApi, userTrpc, type UserCaller } from "@langwatch/user-contract";
 
@@ -30,7 +31,10 @@ function callerOf(actor: TrpcHandlerActor): UserCaller {
   return { id: actor.id, operatorId, impersonated: operatorId !== actor.id };
 }
 
-export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
+export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> = defineTrpcRouter(
+  UserApi,
+  userTrpc,
+)
   // `register` predates the account it creates, so it runs with no caller at
   // all and the address it arrived from is the only thing to throttle on.
   .procedure("register")

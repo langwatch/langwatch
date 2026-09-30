@@ -3,7 +3,12 @@
  * hands the parsed input, with the person the browser session proved, to one panel operation.
  * Spec: modules/langy/specs/langy-panel-trpc.feature
  */
-import { defineTrpcFact, defineTrpcRouter, type TrpcHandlerActor } from "@langwatch/api/trpc";
+import {
+  defineTrpcFact,
+  defineTrpcRouter,
+  type TrpcHandlerActor,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import {
   LangyApi,
   langyEgressTrpc,
@@ -24,200 +29,201 @@ function callerOf(actor: TrpcHandlerActor, person: SessionPerson): LangyPanelCal
   return { userId: actor.id, name: person?.name ?? null, email: person?.email ?? null };
 }
 
-export const langyTrpcTransport = defineTrpcRouter(LangyApi, langyTrpc)
-  .procedure("list")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.listConversations({ ...input, caller: callerOf(actor, person) }),
-  )
+export const langyTrpcTransport: TrpcRouterDeclaration<LangyApi, typeof langyTrpc> =
+  defineTrpcRouter(LangyApi, langyTrpc)
+    .procedure("list")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.listConversations({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("conversationEventsAfter")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.getConversationEventsAfter({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("conversationEventsAfter")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.getConversationEventsAfter({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("detail")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(async ({ app, input, actor }, person) => {
-    const [detail] = await app.findVisibleConversationDetails({
-      ...input,
-      caller: callerOf(actor, person),
-    });
-    return detail ?? null;
-  })
+    .procedure("detail")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(async ({ app, input, actor }, person) => {
+      const [detail] = await app.findVisibleConversationDetails({
+        ...input,
+        caller: callerOf(actor, person),
+      });
+      return detail ?? null;
+    })
 
-  .procedure("messages")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.getConversationMessages({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("messages")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.getConversationMessages({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("deleteConversation")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:delete")
-  .handle(({ app, input, actor }, person) =>
-    app.archiveConversation({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("deleteConversation")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:delete")
+    .handle(({ app, input, actor }, person) =>
+      app.archiveConversation({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("renameConversation")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:update")
-  .handle(({ app, input, actor }, person) =>
-    app.renameConversation({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("renameConversation")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:update")
+    .handle(({ app, input, actor }, person) =>
+      app.renameConversation({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("forkConversation")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.forkConversation({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("forkConversation")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.forkConversation({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("createConversation")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.createConversationTurn({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("createConversation")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.createConversationTurn({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("continueConversation")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.continueConversationTurn({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("continueConversation")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.continueConversationTurn({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("stopTurn")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.stopPanelTurn({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("stopTurn")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.stopPanelTurn({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("claimUiAction")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.claimUiAction({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("claimUiAction")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.claimUiAction({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("completeUiAction")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.completeUiAction({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("completeUiAction")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.completeUiAction({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("answerLocalPermission")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.answerLocalPermission({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("answerLocalPermission")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.answerLocalPermission({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("answerQuestion")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.answerLocalQuestion({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("answerQuestion")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.answerLocalQuestion({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("setLocalPolicy")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.setLocalPolicy({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("setLocalPolicy")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.setLocalPolicy({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("disconnectLocalWorkspace")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.disconnectLocalWorkspace({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("disconnectLocalWorkspace")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.disconnectLocalWorkspace({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("setCodeAccessPreference")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:update")
-  .handle(({ app, input, actor }, person) =>
-    app.setCodeAccessPreference({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("setCodeAccessPreference")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:update")
+    .handle(({ app, input, actor }, person) =>
+      app.setCodeAccessPreference({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("getCodeAccessPreference")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.getCodeAccessPreference({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("getCodeAccessPreference")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.getCodeAccessPreference({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("localRecord")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.getPanelLocalRecord({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("localRecord")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.getPanelLocalRecord({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("getLocalWorkspace")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.getPanelLocalWorkspace({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("getLocalWorkspace")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.getPanelLocalWorkspace({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("renewLocalControlRequest")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.renewLocalControlRequest({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("renewLocalControlRequest")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.renewLocalControlRequest({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("warmWorker")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.warmPanelWorker({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("warmWorker")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.warmPanelWorker({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("modelsAllowed")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor }, person) =>
-    app.getModelsAllowed({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("modelsAllowed")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor }, person) =>
+      app.getModelsAllowed({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("recordFeedback")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.recordFeedback({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("recordFeedback")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.recordFeedback({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("feedbackPromptShown")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:create")
-  .handle(({ app, input, actor }, person) =>
-    app.markFeedbackPromptShown({ ...input, caller: callerOf(actor, person) }),
-  )
+    .procedure("feedbackPromptShown")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:create")
+    .handle(({ app, input, actor }, person) =>
+      app.markFeedbackPromptShown({ ...input, caller: callerOf(actor, person) }),
+    )
 
-  .procedure("onConversationUpdate")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor, signal }, person) =>
-    app.watchConversationUpdates({ ...input, caller: callerOf(actor, person), signal }),
-  )
+    .procedure("onConversationUpdate")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor, signal }, person) =>
+      app.watchConversationUpdates({ ...input, caller: callerOf(actor, person), signal }),
+    )
 
-  .procedure("onTurnStream")
-  .withFacts(sessionPersonFact)
-  .withPermission("langy:view")
-  .handle(({ app, input, actor, signal }, person) =>
-    app.watchTurnStream({ ...input, caller: callerOf(actor, person), signal }),
-  )
-  .build();
+    .procedure("onTurnStream")
+    .withFacts(sessionPersonFact)
+    .withPermission("langy:view")
+    .handle(({ app, input, actor, signal }, person) =>
+      app.watchTurnStream({ ...input, caller: callerOf(actor, person), signal }),
+    )
+    .build();
 
 export const langyEgressTrpcTransport = defineTrpcRouter(LangyApi, langyEgressTrpc)
   .procedure("get")

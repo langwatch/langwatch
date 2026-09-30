@@ -1,45 +1,46 @@
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { PresenceApi, presenceTrpc } from "@langwatch/presence-contract";
 
 const accepted = { ok: true } as const;
 
-export const presenceTrpcTransport = defineTrpcRouter(PresenceApi, presenceTrpc)
-  .procedure("update")
-  .withPermission("traces:view")
-  .handle(async ({ app, input, actor }) => {
-    await app.update({ ...input, userId: actor.id });
+export const presenceTrpcTransport: TrpcRouterDeclaration<PresenceApi, typeof presenceTrpc> =
+  defineTrpcRouter(PresenceApi, presenceTrpc)
+    .procedure("update")
+    .withPermission("traces:view")
+    .handle(async ({ app, input, actor }) => {
+      await app.update({ ...input, userId: actor.id });
 
-    return accepted;
-  })
+      return accepted;
+    })
 
-  .procedure("leave")
-  .withPermission("traces:view")
-  .handle(async ({ app, input, actor }) => {
-    await app.leave({ ...input, userId: actor.id });
+    .procedure("leave")
+    .withPermission("traces:view")
+    .handle(async ({ app, input, actor }) => {
+      await app.leave({ ...input, userId: actor.id });
 
-    return accepted;
-  })
+      return accepted;
+    })
 
-  .procedure("cursor")
-  .withPermission("traces:view")
-  .handle(async ({ app, input, actor }) => {
-    await app.broadcastCursor({ ...input, userId: actor.id });
+    .procedure("cursor")
+    .withPermission("traces:view")
+    .handle(async ({ app, input, actor }) => {
+      await app.broadcastCursor({ ...input, userId: actor.id });
 
-    return accepted;
-  })
+      return accepted;
+    })
 
-  .procedure("onPresenceUpdate")
-  .withPermission("traces:view")
-  .handle(({ app, input, signal }) => app.events({ projectId: input.projectId, signal }))
+    .procedure("onPresenceUpdate")
+    .withPermission("traces:view")
+    .handle(({ app, input, signal }) => app.events({ projectId: input.projectId, signal }))
 
-  .procedure("onPresenceCursor")
-  .withPermission("traces:view")
-  .handle(({ app, input, signal }) =>
-    app.cursors({
-      projectId: input.projectId,
-      anchor: input.anchor,
-      sessionId: input.sessionId,
-      signal,
-    }),
-  )
-  .build();
+    .procedure("onPresenceCursor")
+    .withPermission("traces:view")
+    .handle(({ app, input, signal }) =>
+      app.cursors({
+        projectId: input.projectId,
+        anchor: input.anchor,
+        sessionId: input.sessionId,
+        signal,
+      }),
+    )
+    .build();

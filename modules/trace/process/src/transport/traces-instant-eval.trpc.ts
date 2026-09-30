@@ -3,10 +3,13 @@
  * `analytics:manage` to spend, `analytics:view` to read a run back.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { TraceApi, tracesInstantEvalTrpc } from "@langwatch/trace-contract";
 
-export const tracesInstantEvalTrpcTransport = defineTrpcRouter(TraceApi, tracesInstantEvalTrpc)
+export const tracesInstantEvalTrpcTransport: TrpcRouterDeclaration<
+  TraceApi,
+  typeof tracesInstantEvalTrpc
+> = defineTrpcRouter(TraceApi, tracesInstantEvalTrpc)
   .procedure("estimate")
   .withPermission("analytics:manage")
   .handle(({ app, input, actor }) =>

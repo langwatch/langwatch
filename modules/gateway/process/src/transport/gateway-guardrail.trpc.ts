@@ -3,10 +3,13 @@
  * behind /gateway/guardrails; a key opts in via `config.guardrailAttachments[]`.
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { GatewayApi, gatewayGuardrailTrpc } from "@langwatch/gateway-contract";
 
-export const gatewayGuardrailTrpcTransport = defineTrpcRouter(GatewayApi, gatewayGuardrailTrpc)
+export const gatewayGuardrailTrpcTransport: TrpcRouterDeclaration<
+  GatewayApi,
+  typeof gatewayGuardrailTrpc
+> = defineTrpcRouter(GatewayApi, gatewayGuardrailTrpc)
   .procedure("list")
   .withPermission("gatewayGuardrails:view")
   .handle(({ app, input }) => app.listGuardrails(input.projectId))

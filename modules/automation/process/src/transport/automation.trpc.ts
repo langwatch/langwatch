@@ -3,7 +3,7 @@
  * answered behind, and one call into the application.
  * ADR-026, ADR-031, ADR-040, ADR-041, ADR-043, ADR-044.
  */
-import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { AutomationApi, automationTrpc } from "@langwatch/automation-contract";
 import { z } from "zod";
 
@@ -14,98 +14,99 @@ import { z } from "zod";
  */
 export const automationCallerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
 
-export const automationTrpcTransport = defineTrpcRouter(AutomationApi, automationTrpc)
-  // Creating asks for `:create`; `:manage` still implies it, so no existing
-  // caller changes and a viewer is declined as before.
-  .procedure("create")
-  .withPermission("triggers:create")
-  .handle(({ app, input, actor }) => app.createAutomation(input, { id: actor.id }))
+export const automationTrpcTransport: TrpcRouterDeclaration<AutomationApi, typeof automationTrpc> =
+  defineTrpcRouter(AutomationApi, automationTrpc)
+    // Creating asks for `:create`; `:manage` still implies it, so no existing
+    // caller changes and a viewer is declined as before.
+    .procedure("create")
+    .withPermission("triggers:create")
+    .handle(({ app, input, actor }) => app.createAutomation(input, { id: actor.id }))
 
-  /**
-   * Removal is one operation on the application: soft delete, scheduled-
-   * report retirement, and dispatch-cache invalidation. Splitting it here
-   * left REST free to do only two of the three, which it did.
-   */
-  .procedure("deleteById")
-  .withPermission("triggers:delete")
-  .handle(async ({ app, input }) => {
-    await app.delete({ triggerId: input.triggerId, projectId: input.projectId });
+    /**
+     * Removal is one operation on the application: soft delete, scheduled-
+     * report retirement, and dispatch-cache invalidation. Splitting it here
+     * left REST free to do only two of the three, which it did.
+     */
+    .procedure("deleteById")
+    .withPermission("triggers:delete")
+    .handle(async ({ app, input }) => {
+      await app.delete({ triggerId: input.triggerId, projectId: input.projectId });
 
-    return { success: true };
-  })
+      return { success: true };
+    })
 
-  .procedure("getTriggers")
-  .withPermission("triggers:view")
-  .handle(({ app, input }) => app.listAutomations({ projectId: input.projectId }))
+    .procedure("getTriggers")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) => app.listAutomations({ projectId: input.projectId }))
 
-  .procedure("getDailyCap")
-  .withPermission("triggers:view")
-  .handle(async ({ app, input }) => ({
-    cap: await app.resolvePersistDailyCap(input.projectId),
-  }))
+    .procedure("getDailyCap")
+    .withPermission("triggers:view")
+    .handle(async ({ app, input }) => ({
+      cap: await app.resolvePersistDailyCap(input.projectId),
+    }))
 
-  .procedure("getDailyCapStatus")
-  .withPermission("triggers:view")
-  .handle(({ app, input }) => app.readDailyCapStatus({ projectId: input.projectId }))
+    .procedure("getDailyCapStatus")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) => app.readDailyCapStatus({ projectId: input.projectId }))
 
-  .procedure("getTriggerStats")
-  .withPermission("triggers:view")
-  .handle(({ app, input }) => app.getFireStats({ projectId: input.projectId }))
+    .procedure("getTriggerStats")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) => app.getFireStats({ projectId: input.projectId }))
 
-  .procedure("getRecentFires")
-  .withPermission("triggers:view")
-  .handle(({ app, input }) =>
-    app.getRecentFires({
-      projectId: input.projectId,
-      triggerId: input.triggerId,
-      limit: input.limit,
-    }),
-  )
+    .procedure("getRecentFires")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) =>
+      app.getRecentFires({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+        limit: input.limit,
+      }),
+    )
 
-  .procedure("getWebhookDeliveries")
-  .withPermission("triggers:view")
-  .handle(({ app, input }) =>
-    app.getRecentWebhookDeliveries({
-      projectId: input.projectId,
-      triggerId: input.triggerId,
-      limit: input.limit,
-    }),
-  )
+    .procedure("getWebhookDeliveries")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) =>
+      app.getRecentWebhookDeliveries({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+        limit: input.limit,
+      }),
+    )
 
-  .procedure("getRecentActivity")
-  .withPermission("triggers:view")
-  .handle(({ app, input }) =>
-    app.getRecentFires({ projectId: input.projectId, limit: input.limit }),
-  )
+    .procedure("getRecentActivity")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) =>
+      app.getRecentFires({ projectId: input.projectId, limit: input.limit }),
+    )
 
-  .procedure("getReportSchedules")
-  .withPermission("triggers:view")
-  .handle(({ app, input }) => app.getReportSchedules({ projectId: input.projectId }))
+    .procedure("getReportSchedules")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) => app.getReportSchedules({ projectId: input.projectId }))
 
-  .procedure("toggleTrigger")
-  .withPermission("triggers:update")
-  .handle(({ app, input }) => app.setAutomationActive(input))
+    .procedure("toggleTrigger")
+    .withPermission("triggers:update")
+    .handle(({ app, input }) => app.setAutomationActive(input))
 
-  .procedure("getTriggerById")
-  .withPermission("triggers:view")
-  .handle(({ app, input }) =>
-    app.findRedactedById({ triggerId: input.triggerId, projectId: input.projectId }),
-  )
+    .procedure("getTriggerById")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) =>
+      app.findRedactedById({ triggerId: input.triggerId, projectId: input.projectId }),
+    )
 
-  .procedure("listSlackChannels")
-  .withPermission("triggers:update")
-  .handle(({ app, input }) => app.listSlackChannels(input))
+    .procedure("listSlackChannels")
+    .withPermission("triggers:update")
+    .handle(({ app, input }) => app.listSlackChannels(input))
 
-  .procedure("updateTriggerFilters")
-  .withPermission("triggers:update")
-  .handle(({ app, input }) => app.replaceAutomationFilters(input))
+    .procedure("updateTriggerFilters")
+    .withPermission("triggers:update")
+    .handle(({ app, input }) => app.replaceAutomationFilters(input))
 
-  .procedure("testFireTemplate")
-  .withFacts(automationCallerEmailFact)
-  .withPermission("triggers:update")
-  .handle(({ app, input, actor }, email) => app.sendTestFire(input, { id: actor.id, email }))
+    .procedure("testFireTemplate")
+    .withFacts(automationCallerEmailFact)
+    .withPermission("triggers:update")
+    .handle(({ app, input, actor }, email) => app.sendTestFire(input, { id: actor.id, email }))
 
-  .procedure("upsert")
-  .withPermission("triggers:update")
-  .handle(({ app, input, actor }) => app.saveAutomation(input, { id: actor.id }))
-  .build();
+    .procedure("upsert")
+    .withPermission("triggers:update")
+    .handle(({ app, input, actor }) => app.saveAutomation(input, { id: actor.id }))
+    .build();

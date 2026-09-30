@@ -3,7 +3,12 @@
  * session's own user; the organization's are an administrator's, under `organization:manage`.
  * Spec: specs/identity/mfa-and-session-shape.feature.
  */
-import { browserSessionFact, defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import {
+  browserSessionFact,
+  defineTrpcFact,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import {
   requestHeaderRecordSchema,
   TwoStepVerificationApi,
@@ -19,10 +24,10 @@ export const twoStepRequestHeadersFact = defineTrpcFact(
   requestHeaderRecordSchema.nullable().transform((record) => record ?? {}),
 );
 
-export const twoStepVerificationTrpcTransport = defineTrpcRouter(
+export const twoStepVerificationTrpcTransport: TrpcRouterDeclaration<
   TwoStepVerificationApi,
-  twoStepVerificationTrpc,
-)
+  typeof twoStepVerificationTrpc
+> = defineTrpcRouter(TwoStepVerificationApi, twoStepVerificationTrpc)
   .procedure("account")
   .noPermission({ reason: OWN_TWO_STEP })
   .handle(({ app, actor }) => app.getTwoStepAccountStanding({ userId: actor.id }))

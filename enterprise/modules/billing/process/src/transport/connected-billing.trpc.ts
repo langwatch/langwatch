@@ -4,7 +4,7 @@
  * license registry, on the ADMIN_EMAILS staff list checked by the application,
  * never an RBAC permission, and refused with the shared not-found.
  */
-import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   BillingApi,
   connectedBillingTrpc,
@@ -32,7 +32,10 @@ function staffOf(operator: OpsOperator): BillingStaff {
     : { id: operator.id, email: operator.email };
 }
 
-export const connectedBillingTrpcTransport = defineTrpcRouter(BillingApi, connectedBillingTrpc)
+export const connectedBillingTrpcTransport: TrpcRouterDeclaration<
+  BillingApi,
+  typeof connectedBillingTrpc
+> = defineTrpcRouter(BillingApi, connectedBillingTrpc)
   .procedure("get")
   .withFacts(operatorFact)
   .noPermission(STAFF_LIST)

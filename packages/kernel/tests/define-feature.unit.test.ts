@@ -84,11 +84,11 @@ describe("defineServerModule", () => {
     expect(own).toHaveBeenCalledOnce();
   });
 
-  it("keeps transport descriptors inert and preserves their tuple", () => {
+  it("keeps transport descriptors inert and in order", () => {
     expect(directoryWithTransports.transports).toEqual(directoryApis);
     expect(directoryWithTransports.transports[0]).toBe(directoryApis[0]);
     expect(directoryWithTransports.transports[1]).toBe(directoryApis[1]);
     expect(directoryWithTransports.namespace).toBe("annotations");
-    expect(directoryWithTransports.transports[0].protocol).toBe("rest");
+    expect(directoryWithTransports.transports[0]?.protocol).toBe("rest");
   });
 });

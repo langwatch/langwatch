@@ -1,4 +1,4 @@
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { homeTrpc, type RecentItem } from "@langwatch/audit-log-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
@@ -13,10 +13,11 @@ export interface AuditLogHomeApi {
 
 export const AuditLogHomeApi = moduleApi<AuditLogHomeApi>()("audit-log");
 
-export const homeTrpcTransport = defineTrpcRouter(AuditLogHomeApi, homeTrpc)
-  .procedure("getRecentItems")
-  .withPermission("project:view")
-  .handle(({ app, input, actor }) =>
-    app.getRecentItems({ userId: actor.id, projectId: input.projectId, limit: input.limit }),
-  )
-  .build();
+export const homeTrpcTransport: TrpcRouterDeclaration<AuditLogHomeApi, typeof homeTrpc> =
+  defineTrpcRouter(AuditLogHomeApi, homeTrpc)
+    .procedure("getRecentItems")
+    .withPermission("project:view")
+    .handle(({ app, input, actor }) =>
+      app.getRecentItems({ userId: actor.id, projectId: input.projectId, limit: input.limit }),
+    )
+    .build();

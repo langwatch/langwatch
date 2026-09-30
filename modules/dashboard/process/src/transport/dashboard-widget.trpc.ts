@@ -3,7 +3,7 @@
  * procedure. The playground's rollout gate is the widget operations' own.
  */
 import { DASHBOARD_SRCDOC_CHART_KIND, type DashboardWidget } from "@langwatch/analytics-contract";
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   DashboardApi,
   dashboardWidgetTrpc,
@@ -27,7 +27,10 @@ const wireRow = (widget: DashboardWidget): z.infer<typeof dashboardWidgetTrpcRow
   return { ...row, graph: definition, filters: null, kind: DASHBOARD_SRCDOC_CHART_KIND };
 };
 
-export const dashboardWidgetTrpcTransport = defineTrpcRouter(DashboardApi, dashboardWidgetTrpc)
+export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
+  DashboardApi,
+  typeof dashboardWidgetTrpc
+> = defineTrpcRouter(DashboardApi, dashboardWidgetTrpc)
   .procedure("list")
   .withPermission("analytics:view")
   .handle(async ({ app, input }) =>

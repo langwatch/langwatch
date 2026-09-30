@@ -3,11 +3,14 @@
  * `/api/webhooks/v1`. The runtime checks the permission, then each handler asks
  * the Enterprise plan gate: the order this surface has always had.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { fromDate, toDate } from "@langwatch/time";
 import { WEBHOOK_EVENT_TYPES, WebhookApi, webhookEndpointTrpc } from "@langwatch/webhook-contract";
 
-export const webhookEndpointTrpcTransport = defineTrpcRouter(WebhookApi, webhookEndpointTrpc)
+export const webhookEndpointTrpcTransport: TrpcRouterDeclaration<
+  WebhookApi,
+  typeof webhookEndpointTrpc
+> = defineTrpcRouter(WebhookApi, webhookEndpointTrpc)
   .procedure("eventTypes")
   .withPermission("webhookEndpoints:view")
   .handle(async ({ app, input }) => {

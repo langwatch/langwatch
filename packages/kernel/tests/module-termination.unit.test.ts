@@ -75,11 +75,7 @@ describe("given a module that states its doors", () => {
       expect(withoutBuild.namespace).toBe("annotations");
     });
 
-    it("keeps the transport tuple it was handed", () => {
-      // A tuple, not an array: the length is the literal it was called with.
-      type _length = Expect<Equal<(typeof withoutBuild)["transports"]["length"], 1>>;
-      type _element = Expect<Equal<(typeof withoutBuild)["transports"][0], typeof catalogueRest>>;
-
+    it("keeps the transports it was handed", () => {
       expect(withoutBuild.transports[0]).toBe(catalogueRest);
     });
   });

@@ -3,10 +3,13 @@
  * procedure the contract already named. Names, kinds and schemas are not
  * repeated here.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { StoredObjectApi, storedObjectTrpc } from "@langwatch/stored-object-contract";
 
-export const storedObjectTrpcTransport = defineTrpcRouter(StoredObjectApi, storedObjectTrpc)
+export const storedObjectTrpcTransport: TrpcRouterDeclaration<
+  StoredObjectApi,
+  typeof storedObjectTrpc
+> = defineTrpcRouter(StoredObjectApi, storedObjectTrpc)
   /** Main's two-step read check: any file-view permission here, the purpose's in the service. */
   .procedure("headById")
   .withPermission({

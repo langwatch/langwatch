@@ -4,10 +4,13 @@
  * `governance:manage`, as on main. A department is accounting, never an access gate.
  * @see specs/ai-gateway/governance/departments.feature
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { GovernanceRestApi, departmentsTrpc } from "@langwatch/enterprise-governance-contract";
 
-export const departmentsTrpcTransport = defineTrpcRouter(GovernanceRestApi, departmentsTrpc)
+export const departmentsTrpcTransport: TrpcRouterDeclaration<
+  GovernanceRestApi,
+  typeof departmentsTrpc
+> = defineTrpcRouter(GovernanceRestApi, departmentsTrpc)
   .procedure("list")
   .withPermission("governance:view")
   .handle(({ app, input }) => app.departmentList({ organizationId: input.organizationId }))

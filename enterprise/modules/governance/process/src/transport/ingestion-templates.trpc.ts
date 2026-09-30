@@ -3,16 +3,16 @@
  * The server half of `ingestionTemplates.*`: members read under `aiTools:view`,
  * admins author under `aiTools:manage`, and every write is attributed to the caller, as on main.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   GovernanceRestApi,
   ingestionTemplatesTrpc,
 } from "@langwatch/enterprise-governance-contract";
 
-export const ingestionTemplatesTrpcTransport = defineTrpcRouter(
+export const ingestionTemplatesTrpcTransport: TrpcRouterDeclaration<
   GovernanceRestApi,
-  ingestionTemplatesTrpc,
-)
+  typeof ingestionTemplatesTrpc
+> = defineTrpcRouter(GovernanceRestApi, ingestionTemplatesTrpc)
   .procedure("list")
   .withPermission("aiTools:view")
   .handle(({ app, input }) => app.templateListForUser({ organizationId: input.organizationId }))

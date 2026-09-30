@@ -4,22 +4,23 @@
  * @see modules/analytics/specs/analytics-timeseries.feature
  */
 import { AnalyticsApi, analyticsTrpc } from "@langwatch/analytics-contract";
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 
-export const analyticsTrpcTransport = defineTrpcRouter(AnalyticsApi, analyticsTrpc)
-  .procedure("getTimeseries")
-  .withPermission("analytics:view")
-  .handle(({ app, input }) => app.getTimeseries(input))
+export const analyticsTrpcTransport: TrpcRouterDeclaration<AnalyticsApi, typeof analyticsTrpc> =
+  defineTrpcRouter(AnalyticsApi, analyticsTrpc)
+    .procedure("getTimeseries")
+    .withPermission("analytics:view")
+    .handle(({ app, input }) => app.getTimeseries(input))
 
-  .procedure("dataForFilter")
-  .withPermission("analytics:view")
-  .handle(async ({ app, input }) => ({ options: await app.filterOptions(input) }))
+    .procedure("dataForFilter")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input }) => ({ options: await app.filterOptions(input) }))
 
-  .procedure("topUsedDocuments")
-  .withPermission("cost:view")
-  .handle(({ app, input }) => app.getTopUsedDocuments(input))
+    .procedure("topUsedDocuments")
+    .withPermission("cost:view")
+    .handle(({ app, input }) => app.getTopUsedDocuments(input))
 
-  .procedure("feedbacks")
-  .withPermission("cost:view")
-  .handle(({ app, input }) => app.getFeedbacks(input))
-  .build();
+    .procedure("feedbacks")
+    .withPermission("cost:view")
+    .handle(({ app, input }) => app.getFeedbacks(input))
+    .build();

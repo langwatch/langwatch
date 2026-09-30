@@ -4,15 +4,15 @@
  * 10), gated inside the application the same not-found way as every other
  * Backoffice resource.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EnterpriseOpsApi, selfHostedInstancesTrpc } from "@langwatch/enterprise-ops-contract";
 
 import { operatorFact, STAFF_LIST } from "./enterprise-ops-operator.trpc.ts";
 
-export const selfHostedInstancesTrpcTransport = defineTrpcRouter(
+export const selfHostedInstancesTrpcTransport: TrpcRouterDeclaration<
   EnterpriseOpsApi,
-  selfHostedInstancesTrpc,
-)
+  typeof selfHostedInstancesTrpc
+> = defineTrpcRouter(EnterpriseOpsApi, selfHostedInstancesTrpc)
   .procedure("getAll")
   .withFacts(operatorFact)
   .noPermission(STAFF_LIST)

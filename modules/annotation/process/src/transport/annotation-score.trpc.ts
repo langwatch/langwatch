@@ -4,7 +4,7 @@
  */
 
 import { AnnotationApi, annotationScoreTrpc } from "@langwatch/annotation-contract";
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { generate } from "@langwatch/ksuid";
 
 /**
@@ -18,7 +18,10 @@ function radioOptions(values: readonly string[]): { label: string; value: string
   return values.map((value) => ({ label: value, value }));
 }
 
-export const annotationScoreTrpcTransport = defineTrpcRouter(AnnotationApi, annotationScoreTrpc)
+export const annotationScoreTrpcTransport: TrpcRouterDeclaration<
+  AnnotationApi,
+  typeof annotationScoreTrpc
+> = defineTrpcRouter(AnnotationApi, annotationScoreTrpc)
   .procedure("upsert")
   .withPermission("annotations:manage")
   .handle(async ({ app, input }) =>

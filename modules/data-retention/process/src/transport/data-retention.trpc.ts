@@ -4,7 +4,7 @@
  * their input carries — `enforces` records what gates it instead.
  */
 
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DataRetentionApi, dataRetentionTrpc } from "@langwatch/data-retention-contract";
 
 const SCOPE_TARGETED_REASON =
@@ -29,7 +29,10 @@ function scopeTargeted(enforcesProjectId: string): {
   };
 }
 
-export const dataRetentionTrpcTransport = defineTrpcRouter(DataRetentionApi, dataRetentionTrpc)
+export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
+  DataRetentionApi,
+  typeof dataRetentionTrpc
+> = defineTrpcRouter(DataRetentionApi, dataRetentionTrpc)
   .procedure("getRules")
   .withPermission("project:view")
   .handle(async ({ app, input, actor }) =>

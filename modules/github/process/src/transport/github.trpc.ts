@@ -3,7 +3,7 @@
  * repositories it reaches, the live pull-request read and the disconnect.
  * @see specs/integrations/github-connection.feature
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   githubTrpc,
   GithubOrganizationMembershipRequiredError,
@@ -52,68 +52,69 @@ async function organizationMember({
   if (!isMember) throw new GithubOrganizationMembershipRequiredError();
 }
 
-export const githubTrpcTransport = defineTrpcRouter(GithubConnectionApi, githubTrpc)
-  .procedure("getConnectionStatus")
-  .withPermission("organization:view")
-  .handle(async ({ app, input, actor }) => {
-    await organizationMember({
-      app,
-      userId: actor.id,
-      organizationId: input.organizationId,
-    });
+export const githubTrpcTransport: TrpcRouterDeclaration<GithubConnectionApi, typeof githubTrpc> =
+  defineTrpcRouter(GithubConnectionApi, githubTrpc)
+    .procedure("getConnectionStatus")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) => {
+      await organizationMember({
+        app,
+        userId: actor.id,
+        organizationId: input.organizationId,
+      });
 
-    return app.github().getConnectionStatus({ organizationId: input.organizationId });
-  })
+      return app.github().getConnectionStatus({ organizationId: input.organizationId });
+    })
 
-  // `organization:manage`, because an installation grants repository access to
-  // the whole organization and this is the list of what it reaches.
-  .procedure("listRepos")
-  .withPermission("organization:manage")
-  .handle(async ({ app, input, actor }) => {
-    await organizationMember({
-      app,
-      userId: actor.id,
-      organizationId: input.organizationId,
-    });
+    // `organization:manage`, because an installation grants repository access to
+    // the whole organization and this is the list of what it reaches.
+    .procedure("listRepos")
+    .withPermission("organization:manage")
+    .handle(async ({ app, input, actor }) => {
+      await organizationMember({
+        app,
+        userId: actor.id,
+        organizationId: input.organizationId,
+      });
 
-    const repositories = await app.github().listRepositoriesForOrganization(input.organizationId);
+      const repositories = await app.github().listRepositoriesForOrganization(input.organizationId);
 
-    return [...repositories];
-  })
+      return [...repositories];
+    })
 
-  // `traces:view`, because what this reveals is what a coding-agent session did
-  // rather than anything about the connection. The organization is derived from
-  // the project, never taken from the client.
-  .procedure("pullRequestLiveStatus")
-  .withPermission("traces:view")
-  .handle(({ app, input }) => app.getProjectPullRequestLiveStatuses(input))
+    // `traces:view`, because what this reveals is what a coding-agent session did
+    // rather than anything about the connection. The organization is derived from
+    // the project, never taken from the client.
+    .procedure("pullRequestLiveStatus")
+    .withPermission("traces:view")
+    .handle(({ app, input }) => app.getProjectPullRequestLiveStatuses(input))
 
-  .procedure("disconnect")
-  .withPermission("organization:manage")
-  .handle(async ({ app, input, actor }) => {
-    await organizationMember({
-      app,
-      userId: actor.id,
-      organizationId: input.organizationId,
-    });
+    .procedure("disconnect")
+    .withPermission("organization:manage")
+    .handle(async ({ app, input, actor }) => {
+      await organizationMember({
+        app,
+        userId: actor.id,
+        organizationId: input.organizationId,
+      });
 
-    // Throws `GithubNotConnectedError` when the organization has no such
-    // installation, which is also how one owned by another organization
-    // answers — the id cannot be probed. No audit line is left for a refusal.
-    const result = await app.github().disconnect({
-      organizationId: input.organizationId,
-      installationId: input.installationId,
-    });
+      // Throws `GithubNotConnectedError` when the organization has no such
+      // installation, which is also how one owned by another organization
+      // answers — the id cannot be probed. No audit line is left for a refusal.
+      const result = await app.github().disconnect({
+        organizationId: input.organizationId,
+        installationId: input.installationId,
+      });
 
-    await app.recordAudit({
-      userId: actor.id,
-      organizationId: input.organizationId,
-      action: "github.connection.disconnect",
-      args: { installationId: input.installationId },
-    });
+      await app.recordAudit({
+        userId: actor.id,
+        organizationId: input.organizationId,
+        action: "github.connection.disconnect",
+        args: { installationId: input.installationId },
+      });
 
-    // We cannot uninstall through the API — hand back the deep link; the
-    // webhook removes the local row once GitHub confirms the uninstall.
-    return result;
-  })
-  .build();
+      // We cannot uninstall through the API — hand back the deep link; the
+      // webhook removes the local row once GitHub confirms the uninstall.
+      return result;
+    })
+    .build();

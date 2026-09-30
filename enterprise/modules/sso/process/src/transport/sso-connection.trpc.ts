@@ -10,7 +10,11 @@
  *
  * Spec: specs/identity/sso-onboarding-tiers.feature.
  */
-import { defineTrpcRouter, type TrpcHandlerActor } from "@langwatch/api/trpc";
+import {
+  defineTrpcRouter,
+  type TrpcHandlerActor,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { SsoApi, ssoConnectionTrpc, type SsoOperator } from "@langwatch/enterprise-sso-contract";
 
 /**
@@ -42,68 +46,71 @@ function operatorOf(actor: TrpcHandlerActor): SsoOperator {
   return { id: actor.id };
 }
 
-export const ssoConnectionTrpcTransport = defineTrpcRouter(SsoApi, ssoConnectionTrpc)
-  .procedure("getAll")
-  .noPermission({ reason: STAFF_LIST_REASON })
-  .handle(({ app, input, actor }) => app.listConnections(input, operatorOf(actor)))
+export const ssoConnectionTrpcTransport: TrpcRouterDeclaration<SsoApi, typeof ssoConnectionTrpc> =
+  defineTrpcRouter(SsoApi, ssoConnectionTrpc)
+    .procedure("getAll")
+    .noPermission({ reason: STAFF_LIST_REASON })
+    .handle(({ app, input, actor }) => app.listConnections(input, operatorOf(actor)))
 
-  .procedure("getById")
-  .noPermission({ reason: STAFF_LIST_REASON })
-  .handle(
-    async ({ app, input, actor }) => (await app.findConnection(input, operatorOf(actor))) ?? null,
-  )
+    .procedure("getById")
+    .noPermission({ reason: STAFF_LIST_REASON })
+    .handle(
+      async ({ app, input, actor }) => (await app.findConnection(input, operatorOf(actor))) ?? null,
+    )
 
-  .procedure("getHistory")
-  .noPermission({ reason: STAFF_LIST_REASON })
-  .handle(
-    async ({ app, input, actor }) =>
-      (await app.findConnectionHistoryForOperator(input, operatorOf(actor))) ?? null,
-  )
+    .procedure("getHistory")
+    .noPermission({ reason: STAFF_LIST_REASON })
+    .handle(
+      async ({ app, input, actor }) =>
+        (await app.findConnectionHistoryForOperator(input, operatorOf(actor))) ?? null,
+    )
 
-  .procedure("getMigrationProgress")
-  .noPermission({ reason: STAFF_LIST_REASON })
-  .handle(
-    async ({ app, input, actor }) =>
-      (await app.getMigrationProgressForOperator(input, operatorOf(actor))).migration,
-  )
+    .procedure("getMigrationProgress")
+    .noPermission({ reason: STAFF_LIST_REASON })
+    .handle(
+      async ({ app, input, actor }) =>
+        (await app.getMigrationProgressForOperator(input, operatorOf(actor))).migration,
+    )
 
-  .procedure("startLegacyMigration")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.startLegacyMigrationForOperator(input, operatorOf(actor)))
+    .procedure("startLegacyMigration")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) =>
+      app.startLegacyMigrationForOperator(input, operatorOf(actor)),
+    )
 
-  .procedure("register")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.registerConnection(input, operatorOf(actor)))
+    .procedure("register")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.registerConnection(input, operatorOf(actor)))
 
-  .procedure("claimDomain")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.claimDomain(input, operatorOf(actor)))
+    .procedure("claimDomain")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.claimDomain(input, operatorOf(actor)))
 
-  .procedure("approveDomainClaim")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.approveDomainClaim(input, operatorOf(actor)))
+    .procedure("approveDomainClaim")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.approveDomainClaim(input, operatorOf(actor)))
 
-  .procedure("rejectDomainClaim")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.rejectDomainClaim(input, operatorOf(actor)))
+    .procedure("rejectDomainClaim")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.rejectDomainClaim(input, operatorOf(actor)))
 
-  .procedure("attestDomain")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.attestDomain(input, operatorOf(actor)))
+    .procedure("attestDomain")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.attestDomain(input, operatorOf(actor)))
 
-  .procedure("activate")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.activateConnection(input, operatorOf(actor)))
+    .procedure("activate")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.activateConnection(input, operatorOf(actor)))
 
-  .procedure("suspend")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.suspendConnection(input, operatorOf(actor)))
+    .procedure("suspend")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.suspendConnection(input, operatorOf(actor)))
 
-  .procedure("resume")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.resumeConnection(input, operatorOf(actor)))
+    .procedure("resume")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.resumeConnection(input, operatorOf(actor)))
 
-  .procedure("requestTeardown")
-  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
-  .handle(({ app, input, actor }) => app.requestTeardown(input, operatorOf(actor)))
-  .build();
+    .procedure("requestTeardown")
+    .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+    .handle(({ app, input, actor }) => app.requestTeardown(input, operatorOf(actor)))
+    .build();

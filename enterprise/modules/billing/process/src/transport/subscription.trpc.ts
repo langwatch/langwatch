@@ -3,7 +3,7 @@
  * anything that changes what the organization pays takes `organization:manage`.
  * Nothing catches: every refusal below is a handled error the shared path maps.
  */
-import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   subscriptionTrpc,
   billingCallerEmailSchema,
@@ -85,7 +85,10 @@ export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>()("billi
  */
 export const billingCallerEmailFact = defineTrpcFact("callerEmail", billingCallerEmailSchema);
 
-export const subscriptionTrpcTransport = defineTrpcRouter(BillingSubscriptionApi, subscriptionTrpc)
+export const subscriptionTrpcTransport: TrpcRouterDeclaration<
+  BillingSubscriptionApi,
+  typeof subscriptionTrpc
+> = defineTrpcRouter(BillingSubscriptionApi, subscriptionTrpc)
   .procedure("addTeamMemberOrEvents")
   .withPermission("organization:manage")
   // Raises the seat and volume lines on a live subscription, priced at the

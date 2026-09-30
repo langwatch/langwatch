@@ -4,13 +4,17 @@
  * `organization:view`, and their own web sessions, unpermissioned; always
  * answered for the caller alone, as on main.
  */
-import { browserSessionFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import {
+  browserSessionFact,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { GovernanceRestApi, personalSessionsTrpc } from "@langwatch/enterprise-governance-contract";
 
-export const personalSessionsTrpcTransport = defineTrpcRouter(
+export const personalSessionsTrpcTransport: TrpcRouterDeclaration<
   GovernanceRestApi,
-  personalSessionsTrpc,
-)
+  typeof personalSessionsTrpc
+> = defineTrpcRouter(GovernanceRestApi, personalSessionsTrpc)
   .procedure("list")
   .withPermission("organization:view")
   .handle(({ app, actor }) => app.cliSessionListForUser({ userId: actor.id }))

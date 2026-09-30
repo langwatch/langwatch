@@ -3,7 +3,7 @@
  * calls (ADR-056). Project-scoped and gated by `traces:view`, like traces;
  * viewer-scoped redaction is the application's, whichever door asks.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { CodingAgentApi, codingAgentTrpc } from "@langwatch/coding-agent-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -23,7 +23,10 @@ function windowOf(input: { fromMs?: number | undefined; toMs?: number | undefine
   return { fromMs: input.fromMs ?? toMs - DEFAULT_WINDOW_MS, toMs };
 }
 
-export const codingAgentTrpcTransport = defineTrpcRouter(CodingAgentApi, codingAgentTrpc)
+export const codingAgentTrpcTransport: TrpcRouterDeclaration<
+  CodingAgentApi,
+  typeof codingAgentTrpc
+> = defineTrpcRouter(CodingAgentApi, codingAgentTrpc)
   .procedure("usageTotals")
   .withPermission(CODING_AGENT_PERMISSION)
   .handle(({ app, input }) =>

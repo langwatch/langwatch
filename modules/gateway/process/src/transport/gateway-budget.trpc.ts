@@ -3,7 +3,7 @@
  * target id) onto scopeType plus the typed column is the application's job,
  * not this transport's, which parses input and delegates.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   GatewayApi,
   gatewayBudgetTrpc,
@@ -72,7 +72,10 @@ function toDto(b: GatewayBudgetWithSeats): {
   };
 }
 
-export const gatewayBudgetTrpcTransport = defineTrpcRouter(GatewayApi, gatewayBudgetTrpc)
+export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
+  GatewayApi,
+  typeof gatewayBudgetTrpc
+> = defineTrpcRouter(GatewayApi, gatewayBudgetTrpc)
   .procedure("list")
   .withPermission("gatewayBudgets:view")
   .handle(async ({ app, input }) => {

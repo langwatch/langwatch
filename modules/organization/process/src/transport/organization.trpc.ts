@@ -1,6 +1,11 @@
 /** Server-side organization procedures: permissions and handlers forward to application. */
 
-import { defineTrpcFact, defineTrpcRouter, type TrpcHandlerActor } from "@langwatch/api/trpc";
+import {
+  defineTrpcFact,
+  defineTrpcRouter,
+  type TrpcHandlerActor,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
   OrganizationApi,
@@ -63,7 +68,10 @@ export function callerOf(actor: TrpcHandlerActor, person: SessionPerson): Organi
   return { id: actor.id, name: person?.name ?? null, email: person?.email ?? null };
 }
 
-export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organizationTrpc)
+export const organizationTrpcTransport: TrpcRouterDeclaration<
+  OrganizationApi,
+  typeof organizationTrpc
+> = defineTrpcRouter(OrganizationApi, organizationTrpc)
   .procedure("createAndAssign")
   .withFacts(organizationSessionPersonFact)
   .noPermission(BEFORE_MEMBERSHIP)

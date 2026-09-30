@@ -11,10 +11,13 @@
  * that lapsed, and gating it would withhold "why did my push stop" on the
  * grounds that the push stopped. The overview asks the plan, in the app.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { ScimApi, scimReconciliationTrpc } from "@langwatch/enterprise-scim-contract";
 
-export const scimReconciliationTrpcTransport = defineTrpcRouter(ScimApi, scimReconciliationTrpc)
+export const scimReconciliationTrpcTransport: TrpcRouterDeclaration<
+  ScimApi,
+  typeof scimReconciliationTrpc
+> = defineTrpcRouter(ScimApi, scimReconciliationTrpc)
   .procedure("getAll")
   .withPermission("sso:view")
   .handle(({ app, input }) => app.getDirectoryReconciliation(input))

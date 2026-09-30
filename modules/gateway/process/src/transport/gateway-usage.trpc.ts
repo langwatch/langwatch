@@ -3,7 +3,7 @@
  * permission: the keys a caller may total over are data the resolver loads, so
  * the membership filter inside it is the check, declared as such.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { GatewayApi, gatewayUsageTrpc } from "@langwatch/gateway-contract";
 import { type Instant, Temporal, toEpochMs } from "@langwatch/time";
 
@@ -18,49 +18,50 @@ function usageWindow(input: { fromDate: string; toDate: string }): {
   };
 }
 
-export const gatewayUsageTrpcTransport = defineTrpcRouter(GatewayApi, gatewayUsageTrpc)
-  // Membership-based like virtualKeys.list: the summary totals the keys the
-  // caller can see, so its numbers reconcile with the table a click arrives
-  // from. A non-member sees no keys and gets an empty summary.
-  .procedure("summary")
-  .serviceAuthorized({
-    reason:
-      "usage is summed only over the keys the caller's membership in this organization makes visible; the membership filter in the resolver is the check",
-    permissions: ["gatewayUsage:view"],
-  })
-  .handle(async ({ app, input, actor }) => {
-    const keys = await app.listVisibleVirtualKeys({
-      organizationId: input.organizationId,
-      userId: actor.id,
-    });
+export const gatewayUsageTrpcTransport: TrpcRouterDeclaration<GatewayApi, typeof gatewayUsageTrpc> =
+  defineTrpcRouter(GatewayApi, gatewayUsageTrpc)
+    // Membership-based like virtualKeys.list: the summary totals the keys the
+    // caller can see, so its numbers reconcile with the table a click arrives
+    // from. A non-member sees no keys and gets an empty summary.
+    .procedure("summary")
+    .serviceAuthorized({
+      reason:
+        "usage is summed only over the keys the caller's membership in this organization makes visible; the membership filter in the resolver is the check",
+      permissions: ["gatewayUsage:view"],
+    })
+    .handle(async ({ app, input, actor }) => {
+      const keys = await app.listVisibleVirtualKeys({
+        organizationId: input.organizationId,
+        userId: actor.id,
+      });
 
-    return app.usageSummary({
-      organizationId: input.organizationId,
-      virtualKeyIds: keys.map((k) => k.id),
-      window: usageWindow(input),
-    });
-  })
+      return app.usageSummary({
+        organizationId: input.organizationId,
+        virtualKeyIds: keys.map((k) => k.id),
+        window: usageWindow(input),
+      });
+    })
 
-  .procedure("summaryForVirtualKey")
-  .serviceAuthorized({
-    reason:
-      "the key is loaded within this organization and must be visible to the caller's membership set; a miss is answered as not found",
-    permissions: ["gatewayUsage:view"],
-  })
-  .handle(async ({ app, input, actor }) => {
-    // Same visibility rule as virtualKeys.get: a key the caller cannot see is
-    // indistinguishable from one that does not exist.
-    await app.getVisibleVirtualKeyForUser({
-      organizationId: input.organizationId,
-      id: input.virtualKeyId,
-      userId: actor.id,
-    });
+    .procedure("summaryForVirtualKey")
+    .serviceAuthorized({
+      reason:
+        "the key is loaded within this organization and must be visible to the caller's membership set; a miss is answered as not found",
+      permissions: ["gatewayUsage:view"],
+    })
+    .handle(async ({ app, input, actor }) => {
+      // Same visibility rule as virtualKeys.get: a key the caller cannot see is
+      // indistinguishable from one that does not exist.
+      await app.getVisibleVirtualKeyForUser({
+        organizationId: input.organizationId,
+        id: input.virtualKeyId,
+        userId: actor.id,
+      });
 
-    return app.usageSummaryForVirtualKey({
-      organizationId: input.organizationId,
-      virtualKeyId: input.virtualKeyId,
-      window: usageWindow(input),
-      model: input.model,
-    });
-  })
-  .build();
+      return app.usageSummaryForVirtualKey({
+        organizationId: input.organizationId,
+        virtualKeyId: input.virtualKeyId,
+        window: usageWindow(input),
+        model: input.model,
+      });
+    })
+    .build();

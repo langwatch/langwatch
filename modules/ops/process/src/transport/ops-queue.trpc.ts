@@ -3,262 +3,263 @@
  * throughout: see `ops-operator.trpc.ts` for why the gate is the
  * application's rather than the door's.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsQueueTrpc } from "@langwatch/ops-contract";
 
 import { OPS_MANAGE, OPS_VIEW, opsOperatorFact } from "#transport/ops-operator.trpc";
 
-export const opsQueueTrpcTransport = defineTrpcRouter(OpsApi, opsQueueTrpc)
-  .procedure("listGroups")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueueTrpc> =
+  defineTrpcRouter(OpsApi, opsQueueTrpc)
+    .procedure("listGroups")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listQueueGroups(input);
-  })
+      return app.listQueueGroups(input);
+    })
 
-  .procedure("getGroupDetail")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("getGroupDetail")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.getQueueGroup(input);
-  })
+      return app.getQueueGroup(input);
+    })
 
-  .procedure("getGrafanaLinkConfig")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("getGrafanaLinkConfig")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.findGrafanaLinkConfig();
-  })
+      return app.findGrafanaLinkConfig();
+    })
 
-  .procedure("getBlockedSummary")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("getBlockedSummary")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.getBlockedQueueSummary();
-  })
+      return app.getBlockedQueueSummary();
+    })
 
-  .procedure("getGroupJobs")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("getGroupJobs")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listQueueGroupJobs(input);
-  })
+      return app.listQueueGroupJobs(input);
+    })
 
-  .procedure("unblockGroup")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("unblockGroup")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.unblockQueueGroup({ ...input, requestedBy: actor.id });
-  })
+      return app.unblockQueueGroup({ ...input, requestedBy: actor.id });
+    })
 
-  .procedure("unblockAll")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("unblockAll")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.unblockAllQueueGroups({ ...input, requestedBy: actor.id });
-  })
+      return app.unblockAllQueueGroups({ ...input, requestedBy: actor.id });
+    })
 
-  .procedure("drainGroup")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("drainGroup")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.drainQueueGroup({ ...input, requestedBy: actor.id });
-  })
+      return app.drainQueueGroup({ ...input, requestedBy: actor.id });
+    })
 
-  .procedure("pausePipeline")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("pausePipeline")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.pauseQueuePipeline(input);
-  })
+      return app.pauseQueuePipeline(input);
+    })
 
-  .procedure("unpausePipeline")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("unpausePipeline")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.unpauseQueuePipeline(input);
-  })
+      return app.unpauseQueuePipeline(input);
+    })
 
-  .procedure("pauseTenant")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("pauseTenant")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.pauseQueueTenant(input);
-  })
+      return app.pauseQueueTenant(input);
+    })
 
-  .procedure("unpauseTenant")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("unpauseTenant")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.unpauseQueueTenant(input);
-  })
+      return app.unpauseQueueTenant(input);
+    })
 
-  .procedure("listPausedTenants")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listPausedTenants")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listPausedQueueTenants(input);
-  })
+      return app.listPausedQueueTenants(input);
+    })
 
-  .procedure("drainTenant")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("drainTenant")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.drainQueueTenant({ ...input, requestedBy: actor.id });
-  })
+      return app.drainQueueTenant({ ...input, requestedBy: actor.id });
+    })
 
-  .procedure("retryBlocked")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("retryBlocked")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.retryBlockedQueueJob(input);
-  })
+      return app.retryBlockedQueueJob(input);
+    })
 
-  .procedure("listProjections")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listProjections")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listPipelineRegistrations();
-  })
+      return app.listPipelineRegistrations();
+    })
 
-  .procedure("listDlqGroups")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listDlqGroups")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listQueueDlqGroups(input);
-  })
+      return app.listQueueDlqGroups(input);
+    })
 
-  .procedure("listAllDlqGroups")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listAllDlqGroups")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listAllQueueDlqGroups();
-  })
+      return app.listAllQueueDlqGroups();
+    })
 
-  .procedure("listPausedKeys")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listPausedKeys")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listPausedQueueKeys(input);
-  })
+      return app.listPausedQueueKeys(input);
+    })
 
-  .procedure("drainAllBlockedPreview")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("drainAllBlockedPreview")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.getQueueDrainPreview(input);
-  })
+      return app.getQueueDrainPreview(input);
+    })
 
-  .procedure("moveToDlq")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("moveToDlq")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.moveQueueGroupToDlq({ ...input, requestedBy: actor.id });
-  })
+      return app.moveQueueGroupToDlq({ ...input, requestedBy: actor.id });
+    })
 
-  .procedure("moveAllBlockedToDlq")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("moveAllBlockedToDlq")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.moveAllBlockedQueueGroupsToDlq({ ...input, requestedBy: actor.id });
-  })
+      return app.moveAllBlockedQueueGroupsToDlq({ ...input, requestedBy: actor.id });
+    })
 
-  .procedure("replayFromDlq")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("replayFromDlq")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.replayQueueGroupFromDlq(input);
-  })
+      return app.replayQueueGroupFromDlq(input);
+    })
 
-  .procedure("replayAllFromDlq")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("replayAllFromDlq")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.replayAllQueueGroupsFromDlq(input);
-  })
+      return app.replayAllQueueGroupsFromDlq(input);
+    })
 
-  .procedure("redriveManyFromDlq")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("redriveManyFromDlq")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.redriveQueueDlqGroups({ ...input, requestedBy: actor.id });
-  })
+      return app.redriveQueueDlqGroups({ ...input, requestedBy: actor.id });
+    })
 
-  .procedure("discardManyFromDlq")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("discardManyFromDlq")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.discardQueueDlqGroups({ ...input, requestedBy: actor.id });
-  })
+      return app.discardQueueDlqGroups({ ...input, requestedBy: actor.id });
+    })
 
-  .procedure("canaryRedrive")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("canaryRedrive")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.canaryRedriveQueueDlq(input);
-  })
+      return app.canaryRedriveQueueDlq(input);
+    })
 
-  .procedure("canaryUnblock")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("canaryUnblock")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.canaryUnblockQueueGroups(input);
-  })
+      return app.canaryUnblockQueueGroups(input);
+    })
 
-  .build();
+    .build();

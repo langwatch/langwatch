@@ -3,10 +3,13 @@
  * The server half of `anomalyRules.*`: `anomalyRules:view` reads, `anomalyRules:manage`
  * writes. Main's Enterprise gate is the application's per-organization refusal.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { GovernanceRestApi, anomalyRulesTrpc } from "@langwatch/enterprise-governance-contract";
 
-export const anomalyRulesTrpcTransport = defineTrpcRouter(GovernanceRestApi, anomalyRulesTrpc)
+export const anomalyRulesTrpcTransport: TrpcRouterDeclaration<
+  GovernanceRestApi,
+  typeof anomalyRulesTrpc
+> = defineTrpcRouter(GovernanceRestApi, anomalyRulesTrpc)
   .procedure("list")
   .withPermission("anomalyRules:view")
   .handle(({ app, input, actor }) =>

@@ -3,7 +3,7 @@
  * so tenancy is the whole game: both writes are authorized against the scope
  * the application resolves, never the caller-supplied `projectId`.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   ModelProviderApi,
   llmModelCostTrpc,
@@ -19,7 +19,10 @@ const WRITTEN_SCOPE_DECIDES =
 const STORED_SCOPE_DECIDES =
   "not trusted — the scope is derived from the stored row and assertCanManageScope runs against that scope, never the caller-supplied projectId";
 
-export const llmModelCostTrpcTransport = defineTrpcRouter(ModelProviderApi, llmModelCostTrpc)
+export const llmModelCostTrpcTransport: TrpcRouterDeclaration<
+  ModelProviderApi,
+  typeof llmModelCostTrpc
+> = defineTrpcRouter(ModelProviderApi, llmModelCostTrpc)
   .procedure("getAllForProject")
   .withPermission("project:view")
   .handle(({ app, input }) => app.listCostsWithCatalogue(input))

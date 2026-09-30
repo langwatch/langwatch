@@ -2,7 +2,7 @@
  * The server half of `identityLookup.*` (D05): gated on the ADMIN_EMAILS staff
  * list by the application, never an RBAC permission, and refused as a 404.
  */
-import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   type IdentityLookupOperator,
   IdentityLookupApi,
@@ -31,7 +31,10 @@ function operatorOf(fact: OpsOperator | null, actor: { id: string }): IdentityLo
   return { userId: fact?.impersonator?.id ?? actor.id };
 }
 
-export const identityLookupTrpcTransport = defineTrpcRouter(IdentityLookupApi, identityLookupTrpc)
+export const identityLookupTrpcTransport: TrpcRouterDeclaration<
+  IdentityLookupApi,
+  typeof identityLookupTrpc
+> = defineTrpcRouter(IdentityLookupApi, identityLookupTrpc)
   .procedure("resolve")
   .withFacts(operatorFact)
   .noPermission(NO_PERMISSION)

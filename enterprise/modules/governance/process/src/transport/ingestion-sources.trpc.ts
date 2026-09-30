@@ -3,13 +3,13 @@
  * The server half of `ingestionSources.*`: reads under `ingestionSources:view`, writes under
  * `ingestionSources:manage`, and a create is attributed to the caller, as on main.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { GovernanceRestApi, ingestionSourcesTrpc } from "@langwatch/enterprise-governance-contract";
 
-export const ingestionSourcesTrpcTransport = defineTrpcRouter(
+export const ingestionSourcesTrpcTransport: TrpcRouterDeclaration<
   GovernanceRestApi,
-  ingestionSourcesTrpc,
-)
+  typeof ingestionSourcesTrpc
+> = defineTrpcRouter(GovernanceRestApi, ingestionSourcesTrpc)
   .procedure("list")
   .withPermission("ingestionSources:view")
   .handle(({ app, input }) => app.ingestionSourceList(input))

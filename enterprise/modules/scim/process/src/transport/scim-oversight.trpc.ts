@@ -5,7 +5,11 @@
  * RBAC permission — `ops:*` must not widen who may re-drive a customer's
  * deprovision. specs/identity/scim-reconciliation-surfaces.feature
  */
-import { defineTrpcRouter, type TrpcHandlerActor } from "@langwatch/api/trpc";
+import {
+  defineTrpcRouter,
+  type TrpcHandlerActor,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { ScimApi, scimOversightTrpc, type ScimOperator } from "@langwatch/enterprise-scim-contract";
 
 const STAFF_LIST_REASON =
@@ -20,23 +24,24 @@ function operatorOf(actor: TrpcHandlerActor): ScimOperator {
   return { id: actor.id };
 }
 
-export const scimOversightTrpcTransport = defineTrpcRouter(ScimApi, scimOversightTrpc)
-  .procedure("getAll")
-  .noPermission({ reason: STAFF_LIST_REASON })
-  .handle(({ app, input, actor }) => app.listOversightSyncs(input, operatorOf(actor)))
+export const scimOversightTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimOversightTrpc> =
+  defineTrpcRouter(ScimApi, scimOversightTrpc)
+    .procedure("getAll")
+    .noPermission({ reason: STAFF_LIST_REASON })
+    .handle(({ app, input, actor }) => app.listOversightSyncs(input, operatorOf(actor)))
 
-  .procedure("getById")
-  .noPermission({ reason: STAFF_LIST_REASON })
-  .handle(
-    async ({ app, input, actor }) =>
-      (await app.findOversightSync(input, operatorOf(actor)))[0] ?? null,
-  )
+    .procedure("getById")
+    .noPermission({ reason: STAFF_LIST_REASON })
+    .handle(
+      async ({ app, input, actor }) =>
+        (await app.findOversightSync(input, operatorOf(actor)))[0] ?? null,
+    )
 
-  .procedure("directoryIdentities")
-  .noPermission({ reason: STAFF_LIST_REASON })
-  .handle(({ app, input, actor }) => app.findDirectoryIdentities(input, operatorOf(actor)))
+    .procedure("directoryIdentities")
+    .noPermission({ reason: STAFF_LIST_REASON })
+    .handle(({ app, input, actor }) => app.findDirectoryIdentities(input, operatorOf(actor)))
 
-  .procedure("redriveRetiredApply")
-  .noPermission({ reason: STAFF_LIST_REASON })
-  .handle(({ app, input, actor }) => app.redriveRetiredApply(input, operatorOf(actor)))
-  .build();
+    .procedure("redriveRetiredApply")
+    .noPermission({ reason: STAFF_LIST_REASON })
+    .handle(({ app, input, actor }) => app.redriveRetiredApply(input, operatorOf(actor)))
+    .build();

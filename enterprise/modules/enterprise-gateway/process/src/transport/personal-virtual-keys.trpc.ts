@@ -3,7 +3,7 @@
  * The server half of `personalVirtualKeys.*`. `list` refuses non-members itself and
  * widens past the caller only under `virtualKeys:viewOtherPersonal`, as on main.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   EnterpriseGatewayApi,
   personalVirtualKeysTrpc,
@@ -16,10 +16,10 @@ const MEMBERSHIP_CHECKED_BY_THE_APPLICATION = {
   },
 } as const;
 
-export const personalVirtualKeysTrpcTransport = defineTrpcRouter(
+export const personalVirtualKeysTrpcTransport: TrpcRouterDeclaration<
   EnterpriseGatewayApi,
-  personalVirtualKeysTrpc,
-)
+  typeof personalVirtualKeysTrpc
+> = defineTrpcRouter(EnterpriseGatewayApi, personalVirtualKeysTrpc)
   .procedure("list")
   .noPermission(MEMBERSHIP_CHECKED_BY_THE_APPLICATION)
   .handle(({ app, input, actor }) =>

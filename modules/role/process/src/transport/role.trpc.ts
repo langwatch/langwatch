@@ -3,13 +3,16 @@
  * organization the check runs against, so they declare themselves
  * service-authorized and the application runs that check where the row is.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { RoleApi, roleTrpc } from "@langwatch/role-contract";
 
 const ROLE_ORGANIZATION_IS_DATA =
   "the role's organization is loaded by its id, so the check runs there rather than on input";
 
-export const roleTrpcTransport = defineTrpcRouter(RoleApi, roleTrpc)
+export const roleTrpcTransport: TrpcRouterDeclaration<RoleApi, typeof roleTrpc> = defineTrpcRouter(
+  RoleApi,
+  roleTrpc,
+)
   /**
    * Role definitions are an admin-surface read: every screen that lists them
    * already requires manage, so a member session cannot reach them directly.

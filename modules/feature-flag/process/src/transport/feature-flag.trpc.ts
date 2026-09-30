@@ -4,7 +4,7 @@
  * exact tenant target, not the scope id a declaration would read off input.
  */
 
-import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { FeatureFlagApi, featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import { z } from "zod";
 
@@ -22,7 +22,10 @@ const EXPERIMENT_PERMISSIONS = [
  * (matched to `organization.trpc.ts`'s fact by name, not import). */
 const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
 
-export const featureFlagTrpcTransport = defineTrpcRouter(FeatureFlagApi, featureFlagTrpc)
+export const featureFlagTrpcTransport: TrpcRouterDeclaration<
+  FeatureFlagApi,
+  typeof featureFlagTrpc
+> = defineTrpcRouter(FeatureFlagApi, featureFlagTrpc)
   .procedure("isEnabled")
   .withFacts(callerEmailFact)
   .serviceAuthorized({

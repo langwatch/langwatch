@@ -4,7 +4,11 @@
  * and the permission-gated operator pair, whose list read is audited.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { callerAddressFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import {
+  callerAddressFact,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { AutomationApi, emailSuppressionTrpc } from "@langwatch/automation-contract";
 
 /** Why the unsubscribe pair opens without a credential. */
@@ -12,7 +16,10 @@ const TOKEN_IS_THE_AUTHORIZATION =
   "the unsubscribe link arrives in a mail client where no session exists; the single-purpose " +
   "token in it, whose HMAC binds it to one recipient, is the whole authorization";
 
-export const emailSuppressionTrpcTransport = defineTrpcRouter(AutomationApi, emailSuppressionTrpc)
+export const emailSuppressionTrpcTransport: TrpcRouterDeclaration<
+  AutomationApi,
+  typeof emailSuppressionTrpc
+> = defineTrpcRouter(AutomationApi, emailSuppressionTrpc)
   /**
    * Public token resolution for the `/unsubscribe` page. Answers the masked
    * address plus the project and automation names, and refuses an invalid,

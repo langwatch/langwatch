@@ -3,10 +3,13 @@
  * The server half of `activityMonitor.*`: every read under `activityMonitor:view`, as on
  * main. Main's Enterprise gate is the application's per-organization refusal.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { GovernanceRestApi, activityMonitorTrpc } from "@langwatch/enterprise-governance-contract";
 
-export const activityMonitorTrpcTransport = defineTrpcRouter(GovernanceRestApi, activityMonitorTrpc)
+export const activityMonitorTrpcTransport: TrpcRouterDeclaration<
+  GovernanceRestApi,
+  typeof activityMonitorTrpc
+> = defineTrpcRouter(GovernanceRestApi, activityMonitorTrpc)
   .procedure("summary")
   .withPermission("activityMonitor:view")
   .handle(({ app, input, actor }) => app.activitySummary(input, actor))

@@ -4,7 +4,7 @@
  * bundle is a navigation predicate: switching it off hides nav, deletes nothing.
  */
 
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OrganizationApi, personalWorkspaceFeaturesTrpc } from "@langwatch/organization-contract";
 
 const OWNED_BY_ITS_OWNER = {
@@ -15,10 +15,10 @@ const OWNED_BY_ITS_OWNER = {
   },
 } as const;
 
-export const personalWorkspaceFeaturesTrpcTransport = defineTrpcRouter(
+export const personalWorkspaceFeaturesTrpcTransport: TrpcRouterDeclaration<
   OrganizationApi,
-  personalWorkspaceFeaturesTrpc,
-)
+  typeof personalWorkspaceFeaturesTrpc
+> = defineTrpcRouter(OrganizationApi, personalWorkspaceFeaturesTrpc)
   .procedure("get")
   .noPermission(OWNED_BY_ITS_OWNER)
   .handle(({ app, input, actor }) =>

@@ -3,10 +3,13 @@
  * The server half of `ingestionKey.*`: the caller's own personal ingestion
  * keys, gated on `organization:view` (membership), as on main.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { GovernanceRestApi, ingestionKeyTrpc } from "@langwatch/enterprise-governance-contract";
 
-export const ingestionKeyTrpcTransport = defineTrpcRouter(GovernanceRestApi, ingestionKeyTrpc)
+export const ingestionKeyTrpcTransport: TrpcRouterDeclaration<
+  GovernanceRestApi,
+  typeof ingestionKeyTrpc
+> = defineTrpcRouter(GovernanceRestApi, ingestionKeyTrpc)
   .procedure("list")
   .withPermission("organization:view")
   .handle(({ app, input, actor }) =>

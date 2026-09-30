@@ -7,7 +7,11 @@
  *
  * Spec: specs/identity/sso-connection-history.feature.
  */
-import { defineTrpcRouter, type TrpcHandlerActor } from "@langwatch/api/trpc";
+import {
+  defineTrpcRouter,
+  type TrpcHandlerActor,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { SsoApi, ssoSetupTrpc, type SsoAdministrator } from "@langwatch/enterprise-sso-contract";
 
 /**
@@ -22,123 +26,124 @@ function administratorOf(actor: TrpcHandlerActor): SsoAdministrator {
   return { id: actor.id };
 }
 
-export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
-  .procedure("getSetup")
-  .withPermission("sso:view")
-  .handle(({ app, input }) => app.getSetup(input))
+export const ssoSetupTrpcTransport: TrpcRouterDeclaration<SsoApi, typeof ssoSetupTrpc> =
+  defineTrpcRouter(SsoApi, ssoSetupTrpc)
+    .procedure("getSetup")
+    .withPermission("sso:view")
+    .handle(({ app, input }) => app.getSetup(input))
 
-  /** The wire answers the cutover itself, as the surface it replaces did;
-   *  identity and this module carry it inside an answer of its own. */
-  .procedure("getMigrationProgress")
-  .withPermission("sso:view")
-  .handle(async ({ app, input }) => (await app.getMigrationProgress(input)).migration)
+    /** The wire answers the cutover itself, as the surface it replaces did;
+     *  identity and this module carry it inside an answer of its own. */
+    .procedure("getMigrationProgress")
+    .withPermission("sso:view")
+    .handle(async ({ app, input }) => (await app.getMigrationProgress(input)).migration)
 
-  .procedure("getHistory")
-  .withPermission("sso:manage")
-  .handle(({ app, input }) => app.findConnectionHistory(input))
+    .procedure("getHistory")
+    .withPermission("sso:manage")
+    .handle(({ app, input }) => app.findConnectionHistory(input))
 
-  .procedure("onHistoryActivity")
-  .withPermission("sso:manage")
-  .handle(({ app, input, signal }) =>
-    app.watchConnectionHistory({
-      organizationId: input.organizationId,
-      connectionId: input.connectionId,
-      signal,
-    }),
-  )
+    .procedure("onHistoryActivity")
+    .withPermission("sso:manage")
+    .handle(({ app, input, signal }) =>
+      app.watchConnectionHistory({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        signal,
+      }),
+    )
 
-  .procedure("claimDomain")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupClaimDomain(input, administratorOf(actor)))
+    .procedure("claimDomain")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupClaimDomain(input, administratorOf(actor)))
 
-  .procedure("proveDomain")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupProveDomain(input, administratorOf(actor)))
+    .procedure("proveDomain")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupProveDomain(input, administratorOf(actor)))
 
-  .procedure("removeDomain")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupRemoveDomain(input, administratorOf(actor)))
+    .procedure("removeDomain")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupRemoveDomain(input, administratorOf(actor)))
 
-  .procedure("checkDomainRecord")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupCheckDomainRecord(input, administratorOf(actor)))
+    .procedure("checkDomainRecord")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupCheckDomainRecord(input, administratorOf(actor)))
 
-  .procedure("checkDomainFile")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupCheckDomainFile(input, administratorOf(actor)))
+    .procedure("checkDomainFile")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupCheckDomainFile(input, administratorOf(actor)))
 
-  /** The Enterprise plan gate is NOT declared here and is not gone: it runs
-   *  second, inside the application, so a caller who does not hold
-   *  `sso:manage` is told that rather than told what was not bought. */
-  .procedure("register")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupRegister(input, administratorOf(actor)))
+    /** The Enterprise plan gate is NOT declared here and is not gone: it runs
+     *  second, inside the application, so a caller who does not hold
+     *  `sso:manage` is told that rather than told what was not bought. */
+    .procedure("register")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupRegister(input, administratorOf(actor)))
 
-  .procedure("startLegacyMigration")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupStartLegacyMigration(input, administratorOf(actor)))
+    .procedure("startLegacyMigration")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupStartLegacyMigration(input, administratorOf(actor)))
 
-  /** The plan gate runs inside the application and only for `direct`: rolling
-   *  back to the grandfathered provider stays reachable however a plan
-   *  stands. */
-  .procedure("selectMigrationRoute")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupSelectMigrationRoute(input, administratorOf(actor)))
+    /** The plan gate runs inside the application and only for `direct`: rolling
+     *  back to the grandfathered provider stays reachable however a plan
+     *  stands. */
+    .procedure("selectMigrationRoute")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupSelectMigrationRoute(input, administratorOf(actor)))
 
-  /** Gated inside the application, like the registration that opened the
-   *  cutover — the permission refusal comes first either way. */
-  .procedure("finalizeLegacyMigration")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) =>
-    app.setupFinalizeLegacyMigration(input, administratorOf(actor)),
-  )
+    /** Gated inside the application, like the registration that opened the
+     *  cutover — the permission refusal comes first either way. */
+    .procedure("finalizeLegacyMigration")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) =>
+      app.setupFinalizeLegacyMigration(input, administratorOf(actor)),
+    )
 
-  .procedure("rename")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupRename(input, administratorOf(actor)))
+    .procedure("rename")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupRename(input, administratorOf(actor)))
 
-  .procedure("setArrivals")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupSetArrivals(input, administratorOf(actor)))
+    .procedure("setArrivals")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupSetArrivals(input, administratorOf(actor)))
 
-  /** The plan gate runs inside the application, like registration's. */
-  .procedure("activate")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupActivate(input, administratorOf(actor)))
+    /** The plan gate runs inside the application, like registration's. */
+    .procedure("activate")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupActivate(input, administratorOf(actor)))
 
-  /**
-   * `sso:view`, deliberately below the rest: who can still get in without the
-   * identity provider is what a security reviewer reads this page for. Not
-   * plan-gated anywhere in this block — a lapsed plan must never close the
-   * way back in.
-   */
-  .procedure("breakGlassBindings")
-  .withPermission("sso:view")
-  .handle(({ app, input }) => app.findBreakGlassGrants(input))
+    /**
+     * `sso:view`, deliberately below the rest: who can still get in without the
+     * identity provider is what a security reviewer reads this page for. Not
+     * plan-gated anywhere in this block — a lapsed plan must never close the
+     * way back in.
+     */
+    .procedure("breakGlassBindings")
+    .withPermission("sso:view")
+    .handle(({ app, input }) => app.findBreakGlassGrants(input))
 
-  /** `sso:manage`: the administrators with their addresses, which only
-   *  somebody who can actually grant one needs. */
-  .procedure("breakGlassCandidates")
-  .withPermission("sso:manage")
-  .handle(({ app, input }) => app.findBreakGlassCandidates(input))
+    /** `sso:manage`: the administrators with their addresses, which only
+     *  somebody who can actually grant one needs. */
+    .procedure("breakGlassCandidates")
+    .withPermission("sso:manage")
+    .handle(({ app, input }) => app.findBreakGlassCandidates(input))
 
-  .procedure("grantBreakGlass")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupGrantBreakGlass(input, administratorOf(actor)))
+    .procedure("grantBreakGlass")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupGrantBreakGlass(input, administratorOf(actor)))
 
-  .procedure("renewBreakGlass")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupRenewBreakGlass(input, administratorOf(actor)))
+    .procedure("renewBreakGlass")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupRenewBreakGlass(input, administratorOf(actor)))
 
-  .procedure("revokeBreakGlass")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupRevokeBreakGlass(input, administratorOf(actor)))
+    .procedure("revokeBreakGlass")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupRevokeBreakGlass(input, administratorOf(actor)))
 
-  .procedure("discardConnection")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupDiscardConnection(input, administratorOf(actor)))
+    .procedure("discardConnection")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupDiscardConnection(input, administratorOf(actor)))
 
-  .procedure("removeConnection")
-  .withPermission("sso:manage")
-  .handle(({ app, input, actor }) => app.setupRemoveConnection(input, administratorOf(actor)))
-  .build();
+    .procedure("removeConnection")
+    .withPermission("sso:manage")
+    .handle(({ app, input, actor }) => app.setupRemoveConnection(input, administratorOf(actor)))
+    .build();

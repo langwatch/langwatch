@@ -3,10 +3,13 @@
  * member sees their own allowance. The notification takes `organization:manage`,
  * since it mails administrators with caller-supplied counts.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EntitlementApi, usageLimitsTrpc } from "@langwatch/entitlement-contract";
 
-export const usageLimitsTrpcTransport = defineTrpcRouter(EntitlementApi, usageLimitsTrpc)
+export const usageLimitsTrpcTransport: TrpcRouterDeclaration<
+  EntitlementApi,
+  typeof usageLimitsTrpc
+> = defineTrpcRouter(EntitlementApi, usageLimitsTrpc)
   .procedure("getUsage")
   .withPermission("organization:view")
   .handle(async ({ app, input, actor }) =>

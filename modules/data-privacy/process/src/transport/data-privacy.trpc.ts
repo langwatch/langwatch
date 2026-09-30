@@ -4,7 +4,7 @@
  * to the acting project's organization — no member can push a rule up.
  */
 
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DataPrivacyApi, dataPrivacyTrpc } from "@langwatch/data-privacy-contract";
 
 const SCOPE_TARGETED_PERMISSIONS = [
@@ -30,7 +30,10 @@ function scopeTargeted(act: string): {
   };
 }
 
-export const dataPrivacyTrpcTransport = defineTrpcRouter(DataPrivacyApi, dataPrivacyTrpc)
+export const dataPrivacyTrpcTransport: TrpcRouterDeclaration<
+  DataPrivacyApi,
+  typeof dataPrivacyTrpc
+> = defineTrpcRouter(DataPrivacyApi, dataPrivacyTrpc)
   /**
    * `project:view`: reading the screen is a project read. The snapshot filters
    * the rules and the writable scopes it returns by what the caller may

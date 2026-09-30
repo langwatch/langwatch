@@ -14,7 +14,7 @@ import {
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
 } from "@langwatch/analytics-contract";
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 /**
@@ -52,7 +52,10 @@ async function assertWorkbenchEnabled(app: AnalyticsLwqlApi, projectId: string):
   throw new LangWatchQLNotEnabledError();
 }
 
-export const analyticsLwqlTrpcTransport = defineTrpcRouter(AnalyticsLwqlApi, analyticsLwqlTrpc)
+export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
+  AnalyticsLwqlApi,
+  typeof analyticsLwqlTrpc
+> = defineTrpcRouter(AnalyticsLwqlApi, analyticsLwqlTrpc)
   .procedure("availability")
   .withPermission("analytics:view")
   .handle(({ app, input }) => app.workbenchAvailability({ projectId: input.projectId }))

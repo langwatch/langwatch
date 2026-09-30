@@ -1278,7 +1278,10 @@ class RepositoryAppBuilder<
   ): ModuleContributions<
     ReturnType<
       RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
-    > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> },
+    > & {
+      readonly transports: readonly FeatureTransportDescriptor[];
+      readonly namespace: PublicNamespace<Name>;
+    },
     ModuleRepositories<Live, Memory>,
     App,
     Dependencies,
@@ -1288,7 +1291,10 @@ class RepositoryAppBuilder<
     return withContributions<
       ReturnType<
         RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
-      > & { readonly transports: Transports; readonly namespace: PublicNamespace<Name> },
+      > & {
+        readonly transports: readonly FeatureTransportDescriptor[];
+        readonly namespace: PublicNamespace<Name>;
+      },
       ModuleRepositories<Live, Memory>,
       App,
       Dependencies,
@@ -1503,7 +1509,7 @@ class ConfiguredAppBuilder<
     ...transports: Transports
   ): ModuleContributions<
     ReturnType<ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>["build"]> & {
-      readonly transports: Transports;
+      readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
     },
     unknown,
@@ -1513,7 +1519,7 @@ class ConfiguredAppBuilder<
   > {
     return withContributions<
       ReturnType<ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>["build"]> & {
-        readonly transports: Transports;
+        readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
       },
       unknown,
@@ -1609,7 +1615,7 @@ class UnconfiguredAppBuilder<
     ...transports: Transports
   ): ModuleContributions<
     ReturnType<UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>["build"]> & {
-      readonly transports: Transports;
+      readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
     },
     unknown,
@@ -1619,7 +1625,7 @@ class UnconfiguredAppBuilder<
   > {
     return withContributions<
       ReturnType<UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>["build"]> & {
-        readonly transports: Transports;
+        readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
       },
       unknown,

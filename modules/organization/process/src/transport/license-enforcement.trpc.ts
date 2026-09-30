@@ -3,15 +3,15 @@
  * `organization:view`, which every member holds: a member who cannot invite
  * anybody should still be told the seats are full, not shown a control that fails.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { licenseEnforcementTrpc, OrganizationApi } from "@langwatch/organization-contract";
 
 import { callerOf, organizationSessionPersonFact } from "./organization.trpc.ts";
 
-export const licenseEnforcementTrpcTransport = defineTrpcRouter(
+export const licenseEnforcementTrpcTransport: TrpcRouterDeclaration<
   OrganizationApi,
-  licenseEnforcementTrpc,
-)
+  typeof licenseEnforcementTrpc
+> = defineTrpcRouter(OrganizationApi, licenseEnforcementTrpc)
   .procedure("checkLimit")
   .withFacts(organizationSessionPersonFact)
   .withPermission("organization:view")

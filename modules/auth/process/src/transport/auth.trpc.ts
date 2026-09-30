@@ -4,7 +4,12 @@
  * safe in front of whoever arrived, not whoever it was meant for.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { callerAddressFact, defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
+import {
+  callerAddressFact,
+  defineTrpcFact,
+  defineTrpcRouter,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
 import { AuthApi, authTrpc, FrontDoorRateLimitedError } from "@langwatch/auth-contract";
 import { z } from "zod";
 
@@ -78,7 +83,10 @@ const OWN_ADDRESS_STATE =
 const OWN_ADDRESS =
   "sends the session user's own address confirmation; no tenant scope is involved";
 
-export const authTrpcTransport = defineTrpcRouter(AuthApi, authTrpc)
+export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> = defineTrpcRouter(
+  AuthApi,
+  authTrpc,
+)
   /** The methods a proven address may enrol. The proof is the authorization and is not spent. */
   .procedure("signUpEnrollment")
   .withAccess(PROOF_HOLDER_ENROLLMENT)

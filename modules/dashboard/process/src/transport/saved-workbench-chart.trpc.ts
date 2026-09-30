@@ -3,13 +3,13 @@
  * handler per procedure the contract already named. Thin by design — the app
  * resolves who's asking, applies the rollout gate, admits against protections.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, savedWorkbenchChartTrpc } from "@langwatch/dashboard-contract";
 
-export const savedWorkbenchChartTrpcTransport = defineTrpcRouter(
+export const savedWorkbenchChartTrpcTransport: TrpcRouterDeclaration<
   DashboardApi,
-  savedWorkbenchChartTrpc,
-)
+  typeof savedWorkbenchChartTrpc
+> = defineTrpcRouter(DashboardApi, savedWorkbenchChartTrpc)
   .procedure("getAll")
   .withPermission("analytics:view")
   .handle(async ({ app, input }) => app.listSavedWorkbenchCharts({ projectId: input.projectId }))

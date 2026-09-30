@@ -3,7 +3,7 @@
  * Every other deployment capability is named on {@link ProjectBrowserApi};
  * nothing here constructs a transport error. Spec: modules/project/specs/project-service.feature.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import {
@@ -99,144 +99,145 @@ export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>()("project");
 const CREATE_RESOLVES_ITS_OWN_TIER =
   "creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed";
 
-export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectTrpc)
-  /**
-   * The owner is ADMIN of their own personal team, so `project:create` passes
-   * there. A personal workspace holds only the project provisioned with it,
-   * which is what `PersonalWorkspaceBoundaryError` refuses.
-   */
-  .procedure("create")
-  .serviceAuthorized({
-    reason: CREATE_RESOLVES_ITS_OWN_TIER,
-    permissions: ["project:create", "organization:manage"],
-    enforces: {
-      teamId: "requireCreateStanding asks the named team for project:create",
-      organizationId:
-        "requireCreateStanding asks the organization for organization:manage when a team is created alongside",
-    },
-  })
-  .handle(async ({ app, input, actor }) => {
-    await createStanding({ app, input, actor });
+export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, typeof projectTrpc> =
+  defineTrpcRouter(ProjectBrowserApi, projectTrpc)
+    /**
+     * The owner is ADMIN of their own personal team, so `project:create` passes
+     * there. A personal workspace holds only the project provisioned with it,
+     * which is what `PersonalWorkspaceBoundaryError` refuses.
+     */
+    .procedure("create")
+    .serviceAuthorized({
+      reason: CREATE_RESOLVES_ITS_OWN_TIER,
+      permissions: ["project:create", "organization:manage"],
+      enforces: {
+        teamId: "requireCreateStanding asks the named team for project:create",
+        organizationId:
+          "requireCreateStanding asks the organization for organization:manage when a team is created alongside",
+      },
+    })
+    .handle(async ({ app, input, actor }) => {
+      await createStanding({ app, input, actor });
 
-    const project = await app.projects().create(
-      {
+      const project = await app.projects().create(
+        {
+          organizationId: input.organizationId,
+          teamId: input.teamId,
+          newTeamName: input.newTeamName,
+          name: input.name,
+          language: input.language,
+          framework: input.framework,
+        },
+        actor,
+      );
+
+      await app.provisionLangyVirtualKey({
+        projectId: project.id,
         organizationId: input.organizationId,
-        teamId: input.teamId,
-        newTeamName: input.newTeamName,
+        actorUserId: actor.id,
+      });
+
+      return { success: true as const, projectSlug: project.slug };
+    })
+
+    /**
+     * The base key authenticates every ingestion call, so revealing it is
+     * gated like rotating it. `project:update` (a contributor permission) used
+     * to hand out a credential that outlives membership and can't be attributed back.
+     */
+    .procedure("getProjectAPIKey")
+    .withPermission("project:manage")
+    .handle(({ app, input }) => app.getProject({ projectId: input.projectId }))
+
+    .procedure("getHasFirstMessage")
+    .withPermission("project:view")
+    .handle(async ({ app, input }) => {
+      const project = await app.projects().findById(input.projectId);
+
+      return { firstMessage: project?.firstMessage ?? false };
+    })
+
+    .procedure("regenerateApiKey")
+    .withPermission("project:manage")
+    .handle(async ({ app, input, actor }) => {
+      const apiKey = await app.projects().regenerateLegacyProjectKey({
+        projectId: input.projectId,
+      });
+
+      // Audit the security-critical action; non-fatal, so an audit failure
+      // cannot prevent returning the new key to the caller.
+      await app.recordApiKeyRegenerated({ userId: actor.id, projectId: input.projectId });
+
+      return { apiKey };
+    })
+
+    /**
+     * `project:update` for the form, plus `project:manage` for the one field
+     * that changes who OUTSIDE the project can read its traces.
+     */
+    .procedure("update")
+    .withPermission("project:update")
+    .handle(async ({ app, input, actor }) => {
+      await traceSharingStanding({ app, input, actor });
+
+      const updatedProject = await app.projects().updateSettings({
+        projectId: input.projectId,
         name: input.name,
         language: input.language,
         framework: input.framework,
-      },
-      actor,
-    );
+        teamId: input.teamId,
+        traceSharingEnabled: input.traceSharingEnabled,
+        presenceEnabled: input.presenceEnabled,
+        userLinkTemplate: input.userLinkTemplate,
+        s3Endpoint: input.s3Endpoint ? app.encryptProjectSecret(input.s3Endpoint) : null,
+        s3AccessKeyId: input.s3AccessKeyId ? app.encryptProjectSecret(input.s3AccessKeyId) : null,
+        s3SecretAccessKey: input.s3SecretAccessKey
+          ? app.encryptProjectSecret(input.s3SecretAccessKey)
+          : null,
+        s3Bucket: input.s3Bucket,
+      });
 
-    await app.provisionLangyVirtualKey({
-      projectId: project.id,
-      organizationId: input.organizationId,
-      actorUserId: actor.id,
-    });
+      return { success: true, projectSlug: updatedProject.slug };
+    })
 
-    return { success: true as const, projectSlug: project.slug };
-  })
+    .procedure("getFieldRedactionStatus")
+    .withPermission("project:view")
+    .handle(async ({ app, input, actor }) => {
+      const protections = await app.getFieldProtections({ projectId: input.projectId, by: actor });
 
-  /**
-   * The base key authenticates every ingestion call, so revealing it is
-   * gated like rotating it. `project:update` (a contributor permission) used
-   * to hand out a credential that outlives membership and can't be attributed back.
-   */
-  .procedure("getProjectAPIKey")
-  .withPermission("project:manage")
-  .handle(({ app, input }) => app.getProject({ projectId: input.projectId }))
+      return {
+        isRedacted: {
+          input: !protections.canSeeCapturedInput,
+          output: !protections.canSeeCapturedOutput,
+        },
+        // Human label of who CAN see a restricted field (e.g. "Admins,
+        // Security" or "no one"), so the redaction placeholder can explain why
+        // content is hidden and who to ask. Null when the field is visible.
+        visibleTo: {
+          input: protections.capturedInputVisibleTo ?? null,
+          output: protections.capturedOutputVisibleTo ?? null,
+        },
+      };
+    })
 
-  .procedure("getHasFirstMessage")
-  .withPermission("project:view")
-  .handle(async ({ app, input }) => {
-    const project = await app.projects().findById(input.projectId);
+    .procedure("archiveById")
+    .withPermission("project:delete")
+    .handle(async ({ app, input, actor }) => {
+      const { alreadyArchived } = await app.archiveOtherProject({
+        projectId: input.projectId,
+        projectToArchiveId: input.projectToArchiveId,
+        by: actor,
+      });
 
-    return { firstMessage: project?.firstMessage ?? false };
-  })
+      return { success: true as const, alreadyArchived };
+    })
 
-  .procedure("regenerateApiKey")
-  .withPermission("project:manage")
-  .handle(async ({ app, input, actor }) => {
-    const apiKey = await app.projects().regenerateLegacyProjectKey({
-      projectId: input.projectId,
-    });
-
-    // Audit the security-critical action; non-fatal, so an audit failure
-    // cannot prevent returning the new key to the caller.
-    await app.recordApiKeyRegenerated({ userId: actor.id, projectId: input.projectId });
-
-    return { apiKey };
-  })
-
-  /**
-   * `project:update` for the form, plus `project:manage` for the one field
-   * that changes who OUTSIDE the project can read its traces.
-   */
-  .procedure("update")
-  .withPermission("project:update")
-  .handle(async ({ app, input, actor }) => {
-    await traceSharingStanding({ app, input, actor });
-
-    const updatedProject = await app.projects().updateSettings({
-      projectId: input.projectId,
-      name: input.name,
-      language: input.language,
-      framework: input.framework,
-      teamId: input.teamId,
-      traceSharingEnabled: input.traceSharingEnabled,
-      presenceEnabled: input.presenceEnabled,
-      userLinkTemplate: input.userLinkTemplate,
-      s3Endpoint: input.s3Endpoint ? app.encryptProjectSecret(input.s3Endpoint) : null,
-      s3AccessKeyId: input.s3AccessKeyId ? app.encryptProjectSecret(input.s3AccessKeyId) : null,
-      s3SecretAccessKey: input.s3SecretAccessKey
-        ? app.encryptProjectSecret(input.s3SecretAccessKey)
-        : null,
-      s3Bucket: input.s3Bucket,
-    });
-
-    return { success: true, projectSlug: updatedProject.slug };
-  })
-
-  .procedure("getFieldRedactionStatus")
-  .withPermission("project:view")
-  .handle(async ({ app, input, actor }) => {
-    const protections = await app.getFieldProtections({ projectId: input.projectId, by: actor });
-
-    return {
-      isRedacted: {
-        input: !protections.canSeeCapturedInput,
-        output: !protections.canSeeCapturedOutput,
-      },
-      // Human label of who CAN see a restricted field (e.g. "Admins,
-      // Security" or "no one"), so the redaction placeholder can explain why
-      // content is hidden and who to ask. Null when the field is visible.
-      visibleTo: {
-        input: protections.capturedInputVisibleTo ?? null,
-        output: protections.capturedOutputVisibleTo ?? null,
-      },
-    };
-  })
-
-  .procedure("archiveById")
-  .withPermission("project:delete")
-  .handle(async ({ app, input, actor }) => {
-    const { alreadyArchived } = await app.archiveOtherProject({
-      projectId: input.projectId,
-      projectToArchiveId: input.projectToArchiveId,
-      by: actor,
-    });
-
-    return { success: true as const, alreadyArchived };
-  })
-
-  .procedure("triggerTopicClustering")
-  .withPermission("project:update")
-  .handle(({ app, input, actor }) =>
-    app.triggerTopicClustering({ projectId: input.projectId, by: actor }),
-  )
-  .build();
+    .procedure("triggerTopicClustering")
+    .withPermission("project:update")
+    .handle(({ app, input, actor }) =>
+      app.triggerTopicClustering({ projectId: input.projectId, by: actor }),
+    )
+    .build();
 
 /**
  * The tier a create is judged at, resolved from what it asked for. A request

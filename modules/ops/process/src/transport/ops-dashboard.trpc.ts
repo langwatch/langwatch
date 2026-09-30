@@ -3,132 +3,133 @@
  * Platform-tier: the deployment's own operator allow-list decides, not an
  * RBAC permission. `getScope` answers rather than refuses, so the menu can poll it.
  */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsDashboardTrpc } from "@langwatch/ops-contract";
 
 import { OPS_MANAGE, OPS_PROBE, OPS_VIEW, opsOperatorFact } from "#transport/ops-operator.trpc";
 
-export const opsDashboardTrpcTransport = defineTrpcRouter(OpsApi, opsDashboardTrpc)
-  .procedure("getScope")
-  .withFacts(opsOperatorFact)
-  .noPermission(OPS_PROBE)
-  .handle(({ app }, operator) => ({ scope: app.operatorScope(operator) }))
+export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsDashboardTrpc> =
+  defineTrpcRouter(OpsApi, opsDashboardTrpc)
+    .procedure("getScope")
+    .withFacts(opsOperatorFact)
+    .noPermission(OPS_PROBE)
+    .handle(({ app }, operator) => ({ scope: app.operatorScope(operator) }))
 
-  .procedure("getDashboardSnapshot")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("getDashboardSnapshot")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.findDashboardData();
-  })
+      return app.findDashboardData();
+    })
 
-  .procedure("getSignUpHealth")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("getSignUpHealth")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.getSignUpHealth(input);
-  })
+      return app.getSignUpHealth(input);
+    })
 
-  .procedure("getBadgeCounts")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("getBadgeCounts")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.badgeCounts();
-  })
+      return app.badgeCounts();
+    })
 
-  .procedure("dashboardStream")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, signal }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("dashboardStream")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, signal }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.streamDashboard({ signal });
-  })
+      return app.streamDashboard({ signal });
+    })
 
-  .procedure("listParkedGroups")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listParkedGroups")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listParkedQueueGroups(input);
-  })
+      return app.listParkedQueueGroups(input);
+    })
 
-  .procedure("listQueues")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listQueues")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listQueues();
-  })
+      return app.listQueues();
+    })
 
-  .procedure("listScheduledJobs")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listScheduledJobs")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listScheduledJobs({ limit: input.limit });
-  })
+      return app.listScheduledJobs({ limit: input.limit });
+    })
 
-  .procedure("listPausedSchedules")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listPausedSchedules")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listPausedSchedules({ limit: input.limit });
-  })
+      return app.listPausedSchedules({ limit: input.limit });
+    })
 
-  .procedure("listSchedulerActions")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_VIEW)
-  .handle(({ app, input }, operator) => {
-    app.admitOperator(operator, "ops:view");
+    .procedure("listSchedulerActions")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_VIEW)
+    .handle(({ app, input }, operator) => {
+      app.admitOperator(operator, "ops:view");
 
-    return app.listSchedulerActions({ limit: input.limit });
-  })
+      return app.listSchedulerActions({ limit: input.limit });
+    })
 
-  .procedure("setScheduleActive")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("setScheduleActive")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.setScheduleActive({
-      scheduleId: input.scheduleId,
-      active: input.active,
-      actorUserId: actor.id,
-    });
-  })
+      return app.setScheduleActive({
+        scheduleId: input.scheduleId,
+        active: input.active,
+        actorUserId: actor.id,
+      });
+    })
 
-  .procedure("clearScheduleSlot")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("clearScheduleSlot")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.clearStuckScheduleSlot({
-      scheduleId: input.scheduleId,
-      actorUserId: actor.id,
-    });
-  })
+      return app.clearStuckScheduleSlot({
+        scheduleId: input.scheduleId,
+        actorUserId: actor.id,
+      });
+    })
 
-  .procedure("runScheduleNow")
-  .withFacts(opsOperatorFact)
-  .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app, input, actor }, operator) => {
-    app.admitOperator(operator, "ops:manage");
+    .procedure("runScheduleNow")
+    .withFacts(opsOperatorFact)
+    .serviceAuthorized(OPS_MANAGE)
+    .handle(({ app, input, actor }, operator) => {
+      app.admitOperator(operator, "ops:manage");
 
-    return app.runScheduleNow({
-      scheduleId: input.scheduleId,
-      actorUserId: actor.id,
-    });
-  })
-  .build();
+      return app.runScheduleNow({
+        scheduleId: input.scheduleId,
+        actorUserId: actor.id,
+      });
+    })
+    .build();

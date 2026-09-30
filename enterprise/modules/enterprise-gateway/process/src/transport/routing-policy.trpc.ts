@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The server half of `routingPolicy.*`: `routingPolicies:view` reads, `routingPolicies:manage` writes, as on main. */
-import { defineTrpcRouter } from "@langwatch/api/trpc";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EnterpriseGatewayApi, routingPolicyTrpc } from "@langwatch/enterprise-gateway-contract";
 
-export const routingPolicyTrpcTransport = defineTrpcRouter(EnterpriseGatewayApi, routingPolicyTrpc)
+export const routingPolicyTrpcTransport: TrpcRouterDeclaration<
+  EnterpriseGatewayApi,
+  typeof routingPolicyTrpc
+> = defineTrpcRouter(EnterpriseGatewayApi, routingPolicyTrpc)
   .procedure("list")
   .withPermission("routingPolicies:view")
   .handle(({ app, input }) => app.listRoutingPolicies(input))
