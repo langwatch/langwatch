@@ -1,5 +1,3 @@
----
----
 @integration
 Feature: Developer seat
   As an organisation administrator
