@@ -24,7 +24,11 @@ import { Calendar, TrendingUp } from "react-feather";
 
 import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
 import { api } from "../../../../behavior/automation-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import {
+  useCloseAddressedDrawer,
+  useOrganizationTeamProject,
+} from "../../../../behavior/automation-session.ts";
+import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
 import { formatTimeAgo } from "../../../../model/relative-time.ts";
 import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
@@ -56,6 +60,19 @@ function formatDurationBetween(from: TimeInput, to: TimeInput): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+/** The panel as the registry opens it at `?drawer.open=viewAutomation`; the host closes it. */
+export function RegisteredViewAutomationDrawer({ automationId }: { automationId: string }) {
+  const host = useAutomationHost();
+  const close = useCloseAddressedDrawer();
+  return (
+    <ViewAutomationDrawer
+      automationId={automationId}
+      onClose={close}
+      onEdit={(id) => host.openDrawer({ drawer: "automation", params: { automationId: id } })}
+    />
+  );
 }
 
 export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAutomationDrawerProps) {

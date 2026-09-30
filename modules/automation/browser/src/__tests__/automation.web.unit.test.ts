@@ -4,7 +4,8 @@ import { createUi, installedDrawerLoaders } from "@langwatch/ui-kernel";
 import { describe, expect, it } from "vitest";
 
 import { automationWeb } from "../automation.web.ts";
-import { AutomationDrawer } from "../features/authoring/ui/sections/automation-drawer.tsx";
+import { RegisteredAutomationDrawer } from "../features/authoring/ui/sections/automation-drawer.tsx";
+import { RegisteredViewAutomationDrawer } from "../features/authoring/ui/sections/view-automation-drawer.tsx";
 
 function browserDocument() {
   const mount = document.createElement("div");
@@ -30,7 +31,15 @@ describe("given a browser that installs automation", () => {
     it("answers with the automation drawer", async () => {
       const loaded = await installedDrawerLoaders([automationWeb]).automation?.();
 
-      expect(loaded).toEqual({ default: AutomationDrawer });
+      expect(loaded).toEqual({ default: RegisteredAutomationDrawer });
+    });
+  });
+
+  describe("when an address names the viewer, as a row's View action writes it", () => {
+    it("answers with the viewer the host closes and edits", async () => {
+      const loaded = await installedDrawerLoaders([automationWeb]).viewAutomation?.();
+
+      expect(loaded).toEqual({ default: RegisteredViewAutomationDrawer });
     });
   });
 
