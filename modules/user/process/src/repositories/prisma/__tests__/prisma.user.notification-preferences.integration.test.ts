@@ -62,6 +62,38 @@ describe.skipIf(!databaseUrl)("given a person who never answered the notificatio
         future: "enabled",
         langy: "declined",
       });
+      const stored = await connection.client.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { notificationPreferences: true },
+      });
+      expect(stored.notificationPreferences).toEqual({
+        future: "enabled",
+        broken: 3,
+        langy: "declined",
+      });
+    });
+  });
+
+  describe("when two topics are answered at the same time", () => {
+    it("keeps both answers", async () => {
+      await connection.client.user.update({
+        where: { id: userId },
+        data: { notificationPreferences: {} },
+      });
+      const users = PrismaUserRepository.create({ prisma: connection.client });
+
+      await Promise.all(
+        Array.from({ length: 2 }, (_, index) =>
+          users.setNotificationPreference({
+            id: userId,
+            topic: `topic-${index}` as "langy",
+            choice: "enabled",
+          }),
+        ),
+      );
+
+      const stored = await users.findNotificationPreferences(userId);
+      expect(Object.keys(stored)).toHaveLength(2);
     });
   });
 });

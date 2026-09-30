@@ -49,6 +49,12 @@ function readNotificationPreferences(value: unknown): Record<string, UserNotific
   return known;
 }
 
+/** The stored map as it is, every key kept; anything that is not an object reads as empty. */
+function storedPreferenceMap(value: Prisma.JsonValue): Prisma.JsonObject {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  return value;
+}
+
 /** The three models and the transaction runner these statements need. */
 export type UserDatabase = Pick<PrismaClient, "user" | "account" | "passkey" | "$transaction">;
 
@@ -339,16 +345,29 @@ export class PrismaUserRepository
     return readNotificationPreferences(row.notificationPreferences);
   }
 
-  /** One topic is merged into the stored map; the other topics keep their answers. */
+  /**
+   * One topic is merged into the stored map as it is stored, so a value this release does not
+   * read is kept. Serializable, so two answers to different topics cannot drop each other.
+   */
   async setNotificationPreference(input: {
     id: string;
     topic: UserNotificationTopic;
     choice: UserNotificationChoice;
   }): Promise<void> {
-    const stored = await this.findNotificationPreferences(input.id);
-    await this.prisma.user.update({
-      where: { id: input.id },
-      data: { notificationPreferences: { ...stored, [input.topic]: input.choice } },
+    await this.serializableTransaction(async (transaction) => {
+      const row = await transaction.user.findUniqueOrThrow({
+        where: { id: input.id },
+        select: { notificationPreferences: true },
+      });
+      await transaction.user.update({
+        where: { id: input.id },
+        data: {
+          notificationPreferences: {
+            ...storedPreferenceMap(row.notificationPreferences),
+            [input.topic]: input.choice,
+          },
+        },
+      });
     });
   }
 
