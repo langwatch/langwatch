@@ -80,7 +80,7 @@ For an alert, find the graph that plots the metric with `langwatch graph list --
 
 Analytics has no error-rate metric: never pass `--metric error-rate`. For errors, plot a trace count (`metadata.trace_id` / `cardinality`) on a series filtered to errored traces (`"filters":{"traces.error":["true"]}`) and alert on the count per window; tell the user the threshold is a count, not a percentage.
 
-When `graph create` is refused with `custom_graph_writes_disabled_for_playground`, this project cannot get a new alert graph. Do not create a dashboard widget: an alert cannot watch one. Say so in one line and offer a trace automation on errored traces (`--filters '{"traces.error":["true"]}'`) instead.
+When `graph create` is refused with `custom_graph_writes_disabled_for_playground`, this project cannot get a new alert graph. Do not create a dashboard widget: an alert cannot watch one. Say so in one line and offer a trace automation on errored traces (`--filter-query 'status:error'`) instead.
 
 ## Pause, Resume, Test and Review
 
