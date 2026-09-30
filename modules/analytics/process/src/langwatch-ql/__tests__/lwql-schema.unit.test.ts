@@ -80,6 +80,7 @@ describe("given the LangWatchQL schema catalog when it is published for a caller
     );
   });
 
+  /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
   it("carries the grain, join keys, partition-pruning column and freshness of each dataset", () => {
     for (const dataset of schemaFor(FULLY_PERMITTED).views) {
       expect(dataset.grain, dataset.name).not.toBe("");
@@ -90,6 +91,7 @@ describe("given the LangWatchQL schema catalog when it is published for a caller
     }
   });
 
+  /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
   it("gives every column a type and a description", () => {
     for (const column of columnsOf(FULLY_PERMITTED)) {
       expect(column.type, `${column.dataset}.${column.name}`).not.toBe("");
@@ -285,6 +287,7 @@ describe("given the LangWatchQL schema catalog when a dataset is outside the cal
   const schemaWith = (protections: LangWatchQLProtections) =>
     lwqlSchema.describe({ database: DATABASE, protections, views });
 
+  /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
   it("leaves it out of the published schema entirely", () => {
     expect(schemaWith(WITHOUT_CONTENT).views.map((dataset) => dataset.name)).not.toContain(
       GATED_DATASET_QUALIFIED_NAME,
