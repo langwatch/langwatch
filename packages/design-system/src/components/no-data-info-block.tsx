@@ -22,7 +22,9 @@ export const NoDataInfoBlock = ({
           <EmptyState.Indicator>
             <Icon size={"lg"}>{icon}</Icon>
           </EmptyState.Indicator>
-          <EmptyState.Title>{title}</EmptyState.Title>
+          <EmptyState.Title asChild>
+            <h3>{title}</h3>
+          </EmptyState.Title>
           {/* EmptyState.Description renders a <p>, so anything block-level
               (docsInfo, children) must sit beside it, not inside it. */}
           <EmptyState.Description>{description}</EmptyState.Description>
