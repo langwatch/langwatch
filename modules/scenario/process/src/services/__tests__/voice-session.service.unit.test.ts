@@ -169,6 +169,16 @@ describe("VoiceSessionService", () => {
     });
   });
 
+  describe("given a member with no permission on the requested project", () => {
+    /** @scenario "A Talk to it request for another project is refused" */
+    it("refuses as forbidden and signs no session", async () => {
+      const { service, createVoiceAgent } = build({ granted: [] });
+
+      await expect(service.mint(mint)).rejects.toMatchObject({ code: "project_permission_denied" });
+      expect(createVoiceAgent).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a mint against a saved agent row", () => {
     /** @scenario "Talk to it against a saved agent needs only scenario rights" */
     it("asks for scenarios:create alone and mints", async () => {
