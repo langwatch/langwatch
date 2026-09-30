@@ -9,9 +9,18 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
-import type { SignInSecuritySettingsRepository } from "../repositories/sign-in-security-settings.repository.ts";
+import type {
+  OrganizationSignInSecurityRule,
+  SignInSecuritySettingsRepository,
+} from "../repositories/sign-in-security-settings.repository.ts";
 
 const logger = createLogger("langwatch:auth:session-bound");
+
+/** How long a read rule is trusted: the bound on a saved window reaching another process. */
+export const SESSION_RULES_TTL_MS = 30_000;
+const MAX_CACHED_PEOPLE = 10_000;
+
+type Remembered<T> = { value: T; until: number };
 
 /**
  * Bounding how long a signed-in browser session lasts (GAC-10). Asked where a
@@ -49,7 +58,16 @@ export class SessionBoundService {
     return new SessionBoundService(deps);
   }
 
+  #configured: Remembered<readonly OrganizationSignInSecurityRule[]> | null = null;
+  readonly #governing = new Map<string, Remembered<SessionBound | null>>();
+
   private constructor(private readonly deps: SessionBoundDeps) {}
+
+  /** Drops every remembered rule, so the next read is fresh: a just-saved window sweeps by it. */
+  forget(): void {
+    this.#configured = null;
+    this.#governing.clear();
+  }
 
   /**
    * Whether this session may still be used. The verdict rather than a throw:
@@ -80,8 +98,32 @@ export class SessionBoundService {
    *  the installation first, so a deployment that never turned this on stops
    *  before any per-person lookup. */
   private async boundFor({ userId }: { userId: string }): Promise<SessionBound | null> {
-    const configured = await this.deps.settings.findConfigured();
-    const anybody = strictestSessionBound(configured.map((rule) => rule.sessionBound));
+    const nowMs = this.deps.now().epochMilliseconds;
+    const remembered = this.#governing.get(userId);
+    if (remembered && remembered.until > nowMs) return remembered.value;
+
+    const bound = await this.readBoundFor({ userId, nowMs });
+    if (this.#governing.size >= MAX_CACHED_PEOPLE) {
+      const oldest = this.#governing.keys().next().value;
+      if (oldest !== void 0) this.#governing.delete(oldest);
+    }
+    this.#governing.set(userId, { value: bound, until: nowMs + SESSION_RULES_TTL_MS });
+
+    return bound;
+  }
+
+  private async readBoundFor({
+    userId,
+    nowMs,
+  }: {
+    userId: string;
+    nowMs: number;
+  }): Promise<SessionBound | null> {
+    if (!this.#configured || this.#configured.until <= nowMs) {
+      const rules = await this.deps.settings.findConfigured();
+      this.#configured = { value: rules, until: nowMs + SESSION_RULES_TTL_MS };
+    }
+    const anybody = strictestSessionBound(this.#configured.value.map((rule) => rule.sessionBound));
     if (boundsNothing(anybody)) return null;
 
     const governing = await this.deps.settings.findForUser({ userId });
