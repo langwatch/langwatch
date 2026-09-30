@@ -1116,14 +1116,12 @@ export function EvaluatorEditorFooter({
   } = controller;
 
   const isComparisonEditor = !!onComparisonChange;
-  // Nothing is saved while the form is still waiting on what it edits.
-  const isBusy = isSaving || isLoadingEvaluator;
-  const saveDisabled = isSaveDisabled({ isValid, isSaving: isBusy });
-  const applyDisabled = isApplyDisabled({
-    isComparisonEditor,
-    isValid,
-    isSaving: isBusy,
-  });
+  // Nothing is saved or applied while the form is still waiting on what it edits.
+  const saveDisabled =
+    isLoadingEvaluator || isSaveDisabled({ isValid, isSaving });
+  const applyDisabled =
+    isLoadingEvaluator ||
+    isApplyDisabled({ isComparisonEditor, isValid, isSaving });
 
   if (onLocalConfigChange) {
     return (
