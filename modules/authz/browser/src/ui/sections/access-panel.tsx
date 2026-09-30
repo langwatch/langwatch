@@ -109,6 +109,7 @@ export function AccessPanel({
             colorPalette="blue"
             disabled={!canManage}
             onClick={() => setDialog({ kind: "grant" })}
+            data-testid="grant-role-open"
           >
             <Plus size={14} aria-hidden />
             Grant role
@@ -263,7 +264,7 @@ function GrantsTable({
       </Table.Header>
       <Table.Body>
         {grants.map((grant) => (
-          <Table.Row key={grant.id}>
+          <Table.Row key={grant.id} data-testid="grant-row">
             <Table.Cell>
               <Text fontSize="sm" fontWeight="medium">
                 {grantPrincipalText(grant.principal)}
@@ -301,15 +302,25 @@ function GrantsTable({
                       size="xs"
                       variant="ghost"
                       aria-label={`Actions for ${grantPrincipalText(grant.principal)}`}
+                      data-testid="grant-row-actions"
                     >
                       <MoreVertical size={14} />
                     </Button>
                   </Menu.Trigger>
                   <Menu.Content>
-                    <Menu.Item value="change" onClick={() => onChangeRole(grant)}>
+                    <Menu.Item
+                      value="change"
+                      onClick={() => onChangeRole(grant)}
+                      data-testid="grant-change-role"
+                    >
                       Change role
                     </Menu.Item>
-                    <Menu.Item value="revoke" color="red.500" onClick={() => onRevoke(grant)}>
+                    <Menu.Item
+                      value="revoke"
+                      color="red.500"
+                      onClick={() => onRevoke(grant)}
+                      data-testid="grant-revoke"
+                    >
                       Revoke
                     </Menu.Item>
                   </Menu.Content>

@@ -189,7 +189,7 @@ type scenarioMail struct {
 }
 
 // scenarioExpect is what a response must hold: a status, a body subset, text
-// it does or does not contain, and the length of the value at Path.
+// it does or does not contain, the length of the value at Path, and headers.
 type scenarioExpect struct {
 	Status      intList    `yaml:"status"`
 	Body        any        `yaml:"body"`
@@ -197,11 +197,13 @@ type scenarioExpect struct {
 	NotContains stringList `yaml:"notContains"`
 	Path        string     `yaml:"path"`
 	Length      *int       `yaml:"length"`
+	// Headers maps a response header's name to text its value must contain.
+	Headers map[string]string `yaml:"headers"`
 }
 
 func (expect scenarioExpect) empty() bool {
 	return len(expect.Status) == 0 && expect.Body == nil && len(expect.Contains) == 0 &&
-		len(expect.NotContains) == 0 && expect.Length == nil
+		len(expect.NotContains) == 0 && expect.Length == nil && len(expect.Headers) == 0
 }
 
 type intList []int

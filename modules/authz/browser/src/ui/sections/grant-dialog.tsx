@@ -115,6 +115,7 @@ export function GrantDialog({ organizationId, editing, onClose }: GrantDialogPro
                 <NativeSelect.Root>
                   <NativeSelect.Field
                     aria-label="Who"
+                    data-testid="grant-who"
                     value={principal}
                     onChange={(event) => setPrincipal(event.currentTarget.value)}
                   >
@@ -144,6 +145,7 @@ export function GrantDialog({ organizationId, editing, onClose }: GrantDialogPro
               <NativeSelect.Root>
                 <NativeSelect.Field
                   aria-label="Role"
+                  data-testid="grant-role"
                   value={roleId}
                   onChange={(event) => setRoleId(event.currentTarget.value)}
                 >
@@ -197,6 +199,7 @@ export function GrantDialog({ organizationId, editing, onClose }: GrantDialogPro
           <Button
             colorPalette="blue"
             disabled={!canSubmit}
+            data-testid="grant-submit"
             loading={createGrant.isPending || changeGrantRole.isPending}
             onClick={submit}
           >
