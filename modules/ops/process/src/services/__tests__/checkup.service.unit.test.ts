@@ -72,7 +72,7 @@ function healthyDeps(overrides: Partial<CheckupFacts> = {}): CheckupFacts {
     redis: { target: "redis://redis:6379", ready: async () => undefined },
     gateway: async () => ({
       baseUrl: "http://gateway:5563",
-      expectedControlPlaneUrl: "http://app:5560",
+      controlPlaneUrls: ["http://app:5560"],
       health: async () => undefined,
       probeControlPlane: async () => ({
         kind: "ok",
@@ -525,6 +525,58 @@ describe("CheckupService", () => {
       expect(canary).toHaveBeenCalledTimes(1);
       expect(canary).toHaveBeenCalledWith("collector", {});
       expect(rowOf(rows, "canary_collector").outcome).toBe("verified");
+    });
+  });
+
+  describe("given the app is reached publicly and by its in-cluster Service", () => {
+    const gatewayReporting = (controlPlaneBaseUrl: string) =>
+      healthyDeps({
+        gateway: async () => ({
+          baseUrl: "http://langwatch-gateway:80",
+          controlPlaneUrls: ["http://localhost:5560", "http://langwatch-app:5560"],
+          health: async () => undefined,
+          probeControlPlane: async () => ({ kind: "ok", controlPlaneBaseUrl }),
+        }),
+      });
+
+    describe("when the gateway reports the in-cluster address", () => {
+      /** @scenario "A gateway that reaches this app by its in-cluster address passes the control plane check" */
+      it("passes the control plane row", async () => {
+        const { rows } = await CheckupService.create(
+          gatewayReporting("http://langwatch-app:5560/"),
+        ).explicit({ checks: ["gateway_control_plane"] });
+
+        expect(rowOf(rows, "gateway_control_plane").outcome).toBe("verified");
+      });
+    });
+
+    describe("when the gateway reports an address of another install", () => {
+      /** @scenario "A gateway that reports another install as its control plane fails the check" */
+      it("fails the control plane row with the mismatch code", async () => {
+        const { rows } = await CheckupService.create(
+          gatewayReporting("http://other-app:5560"),
+        ).explicit({ checks: ["gateway_control_plane"] });
+        const verdict = rowOf(rows, "gateway_control_plane");
+
+        expect(verdict.outcome).toBe("refused");
+        expect(verdict.code).toBe("checkup_gateway_control_plane_mismatch");
+        expect(verdict.detail).toContain("http://localhost:5560");
+      });
+    });
+  });
+
+  describe("when the only provider stores no key", () => {
+    /** @scenario "A provider that cannot be tested says why" */
+    it("leaves the row not checked and names the missing key", async () => {
+      const { rows } = await CheckupService.create(
+        healthyDeps({
+          testModelProvider: async () => ({ outcome: "unchecked", reason: "no_credential" }),
+        }),
+      ).explicit({ checks: ["model_provider_test"] });
+      const verdict = rowOf(rows, "model_provider_test");
+
+      expect(verdict.outcome).toBe("unchecked");
+      expect(verdict.detail).toContain("openai (no key stored)");
     });
   });
 });

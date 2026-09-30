@@ -522,6 +522,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And the fault is the caller's, and the remediation tells them to check the name against the view's columns
     And no part of the server's own refusal text reaches the caller, because it echoes the submitted query
 
+  @unit
+  Scenario: A missing column passed to a function is named in the refusal
+    Given a query that passes a column no view carries to a function, as in arrayJoin(Labels)
+    When the server refuses it as an unknown expression or function identifier
+    Then the refusal names that column
+
   @integration
   Scenario: A parameterized query missing a bound value is refused before execution
     Given an authenticated API client

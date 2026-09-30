@@ -1,4 +1,5 @@
 import { Box, chakra, HStack, Spinner, Text, Textarea } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -100,10 +101,10 @@ export const AWAITING_ANSWER_PLACEHOLDER = "Answer the card above to keep going.
  */
 export const AWAITING_ANSWER_TERMINAL_PLACEHOLDER = LANGY_ANSWER_HERE_OR_TERMINAL;
 
-// Shown under every composer, in every variant and at every viewport height. A
-// notice about what happens to what you type only does its job where you type,
-// so it is not gated on the layout the way the tagline below it is.
-const COMPOSER_DATA_USE_NOTICE = "Note: these chats are used by LangWatch to improve Langy.";
+// Shown under every composer on LangWatch Cloud, in every variant and at every
+// viewport height, since a notice about what you type only works where you type.
+// A self-hosted install sends no chats to LangWatch, so it is hidden there.
+export const COMPOSER_DATA_USE_NOTICE = "Note: these chats are used by LangWatch to improve Langy.";
 
 /** The gutter under the composer card: none on the hero, tighter when floating. */
 function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }) {
@@ -176,6 +177,7 @@ function ComposerImpl({
   const hero = variant === "hero";
   const composerPaddingBottom = composerGutter({ hero, floating });
   const reduceMotion = useReducedMotion();
+  const { isSaaS } = useUiDeployment();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // The draft subscription lives in ComposerInputRow, NOT here.
   const setDraft = useLangyStore((s) => s.setDraft);
@@ -439,16 +441,18 @@ function ComposerImpl({
           Langy proposes, you review and apply.
         </Text>
       ) : null}
-      <Text
-        marginTop={1.5}
-        textStyle="2xs"
-        color="fg.subtle"
-        textAlign="center"
-        letterSpacing="0.01em"
-        lineHeight="1.2"
-      >
-        {COMPOSER_DATA_USE_NOTICE}
-      </Text>
+      {isSaaS ? (
+        <Text
+          marginTop={1.5}
+          textStyle="2xs"
+          color="fg.subtle"
+          textAlign="center"
+          letterSpacing="0.01em"
+          lineHeight="1.2"
+        >
+          {COMPOSER_DATA_USE_NOTICE}
+        </Text>
+      ) : null}
     </Box>
   );
 }

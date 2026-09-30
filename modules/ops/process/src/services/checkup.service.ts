@@ -57,7 +57,12 @@ export interface CheckupLicenseView {
 
 export interface CheckupGatewayFacts {
   readonly baseUrl: string | undefined;
-  readonly expectedControlPlaneUrl: string | undefined;
+  /**
+   * Every address this app is reached at, its public address first. The
+   * gateway usually reaches the app over the cluster, so its control plane
+   * is this app when it names any one of them.
+   */
+  readonly controlPlaneUrls: string[];
   readonly health: () => Promise<void>;
   readonly probeControlPlane: () => Promise<ControlPlaneProbe>;
 }
@@ -626,7 +631,8 @@ export class CheckupService {
 
   private async gatewayControlPlane(): Promise<CheckVerdict> {
     const gateway = await this.facts.gateway();
-    const expected = gateway.expectedControlPlaneUrl;
+    const known = gateway.controlPlaneUrls;
+    const expected = known[0];
     if (!gateway.baseUrl || !expected) {
       return {
         outcome: "unchecked",
@@ -643,7 +649,8 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.gateway,
       };
     }
-    if (normalizeUrl(probe.controlPlaneBaseUrl) !== normalizeUrl(expected)) {
+    const reported = normalizeUrl(probe.controlPlaneBaseUrl);
+    if (!known.some((url) => normalizeUrl(url) === reported)) {
       return {
         outcome: "refused",
         code: "checkup_gateway_control_plane_mismatch",
@@ -754,7 +761,7 @@ export class CheckupService {
     if (verified.length === 0) {
       return {
         outcome: "unchecked",
-        detail: `None of the configured providers can be probed from here (${results.map((entry) => entry.provider).join(", ")}).`,
+        detail: `None of the configured providers could be tested: ${results.map((entry) => `${entry.provider} (${untestedReason(entry.result)})`).join(", ")}.`,
       };
     }
     return {
@@ -782,6 +789,19 @@ export class CheckupService {
       docsPath: CHECKUP_DOCS.troubleshooting,
     };
   }
+}
+
+const UNTESTED_REASONS: Record<string, string> = {
+  no_credential: "no key stored",
+  credential_masked: "no key stored",
+  no_endpoint: "no endpoint to ask",
+  provider_not_probeable: "its sign-in cannot be tested from here",
+  unknown_provider: "not a known provider",
+};
+
+function untestedReason(result: ProviderTestOutcome): string {
+  if (result.outcome !== "unchecked") return result.outcome;
+  return UNTESTED_REASONS[result.reason] ?? result.reason.replaceAll("_", " ");
 }
 
 function inDefinitionOrder(rows: CheckRow[]): CheckRow[] {

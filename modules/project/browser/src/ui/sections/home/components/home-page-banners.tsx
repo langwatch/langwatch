@@ -714,10 +714,13 @@ function LanternBanner({
       }}
     >
       {/* Light bloom background; bleeds past box intentionally as the source
-            of illumination for the hero. */}
+            of illumination for the hero. Both bleed layers sit at zIndex -1:
+            they light the page from behind, so neighbours never paint under
+            them. They stay visible only inside HomePage's zIndex={1} Container. */}
       <Box
         aria-hidden
         position="absolute"
+        zIndex={-1}
         insetInline={{ base: "-8%", md: "-14%" }}
         insetBlock={{ base: "-30%", md: "-45%" }}
         pointerEvents="none"
@@ -764,6 +767,7 @@ function LanternBanner({
       <Box
         aria-hidden
         position="absolute"
+        zIndex={-1}
         insetInline={{ base: "-8%", md: "-14%" }}
         insetBlock={{ base: "-30%", md: "-45%" }}
         pointerEvents="none"

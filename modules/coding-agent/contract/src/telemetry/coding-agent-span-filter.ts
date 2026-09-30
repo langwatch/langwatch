@@ -8,6 +8,12 @@ export const CODEX_SCOPE = "codex_cli_rs";
  * `codex_cli_rs` — same emitter, same noise (500+ spans per exec turn), same filter.
  */
 export const CODEX_EXEC_SCOPE = "codex_exec";
+/**
+ * Newer codex releases run the TUI on top of their app-server and report
+ * every span under the app-server's scope instead. Same span names, same
+ * attributes, same noise as `codex_cli_rs`, so it takes the TUI's rules.
+ */
+export const CODEX_APP_SERVER_SCOPE = "codex-app-server";
 export const OPENCODE_SCOPE = "opencode";
 
 /** The per-turn rollup span codex emits (model + tokens + cost + reasoning). */
@@ -21,13 +27,18 @@ const CODEX_TURN_SPAN = "session_task.turn";
 const CODEX_TURN_REQUEST_SPAN = "turn/start";
 const CODEX_HELPER_THREAD_STAMP = "langwatch.thread.id";
 
-const CODEX_SCOPES: ReadonlySet<string> = new Set([CODEX_SCOPE, CODEX_EXEC_SCOPE]);
-
-const CODING_AGENT_SCOPES: ReadonlySet<string> = new Set([
+const CODEX_SCOPES: ReadonlySet<string> = new Set([
   CODEX_SCOPE,
   CODEX_EXEC_SCOPE,
-  OPENCODE_SCOPE,
+  CODEX_APP_SERVER_SCOPE,
 ]);
+
+const CODING_AGENT_SCOPES: ReadonlySet<string> = new Set([...CODEX_SCOPES, OPENCODE_SCOPE]);
+
+/** Whether this scope is one of codex's (the TUI's, `codex exec`'s, the app-server's). */
+export function isCodexScope(scopeName: string | null | undefined): boolean {
+  return typeof scopeName === "string" && CODEX_SCOPES.has(scopeName);
+}
 
 /** Whether spans under this scope are subject to the coding-agent filter. */
 export function isCodingAgentNoiseScope(scopeName: string | null | undefined): boolean {

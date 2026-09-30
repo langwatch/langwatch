@@ -29,6 +29,7 @@ export class GoogleDlpRedactionService {
     text: string;
     piiRedactionLevel: PIIRedactionLevel;
     exceptPatterns?: readonly string[];
+    spareNamesAndPlaces?: boolean;
   }): Promise<PiiClearing> {
     this.metrics.analysisCalled("google_dlp");
     const text = input.text.slice(0, PII_ANALYSIS_TEXT_BUDGET);
@@ -47,6 +48,7 @@ export class GoogleDlpRedactionService {
       text,
       findings,
       exceptions: compilePiiExceptPatterns(input.exceptPatterns ?? []),
+      spareNamesAndPlaces: input.spareNamesAndPlaces ?? false,
     });
 
     return masked > 0

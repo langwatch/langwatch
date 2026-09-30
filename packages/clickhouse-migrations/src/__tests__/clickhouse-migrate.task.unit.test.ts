@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const stubs = vi.hoisted(() => ({
   reconcileTTL: vi.fn(async () => undefined),
   runMigrations: vi.fn(async () => undefined),
+  waitForClickHouse: vi.fn(async () => undefined),
 }));
 
 vi.mock("../goose.migration-runner.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   runMigrations: stubs.runMigrations,
+  waitForClickHouse: stubs.waitForClickHouse,
 }));
 vi.mock("../ttl.reconciler.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -23,6 +25,21 @@ describe("clickhouse-migrate task", () => {
   beforeEach(() => {
     stubs.runMigrations.mockClear();
     stubs.reconcileTTL.mockClear();
+    stubs.waitForClickHouse.mockClear();
+  });
+
+  it("waits for the shared endpoint before it queues on the schema lock", async () => {
+    await ClickHouseMigrateTask.create({
+      source: { CLICKHOUSE_URL: "http://shared:8123", CLICKHOUSE_MIGRATE_WAIT_SECONDS: "30" },
+    }).execute();
+
+    expect(stubs.waitForClickHouse).toHaveBeenCalledExactlyOnceWith({
+      connectionUrl: "http://shared:8123",
+      waitSeconds: 30,
+    });
+    expect(stubs.waitForClickHouse.mock.invocationCallOrder[0]).toBeLessThan(
+      stubs.runMigrations.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 
   it("runs schema work once for each physical private endpoint", async () => {
@@ -93,7 +110,12 @@ describe("clickhouse-migrate task", () => {
       skipped: false,
       sharedUrl: "http://shared:8123",
       privateEndpoints: [{ organizationId: "org_1", url: "http://private:8123" }],
-      settings: { coldStorageEnabled: false, hotDayOverrides: {}, childEnvironment: {} },
+      settings: {
+        coldStorageEnabled: false,
+        hotDayOverrides: {},
+        childEnvironment: {},
+        waitSeconds: 180,
+      },
     });
   });
 
@@ -113,6 +135,7 @@ describe("clickhouse-migrate task", () => {
       connectionUrl: "http://shared:8123",
       clusterName: "main",
       childEnvironment: { PATH: "/usr/bin" },
+      waitSeconds: 180,
       verbose: true,
     });
     expect(stubs.reconcileTTL).toHaveBeenCalledExactlyOnceWith({

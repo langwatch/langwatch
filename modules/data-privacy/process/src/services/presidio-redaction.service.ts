@@ -2,8 +2,12 @@ import { type EvaluationApi, LangevalsPiiDetectionError } from "@langwatch/evalu
 import { normalizePresidioMarkers } from "@langwatch/redaction";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import type { PiiAnalysisMetrics } from "../app/data-privacy.members.ts";
-import { PII_ANALYSIS_TEXT_BUDGET, presidioEntitiesFor } from "../rules/pii-analysis.rules.ts";
+import type { PiiAnalysisMetrics, PiiClearing } from "../app/data-privacy.members.ts";
+import {
+  PII_ANALYSIS_TEXT_BUDGET,
+  presidioEntitiesFor,
+  redactSparingNamesAndPlaces,
+} from "../rules/pii-analysis.rules.ts";
 
 type PiiDetection = Pick<EvaluationApi, "detectPii">;
 
@@ -43,6 +47,8 @@ export class PresidioRedactionService {
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     projectId?: string | undefined;
+    /** Per text: a model, provider or tool name, spared name and place findings. */
+    spareNamesAndPlaces?: readonly boolean[] | undefined;
   }): Promise<(string | null)[]> {
     if (input.texts.length === 0) return [];
 
@@ -64,11 +70,13 @@ export class PresidioRedactionService {
       if (!result) throw new Error(`Presidio returned no result for text ${i}`);
       this.metrics.analysisFinished(result.status);
       if (result.status === "error") throw new Error(result.details);
-      const anonymized: unknown =
-        result.status === "processed" ? result.raw_response?.anonymized : undefined;
-      return typeof anonymized === "string" && anonymized
-        ? normalizePresidioMarkers(anonymized) + entry.remaining
-        : null;
+      if (result.status !== "processed") return null;
+      const clearing = clearingOf({
+        input: entry.input,
+        rawResponse: result.raw_response,
+        spareNamesAndPlaces: input.spareNamesAndPlaces?.[i] ?? false,
+      });
+      return clearing.kind === "redacted" ? clearing.text + entry.remaining : null;
     });
   }
 
@@ -98,4 +106,31 @@ export class PresidioRedactionService {
       clearTimeout(timeout);
     }
   }
+}
+
+/**
+ * How one analysed input was cleared. A flagged input whose findings cannot be placed keeps
+ * Presidio's own full redaction rather than going unredacted.
+ */
+function clearingOf({
+  input,
+  rawResponse,
+  spareNamesAndPlaces,
+}: {
+  input: string;
+  rawResponse: unknown;
+  spareNamesAndPlaces: boolean;
+}): PiiClearing {
+  const response = typeof rawResponse === "object" && rawResponse !== null ? rawResponse : {};
+  if (spareNamesAndPlaces) {
+    const spared = redactSparingNamesAndPlaces({
+      text: input,
+      findings: "results" in response ? response.results : undefined,
+    });
+    if (spared.kind !== "unplaceable") return spared;
+  }
+  const anonymized = "anonymized" in response ? response.anonymized : undefined;
+  return typeof anonymized === "string" && anonymized
+    ? { kind: "redacted", text: normalizePresidioMarkers(anonymized) }
+    : { kind: "unchanged" };
 }

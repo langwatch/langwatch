@@ -60773,6 +60773,51 @@ Because each session is a run in your project, you can open it in the same trace
 
 ---
 
+# FILE: ./self-hosting/checkup.mdx
+
+---
+title: Checkup
+description: "Check that a self-hosted install is wired correctly, and see what it sends to LangWatch"
+---
+
+## What the Checkup Page Shows
+
+**Settings > Checkup** lists one row per part of the install. Each row reads **Pass**, **Fail** or **Not checked**. A failed row names the fix and links the page that explains it. Not checked means the check did not run or could not run; it is never counted as a pass.
+
+Organization members can read the page. Running the checks behind the buttons needs permission to manage the organization.
+
+## Sections
+
+| Section | What it checks | When it runs |
+|---------|----------------|--------------|
+| Install | The release, Postgres, ClickHouse, their migrations, Redis and the AI Gateway | When the page opens |
+| LangWatch | The license, the connect host, the daily usage report, and whether the gateway reports this install as its control plane | **Run connection checks** |
+| Integrations | Object storage, email and model providers, plus a write to storage, an SMTP connection and a call to each model provider | Basic rows when the page opens, the rest with **Run integration checks** |
+| Pipelines | Canaries that send one real trace, evaluation, scenario run or Langy turn through the install | **Run canaries** |
+
+Checks that open outbound connections or spend money run only when you press the button for their section.
+
+The scenario canary needs a run plan: enter its id or slug next to **Run canaries**. The Langy canary sends its turn as the administrator who runs the checkup.
+
+The collector and processor canaries send real traces into the organization's first project, so they appear in its trace list and analytics.
+
+## What This Install Sends
+
+The last section shows the exact usage report the install sends to LangWatch once a day, with the switches that shrink it. See [Data and telemetry](/self-hosting/data-and-telemetry) for the full contract and [Usage report dictionary](/self-hosting/usage-report-dictionary) for every field.
+
+## Common Results
+
+| Row | Result | What to do |
+|-----|--------|------------|
+| Reach the connect host | Fail | The install cannot open `connect.langwatch.ai:443`. It needs that only with a license that names hosted services. See [Connect](/self-hosting/connect). |
+| AI Gateway control plane | Fail | The gateway reports a control plane that is not this install. Point `GATEWAY_CONTROL_PLANE_URL` on the gateway at this app and restart it. |
+| Model provider connection | Not checked | No stored key could be tested. The row names the reason for each provider. |
+| Scenarios | Not checked | Enter a run plan id or slug and run the canaries again. |
+
+For errors outside the checkup, see [Troubleshooting](/self-hosting/troubleshooting).
+
+---
+
 # FILE: ./self-hosting/compliance.mdx
 
 ---
@@ -61434,14 +61479,15 @@ LangWatch is configured through environment variables. How you set them depends 
 
 ## Core Configuration
 
-| Variable         | Description                                                                     | Required | Default             |
-| ---------------- | ------------------------------------------------------------------------------- | -------- | ------------------- |
-| `DATABASE_URL`   | PostgreSQL connection string                                                    | Yes      | -                   |
-| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes      | -                   |
-| `REDIS_URL`      | Redis connection string                                                         | Yes      | -                   |
-| `NODE_ENV`       | Environment (`production`, `development`)                                       | No       | `production`        |
-| `BASE_HOST`      | Internal base URL for the application                                           | Yes      | -                   |
-| `NEXTAUTH_URL`   | Public URL for authentication callbacks                                         | Yes      | Same as `BASE_HOST` |
+| Variable                          | Description                                                                                                                       | Required | Default             |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------- |
+| `DATABASE_URL`                    | PostgreSQL connection string                                                                                                      | Yes      | -                   |
+| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`)                                                   | Yes      | -                   |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds the boot migrations wait for ClickHouse to accept connections before failing. `0` fails on the first refused connection | No       | `180`               |
+| `REDIS_URL`                       | Redis connection string                                                                                                           | Yes      | -                   |
+| `NODE_ENV`                        | Environment (`production`, `development`)                                                                                         | No       | `production`        |
+| `BASE_HOST`                       | Internal base URL for the application                                                                                             | Yes      | -                   |
+| `NEXTAUTH_URL`                    | Public URL for authentication callbacks                                                                                           | Yes      | Same as `BASE_HOST` |
 
 <Note>
   There is no in-process worker mode. The app and the background workers are always separate
@@ -61468,6 +61514,7 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable            | Description                                                                                                                                                          | Default |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
+| `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
 
 ### SSO Provider Variables
 
@@ -61771,7 +61818,7 @@ The `smtp` gateway ignores these variables on purpose, because an SMTP relay is 
 
 ## Langy (optional)
 
-Langy, the automated AI engineer, runs as a separate agent pod that is off by default. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
+Langy, the automated AI engineer, runs as a separate agent pod that the chart deploys by default (`langyagent.chartManaged: true`). It uses a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
 
 <Note>
   See [Langy environment variables](/self-hosting/langy/environment-variables) for the full
@@ -63056,7 +63103,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.18.0
+    targetRevision: 3.18.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -63105,7 +63152,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.18.0
+      targetRevision: 3.18.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -63474,7 +63521,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.18.0
+VERSION=3.18.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -63490,13 +63537,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.18.0"
+    tag: "3.18.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.18.0"
+    tag: "3.18.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.18.0"
+    tag: "3.18.0" # x-release-please-version
 
 imagePullSecrets:
   - name: registry-credentials
@@ -63557,19 +63604,36 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
   Deployment](#production-deployment) below.
 </Warning>
 
+### Operator access and feature flags
+
+The Ops pages (`/ops`) are open only to the operators listed in `ADMIN_EMAILS`. No account has them on a new install. Add your email and upgrade:
+
+```yaml
+app:
+  extraEnvs:
+    - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
+workers:
+  extraEnvs:
+    - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
+```
+
+Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Custom LangWatchQL charts on dashboards need both `release_lwql_workbench` and `release_custom_chart_playground`. The Query API (`POST /api/v1/query`) works without either.
+
 ## Low-Resources Deployment
 
 The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
 
 ```bash
-curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
+helm pull langwatch/langwatch --untar
 
-helm install langwatch langwatch/langwatch \
+helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
-  -f size-dev.yaml \
+  -f langwatch/examples/overlays/size-dev.yaml \
   --wait --timeout 10m
 ```
+
+The overlay comes from the chart you pulled, so it always matches the chart version you install.
 
 This configures smaller resource limits, single replicas, and disables evaluator preloading to reduce memory usage. Suitable for development, demos, and small teams.
 
@@ -63827,10 +63891,10 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 | Overlay                 | Use Case                      | Approx Resources (requests) |
 | ----------------------- | ----------------------------- | --------------------------- |
-| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi              |
-| `size-dev.yaml`         | Local dev, small teams        | ~2 CPU, ~4 Gi               |
-| `size-prod.yaml`        | Production, single-node CH    | ~12 CPU, ~28 Gi             |
-| `size-ha.yaml`          | HA production, replicated CH  | ~25 CPU, ~70 Gi             |
+| _(default, no overlay)_ | Quick start, small production | ~5 CPU, ~17 Gi              |
+| `size-dev.yaml`         | Local dev, small teams        | ~2.6 CPU, ~6.7 Gi           |
+| `size-prod.yaml`        | Production, single-node CH    | ~8.7 CPU, ~23 Gi            |
+| `size-ha.yaml`          | HA production, replicated CH  | ~23 CPU, ~85 Gi             |
 
 ### Access Overlays
 
@@ -65001,7 +65065,7 @@ If your threat model requires that a compromised worker cannot reach an arbitrar
 
 ---
 title: Self-Hosting Langy
-description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
+description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the optional gVisor sandbox.
 sidebarTitle: Overview
 keywords:
   - self-host langy
@@ -65012,11 +65076,11 @@ keywords:
 
 Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, and ships **enabled**: a plain `helm install` deploys it, materialises the shared secret, wires the app and workers to it, and opens Langy to everyone in the install.
 
-The default pins the pod to a `gvisor` RuntimeClass. On a cluster without one, only the agent pod waits (Pending) while the rest of the install runs; provide a sandboxed runtime or accept running without one. See [Setup](/self-hosting/langy/setup).
+By default the pod runs on the node's normal container runtime, so it starts on any cluster. To isolate it from the host, pin it to a sandboxed RuntimeClass such as `gvisor`. See [Setup](/self-hosting/langy/setup).
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
-The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [agent worker](/langy/how-langy-works) per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
+The `langyagent` pod is a single Go "manager" process that spawns one [agent worker](/langy/how-langy-works) per conversation. Workers run on the node's normal runtime by default; set a sandboxed `runtimeClassName` to harden them. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
   **Also check:** [Setup](/self-hosting/langy/setup), [Environment
@@ -65030,25 +65094,25 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 
 ## At a glance
 
-|                 |                                                                                                                               |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Deployment      | Separate `langyagent` Deployment + ConfigMap + Service + NetworkPolicy in the umbrella chart                                  |
-| Default state   | On (`langyagent.chartManaged: true`); disable with `chartManaged: false`                                                      |
-| Access          | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead                                      |
-| Replicas        | 1 (render-time guard blocks more until conversation-sticky routing exists)                                                    |
-| Update strategy | `Recreate`, no HPA. Scale vertically.                                                                                         |
-| Sandbox         | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true`                         |
-| Sizing          | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi                                                                      |
-| Shared secret   | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
-| GitHub App      | Optional, for bot-authored pull requests                                                                                      |
-| Outbound egress | Off by default (`networkPolicy.allowExternalHttps: false`)                                                                    |
+|                 |                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deployment      | Separate `langyagent` Deployment + ConfigMap + Service + NetworkPolicy in the umbrella chart                                                            |
+| Default state   | On (`langyagent.chartManaged: true`); disable with `chartManaged: false`                                                                                |
+| Access          | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead                                                                |
+| Replicas        | 1 (render-time guard blocks more until conversation-sticky routing exists)                                                                              |
+| Update strategy | `Recreate`, no HPA. Scale vertically.                                                                                                                   |
+| Sandbox         | None by default (`runtimeClassName: ""`, `acceptUnsandboxedRuntime: true`); set `runtimeClassName` and `acceptUnsandboxedRuntime: false` to require one |
+| Sizing          | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi                                                                                                |
+| Shared secret   | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false`                           |
+| GitHub App      | Optional, for bot-authored pull requests                                                                                                                |
+| Outbound egress | Off by default (`networkPolicy.allowExternalHttps: false`)                                                                                              |
 
 ## Hard requirements
 
-- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime, for hardening.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`). The default runs it on the node's normal runtime so the install works on any cluster; for production, pin the pod to a sandboxed RuntimeClass and set `acceptUnsandboxedRuntime: false`. On a cluster without that RuntimeClass, the pod then waits with a `RuntimeClass not found` event. See [The sandbox](/langy/security/sandbox).
   - GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly).
   - On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works.
-  - EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`.
+  - EKS has no managed option: install gVisor on a node group ([Setup](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group)).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -65064,7 +65128,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 graph LR
     Browser["Browser<br/>(event-sourced UI)"] -->|"HTTPS"| App["LangWatch App<br/>(control plane)"]
     App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
-    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>agent worker"]
+    Agent -->|"one per conversation"| Worker["agent worker"]
     Worker -->|"langwatch CLI<br/>(per-session key)"| App
     Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
     Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
@@ -65409,7 +65473,8 @@ langyagent:
 
 Langy then stays hidden until you enable `release_langy_enabled`, or add targeting
 rules for specific projects and organizations, from `/ops/feature-flags` in your
-install.
+install. That page is open to the operators listed in `ADMIN_EMAILS`; see
+[operator access](/self-hosting/deployment/kubernetes-helm#operator-access-and-feature-flags).
 
 ## Bringing your own secrets
 
@@ -66313,7 +66378,7 @@ Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 
 `examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
-Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
+Langy, the AI assistant, is part of this install and runs on the node's normal container runtime. To harden it with a sandboxed runtime on EKS, see [installing gVisor on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
 </Tip>
 
 <Note>
@@ -66343,9 +66408,9 @@ graph LR
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
 <Note>
-  Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional,
-  gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting
-  Langy](/self-hosting/langy/overview).
+  Running [Langy](/langy/overview), the automated AI engineer? It ships as an agent pod in the
+  same umbrella chart, on by default; set `langyagent.chartManaged: false` to leave it out. See
+  [Self-hosting Langy](/self-hosting/langy/overview).
 </Note>
 
 ## Deployment Models
@@ -67421,7 +67486,6 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.18.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -67871,10 +67935,12 @@ helm upgrade langwatch langwatch/langwatch \
 helm search repo langwatch/langwatch --versions
 
 # Install a specific chart version
+# x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   --version 3.18.0 \
   -f values-production.yaml
+# x-release-please-end
 ```
 
 ## Database Migrations

@@ -10,12 +10,14 @@ import {
   isHeldOutIdentifierAttribute,
   redactAttributeNative,
   redactStringNative,
+  reservesModelOrToolName,
 } from "@langwatch/redaction/pii";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
 import type { PIICheckOptions } from "../app/data-privacy.members.ts";
 import type {
   OtlpSpanPiiRedactionServiceDependencies,
+  PiiAnalysisItem,
   PiiRedactionPolicyService,
 } from "./pii-redaction-policy.service.ts";
 
@@ -24,9 +26,14 @@ import type {
  * of texts and their write-backs plus a cumulative length budget enforced by `tryPush`.
  */
 type RedactionBatch = {
-  texts: string[];
+  items: PiiAnalysisItem[];
   writes: ((redacted: string) => void)[];
-  tryPush: (entry: { key: string; value: string; write: (redacted: string) => void }) => void;
+  tryPush: (entry: {
+    key: string;
+    value: string;
+    isNameExempt: boolean;
+    write: (redacted: string) => void;
+  }) => void;
 };
 
 export class OtlpRecordPiiRedactionService {
@@ -188,6 +195,7 @@ export class OtlpRecordPiiRedactionService {
       batch.tryPush({
         key: "body",
         value: log.body,
+        isNameExempt: false,
         write: (redacted) => {
           log.body = redacted;
         },
@@ -278,16 +286,16 @@ export class OtlpRecordPiiRedactionService {
   }
 
   private createRedactionBatch(): RedactionBatch {
-    const texts: string[] = [];
+    const items: PiiAnalysisItem[] = [];
     const writes: ((redacted: string) => void)[] = [];
     const maxLen = this.deps.piiRedactionMaxAttributeLength;
     const logger = this.logger;
     const state = { totalLength: 0 };
 
     return {
-      texts,
+      items,
       writes,
-      tryPush({ key, value, write }) {
+      tryPush({ key, value, isNameExempt, write }) {
         if (state.totalLength + value.length > maxLen) {
           logger.warn(
             {
@@ -302,7 +310,7 @@ export class OtlpRecordPiiRedactionService {
           return;
         }
 
-        texts.push(value);
+        items.push({ text: value, isNameExempt });
         writes.push(write);
         state.totalLength += value.length;
       },
@@ -322,12 +330,12 @@ export class OtlpRecordPiiRedactionService {
     for (const key of Object.keys(record)) {
       const value = record[key];
       if (!value) continue;
-      if (isHeldOutIdentifierAttribute({ key: attributeNames?.[key] ?? key, value })) {
-        continue;
-      }
+      const name = attributeNames?.[key] ?? key;
+      if (isHeldOutIdentifierAttribute({ key: name, value })) continue;
       batch.tryPush({
         key,
         value,
+        isNameExempt: reservesModelOrToolName({ key: name, value }),
         write: (redacted) => {
           record[key] = redacted;
         },
@@ -339,17 +347,11 @@ export class OtlpRecordPiiRedactionService {
     batch: RedactionBatch,
     options: PIICheckOptions,
   ): Promise<void> {
-    if (batch.texts.length === 0) {
+    if (batch.items.length === 0) {
       return;
     }
 
-    const results = await this.policy.clearBatch(batch.texts, options);
-
-    if (results.length !== batch.writes.length) {
-      throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${batch.writes.length} inputs`,
-      );
-    }
+    const results = await this.policy.clearBatch(batch.items, options);
 
     batch.writes.forEach((write, index) => {
       const redacted = results[index];

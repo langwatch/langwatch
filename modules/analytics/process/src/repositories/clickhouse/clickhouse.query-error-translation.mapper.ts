@@ -153,12 +153,12 @@ export function isClickHouseUnknownFunctionError(error: unknown): boolean {
 const IDENTIFIER_SHAPE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
 
 /**
- * The sentences ClickHouse uses to say a name resolved to nothing. Both delimiter forms
- * (backtick from the analyzer path, single quote from the older path) are matched without
- * requiring a matched pair — identifiers can't contain either, so that stays safe.
+ * ClickHouse's sentences for a name that resolved to nothing, in backtick (analyzer) or quote
+ * form, unpaired since identifiers hold neither. A name passed to a function
+ * (`arrayJoin(Labels)`) gets "Unknown expression or function identifier".
  */
 const IDENTIFIER_PATTERNS: readonly RegExp[] = [
-  /Unknown (?:expression |table |column )?identifier [`'"]([^`'"]{1,128})[`'"]/,
+  /Unknown (?:expression or function |expression |table |column )?identifier [`'"]([^`'"]{1,128})[`'"]/,
   /Missing columns: [`'"]([^`'"]{1,128})[`'"]/,
 ];
 

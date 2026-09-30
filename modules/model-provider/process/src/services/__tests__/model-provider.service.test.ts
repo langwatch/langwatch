@@ -2168,6 +2168,7 @@ describe("ModelProviderService", () => {
   });
 
   /** @scenario "Testing a saved provider uses the credential already stored" */
+  /** @scenario "The model provider test reads the provider's stored key" */
   /** @scenario "A test never accepts an endpoint from the caller" */
   /** @scenario "Testing an organization-scoped provider reaches its credential" */
   it("uses stored credentials for a connection check and never request-supplied values", async () => {

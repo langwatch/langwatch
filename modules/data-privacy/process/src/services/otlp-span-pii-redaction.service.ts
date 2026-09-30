@@ -11,6 +11,7 @@ import {
   isHeldOutIdentifierAttribute,
   redactAttributeNative,
   redactStringNative,
+  reservesModelOrToolName,
 } from "@langwatch/redaction/pii";
 import type {
   PIIRedactionLevel,
@@ -38,6 +39,8 @@ type StringEntry = {
   field: "stringValue" | "message";
   /** The original text value */
   text: string;
+  /** A model, provider or tool name: its name/place findings are dropped */
+  isNameExempt: boolean;
 };
 
 export class OtlpSpanPiiRedactionService {
@@ -254,16 +257,7 @@ export class OtlpSpanPiiRedactionService {
       return true;
     }
 
-    const results = await this.policy.clearBatch(
-      entries.map((e) => e.text),
-      options,
-    );
-
-    if (results.length !== entries.length) {
-      throw new Error(
-        `Incomplete PII batch: got ${results.length} results for ${entries.length} inputs`,
-      );
-    }
+    const results = await this.policy.clearBatch(entries, options);
 
     for (let i = 0; i < entries.length; i++) {
       const redacted = results[i];
@@ -308,6 +302,7 @@ export class OtlpSpanPiiRedactionService {
           owner: span.status,
           field: "message",
           text: span.status.message,
+          isNameExempt: false,
         });
         totalLength += span.status.message.length;
         anyRedacted = true;
@@ -395,6 +390,10 @@ export class OtlpSpanPiiRedactionService {
           owner: attr.value,
           field: "stringValue",
           text: attr.value.stringValue,
+          isNameExempt: reservesModelOrToolName({
+            key: attr.key,
+            value: attr.value.stringValue,
+          }),
         });
         totalLength += attr.value.stringValue.length;
         collected = true;

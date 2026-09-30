@@ -133,7 +133,10 @@ describe("config", () => {
     });
 
     describe("when it asks whether one is there", () => {
-      /** @scenario "Asking whether the MCP configuration exists is not a failure" */
+      /**
+       * @scenario "Asking whether the MCP configuration exists is not a failure"
+       * @scenario "Checking for a config before it exists logs nothing"
+       */
       it("is told there is none, and nothing is printed", () => {
         const console_error = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -166,7 +169,10 @@ describe("config", () => {
         expect(tryGetConfig()?.endpoint).toBe("https://asked.example.com");
       });
 
-      /** @scenario "The initialised configuration is what the asking caller gets" */
+      /**
+       * @scenario "The initialised configuration is what the asking caller gets"
+       * @scenario "A config counts as present once initialized or scoped"
+       */
       it("is handed the scoped configuration inside a scoped call", () => {
         initConfig({ apiKey: "global-key", endpoint: "https://global.example.com" });
 

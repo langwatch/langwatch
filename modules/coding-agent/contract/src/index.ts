@@ -14,7 +14,11 @@ export * from "./telemetry/session-context.ts";
 // The pure derivations `CodingAgentApi`'s implementation answers directly, with no
 // session store read: content-key lookups, transcript building and span filtering.
 export * from "./coding-agent-log-content.ts";
-export { shouldFilterCodingAgentSpan } from "./telemetry/coding-agent-span-filter.ts";
+export {
+  CODEX_EXEC_SCOPE,
+  isCodexScope,
+  shouldFilterCodingAgentSpan,
+} from "./telemetry/coding-agent-span-filter.ts";
 export {
   buildCodingAgentTranscript,
   codingAgentTranscriptSchema,

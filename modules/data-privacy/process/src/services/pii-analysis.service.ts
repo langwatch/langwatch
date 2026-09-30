@@ -22,6 +22,7 @@ export class PiiAnalysisService implements PiiAnalysis {
     text: string;
     piiRedactionLevel: PIIRedactionLevel;
     exceptPatterns?: readonly string[];
+    spareNamesAndPlaces?: boolean;
   }): Promise<PiiClearing> {
     return this.dlp.clear(input);
   }
@@ -31,6 +32,7 @@ export class PiiAnalysisService implements PiiAnalysis {
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     projectId?: string | undefined;
+    spareNamesAndPlaces?: readonly boolean[] | undefined;
   }): Promise<(string | null)[]> {
     return this.presidio.clear(input);
   }

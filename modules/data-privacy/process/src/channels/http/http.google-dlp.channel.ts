@@ -78,7 +78,14 @@ export class HttpGoogleDlpChannel implements GoogleDlpChannel {
       const start = finding.location?.codepointRange?.start;
       const end = finding.location?.codepointRange?.end;
       if (start == null || end == null) return [];
-      return [{ start: Number(start), end: Number(end), quote: finding.quote ?? undefined }];
+      return [
+        {
+          start: Number(start),
+          end: Number(end),
+          quote: finding.quote ?? undefined,
+          infoType: finding.infoType?.name ?? undefined,
+        },
+      ];
     });
   }
 

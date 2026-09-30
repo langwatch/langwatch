@@ -113,14 +113,16 @@ export class OpsCheckupService {
   private static async gatewayFacts({
     gateway,
     probes,
+    publicBaseUrl,
   }: {
     gateway: OpsCheckupDependencies["peers"]["gateway"];
     probes: OpsCheckupDependencies["channels"]["probes"];
+    publicBaseUrl: string | undefined;
   }): ReturnType<CheckupFacts["gateway"]> {
     const { baseUrl, expectedControlPlaneUrl } = gateway.getDeploymentAddresses();
     return {
       baseUrl,
-      expectedControlPlaneUrl,
+      controlPlaneUrls: appAddresses([publicBaseUrl, expectedControlPlaneUrl]),
       health: async () => {
         const answer = await probes.get({
           url: `${baseUrl}/healthz`,
@@ -195,7 +197,11 @@ export class OpsCheckupService {
       },
       redis: { target: redis.describeTarget(), ready: () => redis.ping() },
       gateway: () =>
-        OpsCheckupService.gatewayFacts({ gateway: peers.gateway, probes: channels.probes }),
+        OpsCheckupService.gatewayFacts({
+          gateway: peers.gateway,
+          probes: channels.probes,
+          publicBaseUrl: members.publicBaseUrl,
+        }),
       license: async () => licenseView(await peers.licensing.getLicenseStatus(organizationId)),
       connect: async () => {
         const [status, deployment] = await Promise.all([
@@ -312,6 +318,15 @@ export class OpsCheckupService {
   setUsageReportSwitches(switches: UsageReportSwitchChange): Promise<UsageReportPreview> {
     return this.usageReports.setSwitches(switches);
   }
+}
+
+/** The addresses this app is reached at, public first, each once. */
+function appAddresses(candidates: (string | undefined)[]): string[] {
+  return [
+    ...new Set(
+      candidates.filter((url): url is string => typeof url === "string" && url.trim() !== ""),
+    ),
+  ];
 }
 
 /** Where the gateway says its control plane is, or why it would not say. */

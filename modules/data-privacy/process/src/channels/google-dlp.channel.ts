@@ -4,6 +4,8 @@ export type GoogleDlpFinding = Readonly<{
   end: number;
   /** The matched text DLP quoted back, when it did. */
   quote: string | undefined;
+  /** The info type DLP matched (`PERSON_NAME`), when it said. */
+  infoType?: string | undefined;
 }>;
 
 /** Google Cloud DLP, as this module reaches it: one inspection of one text. */

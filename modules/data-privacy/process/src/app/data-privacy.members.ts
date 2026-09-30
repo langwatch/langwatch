@@ -48,6 +48,8 @@ export interface PiiAnalysis {
     text: string;
     piiRedactionLevel: PIIRedactionLevel;
     exceptPatterns?: readonly string[];
+    /** A model, provider or tool name: its name and place findings are left unmasked. */
+    spareNamesAndPlaces?: boolean;
   }): Promise<PiiClearing>;
   clearPresidio(input: {
     texts: string[];
@@ -55,6 +57,8 @@ export interface PiiAnalysis {
     entities?: readonly string[] | undefined;
     /** The tenant the texts belong to, when the path has one. */
     projectId?: string | undefined;
+    /** Per text: a model, provider or tool name, spared name and place findings. */
+    spareNamesAndPlaces?: readonly boolean[] | undefined;
   }): Promise<(string | null)[]>;
   close(): Promise<void>;
 }

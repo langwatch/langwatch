@@ -14,6 +14,7 @@ export {
   METADATA_SUBKEY_PREFIXES,
   isOpaqueIdentifierValue,
   isReservedIdentifierAttributeKey,
+  reservesModelOrToolName,
   reservesTraceAddress,
 } from "./identifierHoldout.ts";
 export {

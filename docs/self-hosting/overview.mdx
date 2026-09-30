@@ -27,7 +27,7 @@ Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 
 `examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
-Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
+Langy, the AI assistant, is part of this install and runs on the node's normal container runtime. To harden it with a sandboxed runtime on EKS, see [installing gVisor on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
 </Tip>
 
 <Note>
@@ -57,9 +57,9 @@ graph LR
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
 <Note>
-  Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional,
-  gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting
-  Langy](/self-hosting/langy/overview).
+  Running [Langy](/langy/overview), the automated AI engineer? It ships as an agent pod in the
+  same umbrella chart, on by default; set `langyagent.chartManaged: false` to leave it out. See
+  [Self-hosting Langy](/self-hosting/langy/overview).
 </Note>
 
 ## Deployment Models

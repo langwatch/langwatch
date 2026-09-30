@@ -96,4 +96,52 @@ describe("GoogleDlpRedactionService", () => {
       expect(dlp.inspections[0]!.text).toHaveLength(250_000);
     });
   });
+
+  describe("given a model name with a misread first name and a phone number", () => {
+    const value = "claude-sonnet-4-6+12345678901";
+    const nameAndPhone = [
+      { start: 0, end: 6, quote: "claude", infoType: "FIRST_NAME" },
+      { start: 18, end: 29, quote: "12345678901", infoType: "PHONE_NUMBER" },
+    ];
+
+    it("masks only the phone number when the value is flagged", async () => {
+      const { dlp, service } = setup();
+      dlp.answerWith(nameAndPhone);
+
+      const clearing = await service.clear({
+        text: value,
+        piiRedactionLevel: "STRICT",
+        spareNamesAndPlaces: true,
+      });
+
+      expect(clearing).toEqual({ kind: "redacted", text: "claude-sonnet-4-6+[REDACTED]" });
+    });
+
+    /** @scenario "A spared name an exception keeps still blocks an overlapping finding on the fallback detector" */
+    it("still protects a spared name an exception keeps from an overlapping finding", async () => {
+      const { dlp, service } = setup();
+      dlp.answerWith([
+        { start: 0, end: 6, quote: "claude", infoType: "FIRST_NAME" },
+        { start: 3, end: 29, quote: undefined, infoType: "PHONE_NUMBER" },
+      ]);
+
+      const clearing = await service.clear({
+        text: value,
+        piiRedactionLevel: "STRICT",
+        exceptPatterns: ["claude"],
+        spareNamesAndPlaces: true,
+      });
+
+      expect(clearing).toEqual({ kind: "redacted", text: "claude[REDACTED]" });
+    });
+
+    it("masks the name too when the value is not flagged", async () => {
+      const { dlp, service } = setup();
+      dlp.answerWith(nameAndPhone);
+
+      const clearing = await service.clear({ text: value, piiRedactionLevel: "STRICT" });
+
+      expect(clearing).toEqual({ kind: "redacted", text: "[REDACTED]-sonnet-4-6+[REDACTED]" });
+    });
+  });
 });

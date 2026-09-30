@@ -1,3 +1,4 @@
+import { CODEX_EXEC_SCOPE, isCodexScope } from "@langwatch/coding-agent-contract";
 import { ATTR_KEYS, CODEX_TURN_SPAN_NAME } from "@langwatch/trace-contract";
 
 import { type ExtractorContext, takeAttribute } from "../rules/canonical-attributes.rules.ts";
@@ -5,10 +6,8 @@ import {
   applyCanonicalLifts,
   asNumber,
   asString,
-  CODEX_EXEC_SCOPE_NAME,
   CODEX_PROVIDER_KEY,
   CODEX_REDUNDANT_USAGE_SPAN_NAMES,
-  CODEX_SCOPE_NAMES,
   extractConversationId,
   isCodexModel,
   computeNonCachedInput,
@@ -27,14 +26,14 @@ export class CodexSpanCanonicaliserService {
     this.markCodexProviderBundled(ctx);
 
     const scopeName = ctx.span.instrumentationScope?.name ?? "";
-    if (!CODEX_SCOPE_NAMES[scopeName] === true) {
+    if (!isCodexScope(scopeName)) {
       return;
     }
 
     if (ctx.span.name !== CODEX_TURN_SPAN_NAME) {
       this.liftResponseSpan(ctx);
       this.typeUsageSpanAsModelCall(ctx);
-      if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
+      if (scopeName !== CODEX_EXEC_SCOPE) {
         this.markRedundantUsageSpan(ctx);
       }
 
@@ -77,7 +76,7 @@ export class CodexSpanCanonicaliserService {
       ctx.recordRule("codex/session_task.turn");
     }
 
-    if (scopeName === CODEX_EXEC_SCOPE_NAME && this.hasTokenUsage(ctx)) {
+    if (scopeName === CODEX_EXEC_SCOPE && this.hasTokenUsage(ctx)) {
       ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
       ctx.recordRule("codex/skip-exec-rollup-usage");
     }

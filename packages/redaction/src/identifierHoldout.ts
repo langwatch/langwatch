@@ -154,6 +154,50 @@ export function reservesTraceAddress({ key, value }: { key: string; value: strin
 }
 
 /**
+ * Attributes holding a model, provider or tool name, set by code. The name pass reads a bare
+ * model id (`claude-sonnet-4-6`) as a first name, so strict stored `[PERSON]`. Compared
+ * lower-cased, and the value is gated too ({@link MODEL_OR_TOOL_NAME_VALUE}): nobody owns these.
+ */
+const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
+  "ai.model.id",
+  "ai.model.provider",
+  "ai.response.model",
+  "ai.toolcall.name",
+  "gen_ai.request.model",
+  "gen_ai.response.model",
+  "gen_ai.system",
+  "gen_ai.provider.name",
+  "gen_ai.tool.name",
+  "llm.model_name",
+]);
+
+/**
+ * One token of letters, digits and vendor separators (`anthropic/claude-sonnet-4`, `gpt-5:latest`).
+ * No whitespace or `@`, so prose and emails are still analysed. The accepted residual is a lone
+ * single-token name ("jane.doe"): it cannot be told from `anthropic.messages` by shape.
+ */
+const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]+$/;
+
+/** Real model names fit, a full Bedrock inference-profile ARN included (about 100 characters). */
+export const MAX_MODEL_OR_TOOL_NAME_LENGTH = 128;
+
+/** A scheme (`https://`), or a dotted host before the first `/`; a vendor namespace has no dot. */
+const URL_SHAPED = /:\/\/|^[^/]*\.[^/]*\//;
+
+/**
+ * Whether this attribute is a model, provider or tool name carrying a value shaped like one.
+ * Such a value is spared name and place detection only: every other entity is still looked for.
+ */
+export function reservesModelOrToolName({ key, value }: { key: string; value: string }): boolean {
+  return (
+    RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS.has(key.toLowerCase()) &&
+    value.length <= MAX_MODEL_OR_TOOL_NAME_LENGTH &&
+    MODEL_OR_TOOL_NAME_VALUE.test(value) &&
+    !URL_SHAPED.test(value)
+  );
+}
+
+/**
  * Held back from PII analysis: reserved by name, or a value that's
  * exclusively one opaque identifier token. Attribute values only — free
  * text (a log body, a status message, chat content) is always analysed.

@@ -2,7 +2,12 @@ import { ClickHouseSchemaLock, parseRoutingTable } from "@langwatch/clickhouse-c
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import { GOOSE_INHERITED_VARIABLES, runMigrations } from "./goose.migration-runner.ts";
+import {
+  GOOSE_INHERITED_VARIABLES,
+  readClickHouseWaitSeconds,
+  runMigrations,
+  waitForClickHouse,
+} from "./goose.migration-runner.ts";
 import { HOT_DAYS_VARIABLES, reconcileTTL } from "./ttl.reconciler.ts";
 
 const logger = createLogger("langwatch:task:clickhouse-migrate");
@@ -31,6 +36,8 @@ export type ClickHouseMigrationSettings = {
   coldStorageEnabled: boolean;
   hotDayOverrides: Readonly<Record<string, string | undefined>>;
   childEnvironment: Readonly<Record<string, string | undefined>>;
+  /** `CLICKHOUSE_MIGRATE_WAIT_SECONDS`: unset waits the runner's default, `0` turns it off. */
+  waitSeconds?: number;
 };
 
 const NO_SETTINGS: ClickHouseMigrationSettings = {
@@ -48,8 +55,15 @@ export class GooseClickHouseMigrationExecutor {
     url: string;
     settings: ClickHouseMigrationSettings;
   }): Promise<void> {
-    const { clusterName, coldStorageEnabled, hotDayOverrides, childEnvironment } = settings;
-    await runMigrations({ connectionUrl: url, clusterName, childEnvironment, verbose: true });
+    const { clusterName, coldStorageEnabled, hotDayOverrides, childEnvironment, waitSeconds } =
+      settings;
+    await runMigrations({
+      connectionUrl: url,
+      clusterName,
+      childEnvironment,
+      waitSeconds,
+      verbose: true,
+    });
     await reconcileTTL({
       connectionUrl: url,
       clusterName,
@@ -57,6 +71,16 @@ export class GooseClickHouseMigrationExecutor {
       hotDayOverrides,
       verbose: true,
     });
+  }
+
+  async waitFor({
+    url,
+    settings,
+  }: {
+    url: string;
+    settings: ClickHouseMigrationSettings;
+  }): Promise<void> {
+    await waitForClickHouse({ connectionUrl: url, waitSeconds: settings.waitSeconds });
   }
 }
 
@@ -113,6 +137,15 @@ export class ClickHouseMigrateTask extends Task {
       return;
     }
     if (this.config.buildTime) return;
+
+    // Wait for a booting ClickHouse before queueing on the lock, so a process
+    // that is only waiting for the server never holds up the ones behind it.
+    if (this.config.sharedUrl !== undefined) {
+      await this.executor.waitFor({
+        url: this.config.sharedUrl,
+        settings: this.config.settings ?? NO_SETTINGS,
+      });
+    }
 
     // One process at a time owns the schema. Migration is not tenant-scoped —
     // it drops views and re-derives tables for every tenant at once — so a
@@ -207,6 +240,7 @@ export function resolveClickHouseMigrationTaskConfig(
       coldStorageEnabled: source.CLICKHOUSE_COLD_STORAGE_ENABLED === "true",
       hotDayOverrides: pickDefined(source, HOT_DAYS_VARIABLES),
       childEnvironment: pickDefined(source, GOOSE_INHERITED_VARIABLES),
+      waitSeconds: readClickHouseWaitSeconds(source.CLICKHOUSE_MIGRATE_WAIT_SECONDS),
     },
   };
 }

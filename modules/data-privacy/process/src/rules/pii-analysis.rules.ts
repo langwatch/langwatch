@@ -1,10 +1,11 @@
-import { PRESIDIO_STRICT_ENTITIES } from "@langwatch/redaction";
+import { formatPiiMarker, PRESIDIO_STRICT_ENTITIES } from "@langwatch/redaction";
 import {
   matchesPiiException,
   type ProtectedRange,
   subtractProtectedRanges,
 } from "@langwatch/redaction/pii";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { GoogleDlpFinding } from "../channels/google-dlp.channel.ts";
 
@@ -79,6 +80,87 @@ export function presidioEntitiesFor(
   );
 }
 
+/** What the name/place model finds, and so what it misreads on a model id. */
+export const NAME_AND_PLACE_ENTITIES: ReadonlySet<string> = new Set(["PERSON", "LOCATION"]);
+
+/**
+ * DLP's counterpart of {@link NAME_AND_PLACE_ENTITIES}. STREET_ADDRESS stays masked on purpose:
+ * it needs a street-shaped value, so it does not misfire on a model id.
+ */
+const DLP_NAME_AND_PLACE_INFO_TYPES: ReadonlySet<string> = new Set([
+  "FIRST_NAME",
+  "LAST_NAME",
+  "PERSON_NAME",
+  "LOCATION",
+]);
+
+/** Presidio's findings as the analysis service serializes them in `raw_response.results`. */
+const presidioFindingsSchema = z.array(
+  z.object({
+    entity_type: z.string(),
+    start: z.number().int(),
+    end: z.number().int(),
+    score: z.number(),
+  }),
+);
+
+type PresidioFinding = z.infer<typeof presidioFindingsSchema>[number];
+
+/** A spared redaction: the new text, nothing left to redact, or findings that cannot be placed. */
+export type SparedRedaction =
+  | { kind: "redacted"; text: string }
+  | { kind: "unchanged" }
+  | { kind: "unplaceable" };
+
+/**
+ * `text` redacted from Presidio's findings, leaving name and place findings out. Findings index
+ * the text Presidio analysed (trimmed, JSON escapes unfolded, codepoints), so a text either step
+ * would change is unplaceable and the caller keeps Presidio's own full redaction.
+ */
+export function redactSparingNamesAndPlaces({
+  text,
+  findings,
+}: {
+  text: string;
+  findings: unknown;
+}): SparedRedaction {
+  const parsed = presidioFindingsSchema.safeParse(findings);
+  if (!parsed.success) return { kind: "unplaceable" };
+  if (text !== text.trim() || /[\\\uD800-\uDFFF]/.test(text)) return { kind: "unplaceable" };
+  const kept = parsed.data
+    .filter((finding) => !NAME_AND_PLACE_ENTITIES.has(finding.entity_type))
+    .filter(
+      (finding) => finding.start >= 0 && finding.end <= text.length && finding.start < finding.end,
+    );
+  if (kept.length === 0) return { kind: "unchanged" };
+
+  let redacted = "";
+  let cursor = 0;
+  for (const { entity_type, start, end } of mergeOverlapping(kept)) {
+    redacted += text.substring(cursor, start) + formatPiiMarker(entity_type);
+    cursor = end;
+  }
+  return { kind: "redacted", text: redacted + text.substring(cursor) };
+}
+
+/** Overlapping findings merged into one span each, labelled by the higher-scoring finding. */
+function mergeOverlapping(findings: readonly PresidioFinding[]): PresidioFinding[] {
+  const merged: PresidioFinding[] = [];
+  for (const finding of findings.toSorted((a, b) => a.start - b.start)) {
+    const last = merged.at(-1);
+    if (!last || finding.start >= last.end) {
+      merged.push(finding);
+      continue;
+    }
+    merged[merged.length - 1] = {
+      ...(finding.score > last.score ? finding : last),
+      start: last.start,
+      end: Math.max(last.end, finding.end),
+    };
+  }
+  return merged;
+}
+
 /** DLP counts codepoints; a text without surrogate pairs indexes the same either way. */
 function codepointToCodeUnitConverter(text: string): (cp: number) => number {
   if (!/[\uD800-\uDFFF]/.test(text)) return (cp) => cp;
@@ -101,6 +183,8 @@ export function maskGoogleDlpFindings(input: {
   text: string;
   findings: readonly GoogleDlpFinding[];
   exceptions: readonly RegExp[];
+  /** Leave name and place findings unmasked; they still protect an exception's range first. */
+  spareNamesAndPlaces?: boolean;
 }): { redacted: string; masked: number } {
   const toCodeUnit = codepointToCodeUnitConverter(input.text);
   const ranged = input.findings.map((finding) => ({
@@ -115,7 +199,10 @@ export function maskGoogleDlpFindings(input: {
 
   let redacted = input.text;
   let masked = 0;
-  for (const { startIdx, endIdx } of ranged) {
+  for (const { finding, startIdx, endIdx } of ranged) {
+    if (input.spareNamesAndPlaces && DLP_NAME_AND_PLACE_INFO_TYPES.has(finding.infoType ?? "")) {
+      continue;
+    }
     for (const part of subtractProtectedRanges({ start: startIdx, end: endIdx }, protectedRanges)) {
       redacted =
         redacted.substring(0, part.start) +

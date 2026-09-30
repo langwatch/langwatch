@@ -93,6 +93,60 @@ describe("PresidioRedactionService", () => {
     });
   });
 
+  describe("when a model name is spared name and place findings", () => {
+    const PERSON = { entity_type: "PERSON", start: 0, end: 6, score: 0.85 };
+    const PHONE = { entity_type: "PHONE_NUMBER", start: 18, end: 29, score: 0.75 };
+    const answering = (raw: { anonymized: string; results?: (typeof PERSON)[] }[]) =>
+      setup(async () => ({
+        kind: "detected",
+        results: raw.map((raw_response) => ({ status: "processed" as const, raw_response })),
+      }));
+
+    it("sends both texts in one request and drops the name on the flagged text only", async () => {
+      const { requests, service } = answering([
+        { anonymized: "<PERSON>-sonnet-4-6", results: [PERSON] },
+        { anonymized: "<PERSON> called", results: [PERSON] },
+      ]);
+
+      const cleared = await service.clear({
+        texts: ["claude-sonnet-4-6", "Jane called"],
+        piiRedactionLevel: "STRICT",
+        spareNamesAndPlaces: [true, false],
+      });
+
+      expect(requests).toHaveLength(1);
+      expect(cleared).toEqual([null, "[PERSON] called"]);
+    });
+
+    /** @scenario "A name found in a model name is dropped while a phone number beside it is redacted" */
+    it("replaces only the phone number with its marker", async () => {
+      const { service } = answering([
+        { anonymized: "<PERSON>-sonnet-4-6+<PHONE_NUMBER>", results: [PERSON, PHONE] },
+      ]);
+
+      const [cleared] = await service.clear({
+        texts: ["claude-sonnet-4-6+12345678901"],
+        piiRedactionLevel: "STRICT",
+        spareNamesAndPlaces: [true],
+      });
+
+      expect(cleared).toBe("claude-sonnet-4-6+[PHONE_NUMBER]");
+    });
+
+    /** @scenario "A model name whose findings cannot be placed keeps the full redaction" */
+    it("keeps the analysis service's own redaction when no finding positions came back", async () => {
+      const { service } = answering([{ anonymized: "<PERSON>-sonnet-4-6" }]);
+
+      const [cleared] = await service.clear({
+        texts: ["claude-sonnet-4-6"],
+        piiRedactionLevel: "STRICT",
+        spareNamesAndPlaces: [true],
+      });
+
+      expect(cleared).toBe("[PERSON]-sonnet-4-6");
+    });
+  });
+
   describe("when asked whether the analysis service is configured", () => {
     /** @scenario "Whether the analysis service is reachable is asked of evaluation, once" */
     it("asks once with an empty batch and remembers the answer", async () => {

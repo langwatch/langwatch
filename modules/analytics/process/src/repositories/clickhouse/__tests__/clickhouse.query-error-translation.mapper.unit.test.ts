@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  extractUnknownIdentifier,
   isClickHouseResultTooLargeError,
+  isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
 } from "../clickhouse.query-error-translation.mapper.ts";
 
@@ -38,5 +40,28 @@ describe("isClickHouseResultTooLargeError", () => {
     const raw = Object.assign(new Error("boom"), { code: "396", type: "TOO_MANY_ROWS_OR_BYTES" });
 
     expect(translateClickHouseQueryError(raw, 1)).toBe(raw);
+  });
+});
+
+describe("extractUnknownIdentifier", () => {
+  describe("given the analyzer's sentence for a name used as a function argument", () => {
+    // Verbatim from a real 25.8 server: a name passed to a function gets the
+    // longer "expression or function" sentence.
+    const raised = () =>
+      Object.assign(
+        new Error(
+          "Unknown expression or function identifier `trace_idd` in scope SELECT arrayJoin(trace_idd) AS label, count() AS n FROM traces GROUP BY label ORDER BY n DESC. Maybe you meant: ['label']. ",
+        ),
+        { code: "47", type: "UNKNOWN_IDENTIFIER" },
+      );
+
+    it("recognises it", () => {
+      expect(isClickHouseUnknownIdentifierError(raised())).toBe(true);
+    });
+
+    /** @scenario "A missing column passed to a function is named in the refusal" */
+    it("names the column, and nothing else from the message", () => {
+      expect(extractUnknownIdentifier(raised())).toBe("trace_idd");
+    });
   });
 });

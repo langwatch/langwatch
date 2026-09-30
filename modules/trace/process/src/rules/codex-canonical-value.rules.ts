@@ -6,16 +6,10 @@ import {
 
 export const CODEX_EVENT_NAME_PREFIX = "codex.";
 export const CODEX_PROVIDER_KEY = "openai_codex";
-const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
 
 export const isCodexModel = (modelId: string): boolean =>
   modelId.startsWith(`${CODEX_PROVIDER_KEY}/`);
 
-export const CODEX_EXEC_SCOPE_NAME = "codex_exec";
-export const CODEX_SCOPE_NAMES: Readonly<Record<string, true>> = {
-  [CODEX_RUST_SCOPE_NAME]: true,
-  [CODEX_EXEC_SCOPE_NAME]: true,
-};
 export const CODEX_REDUNDANT_USAGE_SPAN_NAMES: Readonly<Record<string, true>> = {
   handle_responses: true,
 };

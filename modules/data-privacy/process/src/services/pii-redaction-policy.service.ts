@@ -20,6 +20,7 @@ import {
   type PIICheckOptions,
   type PiiAnalysis,
 } from "../app/data-privacy.members.ts";
+import { NAME_AND_PLACE_ENTITIES, presidioEntitiesFor } from "../rules/pii-analysis.rules.ts";
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.
@@ -35,7 +36,12 @@ export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 export type BatchClearPIIFunction = (
   texts: string[],
   options: PIICheckOptions,
+  /** Per text: a model, provider or tool name, spared name/place findings. */
+  spareNamesAndPlaces?: readonly boolean[],
 ) => Promise<(string | null)[]>;
+
+/** One text to analyse, and whether its name/place findings are dropped. */
+export type PiiAnalysisItem = { text: string; isNameExempt: boolean };
 
 /** The tenant's native-redaction context, or the analysis-service path when none applies. */
 export type NativeContext =
@@ -75,28 +81,37 @@ const runGoogleDlpBatch = ({
   texts,
   piiRedactionLevel,
   exceptPatterns,
+  spareNamesAndPlaces,
 }: {
   transport: PiiAnalysis;
   texts: string[];
   piiRedactionLevel: PIIRedactionLevel;
   exceptPatterns?: readonly string[];
+  spareNamesAndPlaces?: readonly boolean[];
 }): Promise<(string | null)[]> =>
   Promise.all(
-    texts.map(async (text) => {
+    texts.map(async (text, i) => {
       const clearing = await transport.clearGoogleDlp({
         text,
         piiRedactionLevel,
         exceptPatterns,
+        spareNamesAndPlaces: spareNamesAndPlaces?.[i] ?? false,
       });
       return clearing.kind === "redacted" ? clearing.text : null;
     }),
   );
 
-const batchClearPII = async (
-  transport: PiiAnalysis,
-  texts: string[],
-  options: PIICheckOptions,
-): Promise<(string | null)[]> => {
+const batchClearPII = async ({
+  transport,
+  texts,
+  options,
+  spareNamesAndPlaces,
+}: {
+  transport: PiiAnalysis;
+  texts: string[];
+  options: PIICheckOptions;
+  spareNamesAndPlaces: readonly boolean[];
+}): Promise<(string | null)[]> => {
   const { piiRedactionLevel, mainMethod, entities, exceptPatterns, projectId } = options;
 
   if (mainMethod === "google_dlp") {
@@ -105,22 +120,30 @@ const batchClearPII = async (
       texts,
       piiRedactionLevel,
       exceptPatterns,
+      spareNamesAndPlaces,
     });
   }
 
   try {
-    return await transport.clearPresidio({ texts, piiRedactionLevel, entities, projectId });
+    return await transport.clearPresidio({
+      texts,
+      piiRedactionLevel,
+      entities,
+      projectId,
+      spareNamesAndPlaces,
+    });
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
     // native pass already handled the pattern-based selections, so this only
     // ever widens the analysis-service entities on a presidio outage. The
     // policy's do-not-redact exceptions do carry over, so the fallback cannot
-    // re-redact a value an exception kept.
+    // re-redact a value an exception kept, and so does the model/tool name flag.
     return runGoogleDlpBatch({
       transport,
       texts,
       piiRedactionLevel,
       exceptPatterns,
+      spareNamesAndPlaces,
     });
   }
 };
@@ -166,8 +189,39 @@ export class PiiRedactionPolicyService {
    * for every strict and custom escalation, Google DLP when the options say so
    * or when Presidio is unreachable.
    */
-  async clearBatch(texts: string[], options: PIICheckOptions): Promise<(string | null)[]> {
-    return batchClearPII(this.deps.transport, texts, options);
+  async clearBatch(
+    items: readonly PiiAnalysisItem[],
+    options: PIICheckOptions,
+  ): Promise<(string | null)[]> {
+    const results: (string | null)[] = items.map(() => null);
+    // A spared value has nothing to be scanned for when the call looks only
+    // for names and places, so it stays out of the request altogether.
+    const isOnlyNamesAndPlaces =
+      items.some((item) => item.isNameExempt) &&
+      presidioEntitiesFor(options.piiRedactionLevel, options.entities).every((entity) =>
+        NAME_AND_PLACE_ENTITIES.has(entity),
+      );
+    const indexes = items.flatMap((item, i) =>
+      item.isNameExempt && isOnlyNamesAndPlaces ? [] : [i],
+    );
+    const sent = indexes.flatMap((i) => items[i] ?? []);
+    if (sent.length === 0) return results;
+
+    const batchResults = await batchClearPII({
+      transport: this.deps.transport,
+      texts: sent.map((item) => item.text),
+      options,
+      spareNamesAndPlaces: sent.map((item) => item.isNameExempt),
+    });
+    if (batchResults.length !== sent.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${batchResults.length} results for ${sent.length} inputs`,
+      );
+    }
+    indexes.forEach((itemIndex, j) => {
+      results[itemIndex] = batchResults[j] ?? null;
+    });
+    return results;
   }
 
   /**

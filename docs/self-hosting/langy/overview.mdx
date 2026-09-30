@@ -1,6 +1,6 @@
 ---
 title: Self-Hosting Langy
-description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
+description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the optional gVisor sandbox.
 sidebarTitle: Overview
 keywords:
   - self-host langy
@@ -11,11 +11,11 @@ keywords:
 
 Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, and ships **enabled**: a plain `helm install` deploys it, materialises the shared secret, wires the app and workers to it, and opens Langy to everyone in the install.
 
-The default pins the pod to a `gvisor` RuntimeClass. On a cluster without one, only the agent pod waits (Pending) while the rest of the install runs; provide a sandboxed runtime or accept running without one. See [Setup](/self-hosting/langy/setup).
+By default the pod runs on the node's normal container runtime, so it starts on any cluster. To isolate it from the host, pin it to a sandboxed RuntimeClass such as `gvisor`. See [Setup](/self-hosting/langy/setup).
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
-The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [agent worker](/langy/how-langy-works) per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
+The `langyagent` pod is a single Go "manager" process that spawns one [agent worker](/langy/how-langy-works) per conversation. Workers run on the node's normal runtime by default; set a sandboxed `runtimeClassName` to harden them. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
   **Also check:** [Setup](/self-hosting/langy/setup), [Environment
@@ -29,25 +29,25 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 
 ## At a glance
 
-|                 |                                                                                                                               |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Deployment      | Separate `langyagent` Deployment + ConfigMap + Service + NetworkPolicy in the umbrella chart                                  |
-| Default state   | On (`langyagent.chartManaged: true`); disable with `chartManaged: false`                                                      |
-| Access          | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead                                      |
-| Replicas        | 1 (render-time guard blocks more until conversation-sticky routing exists)                                                    |
-| Update strategy | `Recreate`, no HPA. Scale vertically.                                                                                         |
-| Sandbox         | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true`                         |
-| Sizing          | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi                                                                      |
-| Shared secret   | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
-| GitHub App      | Optional, for bot-authored pull requests                                                                                      |
-| Outbound egress | Off by default (`networkPolicy.allowExternalHttps: false`)                                                                    |
+|                 |                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deployment      | Separate `langyagent` Deployment + ConfigMap + Service + NetworkPolicy in the umbrella chart                                                            |
+| Default state   | On (`langyagent.chartManaged: true`); disable with `chartManaged: false`                                                                                |
+| Access          | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead                                                                |
+| Replicas        | 1 (render-time guard blocks more until conversation-sticky routing exists)                                                                              |
+| Update strategy | `Recreate`, no HPA. Scale vertically.                                                                                                                   |
+| Sandbox         | None by default (`runtimeClassName: ""`, `acceptUnsandboxedRuntime: true`); set `runtimeClassName` and `acceptUnsandboxedRuntime: false` to require one |
+| Sizing          | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi                                                                                                |
+| Shared secret   | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false`                           |
+| GitHub App      | Optional, for bot-authored pull requests                                                                                                                |
+| Outbound egress | Off by default (`networkPolicy.allowExternalHttps: false`)                                                                                              |
 
 ## Hard requirements
 
-- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime, for hardening.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`). The default runs it on the node's normal runtime so the install works on any cluster; for production, pin the pod to a sandboxed RuntimeClass and set `acceptUnsandboxedRuntime: false`. On a cluster without that RuntimeClass, the pod then waits with a `RuntimeClass not found` event. See [The sandbox](/langy/security/sandbox).
   - GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly).
   - On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works.
-  - EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`.
+  - EKS has no managed option: install gVisor on a node group ([Setup](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group)).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -63,7 +63,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 graph LR
     Browser["Browser<br/>(event-sourced UI)"] -->|"HTTPS"| App["LangWatch App<br/>(control plane)"]
     App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
-    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>agent worker"]
+    Agent -->|"one per conversation"| Worker["agent worker"]
     Worker -->|"langwatch CLI<br/>(per-session key)"| App
     Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
     Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
