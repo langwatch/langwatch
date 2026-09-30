@@ -107,6 +107,32 @@ describe("useEvaluatorEditorController", () => {
         });
         expect(CONFIGURED_MODEL).not.toBe(DEFAULT_MODEL);
       });
+
+      /** @scenario A new evaluator waits for the configured default before filling its model */
+      it("holds the form as loading until the defaults answer", async () => {
+        const { result, rerender } = renderHook(() =>
+          useEvaluatorEditorController({
+            isOpen: true,
+            evaluatorType: "langevals/llm_boolean",
+          }),
+        );
+
+        expect(result.current.isLoadingEvaluator).toBe(true);
+
+        queries["prompt.create_default"] = {
+          data: { model: CONFIGURED_MODEL, source: "role_default" } as never,
+          isLoading: false,
+        };
+        queries["analytics.topic_clustering_embeddings"] = {
+          data: null,
+          isLoading: false,
+        };
+        rerender();
+
+        await waitFor(() => {
+          expect(result.current.isLoadingEvaluator).toBe(false);
+        });
+      });
     });
   });
 

@@ -740,7 +740,10 @@ export function useEvaluatorEditorController(
     evaluatorType,
     evaluatorDef,
     effectiveEvaluatorDef,
-    isLoadingEvaluator: evaluatorQuery.isLoading,
+    // A new evaluator's form holds until its default models answer, so the
+    // reset that fills them in never lands on top of something typed.
+    isLoadingEvaluator:
+      evaluatorQuery.isLoading || (!evaluatorId && resolvedDefaultsLoading),
     workflowCard,
     isWorkflowEvaluator,
     hasSettings,
@@ -824,7 +827,6 @@ export function EvaluatorEditorBody({
 }) {
   const {
     form,
-    evaluatorId,
     evaluatorType,
     evaluatorDef,
     effectiveEvaluatorDef,
@@ -854,7 +856,7 @@ export function EvaluatorEditorBody({
   // decides which layout to draw.
   const isComparison = isComparisonEvaluatorType(evaluatorType);
 
-  if (evaluatorId && isLoadingEvaluator) {
+  if (isLoadingEvaluator) {
     return (
       <HStack justify="center" paddingY={8}>
         <Spinner size="md" />
@@ -1110,14 +1112,17 @@ export function EvaluatorEditorFooter({
     handleDiscard,
     handleApply,
     handleClose,
+    isLoadingEvaluator,
   } = controller;
 
   const isComparisonEditor = !!onComparisonChange;
-  const saveDisabled = isSaveDisabled({ isValid, isSaving });
+  // Nothing is saved while the form is still waiting on what it edits.
+  const isBusy = isSaving || isLoadingEvaluator;
+  const saveDisabled = isSaveDisabled({ isValid, isSaving: isBusy });
   const applyDisabled = isApplyDisabled({
     isComparisonEditor,
     isValid,
-    isSaving,
+    isSaving: isBusy,
   });
 
   if (onLocalConfigChange) {
