@@ -138,6 +138,22 @@ describe("given the SCIM tokens management family", () => {
     });
   });
 
+  describe("when a mint names a connection carrying a null byte", () => {
+    it("refuses it as the caller's error and mints nothing", async () => {
+      const api = mount();
+
+      const response = await api.request("", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ connectionId: "ssoc\u0000okta" }),
+      });
+
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(response.status).toBeLessThan(500);
+      expect(api.scim.generateToken).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a token is revoked", () => {
     it("revokes it in the caller's own organization and records the act", async () => {
       const api = mount();

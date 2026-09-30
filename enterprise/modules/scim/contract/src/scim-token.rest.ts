@@ -14,11 +14,25 @@ export const scimTokenRestSummarySchema = z.object({
 
 export const scimTokenIdParamsSchema = z.object({ id: z.string().min(1) });
 
+/** Postgres cannot store U+0000, so input carrying one is the caller's error, not a 500. */
+const withoutNullByte = (value: string) => !value.includes("\u0000");
+
 export const scimTokenCreateRestInputSchema = z.object({
-  description: z.string().trim().min(1).max(255).optional(),
+  description: z
+    .string()
+    .trim()
+    .min(1)
+    .max(255)
+    .refine(withoutNullByte, "description must not contain a null byte")
+    .optional(),
   /** D08: the connection this token is for, and the whole of its write
    *  authority. Optional on the wire and required by the application, so a
    *  provisioning tool that has not been updated gets the named
    *  `scim_connection_required` refusal rather than a schema error. */
-  connectionId: z.string().trim().min(1).optional(),
+  connectionId: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(withoutNullByte, "connectionId must not contain a null byte")
+    .optional(),
 });

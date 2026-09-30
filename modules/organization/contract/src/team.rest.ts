@@ -52,14 +52,26 @@ export const organizationTeamRestPaginationQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).optional().default(50),
 });
 
+/** Postgres cannot store U+0000, so a name carrying one is the caller's error, not a 500. */
+const withoutNullByte = (value: string) => !value.includes("\u0000");
+
 /** The body a create takes: a name, and nothing else. */
 export const organizationTeamRestCreateSchema = z.object({
-  name: z.string().min(1, "name is required").max(255),
+  name: z
+    .string()
+    .min(1, "name is required")
+    .max(255)
+    .refine(withoutNullByte, "name must not contain a null byte"),
 });
 
 /** The body a rename takes. A PATCH here never touches membership. */
 export const organizationTeamRestUpdateSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
+  name: z
+    .string()
+    .min(1)
+    .max(255)
+    .refine(withoutNullByte, "name must not contain a null byte")
+    .optional(),
 });
 
 /** The body that adds one member to a team, at a role. */

@@ -350,6 +350,19 @@ describe("given the teams REST family over the application the composition build
 
       expect(refusal.code).toBe("validation_error");
     });
+
+    it("refuses a name carrying a null byte rather than failing the write", async () => {
+      const { app, memory } = application();
+      const { send } = mountTeamsRestApplication(app);
+      const before = memory.teams.size;
+
+      const refusal = await refusalOf(
+        await send("/api/teams", { method: "POST", body: { name: "a\u0000b" } }),
+      );
+
+      expect(refusal.code).toBe("validation_error");
+      expect(memory.teams.size).toBe(before);
+    });
   });
 
   describe("when the collection is listed", () => {
