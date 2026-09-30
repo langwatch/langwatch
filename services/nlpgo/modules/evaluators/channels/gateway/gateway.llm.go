@@ -95,7 +95,7 @@ func (l *llm) dispatch(ctx context.Context, call dispatcher.Request) (*domain.Re
 		return nil, fmt.Errorf("%w: model provider answered status %d", channels.ErrRateLimited, resp.StatusCode)
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("model provider answered status %d", resp.StatusCode)
+		return nil, fmt.Errorf("model provider answered status %d: %s", resp.StatusCode, providerErrorMessage(resp.Body))
 	}
 	return resp, nil
 }
@@ -373,4 +373,18 @@ func parseEmbedding(body []byte, inputs int) (channels.EmbeddingResponse, error)
 		vectors[item.Index] = item.Embedding
 	}
 	return channels.EmbeddingResponse{Vectors: vectors, Usage: channels.Usage(parsed.Usage)}, nil
+}
+
+// providerErrorMessage is the provider's own error message, which callers read
+// to tell a refused tool_choice from other rejections.
+func providerErrorMessage(body []byte) string {
+	var parsed struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &parsed) != nil {
+		return ""
+	}
+	return parsed.Error.Message
 }
