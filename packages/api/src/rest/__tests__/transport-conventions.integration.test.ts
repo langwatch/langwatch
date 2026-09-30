@@ -311,3 +311,42 @@ describe("a schema failure thrown past the route's own validation", () => {
     expect(JSON.stringify(body)).toContain("name");
   });
 });
+
+describe("a store refusal thrown past the service", () => {
+  const traceIds = { traceId: "a".repeat(32), spanId: "b".repeat(16) };
+
+  /** @scenario "A value the store cannot hold is a 422, never a 500" */
+  it.each(["22021", "22P05", "22001"])(
+    "answers the 422 validation error for SQLSTATE %s",
+    (sqlState) => {
+      const failure = Object.assign(
+        new Error(`Invalid create() invocation. Database error. Code: \`${sqlState}\`. Message: x`),
+        { code: "P2039" },
+      );
+
+      const { status, body } = canonicalErrorFor(failure, traceIds);
+
+      expect(status).toBe(422);
+      expect(body).toMatchObject({ code: "validation_error", trace_id: traceIds.traceId });
+    },
+  );
+
+  /** @scenario "A value the store cannot hold is a 422, never a 500" */
+  it("keeps a database outage a 500", () => {
+    const failure = Object.assign(new Error("Database error. Code: `57P01`. Message: gone"), {
+      code: "P2039",
+    });
+
+    expect(canonicalErrorFor(failure).status).toBe(500);
+  });
+
+  /** @scenario "A unique constraint a service did not check is a 409, never a 500" */
+  it("answers the 409 conflict for a Prisma unique violation", () => {
+    const failure = Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+
+    const { status, body } = canonicalErrorFor(failure, traceIds);
+
+    expect(status).toBe(409);
+    expect(body).toMatchObject({ code: "conflict", trace_id: traceIds.traceId });
+  });
+});

@@ -3210,7 +3210,8 @@
     {
       "request": "GET /api/simulation-runs/batches/list",
       "query": {
-        "limit": 100
+        "scenarioSetId": "set-{uid}",
+        "limit": 50
       },
       "auth": "project-b",
       "expect": {
@@ -3508,7 +3509,7 @@
     "method": "GET",
     "path": "/api/simulation-runs",
     "query": {
-      "batchRunId": "batch-{uid}",
+      "scenarioSetId": "set-{uid}",
       "limit": 1
     }
   },
@@ -9898,7 +9899,7 @@
       "request": "GET /api/prompts/tags",
       "expect": {
         "status": 200,
-        "contains": "latest"
+        "contains": "production"
       }
     }
   ]

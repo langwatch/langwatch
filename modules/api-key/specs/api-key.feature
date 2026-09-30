@@ -196,3 +196,9 @@ Feature: API key lifecycle
     Given an elapsed login key whose minted ingest keys cannot be read
     When the session ceiling is applied
     Then the login key is revoked and counted
+
+  @unit
+  Scenario: A restricted API key reads back the permissions of its private role
+    Given a restricted key whose CUSTOM binding points at its own private role
+    When the key is read back by id
+    Then its permissions are the private role's permissions, as main reports them

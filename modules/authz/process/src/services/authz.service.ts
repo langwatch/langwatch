@@ -13,6 +13,8 @@ import {
   type AuthzAccessBinding,
   type AuthzBindingForSynthesis,
   type AuthzCustomRole,
+  type AuthzFindRolePermissionsInput,
+  type AuthzRolePermissions,
   type AuthzAccessBreakdownInput,
   type AuthzAccessBreakdownOutput,
   type AuthzDeclaredScopeId,
@@ -59,6 +61,7 @@ import {
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
 
 import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
@@ -112,6 +115,8 @@ export type AuthzServiceOptions = {
   /** Finalized cutover time used by compatibility fact minting. */
   findEngineCutoverAt?: (organizationId: string) => Promise<Instant | null>;
 };
+
+const rolePermissionListSchema = z.array(z.string());
 
 export class AuthzService extends AuthzServiceContract {
   static create(options: AuthzServiceOptions): AuthzService {
@@ -413,6 +418,15 @@ export class AuthzService extends AuthzServiceContract {
 
   async listUserCreatedRoles(args: AuthzListOrganizationBindingsInput): Promise<AuthzCustomRole[]> {
     return this.options.listing.findUserCreatedRoles(args);
+  }
+
+  /** A malformed stored permission set grants nothing: one bad row must not fail a read. */
+  async findRolePermissions(args: AuthzFindRolePermissionsInput): Promise<AuthzRolePermissions[]> {
+    const rows = await this.options.listing.findRolePermissionRows(args);
+    return rows.map(({ id, name, permissions }) => {
+      const parsed = rolePermissionListSchema.safeParse(permissions);
+      return { id, name, permissions: parsed.success ? parsed.data : [] };
+    });
   }
 
   wouldFirstBindingDisableLegacyAccess(args: AuthzLegacyAccessNoticeInput): Promise<boolean> {

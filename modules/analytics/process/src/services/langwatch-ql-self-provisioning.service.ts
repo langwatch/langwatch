@@ -66,7 +66,13 @@ export type LwqlSelfProvisionRequest =
 export type LwqlAccessModelMode = "rendered" | "sql";
 
 /** The endpoint must be reachable from the ClickHouse server; the chart's cluster DNS is. */
-function postgresEndpoints(databaseUrl: string | undefined): LwqlPostgresEndpoint[] {
+function postgresEndpoints({
+  databaseUrl,
+  host,
+}: {
+  databaseUrl: string | undefined;
+  host: string | undefined;
+}): LwqlPostgresEndpoint[] {
   if (!databaseUrl) return [];
   let parsed: URL;
   try {
@@ -76,7 +82,9 @@ function postgresEndpoints(databaseUrl: string | undefined): LwqlPostgresEndpoin
   }
   const database = parsed.pathname.replace(/^\//, "");
   if (!parsed.hostname || !database) return [];
-  return [{ host: parsed.hostname, port: parsed.port ? Number(parsed.port) : 5432, database }];
+  return [
+    { host: host || parsed.hostname, port: parsed.port ? Number(parsed.port) : 5432, database },
+  ];
 }
 
 /** The self-hosted provisioning statements, and the environment that selects them. */
@@ -101,7 +109,10 @@ export class LangWatchQLSelfProvisioningService {
     if (!postgresReaderPassword) {
       return { requested: true, complete: false, missing: "LWQL_POSTGRES_READER_PASSWORD" };
     }
-    const [endpoint] = postgresEndpoints(source.DATABASE_URL);
+    const [endpoint] = postgresEndpoints({
+      databaseUrl: source.DATABASE_URL,
+      host: source.LWQL_POSTGRES_HOST,
+    });
     if (!endpoint) {
       return { requested: true, complete: false, missing: "a parseable DATABASE_URL" };
     }

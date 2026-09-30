@@ -20,7 +20,7 @@ import (
 )
 
 // Exit codes: 0 no behavioral differences, 1 differences found, 2
-// operational or usage error.
+// operational or usage error, 3 stopped early on a streak of ERROR scenarios.
 const (
 	exitEqual = iota
 	exitDifferences

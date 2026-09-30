@@ -395,6 +395,24 @@ Feature: Authorization grants
     Then the write is reported as done
 
   @unit
+  Scenario: A role definition that clears the description waits for the cleared Role row
+    Given a canonical Role row with the requested name and permissions but the old description
+    When the role definition is written without a description
+    Then the write is not confirmed
+
+  @unit
+  Scenario: Deleting a role binding twice answers not found the second time
+    Given a role binding whose grant was revoked but whose compatibility row has not been removed yet
+    When the binding is looked up for deletion
+    Then it reads as missing
+
+  @unit
+  Scenario: A restricted API key's private role permissions are read by id within its organization
+    Given a live role of the system API key kind in the organization
+    When its permissions are read by id
+    Then the role is returned with its permissions, whatever its kind
+
+  @unit
   Scenario: A changed binding role is confirmed by the canonical Grant projection
     Given a canonical Grant row with the requested role
     When the binding role is changed

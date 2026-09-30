@@ -55,3 +55,27 @@ describe("AuthzService custom role listing", () => {
     });
   });
 });
+
+describe("AuthzService role permissions by id", () => {
+  it("passes the organization and ids through and reads a malformed permission set as granting nothing", async () => {
+    const listing = new StubAuthzListingRepository();
+    listing.findRolePermissionRows.mockResolvedValue([
+      { id: "role-key", name: "apikey:key-1", permissions: ["project:view"] },
+      { id: "role-bad", name: "broken", permissions: "project:view" },
+    ]);
+
+    const result = await makeService({ listing }).findRolePermissions({
+      organizationId: ORG,
+      roleIds: ["role-key", "role-bad"],
+    });
+
+    expect(result).toEqual([
+      { id: "role-key", name: "apikey:key-1", permissions: ["project:view"] },
+      { id: "role-bad", name: "broken", permissions: [] },
+    ]);
+    expect(listing.findRolePermissionRows).toHaveBeenCalledWith({
+      organizationId: ORG,
+      roleIds: ["role-key", "role-bad"],
+    });
+  });
+});

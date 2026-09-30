@@ -642,6 +642,15 @@ whose name starts with `_` are skipped by the default glob. A scenario that
 held on both sides still fails as FAIL-diff when the two main responses differ
 after normalization. Exit code: 2 if any ERROR (the harness could not
 measure, including a 429), else 1 if anything is not PASS, else 0.
+
+Under SaaS the instance-admin routes answer 404 (`instanceAdminDoor`), so the
+admin key is unusable. The phase probes `GET /api/organizations` with the key
+once per side; on a 404 it logs one line, drops the key, seeds through the
+no-key path and defers every scenario that needs it (`shard: org`, auth
+`admin`, `org-c`, `org-c-org`). They are listed by id on a `deferred:
+self-hosted pass` line, are not in the tally and are not failures. A 401 or 403
+keeps the key. The list of what a later non-SaaS pass must cover is kept in
+the run notes, not here.
 `scenarios.jsonl` lands in the run directory (`-run-dir` in the standalone
 mode).
 
@@ -660,6 +669,20 @@ mode).
   `local-dev-organization`; without it the seeded organization is used and
   `org` shards are ERROR. `shard: serial` scenarios take a flock on
   `.visualdiff/check/instance.lock` for the serial pass.
+- **Stopping when nothing works:** a scenario that ends ERROR (the harness or
+  the stack, never the API: a transport error, the rate limiter, a shard whose
+  seeding failed) counts; a PASS ends the streak; a FAIL, `FAIL-branch`,
+  `FAIL-main`, `FAIL-both` or `FAIL-diff` neither counts nor ends it. After
+  `-max-consecutive-errors N` ERROR scenarios in a row, in the order they
+  complete (default 50, `0` disables), scenarios in flight are cancelled and
+  left out, the rest are not started, the partial results and
+  `scenarios.jsonl` are written, and it prints `apidiff: stopping: N consecutive
+  errors, most common cause: <cause> (xK)` and exits 3. A setup that leaves
+  nothing usable stops before any scenario with `apidiff: stopping: setup
+  failed: <cause>` (exit 2): the shared or run organization could not be made
+  (with `-admin-key`; without it the seeded organization is still used), or
+  every isolated project, organization and sign-in the scenarios asked for
+  failed on a side.
 - **Pool:** `-scenario-concurrency` (default 48) scenarios in flight per side,
   both sides of one scenario at once, over pooled keep-alive connections.
 - **Shards:** `shard: shared` (default) uses the seeded fixtures;

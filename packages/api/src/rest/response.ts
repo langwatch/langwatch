@@ -724,6 +724,22 @@ function isStatusCarryingError(
 }
 
 /**
+ * A Postgres data exception (SQLSTATE class 22: a NUL byte, a bad JSON escape, an out-of-range
+ * value) surfaces through Prisma as one code with the SQLSTATE in its message. The caller sent
+ * a value the store cannot hold, so it is theirs to fix.
+ */
+const DATA_EXCEPTION = /Database error\. Code: `22[0-9A-Z]{3}`/;
+
+function isDataException(error: unknown): boolean {
+  return error instanceof Error && DATA_EXCEPTION.test(error.message);
+}
+
+/** A unique constraint a service did not check first, usually a race with another writer. */
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "P2002";
+}
+
+/**
  * The canonical body and status for any thrown value. THE mapping — every canonical
  * family answers through it, so one code can never mean two statuses across families.
  */
@@ -736,6 +752,25 @@ export function canonicalErrorFor(
   if (HandledError.isHandled(error)) return handledErrorEnvelope(error, traceIds);
   if (isZodLikeError(error))
     return handledErrorEnvelope(ValidationError.fromZodError(error), traceIds);
+
+  if (isDataException(error)) {
+    return handledErrorEnvelope(
+      new ValidationError("The request holds a value that cannot be stored"),
+      traceIds,
+    );
+  }
+
+  if (isUniqueViolation(error)) {
+    return {
+      status: 409,
+      body: apiErrorBody({
+        status: 409,
+        code: CODE_BY_STATUS[409] ?? FALLBACK_ERROR_CODE,
+        message: "The request conflicts with a value that already exists",
+        ...traceIds,
+      }),
+    };
+  }
 
   if (isStatusCarryingError(error)) {
     const { status } = error;

@@ -1057,6 +1057,13 @@ jobs:
       - name: Lint rule reference is current (blocking)
         run: pnpm --filter @langwatch/architecture-enforcer docs:check
 
+      # The enforcer's ported policies run in Go (cmd/enforcer via
+      # dev/scripts/enforcer.sh); without Go the TS CLI reports the same, slower.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
       # The architecture-enforcer policies that read zero findings on this tree,
       # named one by one; a policy joins the list when its findings reach zero.
       # `declarations` is left out because it reads the output of `tsc -b`.

@@ -219,6 +219,7 @@ export class TestAuthzApi implements AuthzApi {
     "listBindingsForSynthesis",
   );
   listUserCreatedRoles = unsupported<AuthzApi["listUserCreatedRoles"]>("listUserCreatedRoles");
+  findRolePermissions = unsupported<AuthzApi["findRolePermissions"]>("findRolePermissions");
   wouldFirstBindingDisableLegacyAccess = unsupported<
     AuthzApi["wouldFirstBindingDisableLegacyAccess"]
   >("wouldFirstBindingDisableLegacyAccess");

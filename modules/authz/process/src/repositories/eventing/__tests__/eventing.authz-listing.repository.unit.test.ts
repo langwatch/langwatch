@@ -484,6 +484,37 @@ describe("EventingAuthzListingRepository", () => {
     });
   });
 
+  describe("when a key's role permissions are read by id", () => {
+    /** @scenario "A restricted API key's private role permissions are read by id within its organization" */
+    it("reads live roles of any kind inside the organization", async () => {
+      const { prisma, repository } = prismaWith({
+        roles: [{ id: "role-key", name: "apikey:key-1", permissions: ["project:view"] }],
+      });
+
+      const rows = await repository.findRolePermissionRows({
+        organizationId: ORG,
+        roleIds: ["role-key"],
+      });
+
+      expect(rows).toEqual([
+        { id: "role-key", name: "apikey:key-1", permissions: ["project:view"] },
+      ]);
+      expect(prisma.role.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["role-key"] }, organizationId: ORG, deletedAt: null },
+        select: { id: true, name: true, permissions: true },
+      });
+    });
+
+    it("asks nothing for no ids", async () => {
+      const { prisma, repository } = prismaWith({});
+
+      expect(await repository.findRolePermissionRows({ organizationId: ORG, roleIds: [] })).toEqual(
+        [],
+      );
+      expect(prisma.role.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the listing is one group's own bindings", () => {
     it("renders the row against the group and fences the name lookup to the organization", async () => {
       const { prisma, repository } = prismaWith({

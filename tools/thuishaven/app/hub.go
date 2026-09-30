@@ -82,6 +82,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	// Same ordering rule as stopAndDropForDir: the launcher's children must be
 	// gone before the databases they hold connections to are dropped.
 	o.waitForProcessesDead(downed)
+	o.stopNxDaemon(ctx, worktreeDir)
 	o.dropWorktreeDatabases(ctx, slug)
 	// Logs are haven's own state, same as the databases above: remove this
 	// slug's share of them, not the checkout (ruling 2026-09-29). Best-effort —
@@ -92,6 +93,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 		_ = os.RemoveAll(combined)
 	}
 	o.removeStackHome(slug)
+	o.removeNxPrivateDir(slug)
 	o.removeStackCredentials(slug)
 	fmt.Printf("stack %q destroyed (database %s dropped)\n", slug, db)
 	return nil
@@ -135,6 +137,7 @@ func (o *Orchestrator) DestroyWorktree(ctx context.Context, gitDir, dir, selfDir
 		return fmt.Errorf("removing worktree: %w", err)
 	}
 	o.removeStackHome(slug)
+	o.removeNxPrivateDir(slug)
 	o.hyg.PruneGitWorktrees(gitDir)
 	return nil
 }
@@ -166,6 +169,7 @@ func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) s
 	// group); wait for them to actually exit before touching the databases or the
 	// directory, so the removal does not race a node/vite stack still writing.
 	o.waitForProcessesDead(downedPIDs)
+	o.stopNxDaemon(ctx, canonDir)
 	o.dropWorktreeDatabases(ctx, dbSlug)
 	return dbSlug
 }

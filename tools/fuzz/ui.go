@@ -3,6 +3,7 @@ package fuzz
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +19,9 @@ const DefaultUIWorkers = 16
 // DefaultReloadEvery is the UI runner's full-load cadence: one load, then four in-app visits.
 const DefaultReloadEvery = 5
 
+// DefaultUIMaxErrors is how many visits in a row that error or stay loading stop a UI run.
+const DefaultUIMaxErrors = 10
+
 // DefaultActionsPerRoute is how long the UI runner stays on one route.
 const DefaultActionsPerRoute = 40
 
@@ -32,6 +36,7 @@ type uiPlan struct {
 	ActionsPerRoute int             `json:"actionsPerRoute"`
 	ReloadEvery     int             `json:"reloadEvery"`
 	Only            string          `json:"only"`
+	MaxErrors       int             `json:"maxConsecutiveErrors"`
 	Org             diffkit.ToolOrg `json:"org"`
 	Credential      uiCredential    `json:"credential"`
 }
@@ -59,25 +64,25 @@ func runUI(ctx context.Context, streams Streams, options Options) error {
 	if appURL == "" {
 		stack, err := diffkit.ReadSharedStack(ctx, diffkit.CheckSlug)
 		if err != nil {
-			return err
+			return diffkit.SetupFailed(err)
 		}
 		appURL = stack.AppURL
 	}
 	runID := time.Now().Format("20060102-150405")
 	runDir := filepath.Join(options.Root, ".fuzz", runID)
 	if err := os.MkdirAll(runDir, 0o750); err != nil {
-		return err
+		return diffkit.SetupFailed(err)
 	}
 	org, err := diffkit.SeedToolOrg(ctx, diffkit.SeedOptions{
 		BaseURL: appURL, Tool: "fuzzer", Projects: 1, Dir: filepath.Dir(runDir),
 		Progress: func(line string) { fmt.Fprintln(streams.Err, line) },
 	})
 	if err != nil {
-		return fmt.Errorf("seed fuzzer org: %w", err)
+		return diffkit.SetupFailed(fmt.Errorf("seed fuzzer org: %w", err))
 	}
 	plan := uiPlan{
 		RunID: runID, URL: appURL, Seed: options.Seed, Workers: options.Workers,
-		DurationMs: options.Duration.Milliseconds(), ActionsPerRoute: options.ActionsPerRoute, ReloadEvery: options.ReloadEvery, Only: options.Only, Org: org,
+		DurationMs: options.Duration.Milliseconds(), ActionsPerRoute: options.ActionsPerRoute, ReloadEvery: options.ReloadEvery, Only: options.Only, MaxErrors: options.errorLimit(DefaultUIMaxErrors), Org: org,
 		Credential: uiCredential{Email: diffkit.CeremonyEmail("fuzzer"), Password: diffkit.CeremonyPassword},
 	}
 	planPath := filepath.Join(runDir, "plan.json")
@@ -93,7 +98,12 @@ func runUI(ctx context.Context, streams Streams, options Options) error {
 	}
 	command := exec.CommandContext(ctx, "pnpm", "--dir", runner, "start", "--", "--plan", planPath, "--out", runDir)
 	command.Stdout, command.Stderr = streams.Out, streams.Err
-	return command.Run()
+	err = command.Run()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == diffkit.ExitStopped {
+		return &diffkit.Stopped{} // the runner printed why
+	}
+	return err
 }
 
 func writeJSON(path string, value any) error {

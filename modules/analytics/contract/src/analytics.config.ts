@@ -12,6 +12,7 @@ export const analyticsServerConfig = Config.define((c) => ({
     username: c.env("LWQL_CLICKHOUSE_USER", z.string().optional()),
     database: c.env("LWQL_DATABASE", z.string().optional()),
     tenantSetting: c.env("LWQL_TENANT_SETTING", z.string().optional()),
+    postgresHost: c.env("LWQL_POSTGRES_HOST", z.string().optional()),
     accessModelMode: c.env("LWQL_ACCESS_MODEL_MODE", z.string().optional()),
     sqlSingleNode: c.env("LWQL_ACCESS_MODEL_SQL_SINGLE_NODE", z.string().optional()),
   },

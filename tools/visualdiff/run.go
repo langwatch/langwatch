@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -73,6 +74,9 @@ type Options struct {
 	SkipWorks bool
 	// Follow moves a resumed worktree to the commit its ref names now (loop.go).
 	Follow bool
+	// MaxConsecutiveErrors stops the run after this many harness errors in a
+	// row on one side (streaks.go); 0 never stops it.
+	MaxConsecutiveErrors int
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -154,6 +158,10 @@ const (
 
 // ExitCode maps a finished run onto its process exit status.
 func ExitCode(result Result, err error) int {
+	var stopped *diffkit.Stopped
+	if errors.As(err, &stopped) {
+		return diffkit.ExitStopped
+	}
 	if err != nil {
 		return ExitOperational
 	}
@@ -281,7 +289,7 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	finish, err := startRun(ctx, request, &streams)
 	defer finish()
 	if err != nil {
-		return Result{}, err
+		return Result{}, diffkit.SetupFailed(err)
 	}
 	clock := &phaseClock{stderr: streams.Err}
 	defer func() {
@@ -314,14 +322,14 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	writeBaselinePlan(streams.Err, options.Editions, baselines)
 	request.Done.writeSkips(streams.Err, config, options.Editions)
 	if err := prepareInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}, options); err != nil {
-		return result, err
+		return result, diffkit.SetupFailed(err)
 	}
 	result.Plan = plan
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	if err := claimWorktrees(&plan, options); err != nil {
-		return result, err
+		return result, diffkit.SetupFailed(err)
 	}
 	result.Plan = plan
 	run := &session{
@@ -340,14 +348,29 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	defer run.stopAll()
 
 	if err := run.boot(ctx); err != nil {
-		return result, err
+		return result, diffkit.SetupFailed(err)
 	}
 	captured, err := run.captureEditions(ctx, baselines)
 	captured.Coverage = result.Coverage
+	var stopped *diffkit.Stopped
+	if errors.As(err, &stopped) {
+		return run.finishStopped(captured, err)
+	}
 	if err != nil {
 		return captured, err
 	}
 	return run.finish(captured)
+}
+
+// finishStopped writes what a stopped run captured, as a finished run does,
+// and answers the reason it stopped.
+func (run *session) finishStopped(captured Result, stopped error) (Result, error) {
+	finished, err := run.finish(captured)
+	if err != nil {
+		fmt.Fprintln(run.streams.Err, err)
+		return captured, stopped
+	}
+	return finished, stopped
 }
 
 // boot brings both stacks up through haven, or by hand with -no-haven.
@@ -644,7 +667,7 @@ func (run *session) captureEditions(ctx context.Context, baselines map[Edition]B
 	options, deps := run.request.Options, run.request.Deps
 	total := Result{Plan: run.plan, ReportDir: filepath.Join(options.RunDir, "report")}
 	if err := run.seed(ctx); err != nil {
-		return total, err
+		return total, diffkit.SetupFailed(err)
 	}
 	seeded := EditionEnterprise
 	if options.Resume {
@@ -653,11 +676,11 @@ func (run *session) captureEditions(ctx context.Context, baselines map[Edition]B
 	switcher := newEditionSwitch(deps.Run, deps.Environ, seeded)
 	for _, edition := range options.Editions {
 		rows, err := run.captureEdition(ctx, editionPass{switcher: switcher, edition: edition, baseline: baselines[edition]})
+		total.Rows = append(total.Rows, rows...)
+		total.Findings += CountFindings(rows)
 		if err != nil {
 			return total, err
 		}
-		total.Rows = append(total.Rows, rows...)
-		total.Findings += CountFindings(rows)
 	}
 	total.Plan = run.plan
 	return total, nil
@@ -684,11 +707,18 @@ func (run *session) captureEdition(ctx context.Context, pass editionPass) ([]Row
 		pass.baseline = run.fillBaseline(ctx, pass.edition, pass.baseline)
 	}
 	stream, err := run.capture(ctx, pass.edition, pass.baseline)
-	if err != nil {
+	var stopped *diffkit.Stopped
+	if err != nil && !errors.As(err, &stopped) {
 		return nil, err
 	}
-	run.cacheBaseline(pass.baseline, stream)
-	return run.report(stream, pass.edition)
+	if err == nil {
+		run.cacheBaseline(pass.baseline, stream)
+	}
+	rows, reportErr := run.report(stream, pass.edition)
+	if reportErr != nil {
+		return nil, reportErr
+	}
+	return rows, err
 }
 
 // cacheBaseline keeps a live base pass for the next run. A failure to cache
@@ -768,11 +798,15 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	findingsPath := filepath.Join(options.RunDir, FindingsFile)
 	started := time.Now()
 	stream, err := runWithFindings(ctx, findingsRunInputs{
-		Deps: deps, Plan: runnerPlan, Options: CaptureOptions{Root: options.Root, Stderr: run.streams.Err},
+		Deps: deps, Plan: runnerPlan, Options: CaptureOptions{Root: options.Root, Stderr: run.streams.Err, MaxConsecutiveErrors: options.MaxConsecutiveErrors},
 		FindingsPath: findingsPath, CatalogueRoot: options.Root, Edition: edition,
 	})
 	run.phases.recordRunnerPhases(string(edition), stream.Phases)
 	run.phases.since(string(edition)+" runner", started)
+	var stopped *diffkit.Stopped
+	if errors.As(err, &stopped) {
+		return stream, stopped
+	}
 	if err != nil {
 		return stream, fmt.Errorf("capture %s: %w", edition, err)
 	}
@@ -1015,6 +1049,9 @@ type CaptureOptions struct {
 	OnDiff    func(Diff)
 	// OnPhase is called as each phase the runner times ends (check's per-flow progress).
 	OnPhase func(RunnerPhase)
+	// MaxConsecutiveErrors stops the runner after this many harness errors in a
+	// row on one side (streaks.go); 0 never stops it.
+	MaxConsecutiveErrors int
 }
 
 // runnerWaitDelay is how long the runner's pipes may outlive its process.
@@ -1052,10 +1089,27 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 	if err := command.Start(); err != nil {
 		return RunnerStream{}, err
 	}
+	var stopped atomic.Pointer[diffkit.Stopped]
+	streaks, onCapture := newCaptureStreaks(options.MaxConsecutiveErrors), options.OnCapture
+	options.OnCapture = func(capture Capture) {
+		if stopped.Load() != nil {
+			return
+		}
+		if onCapture != nil {
+			onCapture(capture)
+		}
+		if reason := streaks.file(capture); reason != nil {
+			stopped.Store(reason)
+			killTree(command.Process.Pid)
+		}
+	}
 	stream, parseErr := ParseRunnerStreamLive(stdout, options)
 	// Parsing stops at the runner's error line; unread, its last writes block it from exiting.
 	_, _ = io.Copy(io.Discard, stdout)
 	runErr := command.Wait()
+	if reason := stopped.Load(); reason != nil {
+		return stream, reason
+	}
 	if parseErr != nil {
 		return stream, parseErr
 	}

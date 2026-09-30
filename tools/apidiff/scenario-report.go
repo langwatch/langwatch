@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // Scenario verdicts. FAIL-branch is the finding; FAIL-both is a script bug
@@ -134,6 +136,9 @@ func tallyLine(results []scenarioResult) string {
 	}
 	return fmt.Sprintf("scenarios: %d run: %s", len(results), strings.Join(parts, ", "))
 }
+
+// exitStopped is the run that stopped early on a streak of ERROR scenarios.
+const exitStopped = diffkit.ExitStopped
 
 // scenarioExit is the phase's contribution to the exit code: 2 when the
 // harness could not measure, 1 when anything failed, else 0.

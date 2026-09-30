@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestOverlayProvisionsLangWatchQLOnlyWhenBothStoresAreManaged(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, ClickHouseHTTPPort: 18123, ClickHouseDatabase: "lw_brave_otter"}
@@ -16,5 +19,11 @@ func TestOverlayProvisionsLangWatchQLOnlyWhenBothStoresAreManaged(t *testing.T) 
 	}
 	if valueOf(env, "LWQL_CLICKHOUSE_PASSWORD") == "" || valueOf(env, "LWQL_POSTGRES_READER_PASSWORD") == "" {
 		t.Error("both LWQL passwords are needed, or lwql-provision skips as partially configured")
+	}
+	if got := valueOf(env, "LWQL_POSTGRES_HOST"); got != "host.lima.internal" {
+		t.Errorf("LWQL_POSTGRES_HOST = %q, want the VM's route to the Mac, since ClickHouse dials Postgres from inside colima", got)
+	}
+	if got := valueOf(env, "DATABASE_URL"); !strings.Contains(got, "@127.0.0.1:") {
+		t.Errorf("DATABASE_URL = %q, want the app itself to keep dialing loopback", got)
 	}
 }

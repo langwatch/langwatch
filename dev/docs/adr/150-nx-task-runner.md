@@ -136,7 +136,9 @@ only the fallback when `~/.nx` cannot be written. Nothing sets the location:
 `NX_CACHE_DIRECTORY`, `NX_WORKSPACE_DATA_DIRECTORY` or a `cacheDirectory` in
 `nx.json` each turn sharing off and leave the index per checkout, so a second
 worktree misses on entries the first wrote. haven's overlay pins that it emits
-none of them (`TestOverlayLeavesNxCacheLocationToNx`). `maxCacheSize` caps the
+none of them (`TestOverlayLeavesNxCacheLocationToNx`), except for an untrusted
+checkout, which gets a private cache and no daemon
+(`TestOverlayGivesUntrustedCheckoutAPrivateNxCache`). `maxCacheSize` caps the
 shared cache at 10 GB, least recently used first. `.claude/settings.json`
 already grants the agent sandbox `~/.nx`.
 

@@ -131,7 +131,8 @@ var envHelpText = `Environment variables.
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
                                  runaway typecheck shouldn't sit on a slot
-                                 forever.
+                                 forever. Per slot: an --affected run
+                                 holding N slots may use N times this.
     CHECK_SLOTS=N                Concurrent checks across optional agent hooks,
                                  "haven slot run" and "haven typecheck". The
                                  default uses available machine capacity; plain

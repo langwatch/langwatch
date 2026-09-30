@@ -20,13 +20,6 @@ import type {
 import { userCanOpenTeam } from "../rules/team-visibility.rules.ts";
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
 
-/**
- * How many permission questions one organization asks at once, bounded
- * rather than fanned out — a long project list opening one decision per
- * project at once would starve the request's own connection pool.
- */
-const PERMISSION_PROBE_CONCURRENCY = 8;
-
 /** What this service reads the organization rows through. */
 export interface OrganizationVisibilityReader {
   getAllForUser(
@@ -182,14 +175,6 @@ export class OrganizationVisibilityService {
     });
   }
 
-  #probeProject(input: { userId: string; projectId: string }): Promise<boolean> {
-    return this.deps.permissions.hasPermission({
-      userId: input.userId,
-      permission: "project:manage",
-      projectId: input.projectId,
-    });
-  }
-
   /** Which of these organizations the caller may administer. */
   async #manageableOrganizationIds(input: {
     organizations: readonly FullyLoadedOrganization[];
@@ -209,9 +194,9 @@ export class OrganizationVisibilityService {
   }
 
   /**
-   * Which projects the caller may change, per organization — one batched
-   * resolution rather than one check per project, since a scoped check costs
-   * several queries and would otherwise scale with project count.
+   * Which projects the caller may administer, per organization: one batched
+   * resolution per organization, since a per-project check re-collects the
+   * caller's grants and starves the connection pool under a page load.
    */
   async #updatableProjectIds(input: {
     organizations: readonly FullyLoadedOrganization[];
@@ -220,16 +205,19 @@ export class OrganizationVisibilityService {
     const byOrganization = new Map<string, ReadonlyMap<string, boolean>>();
 
     for (const organization of input.organizations) {
-      const projectIds = organization.teams.flatMap((team) =>
-        team.projects.map((project) => project.id),
+      const projects = organization.teams.flatMap((team) =>
+        team.projects.map((project) => ({ projectId: project.id, teamId: team.id })),
       );
-      if (projectIds.length === 0) continue;
+      if (projects.length === 0) continue;
 
-      const decisions = await mapWithConcurrency(projectIds, async (projectId) => {
-        const permitted = await this.#probeProject({ userId: input.userId, projectId });
-        return [projectId, permitted] as const;
+      const decisions = await this.deps.permissions.canBatchByIds({
+        principal: { type: "user", id: input.userId },
+        permission: "project:manage",
+        organizationId: organization.id,
+        teams: [],
+        projects,
       });
-      byOrganization.set(organization.id, new Map(decisions));
+      byOrganization.set(organization.id, decisions.projects);
     }
 
     return byOrganization;
@@ -342,27 +330,4 @@ export class OrganizationVisibilityService {
       return [team];
     });
   }
-}
-
-/** Runs one asynchronous read over a list, a few at a time. */
-async function mapWithConcurrency<TItem, TResult>(
-  items: readonly TItem[],
-  run: (item: TItem) => Promise<TResult>,
-): Promise<TResult[]> {
-  const results = Array.from<TResult>({ length: items.length });
-  let next = 0;
-  const workers = Array.from(
-    { length: Math.min(PERMISSION_PROBE_CONCURRENCY, items.length) },
-    async () => {
-      while (next < items.length) {
-        const index = next++;
-        const item = items[index];
-        if (item === undefined) return;
-        results[index] = await run(item);
-      }
-    },
-  );
-
-  await Promise.all(workers);
-  return results;
 }

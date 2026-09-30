@@ -276,7 +276,11 @@ function lwqlProvisioningOperations({
             complete: true,
             connection,
             postgresReaderPassword: readerPassword,
-            endpoint: { host: postgres.host, port: postgres.port, database: postgres.database },
+            endpoint: {
+              host: settings.postgresHost || postgres.host,
+              port: postgres.port,
+              database: postgres.database,
+            },
           },
           names,
           sourceDatabase: () => admin.target.database,

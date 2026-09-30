@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "lint": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../..",
+    "lint": "bash ../../dev/scripts/enforcer.sh --root ../..",
     "review:test-quality": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --review-test-quality",
     "typecheck": "pnpm -w exec tsc -b packages/architecture-enforcer",
     "test": "vitest run",

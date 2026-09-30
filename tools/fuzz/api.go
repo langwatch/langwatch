@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +19,9 @@ import (
 
 	"github.com/langwatch/langwatch/tools/diffkit"
 )
+
+// DefaultAPIMaxErrors is how many transport errors in a row stop an API run.
+const DefaultAPIMaxErrors = 200
 
 // DefaultAPIWorkers is the fuzzer's default parallelism over keep-alive clients.
 const DefaultAPIWorkers = 64
@@ -44,6 +49,8 @@ type apiRun struct {
 	foreign   sync.Map // collection path -> a real id listed there by the other tenant
 	mu        sync.Mutex
 	raw       []rawFinding
+	streak    *diffkit.Streak
+	cancel    context.CancelFunc
 }
 
 func runAPI(ctx context.Context, streams Streams, options Options) error {
@@ -51,21 +58,21 @@ func runAPI(ctx context.Context, streams Streams, options Options) error {
 		options.Workers = DefaultAPIWorkers
 	}
 	started := time.Now()
-	run := &apiRun{options: options, streams: streams, client: keepAliveClient(options.Workers)}
+	run := &apiRun{options: options, streams: streams, client: keepAliveClient(options.Workers), streak: diffkit.NewStreak(options.errorLimit(DefaultAPIMaxErrors))}
 	if err := run.resolveStack(ctx); err != nil {
-		return err
+		return diffkit.SetupFailed(err)
 	}
 	seedStart := time.Now()
 	runDir, err := run.prepareDir()
 	if err != nil {
-		return err
+		return diffkit.SetupFailed(err)
 	}
 	org, err := diffkit.SeedToolOrg(ctx, diffkit.SeedOptions{
 		BaseURL: run.appURL, Tool: "fuzzer", Projects: 1, Dir: filepath.Dir(runDir),
 		Progress: func(line string) { fmt.Fprintln(streams.Err, line) }, Client: keepAliveClient(4),
 	})
 	if err != nil {
-		return fmt.Errorf("seed fuzzer org: %w", err)
+		return diffkit.SetupFailed(fmt.Errorf("seed fuzzer org: %w", err))
 	}
 	run.org = org
 	seedTook := time.Since(seedStart)
@@ -74,11 +81,11 @@ func runAPI(ctx context.Context, streams Streams, options Options) error {
 
 	document, _, err := diffkit.FetchSpec(ctx, run.client, run.apiURL)
 	if err != nil {
-		return err
+		return diffkit.SetupFailed(err)
 	}
 	operations, err := diffkit.Operations(document)
 	if err != nil {
-		return err
+		return diffkit.SetupFailed(err)
 	}
 	jobs := run.plan(operations)
 	logsBefore := logSignatures(ctx, run.slug())
@@ -88,13 +95,30 @@ func runAPI(ctx context.Context, streams Streams, options Options) error {
 	run.recordLogHits(logsBefore, logSignatures(ctx, run.slug()))
 
 	shrinkStart := time.Now()
-	groups := run.shrinkGroups(ctx)
+	groups := run.shrinkGroups(run.shrinkContext(ctx))
 	shrinkTook := time.Since(shrinkStart)
 
 	coverage := Coverage{OperationsTotal: len(operations), OperationsExercised: run.exercisedCount()}
 	timing := Timing{Total: time.Since(started), Seed: seedTook, Fuzzing: fuzzTook, Shrinking: shrinkTook,
 		Requests: int(atomic.LoadInt64(&run.requests)), Findings: len(run.raw)}
-	return run.report(runDir, groups, coverage, timing)
+	if err := run.report(runDir, groups, coverage, timing); err != nil {
+		return err
+	}
+	if stopped := run.streak.Stopped(); stopped != nil {
+		return stopped
+	}
+	return nil
+}
+
+// shrinkContext is ctx, or a cancelled one after a stop: shrinking against a
+// stack that stopped answering would only wait for every timeout.
+func (run *apiRun) shrinkContext(ctx context.Context) context.Context {
+	if run.streak.Stopped() == nil {
+		return ctx
+	}
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	return cancelled
 }
 
 // slug is the haven stack to scan logs from; empty when a -url overrode the
@@ -160,7 +184,10 @@ func (run *apiRun) plan(operations []diffkit.Operation) []job {
 	return jobs
 }
 
-func (run *apiRun) fuzz(ctx context.Context, jobs []job) {
+func (run *apiRun) fuzz(parent context.Context, jobs []job) {
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+	run.cancel = cancel
 	deadline := time.Now().Add(run.options.Duration)
 	queue := make(chan job)
 	var group sync.WaitGroup
@@ -194,8 +221,12 @@ func (run *apiRun) runJob(ctx context.Context, item job) {
 	if !ok {
 		return
 	}
-	status, elapsed, body := run.do(ctx, request)
+	status, elapsed, body, cause := run.do(ctx, request)
+	if run.streak.Stopped() != nil {
+		return
+	}
 	atomic.AddInt64(&run.requests, 1)
+	run.file(cause)
 	run.exercised.Store(item.op.Method+" "+item.op.Path, true)
 	hits := Evaluate(Observation{
 		Mutation: item.mutation, Status: status, Elapsed: elapsed, Body: body,
@@ -203,6 +234,16 @@ func (run *apiRun) runJob(ctx context.Context, item job) {
 	})
 	for _, hit := range hits {
 		run.record(item, request, status, hit)
+	}
+}
+
+// file counts one completed request: a transport error is a harness error, any
+// answer ends the streak (a 5xx is a finding, not an error).
+func (run *apiRun) file(cause string) {
+	if cause == "" {
+		run.streak.OK()
+	} else if run.streak.Error(cause) {
+		run.cancel()
 	}
 }
 
@@ -251,14 +292,24 @@ func (run *apiRun) prepareDir() (string, error) {
 	return dir, os.MkdirAll(dir, 0o750)
 }
 
-func (run *apiRun) do(ctx context.Context, request builtRequest) (int, time.Duration, []byte) {
+// transportCause is the error without the URL it names, so equal causes group.
+func transportCause(err error) string {
+	var failed *url.Error
+	if errors.As(err, &failed) {
+		return failed.Err.Error()
+	}
+	return err.Error()
+}
+
+// do sends one request; a status of 0 comes with the transport error's text.
+func (run *apiRun) do(ctx context.Context, request builtRequest) (int, time.Duration, []byte, string) {
 	var reader io.Reader
 	if request.body != nil {
 		reader = bytes.NewReader(request.body)
 	}
 	httpRequest, err := http.NewRequestWithContext(ctx, request.method, request.url, reader)
 	if err != nil {
-		return 0, 0, nil
+		return 0, 0, nil, err.Error()
 	}
 	httpRequest.Header.Set("Content-Type", "application/json")
 	for key, value := range request.headers {
@@ -268,11 +319,11 @@ func (run *apiRun) do(ctx context.Context, request builtRequest) (int, time.Dura
 	response, err := run.client.Do(httpRequest)
 	elapsed := time.Since(started)
 	if err != nil {
-		return 0, elapsed, nil
+		return 0, elapsed, nil, transportCause(err)
 	}
 	defer func() { _ = response.Body.Close() }()
 	body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-	return response.StatusCode, elapsed, body
+	return response.StatusCode, elapsed, body, ""
 }
 
 func (run *apiRun) report(runDir string, groups []Group, coverage Coverage, timing Timing) error {

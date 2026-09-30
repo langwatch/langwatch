@@ -11,6 +11,7 @@ import type {
   TeamUserRole,
 } from "@langwatch/authz-contract";
 import { type Instant, fromDate, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import { AuthzListingRepository } from "../authz-listing.repository.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
@@ -400,6 +401,22 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     return roles.map((role) => this.toCustomRoleShape(role));
   };
 
+  findRolePermissionRows = async ({
+    organizationId,
+    roleIds,
+  }: {
+    organizationId: string;
+    roleIds: readonly string[];
+  }): Promise<{ id: string; name: string; permissions: unknown }[]> => {
+    if (roleIds.length === 0) return [];
+    return rolePermissionRowsSchema.parse(
+      await liveRoles(this.database).findMany({
+        where: { id: { in: [...roleIds] }, organizationId },
+        select: { id: true, name: true, permissions: true },
+      }),
+    );
+  };
+
   /** One query shape for every binding listing: the organization, the
    *  listable scope tiers, the listable principal kinds, a roleKey the legacy
    *  vocabulary can carry, and the caller's own predicate on top. Ordered by
@@ -709,6 +726,10 @@ type Decoration = {
 /** A `Role` head row in the `CustomRole` column shape. The two heads share
  *  every column; `createdAt` carries the fact's business time
  *  (`occurredAt`), consistent with what the binding rows report. */
+const rolePermissionRowsSchema = z.array(
+  z.object({ id: z.string(), name: z.string(), permissions: z.unknown() }),
+);
+
 type RoleHeadRow = {
   id: string;
   organizationId: string;

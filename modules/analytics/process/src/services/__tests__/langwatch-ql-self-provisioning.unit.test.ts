@@ -138,6 +138,29 @@ describe("when the self-provisioning environment is read", () => {
   });
 });
 
+describe("the host the named collection dials", () => {
+  const source = {
+    ...SELF_PROVISION_SOURCE,
+    DATABASE_URL: "postgresql://a:b@127.0.0.1:5433/langwatch",
+  };
+
+  /** @scenario "The named collection dials the database URL's host by default" */
+  it("is the database URL's host when LWQL_POSTGRES_HOST is unset", () => {
+    expect(selfProvisioning.request({ source })).toMatchObject({
+      endpoint: { host: "127.0.0.1", port: 5433, database: "langwatch" },
+    });
+  });
+
+  /** @scenario "LWQL_POSTGRES_HOST overrides the host the named collection dials" */
+  it("is LWQL_POSTGRES_HOST when set, keeping the URL's port and database", () => {
+    expect(
+      selfProvisioning.request({ source: { ...source, LWQL_POSTGRES_HOST: "host.lima.internal" } }),
+    ).toMatchObject({
+      endpoint: { host: "host.lima.internal", port: 5433, database: "langwatch" },
+    });
+  });
+});
+
 describe("the PostgreSQL reader role", () => {
   describe("when the access model is provisioned", () => {
     it("converges lwql_ro with its password and approved-view grants on every path", () => {

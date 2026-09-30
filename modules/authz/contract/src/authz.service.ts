@@ -26,6 +26,8 @@ import type {
   AuthzCheckDetailedOutput,
   AuthzCheckInput,
   AuthzCustomRole,
+  AuthzFindRolePermissionsInput,
+  AuthzRolePermissions,
   AuthzEffectivePermissionsInput,
   AuthzEffectivePermissionsOutput,
   AuthzExplainDecisionInput,
@@ -179,6 +181,10 @@ export abstract class AuthzService {
   abstract listUserCreatedRoles(
     args: AuthzListOrganizationBindingsInput,
   ): Promise<AuthzCustomRole[]>;
+
+  abstract findRolePermissions(
+    args: AuthzFindRolePermissionsInput,
+  ): Promise<AuthzRolePermissions[]>;
 
   abstract wouldFirstBindingDisableLegacyAccess(
     args: AuthzLegacyAccessNoticeInput,

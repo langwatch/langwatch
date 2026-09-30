@@ -14,6 +14,8 @@ export const planSchema = z.object({
   /** reloadEvery: every Nth visit a lane loads the page afresh; the others navigate in-app. */
   reloadEvery: z.number().int().positive().default(5),
   only: z.string().optional(),
+  /** maxConsecutiveErrors stops the run after this many visits in a row that errored; 0 never. */
+  maxConsecutiveErrors: z.number().int().nonnegative().default(10),
   credential: z.object({
     email: z.string(),
     password: z.string(),

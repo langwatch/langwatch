@@ -31,7 +31,7 @@ func TestEnsureDepsSuppressesLifecycleScriptsForUntrustedCheckouts(t *testing.T)
 		t.Run("when dependencies install, lifecycle scripts are suppressed", func(t *testing.T) {
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), staleDir(t), false); err != nil {
+			if err := o.ensureDeps(context.Background(), staleDir(t), depsInstall{WithLifecycleScripts: false}); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
 			if len(sup.shells) != 1 {
@@ -47,7 +47,7 @@ func TestEnsureDepsSuppressesLifecycleScriptsForUntrustedCheckouts(t *testing.T)
 		t.Run("when dependencies install, the repo's postinstall still runs", func(t *testing.T) {
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), staleDir(t), true); err != nil {
+			if err := o.ensureDeps(context.Background(), staleDir(t), depsInstall{WithLifecycleScripts: true}); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
 			if len(sup.shells) != 1 {
@@ -141,7 +141,7 @@ func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
 			root, repoDir := repo(t)
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), repoDir, true); err != nil {
+			if err := o.ensureDeps(context.Background(), repoDir, depsInstall{WithLifecycleScripts: true}); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
 			if len(sup.dirs) != 1 {
@@ -156,7 +156,7 @@ func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
 			root, _ := repo(t)
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), root, true); err != nil {
+			if err := o.ensureDeps(context.Background(), root, depsInstall{WithLifecycleScripts: true}); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
 			if len(sup.dirs) != 1 || sup.dirs[0] != root {
@@ -174,7 +174,7 @@ func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
 			}
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			err := o.ensureDeps(context.Background(), dir, true)
+			err := o.ensureDeps(context.Background(), dir, depsInstall{WithLifecycleScripts: true})
 			if err == nil {
 				t.Fatal("ensureDeps = nil, want an error naming the missing lockfile")
 			}

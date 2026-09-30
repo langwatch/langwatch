@@ -27,6 +27,10 @@ const (
 	LWQLPostgresReaderPassword = "langwatch-lwql-reader-local"
 )
 
+// ColimaHostAddress is how a container in the colima (Lima) VM reaches the Mac;
+// Lima forwards it to the Mac's localhost, where brew Postgres listens.
+const ColimaHostAddress = "host.lima.internal"
+
 // DefaultRetentionDays is the platform retention default haven pins for a dev
 // stack: one week, so an unseeded worktree's ClickHouse stays tiny and whole
 // weekly partitions drop cleanly (the partition key is toYearWeek, so retention
@@ -166,6 +170,15 @@ func (s Stack) OverlayEnv() []string {
 	if s.DisableGoogleDLP {
 		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
 	}
+	// An untrusted checkout gets a private Nx cache and no daemon, so nothing it
+	// computes reaches the cache trusted worktrees share (see Stack.NxPrivateDir).
+	if s.NxPrivateDir != "" {
+		env = append(env,
+			"NX_CACHE_DIRECTORY="+s.NxPrivateDir+"/cache",
+			"NX_WORKSPACE_DATA_DIRECTORY="+s.NxPrivateDir+"/workspace-data",
+			"NX_DAEMON=false",
+		)
+	}
 	if s.VoiceSocketPort != 0 {
 		env = append(env, fmt.Sprintf("VOICE_WS_PORT=%d", s.VoiceSocketPort))
 	}
@@ -242,6 +255,8 @@ func (s Stack) OverlayEnv() []string {
 			"LWQL_CLICKHOUSE_USER="+s.ClickHouseDatabase+"_lwql",
 			"LWQL_CLICKHOUSE_PASSWORD="+LWQLClickHousePassword,
 			"LWQL_POSTGRES_READER_PASSWORD="+LWQLPostgresReaderPassword,
+			// ClickHouse runs in the VM, where DATABASE_URL's 127.0.0.1 is the VM itself.
+			"LWQL_POSTGRES_HOST="+ColimaHostAddress,
 		)
 	}
 	// Redis needs no per-slug database — REDIS_DB_INDEX above already partitions

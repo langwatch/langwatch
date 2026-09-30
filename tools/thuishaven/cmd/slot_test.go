@@ -21,24 +21,55 @@ import (
 
 func TestParseSlotRun(t *testing.T) {
 	t.Run("the label defaults to the command", func(t *testing.T) {
-		label, argv, err := parseSlotRun([]string{"--", "tsgo", "--noEmit"})
+		label, _, argv, err := parseSlotRun([]string{"--", "tsgo", "--noEmit"})
 		if err != nil || label != "tsgo" || len(argv) != 2 {
 			t.Fatalf("got label=%q argv=%v err=%v", label, argv, err)
 		}
 	})
 
 	t.Run("an explicit label survives", func(t *testing.T) {
-		label, argv, err := parseSlotRun([]string{"--label", "typecheck (wt)", "--", "tsgo"})
+		label, _, argv, err := parseSlotRun([]string{"--label", "typecheck (wt)", "--", "tsgo"})
 		if err != nil || label != "typecheck (wt)" || argv[0] != "tsgo" {
 			t.Fatalf("got label=%q argv=%v err=%v", label, argv, err)
 		}
 	})
 
 	t.Run("no command is an error", func(t *testing.T) {
-		if _, _, err := parseSlotRun([]string{"--label", "x", "--"}); err == nil {
+		if _, _, _, err := parseSlotRun([]string{"--label", "x", "--"}); err == nil {
 			t.Fatal("expected an error for a missing command")
 		}
 	})
+
+	t.Run("a timeout is read in either order with the label", func(t *testing.T) {
+		label, limit, argv, err := parseSlotRun([]string{"--timeout", "10m", "--label", "lint", "--", "golangci-lint"})
+		if err != nil || label != "lint" || limit != 10*time.Minute || argv[0] != "golangci-lint" {
+			t.Fatalf("got label=%q limit=%s argv=%v err=%v", label, limit, argv, err)
+		}
+	})
+
+	t.Run("a timeout that is not a positive duration is an error", func(t *testing.T) {
+		if _, _, _, err := parseSlotRun([]string{"--timeout", "soon", "--", "x"}); err == nil {
+			t.Fatal("expected an error for a bad timeout")
+		}
+	})
+}
+
+// @scenario "A stuck check fails instead of waiting forever"
+func TestSlotRunStopsAStuckCommand(t *testing.T) {
+	t.Setenv("CHECK_SLOTS", "1")
+	t.Setenv("CI", "")
+	var progress bytes.Buffer
+	job := &slotJob{sem: semaphore.New(t.TempDir()), label: "stuck", limit: 200 * time.Millisecond, argv: []string{"sleep", "30"}, progress: &progress}
+	started := time.Now()
+	if code := job.run(context.Background()); code != 124 {
+		t.Fatalf("exit code = %d, want 124", code)
+	}
+	if time.Since(started) > 10*time.Second {
+		t.Fatalf("the stuck command was not stopped at its limit (took %s)", time.Since(started))
+	}
+	if !strings.Contains(progress.String(), "stuck ran past 200ms and was stopped") {
+		t.Fatalf("progress = %q, want the stop named", progress.String())
+	}
 }
 
 // @scenario "haven's slot run is transparent to the command"

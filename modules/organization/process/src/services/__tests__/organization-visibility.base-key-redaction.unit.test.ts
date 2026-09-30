@@ -86,16 +86,25 @@ function seededMembership(): MemoryOrganizationMembershipRepository {
  * Grants exactly the permissions in `granted`. `organization:manage` is
  * never granted here — the base key is gated on the project, not on the organization.
  */
-function testPermissions(granted: readonly string[]): AuthzApi {
-  return createApiFixture<AuthzApi>({
+function testPermissions(granted: readonly string[]) {
+  return {
     hasPermission: vi.fn(async (check: { permission: string }) =>
       granted.includes(check.permission),
     ),
+    canBatchByIds: vi.fn(
+      async (batch: { permission: string; projects: readonly { projectId: string }[] }) => ({
+        teams: new Map<string, boolean>(),
+        projects: new Map(
+          batch.projects.map(({ projectId }) => [projectId, granted.includes(batch.permission)]),
+        ),
+        organizationRole: null,
+      }),
+    ),
     listBindingsForSynthesis: vi.fn(async () => []),
-  });
+  };
 }
 
-function visibility(granted: readonly string[]) {
+function visibility(granted: readonly string[], permissions = testPermissions(granted)) {
   const membership = seededMembership();
   return OrganizationVisibilityService.create({
     reader: {
@@ -103,7 +112,7 @@ function visibility(granted: readonly string[]) {
       findOrganizationWithMembers: (input) => membership.findOrganizationWithMembers(input),
       findMemberById: (input) => membership.findMemberById(input),
     },
-    permissions: testPermissions(granted),
+    permissions: createApiFixture<AuthzApi>(permissions),
     secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     demoProject: { userId: "", projectId: "" },
   });
@@ -161,6 +170,21 @@ describe("given the base key in the organizations payload", () => {
       const project = await readProject(granted);
 
       expect(project.lwqlKey).toBe("");
+    });
+  });
+});
+
+describe("given the project permissions behind the base key", () => {
+  describe("when the organizations payload is read", () => {
+    it("decides every project in one batched call, never one check per project", async () => {
+      const permissions = testPermissions(["project:manage"]);
+
+      await visibility(["project:manage"], permissions).listVisible({ isDemo: false }, CALLER);
+
+      expect(permissions.canBatchByIds).toHaveBeenCalledTimes(1);
+      expect(permissions.hasPermission).not.toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: expect.any(String) }),
+      );
     });
   });
 });

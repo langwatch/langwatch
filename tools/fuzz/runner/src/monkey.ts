@@ -128,6 +128,8 @@ export interface VisitResult {
   navigation: Navigation;
   fellBack: boolean;
   broken: boolean;
+  /** error is why the harness or stack failed this visit (a stall, a closed page); "" if none. */
+  error: string;
 }
 
 export class SessionLost extends Error {}
@@ -146,6 +148,7 @@ class RouteWalk {
   private navigation: Navigation;
   private fellBack = false;
   private broken = false;
+  private error = "";
 
   constructor(private readonly visit: Visit) {
     this.navigation = visit.navigation;
@@ -174,6 +177,7 @@ class RouteWalk {
       navigation: this.navigation,
       fellBack: this.fellBack,
       broken: this.broken,
+      error: this.error,
     };
   }
 
@@ -212,6 +216,7 @@ class RouteWalk {
   private async step(n: number): Promise<boolean> {
     const gathered = await this.gather();
     if (gathered === undefined) {
+      this.error ||= "page unresponsive";
       await this.record([classifyHang({ what: "page unresponsive", url: this.page.url() })]);
       return false;
     }
@@ -236,7 +241,10 @@ class RouteWalk {
       millis: this.visit.plan.actionCapMillis,
       fallback: false,
     });
-    if (!finished && this.page.isClosed()) return false;
+    if (!finished && this.page.isClosed()) {
+      this.error ||= "page closed";
+      return false;
+    }
     await this.settle();
     await this.inspect();
     return this.returnHome();
@@ -265,6 +273,7 @@ class RouteWalk {
       const what = `request pending ${outcome.inFlight[0]?.slice(0, 120)}`;
       await this.record([classifyHang({ what, url })]);
     } else if (outcome.stillLoading) {
+      this.error ||= "still loading";
       await this.record([classifyHang({ what: "still loading", url })]);
     }
   }
@@ -279,6 +288,7 @@ class RouteWalk {
     const url = this.page.url();
     this.paths.add(normalisePath(url));
     const text = await this.readBody();
+    if (text === undefined) this.error ||= "page unresponsive";
     const screen =
       text === undefined
         ? classifyHang({ what: "page unresponsive", url })

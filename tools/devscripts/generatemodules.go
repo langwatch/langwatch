@@ -11,6 +11,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/langwatch/langwatch/tools/internal/collate"
 )
 
 const (
@@ -150,7 +152,7 @@ func declarationsFor(root string, cat catalogue, half, suffix string) ([]declara
 		}
 		out = append(out, declaration{entry.ID, symbol, manifest.Name, specifier})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return localeCompare(out[i].symbol, out[j].symbol) < 0 })
+	sort.SliceStable(out, func(i, j int) bool { return collate.Compare(out[i].symbol, out[j].symbol) < 0 })
 	return out, nil
 }
 
@@ -258,7 +260,7 @@ func moduleConfigsFor(root string, cat catalogue) ([]declaration, error) {
 		}
 		out = append(out, declaration{id: entry.ID, symbol: symbol, specifier: manifest.Name})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return localeCompare(out[i].id, out[j].id) < 0 })
+	sort.SliceStable(out, func(i, j int) bool { return collate.Compare(out[i].id, out[j].id) < 0 })
 	return out, nil
 }
 

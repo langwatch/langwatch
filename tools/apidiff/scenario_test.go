@@ -119,7 +119,11 @@ func (stack *fakeStack) handler() http.Handler {
 		stack.mu.Unlock()
 		replyJSON(writer, http.StatusCreated, map[string]any{"id": fmt.Sprintf("p%d", number), "serviceApiKey": fmt.Sprintf("k%d", number)})
 	})
-	mux.HandleFunc("/api/organizations", func(writer http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/api/organizations", func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodGet {
+			replyJSON(writer, http.StatusOK, map[string]any{"data": []string{}})
+			return
+		}
 		stack.mu.Lock()
 		stack.orgs++
 		number := stack.orgs

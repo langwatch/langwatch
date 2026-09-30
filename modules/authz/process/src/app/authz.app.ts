@@ -259,6 +259,8 @@ export class AuthzApp implements AuthzApi {
     this.#permissions.listBindingsForSynthesis(a);
   listUserCreatedRoles: AuthzApi["listUserCreatedRoles"] = (a) =>
     this.#permissions.listUserCreatedRoles(a);
+  findRolePermissions: AuthzApi["findRolePermissions"] = (a) =>
+    this.#permissions.findRolePermissions(a);
   wouldFirstBindingDisableLegacyAccess: AuthzApi["wouldFirstBindingDisableLegacyAccess"] = (a) =>
     this.#permissions.wouldFirstBindingDisableLegacyAccess(a);
   listManagedBindingsForUser: AuthzApi["listManagedBindingsForUser"] = (a) =>

@@ -2,12 +2,15 @@ package apidiff
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // defaultScenarioGlob skips the files whose name starts with an underscore
@@ -27,6 +30,7 @@ type scenarioFlags struct {
 	final       bool
 	dryRun      bool
 	skip        bool
+	maxErrors   int
 }
 
 func registerScenarioFlags(flags *flag.FlagSet, scenarios *scenarioFlags) {
@@ -38,6 +42,7 @@ func registerScenarioFlags(flags *flag.FlagSet, scenarios *scenarioFlags) {
 	flags.StringVar(&scenarios.mailA, "mail-a", "", "candidate's mail sink base URL (mailsim), for mail steps")
 	flags.StringVar(&scenarios.seedDir, "seed-dir", ".apidiff", "single-sided mode: where the shared-stack seed record and its lock live")
 	flags.BoolVar(&scenarios.final, "final", false, "also run the scenarios the done ledger has signed off")
+	flags.IntVar(&scenarios.maxErrors, "max-consecutive-errors", defaultMaxConsecutiveErrors, "stop the scenario phase after this many ERROR scenarios in a row, in order of completion (0 never stops it)")
 	flags.StringVar(&scenarios.mailB, "mail-b", "", "base's mail sink base URL (mailsim), for mail steps")
 }
 
@@ -47,7 +52,7 @@ func (scenarios *scenarioFlags) options(probe *probeFlags, runDir string, progre
 		A: probe.a, B: probe.b, MailA: scenarios.mailA, MailB: scenarios.mailB, Keys: probe.keys,
 		Timeout: probe.timeout, Concurrency: scenarios.concurrency, Shards: scenarios.shards,
 		Repeat: scenarios.repeat, Glob: scenarios.glob, IDs: scenarios.ids, RunDir: runDir, Progress: progress,
-		SeedDir: scenarios.seedDir, Final: scenarios.final, DryRun: scenarios.dryRun, DoneRoot: ".",
+		SeedDir: scenarios.seedDir, Final: scenarios.final, DryRun: scenarios.dryRun, DoneRoot: ".", MaxErrors: scenarios.maxErrors,
 	}
 }
 
@@ -70,6 +75,11 @@ func runScenariosSubcommand(ctx context.Context, args []string, out streams) int
 	}
 	if runDir == "" {
 		runDir = filepath.Join(".apidiff", "scenarios-"+time.Now().Format("20060102-150405"))
+	}
+	if probe.a != "" && probe.b != "" {
+		if err := rememberHavenOrigins(ctx, probe.a, probe.b); err != nil {
+			fmt.Fprintln(out.stderr, "scenarios: haven origins:", err)
+		}
 	}
 	if probe.a != "" && probe.b == "" {
 		filled, err := fillHavenCredentials(ctx, probe.a, &probe.keys)
@@ -124,9 +134,21 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 		return exitEqual
 	}
 	runner := newScenarioRunner(ctx, options)
+	defer runner.cancel()
+	runner.probeAdminKey()
+	items, deferred := runner.deferAdminScenarios(items)
+	if len(items) == 0 {
+		writeDeferred(report, deferred)
+		return exitEqual
+	}
 	fmt.Fprintf(progress, "scenarios: %d selected, %d in flight per side, %d shards per kind\n", len(items), runner.options.Concurrency, options.Shards)
 	seeded := time.Now()
-	runner.seed(needsOf(items, options.Shards))
+	needs := needsOf(items, options.Shards)
+	runner.seed(needs)
+	if cause := runner.setupFailure(needs); cause != "" {
+		fmt.Fprintln(progress, "apidiff:", diffkit.SetupFailed(errors.New(cause)))
+		return exitError
+	}
 	fmt.Fprintf(progress, "scenarios: shards seeded in %s\n", time.Since(seeded).Round(time.Millisecond))
 	phaseDone(progress, "scenario shards", seeded)
 	started := time.Now()
@@ -136,10 +158,15 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 	phaseDone(progress, "scenarios", started)
 	timing := scenarioTiming{Wall: time.Since(started), Requests: runner.requests.Load(), Waits: time.Duration(runner.waitNanos.Load()), Workers: runner.options.Concurrency}
 	writeScenarioReport(report, results, timing)
+	writeDeferred(report, deferred)
 	if target, err := writeScenariosJSONL(options.RunDir, results); err != nil {
 		fmt.Fprintln(progress, "scenarios.jsonl:", err)
 	} else if target != "" {
 		fmt.Fprintln(progress, "scenarios:", target)
+	}
+	if stopped := runner.streak.Stopped(); stopped != nil {
+		fmt.Fprintf(progress, "apidiff: %s\nscenarios: %d of %d not run\n", stopped.Reason, len(items)-len(results), len(items))
+		return exitStopped
 	}
 	return scenarioExit(results)
 }

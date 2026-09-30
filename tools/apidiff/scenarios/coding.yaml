@@ -101,16 +101,14 @@
   verify:
     - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200, "path": "events", "length": 2}}
 
-- id: coding-events-refuses-restricted-key
+- id: coding-events-allows-read-only-key
   endpoint: GET /api/coding-agent/sessions/{sessionId}/events
   auth: restricted
   setup:
     - {"request": "POST /api/otel/v1/logs", "body": {"resourceLogs": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "claude-code"}}]}, "scopeLogs": [{"scope": {"name": "com.anthropic.claude_code.events", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721991000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.user_prompt", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.user_prompt"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "prompt", "value": {"stringValue": "vd prompt {uid}"}}, {"key": "prompt_length", "value": {"intValue": "14"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}, {"timeUnixNano": "1790722051000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "claude_code.api_request", "attributes": [{"key": "event.name", "value": {"stringValue": "claude_code.api_request"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "model", "value": {"stringValue": "claude-sonnet-4-20250514"}}, {"key": "input_tokens", "value": {"intValue": "1200"}}, {"key": "output_tokens", "value": {"intValue": "340"}}, {"key": "cache_read_tokens", "value": {"intValue": "800"}}, {"key": "cache_creation_tokens", "value": {"intValue": "100"}}, {"key": "cost_usd", "value": {"doubleValue": 0.012}}, {"key": "duration_ms", "value": {"intValue": "2100"}}, {"key": "prompt.id", "value": {"stringValue": "vd-p-{uid}"}}]}]}, {"scope": {"name": "langwatch.coding_agent.hook", "version": "1"}, "logRecords": [{"timeUnixNano": "1790721931000000000", "severityNumber": 9, "severityText": "INFO", "eventName": "langwatch.session_context", "attributes": [{"key": "event.name", "value": {"stringValue": "langwatch.session_context"}}, {"key": "session.id", "value": {"stringValue": "vd-sess-{uid}"}}, {"key": "coding_agent.name", "value": {"stringValue": "claude_code"}}, {"key": "vcs.repository.host", "value": {"stringValue": "github.com"}}, {"key": "vcs.repository.owner", "value": {"stringValue": "vd-org"}}, {"key": "vcs.repository.name", "value": {"stringValue": "vd-repo"}}, {"key": "vcs.ref.head.name", "value": {"stringValue": "feat/vd-{uid}"}}]}]}]}]}, "expect": {"status": 200}}
     - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "eventually": "60s", "expect": {"status": 200, "path": "events", "length": 2}}
   request: {"path": "/api/coding-agent/sessions/vd-sess-{uid}/events"}
-  expect: {"status": [401, 403]}
-  verify:
-    - {"request": "GET /api/coding-agent/sessions/vd-sess-{uid}/events", "expect": {"status": 200, "path": "events", "length": 2}}
+  expect: {"status": 200, "path": "events", "length": 2}
 
 - id: coding-ingest-context-and-model-call-become-a-session
   endpoint: POST /api/otel/v1/logs
@@ -182,45 +180,45 @@
   expect: {"status": [400, 401, 403]}
 
 - id: coding-pr-usage-v1-unmapped-pull-request-is-not-found
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo-{uid}", "pullRequest": 7}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo-{uid}", "pullRequest": 7}}
   expect: {"status": 404}
 
 - id: coding-pr-usage-v1-unmapped-host-is-not-found
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1, "host": "ghe-{uid}.example.com"}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1, "host": "ghe-{uid}.example.com"}}
   expect: {"status": 404}
 
 - id: coding-pr-usage-v1-refuses-no-key
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: none
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
   expect: {"status": 401}
 
 - id: coding-pr-usage-v1-refuses-project-key
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: project
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
   expect: {"status": [401, 403]}
 
 - id: coding-pr-usage-v1-rejects-bad-repository
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "no-slash", "pullRequest": 1}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "no-slash", "pullRequest": 1}}
   expect: {"status": [400, 422]}
 
 - id: coding-pr-usage-v1-rejects-missing-pull-request
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo"}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo"}}
   expect: {"status": [400, 422]}
 
 - id: coding-pr-usage-v1-rejects-negative-pull-request
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": -3}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": -3}}
   expect: {"status": [400, 422]}
 
 - id: github-install-refuses-no-session

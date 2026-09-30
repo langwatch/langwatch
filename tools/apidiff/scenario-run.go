@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // scenarioOptions is what the scenario phase needs to reach a pair of stacks.
@@ -32,11 +34,13 @@ type scenarioOptions struct {
 	DryRun       bool   // load and validate only
 	DoneRoot     string // repository root the done ledger sits under
 	Progress     io.Writer
+	MaxErrors    int // consecutive ERROR scenarios that stop the run; 0 never stops it
 }
 
 const (
-	defaultScenarioConcurrency = 48
-	defaultScenarioShards      = 8
+	defaultScenarioConcurrency  = 48
+	defaultScenarioShards       = 8
+	defaultMaxConsecutiveErrors = 50
 )
 
 // scenarioSide is one stack under test: where it is, the credentials its
@@ -80,6 +84,31 @@ type scenarioRunner struct {
 	waitNanos atomic.Int64
 	liveMu    sync.Mutex
 	live      map[string]int
+	streak    *diffkit.Streak
+	stopped   atomic.Bool
+	cancel    context.CancelFunc
+	// adminAbsent is set once probeAdminKey finds the instance-admin routes 404.
+	adminAbsent bool
+}
+
+// stop ends the run early: scenarios not started are dropped, and the ones in
+// flight are cancelled and left out of the results.
+func (runner *scenarioRunner) stop() {
+	runner.stopped.Store(true)
+	runner.cancel()
+}
+
+// settle files one judged scenario with the streak: only an ERROR counts, a
+// PASS ends the streak, and a FAIL does neither.
+func (runner *scenarioRunner) settle(result *scenarioResult) {
+	switch result.Verdict {
+	case verdictError:
+		if runner.streak.Error(result.FirstFail) {
+			runner.stop()
+		}
+	case verdictPass:
+		runner.streak.OK()
+	}
 }
 
 func (runner *scenarioRunner) verdicts() []string {
@@ -132,6 +161,7 @@ func newScenarioClient(options scenarioOptions) *http.Client {
 
 func newScenarioRunner(ctx context.Context, options scenarioOptions) *scenarioRunner {
 	options.Concurrency = max(options.Concurrency, 1)
+	ctx, cancel := context.WithCancel(ctx)
 	if options.Progress == nil {
 		options.Progress = io.Discard
 	}
@@ -139,7 +169,7 @@ func newScenarioRunner(ctx context.Context, options scenarioOptions) *scenarioRu
 		ctx: ctx, client: newScenarioClient(options),
 		options: ProbeOptions{A: options.A, B: options.B, Keys: options.Keys, Progress: options.Progress},
 	}
-	runner := &scenarioRunner{ctx: ctx, engine: engine, options: options, live: map[string]int{}, tag: strconv.FormatInt(time.Now().Unix()%1_000_000_000, 36)}
+	runner := &scenarioRunner{ctx: ctx, engine: engine, options: options, live: map[string]int{}, streak: diffkit.NewStreak(options.MaxErrors), cancel: cancel, tag: strconv.FormatInt(time.Now().Unix()%1_000_000_000, 36)}
 	if options.B == "" {
 		runner.sides = []*scenarioSide{newScenarioSide("stack", options.A, options.MailA, options)}
 		return runner
@@ -199,13 +229,26 @@ func (runner *scenarioRunner) runAll(items []scenario) []scenarioResult {
 		}()
 	}
 	pooled.Wait()
-	if unlock := runner.lockInstance(len(serial)); unlock != nil {
-		defer unlock()
+	if !runner.stopped.Load() {
+		if unlock := runner.lockInstance(len(serial)); unlock != nil {
+			defer unlock()
+		}
+		for _, index := range serial {
+			runner.runOne(&results[index], 0)
+		}
 	}
-	for _, index := range serial {
-		runner.runOne(&results[index], 0)
+	return judged(results)
+}
+
+// judged drops the scenarios a stopped run never judged.
+func judged(results []scenarioResult) []scenarioResult {
+	kept := results[:0]
+	for index := range results {
+		if results[index].Verdict != "" {
+			kept = append(kept, results[index])
+		}
 	}
-	return results
+	return kept
 }
 
 // lockInstance holds the shared stack's instance-wide lock for the serial pass,
@@ -225,6 +268,9 @@ func (runner *scenarioRunner) lockInstance(serial int) func() {
 
 // runOne runs one scenario on both sides at once and judges the pair.
 func (runner *scenarioRunner) runOne(result *scenarioResult, pick int) {
+	if runner.stopped.Load() {
+		return
+	}
 	started := time.Now()
 	var sides sync.WaitGroup
 	outcomes := []*sideOutcome{&result.Branch, &result.Main}
@@ -237,10 +283,14 @@ func (runner *scenarioRunner) runOne(result *scenarioResult, pick int) {
 		}()
 	}
 	sides.Wait()
+	if runner.stopped.Load() {
+		return
+	}
 	result.elapsed = time.Since(started)
 	result.DurationMS = result.elapsed.Milliseconds()
 	runner.judgePair(result)
 	runner.tick(result.Verdict)
+	runner.settle(result)
 }
 
 func (runner *scenarioRunner) runSide(side *scenarioSide, result *scenarioResult, pick int, out *sideOutcome) {

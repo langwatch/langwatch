@@ -17,6 +17,26 @@ go run ./cmd/fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only <area>]
 Output lands in `.fuzz/<run>/`: `findings.jsonl`, `findings.md` (grouped),
 `coverage.md`, and a timing block on stderr and in `timing.txt`.
 
+## Stopping when nothing works
+
+A setup that fails (resolving the stack, seeding the `fuzzer` organisation, the
+OpenAPI document, launching the browser, signing in, finding the project) stops
+the run at once with `fuzz <mode>: stopping: setup failed: <cause>`. Once
+running, `-max-consecutive-errors N` (0 disables) stops it after N harness
+errors in a row, in the order they complete, writes what it has as usual and
+exits 3 after `fuzz <mode>: stopping: N consecutive errors, most common cause:
+<cause> (xK)`.
+
+- `api` (default 200): a request that got no answer (transport error, refused,
+  timeout). Any response ends the streak, and a 5xx is a finding, not an error.
+- `ui` (default 10): a visit that threw (page or browser closed), whose page
+  stopped answering, or that stayed "still loading" at the settle's cap. A
+  visit that ran to its end, findings or not, ends the streak.
+
+In `api` the requests in flight are cancelled and dropped, and findings are not
+shrunk against the stack that stopped answering. In `ui` the lanes finish their
+current action and take no new visit.
+
 ## The oracles (no AI)
 
 1. any 5xx response;

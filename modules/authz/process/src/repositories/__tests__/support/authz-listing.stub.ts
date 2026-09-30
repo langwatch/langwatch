@@ -23,4 +23,7 @@ export class StubAuthzListingRepository extends AuthzListingRepository {
   readonly findUserCreatedRoles = vi.fn<AuthzListingRepository["findUserCreatedRoles"]>(
     async () => [],
   );
+  readonly findRolePermissionRows = vi.fn<AuthzListingRepository["findRolePermissionRows"]>(
+    async () => [],
+  );
 }

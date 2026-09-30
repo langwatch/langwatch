@@ -273,6 +273,7 @@ describe("given a role definition whose projection does not land inside the wind
       const { writer, db } = harness({});
       db.role.findFirst.mockResolvedValue({
         name: "apikey:key_1",
+        description: null,
         permissions: ["langy:view"],
       });
 
@@ -288,8 +289,31 @@ describe("given a role definition whose projection does not land inside the wind
       ).resolves.toBeUndefined();
       expect(db.role.findFirst).toHaveBeenCalledWith({
         where: { id: "role_1", organizationId: ORG_ID, deletedAt: null },
-        select: { name: true, permissions: true },
+        select: { name: true, description: true, permissions: true },
       });
+    });
+
+    /** @scenario "A role definition that clears the description waits for the cleared Role row" */
+    it("does not accept a Role row still carrying the old description", async () => {
+      const { writer, db } = harness({});
+      db.role.findFirst.mockResolvedValue({
+        name: "custom_viewer",
+        description: "soon gone",
+        permissions: ["project:view"],
+      });
+
+      expect(
+        await codeOf(() =>
+          writer.defineRole({
+            organizationId: ORG_ID,
+            roleId: "role_1",
+            name: "custom_viewer",
+            permissions: ["project:view"],
+            kind: "custom",
+            actor: ACTOR,
+          }),
+        ),
+      ).toBe("authz_grant_not_confirmed");
     });
 
     it("does not accept a deleted Role row as confirmation", async () => {

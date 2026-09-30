@@ -8,13 +8,20 @@ const required = async (context: Parameters<Action>[0], text: string): Promise<v
 /** signIn signs the run in, signing up first when the account does not exist yet. */
 export const signIn: Action = async (context) => {
   const { credential } = context;
-  await goTo({ context, path: "/auth/signin" });
-  await context.side.page
-    .locator("input")
-    .locator("visible=true")
-    .first()
-    .waitFor({ timeout: 15_000 })
-    .catch(() => undefined);
+  const formShown = async (): Promise<boolean> => {
+    await goTo({ context, path: "/auth/signin" });
+    return context.side.page
+      .locator("input")
+      .locator("visible=true")
+      .first()
+      .waitFor({ timeout: 15_000 })
+      .then(
+        () => true,
+        () => false,
+      );
+  };
+  // A cold dev server can fail the first page's module import; one reload recovers it.
+  if (!(await formShown())) await formShown();
   await context.snapshot("sign in");
   const filled = await fillField({ context, target: "email", value: credential.email }).then(
     () => true,

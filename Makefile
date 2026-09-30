@@ -271,7 +271,7 @@ GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
 # edits, not the whole tree, and is not the cost this queue exists for.
 go-lint-slot:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
-	@$(HAVEN) slot run --label golangci-lint -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run $(GO_LINT_PKGS)
+	@$(HAVEN) slot run --label golangci-lint --timeout 10m -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --allow-serial-runners $(GO_LINT_PKGS)
 
 go-lint: go-lint-slot
 
@@ -283,7 +283,7 @@ go-lint-changed:
 		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "./$$d"; done); \
 	if [ -z "$$pkgs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
 	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$pkgs" | wc -l | tr -d ' ') packages)"; \
-	env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --new-from-rev=HEAD $$pkgs
+	$(HAVEN) slot run --label golangci-lint --timeout 10m -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --allow-serial-runners --new-from-rev=HEAD $$pkgs
 
 # Stop all services
 down:

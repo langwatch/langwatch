@@ -1088,6 +1088,7 @@ func (o *Orchestrator) registerPlayStack(pl PlaySandbox, ports playPorts) (domai
 		// Sandboxes run unreviewed branches, so this is the last place that
 		// should be shipping trace text to Google on someone's real credentials.
 		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,
+		NxPrivateDir:     o.nxPrivateDir(pl.slug),
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -1131,11 +1132,11 @@ func (o *Orchestrator) preparePlaySandbox(ctx context.Context, pl PlaySandbox, s
 	// than re-deriving fork status inside this detached child. Nothing is lost:
 	// the repo's postinstall is codegen, and the very next step runs it
 	// explicitly through start:prepare:files.
-	if err := o.ensureDeps(ctx, pl.Checkout, false); err != nil {
+	if err := o.ensureDeps(ctx, pl.Checkout, depsInstall{Env: nxEnv(st)}); err != nil {
 		return err
 	}
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
-	if err := o.sup.RunOnce(ctx, "codegen", pl.Checkout, "pnpm --silent run start:prepare:files", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "codegen", pl.Checkout, "pnpm --silent run start:prepare:files", append(o.nxParallelEnv(), env...)); err != nil {
 		o.log.Warn("play codegen failed (continuing)", zap.Error(err))
 	}
 	if err := o.sup.RunOnce(ctx, "prepare", pl.Checkout, prepareDBShell, env); err != nil {

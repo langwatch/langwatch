@@ -284,6 +284,10 @@ class Authorization extends AuthzService {
     return this.notUsed();
   }
 
+  findRolePermissions(): Promise<never> {
+    return this.notUsed();
+  }
+
   wouldFirstBindingDisableLegacyAccess(): Promise<never> {
     return this.notUsed();
   }

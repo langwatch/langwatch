@@ -12,22 +12,12 @@ import {
   type ApiKeyUser,
   HIDDEN_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
-import type { AuthzCustomRole } from "@langwatch/authz-contract";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
-
-function toApiKeyRoleSummary(role: AuthzCustomRole): ApiKeyRoleSummary {
-  const permissionsArray = Array.isArray(role.permissions) ? role.permissions : [];
-  const isStringPermission = (permission: unknown): permission is string =>
-    typeof permission === "string";
-  const permissions = permissionsArray.every(isStringPermission) ? permissionsArray : [];
-
-  return { id: role.id, name: role.name, permissions };
-}
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
@@ -222,9 +212,7 @@ export class ApiKeyCatalogService {
       return [];
     }
 
-    const roles = await this.options.authz.listUserCreatedRoles({ organizationId });
-
-    return roles.filter((role) => ids.includes(role.id)).map(toApiKeyRoleSummary);
+    return this.options.authz.findRolePermissions({ organizationId, roleIds: ids });
   }
 
   private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {
@@ -240,29 +228,17 @@ export class ApiKeyCatalogService {
   }
 
   private async customPermissions(row: StoredApiKey, organizationId: string): Promise<string[]> {
-    const ids = new Set(
-      row.roleBindings.flatMap((binding) => (binding.customRoleId ? [binding.customRoleId] : [])),
-    );
-    if (ids.size === 0) {
+    const roleIds = [
+      ...new Set(
+        row.roleBindings.flatMap((binding) => (binding.customRoleId ? [binding.customRoleId] : [])),
+      ),
+    ];
+    if (roleIds.length === 0) {
       return [];
     }
 
-    const roles = await this.options.authz.listUserCreatedRoles({
-      organizationId,
-    });
+    const roles = await this.options.authz.findRolePermissions({ organizationId, roleIds });
 
-    return [
-      ...new Set(
-        roles
-          .filter((role) => ids.has(role.id) && Array.isArray(role.permissions))
-          .flatMap((role) =>
-            Array.isArray(role.permissions)
-              ? role.permissions.filter(
-                  (permission): permission is string => typeof permission === "string",
-                )
-              : [],
-          ),
-      ),
-    ].toSorted();
+    return [...new Set(roles.flatMap((role) => role.permissions))].toSorted();
   }
 }

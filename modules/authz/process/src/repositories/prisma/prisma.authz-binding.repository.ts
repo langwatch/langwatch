@@ -69,6 +69,7 @@ const assignableRoleRowsSchema = z.array(assignableRoleRowSchema);
 export type AuthzBindingDatabase = {
   apiKey: Delegate;
   customRole: Delegate;
+  grant: Delegate;
   group: Delegate;
   groupMembership: Delegate;
   organization: Delegate;
@@ -279,6 +280,13 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
     organizationId: string;
     bindingId: string;
   }): Promise<AuthzManagedBindingRow | null> {
+    // The live Grant is the truth: a revoke marks it at once, while the compat
+    // RoleBinding row only goes when the queued revoke projects.
+    const live = await this.database.grant.findFirst({
+      where: { id: bindingId, organizationId, revokedAt: null },
+      select: { id: true },
+    });
+    if (live === null) return null;
     const row = await this.database.roleBinding.findFirst({
       where: { id: bindingId, organizationId },
       select: {

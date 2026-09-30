@@ -1,7 +1,6 @@
 import { defineServerModule } from "@langwatch/kernel";
 
 import { StoredObjectApp } from "#app/stored-object.app";
-import type { StoredObjectsTelemetry } from "#app/stored-object.members";
 import type { PayloadStagingRepository } from "#repositories/payload-staging.repository";
 import { storedObjectRepositories } from "#repositories/stored-object-repositories.registry";
 import { AbsentPayloadStagingService } from "#services/absent-payload-staging.service";
@@ -21,9 +20,6 @@ import type {
   StoredObjectProjectDestinationResolver,
   StoredObjectStorageRuntimeOptions,
 } from "#services/stored-object-storage-runtime.service";
-import { StoredObjectsTelemetryService } from "#services/stored-objects-telemetry.service";
-import { StoredObjectsService } from "#services/stored-objects.service";
-import type { StoredObjectsServiceOptions } from "#services/stored-objects.service";
 import { storedObjectFileRest } from "#transport/stored-object-file.rest";
 import { storedObjectImageProxyRest } from "#transport/stored-object-image-proxy.rest";
 import { storedObjectRest } from "#transport/stored-object.rest";
@@ -57,10 +53,6 @@ export function resolveAzureBlobCredentials(options: {
   return AzureBlobCredentialsService.create().resolve(options);
 }
 
-export function createPrometheusStoredObjectsTelemetry(): StoredObjectsTelemetry {
-  return StoredObjectsTelemetryService.create();
-}
-
 export function createStoredObjectDestinationPolicy(options: {
   selection: StoredObjectStorageSelection;
   projects: StoredObjectProjectS3Config;
@@ -72,10 +64,4 @@ export function createStoredObjectStorageRuntime(
   options: StoredObjectStorageRuntimeOptions,
 ): StoredObjectStorageRuntimeService {
   return StoredObjectStorageRuntimeService.create(options);
-}
-
-export function createStoredObjectsService(
-  options: StoredObjectsServiceOptions,
-): StoredObjectsService {
-  return StoredObjectsService.create(options);
 }

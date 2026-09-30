@@ -50,31 +50,14 @@ const row: StoredObject = {
 
 function makeService(): StoredObjectsService {
   return StoredObjectsService.create({
-    repository: {
-      insert: vi.fn(async () => undefined),
-      tryFindById: vi.fn(async () => row),
-      findAllByProject: vi.fn(async () => []),
-      deleteByProject: vi.fn(async () => undefined),
-      deleteByIds: vi.fn(async () => undefined),
-      findLiveRowsByProjectPage: () =>
-        Promise.reject(new Error("findLiveRowsByProjectPage is not used here")),
-      sumSizeBytesByProject: () =>
-        Promise.reject(new Error("sumSizeBytesByProject is not used here")),
-    },
+    repository: { tryFindById: vi.fn(async () => row) },
     registry: {
       get: vi.fn(async () => Readable.from([Buffer.from("bytes")])),
       put: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
       exists: vi.fn(async () => true),
     },
-    mintStorageUri: async ({ projectId, sha256 }) => `file:///tmp/${projectId}/${sha256}`,
-    telemetry: {
-      recordExtract: vi.fn(),
-      recordDedupHit: vi.fn(),
-      recordWriteFailure: vi.fn(),
-      recordReadFailure: vi.fn(),
-      observeSizeBytes: vi.fn(),
-    },
+    telemetry: { recordReadFailure: vi.fn() },
   });
 }
 
@@ -83,24 +66,8 @@ beforeEach(() => {
 });
 
 describe("StoredObjectsService tracing", () => {
-  describe("when bytes are externalized during ingest", () => {
-    /** @scenario "OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id" */
-    it("opens a span named for the extraction", async () => {
-      await makeService().storeFromBytes({
-        projectId: PROJECT_ID,
-        purpose: "scenario_event",
-        ownerKind: "scenario_run",
-        ownerId: "run-1",
-        mediaType: "audio/wav",
-        bytes: Buffer.from("bytes"),
-      });
-
-      expect(spanNames).toContain("StoredObjectsService.storeFromBytes");
-    });
-  });
-
   describe("when the file surface reads an object back", () => {
-    /** @scenario "OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id" */
+    /** @scenario "OpenTelemetry spans wrap reads via /api/files/:id" */
     it("opens a span named for the read", async () => {
       await makeService().getById({ projectId: PROJECT_ID, id: "obj-1" });
 

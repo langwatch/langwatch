@@ -369,21 +369,6 @@ describe("storage_uri persisted on the stored_objects row is the authoritative b
         /registry(?:For\([^)]*\))?\.get[\s\S]{0,200}row\.storage_uri|row\.storage_uri[\s\S]{0,200}registry(?:For\([^)]*\))?\.get/,
       );
       expect(readPathMatch).not.toBeNull();
-
-      // And mintStorageUri is for writes only — there must not be a read
-      // path that calls mintStorageUri to construct a fetch URI. Verify
-      // that no usage of mintStorageUri appears inside the getById method
-      // (the read path). We pick out the getById block by source-position
-      // and check that mintStorageUri does not appear inside it.
-      const getByIdStart = service.indexOf("async getById(");
-      expect(getByIdStart).toBeGreaterThan(0);
-      // The next `async ` after getByIdStart marks the end of getById's body.
-      const nextMethodStart = service.indexOf("\n  async ", getByIdStart + 1);
-      const getByIdBody = service.slice(
-        getByIdStart,
-        nextMethodStart > 0 ? nextMethodStart : undefined,
-      );
-      expect(getByIdBody).not.toContain("mintStorageUri");
     });
   });
 });

@@ -16,6 +16,9 @@ type recordingStack struct {
 
 func (stack *recordingStack) handler() http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodGet && request.URL.Path == "/api/organizations" {
+			return
+		}
 		stack.mutex.Lock()
 		stack.bearers[request.URL.Path] = append(stack.bearers[request.URL.Path], request.Header.Get("Authorization"))
 		stack.mutex.Unlock()

@@ -46,4 +46,10 @@ export abstract class AuthzListingRepository {
   ) => Promise<AuthzBindingForSynthesis[]>;
 
   abstract findUserCreatedRoles: (input: { organizationId: string }) => Promise<AuthzCustomRole[]>;
+
+  /** Live roles of any kind, by id, as stored: permissions are not yet parsed. */
+  abstract findRolePermissionRows: (input: {
+    organizationId: string;
+    roleIds: readonly string[];
+  }) => Promise<{ id: string; name: string; permissions: unknown }[]>;
 }

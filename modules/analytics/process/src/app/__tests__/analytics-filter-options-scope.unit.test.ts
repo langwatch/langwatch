@@ -57,6 +57,7 @@ async function appOver() {
         username: void 0,
         database: void 0,
         tenantSetting: void 0,
+        postgresHost: void 0,
         accessModelMode: void 0,
         sqlSingleNode: void 0,
       },
