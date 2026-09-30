@@ -663,4 +663,5 @@
 - {"id": "ops-admin-impersonate-stop-org-key-is-not-staff", "endpoint": "DELETE /api/admin/impersonate", "auth": "org", "request": {"path": "/api/admin/impersonate"}, "expect": {"status": [404]}}
 - {"id": "ops-admin-operation-wrong-bearer", "endpoint": "POST /api/admin/:resource", "auth": "none", "request": {"path": "/api/admin/users", "body": {}, "headers": {"Authorization": "Bearer wrong-{uid}"}}, "expect": {"status": [404]}}
 - {"id": "ops-admin-operation-org-key-is-not-staff", "endpoint": "POST /api/admin/:resource", "auth": "org", "request": {"path": "/api/admin/users", "body": {}}, "expect": {"status": [404]}}
-- {"id": "ops-checkup-other-project-key-reads", "endpoint": "GET /api/checkup", "auth": "project-b", "request": {"path": "/api/checkup"}, "expect": {"status": [200, 404]}}
+# Alex, 2026-09-30: the checkup needs organization:view; a project-scoped key holds none, so 403.
+- {"id": "ops-checkup-project-scoped-key-refused", "endpoint": "GET /api/checkup", "auth": "project-b", "request": {"path": "/api/checkup"}, "expect": {"status": [403]}}
