@@ -141,6 +141,19 @@ describe("useAgentTestingRouting", () => {
         argumentCount: 1,
       });
     });
+
+    /** @scenario "An in-page move carries no part of the old path into the new address" */
+    it("leaves the router's catch-all value out of the new address", () => {
+      openAt("/checkout/agent-testing/suites/refunds", {
+        project: "checkout",
+        "*": "suites/refunds",
+      });
+      const { result } = renderHook(() => useAgentTestingRouting());
+
+      result.current.selectPlan("nightly");
+
+      expect(lastPush().address).toBe("/checkout/agent-testing/results/nightly");
+    });
   });
 
   describe("when the tab is changed", () => {

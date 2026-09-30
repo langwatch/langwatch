@@ -213,8 +213,9 @@ type SuiteRouting = {
 
 /**
  * Route params, rebuilt from the target selection rather than carried over.
+ * The shell's router names the catch-all part `*`; main's named it `path`.
  */
-const ROUTE_PARAM_KEYS = new Set(["project", "path"]);
+const ROUTE_PARAM_KEYS = new Set(["project", "path", "*"]);
 
 /**
  * Whether a query param carries over when the sidebar selection changes.

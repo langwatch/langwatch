@@ -22,3 +22,11 @@ Feature: Navigating inside a project keeps the reader in that project
     Given the shell's capabilities are mounted on "/checkout/agent-testing"
     When a screen pushes "/checkout/agent-testing/suites/refunds"
     Then the navigation capability is asked for "/checkout/agent-testing/suites/refunds"
+
+  @integration
+  Scenario: An in-page move carries no part of the old path into the new address
+    Given the reader is on "/checkout/agent-testing/suites/refunds"
+    And the router reports the catch-all part "suites/refunds" among its values
+    When they open the run plan "nightly" on the Results tab
+    Then the router is asked for "/checkout/agent-testing/results/nightly"
+    And the address has no query string
