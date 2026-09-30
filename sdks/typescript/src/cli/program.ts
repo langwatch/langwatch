@@ -113,6 +113,9 @@ const TARGET_FLAG_HELP =
 const RUN_NAME_FLAG_HELP =
   "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
 
+const TRIGGER_FILTERS_HELP =
+  "Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {\"traces.error\":[\"true\"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {\"evaluations.passed\":{\"<monitorId>\":[\"false\"]}}; metadata.value keys by metadata key, e.g. {\"metadata.value\":{\"<key>\":[\"true\"]}}. A keyed field sent flat is refused";
+
 const REPEAT_FLAG_HELP =
   "How many times to run each scenario against each target, from 1 to 5.";
 
@@ -4103,13 +4106,20 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     triggerCmd
       .command("create <name>")
       .description("Create a new trigger (automation)")
-      .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE")
-      .option("--filters <json>", "Trigger filter conditions as JSON")
+      .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE, SEND_WEBHOOK")
+      .option("--action-params <json>", "Delivery configuration for the chosen action, as JSON")
+      .option("--filters <json>", TRIGGER_FILTERS_HELP)
+      .option("--filter-query <query>", "Trace query in the syntax the traces view uses, e.g. status:error. Supersedes --filters")
+      .option("--custom-graph-id <id>", "Make this an alert on that graph. Needs --graph-alert and --alert-type")
+      .option("--graph-alert <json>", "The rule an alert fires by, as JSON: {\"seriesName\":\"...\",\"operator\":\"gt|gte|lt|lte|eq\",\"threshold\":0.5,\"timePeriod\":5} (minutes: 1, 5, 15, 30, 60, 1440)")
+      .option("--report <json>", "Make this a scheduled report, as JSON: {\"source\":{\"kind\":\"dashboard\",\"dashboardId\":\"...\"},\"schedule\":{\"cron\":\"0 9 * * 1\",\"timezone\":\"UTC\"}}. source.kind is dashboard, customGraph or traceQuery")
       .option("--message <text>", "Custom alert message")
       .option("--alert-type <type>", "Alert severity: CRITICAL, WARNING, INFO")
-      .option("--slack-webhook <url>", "Slack webhook URL (for SEND_SLACK_MESSAGE action)")
+      .option("--slack-connection <id>", "The Slack connection to post through, for SEND_SLACK_MESSAGE. List them with `langwatch slack-connection list`")
+      .option("--slack-channel <id>", "The Slack channel to post in, e.g. C0123. Needed with a bot connection")
+      .option("--slack-webhook <url>", "Legacy: a Slack incoming webhook URL, stored as a Slack connection. Prefer --slack-connection")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { action: string; filters?: string; message?: string; alertType?: string; slackWebhook?: string }) => {
+    async (name: string, options: { action: string; actionParams?: string; filters?: string; filterQuery?: string; message?: string; alertType?: string; slackWebhook?: string; slackConnection?: string; slackChannel?: string; customGraphId?: string; graphAlert?: string; report?: string }) => {
       const { createTriggerCommand: impl } = await import("./commands/triggers/create.js");
       return impl(name, options);
     },
@@ -4123,10 +4133,57 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--active <boolean>", "Enable or disable the trigger (true/false)")
       .option("--message <text>", "New alert message")
       .option("--alert-type <type>", "New alert severity")
+      .option("--filters <json>", TRIGGER_FILTERS_HELP)
+      .option("--filter-query <query>", "Trace query in the syntax the traces view uses. An empty value clears it")
+      .option("--graph-alert <json>", "The rule an alert fires by, as JSON (only for an automation that is already an alert)")
+      .option("--report <json>", "What a report renders and when, as JSON (only for an automation that is already a report)")
+      .option("--action-params <json>", "The delivery configuration this trigger should have from now on, as JSON. Replaces the stored one; send [redacted] back for a credential to keep it")
+      .option("--slack-connection <id>", "The Slack connection to post through from now on (see `langwatch slack-connection list`). Replaces the delivery configuration, so pass --slack-channel with a bot connection")
+      .option("--slack-channel <id>", "The Slack channel to post in, e.g. C0123, for a bot connection")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string }) => {
+    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string; filters?: string; filterQuery?: string; actionParams?: string; slackConnection?: string; slackChannel?: string; graphAlert?: string; report?: string }) => {
       const { updateTriggerCommand: impl } = await import("./commands/triggers/update.js");
       return impl(id, options);
+    },
+  );
+
+  for (const [verb, description, active] of [
+    ["enable", "Resume a paused trigger", true],
+    ["disable", "Pause a trigger", false],
+  ] as const) {
+    emitsResult(
+      triggerCmd
+        .command(`${verb} <id>`)
+        .description(description)
+        .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+      async (id: string) => {
+        const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
+        return impl({ id, active });
+      },
+    );
+  }
+
+  emitsResult(
+    triggerCmd
+      .command("test-fire <id>")
+      .description("Send the trigger's message to the destination it is configured with")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { testFireTriggerCommand: impl } = await import("./commands/triggers/testFire.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    triggerCmd
+      .command("fires <id>")
+      .description("What the trigger has done, newest first")
+      .option("--limit <n>", "How many fires to read")
+      .option("--cursor <cursor>", "Read the page after this one: the next cursor a previous call printed")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { limit?: string; cursor?: string }) => {
+      const { triggerFiresCommand: impl } = await import("./commands/triggers/fires.js");
+      return impl({ id, options });
     },
   );
 
@@ -4138,6 +4195,24 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string) => {
       const { deleteTriggerCommand: impl } = await import("./commands/triggers/delete.js");
       return impl(id);
+    },
+  );
+
+  // Add Slack connection command group
+  const slackConnectionCmd = program
+    .command("slack-connection")
+    .description("Slack connections automations post through, listed by name (never their secrets)");
+
+  emitsResult(
+    slackConnectionCmd
+      .command("list")
+      .description("List the Slack connections this project can deliver through")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listSlackConnectionsCommand: impl } = await import(
+        "./commands/slack-connections/list.js"
+      );
+      return impl();
     },
   );
 

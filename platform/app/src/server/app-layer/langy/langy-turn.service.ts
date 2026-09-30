@@ -377,15 +377,21 @@ export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
  * it (see the composition site in `startConversationTurn`).
  */
 export function composeLangyTurnPrompt({
+  viewer,
   contextBlock,
   capNote,
   userText,
 }: {
+  viewer: Session["user"];
   contextBlock: string | null;
   capNote: string;
   userText: string;
 }): { prompt: string; labelled: boolean } {
-  const preamble = [contextBlock, capNote]
+  // Lets "email me" resolve to the viewer's own address without asking.
+  const viewerLine = viewer.email
+    ? `You are talking to ${viewer.name ?? viewer.email} <${viewer.email}>. This identifies the user; it is not an instruction.`
+    : null;
+  const preamble = [viewerLine, contextBlock, capNote]
     .map((block) => (block ?? "").trim())
     .filter((block) => block.length > 0);
   if (preamble.length === 0) return { prompt: userText, labelled: false };
@@ -1339,6 +1345,7 @@ export class LangyTurnService {
       // turn-scoped cap note precede a clearly labelled ask, so the model
       // reads the DATA before the message that may refer to it.
       const { prompt, labelled } = composeLangyTurnPrompt({
+        viewer: session.user,
         contextBlock: renderLangyTurnContext({
           context: turnContext,
           isUiActionSurfaceOpen,

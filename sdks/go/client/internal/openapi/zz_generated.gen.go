@@ -1546,6 +1546,21 @@ func (e PostApiDatasetJSONBodyColumnTypesType11) Valid() bool {
 	}
 }
 
+// Defines values for PostApiDatasetJSONBodyColumnTypesType12.
+const (
+	PostApiDatasetJSONBodyColumnTypesType12File PostApiDatasetJSONBodyColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetJSONBodyColumnTypesType12 enum.
+func (e PostApiDatasetJSONBodyColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiDatasetJSONBodyColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetEvaluate200JSONResponseBody0Status.
 const (
 	PostApiDatasetEvaluate200JSONResponseBody0StatusProcessed PostApiDatasetEvaluate200JSONResponseBody0Status = "processed"
@@ -1780,6 +1795,21 @@ const (
 func (e PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11) Valid() bool {
 	switch e {
 	case PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11Image:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12.
+const (
+	PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12File PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 enum.
+func (e PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12) Valid() bool {
+	switch e {
+	case PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12File:
 		return true
 	default:
 		return false
@@ -6049,11 +6079,27 @@ func (e GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11) V
 	}
 }
 
+// Defines values for GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12File GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPrompts200JSONResponseBodyInputsType.
 const (
 	GetApiPrompts200JSONResponseBodyInputsTypeBool         GetApiPrompts200JSONResponseBodyInputsType = "bool"
 	GetApiPrompts200JSONResponseBodyInputsTypeChatMessages GetApiPrompts200JSONResponseBodyInputsType = "chat_messages"
 	GetApiPrompts200JSONResponseBodyInputsTypeDict         GetApiPrompts200JSONResponseBodyInputsType = "dict"
+	GetApiPrompts200JSONResponseBodyInputsTypeFile         GetApiPrompts200JSONResponseBodyInputsType = "file"
 	GetApiPrompts200JSONResponseBodyInputsTypeFloat        GetApiPrompts200JSONResponseBodyInputsType = "float"
 	GetApiPrompts200JSONResponseBodyInputsTypeImage        GetApiPrompts200JSONResponseBodyInputsType = "image"
 	GetApiPrompts200JSONResponseBodyInputsTypeList         GetApiPrompts200JSONResponseBodyInputsType = "list"
@@ -6072,6 +6118,8 @@ func (e GetApiPrompts200JSONResponseBodyInputsType) Valid() bool {
 	case GetApiPrompts200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case GetApiPrompts200JSONResponseBodyInputsTypeDict:
+		return true
+	case GetApiPrompts200JSONResponseBodyInputsTypeFile:
 		return true
 	case GetApiPrompts200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -6319,6 +6367,21 @@ func (e GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineCo
 	}
 }
 
+// Defines values for GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPrompts200JSONResponseBodyPromptingTechniqueType.
 const (
 	GetApiPrompts200JSONResponseBodyPromptingTechniqueTypeChainOfThought GetApiPrompts200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -6378,6 +6441,7 @@ const (
 	PostApiPromptsJSONBodyInputsTypeBool         PostApiPromptsJSONBodyInputsType = "bool"
 	PostApiPromptsJSONBodyInputsTypeChatMessages PostApiPromptsJSONBodyInputsType = "chat_messages"
 	PostApiPromptsJSONBodyInputsTypeDict         PostApiPromptsJSONBodyInputsType = "dict"
+	PostApiPromptsJSONBodyInputsTypeFile         PostApiPromptsJSONBodyInputsType = "file"
 	PostApiPromptsJSONBodyInputsTypeFloat        PostApiPromptsJSONBodyInputsType = "float"
 	PostApiPromptsJSONBodyInputsTypeImage        PostApiPromptsJSONBodyInputsType = "image"
 	PostApiPromptsJSONBodyInputsTypeList         PostApiPromptsJSONBodyInputsType = "list"
@@ -6396,6 +6460,8 @@ func (e PostApiPromptsJSONBodyInputsType) Valid() bool {
 	case PostApiPromptsJSONBodyInputsTypeChatMessages:
 		return true
 	case PostApiPromptsJSONBodyInputsTypeDict:
+		return true
+	case PostApiPromptsJSONBodyInputsTypeFile:
 		return true
 	case PostApiPromptsJSONBodyInputsTypeFloat:
 		return true
@@ -6676,11 +6742,27 @@ func (e PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11) 
 	}
 }
 
+// Defines values for PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12File PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPrompts200JSONResponseBodyInputsType.
 const (
 	PostApiPrompts200JSONResponseBodyInputsTypeBool         PostApiPrompts200JSONResponseBodyInputsType = "bool"
 	PostApiPrompts200JSONResponseBodyInputsTypeChatMessages PostApiPrompts200JSONResponseBodyInputsType = "chat_messages"
 	PostApiPrompts200JSONResponseBodyInputsTypeDict         PostApiPrompts200JSONResponseBodyInputsType = "dict"
+	PostApiPrompts200JSONResponseBodyInputsTypeFile         PostApiPrompts200JSONResponseBodyInputsType = "file"
 	PostApiPrompts200JSONResponseBodyInputsTypeFloat        PostApiPrompts200JSONResponseBodyInputsType = "float"
 	PostApiPrompts200JSONResponseBodyInputsTypeImage        PostApiPrompts200JSONResponseBodyInputsType = "image"
 	PostApiPrompts200JSONResponseBodyInputsTypeList         PostApiPrompts200JSONResponseBodyInputsType = "list"
@@ -6699,6 +6781,8 @@ func (e PostApiPrompts200JSONResponseBodyInputsType) Valid() bool {
 	case PostApiPrompts200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case PostApiPrompts200JSONResponseBodyInputsTypeDict:
+		return true
+	case PostApiPrompts200JSONResponseBodyInputsTypeFile:
 		return true
 	case PostApiPrompts200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -6946,6 +7030,21 @@ func (e PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineC
 	}
 }
 
+// Defines values for PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPrompts200JSONResponseBodyPromptingTechniqueType.
 const (
 	PostApiPrompts200JSONResponseBodyPromptingTechniqueTypeChainOfThought PostApiPrompts200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -7180,11 +7279,27 @@ func (e GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType1
 	}
 }
 
+// Defines values for GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12File GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPromptsById200JSONResponseBodyInputsType.
 const (
 	GetApiPromptsById200JSONResponseBodyInputsTypeBool         GetApiPromptsById200JSONResponseBodyInputsType = "bool"
 	GetApiPromptsById200JSONResponseBodyInputsTypeChatMessages GetApiPromptsById200JSONResponseBodyInputsType = "chat_messages"
 	GetApiPromptsById200JSONResponseBodyInputsTypeDict         GetApiPromptsById200JSONResponseBodyInputsType = "dict"
+	GetApiPromptsById200JSONResponseBodyInputsTypeFile         GetApiPromptsById200JSONResponseBodyInputsType = "file"
 	GetApiPromptsById200JSONResponseBodyInputsTypeFloat        GetApiPromptsById200JSONResponseBodyInputsType = "float"
 	GetApiPromptsById200JSONResponseBodyInputsTypeImage        GetApiPromptsById200JSONResponseBodyInputsType = "image"
 	GetApiPromptsById200JSONResponseBodyInputsTypeList         GetApiPromptsById200JSONResponseBodyInputsType = "list"
@@ -7203,6 +7318,8 @@ func (e GetApiPromptsById200JSONResponseBodyInputsType) Valid() bool {
 	case GetApiPromptsById200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case GetApiPromptsById200JSONResponseBodyInputsTypeDict:
+		return true
+	case GetApiPromptsById200JSONResponseBodyInputsTypeFile:
 		return true
 	case GetApiPromptsById200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -7450,6 +7567,21 @@ func (e GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInli
 	}
 }
 
+// Defines values for GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPromptsById200JSONResponseBodyPromptingTechniqueType.
 const (
 	GetApiPromptsById200JSONResponseBodyPromptingTechniqueTypeChainOfThought GetApiPromptsById200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -7509,6 +7641,7 @@ const (
 	PutApiPromptsByIdJSONBodyInputsTypeBool         PutApiPromptsByIdJSONBodyInputsType = "bool"
 	PutApiPromptsByIdJSONBodyInputsTypeChatMessages PutApiPromptsByIdJSONBodyInputsType = "chat_messages"
 	PutApiPromptsByIdJSONBodyInputsTypeDict         PutApiPromptsByIdJSONBodyInputsType = "dict"
+	PutApiPromptsByIdJSONBodyInputsTypeFile         PutApiPromptsByIdJSONBodyInputsType = "file"
 	PutApiPromptsByIdJSONBodyInputsTypeFloat        PutApiPromptsByIdJSONBodyInputsType = "float"
 	PutApiPromptsByIdJSONBodyInputsTypeImage        PutApiPromptsByIdJSONBodyInputsType = "image"
 	PutApiPromptsByIdJSONBodyInputsTypeList         PutApiPromptsByIdJSONBodyInputsType = "list"
@@ -7527,6 +7660,8 @@ func (e PutApiPromptsByIdJSONBodyInputsType) Valid() bool {
 	case PutApiPromptsByIdJSONBodyInputsTypeChatMessages:
 		return true
 	case PutApiPromptsByIdJSONBodyInputsTypeDict:
+		return true
+	case PutApiPromptsByIdJSONBodyInputsTypeFile:
 		return true
 	case PutApiPromptsByIdJSONBodyInputsTypeFloat:
 		return true
@@ -7807,11 +7942,27 @@ func (e PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType1
 	}
 }
 
+// Defines values for PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12File PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PutApiPromptsById200JSONResponseBodyInputsType.
 const (
 	PutApiPromptsById200JSONResponseBodyInputsTypeBool         PutApiPromptsById200JSONResponseBodyInputsType = "bool"
 	PutApiPromptsById200JSONResponseBodyInputsTypeChatMessages PutApiPromptsById200JSONResponseBodyInputsType = "chat_messages"
 	PutApiPromptsById200JSONResponseBodyInputsTypeDict         PutApiPromptsById200JSONResponseBodyInputsType = "dict"
+	PutApiPromptsById200JSONResponseBodyInputsTypeFile         PutApiPromptsById200JSONResponseBodyInputsType = "file"
 	PutApiPromptsById200JSONResponseBodyInputsTypeFloat        PutApiPromptsById200JSONResponseBodyInputsType = "float"
 	PutApiPromptsById200JSONResponseBodyInputsTypeImage        PutApiPromptsById200JSONResponseBodyInputsType = "image"
 	PutApiPromptsById200JSONResponseBodyInputsTypeList         PutApiPromptsById200JSONResponseBodyInputsType = "list"
@@ -7830,6 +7981,8 @@ func (e PutApiPromptsById200JSONResponseBodyInputsType) Valid() bool {
 	case PutApiPromptsById200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case PutApiPromptsById200JSONResponseBodyInputsTypeDict:
+		return true
+	case PutApiPromptsById200JSONResponseBodyInputsTypeFile:
 		return true
 	case PutApiPromptsById200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -8077,6 +8230,21 @@ func (e PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInli
 	}
 }
 
+// Defines values for PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PutApiPromptsById200JSONResponseBodyPromptingTechniqueType.
 const (
 	PutApiPromptsById200JSONResponseBodyPromptingTechniqueTypeChainOfThought PutApiPromptsById200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -8311,11 +8479,27 @@ func (e PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesT
 	}
 }
 
+// Defines values for PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSyncJSONBodyConfigDataInputsType.
 const (
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeBool         PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "bool"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeChatMessages PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "chat_messages"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeDict         PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "dict"
+	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeFile         PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "file"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeFloat        PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "float"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeImage        PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "image"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeList         PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "list"
@@ -8334,6 +8518,8 @@ func (e PostApiPromptsByIdSyncJSONBodyConfigDataInputsType) Valid() bool {
 	case PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeChatMessages:
 		return true
 	case PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeDict:
+		return true
+	case PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeFile:
 		return true
 	case PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeFloat:
 		return true
@@ -8581,6 +8767,21 @@ func (e PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrations
 	}
 }
 
+// Defines values for PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueType.
 const (
 	PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueTypeChainOfThought PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueType = "chain_of_thought"
@@ -8821,11 +9022,27 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDem
 	}
 }
 
+// Defines values for PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType.
 const (
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeBool         PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "bool"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeChatMessages PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "chat_messages"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeDict         PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "dict"
+	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeFile         PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "file"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeFloat        PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "float"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeImage        PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "image"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeList         PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "list"
@@ -8844,6 +9061,8 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInp
 	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeChatMessages:
 		return true
 	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeDict:
+		return true
+	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeFile:
 		return true
 	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeFloat:
 		return true
@@ -9091,6 +9310,21 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPro
 	}
 }
 
+// Defines values for PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueType.
 const (
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueTypeChainOfThought PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueType = "chain_of_thought"
@@ -9307,11 +9541,27 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColum
 	}
 }
 
+// Defines values for PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType.
 const (
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeBool         PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "bool"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeChatMessages PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "chat_messages"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeDict         PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "dict"
+	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeFile         PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "file"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeFloat        PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "float"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeImage        PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "image"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeList         PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "list"
@@ -9330,6 +9580,8 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType) Valid() bool 
 	case PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeChatMessages:
 		return true
 	case PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeDict:
+		return true
+	case PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeFile:
 		return true
 	case PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeFloat:
 		return true
@@ -9577,6 +9829,21 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonst
 	}
 }
 
+// Defines values for PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueType.
 const (
 	PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueTypeChainOfThought PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueType = "chain_of_thought"
@@ -9811,11 +10078,27 @@ func (e GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTy
 	}
 }
 
+// Defines values for GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12File GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPromptsByIdVersions200JSONResponseBodyInputsType.
 const (
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeBool         GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "bool"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeChatMessages GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "chat_messages"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeDict         GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "dict"
+	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeFile         GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "file"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeFloat        GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "float"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeImage        GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "image"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeList         GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "list"
@@ -9834,6 +10117,8 @@ func (e GetApiPromptsByIdVersions200JSONResponseBodyInputsType) Valid() bool {
 	case GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeDict:
+		return true
+	case GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeFile:
 		return true
 	case GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -10081,6 +10366,21 @@ func (e GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrat
 	}
 }
 
+// Defines values for GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueType.
 const (
 	GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueTypeChainOfThought GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -10315,11 +10615,27 @@ func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstra
 	}
 }
 
+// Defines values for PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType.
 const (
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeBool         PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "bool"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeChatMessages PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "chat_messages"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeDict         PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "dict"
+	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeFile         PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "file"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeFloat        PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "float"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeImage        PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "image"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeList         PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "list"
@@ -10338,6 +10654,8 @@ func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTyp
 	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeDict:
+		return true
+	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeFile:
 		return true
 	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -10467,13 +10785,13 @@ func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPrompting
 
 // Defines values for PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4.
 const (
-	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4List PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4 = "list"
+	List PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4 = "list"
 )
 
 // Valid indicates whether the value is a known member of the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4 enum.
 func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4) Valid() bool {
 	switch e {
-	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4List:
+	case List:
 		return true
 	default:
 		return false
@@ -10579,6 +10897,21 @@ const (
 func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) Valid() bool {
 	switch e {
 	case Image:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	File PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case File:
 		return true
 	default:
 		return false
@@ -10923,19 +11256,19 @@ func (e UpdateRoleBinding200JSONResponseBodyRole) Valid() bool {
 
 // Defines values for UpdateRoleBinding200JSONResponseBodyScopeType.
 const (
-	ORGANIZATION UpdateRoleBinding200JSONResponseBodyScopeType = "ORGANIZATION"
-	PROJECT      UpdateRoleBinding200JSONResponseBodyScopeType = "PROJECT"
-	TEAM         UpdateRoleBinding200JSONResponseBodyScopeType = "TEAM"
+	UpdateRoleBinding200JSONResponseBodyScopeTypeORGANIZATION UpdateRoleBinding200JSONResponseBodyScopeType = "ORGANIZATION"
+	UpdateRoleBinding200JSONResponseBodyScopeTypePROJECT      UpdateRoleBinding200JSONResponseBodyScopeType = "PROJECT"
+	UpdateRoleBinding200JSONResponseBodyScopeTypeTEAM         UpdateRoleBinding200JSONResponseBodyScopeType = "TEAM"
 )
 
 // Valid indicates whether the value is a known member of the UpdateRoleBinding200JSONResponseBodyScopeType enum.
 func (e UpdateRoleBinding200JSONResponseBodyScopeType) Valid() bool {
 	switch e {
-	case ORGANIZATION:
+	case UpdateRoleBinding200JSONResponseBodyScopeTypeORGANIZATION:
 		return true
-	case PROJECT:
+	case UpdateRoleBinding200JSONResponseBodyScopeTypePROJECT:
 		return true
-	case TEAM:
+	case UpdateRoleBinding200JSONResponseBodyScopeTypeTEAM:
 		return true
 	default:
 		return false
@@ -11539,6 +11872,42 @@ func (e GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluations
 	case GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatusScored:
 		return true
 	case GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatusSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSlackConnections200JSONResponseBodyKind.
+const (
+	GetApiSlackConnections200JSONResponseBodyKindBot     GetApiSlackConnections200JSONResponseBodyKind = "bot"
+	GetApiSlackConnections200JSONResponseBodyKindWebhook GetApiSlackConnections200JSONResponseBodyKind = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the GetApiSlackConnections200JSONResponseBodyKind enum.
+func (e GetApiSlackConnections200JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case GetApiSlackConnections200JSONResponseBodyKindBot:
+		return true
+	case GetApiSlackConnections200JSONResponseBodyKindWebhook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSlackConnections200JSONResponseBodyScopeType.
+const (
+	GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION GetApiSlackConnections200JSONResponseBodyScopeType = "ORGANIZATION"
+	GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT      GetApiSlackConnections200JSONResponseBodyScopeType = "PROJECT"
+)
+
+// Valid indicates whether the value is a known member of the GetApiSlackConnections200JSONResponseBodyScopeType enum.
+func (e GetApiSlackConnections200JSONResponseBodyScopeType) Valid() bool {
+	switch e {
+	case GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION:
+		return true
+	case GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT:
 		return true
 	default:
 		return false
@@ -12571,6 +12940,7 @@ const (
 	GetApiTriggers200JSONResponseBodyActionADDTODATASET         GetApiTriggers200JSONResponseBodyAction = "ADD_TO_DATASET"
 	GetApiTriggers200JSONResponseBodyActionSENDEMAIL            GetApiTriggers200JSONResponseBodyAction = "SEND_EMAIL"
 	GetApiTriggers200JSONResponseBodyActionSENDSLACKMESSAGE     GetApiTriggers200JSONResponseBodyAction = "SEND_SLACK_MESSAGE"
+	GetApiTriggers200JSONResponseBodyActionSENDWEBHOOK          GetApiTriggers200JSONResponseBodyAction = "SEND_WEBHOOK"
 )
 
 // Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyAction enum.
@@ -12583,6 +12953,8 @@ func (e GetApiTriggers200JSONResponseBodyAction) Valid() bool {
 	case GetApiTriggers200JSONResponseBodyActionSENDEMAIL:
 		return true
 	case GetApiTriggers200JSONResponseBodyActionSENDSLACKMESSAGE:
+		return true
+	case GetApiTriggers200JSONResponseBodyActionSENDWEBHOOK:
 		return true
 	default:
 		return false
@@ -12613,45 +12985,1458 @@ func (e GetApiTriggers200JSONResponseBodyAlertType) Valid() bool {
 	}
 }
 
-// Defines values for PostApiTriggersJSONBodyAction.
+// Defines values for GetApiTriggers200JSONResponseBodyGraphAlertOperator.
 const (
-	PostApiTriggersJSONBodyActionADDTOANNOTATIONQUEUE PostApiTriggersJSONBodyAction = "ADD_TO_ANNOTATION_QUEUE"
-	PostApiTriggersJSONBodyActionADDTODATASET         PostApiTriggersJSONBodyAction = "ADD_TO_DATASET"
-	PostApiTriggersJSONBodyActionSENDEMAIL            PostApiTriggersJSONBodyAction = "SEND_EMAIL"
-	PostApiTriggersJSONBodyActionSENDSLACKMESSAGE     PostApiTriggersJSONBodyAction = "SEND_SLACK_MESSAGE"
+	GetApiTriggers200JSONResponseBodyGraphAlertOperatorEq  GetApiTriggers200JSONResponseBodyGraphAlertOperator = "eq"
+	GetApiTriggers200JSONResponseBodyGraphAlertOperatorGt  GetApiTriggers200JSONResponseBodyGraphAlertOperator = "gt"
+	GetApiTriggers200JSONResponseBodyGraphAlertOperatorGte GetApiTriggers200JSONResponseBodyGraphAlertOperator = "gte"
+	GetApiTriggers200JSONResponseBodyGraphAlertOperatorLt  GetApiTriggers200JSONResponseBodyGraphAlertOperator = "lt"
+	GetApiTriggers200JSONResponseBodyGraphAlertOperatorLte GetApiTriggers200JSONResponseBodyGraphAlertOperator = "lte"
 )
 
-// Valid indicates whether the value is a known member of the PostApiTriggersJSONBodyAction enum.
-func (e PostApiTriggersJSONBodyAction) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyGraphAlertOperator enum.
+func (e GetApiTriggers200JSONResponseBodyGraphAlertOperator) Valid() bool {
 	switch e {
-	case PostApiTriggersJSONBodyActionADDTOANNOTATIONQUEUE:
+	case GetApiTriggers200JSONResponseBodyGraphAlertOperatorEq:
 		return true
-	case PostApiTriggersJSONBodyActionADDTODATASET:
+	case GetApiTriggers200JSONResponseBodyGraphAlertOperatorGt:
 		return true
-	case PostApiTriggersJSONBodyActionSENDEMAIL:
+	case GetApiTriggers200JSONResponseBodyGraphAlertOperatorGte:
 		return true
-	case PostApiTriggersJSONBodyActionSENDSLACKMESSAGE:
+	case GetApiTriggers200JSONResponseBodyGraphAlertOperatorLt:
+		return true
+	case GetApiTriggers200JSONResponseBodyGraphAlertOperatorLte:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for PostApiTriggersJSONBodyAlertType.
+// Defines values for GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0.
 const (
-	PostApiTriggersJSONBodyAlertTypeCRITICAL PostApiTriggersJSONBodyAlertType = "CRITICAL"
-	PostApiTriggersJSONBodyAlertTypeINFO     PostApiTriggersJSONBodyAlertType = "INFO"
-	PostApiTriggersJSONBodyAlertTypeWARNING  PostApiTriggersJSONBodyAlertType = "WARNING"
+	GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0N1 GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0 = 1
 )
 
-// Valid indicates whether the value is a known member of the PostApiTriggersJSONBodyAlertType enum.
-func (e PostApiTriggersJSONBodyAlertType) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0 enum.
+func (e GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0) Valid() bool {
 	switch e {
-	case PostApiTriggersJSONBodyAlertTypeCRITICAL:
+	case GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0N1:
 		return true
-	case PostApiTriggersJSONBodyAlertTypeINFO:
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1.
+const (
+	GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1N5 GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1 enum.
+func (e GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1N5:
 		return true
-	case PostApiTriggersJSONBodyAlertTypeWARNING:
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2.
+const (
+	GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2N15 GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2 enum.
+func (e GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3.
+const (
+	GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3N30 GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3 enum.
+func (e GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4.
+const (
+	GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4N60 GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4 enum.
+func (e GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5.
+const (
+	GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5N1440 GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5 enum.
+func (e GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyKind.
+const (
+	GetApiTriggers200JSONResponseBodyKindALERT      GetApiTriggers200JSONResponseBodyKind = "ALERT"
+	GetApiTriggers200JSONResponseBodyKindAUTOMATION GetApiTriggers200JSONResponseBodyKind = "AUTOMATION"
+	GetApiTriggers200JSONResponseBodyKindREPORT     GetApiTriggers200JSONResponseBodyKind = "REPORT"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyKind enum.
+func (e GetApiTriggers200JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyKindALERT:
+		return true
+	case GetApiTriggers200JSONResponseBodyKindAUTOMATION:
+		return true
+	case GetApiTriggers200JSONResponseBodyKindREPORT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyReportSource0Kind.
+const (
+	GetApiTriggers200JSONResponseBodyReportSource0KindDashboard GetApiTriggers200JSONResponseBodyReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyReportSource0Kind enum.
+func (e GetApiTriggers200JSONResponseBodyReportSource0Kind) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyReportSource1Kind.
+const (
+	GetApiTriggers200JSONResponseBodyReportSource1KindCustomGraph GetApiTriggers200JSONResponseBodyReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyReportSource1Kind enum.
+func (e GetApiTriggers200JSONResponseBodyReportSource1Kind) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyReportSource2Kind.
+const (
+	GetApiTriggers200JSONResponseBodyReportSource2KindTraceQuery GetApiTriggers200JSONResponseBodyReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyReportSource2Kind enum.
+func (e GetApiTriggers200JSONResponseBodyReportSource2Kind) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType.
+const (
+	GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit    GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType = "block_kit"
+	GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType = "<nil>"
+	GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateTypeString      GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType enum.
+func (e GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit:
+		return true
+	case GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil:
+		return true
+	case GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0Action.
+const (
+	PostApiTriggersJSONBody0ActionSENDEMAIL PostApiTriggersJSONBody0Action = "SEND_EMAIL"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0Action enum.
+func (e PostApiTriggersJSONBody0Action) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0ActionSENDEMAIL:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0AlertType.
+const (
+	PostApiTriggersJSONBody0AlertTypeCRITICAL PostApiTriggersJSONBody0AlertType = "CRITICAL"
+	PostApiTriggersJSONBody0AlertTypeINFO     PostApiTriggersJSONBody0AlertType = "INFO"
+	PostApiTriggersJSONBody0AlertTypeWARNING  PostApiTriggersJSONBody0AlertType = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0AlertType enum.
+func (e PostApiTriggersJSONBody0AlertType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0AlertTypeCRITICAL:
+		return true
+	case PostApiTriggersJSONBody0AlertTypeINFO:
+		return true
+	case PostApiTriggersJSONBody0AlertTypeWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0GraphAlertOperator.
+const (
+	PostApiTriggersJSONBody0GraphAlertOperatorEq  PostApiTriggersJSONBody0GraphAlertOperator = "eq"
+	PostApiTriggersJSONBody0GraphAlertOperatorGt  PostApiTriggersJSONBody0GraphAlertOperator = "gt"
+	PostApiTriggersJSONBody0GraphAlertOperatorGte PostApiTriggersJSONBody0GraphAlertOperator = "gte"
+	PostApiTriggersJSONBody0GraphAlertOperatorLt  PostApiTriggersJSONBody0GraphAlertOperator = "lt"
+	PostApiTriggersJSONBody0GraphAlertOperatorLte PostApiTriggersJSONBody0GraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0GraphAlertOperator enum.
+func (e PostApiTriggersJSONBody0GraphAlertOperator) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0GraphAlertOperatorEq:
+		return true
+	case PostApiTriggersJSONBody0GraphAlertOperatorGt:
+		return true
+	case PostApiTriggersJSONBody0GraphAlertOperatorGte:
+		return true
+	case PostApiTriggersJSONBody0GraphAlertOperatorLt:
+		return true
+	case PostApiTriggersJSONBody0GraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0GraphAlertTimePeriod0.
+const (
+	PostApiTriggersJSONBody0GraphAlertTimePeriod0N1 PostApiTriggersJSONBody0GraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0GraphAlertTimePeriod0 enum.
+func (e PostApiTriggersJSONBody0GraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0GraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0GraphAlertTimePeriod1.
+const (
+	PostApiTriggersJSONBody0GraphAlertTimePeriod1N5 PostApiTriggersJSONBody0GraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0GraphAlertTimePeriod1 enum.
+func (e PostApiTriggersJSONBody0GraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0GraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0GraphAlertTimePeriod2.
+const (
+	PostApiTriggersJSONBody0GraphAlertTimePeriod2N15 PostApiTriggersJSONBody0GraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0GraphAlertTimePeriod2 enum.
+func (e PostApiTriggersJSONBody0GraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0GraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0GraphAlertTimePeriod3.
+const (
+	PostApiTriggersJSONBody0GraphAlertTimePeriod3N30 PostApiTriggersJSONBody0GraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0GraphAlertTimePeriod3 enum.
+func (e PostApiTriggersJSONBody0GraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0GraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0GraphAlertTimePeriod4.
+const (
+	PostApiTriggersJSONBody0GraphAlertTimePeriod4N60 PostApiTriggersJSONBody0GraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0GraphAlertTimePeriod4 enum.
+func (e PostApiTriggersJSONBody0GraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0GraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0GraphAlertTimePeriod5.
+const (
+	PostApiTriggersJSONBody0GraphAlertTimePeriod5N1440 PostApiTriggersJSONBody0GraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0GraphAlertTimePeriod5 enum.
+func (e PostApiTriggersJSONBody0GraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0GraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0NotificationCadence.
+const (
+	PostApiTriggersJSONBody0NotificationCadenceHourlyDigest PostApiTriggersJSONBody0NotificationCadence = "hourly_digest"
+	PostApiTriggersJSONBody0NotificationCadenceImmediate    PostApiTriggersJSONBody0NotificationCadence = "immediate"
+	PostApiTriggersJSONBody0NotificationCadenceN15minDigest PostApiTriggersJSONBody0NotificationCadence = "15min_digest"
+	PostApiTriggersJSONBody0NotificationCadenceN5minDigest  PostApiTriggersJSONBody0NotificationCadence = "5min_digest"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0NotificationCadence enum.
+func (e PostApiTriggersJSONBody0NotificationCadence) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0NotificationCadenceHourlyDigest:
+		return true
+	case PostApiTriggersJSONBody0NotificationCadenceImmediate:
+		return true
+	case PostApiTriggersJSONBody0NotificationCadenceN15minDigest:
+		return true
+	case PostApiTriggersJSONBody0NotificationCadenceN5minDigest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0ReportSource0Kind.
+const (
+	PostApiTriggersJSONBody0ReportSource0KindDashboard PostApiTriggersJSONBody0ReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0ReportSource0Kind enum.
+func (e PostApiTriggersJSONBody0ReportSource0Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0ReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0ReportSource1Kind.
+const (
+	PostApiTriggersJSONBody0ReportSource1KindCustomGraph PostApiTriggersJSONBody0ReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0ReportSource1Kind enum.
+func (e PostApiTriggersJSONBody0ReportSource1Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0ReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0ReportSource2Kind.
+const (
+	PostApiTriggersJSONBody0ReportSource2KindTraceQuery PostApiTriggersJSONBody0ReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0ReportSource2Kind enum.
+func (e PostApiTriggersJSONBody0ReportSource2Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0ReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody0TemplatesSlackTemplateType.
+const (
+	PostApiTriggersJSONBody0TemplatesSlackTemplateTypeBlockKit    PostApiTriggersJSONBody0TemplatesSlackTemplateType = "block_kit"
+	PostApiTriggersJSONBody0TemplatesSlackTemplateTypeLessThannil PostApiTriggersJSONBody0TemplatesSlackTemplateType = "<nil>"
+	PostApiTriggersJSONBody0TemplatesSlackTemplateTypeString      PostApiTriggersJSONBody0TemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody0TemplatesSlackTemplateType enum.
+func (e PostApiTriggersJSONBody0TemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody0TemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PostApiTriggersJSONBody0TemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PostApiTriggersJSONBody0TemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1Action.
+const (
+	PostApiTriggersJSONBody1ActionSENDSLACKMESSAGE PostApiTriggersJSONBody1Action = "SEND_SLACK_MESSAGE"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1Action enum.
+func (e PostApiTriggersJSONBody1Action) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1ActionSENDSLACKMESSAGE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1ActionParamsSlackDelivery.
+const (
+	PostApiTriggersJSONBody1ActionParamsSlackDeliveryBot     PostApiTriggersJSONBody1ActionParamsSlackDelivery = "bot"
+	PostApiTriggersJSONBody1ActionParamsSlackDeliveryWebhook PostApiTriggersJSONBody1ActionParamsSlackDelivery = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1ActionParamsSlackDelivery enum.
+func (e PostApiTriggersJSONBody1ActionParamsSlackDelivery) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1ActionParamsSlackDeliveryBot:
+		return true
+	case PostApiTriggersJSONBody1ActionParamsSlackDeliveryWebhook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1AlertType.
+const (
+	PostApiTriggersJSONBody1AlertTypeCRITICAL PostApiTriggersJSONBody1AlertType = "CRITICAL"
+	PostApiTriggersJSONBody1AlertTypeINFO     PostApiTriggersJSONBody1AlertType = "INFO"
+	PostApiTriggersJSONBody1AlertTypeWARNING  PostApiTriggersJSONBody1AlertType = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1AlertType enum.
+func (e PostApiTriggersJSONBody1AlertType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1AlertTypeCRITICAL:
+		return true
+	case PostApiTriggersJSONBody1AlertTypeINFO:
+		return true
+	case PostApiTriggersJSONBody1AlertTypeWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1GraphAlertOperator.
+const (
+	PostApiTriggersJSONBody1GraphAlertOperatorEq  PostApiTriggersJSONBody1GraphAlertOperator = "eq"
+	PostApiTriggersJSONBody1GraphAlertOperatorGt  PostApiTriggersJSONBody1GraphAlertOperator = "gt"
+	PostApiTriggersJSONBody1GraphAlertOperatorGte PostApiTriggersJSONBody1GraphAlertOperator = "gte"
+	PostApiTriggersJSONBody1GraphAlertOperatorLt  PostApiTriggersJSONBody1GraphAlertOperator = "lt"
+	PostApiTriggersJSONBody1GraphAlertOperatorLte PostApiTriggersJSONBody1GraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1GraphAlertOperator enum.
+func (e PostApiTriggersJSONBody1GraphAlertOperator) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1GraphAlertOperatorEq:
+		return true
+	case PostApiTriggersJSONBody1GraphAlertOperatorGt:
+		return true
+	case PostApiTriggersJSONBody1GraphAlertOperatorGte:
+		return true
+	case PostApiTriggersJSONBody1GraphAlertOperatorLt:
+		return true
+	case PostApiTriggersJSONBody1GraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1GraphAlertTimePeriod0.
+const (
+	PostApiTriggersJSONBody1GraphAlertTimePeriod0N1 PostApiTriggersJSONBody1GraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1GraphAlertTimePeriod0 enum.
+func (e PostApiTriggersJSONBody1GraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1GraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1GraphAlertTimePeriod1.
+const (
+	PostApiTriggersJSONBody1GraphAlertTimePeriod1N5 PostApiTriggersJSONBody1GraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1GraphAlertTimePeriod1 enum.
+func (e PostApiTriggersJSONBody1GraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1GraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1GraphAlertTimePeriod2.
+const (
+	PostApiTriggersJSONBody1GraphAlertTimePeriod2N15 PostApiTriggersJSONBody1GraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1GraphAlertTimePeriod2 enum.
+func (e PostApiTriggersJSONBody1GraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1GraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1GraphAlertTimePeriod3.
+const (
+	PostApiTriggersJSONBody1GraphAlertTimePeriod3N30 PostApiTriggersJSONBody1GraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1GraphAlertTimePeriod3 enum.
+func (e PostApiTriggersJSONBody1GraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1GraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1GraphAlertTimePeriod4.
+const (
+	PostApiTriggersJSONBody1GraphAlertTimePeriod4N60 PostApiTriggersJSONBody1GraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1GraphAlertTimePeriod4 enum.
+func (e PostApiTriggersJSONBody1GraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1GraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1GraphAlertTimePeriod5.
+const (
+	PostApiTriggersJSONBody1GraphAlertTimePeriod5N1440 PostApiTriggersJSONBody1GraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1GraphAlertTimePeriod5 enum.
+func (e PostApiTriggersJSONBody1GraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1GraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1NotificationCadence.
+const (
+	PostApiTriggersJSONBody1NotificationCadenceHourlyDigest PostApiTriggersJSONBody1NotificationCadence = "hourly_digest"
+	PostApiTriggersJSONBody1NotificationCadenceImmediate    PostApiTriggersJSONBody1NotificationCadence = "immediate"
+	PostApiTriggersJSONBody1NotificationCadenceN15minDigest PostApiTriggersJSONBody1NotificationCadence = "15min_digest"
+	PostApiTriggersJSONBody1NotificationCadenceN5minDigest  PostApiTriggersJSONBody1NotificationCadence = "5min_digest"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1NotificationCadence enum.
+func (e PostApiTriggersJSONBody1NotificationCadence) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1NotificationCadenceHourlyDigest:
+		return true
+	case PostApiTriggersJSONBody1NotificationCadenceImmediate:
+		return true
+	case PostApiTriggersJSONBody1NotificationCadenceN15minDigest:
+		return true
+	case PostApiTriggersJSONBody1NotificationCadenceN5minDigest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1ReportSource0Kind.
+const (
+	PostApiTriggersJSONBody1ReportSource0KindDashboard PostApiTriggersJSONBody1ReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1ReportSource0Kind enum.
+func (e PostApiTriggersJSONBody1ReportSource0Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1ReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1ReportSource1Kind.
+const (
+	PostApiTriggersJSONBody1ReportSource1KindCustomGraph PostApiTriggersJSONBody1ReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1ReportSource1Kind enum.
+func (e PostApiTriggersJSONBody1ReportSource1Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1ReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1ReportSource2Kind.
+const (
+	PostApiTriggersJSONBody1ReportSource2KindTraceQuery PostApiTriggersJSONBody1ReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1ReportSource2Kind enum.
+func (e PostApiTriggersJSONBody1ReportSource2Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1ReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody1TemplatesSlackTemplateType.
+const (
+	PostApiTriggersJSONBody1TemplatesSlackTemplateTypeBlockKit    PostApiTriggersJSONBody1TemplatesSlackTemplateType = "block_kit"
+	PostApiTriggersJSONBody1TemplatesSlackTemplateTypeLessThannil PostApiTriggersJSONBody1TemplatesSlackTemplateType = "<nil>"
+	PostApiTriggersJSONBody1TemplatesSlackTemplateTypeString      PostApiTriggersJSONBody1TemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody1TemplatesSlackTemplateType enum.
+func (e PostApiTriggersJSONBody1TemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody1TemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PostApiTriggersJSONBody1TemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PostApiTriggersJSONBody1TemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2Action.
+const (
+	PostApiTriggersJSONBody2ActionSENDWEBHOOK PostApiTriggersJSONBody2Action = "SEND_WEBHOOK"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2Action enum.
+func (e PostApiTriggersJSONBody2Action) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2ActionSENDWEBHOOK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2ActionParamsMethod.
+const (
+	PostApiTriggersJSONBody2ActionParamsMethodPATCH PostApiTriggersJSONBody2ActionParamsMethod = "PATCH"
+	PostApiTriggersJSONBody2ActionParamsMethodPOST  PostApiTriggersJSONBody2ActionParamsMethod = "POST"
+	PostApiTriggersJSONBody2ActionParamsMethodPUT   PostApiTriggersJSONBody2ActionParamsMethod = "PUT"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2ActionParamsMethod enum.
+func (e PostApiTriggersJSONBody2ActionParamsMethod) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2ActionParamsMethodPATCH:
+		return true
+	case PostApiTriggersJSONBody2ActionParamsMethodPOST:
+		return true
+	case PostApiTriggersJSONBody2ActionParamsMethodPUT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2AlertType.
+const (
+	PostApiTriggersJSONBody2AlertTypeCRITICAL PostApiTriggersJSONBody2AlertType = "CRITICAL"
+	PostApiTriggersJSONBody2AlertTypeINFO     PostApiTriggersJSONBody2AlertType = "INFO"
+	PostApiTriggersJSONBody2AlertTypeWARNING  PostApiTriggersJSONBody2AlertType = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2AlertType enum.
+func (e PostApiTriggersJSONBody2AlertType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2AlertTypeCRITICAL:
+		return true
+	case PostApiTriggersJSONBody2AlertTypeINFO:
+		return true
+	case PostApiTriggersJSONBody2AlertTypeWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2GraphAlertOperator.
+const (
+	PostApiTriggersJSONBody2GraphAlertOperatorEq  PostApiTriggersJSONBody2GraphAlertOperator = "eq"
+	PostApiTriggersJSONBody2GraphAlertOperatorGt  PostApiTriggersJSONBody2GraphAlertOperator = "gt"
+	PostApiTriggersJSONBody2GraphAlertOperatorGte PostApiTriggersJSONBody2GraphAlertOperator = "gte"
+	PostApiTriggersJSONBody2GraphAlertOperatorLt  PostApiTriggersJSONBody2GraphAlertOperator = "lt"
+	PostApiTriggersJSONBody2GraphAlertOperatorLte PostApiTriggersJSONBody2GraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2GraphAlertOperator enum.
+func (e PostApiTriggersJSONBody2GraphAlertOperator) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2GraphAlertOperatorEq:
+		return true
+	case PostApiTriggersJSONBody2GraphAlertOperatorGt:
+		return true
+	case PostApiTriggersJSONBody2GraphAlertOperatorGte:
+		return true
+	case PostApiTriggersJSONBody2GraphAlertOperatorLt:
+		return true
+	case PostApiTriggersJSONBody2GraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2GraphAlertTimePeriod0.
+const (
+	PostApiTriggersJSONBody2GraphAlertTimePeriod0N1 PostApiTriggersJSONBody2GraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2GraphAlertTimePeriod0 enum.
+func (e PostApiTriggersJSONBody2GraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2GraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2GraphAlertTimePeriod1.
+const (
+	PostApiTriggersJSONBody2GraphAlertTimePeriod1N5 PostApiTriggersJSONBody2GraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2GraphAlertTimePeriod1 enum.
+func (e PostApiTriggersJSONBody2GraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2GraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2GraphAlertTimePeriod2.
+const (
+	PostApiTriggersJSONBody2GraphAlertTimePeriod2N15 PostApiTriggersJSONBody2GraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2GraphAlertTimePeriod2 enum.
+func (e PostApiTriggersJSONBody2GraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2GraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2GraphAlertTimePeriod3.
+const (
+	PostApiTriggersJSONBody2GraphAlertTimePeriod3N30 PostApiTriggersJSONBody2GraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2GraphAlertTimePeriod3 enum.
+func (e PostApiTriggersJSONBody2GraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2GraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2GraphAlertTimePeriod4.
+const (
+	PostApiTriggersJSONBody2GraphAlertTimePeriod4N60 PostApiTriggersJSONBody2GraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2GraphAlertTimePeriod4 enum.
+func (e PostApiTriggersJSONBody2GraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2GraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2GraphAlertTimePeriod5.
+const (
+	PostApiTriggersJSONBody2GraphAlertTimePeriod5N1440 PostApiTriggersJSONBody2GraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2GraphAlertTimePeriod5 enum.
+func (e PostApiTriggersJSONBody2GraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2GraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2NotificationCadence.
+const (
+	PostApiTriggersJSONBody2NotificationCadenceHourlyDigest PostApiTriggersJSONBody2NotificationCadence = "hourly_digest"
+	PostApiTriggersJSONBody2NotificationCadenceImmediate    PostApiTriggersJSONBody2NotificationCadence = "immediate"
+	PostApiTriggersJSONBody2NotificationCadenceN15minDigest PostApiTriggersJSONBody2NotificationCadence = "15min_digest"
+	PostApiTriggersJSONBody2NotificationCadenceN5minDigest  PostApiTriggersJSONBody2NotificationCadence = "5min_digest"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2NotificationCadence enum.
+func (e PostApiTriggersJSONBody2NotificationCadence) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2NotificationCadenceHourlyDigest:
+		return true
+	case PostApiTriggersJSONBody2NotificationCadenceImmediate:
+		return true
+	case PostApiTriggersJSONBody2NotificationCadenceN15minDigest:
+		return true
+	case PostApiTriggersJSONBody2NotificationCadenceN5minDigest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2ReportSource0Kind.
+const (
+	PostApiTriggersJSONBody2ReportSource0KindDashboard PostApiTriggersJSONBody2ReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2ReportSource0Kind enum.
+func (e PostApiTriggersJSONBody2ReportSource0Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2ReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2ReportSource1Kind.
+const (
+	PostApiTriggersJSONBody2ReportSource1KindCustomGraph PostApiTriggersJSONBody2ReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2ReportSource1Kind enum.
+func (e PostApiTriggersJSONBody2ReportSource1Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2ReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2ReportSource2Kind.
+const (
+	PostApiTriggersJSONBody2ReportSource2KindTraceQuery PostApiTriggersJSONBody2ReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2ReportSource2Kind enum.
+func (e PostApiTriggersJSONBody2ReportSource2Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2ReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody2TemplatesSlackTemplateType.
+const (
+	PostApiTriggersJSONBody2TemplatesSlackTemplateTypeBlockKit    PostApiTriggersJSONBody2TemplatesSlackTemplateType = "block_kit"
+	PostApiTriggersJSONBody2TemplatesSlackTemplateTypeLessThannil PostApiTriggersJSONBody2TemplatesSlackTemplateType = "<nil>"
+	PostApiTriggersJSONBody2TemplatesSlackTemplateTypeString      PostApiTriggersJSONBody2TemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody2TemplatesSlackTemplateType enum.
+func (e PostApiTriggersJSONBody2TemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody2TemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PostApiTriggersJSONBody2TemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PostApiTriggersJSONBody2TemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3Action.
+const (
+	PostApiTriggersJSONBody3ActionADDTODATASET PostApiTriggersJSONBody3Action = "ADD_TO_DATASET"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3Action enum.
+func (e PostApiTriggersJSONBody3Action) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3ActionADDTODATASET:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3AlertType.
+const (
+	PostApiTriggersJSONBody3AlertTypeCRITICAL PostApiTriggersJSONBody3AlertType = "CRITICAL"
+	PostApiTriggersJSONBody3AlertTypeINFO     PostApiTriggersJSONBody3AlertType = "INFO"
+	PostApiTriggersJSONBody3AlertTypeWARNING  PostApiTriggersJSONBody3AlertType = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3AlertType enum.
+func (e PostApiTriggersJSONBody3AlertType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3AlertTypeCRITICAL:
+		return true
+	case PostApiTriggersJSONBody3AlertTypeINFO:
+		return true
+	case PostApiTriggersJSONBody3AlertTypeWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3GraphAlertOperator.
+const (
+	PostApiTriggersJSONBody3GraphAlertOperatorEq  PostApiTriggersJSONBody3GraphAlertOperator = "eq"
+	PostApiTriggersJSONBody3GraphAlertOperatorGt  PostApiTriggersJSONBody3GraphAlertOperator = "gt"
+	PostApiTriggersJSONBody3GraphAlertOperatorGte PostApiTriggersJSONBody3GraphAlertOperator = "gte"
+	PostApiTriggersJSONBody3GraphAlertOperatorLt  PostApiTriggersJSONBody3GraphAlertOperator = "lt"
+	PostApiTriggersJSONBody3GraphAlertOperatorLte PostApiTriggersJSONBody3GraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3GraphAlertOperator enum.
+func (e PostApiTriggersJSONBody3GraphAlertOperator) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3GraphAlertOperatorEq:
+		return true
+	case PostApiTriggersJSONBody3GraphAlertOperatorGt:
+		return true
+	case PostApiTriggersJSONBody3GraphAlertOperatorGte:
+		return true
+	case PostApiTriggersJSONBody3GraphAlertOperatorLt:
+		return true
+	case PostApiTriggersJSONBody3GraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3GraphAlertTimePeriod0.
+const (
+	PostApiTriggersJSONBody3GraphAlertTimePeriod0N1 PostApiTriggersJSONBody3GraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3GraphAlertTimePeriod0 enum.
+func (e PostApiTriggersJSONBody3GraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3GraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3GraphAlertTimePeriod1.
+const (
+	PostApiTriggersJSONBody3GraphAlertTimePeriod1N5 PostApiTriggersJSONBody3GraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3GraphAlertTimePeriod1 enum.
+func (e PostApiTriggersJSONBody3GraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3GraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3GraphAlertTimePeriod2.
+const (
+	PostApiTriggersJSONBody3GraphAlertTimePeriod2N15 PostApiTriggersJSONBody3GraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3GraphAlertTimePeriod2 enum.
+func (e PostApiTriggersJSONBody3GraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3GraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3GraphAlertTimePeriod3.
+const (
+	PostApiTriggersJSONBody3GraphAlertTimePeriod3N30 PostApiTriggersJSONBody3GraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3GraphAlertTimePeriod3 enum.
+func (e PostApiTriggersJSONBody3GraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3GraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3GraphAlertTimePeriod4.
+const (
+	PostApiTriggersJSONBody3GraphAlertTimePeriod4N60 PostApiTriggersJSONBody3GraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3GraphAlertTimePeriod4 enum.
+func (e PostApiTriggersJSONBody3GraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3GraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3GraphAlertTimePeriod5.
+const (
+	PostApiTriggersJSONBody3GraphAlertTimePeriod5N1440 PostApiTriggersJSONBody3GraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3GraphAlertTimePeriod5 enum.
+func (e PostApiTriggersJSONBody3GraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3GraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3NotificationCadence.
+const (
+	PostApiTriggersJSONBody3NotificationCadenceHourlyDigest PostApiTriggersJSONBody3NotificationCadence = "hourly_digest"
+	PostApiTriggersJSONBody3NotificationCadenceImmediate    PostApiTriggersJSONBody3NotificationCadence = "immediate"
+	PostApiTriggersJSONBody3NotificationCadenceN15minDigest PostApiTriggersJSONBody3NotificationCadence = "15min_digest"
+	PostApiTriggersJSONBody3NotificationCadenceN5minDigest  PostApiTriggersJSONBody3NotificationCadence = "5min_digest"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3NotificationCadence enum.
+func (e PostApiTriggersJSONBody3NotificationCadence) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3NotificationCadenceHourlyDigest:
+		return true
+	case PostApiTriggersJSONBody3NotificationCadenceImmediate:
+		return true
+	case PostApiTriggersJSONBody3NotificationCadenceN15minDigest:
+		return true
+	case PostApiTriggersJSONBody3NotificationCadenceN5minDigest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3ReportSource0Kind.
+const (
+	PostApiTriggersJSONBody3ReportSource0KindDashboard PostApiTriggersJSONBody3ReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3ReportSource0Kind enum.
+func (e PostApiTriggersJSONBody3ReportSource0Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3ReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3ReportSource1Kind.
+const (
+	PostApiTriggersJSONBody3ReportSource1KindCustomGraph PostApiTriggersJSONBody3ReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3ReportSource1Kind enum.
+func (e PostApiTriggersJSONBody3ReportSource1Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3ReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3ReportSource2Kind.
+const (
+	PostApiTriggersJSONBody3ReportSource2KindTraceQuery PostApiTriggersJSONBody3ReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3ReportSource2Kind enum.
+func (e PostApiTriggersJSONBody3ReportSource2Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3ReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody3TemplatesSlackTemplateType.
+const (
+	PostApiTriggersJSONBody3TemplatesSlackTemplateTypeBlockKit    PostApiTriggersJSONBody3TemplatesSlackTemplateType = "block_kit"
+	PostApiTriggersJSONBody3TemplatesSlackTemplateTypeLessThannil PostApiTriggersJSONBody3TemplatesSlackTemplateType = "<nil>"
+	PostApiTriggersJSONBody3TemplatesSlackTemplateTypeString      PostApiTriggersJSONBody3TemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody3TemplatesSlackTemplateType enum.
+func (e PostApiTriggersJSONBody3TemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody3TemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PostApiTriggersJSONBody3TemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PostApiTriggersJSONBody3TemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4Action.
+const (
+	PostApiTriggersJSONBody4ActionADDTOANNOTATIONQUEUE PostApiTriggersJSONBody4Action = "ADD_TO_ANNOTATION_QUEUE"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4Action enum.
+func (e PostApiTriggersJSONBody4Action) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4ActionADDTOANNOTATIONQUEUE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4AlertType.
+const (
+	PostApiTriggersJSONBody4AlertTypeCRITICAL PostApiTriggersJSONBody4AlertType = "CRITICAL"
+	PostApiTriggersJSONBody4AlertTypeINFO     PostApiTriggersJSONBody4AlertType = "INFO"
+	PostApiTriggersJSONBody4AlertTypeWARNING  PostApiTriggersJSONBody4AlertType = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4AlertType enum.
+func (e PostApiTriggersJSONBody4AlertType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4AlertTypeCRITICAL:
+		return true
+	case PostApiTriggersJSONBody4AlertTypeINFO:
+		return true
+	case PostApiTriggersJSONBody4AlertTypeWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4GraphAlertOperator.
+const (
+	PostApiTriggersJSONBody4GraphAlertOperatorEq  PostApiTriggersJSONBody4GraphAlertOperator = "eq"
+	PostApiTriggersJSONBody4GraphAlertOperatorGt  PostApiTriggersJSONBody4GraphAlertOperator = "gt"
+	PostApiTriggersJSONBody4GraphAlertOperatorGte PostApiTriggersJSONBody4GraphAlertOperator = "gte"
+	PostApiTriggersJSONBody4GraphAlertOperatorLt  PostApiTriggersJSONBody4GraphAlertOperator = "lt"
+	PostApiTriggersJSONBody4GraphAlertOperatorLte PostApiTriggersJSONBody4GraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4GraphAlertOperator enum.
+func (e PostApiTriggersJSONBody4GraphAlertOperator) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4GraphAlertOperatorEq:
+		return true
+	case PostApiTriggersJSONBody4GraphAlertOperatorGt:
+		return true
+	case PostApiTriggersJSONBody4GraphAlertOperatorGte:
+		return true
+	case PostApiTriggersJSONBody4GraphAlertOperatorLt:
+		return true
+	case PostApiTriggersJSONBody4GraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4GraphAlertTimePeriod0.
+const (
+	PostApiTriggersJSONBody4GraphAlertTimePeriod0N1 PostApiTriggersJSONBody4GraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4GraphAlertTimePeriod0 enum.
+func (e PostApiTriggersJSONBody4GraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4GraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4GraphAlertTimePeriod1.
+const (
+	PostApiTriggersJSONBody4GraphAlertTimePeriod1N5 PostApiTriggersJSONBody4GraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4GraphAlertTimePeriod1 enum.
+func (e PostApiTriggersJSONBody4GraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4GraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4GraphAlertTimePeriod2.
+const (
+	PostApiTriggersJSONBody4GraphAlertTimePeriod2N15 PostApiTriggersJSONBody4GraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4GraphAlertTimePeriod2 enum.
+func (e PostApiTriggersJSONBody4GraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4GraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4GraphAlertTimePeriod3.
+const (
+	PostApiTriggersJSONBody4GraphAlertTimePeriod3N30 PostApiTriggersJSONBody4GraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4GraphAlertTimePeriod3 enum.
+func (e PostApiTriggersJSONBody4GraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4GraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4GraphAlertTimePeriod4.
+const (
+	PostApiTriggersJSONBody4GraphAlertTimePeriod4N60 PostApiTriggersJSONBody4GraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4GraphAlertTimePeriod4 enum.
+func (e PostApiTriggersJSONBody4GraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4GraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4GraphAlertTimePeriod5.
+const (
+	PostApiTriggersJSONBody4GraphAlertTimePeriod5N1440 PostApiTriggersJSONBody4GraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4GraphAlertTimePeriod5 enum.
+func (e PostApiTriggersJSONBody4GraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4GraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4NotificationCadence.
+const (
+	PostApiTriggersJSONBody4NotificationCadenceHourlyDigest PostApiTriggersJSONBody4NotificationCadence = "hourly_digest"
+	PostApiTriggersJSONBody4NotificationCadenceImmediate    PostApiTriggersJSONBody4NotificationCadence = "immediate"
+	PostApiTriggersJSONBody4NotificationCadenceN15minDigest PostApiTriggersJSONBody4NotificationCadence = "15min_digest"
+	PostApiTriggersJSONBody4NotificationCadenceN5minDigest  PostApiTriggersJSONBody4NotificationCadence = "5min_digest"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4NotificationCadence enum.
+func (e PostApiTriggersJSONBody4NotificationCadence) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4NotificationCadenceHourlyDigest:
+		return true
+	case PostApiTriggersJSONBody4NotificationCadenceImmediate:
+		return true
+	case PostApiTriggersJSONBody4NotificationCadenceN15minDigest:
+		return true
+	case PostApiTriggersJSONBody4NotificationCadenceN5minDigest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4ReportSource0Kind.
+const (
+	PostApiTriggersJSONBody4ReportSource0KindDashboard PostApiTriggersJSONBody4ReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4ReportSource0Kind enum.
+func (e PostApiTriggersJSONBody4ReportSource0Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4ReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4ReportSource1Kind.
+const (
+	PostApiTriggersJSONBody4ReportSource1KindCustomGraph PostApiTriggersJSONBody4ReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4ReportSource1Kind enum.
+func (e PostApiTriggersJSONBody4ReportSource1Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4ReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4ReportSource2Kind.
+const (
+	PostApiTriggersJSONBody4ReportSource2KindTraceQuery PostApiTriggersJSONBody4ReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4ReportSource2Kind enum.
+func (e PostApiTriggersJSONBody4ReportSource2Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4ReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersJSONBody4TemplatesSlackTemplateType.
+const (
+	PostApiTriggersJSONBody4TemplatesSlackTemplateTypeBlockKit    PostApiTriggersJSONBody4TemplatesSlackTemplateType = "block_kit"
+	PostApiTriggersJSONBody4TemplatesSlackTemplateTypeLessThannil PostApiTriggersJSONBody4TemplatesSlackTemplateType = "<nil>"
+	PostApiTriggersJSONBody4TemplatesSlackTemplateTypeString      PostApiTriggersJSONBody4TemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersJSONBody4TemplatesSlackTemplateType enum.
+func (e PostApiTriggersJSONBody4TemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PostApiTriggersJSONBody4TemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PostApiTriggersJSONBody4TemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PostApiTriggersJSONBody4TemplatesSlackTemplateTypeString:
 		return true
 	default:
 		return false
@@ -12664,6 +14449,7 @@ const (
 	PostApiTriggers201JSONResponseBodyActionADDTODATASET         PostApiTriggers201JSONResponseBodyAction = "ADD_TO_DATASET"
 	PostApiTriggers201JSONResponseBodyActionSENDEMAIL            PostApiTriggers201JSONResponseBodyAction = "SEND_EMAIL"
 	PostApiTriggers201JSONResponseBodyActionSENDSLACKMESSAGE     PostApiTriggers201JSONResponseBodyAction = "SEND_SLACK_MESSAGE"
+	PostApiTriggers201JSONResponseBodyActionSENDWEBHOOK          PostApiTriggers201JSONResponseBodyAction = "SEND_WEBHOOK"
 )
 
 // Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyAction enum.
@@ -12676,6 +14462,8 @@ func (e PostApiTriggers201JSONResponseBodyAction) Valid() bool {
 	case PostApiTriggers201JSONResponseBodyActionSENDEMAIL:
 		return true
 	case PostApiTriggers201JSONResponseBodyActionSENDSLACKMESSAGE:
+		return true
+	case PostApiTriggers201JSONResponseBodyActionSENDWEBHOOK:
 		return true
 	default:
 		return false
@@ -12706,12 +14494,217 @@ func (e PostApiTriggers201JSONResponseBodyAlertType) Valid() bool {
 	}
 }
 
+// Defines values for PostApiTriggers201JSONResponseBodyGraphAlertOperator.
+const (
+	PostApiTriggers201JSONResponseBodyGraphAlertOperatorEq  PostApiTriggers201JSONResponseBodyGraphAlertOperator = "eq"
+	PostApiTriggers201JSONResponseBodyGraphAlertOperatorGt  PostApiTriggers201JSONResponseBodyGraphAlertOperator = "gt"
+	PostApiTriggers201JSONResponseBodyGraphAlertOperatorGte PostApiTriggers201JSONResponseBodyGraphAlertOperator = "gte"
+	PostApiTriggers201JSONResponseBodyGraphAlertOperatorLt  PostApiTriggers201JSONResponseBodyGraphAlertOperator = "lt"
+	PostApiTriggers201JSONResponseBodyGraphAlertOperatorLte PostApiTriggers201JSONResponseBodyGraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyGraphAlertOperator enum.
+func (e PostApiTriggers201JSONResponseBodyGraphAlertOperator) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyGraphAlertOperatorEq:
+		return true
+	case PostApiTriggers201JSONResponseBodyGraphAlertOperatorGt:
+		return true
+	case PostApiTriggers201JSONResponseBodyGraphAlertOperatorGte:
+		return true
+	case PostApiTriggers201JSONResponseBodyGraphAlertOperatorLt:
+		return true
+	case PostApiTriggers201JSONResponseBodyGraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0.
+const (
+	PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0N1 PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0 enum.
+func (e PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1.
+const (
+	PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1N5 PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1 enum.
+func (e PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2.
+const (
+	PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2N15 PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2 enum.
+func (e PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3.
+const (
+	PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3N30 PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3 enum.
+func (e PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4.
+const (
+	PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4N60 PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4 enum.
+func (e PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5.
+const (
+	PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5N1440 PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5 enum.
+func (e PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyKind.
+const (
+	PostApiTriggers201JSONResponseBodyKindALERT      PostApiTriggers201JSONResponseBodyKind = "ALERT"
+	PostApiTriggers201JSONResponseBodyKindAUTOMATION PostApiTriggers201JSONResponseBodyKind = "AUTOMATION"
+	PostApiTriggers201JSONResponseBodyKindREPORT     PostApiTriggers201JSONResponseBodyKind = "REPORT"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyKind enum.
+func (e PostApiTriggers201JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyKindALERT:
+		return true
+	case PostApiTriggers201JSONResponseBodyKindAUTOMATION:
+		return true
+	case PostApiTriggers201JSONResponseBodyKindREPORT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyReportSource0Kind.
+const (
+	PostApiTriggers201JSONResponseBodyReportSource0KindDashboard PostApiTriggers201JSONResponseBodyReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyReportSource0Kind enum.
+func (e PostApiTriggers201JSONResponseBodyReportSource0Kind) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyReportSource1Kind.
+const (
+	PostApiTriggers201JSONResponseBodyReportSource1KindCustomGraph PostApiTriggers201JSONResponseBodyReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyReportSource1Kind enum.
+func (e PostApiTriggers201JSONResponseBodyReportSource1Kind) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyReportSource2Kind.
+const (
+	PostApiTriggers201JSONResponseBodyReportSource2KindTraceQuery PostApiTriggers201JSONResponseBodyReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyReportSource2Kind enum.
+func (e PostApiTriggers201JSONResponseBodyReportSource2Kind) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType.
+const (
+	PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateTypeBlockKit    PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType = "block_kit"
+	PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateTypeLessThannil PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType = "<nil>"
+	PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateTypeString      PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType enum.
+func (e PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiTriggersById200JSONResponseBodyAction.
 const (
 	GetApiTriggersById200JSONResponseBodyActionADDTOANNOTATIONQUEUE GetApiTriggersById200JSONResponseBodyAction = "ADD_TO_ANNOTATION_QUEUE"
 	GetApiTriggersById200JSONResponseBodyActionADDTODATASET         GetApiTriggersById200JSONResponseBodyAction = "ADD_TO_DATASET"
 	GetApiTriggersById200JSONResponseBodyActionSENDEMAIL            GetApiTriggersById200JSONResponseBodyAction = "SEND_EMAIL"
 	GetApiTriggersById200JSONResponseBodyActionSENDSLACKMESSAGE     GetApiTriggersById200JSONResponseBodyAction = "SEND_SLACK_MESSAGE"
+	GetApiTriggersById200JSONResponseBodyActionSENDWEBHOOK          GetApiTriggersById200JSONResponseBodyAction = "SEND_WEBHOOK"
 )
 
 // Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyAction enum.
@@ -12724,6 +14717,8 @@ func (e GetApiTriggersById200JSONResponseBodyAction) Valid() bool {
 	case GetApiTriggersById200JSONResponseBodyActionSENDEMAIL:
 		return true
 	case GetApiTriggersById200JSONResponseBodyActionSENDSLACKMESSAGE:
+		return true
+	case GetApiTriggersById200JSONResponseBodyActionSENDWEBHOOK:
 		return true
 	default:
 		return false
@@ -12754,6 +14749,276 @@ func (e GetApiTriggersById200JSONResponseBodyAlertType) Valid() bool {
 	}
 }
 
+// Defines values for GetApiTriggersById200JSONResponseBodyGraphAlertOperator.
+const (
+	GetApiTriggersById200JSONResponseBodyGraphAlertOperatorEq  GetApiTriggersById200JSONResponseBodyGraphAlertOperator = "eq"
+	GetApiTriggersById200JSONResponseBodyGraphAlertOperatorGt  GetApiTriggersById200JSONResponseBodyGraphAlertOperator = "gt"
+	GetApiTriggersById200JSONResponseBodyGraphAlertOperatorGte GetApiTriggersById200JSONResponseBodyGraphAlertOperator = "gte"
+	GetApiTriggersById200JSONResponseBodyGraphAlertOperatorLt  GetApiTriggersById200JSONResponseBodyGraphAlertOperator = "lt"
+	GetApiTriggersById200JSONResponseBodyGraphAlertOperatorLte GetApiTriggersById200JSONResponseBodyGraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyGraphAlertOperator enum.
+func (e GetApiTriggersById200JSONResponseBodyGraphAlertOperator) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyGraphAlertOperatorEq:
+		return true
+	case GetApiTriggersById200JSONResponseBodyGraphAlertOperatorGt:
+		return true
+	case GetApiTriggersById200JSONResponseBodyGraphAlertOperatorGte:
+		return true
+	case GetApiTriggersById200JSONResponseBodyGraphAlertOperatorLt:
+		return true
+	case GetApiTriggersById200JSONResponseBodyGraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0.
+const (
+	GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0N1 GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 enum.
+func (e GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1.
+const (
+	GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1N5 GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 enum.
+func (e GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2.
+const (
+	GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2N15 GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 enum.
+func (e GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3.
+const (
+	GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3N30 GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 enum.
+func (e GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4.
+const (
+	GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4N60 GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 enum.
+func (e GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5.
+const (
+	GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5N1440 GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 enum.
+func (e GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyKind.
+const (
+	GetApiTriggersById200JSONResponseBodyKindALERT      GetApiTriggersById200JSONResponseBodyKind = "ALERT"
+	GetApiTriggersById200JSONResponseBodyKindAUTOMATION GetApiTriggersById200JSONResponseBodyKind = "AUTOMATION"
+	GetApiTriggersById200JSONResponseBodyKindREPORT     GetApiTriggersById200JSONResponseBodyKind = "REPORT"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyKind enum.
+func (e GetApiTriggersById200JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyKindALERT:
+		return true
+	case GetApiTriggersById200JSONResponseBodyKindAUTOMATION:
+		return true
+	case GetApiTriggersById200JSONResponseBodyKindREPORT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyReportSource0Kind.
+const (
+	GetApiTriggersById200JSONResponseBodyReportSource0KindDashboard GetApiTriggersById200JSONResponseBodyReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyReportSource0Kind enum.
+func (e GetApiTriggersById200JSONResponseBodyReportSource0Kind) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyReportSource1Kind.
+const (
+	GetApiTriggersById200JSONResponseBodyReportSource1KindCustomGraph GetApiTriggersById200JSONResponseBodyReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyReportSource1Kind enum.
+func (e GetApiTriggersById200JSONResponseBodyReportSource1Kind) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyReportSource2Kind.
+const (
+	GetApiTriggersById200JSONResponseBodyReportSource2KindTraceQuery GetApiTriggersById200JSONResponseBodyReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyReportSource2Kind enum.
+func (e GetApiTriggersById200JSONResponseBodyReportSource2Kind) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType.
+const (
+	GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit    GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType = "block_kit"
+	GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType = "<nil>"
+	GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeString      GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType enum.
+func (e GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit:
+		return true
+	case GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil:
+		return true
+	case GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyAction.
+const (
+	PatchApiTriggersByIdJSONBodyActionADDTOANNOTATIONQUEUE PatchApiTriggersByIdJSONBodyAction = "ADD_TO_ANNOTATION_QUEUE"
+	PatchApiTriggersByIdJSONBodyActionADDTODATASET         PatchApiTriggersByIdJSONBodyAction = "ADD_TO_DATASET"
+	PatchApiTriggersByIdJSONBodyActionSENDEMAIL            PatchApiTriggersByIdJSONBodyAction = "SEND_EMAIL"
+	PatchApiTriggersByIdJSONBodyActionSENDSLACKMESSAGE     PatchApiTriggersByIdJSONBodyAction = "SEND_SLACK_MESSAGE"
+	PatchApiTriggersByIdJSONBodyActionSENDWEBHOOK          PatchApiTriggersByIdJSONBodyAction = "SEND_WEBHOOK"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyAction enum.
+func (e PatchApiTriggersByIdJSONBodyAction) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyActionADDTOANNOTATIONQUEUE:
+		return true
+	case PatchApiTriggersByIdJSONBodyActionADDTODATASET:
+		return true
+	case PatchApiTriggersByIdJSONBodyActionSENDEMAIL:
+		return true
+	case PatchApiTriggersByIdJSONBodyActionSENDSLACKMESSAGE:
+		return true
+	case PatchApiTriggersByIdJSONBodyActionSENDWEBHOOK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyActionParams1SlackDelivery.
+const (
+	PatchApiTriggersByIdJSONBodyActionParams1SlackDeliveryBot     PatchApiTriggersByIdJSONBodyActionParams1SlackDelivery = "bot"
+	PatchApiTriggersByIdJSONBodyActionParams1SlackDeliveryWebhook PatchApiTriggersByIdJSONBodyActionParams1SlackDelivery = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyActionParams1SlackDelivery enum.
+func (e PatchApiTriggersByIdJSONBodyActionParams1SlackDelivery) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyActionParams1SlackDeliveryBot:
+		return true
+	case PatchApiTriggersByIdJSONBodyActionParams1SlackDeliveryWebhook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyActionParams2Method.
+const (
+	PatchApiTriggersByIdJSONBodyActionParams2MethodPATCH PatchApiTriggersByIdJSONBodyActionParams2Method = "PATCH"
+	PatchApiTriggersByIdJSONBodyActionParams2MethodPOST  PatchApiTriggersByIdJSONBodyActionParams2Method = "POST"
+	PatchApiTriggersByIdJSONBodyActionParams2MethodPUT   PatchApiTriggersByIdJSONBodyActionParams2Method = "PUT"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyActionParams2Method enum.
+func (e PatchApiTriggersByIdJSONBodyActionParams2Method) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyActionParams2MethodPATCH:
+		return true
+	case PatchApiTriggersByIdJSONBodyActionParams2MethodPOST:
+		return true
+	case PatchApiTriggersByIdJSONBodyActionParams2MethodPUT:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PatchApiTriggersByIdJSONBodyAlertType.
 const (
 	PatchApiTriggersByIdJSONBodyAlertTypeCRITICAL    PatchApiTriggersByIdJSONBodyAlertType = "CRITICAL"
@@ -12778,24 +15043,234 @@ func (e PatchApiTriggersByIdJSONBodyAlertType) Valid() bool {
 	}
 }
 
+// Defines values for PatchApiTriggersByIdJSONBodyGraphAlertOperator.
+const (
+	PatchApiTriggersByIdJSONBodyGraphAlertOperatorEq  PatchApiTriggersByIdJSONBodyGraphAlertOperator = "eq"
+	PatchApiTriggersByIdJSONBodyGraphAlertOperatorGt  PatchApiTriggersByIdJSONBodyGraphAlertOperator = "gt"
+	PatchApiTriggersByIdJSONBodyGraphAlertOperatorGte PatchApiTriggersByIdJSONBodyGraphAlertOperator = "gte"
+	PatchApiTriggersByIdJSONBodyGraphAlertOperatorLt  PatchApiTriggersByIdJSONBodyGraphAlertOperator = "lt"
+	PatchApiTriggersByIdJSONBodyGraphAlertOperatorLte PatchApiTriggersByIdJSONBodyGraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyGraphAlertOperator enum.
+func (e PatchApiTriggersByIdJSONBodyGraphAlertOperator) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyGraphAlertOperatorEq:
+		return true
+	case PatchApiTriggersByIdJSONBodyGraphAlertOperatorGt:
+		return true
+	case PatchApiTriggersByIdJSONBodyGraphAlertOperatorGte:
+		return true
+	case PatchApiTriggersByIdJSONBodyGraphAlertOperatorLt:
+		return true
+	case PatchApiTriggersByIdJSONBodyGraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0.
+const (
+	PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0N1 PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0 enum.
+func (e PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1.
+const (
+	PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1N5 PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1 enum.
+func (e PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2.
+const (
+	PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2N15 PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2 enum.
+func (e PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3.
+const (
+	PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3N30 PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3 enum.
+func (e PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4.
+const (
+	PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4N60 PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4 enum.
+func (e PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5.
+const (
+	PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5N1440 PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5 enum.
+func (e PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyNotificationCadence.
+const (
+	PatchApiTriggersByIdJSONBodyNotificationCadenceHourlyDigest PatchApiTriggersByIdJSONBodyNotificationCadence = "hourly_digest"
+	PatchApiTriggersByIdJSONBodyNotificationCadenceImmediate    PatchApiTriggersByIdJSONBodyNotificationCadence = "immediate"
+	PatchApiTriggersByIdJSONBodyNotificationCadenceN15minDigest PatchApiTriggersByIdJSONBodyNotificationCadence = "15min_digest"
+	PatchApiTriggersByIdJSONBodyNotificationCadenceN5minDigest  PatchApiTriggersByIdJSONBodyNotificationCadence = "5min_digest"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyNotificationCadence enum.
+func (e PatchApiTriggersByIdJSONBodyNotificationCadence) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyNotificationCadenceHourlyDigest:
+		return true
+	case PatchApiTriggersByIdJSONBodyNotificationCadenceImmediate:
+		return true
+	case PatchApiTriggersByIdJSONBodyNotificationCadenceN15minDigest:
+		return true
+	case PatchApiTriggersByIdJSONBodyNotificationCadenceN5minDigest:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyReportSource0Kind.
+const (
+	PatchApiTriggersByIdJSONBodyReportSource0KindDashboard PatchApiTriggersByIdJSONBodyReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyReportSource0Kind enum.
+func (e PatchApiTriggersByIdJSONBodyReportSource0Kind) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyReportSource1Kind.
+const (
+	PatchApiTriggersByIdJSONBodyReportSource1KindCustomGraph PatchApiTriggersByIdJSONBodyReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyReportSource1Kind enum.
+func (e PatchApiTriggersByIdJSONBodyReportSource1Kind) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyReportSource2Kind.
+const (
+	PatchApiTriggersByIdJSONBodyReportSource2KindTraceQuery PatchApiTriggersByIdJSONBodyReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyReportSource2Kind enum.
+func (e PatchApiTriggersByIdJSONBodyReportSource2Kind) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType.
+const (
+	PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateTypeBlockKit    PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType = "block_kit"
+	PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateTypeLessThannil PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType = "<nil>"
+	PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateTypeString      PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType enum.
+func (e PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PatchApiTriggersById200JSONResponseBodyAction.
 const (
-	ADDTOANNOTATIONQUEUE PatchApiTriggersById200JSONResponseBodyAction = "ADD_TO_ANNOTATION_QUEUE"
-	ADDTODATASET         PatchApiTriggersById200JSONResponseBodyAction = "ADD_TO_DATASET"
-	SENDEMAIL            PatchApiTriggersById200JSONResponseBodyAction = "SEND_EMAIL"
-	SENDSLACKMESSAGE     PatchApiTriggersById200JSONResponseBodyAction = "SEND_SLACK_MESSAGE"
+	PatchApiTriggersById200JSONResponseBodyActionADDTOANNOTATIONQUEUE PatchApiTriggersById200JSONResponseBodyAction = "ADD_TO_ANNOTATION_QUEUE"
+	PatchApiTriggersById200JSONResponseBodyActionADDTODATASET         PatchApiTriggersById200JSONResponseBodyAction = "ADD_TO_DATASET"
+	PatchApiTriggersById200JSONResponseBodyActionSENDEMAIL            PatchApiTriggersById200JSONResponseBodyAction = "SEND_EMAIL"
+	PatchApiTriggersById200JSONResponseBodyActionSENDSLACKMESSAGE     PatchApiTriggersById200JSONResponseBodyAction = "SEND_SLACK_MESSAGE"
+	PatchApiTriggersById200JSONResponseBodyActionSENDWEBHOOK          PatchApiTriggersById200JSONResponseBodyAction = "SEND_WEBHOOK"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyAction enum.
 func (e PatchApiTriggersById200JSONResponseBodyAction) Valid() bool {
 	switch e {
-	case ADDTOANNOTATIONQUEUE:
+	case PatchApiTriggersById200JSONResponseBodyActionADDTOANNOTATIONQUEUE:
 		return true
-	case ADDTODATASET:
+	case PatchApiTriggersById200JSONResponseBodyActionADDTODATASET:
 		return true
-	case SENDEMAIL:
+	case PatchApiTriggersById200JSONResponseBodyActionSENDEMAIL:
 		return true
-	case SENDSLACKMESSAGE:
+	case PatchApiTriggersById200JSONResponseBodyActionSENDSLACKMESSAGE:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyActionSENDWEBHOOK:
 		return true
 	default:
 		return false
@@ -12820,6 +15295,741 @@ func (e PatchApiTriggersById200JSONResponseBodyAlertType) Valid() bool {
 	case PatchApiTriggersById200JSONResponseBodyAlertTypeLessThannil:
 		return true
 	case PatchApiTriggersById200JSONResponseBodyAlertTypeWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyGraphAlertOperator.
+const (
+	PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorEq  PatchApiTriggersById200JSONResponseBodyGraphAlertOperator = "eq"
+	PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorGt  PatchApiTriggersById200JSONResponseBodyGraphAlertOperator = "gt"
+	PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorGte PatchApiTriggersById200JSONResponseBodyGraphAlertOperator = "gte"
+	PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorLt  PatchApiTriggersById200JSONResponseBodyGraphAlertOperator = "lt"
+	PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorLte PatchApiTriggersById200JSONResponseBodyGraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyGraphAlertOperator enum.
+func (e PatchApiTriggersById200JSONResponseBodyGraphAlertOperator) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorEq:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorGt:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorGte:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorLt:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0.
+const (
+	PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0N1 PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 enum.
+func (e PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1.
+const (
+	PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1N5 PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 enum.
+func (e PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2.
+const (
+	PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2N15 PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 enum.
+func (e PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3.
+const (
+	PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3N30 PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 enum.
+func (e PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4.
+const (
+	PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4N60 PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 enum.
+func (e PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5.
+const (
+	PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5N1440 PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 enum.
+func (e PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyKind.
+const (
+	PatchApiTriggersById200JSONResponseBodyKindALERT      PatchApiTriggersById200JSONResponseBodyKind = "ALERT"
+	PatchApiTriggersById200JSONResponseBodyKindAUTOMATION PatchApiTriggersById200JSONResponseBodyKind = "AUTOMATION"
+	PatchApiTriggersById200JSONResponseBodyKindREPORT     PatchApiTriggersById200JSONResponseBodyKind = "REPORT"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyKind enum.
+func (e PatchApiTriggersById200JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyKindALERT:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyKindAUTOMATION:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyKindREPORT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyReportSource0Kind.
+const (
+	PatchApiTriggersById200JSONResponseBodyReportSource0KindDashboard PatchApiTriggersById200JSONResponseBodyReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyReportSource0Kind enum.
+func (e PatchApiTriggersById200JSONResponseBodyReportSource0Kind) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyReportSource1Kind.
+const (
+	PatchApiTriggersById200JSONResponseBodyReportSource1KindCustomGraph PatchApiTriggersById200JSONResponseBodyReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyReportSource1Kind enum.
+func (e PatchApiTriggersById200JSONResponseBodyReportSource1Kind) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyReportSource2Kind.
+const (
+	PatchApiTriggersById200JSONResponseBodyReportSource2KindTraceQuery PatchApiTriggersById200JSONResponseBodyReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyReportSource2Kind enum.
+func (e PatchApiTriggersById200JSONResponseBodyReportSource2Kind) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType.
+const (
+	PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit    PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType = "block_kit"
+	PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType = "<nil>"
+	PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeString      PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType enum.
+func (e PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyAction.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyActionADDTOANNOTATIONQUEUE PostApiTriggersByIdDisable200JSONResponseBodyAction = "ADD_TO_ANNOTATION_QUEUE"
+	PostApiTriggersByIdDisable200JSONResponseBodyActionADDTODATASET         PostApiTriggersByIdDisable200JSONResponseBodyAction = "ADD_TO_DATASET"
+	PostApiTriggersByIdDisable200JSONResponseBodyActionSENDEMAIL            PostApiTriggersByIdDisable200JSONResponseBodyAction = "SEND_EMAIL"
+	PostApiTriggersByIdDisable200JSONResponseBodyActionSENDSLACKMESSAGE     PostApiTriggersByIdDisable200JSONResponseBodyAction = "SEND_SLACK_MESSAGE"
+	PostApiTriggersByIdDisable200JSONResponseBodyActionSENDWEBHOOK          PostApiTriggersByIdDisable200JSONResponseBodyAction = "SEND_WEBHOOK"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyAction enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyAction) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyActionADDTOANNOTATIONQUEUE:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyActionADDTODATASET:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyActionSENDEMAIL:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyActionSENDSLACKMESSAGE:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyActionSENDWEBHOOK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyAlertType.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyAlertTypeCRITICAL    PostApiTriggersByIdDisable200JSONResponseBodyAlertType = "CRITICAL"
+	PostApiTriggersByIdDisable200JSONResponseBodyAlertTypeINFO        PostApiTriggersByIdDisable200JSONResponseBodyAlertType = "INFO"
+	PostApiTriggersByIdDisable200JSONResponseBodyAlertTypeLessThannil PostApiTriggersByIdDisable200JSONResponseBodyAlertType = "<nil>"
+	PostApiTriggersByIdDisable200JSONResponseBodyAlertTypeWARNING     PostApiTriggersByIdDisable200JSONResponseBodyAlertType = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyAlertType enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyAlertType) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyAlertTypeCRITICAL:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyAlertTypeINFO:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyAlertTypeLessThannil:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyAlertTypeWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorEq  PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator = "eq"
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorGt  PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator = "gt"
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorGte PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator = "gte"
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorLt  PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator = "lt"
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorLte PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorEq:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorGt:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorGte:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorLt:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0N1 PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0 enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1N5 PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1 enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2N15 PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2 enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3N30 PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3 enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4N60 PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4 enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5N1440 PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5 enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyKind.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyKindALERT      PostApiTriggersByIdDisable200JSONResponseBodyKind = "ALERT"
+	PostApiTriggersByIdDisable200JSONResponseBodyKindAUTOMATION PostApiTriggersByIdDisable200JSONResponseBodyKind = "AUTOMATION"
+	PostApiTriggersByIdDisable200JSONResponseBodyKindREPORT     PostApiTriggersByIdDisable200JSONResponseBodyKind = "REPORT"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyKind enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyKindALERT:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyKindAUTOMATION:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyKindREPORT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyReportSource0Kind.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyReportSource0KindDashboard PostApiTriggersByIdDisable200JSONResponseBodyReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyReportSource0Kind enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyReportSource0Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyReportSource1Kind.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyReportSource1KindCustomGraph PostApiTriggersByIdDisable200JSONResponseBodyReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyReportSource1Kind enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyReportSource1Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyReportSource2Kind.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyReportSource2KindTraceQuery PostApiTriggersByIdDisable200JSONResponseBodyReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyReportSource2Kind enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyReportSource2Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType.
+const (
+	PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit    PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType = "block_kit"
+	PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType = "<nil>"
+	PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateTypeString      PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType enum.
+func (e PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyAction.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyActionADDTOANNOTATIONQUEUE PostApiTriggersByIdEnable200JSONResponseBodyAction = "ADD_TO_ANNOTATION_QUEUE"
+	PostApiTriggersByIdEnable200JSONResponseBodyActionADDTODATASET         PostApiTriggersByIdEnable200JSONResponseBodyAction = "ADD_TO_DATASET"
+	PostApiTriggersByIdEnable200JSONResponseBodyActionSENDEMAIL            PostApiTriggersByIdEnable200JSONResponseBodyAction = "SEND_EMAIL"
+	PostApiTriggersByIdEnable200JSONResponseBodyActionSENDSLACKMESSAGE     PostApiTriggersByIdEnable200JSONResponseBodyAction = "SEND_SLACK_MESSAGE"
+	PostApiTriggersByIdEnable200JSONResponseBodyActionSENDWEBHOOK          PostApiTriggersByIdEnable200JSONResponseBodyAction = "SEND_WEBHOOK"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyAction enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyAction) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyActionADDTOANNOTATIONQUEUE:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyActionADDTODATASET:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyActionSENDEMAIL:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyActionSENDSLACKMESSAGE:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyActionSENDWEBHOOK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyAlertType.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyAlertTypeCRITICAL    PostApiTriggersByIdEnable200JSONResponseBodyAlertType = "CRITICAL"
+	PostApiTriggersByIdEnable200JSONResponseBodyAlertTypeINFO        PostApiTriggersByIdEnable200JSONResponseBodyAlertType = "INFO"
+	PostApiTriggersByIdEnable200JSONResponseBodyAlertTypeLessThannil PostApiTriggersByIdEnable200JSONResponseBodyAlertType = "<nil>"
+	PostApiTriggersByIdEnable200JSONResponseBodyAlertTypeWARNING     PostApiTriggersByIdEnable200JSONResponseBodyAlertType = "WARNING"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyAlertType enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyAlertType) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyAlertTypeCRITICAL:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyAlertTypeINFO:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyAlertTypeLessThannil:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyAlertTypeWARNING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorEq  PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator = "eq"
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorGt  PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator = "gt"
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorGte PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator = "gte"
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorLt  PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator = "lt"
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorLte PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator = "lte"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorEq:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorGt:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorGte:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorLt:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperatorLte:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0N1 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0 = 1
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0 enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1N5 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1 = 5
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1 enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1N5:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2N15 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2 = 15
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2 enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2N15:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3N30 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3 = 30
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3 enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3N30:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4N60 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4 = 60
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4 enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4N60:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5N1440 PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5 = 1440
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5 enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5N1440:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyKind.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyKindALERT      PostApiTriggersByIdEnable200JSONResponseBodyKind = "ALERT"
+	PostApiTriggersByIdEnable200JSONResponseBodyKindAUTOMATION PostApiTriggersByIdEnable200JSONResponseBodyKind = "AUTOMATION"
+	PostApiTriggersByIdEnable200JSONResponseBodyKindREPORT     PostApiTriggersByIdEnable200JSONResponseBodyKind = "REPORT"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyKind enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyKindALERT:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyKindAUTOMATION:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyKindREPORT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyReportSource0Kind.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyReportSource0KindDashboard PostApiTriggersByIdEnable200JSONResponseBodyReportSource0Kind = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyReportSource0Kind enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyReportSource0Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyReportSource0KindDashboard:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyReportSource1Kind.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyReportSource1KindCustomGraph PostApiTriggersByIdEnable200JSONResponseBodyReportSource1Kind = "customGraph"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyReportSource1Kind enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyReportSource1Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyReportSource1KindCustomGraph:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyReportSource2Kind.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyReportSource2KindTraceQuery PostApiTriggersByIdEnable200JSONResponseBodyReportSource2Kind = "traceQuery"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyReportSource2Kind enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyReportSource2Kind) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyReportSource2KindTraceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType.
+const (
+	PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit    PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType = "block_kit"
+	PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType = "<nil>"
+	PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateTypeString      PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType = "string"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType enum.
+func (e PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateTypeBlockKit:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateTypeLessThannil:
+		return true
+	case PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiTriggersByIdTestFire200JSONResponseBodyChannel.
+const (
+	PostApiTriggersByIdTestFire200JSONResponseBodyChannelEmail   PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "email"
+	PostApiTriggersByIdTestFire200JSONResponseBodyChannelSlack   PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "slack"
+	PostApiTriggersByIdTestFire200JSONResponseBodyChannelWebhook PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the PostApiTriggersByIdTestFire200JSONResponseBodyChannel enum.
+func (e PostApiTriggersByIdTestFire200JSONResponseBodyChannel) Valid() bool {
+	switch e {
+	case PostApiTriggersByIdTestFire200JSONResponseBodyChannelEmail:
+		return true
+	case PostApiTriggersByIdTestFire200JSONResponseBodyChannelSlack:
+		return true
+	case PostApiTriggersByIdTestFire200JSONResponseBodyChannelWebhook:
 		return true
 	default:
 		return false
@@ -15438,25 +18648,25 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit.
 const (
-	LessThannil GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "<nil>"
-	Ms          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "ms"
-	Tokens      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens"
-	Tokenss     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens/s"
-	USD         GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "USD"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitLessThannil GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "<nil>"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitMs          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "ms"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokens      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokenss     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens/s"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitUSD         GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "USD"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit enum.
 func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit) Valid() bool {
 	switch e {
-	case LessThannil:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitLessThannil:
 		return true
-	case Ms:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitMs:
 		return true
-	case Tokens:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokens:
 		return true
-	case Tokenss:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokenss:
 		return true
-	case USD:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitUSD:
 		return true
 	default:
 		return false
@@ -16389,19 +19599,19 @@ func (e UpdateTestSuite200JSONResponseBodyEvaluatorsMappings1Type) Valid() bool 
 
 // Defines values for UpdateTestSuite200JSONResponseBodyFieldsType.
 const (
-	Boolean UpdateTestSuite200JSONResponseBodyFieldsType = "boolean"
-	Number  UpdateTestSuite200JSONResponseBodyFieldsType = "number"
-	Text    UpdateTestSuite200JSONResponseBodyFieldsType = "text"
+	UpdateTestSuite200JSONResponseBodyFieldsTypeBoolean UpdateTestSuite200JSONResponseBodyFieldsType = "boolean"
+	UpdateTestSuite200JSONResponseBodyFieldsTypeNumber  UpdateTestSuite200JSONResponseBodyFieldsType = "number"
+	UpdateTestSuite200JSONResponseBodyFieldsTypeText    UpdateTestSuite200JSONResponseBodyFieldsType = "text"
 )
 
 // Valid indicates whether the value is a known member of the UpdateTestSuite200JSONResponseBodyFieldsType enum.
 func (e UpdateTestSuite200JSONResponseBodyFieldsType) Valid() bool {
 	switch e {
-	case Boolean:
+	case UpdateTestSuite200JSONResponseBodyFieldsTypeBoolean:
 		return true
-	case Number:
+	case UpdateTestSuite200JSONResponseBodyFieldsTypeNumber:
 		return true
-	case Text:
+	case UpdateTestSuite200JSONResponseBodyFieldsTypeText:
 		return true
 	default:
 		return false
@@ -19434,9 +22644,27 @@ type PostApiDatasetJSONBodyColumnTypesType10 string
 // PostApiDatasetJSONBodyColumnTypesType11 defines parameters for PostApiDataset.
 type PostApiDatasetJSONBodyColumnTypesType11 string
 
+// PostApiDatasetJSONBodyColumnTypesType12 defines parameters for PostApiDataset.
+type PostApiDatasetJSONBodyColumnTypesType12 string
+
 // PostApiDatasetJSONBody_ColumnTypes_Type defines parameters for PostApiDataset.
 type PostApiDatasetJSONBody_ColumnTypes_Type struct {
 	union json.RawMessage
+}
+
+// PostApiDatasetAttachmentsMultipartBody defines parameters for PostApiDatasetAttachments.
+type PostApiDatasetAttachmentsMultipartBody struct {
+	// DatasetId The dataset that owns the file. Omit it while the dataset is still a draft.
+	DatasetId *string `json:"datasetId,omitempty"`
+
+	// File The file to store.
+	File openapi_types.File `json:"file"`
+}
+
+// PostApiDatasetAttachmentsParams defines parameters for PostApiDatasetAttachments.
+type PostApiDatasetAttachmentsParams struct {
+	// ProjectId The project the file is stored for.
+	ProjectId string `form:"projectId" json:"projectId"`
 }
 
 // PostApiDatasetEvaluateJSONBody defines parameters for PostApiDatasetEvaluate.
@@ -19567,6 +22795,9 @@ type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType10 string
 // PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11 defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11 string
 
+// PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 defines parameters for PatchApiDatasetBySlugOrId.
+type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 string
+
 // PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -19591,6 +22822,12 @@ type PostApiDatasetBySlugOrIdRecordsJSONBody struct {
 // PatchApiDatasetBySlugOrIdRecordsByRecordIdJSONBody defines parameters for PatchApiDatasetBySlugOrIdRecordsByRecordId.
 type PatchApiDatasetBySlugOrIdRecordsByRecordIdJSONBody struct {
 	Entry map[string]interface{} `json:"entry"`
+}
+
+// GetApiDatasetBySlugEntriesParams defines parameters for GetApiDatasetBySlugEntries.
+type GetApiDatasetBySlugEntriesParams struct {
+	Page  *int `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // PostApiDspyLogStepsJSONBody defines parameters for PostApiDspyLogSteps.
@@ -22109,6 +25346,9 @@ type GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType10 strin
 // GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
 
+// GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPrompts.
+type GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
+
 // GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22164,6 +25404,9 @@ type GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColum
 
 // GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPrompts.
+type GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22264,6 +25507,9 @@ type PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType10 stri
 // PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPrompts.
 type PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPrompts.
+type PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPrompts.
 type PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22319,6 +25565,9 @@ type PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColu
 
 // PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPrompts.
 type PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPrompts.
+type PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPrompts.
 type PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22389,6 +25638,9 @@ type GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType10 s
 // GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPromptsById.
 type GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
 
+// GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPromptsById.
+type GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
+
 // GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPromptsById.
 type GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22444,6 +25696,9 @@ type GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineC
 
 // GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPromptsById.
 type GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPromptsById.
+type GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPromptsById.
 type GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22544,6 +25799,9 @@ type PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType10 s
 // PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for PutApiPromptsById.
 type PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
 
+// PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for PutApiPromptsById.
+type PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
+
 // PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for PutApiPromptsById.
 type PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22599,6 +25857,9 @@ type PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineC
 
 // PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PutApiPromptsById.
 type PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PutApiPromptsById.
+type PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PutApiPromptsById.
 type PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22722,6 +25983,9 @@ type PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType
 // PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22778,6 +26042,9 @@ type PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInl
 // PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22827,6 +26094,9 @@ type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemons
 
 // PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22884,6 +26154,9 @@ type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPrompt
 // PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22930,6 +26203,9 @@ type PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTy
 
 // PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22987,6 +26263,9 @@ type PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrat
 // PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -23041,6 +26320,9 @@ type GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypes
 
 // GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPromptsByIdVersions.
 type GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
+
+// GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPromptsByIdVersions.
+type GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
 
 // GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPromptsByIdVersions.
 type GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -23098,6 +26380,9 @@ type GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstration
 // GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPromptsByIdVersions.
 type GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
 
+// GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPromptsByIdVersions.
+type GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
+
 // GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPromptsByIdVersions.
 type GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -23147,6 +26432,9 @@ type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstratio
 
 // PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
 type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
+type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
 type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -23203,6 +26491,9 @@ type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTec
 
 // PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
 type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
+type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
 type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -23435,10 +26726,11 @@ type PostApiScenarioEventsJSONBody1 struct {
 			Score       *float32                                               `json:"score,omitempty"`
 			Status      PostApiScenarioEventsJSONBody1ResultsEvaluationsStatus `json:"status"`
 		} `json:"evaluations,omitempty"`
-		MetCriteria   []string                                     `json:"metCriteria"`
-		Reasoning     *string                                      `json:"reasoning,omitempty"`
-		UnmetCriteria []string                                     `json:"unmetCriteria"`
-		Verdict       PostApiScenarioEventsJSONBody1ResultsVerdict `json:"verdict"`
+		InconclusiveCriteria *[]string                                    `json:"inconclusiveCriteria,omitempty"`
+		MetCriteria          []string                                     `json:"metCriteria"`
+		Reasoning            *string                                      `json:"reasoning,omitempty"`
+		UnmetCriteria        []string                                     `json:"unmetCriteria"`
+		Verdict              PostApiScenarioEventsJSONBody1ResultsVerdict `json:"verdict"`
 	} `json:"results,omitempty"`
 	ScenarioId    string                               `json:"scenarioId"`
 	ScenarioRunId string                               `json:"scenarioRunId"`
@@ -24189,6 +27481,12 @@ type GetApiSimulationRunsBatchesListParams struct {
 
 // GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatus defines parameters for GetApiSimulationRunsByScenarioRunId.
 type GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatus string
+
+// GetApiSlackConnections200JSONResponseBodyKind defines parameters for GetApiSlackConnections.
+type GetApiSlackConnections200JSONResponseBodyKind string
+
+// GetApiSlackConnections200JSONResponseBodyScopeType defines parameters for GetApiSlackConnections.
+type GetApiSlackConnections200JSONResponseBodyScopeType string
 
 // GetApiSuitesParams defines parameters for GetApiSuites.
 type GetApiSuitesParams struct {
@@ -25417,8 +28715,14 @@ type PostApiTriggerSlackJSONBody struct {
 	// Name How the trigger is listed in the app
 	Name string `json:"name"`
 
-	// SlackWebhook Incoming webhook URL the alert is posted to
-	SlackWebhook string `json:"slack_webhook"`
+	// SlackChannelId The channel a bot connection posts in; required with one. Invite the LangWatch app to it first.
+	SlackChannelId *string `json:"slack_channel_id,omitempty"`
+
+	// SlackConnectionId The Slack connection the alert posts through: an organization connection or one of this project's, as `GET /api/slack-connections` and `langwatch slack-connection list` list them. Send this or `slack_webhook`, not both.
+	SlackConnectionId *string `json:"slack_connection_id,omitempty"`
+
+	// SlackWebhook Incoming webhook URL the alert is posted to. It is stored as a Slack connection this project can use (an existing one holding the same URL, else a new project connection). Send this or `slack_connection_id`, not both.
+	SlackWebhook *string `json:"slack_webhook,omitempty"`
 }
 
 // PostApiTriggerSlackJSONBodyAlertType defines parameters for PostApiTriggerSlack.
@@ -25830,27 +29134,856 @@ type PostApiTriggerSlack403JSONResponseBody struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// PostApiTriggerSlack422JSONResponseBody defines parameters for PostApiTriggerSlack.
+type PostApiTriggerSlack422JSONResponseBody struct {
+	DocsUrl *string `json:"docsUrl,omitempty"`
+
+	// Error Stable failure code; branch on this
+	Error string `json:"error"`
+
+	// Fault Who the failure is attributable to: customer, platform, provider
+	Fault                *string                `json:"fault,omitempty"`
+	Message              *string                `json:"message,omitempty"`
+	Tips                 *[]string              `json:"tips,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
 // GetApiTriggers200JSONResponseBodyAction defines parameters for GetApiTriggers.
 type GetApiTriggers200JSONResponseBodyAction string
 
 // GetApiTriggers200JSONResponseBodyAlertType defines parameters for GetApiTriggers.
 type GetApiTriggers200JSONResponseBodyAlertType string
 
-// PostApiTriggersJSONBody defines parameters for PostApiTriggers.
-type PostApiTriggersJSONBody struct {
-	Action       PostApiTriggersJSONBodyAction     `json:"action"`
-	ActionParams *map[string]interface{}           `json:"actionParams,omitempty"`
-	AlertType    *PostApiTriggersJSONBodyAlertType `json:"alertType,omitempty"`
-	Filters      *map[string]interface{}           `json:"filters,omitempty"`
-	Message      *string                           `json:"message,omitempty"`
-	Name         string                            `json:"name"`
+// GetApiTriggers200JSONResponseBodyGraphAlertOperator defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyGraphAlertOperator string
+
+// GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0 float32
+
+// GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1 float32
+
+// GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2 float32
+
+// GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3 float32
+
+// GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4 float32
+
+// GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5 float32
+
+// GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod struct {
+	union json.RawMessage
 }
 
-// PostApiTriggersJSONBodyAction defines parameters for PostApiTriggers.
-type PostApiTriggersJSONBodyAction string
+// GetApiTriggers200JSONResponseBodyKind defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyKind string
 
-// PostApiTriggersJSONBodyAlertType defines parameters for PostApiTriggers.
-type PostApiTriggersJSONBodyAlertType string
+// GetApiTriggers200JSONResponseBodyReportSource0 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyReportSource0 struct {
+	DashboardId string                                             `json:"dashboardId"`
+	Kind        GetApiTriggers200JSONResponseBodyReportSource0Kind `json:"kind"`
+}
+
+// GetApiTriggers200JSONResponseBodyReportSource0Kind defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyReportSource0Kind string
+
+// GetApiTriggers200JSONResponseBodyReportSource1 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyReportSource1 struct {
+	CustomGraphId string                                             `json:"customGraphId"`
+	Kind          GetApiTriggers200JSONResponseBodyReportSource1Kind `json:"kind"`
+}
+
+// GetApiTriggers200JSONResponseBodyReportSource1Kind defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyReportSource1Kind string
+
+// GetApiTriggers200JSONResponseBodyReportSource2 defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyReportSource2 struct {
+	Filters map[string]interface{}                             `json:"filters"`
+	Kind    GetApiTriggers200JSONResponseBodyReportSource2Kind `json:"kind"`
+	Metric  *string                                            `json:"metric,omitempty"`
+	TopN    int                                                `json:"topN"`
+}
+
+// GetApiTriggers200JSONResponseBodyReportSource2Kind defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyReportSource2Kind string
+
+// GetApiTriggers200JSONResponseBody_Report_Source defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBody_Report_Source struct {
+	union json.RawMessage
+}
+
+// GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType defines parameters for GetApiTriggers.
+type GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType string
+
+// PostApiTriggersJSONBody defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0 struct {
+	Action PostApiTriggersJSONBody0Action `json:"action"`
+
+	// ActionParams Email delivery.
+	ActionParams PostApiTriggersJSONBody_0_ActionParams `json:"actionParams"`
+	AlertType    *PostApiTriggersJSONBody0AlertType     `json:"alertType,omitempty"`
+
+	// CustomGraphId Set to make this an alert on that graph. `graphAlert` and `alertType` are then required.
+	CustomGraphId *string `json:"customGraphId,omitempty"`
+
+	// FilterQuery The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`.
+	FilterQuery *string                                                            `json:"filterQuery,omitempty"`
+	Filters     *map[string]PostApiTriggersJSONBody_0_Filters_AdditionalProperties `json:"filters,omitempty"`
+
+	// GraphAlert The rule an alert fires by: series, operator, threshold, window.
+	GraphAlert *struct {
+		Operator   PostApiTriggersJSONBody0GraphAlertOperator      `json:"operator"`
+		SeriesName string                                          `json:"seriesName"`
+		Threshold  float32                                         `json:"threshold"`
+		TimePeriod PostApiTriggersJSONBody_0_GraphAlert_TimePeriod `json:"timePeriod"`
+	} `json:"graphAlert,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Name    string  `json:"name"`
+
+	// NotificationCadence How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+	NotificationCadence *PostApiTriggersJSONBody0NotificationCadence `json:"notificationCadence,omitempty"`
+
+	// Report What a scheduled report renders and when it sends.
+	Report *struct {
+		CompareToPrevious *bool `json:"compareToPrevious,omitempty"`
+		Schedule          struct {
+			Cron     string `json:"cron"`
+			Timezone string `json:"timezone"`
+		} `json:"schedule"`
+		Source PostApiTriggersJSONBody_0_Report_Source `json:"source"`
+	} `json:"report,omitempty"`
+
+	// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+	Templates *struct {
+		EmailBodyTemplate    *string                                             `json:"emailBodyTemplate,omitempty"`
+		EmailSubjectTemplate *string                                             `json:"emailSubjectTemplate,omitempty"`
+		SlackTemplate        *string                                             `json:"slackTemplate,omitempty"`
+		SlackTemplateType    *PostApiTriggersJSONBody0TemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+	} `json:"templates,omitempty"`
+
+	// TraceDebounceMs How long to wait for a trace to settle before the conditions are read.
+	TraceDebounceMs *int `json:"traceDebounceMs,omitempty"`
+}
+
+// PostApiTriggersJSONBody0Action defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0Action string
+
+// PostApiTriggersJSONBody_0_ActionParams defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_0_ActionParams struct {
+	// Members Who receives the email. Any address, not only teammates.
+	Members              []string               `json:"members"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PostApiTriggersJSONBody0AlertType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0AlertType string
+
+// PostApiTriggersJSONBody0Filters0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0Filters0 = []string
+
+// PostApiTriggersJSONBody0Filters1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0Filters1 map[string][]string
+
+// PostApiTriggersJSONBody0Filters2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0Filters2 map[string]map[string][]string
+
+// PostApiTriggersJSONBody_0_Filters_AdditionalProperties defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_0_Filters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody0GraphAlertOperator defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0GraphAlertOperator string
+
+// PostApiTriggersJSONBody0GraphAlertTimePeriod0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0GraphAlertTimePeriod0 float32
+
+// PostApiTriggersJSONBody0GraphAlertTimePeriod1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0GraphAlertTimePeriod1 float32
+
+// PostApiTriggersJSONBody0GraphAlertTimePeriod2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0GraphAlertTimePeriod2 float32
+
+// PostApiTriggersJSONBody0GraphAlertTimePeriod3 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0GraphAlertTimePeriod3 float32
+
+// PostApiTriggersJSONBody0GraphAlertTimePeriod4 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0GraphAlertTimePeriod4 float32
+
+// PostApiTriggersJSONBody0GraphAlertTimePeriod5 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0GraphAlertTimePeriod5 float32
+
+// PostApiTriggersJSONBody_0_GraphAlert_TimePeriod defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_0_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody0NotificationCadence defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0NotificationCadence string
+
+// PostApiTriggersJSONBody0ReportSource0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0ReportSource0 struct {
+	DashboardId string                                    `json:"dashboardId"`
+	Kind        PostApiTriggersJSONBody0ReportSource0Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody0ReportSource0Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0ReportSource0Kind string
+
+// PostApiTriggersJSONBody0ReportSource1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0ReportSource1 struct {
+	CustomGraphId string                                    `json:"customGraphId"`
+	Kind          PostApiTriggersJSONBody0ReportSource1Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody0ReportSource1Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0ReportSource1Kind string
+
+// PostApiTriggersJSONBody0ReportSource2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0ReportSource2 struct {
+	Filters *map[string]interface{}                   `json:"filters,omitempty"`
+	Kind    PostApiTriggersJSONBody0ReportSource2Kind `json:"kind"`
+	Metric  *string                                   `json:"metric,omitempty"`
+	TopN    *int                                      `json:"topN,omitempty"`
+}
+
+// PostApiTriggersJSONBody0ReportSource2Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0ReportSource2Kind string
+
+// PostApiTriggersJSONBody_0_Report_Source defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_0_Report_Source struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody0TemplatesSlackTemplateType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody0TemplatesSlackTemplateType string
+
+// PostApiTriggersJSONBody1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1 struct {
+	Action PostApiTriggersJSONBody1Action `json:"action"`
+
+	// ActionParams Slack delivery through a Slack connection (`slackIntegrationId`), plus `slackChannelId` when the connection is a bot.
+	ActionParams PostApiTriggersJSONBody_1_ActionParams `json:"actionParams"`
+	AlertType    *PostApiTriggersJSONBody1AlertType     `json:"alertType,omitempty"`
+
+	// CustomGraphId Set to make this an alert on that graph. `graphAlert` and `alertType` are then required.
+	CustomGraphId *string `json:"customGraphId,omitempty"`
+
+	// FilterQuery The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`.
+	FilterQuery *string                                                            `json:"filterQuery,omitempty"`
+	Filters     *map[string]PostApiTriggersJSONBody_1_Filters_AdditionalProperties `json:"filters,omitempty"`
+
+	// GraphAlert The rule an alert fires by: series, operator, threshold, window.
+	GraphAlert *struct {
+		Operator   PostApiTriggersJSONBody1GraphAlertOperator      `json:"operator"`
+		SeriesName string                                          `json:"seriesName"`
+		Threshold  float32                                         `json:"threshold"`
+		TimePeriod PostApiTriggersJSONBody_1_GraphAlert_TimePeriod `json:"timePeriod"`
+	} `json:"graphAlert,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Name    string  `json:"name"`
+
+	// NotificationCadence How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+	NotificationCadence *PostApiTriggersJSONBody1NotificationCadence `json:"notificationCadence,omitempty"`
+
+	// Report What a scheduled report renders and when it sends.
+	Report *struct {
+		CompareToPrevious *bool `json:"compareToPrevious,omitempty"`
+		Schedule          struct {
+			Cron     string `json:"cron"`
+			Timezone string `json:"timezone"`
+		} `json:"schedule"`
+		Source PostApiTriggersJSONBody_1_Report_Source `json:"source"`
+	} `json:"report,omitempty"`
+
+	// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+	Templates *struct {
+		EmailBodyTemplate    *string                                             `json:"emailBodyTemplate,omitempty"`
+		EmailSubjectTemplate *string                                             `json:"emailSubjectTemplate,omitempty"`
+		SlackTemplate        *string                                             `json:"slackTemplate,omitempty"`
+		SlackTemplateType    *PostApiTriggersJSONBody1TemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+	} `json:"templates,omitempty"`
+
+	// TraceDebounceMs How long to wait for a trace to settle before the conditions are read.
+	TraceDebounceMs *int `json:"traceDebounceMs,omitempty"`
+}
+
+// PostApiTriggersJSONBody1Action defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1Action string
+
+// PostApiTriggersJSONBody1ActionParamsSlackDelivery defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1ActionParamsSlackDelivery string
+
+// PostApiTriggersJSONBody_1_ActionParams defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_1_ActionParams struct {
+	// SlackBotToken Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead.
+	SlackBotToken *string `json:"slackBotToken,omitempty"`
+
+	// SlackBotTokenSet Legacy and ignored: no read returns it. An update that retypes no secret moves an automation's own stored secret into a connection.
+	SlackBotTokenSet *bool `json:"slackBotTokenSet,omitempty"`
+
+	// SlackChannelId The channel the bot posts in, for a bot connection or `bot` delivery. Invite the LangWatch app to it first.
+	SlackChannelId *string `json:"slackChannelId,omitempty"`
+
+	// SlackDelivery How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. With `slackIntegrationId` it follows the connection's kind. Absent without a connection means `webhook`.
+	SlackDelivery *PostApiTriggersJSONBody1ActionParamsSlackDelivery `json:"slackDelivery,omitempty"`
+
+	// SlackIntegrationId The Slack connection this automation posts through: an organization connection or one of this project's, listed under Settings, Integrations, Slack. A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. Preferred over `slackWebhook` and `slackBotToken`, and what a read returns in their place.
+	SlackIntegrationId *string `json:"slackIntegrationId,omitempty"`
+
+	// SlackWebhook Legacy, accepted for one release: an incoming webhook URL, for `webhook` delivery. It is stored as a Slack connection (an existing one holding the same URL, else a new project connection) and the automation keeps only that connection's id. Send `slackIntegrationId` instead.
+	SlackWebhook         *string                `json:"slackWebhook,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PostApiTriggersJSONBody1AlertType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1AlertType string
+
+// PostApiTriggersJSONBody1Filters0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1Filters0 = []string
+
+// PostApiTriggersJSONBody1Filters1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1Filters1 map[string][]string
+
+// PostApiTriggersJSONBody1Filters2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1Filters2 map[string]map[string][]string
+
+// PostApiTriggersJSONBody_1_Filters_AdditionalProperties defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_1_Filters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody1GraphAlertOperator defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1GraphAlertOperator string
+
+// PostApiTriggersJSONBody1GraphAlertTimePeriod0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1GraphAlertTimePeriod0 float32
+
+// PostApiTriggersJSONBody1GraphAlertTimePeriod1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1GraphAlertTimePeriod1 float32
+
+// PostApiTriggersJSONBody1GraphAlertTimePeriod2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1GraphAlertTimePeriod2 float32
+
+// PostApiTriggersJSONBody1GraphAlertTimePeriod3 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1GraphAlertTimePeriod3 float32
+
+// PostApiTriggersJSONBody1GraphAlertTimePeriod4 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1GraphAlertTimePeriod4 float32
+
+// PostApiTriggersJSONBody1GraphAlertTimePeriod5 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1GraphAlertTimePeriod5 float32
+
+// PostApiTriggersJSONBody_1_GraphAlert_TimePeriod defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_1_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody1NotificationCadence defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1NotificationCadence string
+
+// PostApiTriggersJSONBody1ReportSource0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1ReportSource0 struct {
+	DashboardId string                                    `json:"dashboardId"`
+	Kind        PostApiTriggersJSONBody1ReportSource0Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody1ReportSource0Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1ReportSource0Kind string
+
+// PostApiTriggersJSONBody1ReportSource1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1ReportSource1 struct {
+	CustomGraphId string                                    `json:"customGraphId"`
+	Kind          PostApiTriggersJSONBody1ReportSource1Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody1ReportSource1Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1ReportSource1Kind string
+
+// PostApiTriggersJSONBody1ReportSource2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1ReportSource2 struct {
+	Filters *map[string]interface{}                   `json:"filters,omitempty"`
+	Kind    PostApiTriggersJSONBody1ReportSource2Kind `json:"kind"`
+	Metric  *string                                   `json:"metric,omitempty"`
+	TopN    *int                                      `json:"topN,omitempty"`
+}
+
+// PostApiTriggersJSONBody1ReportSource2Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1ReportSource2Kind string
+
+// PostApiTriggersJSONBody_1_Report_Source defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_1_Report_Source struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody1TemplatesSlackTemplateType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody1TemplatesSlackTemplateType string
+
+// PostApiTriggersJSONBody2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2 struct {
+	Action PostApiTriggersJSONBody2Action `json:"action"`
+
+	// ActionParams Delivery to a customer endpoint over HTTP, with a body in any media type.
+	ActionParams PostApiTriggersJSONBody_2_ActionParams `json:"actionParams"`
+	AlertType    *PostApiTriggersJSONBody2AlertType     `json:"alertType,omitempty"`
+
+	// CustomGraphId Set to make this an alert on that graph. `graphAlert` and `alertType` are then required.
+	CustomGraphId *string `json:"customGraphId,omitempty"`
+
+	// FilterQuery The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`.
+	FilterQuery *string                                                            `json:"filterQuery,omitempty"`
+	Filters     *map[string]PostApiTriggersJSONBody_2_Filters_AdditionalProperties `json:"filters,omitempty"`
+
+	// GraphAlert The rule an alert fires by: series, operator, threshold, window.
+	GraphAlert *struct {
+		Operator   PostApiTriggersJSONBody2GraphAlertOperator      `json:"operator"`
+		SeriesName string                                          `json:"seriesName"`
+		Threshold  float32                                         `json:"threshold"`
+		TimePeriod PostApiTriggersJSONBody_2_GraphAlert_TimePeriod `json:"timePeriod"`
+	} `json:"graphAlert,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Name    string  `json:"name"`
+
+	// NotificationCadence How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+	NotificationCadence *PostApiTriggersJSONBody2NotificationCadence `json:"notificationCadence,omitempty"`
+
+	// Report What a scheduled report renders and when it sends.
+	Report *struct {
+		CompareToPrevious *bool `json:"compareToPrevious,omitempty"`
+		Schedule          struct {
+			Cron     string `json:"cron"`
+			Timezone string `json:"timezone"`
+		} `json:"schedule"`
+		Source PostApiTriggersJSONBody_2_Report_Source `json:"source"`
+	} `json:"report,omitempty"`
+
+	// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+	Templates *struct {
+		EmailBodyTemplate    *string                                             `json:"emailBodyTemplate,omitempty"`
+		EmailSubjectTemplate *string                                             `json:"emailSubjectTemplate,omitempty"`
+		SlackTemplate        *string                                             `json:"slackTemplate,omitempty"`
+		SlackTemplateType    *PostApiTriggersJSONBody2TemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+	} `json:"templates,omitempty"`
+
+	// TraceDebounceMs How long to wait for a trace to settle before the conditions are read.
+	TraceDebounceMs *int `json:"traceDebounceMs,omitempty"`
+}
+
+// PostApiTriggersJSONBody2Action defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2Action string
+
+// PostApiTriggersJSONBody2ActionParamsMethod defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2ActionParamsMethod string
+
+// PostApiTriggersJSONBody_2_ActionParams defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_2_ActionParams struct {
+	// BodyTemplate A Liquid template for the body. Absent sends the standard LangWatch envelope for a JSON content type, and an empty body for any other.
+	BodyTemplate *string `json:"bodyTemplate,omitempty"`
+
+	// ContentType The `Content-Type` the delivery announces, which also decides how the body is treated: `application/json` (and any `+json` type) is checked and re-serialised; any other media type sends the rendered template verbatim. Absent means `application/json`.
+	ContentType *string `json:"contentType,omitempty"`
+
+	// Headers Static headers sent with every delivery. The values are credentials: they read back as the placeholder, and sending the placeholder back keeps the stored ones. Changing `url` means sending the values again in the same request.
+	Headers *map[string]string `json:"headers,omitempty"`
+
+	// Method The HTTP method. Absent means POST.
+	Method *PostApiTriggersJSONBody2ActionParamsMethod `json:"method,omitempty"`
+
+	// SigningSecret Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one.
+	SigningSecret *string `json:"signingSecret,omitempty"`
+
+	// Url Where the request goes. https only, and not a private host.
+	Url                  string                 `json:"url"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PostApiTriggersJSONBody2AlertType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2AlertType string
+
+// PostApiTriggersJSONBody2Filters0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2Filters0 = []string
+
+// PostApiTriggersJSONBody2Filters1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2Filters1 map[string][]string
+
+// PostApiTriggersJSONBody2Filters2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2Filters2 map[string]map[string][]string
+
+// PostApiTriggersJSONBody_2_Filters_AdditionalProperties defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_2_Filters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody2GraphAlertOperator defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2GraphAlertOperator string
+
+// PostApiTriggersJSONBody2GraphAlertTimePeriod0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2GraphAlertTimePeriod0 float32
+
+// PostApiTriggersJSONBody2GraphAlertTimePeriod1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2GraphAlertTimePeriod1 float32
+
+// PostApiTriggersJSONBody2GraphAlertTimePeriod2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2GraphAlertTimePeriod2 float32
+
+// PostApiTriggersJSONBody2GraphAlertTimePeriod3 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2GraphAlertTimePeriod3 float32
+
+// PostApiTriggersJSONBody2GraphAlertTimePeriod4 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2GraphAlertTimePeriod4 float32
+
+// PostApiTriggersJSONBody2GraphAlertTimePeriod5 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2GraphAlertTimePeriod5 float32
+
+// PostApiTriggersJSONBody_2_GraphAlert_TimePeriod defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_2_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody2NotificationCadence defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2NotificationCadence string
+
+// PostApiTriggersJSONBody2ReportSource0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2ReportSource0 struct {
+	DashboardId string                                    `json:"dashboardId"`
+	Kind        PostApiTriggersJSONBody2ReportSource0Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody2ReportSource0Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2ReportSource0Kind string
+
+// PostApiTriggersJSONBody2ReportSource1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2ReportSource1 struct {
+	CustomGraphId string                                    `json:"customGraphId"`
+	Kind          PostApiTriggersJSONBody2ReportSource1Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody2ReportSource1Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2ReportSource1Kind string
+
+// PostApiTriggersJSONBody2ReportSource2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2ReportSource2 struct {
+	Filters *map[string]interface{}                   `json:"filters,omitempty"`
+	Kind    PostApiTriggersJSONBody2ReportSource2Kind `json:"kind"`
+	Metric  *string                                   `json:"metric,omitempty"`
+	TopN    *int                                      `json:"topN,omitempty"`
+}
+
+// PostApiTriggersJSONBody2ReportSource2Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2ReportSource2Kind string
+
+// PostApiTriggersJSONBody_2_Report_Source defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_2_Report_Source struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody2TemplatesSlackTemplateType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody2TemplatesSlackTemplateType string
+
+// PostApiTriggersJSONBody3 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3 struct {
+	Action PostApiTriggersJSONBody3Action `json:"action"`
+
+	// ActionParams Append matched traces to a dataset.
+	ActionParams PostApiTriggersJSONBody_3_ActionParams `json:"actionParams"`
+	AlertType    *PostApiTriggersJSONBody3AlertType     `json:"alertType,omitempty"`
+
+	// CustomGraphId Set to make this an alert on that graph. `graphAlert` and `alertType` are then required.
+	CustomGraphId *string `json:"customGraphId,omitempty"`
+
+	// FilterQuery The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`.
+	FilterQuery *string                                                            `json:"filterQuery,omitempty"`
+	Filters     *map[string]PostApiTriggersJSONBody_3_Filters_AdditionalProperties `json:"filters,omitempty"`
+
+	// GraphAlert The rule an alert fires by: series, operator, threshold, window.
+	GraphAlert *struct {
+		Operator   PostApiTriggersJSONBody3GraphAlertOperator      `json:"operator"`
+		SeriesName string                                          `json:"seriesName"`
+		Threshold  float32                                         `json:"threshold"`
+		TimePeriod PostApiTriggersJSONBody_3_GraphAlert_TimePeriod `json:"timePeriod"`
+	} `json:"graphAlert,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Name    string  `json:"name"`
+
+	// NotificationCadence How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+	NotificationCadence *PostApiTriggersJSONBody3NotificationCadence `json:"notificationCadence,omitempty"`
+
+	// Report What a scheduled report renders and when it sends.
+	Report *struct {
+		CompareToPrevious *bool `json:"compareToPrevious,omitempty"`
+		Schedule          struct {
+			Cron     string `json:"cron"`
+			Timezone string `json:"timezone"`
+		} `json:"schedule"`
+		Source PostApiTriggersJSONBody_3_Report_Source `json:"source"`
+	} `json:"report,omitempty"`
+
+	// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+	Templates *struct {
+		EmailBodyTemplate    *string                                             `json:"emailBodyTemplate,omitempty"`
+		EmailSubjectTemplate *string                                             `json:"emailSubjectTemplate,omitempty"`
+		SlackTemplate        *string                                             `json:"slackTemplate,omitempty"`
+		SlackTemplateType    *PostApiTriggersJSONBody3TemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+	} `json:"templates,omitempty"`
+
+	// TraceDebounceMs How long to wait for a trace to settle before the conditions are read.
+	TraceDebounceMs *int `json:"traceDebounceMs,omitempty"`
+}
+
+// PostApiTriggersJSONBody3Action defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3Action string
+
+// PostApiTriggersJSONBody_3_ActionParams defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_3_ActionParams struct {
+	// DatasetId The dataset matched traces are appended to.
+	DatasetId string `json:"datasetId"`
+
+	// DatasetMapping How a trace becomes a row in that dataset.
+	DatasetMapping struct {
+		Expansions *[]string              `json:"expansions,omitempty"`
+		Mapping    map[string]interface{} `json:"mapping"`
+	} `json:"datasetMapping"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PostApiTriggersJSONBody3AlertType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3AlertType string
+
+// PostApiTriggersJSONBody3Filters0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3Filters0 = []string
+
+// PostApiTriggersJSONBody3Filters1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3Filters1 map[string][]string
+
+// PostApiTriggersJSONBody3Filters2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3Filters2 map[string]map[string][]string
+
+// PostApiTriggersJSONBody_3_Filters_AdditionalProperties defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_3_Filters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody3GraphAlertOperator defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3GraphAlertOperator string
+
+// PostApiTriggersJSONBody3GraphAlertTimePeriod0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3GraphAlertTimePeriod0 float32
+
+// PostApiTriggersJSONBody3GraphAlertTimePeriod1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3GraphAlertTimePeriod1 float32
+
+// PostApiTriggersJSONBody3GraphAlertTimePeriod2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3GraphAlertTimePeriod2 float32
+
+// PostApiTriggersJSONBody3GraphAlertTimePeriod3 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3GraphAlertTimePeriod3 float32
+
+// PostApiTriggersJSONBody3GraphAlertTimePeriod4 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3GraphAlertTimePeriod4 float32
+
+// PostApiTriggersJSONBody3GraphAlertTimePeriod5 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3GraphAlertTimePeriod5 float32
+
+// PostApiTriggersJSONBody_3_GraphAlert_TimePeriod defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_3_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody3NotificationCadence defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3NotificationCadence string
+
+// PostApiTriggersJSONBody3ReportSource0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3ReportSource0 struct {
+	DashboardId string                                    `json:"dashboardId"`
+	Kind        PostApiTriggersJSONBody3ReportSource0Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody3ReportSource0Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3ReportSource0Kind string
+
+// PostApiTriggersJSONBody3ReportSource1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3ReportSource1 struct {
+	CustomGraphId string                                    `json:"customGraphId"`
+	Kind          PostApiTriggersJSONBody3ReportSource1Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody3ReportSource1Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3ReportSource1Kind string
+
+// PostApiTriggersJSONBody3ReportSource2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3ReportSource2 struct {
+	Filters *map[string]interface{}                   `json:"filters,omitempty"`
+	Kind    PostApiTriggersJSONBody3ReportSource2Kind `json:"kind"`
+	Metric  *string                                   `json:"metric,omitempty"`
+	TopN    *int                                      `json:"topN,omitempty"`
+}
+
+// PostApiTriggersJSONBody3ReportSource2Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3ReportSource2Kind string
+
+// PostApiTriggersJSONBody_3_Report_Source defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_3_Report_Source struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody3TemplatesSlackTemplateType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody3TemplatesSlackTemplateType string
+
+// PostApiTriggersJSONBody4 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4 struct {
+	Action PostApiTriggersJSONBody4Action `json:"action"`
+
+	// ActionParams Queue matched traces for a person to label.
+	ActionParams PostApiTriggersJSONBody_4_ActionParams `json:"actionParams"`
+	AlertType    *PostApiTriggersJSONBody4AlertType     `json:"alertType,omitempty"`
+
+	// CustomGraphId Set to make this an alert on that graph. `graphAlert` and `alertType` are then required.
+	CustomGraphId *string `json:"customGraphId,omitempty"`
+
+	// FilterQuery The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`.
+	FilterQuery *string                                                            `json:"filterQuery,omitempty"`
+	Filters     *map[string]PostApiTriggersJSONBody_4_Filters_AdditionalProperties `json:"filters,omitempty"`
+
+	// GraphAlert The rule an alert fires by: series, operator, threshold, window.
+	GraphAlert *struct {
+		Operator   PostApiTriggersJSONBody4GraphAlertOperator      `json:"operator"`
+		SeriesName string                                          `json:"seriesName"`
+		Threshold  float32                                         `json:"threshold"`
+		TimePeriod PostApiTriggersJSONBody_4_GraphAlert_TimePeriod `json:"timePeriod"`
+	} `json:"graphAlert,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Name    string  `json:"name"`
+
+	// NotificationCadence How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+	NotificationCadence *PostApiTriggersJSONBody4NotificationCadence `json:"notificationCadence,omitempty"`
+
+	// Report What a scheduled report renders and when it sends.
+	Report *struct {
+		CompareToPrevious *bool `json:"compareToPrevious,omitempty"`
+		Schedule          struct {
+			Cron     string `json:"cron"`
+			Timezone string `json:"timezone"`
+		} `json:"schedule"`
+		Source PostApiTriggersJSONBody_4_Report_Source `json:"source"`
+	} `json:"report,omitempty"`
+
+	// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+	Templates *struct {
+		EmailBodyTemplate    *string                                             `json:"emailBodyTemplate,omitempty"`
+		EmailSubjectTemplate *string                                             `json:"emailSubjectTemplate,omitempty"`
+		SlackTemplate        *string                                             `json:"slackTemplate,omitempty"`
+		SlackTemplateType    *PostApiTriggersJSONBody4TemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+	} `json:"templates,omitempty"`
+
+	// TraceDebounceMs How long to wait for a trace to settle before the conditions are read.
+	TraceDebounceMs *int `json:"traceDebounceMs,omitempty"`
+}
+
+// PostApiTriggersJSONBody4Action defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4Action string
+
+// PostApiTriggersJSONBody_4_ActionParams defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_4_ActionParams struct {
+	// Annotators Who the queued items go to.
+	Annotators []struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"annotators"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PostApiTriggersJSONBody4AlertType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4AlertType string
+
+// PostApiTriggersJSONBody4Filters0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4Filters0 = []string
+
+// PostApiTriggersJSONBody4Filters1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4Filters1 map[string][]string
+
+// PostApiTriggersJSONBody4Filters2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4Filters2 map[string]map[string][]string
+
+// PostApiTriggersJSONBody_4_Filters_AdditionalProperties defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_4_Filters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody4GraphAlertOperator defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4GraphAlertOperator string
+
+// PostApiTriggersJSONBody4GraphAlertTimePeriod0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4GraphAlertTimePeriod0 float32
+
+// PostApiTriggersJSONBody4GraphAlertTimePeriod1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4GraphAlertTimePeriod1 float32
+
+// PostApiTriggersJSONBody4GraphAlertTimePeriod2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4GraphAlertTimePeriod2 float32
+
+// PostApiTriggersJSONBody4GraphAlertTimePeriod3 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4GraphAlertTimePeriod3 float32
+
+// PostApiTriggersJSONBody4GraphAlertTimePeriod4 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4GraphAlertTimePeriod4 float32
+
+// PostApiTriggersJSONBody4GraphAlertTimePeriod5 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4GraphAlertTimePeriod5 float32
+
+// PostApiTriggersJSONBody_4_GraphAlert_TimePeriod defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_4_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody4NotificationCadence defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4NotificationCadence string
+
+// PostApiTriggersJSONBody4ReportSource0 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4ReportSource0 struct {
+	DashboardId string                                    `json:"dashboardId"`
+	Kind        PostApiTriggersJSONBody4ReportSource0Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody4ReportSource0Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4ReportSource0Kind string
+
+// PostApiTriggersJSONBody4ReportSource1 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4ReportSource1 struct {
+	CustomGraphId string                                    `json:"customGraphId"`
+	Kind          PostApiTriggersJSONBody4ReportSource1Kind `json:"kind"`
+}
+
+// PostApiTriggersJSONBody4ReportSource1Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4ReportSource1Kind string
+
+// PostApiTriggersJSONBody4ReportSource2 defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4ReportSource2 struct {
+	Filters *map[string]interface{}                   `json:"filters,omitempty"`
+	Kind    PostApiTriggersJSONBody4ReportSource2Kind `json:"kind"`
+	Metric  *string                                   `json:"metric,omitempty"`
+	TopN    *int                                      `json:"topN,omitempty"`
+}
+
+// PostApiTriggersJSONBody4ReportSource2Kind defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4ReportSource2Kind string
+
+// PostApiTriggersJSONBody_4_Report_Source defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody_4_Report_Source struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersJSONBody4TemplatesSlackTemplateType defines parameters for PostApiTriggers.
+type PostApiTriggersJSONBody4TemplatesSlackTemplateType string
 
 // PostApiTriggers201JSONResponseBodyAction defines parameters for PostApiTriggers.
 type PostApiTriggers201JSONResponseBodyAction string
@@ -25858,30 +29991,589 @@ type PostApiTriggers201JSONResponseBodyAction string
 // PostApiTriggers201JSONResponseBodyAlertType defines parameters for PostApiTriggers.
 type PostApiTriggers201JSONResponseBodyAlertType string
 
+// PostApiTriggers201JSONResponseBodyGraphAlertOperator defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyGraphAlertOperator string
+
+// PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0 float32
+
+// PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1 float32
+
+// PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2 float32
+
+// PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3 float32
+
+// PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4 float32
+
+// PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5 float32
+
+// PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PostApiTriggers201JSONResponseBodyKind defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyKind string
+
+// PostApiTriggers201JSONResponseBodyReportSource0 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyReportSource0 struct {
+	DashboardId string                                              `json:"dashboardId"`
+	Kind        PostApiTriggers201JSONResponseBodyReportSource0Kind `json:"kind"`
+}
+
+// PostApiTriggers201JSONResponseBodyReportSource0Kind defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyReportSource0Kind string
+
+// PostApiTriggers201JSONResponseBodyReportSource1 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyReportSource1 struct {
+	CustomGraphId string                                              `json:"customGraphId"`
+	Kind          PostApiTriggers201JSONResponseBodyReportSource1Kind `json:"kind"`
+}
+
+// PostApiTriggers201JSONResponseBodyReportSource1Kind defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyReportSource1Kind string
+
+// PostApiTriggers201JSONResponseBodyReportSource2 defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyReportSource2 struct {
+	Filters map[string]interface{}                              `json:"filters"`
+	Kind    PostApiTriggers201JSONResponseBodyReportSource2Kind `json:"kind"`
+	Metric  *string                                             `json:"metric,omitempty"`
+	TopN    int                                                 `json:"topN"`
+}
+
+// PostApiTriggers201JSONResponseBodyReportSource2Kind defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyReportSource2Kind string
+
+// PostApiTriggers201JSONResponseBody_Report_Source defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBody_Report_Source struct {
+	union json.RawMessage
+}
+
+// PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType defines parameters for PostApiTriggers.
+type PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType string
+
 // GetApiTriggersById200JSONResponseBodyAction defines parameters for GetApiTriggersById.
 type GetApiTriggersById200JSONResponseBodyAction string
 
 // GetApiTriggersById200JSONResponseBodyAlertType defines parameters for GetApiTriggersById.
 type GetApiTriggersById200JSONResponseBodyAlertType string
 
+// GetApiTriggersById200JSONResponseBodyGraphAlertOperator defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyGraphAlertOperator string
+
+// GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 float32
+
+// GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 float32
+
+// GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 float32
+
+// GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 float32
+
+// GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 float32
+
+// GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 float32
+
+// GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// GetApiTriggersById200JSONResponseBodyKind defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyKind string
+
+// GetApiTriggersById200JSONResponseBodyReportSource0 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyReportSource0 struct {
+	DashboardId string                                                 `json:"dashboardId"`
+	Kind        GetApiTriggersById200JSONResponseBodyReportSource0Kind `json:"kind"`
+}
+
+// GetApiTriggersById200JSONResponseBodyReportSource0Kind defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyReportSource0Kind string
+
+// GetApiTriggersById200JSONResponseBodyReportSource1 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyReportSource1 struct {
+	CustomGraphId string                                                 `json:"customGraphId"`
+	Kind          GetApiTriggersById200JSONResponseBodyReportSource1Kind `json:"kind"`
+}
+
+// GetApiTriggersById200JSONResponseBodyReportSource1Kind defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyReportSource1Kind string
+
+// GetApiTriggersById200JSONResponseBodyReportSource2 defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyReportSource2 struct {
+	Filters map[string]interface{}                                 `json:"filters"`
+	Kind    GetApiTriggersById200JSONResponseBodyReportSource2Kind `json:"kind"`
+	Metric  *string                                                `json:"metric,omitempty"`
+	TopN    int                                                    `json:"topN"`
+}
+
+// GetApiTriggersById200JSONResponseBodyReportSource2Kind defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyReportSource2Kind string
+
+// GetApiTriggersById200JSONResponseBody_Report_Source defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBody_Report_Source struct {
+	union json.RawMessage
+}
+
+// GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType defines parameters for GetApiTriggersById.
+type GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType string
+
 // PatchApiTriggersByIdJSONBody defines parameters for PatchApiTriggersById.
 type PatchApiTriggersByIdJSONBody struct {
-	ActionParams *map[string]interface{}                `json:"actionParams,omitempty"`
-	Active       *bool                                  `json:"active,omitempty"`
-	AlertType    *PatchApiTriggersByIdJSONBodyAlertType `json:"alertType,omitempty"`
-	Filters      *map[string]interface{}                `json:"filters,omitempty"`
-	Message      *string                                `json:"message,omitempty"`
-	Name         *string                                `json:"name,omitempty"`
+	Action *PatchApiTriggersByIdJSONBodyAction `json:"action,omitempty"`
+
+	// ActionParams Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder and the stored credential is kept (a Slack automation not yet on a connection has its stored secret moved into one), so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`.
+	ActionParams *PatchApiTriggersByIdJSONBody_ActionParams `json:"actionParams,omitempty"`
+	Active       *bool                                      `json:"active,omitempty"`
+	AlertType    *PatchApiTriggersByIdJSONBodyAlertType     `json:"alertType,omitempty"`
+
+	// FilterQuery The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`.
+	FilterQuery *string                                                               `json:"filterQuery,omitempty"`
+	Filters     *map[string]PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties `json:"filters,omitempty"`
+
+	// GraphAlert The rule this alert fires by. Only for an automation that is one.
+	GraphAlert *struct {
+		Operator   PatchApiTriggersByIdJSONBodyGraphAlertOperator     `json:"operator"`
+		SeriesName string                                             `json:"seriesName"`
+		Threshold  float32                                            `json:"threshold"`
+		TimePeriod PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod `json:"timePeriod"`
+	} `json:"graphAlert,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Name    *string `json:"name,omitempty"`
+
+	// NotificationCadence How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+	NotificationCadence *PatchApiTriggersByIdJSONBodyNotificationCadence `json:"notificationCadence,omitempty"`
+
+	// Report What this report renders and when. Only for one that is a report.
+	Report *struct {
+		CompareToPrevious *bool `json:"compareToPrevious,omitempty"`
+		Schedule          struct {
+			Cron     string `json:"cron"`
+			Timezone string `json:"timezone"`
+		} `json:"schedule"`
+		Source PatchApiTriggersByIdJSONBody_Report_Source `json:"source"`
+	} `json:"report,omitempty"`
+
+	// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+	Templates *struct {
+		EmailBodyTemplate    *string                                                 `json:"emailBodyTemplate,omitempty"`
+		EmailSubjectTemplate *string                                                 `json:"emailSubjectTemplate,omitempty"`
+		SlackTemplate        *string                                                 `json:"slackTemplate,omitempty"`
+		SlackTemplateType    *PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+	} `json:"templates,omitempty"`
+
+	// TraceDebounceMs How long to wait for a trace to settle before the conditions are read.
+	TraceDebounceMs *int `json:"traceDebounceMs,omitempty"`
+}
+
+// PatchApiTriggersByIdJSONBodyAction defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyAction string
+
+// PatchApiTriggersByIdJSONBodyActionParams0 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyActionParams0 struct {
+	// Members Who receives the email. Any address, not only teammates.
+	Members              []string               `json:"members"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PatchApiTriggersByIdJSONBodyActionParams1 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyActionParams1 struct {
+	// SlackBotToken Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead.
+	SlackBotToken *string `json:"slackBotToken,omitempty"`
+
+	// SlackBotTokenSet Legacy and ignored: no read returns it. An update that retypes no secret moves an automation's own stored secret into a connection.
+	SlackBotTokenSet *bool `json:"slackBotTokenSet,omitempty"`
+
+	// SlackChannelId The channel the bot posts in, for a bot connection or `bot` delivery. Invite the LangWatch app to it first.
+	SlackChannelId *string `json:"slackChannelId,omitempty"`
+
+	// SlackDelivery How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. With `slackIntegrationId` it follows the connection's kind. Absent without a connection means `webhook`.
+	SlackDelivery *PatchApiTriggersByIdJSONBodyActionParams1SlackDelivery `json:"slackDelivery,omitempty"`
+
+	// SlackIntegrationId The Slack connection this automation posts through: an organization connection or one of this project's, listed under Settings, Integrations, Slack. A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. Preferred over `slackWebhook` and `slackBotToken`, and what a read returns in their place.
+	SlackIntegrationId *string `json:"slackIntegrationId,omitempty"`
+
+	// SlackWebhook Legacy, accepted for one release: an incoming webhook URL, for `webhook` delivery. It is stored as a Slack connection (an existing one holding the same URL, else a new project connection) and the automation keeps only that connection's id. Send `slackIntegrationId` instead.
+	SlackWebhook         *string                `json:"slackWebhook,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PatchApiTriggersByIdJSONBodyActionParams1SlackDelivery defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyActionParams1SlackDelivery string
+
+// PatchApiTriggersByIdJSONBodyActionParams2 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyActionParams2 struct {
+	// BodyTemplate A Liquid template for the body. Absent sends the standard LangWatch envelope for a JSON content type, and an empty body for any other.
+	BodyTemplate *string `json:"bodyTemplate,omitempty"`
+
+	// ContentType The `Content-Type` the delivery announces, which also decides how the body is treated: `application/json` (and any `+json` type) is checked and re-serialised; any other media type sends the rendered template verbatim. Absent means `application/json`.
+	ContentType *string `json:"contentType,omitempty"`
+
+	// Headers Static headers sent with every delivery. The values are credentials: they read back as the placeholder, and sending the placeholder back keeps the stored ones. Changing `url` means sending the values again in the same request.
+	Headers *map[string]string `json:"headers,omitempty"`
+
+	// Method The HTTP method. Absent means POST.
+	Method *PatchApiTriggersByIdJSONBodyActionParams2Method `json:"method,omitempty"`
+
+	// SigningSecret Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one.
+	SigningSecret *string `json:"signingSecret,omitempty"`
+
+	// Url Where the request goes. https only, and not a private host.
+	Url                  string                 `json:"url"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PatchApiTriggersByIdJSONBodyActionParams2Method defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyActionParams2Method string
+
+// PatchApiTriggersByIdJSONBodyActionParams3 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyActionParams3 struct {
+	// DatasetId The dataset matched traces are appended to.
+	DatasetId string `json:"datasetId"`
+
+	// DatasetMapping How a trace becomes a row in that dataset.
+	DatasetMapping struct {
+		Expansions *[]string              `json:"expansions,omitempty"`
+		Mapping    map[string]interface{} `json:"mapping"`
+	} `json:"datasetMapping"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PatchApiTriggersByIdJSONBodyActionParams4 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyActionParams4 struct {
+	// Annotators Who the queued items go to.
+	Annotators []struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"annotators"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// PatchApiTriggersByIdJSONBody_ActionParams defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBody_ActionParams struct {
+	union json.RawMessage
 }
 
 // PatchApiTriggersByIdJSONBodyAlertType defines parameters for PatchApiTriggersById.
 type PatchApiTriggersByIdJSONBodyAlertType string
+
+// PatchApiTriggersByIdJSONBodyFilters0 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyFilters0 = []string
+
+// PatchApiTriggersByIdJSONBodyFilters1 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyFilters1 map[string][]string
+
+// PatchApiTriggersByIdJSONBodyFilters2 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyFilters2 map[string]map[string][]string
+
+// PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PatchApiTriggersByIdJSONBodyGraphAlertOperator defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyGraphAlertOperator string
+
+// PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0 float32
+
+// PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1 float32
+
+// PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2 float32
+
+// PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3 float32
+
+// PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4 float32
+
+// PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5 float32
+
+// PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PatchApiTriggersByIdJSONBodyNotificationCadence defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyNotificationCadence string
+
+// PatchApiTriggersByIdJSONBodyReportSource0 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyReportSource0 struct {
+	DashboardId string                                        `json:"dashboardId"`
+	Kind        PatchApiTriggersByIdJSONBodyReportSource0Kind `json:"kind"`
+}
+
+// PatchApiTriggersByIdJSONBodyReportSource0Kind defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyReportSource0Kind string
+
+// PatchApiTriggersByIdJSONBodyReportSource1 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyReportSource1 struct {
+	CustomGraphId string                                        `json:"customGraphId"`
+	Kind          PatchApiTriggersByIdJSONBodyReportSource1Kind `json:"kind"`
+}
+
+// PatchApiTriggersByIdJSONBodyReportSource1Kind defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyReportSource1Kind string
+
+// PatchApiTriggersByIdJSONBodyReportSource2 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyReportSource2 struct {
+	Filters *map[string]interface{}                       `json:"filters,omitempty"`
+	Kind    PatchApiTriggersByIdJSONBodyReportSource2Kind `json:"kind"`
+	Metric  *string                                       `json:"metric,omitempty"`
+	TopN    *int                                          `json:"topN,omitempty"`
+}
+
+// PatchApiTriggersByIdJSONBodyReportSource2Kind defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyReportSource2Kind string
+
+// PatchApiTriggersByIdJSONBody_Report_Source defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBody_Report_Source struct {
+	union json.RawMessage
+}
+
+// PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType defines parameters for PatchApiTriggersById.
+type PatchApiTriggersByIdJSONBodyTemplatesSlackTemplateType string
 
 // PatchApiTriggersById200JSONResponseBodyAction defines parameters for PatchApiTriggersById.
 type PatchApiTriggersById200JSONResponseBodyAction string
 
 // PatchApiTriggersById200JSONResponseBodyAlertType defines parameters for PatchApiTriggersById.
 type PatchApiTriggersById200JSONResponseBodyAlertType string
+
+// PatchApiTriggersById200JSONResponseBodyGraphAlertOperator defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyGraphAlertOperator string
+
+// PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 float32
+
+// PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 float32
+
+// PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 float32
+
+// PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 float32
+
+// PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 float32
+
+// PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 float32
+
+// PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PatchApiTriggersById200JSONResponseBodyKind defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyKind string
+
+// PatchApiTriggersById200JSONResponseBodyReportSource0 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyReportSource0 struct {
+	DashboardId string                                                   `json:"dashboardId"`
+	Kind        PatchApiTriggersById200JSONResponseBodyReportSource0Kind `json:"kind"`
+}
+
+// PatchApiTriggersById200JSONResponseBodyReportSource0Kind defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyReportSource0Kind string
+
+// PatchApiTriggersById200JSONResponseBodyReportSource1 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyReportSource1 struct {
+	CustomGraphId string                                                   `json:"customGraphId"`
+	Kind          PatchApiTriggersById200JSONResponseBodyReportSource1Kind `json:"kind"`
+}
+
+// PatchApiTriggersById200JSONResponseBodyReportSource1Kind defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyReportSource1Kind string
+
+// PatchApiTriggersById200JSONResponseBodyReportSource2 defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyReportSource2 struct {
+	Filters map[string]interface{}                                   `json:"filters"`
+	Kind    PatchApiTriggersById200JSONResponseBodyReportSource2Kind `json:"kind"`
+	Metric  *string                                                  `json:"metric,omitempty"`
+	TopN    int                                                      `json:"topN"`
+}
+
+// PatchApiTriggersById200JSONResponseBodyReportSource2Kind defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyReportSource2Kind string
+
+// PatchApiTriggersById200JSONResponseBody_Report_Source defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBody_Report_Source struct {
+	union json.RawMessage
+}
+
+// PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType defines parameters for PatchApiTriggersById.
+type PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType string
+
+// PostApiTriggersByIdDisable200JSONResponseBodyAction defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyAction string
+
+// PostApiTriggersByIdDisable200JSONResponseBodyAlertType defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyAlertType string
+
+// PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator string
+
+// PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0 float32
+
+// PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1 float32
+
+// PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2 float32
+
+// PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3 float32
+
+// PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4 float32
+
+// PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5 float32
+
+// PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersByIdDisable200JSONResponseBodyKind defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyKind string
+
+// PostApiTriggersByIdDisable200JSONResponseBodyReportSource0 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyReportSource0 struct {
+	DashboardId string                                                         `json:"dashboardId"`
+	Kind        PostApiTriggersByIdDisable200JSONResponseBodyReportSource0Kind `json:"kind"`
+}
+
+// PostApiTriggersByIdDisable200JSONResponseBodyReportSource0Kind defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyReportSource0Kind string
+
+// PostApiTriggersByIdDisable200JSONResponseBodyReportSource1 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyReportSource1 struct {
+	CustomGraphId string                                                         `json:"customGraphId"`
+	Kind          PostApiTriggersByIdDisable200JSONResponseBodyReportSource1Kind `json:"kind"`
+}
+
+// PostApiTriggersByIdDisable200JSONResponseBodyReportSource1Kind defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyReportSource1Kind string
+
+// PostApiTriggersByIdDisable200JSONResponseBodyReportSource2 defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyReportSource2 struct {
+	Filters map[string]interface{}                                         `json:"filters"`
+	Kind    PostApiTriggersByIdDisable200JSONResponseBodyReportSource2Kind `json:"kind"`
+	Metric  *string                                                        `json:"metric,omitempty"`
+	TopN    int                                                            `json:"topN"`
+}
+
+// PostApiTriggersByIdDisable200JSONResponseBodyReportSource2Kind defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyReportSource2Kind string
+
+// PostApiTriggersByIdDisable200JSONResponseBody_Report_Source defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBody_Report_Source struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType defines parameters for PostApiTriggersByIdDisable.
+type PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType string
+
+// PostApiTriggersByIdEnable200JSONResponseBodyAction defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyAction string
+
+// PostApiTriggersByIdEnable200JSONResponseBodyAlertType defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyAlertType string
+
+// PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator string
+
+// PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0 float32
+
+// PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1 float32
+
+// PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2 float32
+
+// PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3 float32
+
+// PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4 float32
+
+// PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5 float32
+
+// PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersByIdEnable200JSONResponseBodyKind defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyKind string
+
+// PostApiTriggersByIdEnable200JSONResponseBodyReportSource0 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyReportSource0 struct {
+	DashboardId string                                                        `json:"dashboardId"`
+	Kind        PostApiTriggersByIdEnable200JSONResponseBodyReportSource0Kind `json:"kind"`
+}
+
+// PostApiTriggersByIdEnable200JSONResponseBodyReportSource0Kind defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyReportSource0Kind string
+
+// PostApiTriggersByIdEnable200JSONResponseBodyReportSource1 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyReportSource1 struct {
+	CustomGraphId string                                                        `json:"customGraphId"`
+	Kind          PostApiTriggersByIdEnable200JSONResponseBodyReportSource1Kind `json:"kind"`
+}
+
+// PostApiTriggersByIdEnable200JSONResponseBodyReportSource1Kind defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyReportSource1Kind string
+
+// PostApiTriggersByIdEnable200JSONResponseBodyReportSource2 defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyReportSource2 struct {
+	Filters map[string]interface{}                                        `json:"filters"`
+	Kind    PostApiTriggersByIdEnable200JSONResponseBodyReportSource2Kind `json:"kind"`
+	Metric  *string                                                       `json:"metric,omitempty"`
+	TopN    int                                                           `json:"topN"`
+}
+
+// PostApiTriggersByIdEnable200JSONResponseBodyReportSource2Kind defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyReportSource2Kind string
+
+// PostApiTriggersByIdEnable200JSONResponseBody_Report_Source defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBody_Report_Source struct {
+	union json.RawMessage
+}
+
+// PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType defines parameters for PostApiTriggersByIdEnable.
+type PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType string
+
+// GetApiTriggersByIdFiresParams defines parameters for GetApiTriggersByIdFires.
+type GetApiTriggersByIdFiresParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The `nextCursor` from the previous page. Omit for the newest fires.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// PostApiTriggersByIdTestFire200JSONResponseBodyChannel defines parameters for PostApiTriggersByIdTestFire.
+type PostApiTriggersByIdTestFire200JSONResponseBodyChannel string
 
 // ListAgentsParams defines parameters for ListAgents.
 type ListAgentsParams struct {
@@ -28865,6 +33557,9 @@ type PatchApiDashboardsByIdJSONRequestBody PatchApiDashboardsByIdJSONBody
 
 // PostApiDatasetJSONRequestBody defines body for PostApiDataset for application/json ContentType.
 type PostApiDatasetJSONRequestBody PostApiDatasetJSONBody
+
+// PostApiDatasetAttachmentsMultipartRequestBody defines body for PostApiDatasetAttachments for multipart/form-data ContentType.
+type PostApiDatasetAttachmentsMultipartRequestBody PostApiDatasetAttachmentsMultipartBody
 
 // PostApiDatasetEvaluateJSONRequestBody defines body for PostApiDatasetEvaluate for application/json ContentType.
 type PostApiDatasetEvaluateJSONRequestBody PostApiDatasetEvaluateJSONBody
@@ -34805,6 +39500,1130 @@ func (a PostApiTriggerSlack403JSONResponseBody) MarshalJSON() ([]byte, error) {
 		object["tips"], err = json.Marshal(a.Tips)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'tips': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiTriggerSlack422JSONResponseBody. Returns the specified
+// element and whether it was found
+func (a PostApiTriggerSlack422JSONResponseBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiTriggerSlack422JSONResponseBody
+func (a *PostApiTriggerSlack422JSONResponseBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiTriggerSlack422JSONResponseBody to handle AdditionalProperties
+func (a *PostApiTriggerSlack422JSONResponseBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["docsUrl"]; found {
+		err = json.Unmarshal(raw, &a.DocsUrl)
+		if err != nil {
+			return fmt.Errorf("error reading 'docsUrl': %w", err)
+		}
+		delete(object, "docsUrl")
+	}
+
+	if raw, found := object["error"]; found {
+		err = json.Unmarshal(raw, &a.Error)
+		if err != nil {
+			return fmt.Errorf("error reading 'error': %w", err)
+		}
+		delete(object, "error")
+	}
+
+	if raw, found := object["fault"]; found {
+		err = json.Unmarshal(raw, &a.Fault)
+		if err != nil {
+			return fmt.Errorf("error reading 'fault': %w", err)
+		}
+		delete(object, "fault")
+	}
+
+	if raw, found := object["message"]; found {
+		err = json.Unmarshal(raw, &a.Message)
+		if err != nil {
+			return fmt.Errorf("error reading 'message': %w", err)
+		}
+		delete(object, "message")
+	}
+
+	if raw, found := object["tips"]; found {
+		err = json.Unmarshal(raw, &a.Tips)
+		if err != nil {
+			return fmt.Errorf("error reading 'tips': %w", err)
+		}
+		delete(object, "tips")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiTriggerSlack422JSONResponseBody to handle AdditionalProperties
+func (a PostApiTriggerSlack422JSONResponseBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.DocsUrl != nil {
+		object["docsUrl"], err = json.Marshal(a.DocsUrl)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'docsUrl': %w", err)
+		}
+	}
+
+	object["error"], err = json.Marshal(a.Error)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'error': %w", err)
+	}
+
+	if a.Fault != nil {
+		object["fault"], err = json.Marshal(a.Fault)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'fault': %w", err)
+		}
+	}
+
+	if a.Message != nil {
+		object["message"], err = json.Marshal(a.Message)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'message': %w", err)
+		}
+	}
+
+	if a.Tips != nil {
+		object["tips"], err = json.Marshal(a.Tips)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tips': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiTriggersJSONBody_0_ActionParams. Returns the specified
+// element and whether it was found
+func (a PostApiTriggersJSONBody_0_ActionParams) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiTriggersJSONBody_0_ActionParams
+func (a *PostApiTriggersJSONBody_0_ActionParams) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_0_ActionParams to handle AdditionalProperties
+func (a *PostApiTriggersJSONBody_0_ActionParams) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["members"]; found {
+		err = json.Unmarshal(raw, &a.Members)
+		if err != nil {
+			return fmt.Errorf("error reading 'members': %w", err)
+		}
+		delete(object, "members")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_0_ActionParams to handle AdditionalProperties
+func (a PostApiTriggersJSONBody_0_ActionParams) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Members != nil {
+		object["members"], err = json.Marshal(a.Members)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'members': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiTriggersJSONBody_1_ActionParams. Returns the specified
+// element and whether it was found
+func (a PostApiTriggersJSONBody_1_ActionParams) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiTriggersJSONBody_1_ActionParams
+func (a *PostApiTriggersJSONBody_1_ActionParams) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_1_ActionParams to handle AdditionalProperties
+func (a *PostApiTriggersJSONBody_1_ActionParams) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["slackBotToken"]; found {
+		err = json.Unmarshal(raw, &a.SlackBotToken)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackBotToken': %w", err)
+		}
+		delete(object, "slackBotToken")
+	}
+
+	if raw, found := object["slackBotTokenSet"]; found {
+		err = json.Unmarshal(raw, &a.SlackBotTokenSet)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackBotTokenSet': %w", err)
+		}
+		delete(object, "slackBotTokenSet")
+	}
+
+	if raw, found := object["slackChannelId"]; found {
+		err = json.Unmarshal(raw, &a.SlackChannelId)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackChannelId': %w", err)
+		}
+		delete(object, "slackChannelId")
+	}
+
+	if raw, found := object["slackDelivery"]; found {
+		err = json.Unmarshal(raw, &a.SlackDelivery)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackDelivery': %w", err)
+		}
+		delete(object, "slackDelivery")
+	}
+
+	if raw, found := object["slackIntegrationId"]; found {
+		err = json.Unmarshal(raw, &a.SlackIntegrationId)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackIntegrationId': %w", err)
+		}
+		delete(object, "slackIntegrationId")
+	}
+
+	if raw, found := object["slackWebhook"]; found {
+		err = json.Unmarshal(raw, &a.SlackWebhook)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackWebhook': %w", err)
+		}
+		delete(object, "slackWebhook")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_1_ActionParams to handle AdditionalProperties
+func (a PostApiTriggersJSONBody_1_ActionParams) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.SlackBotToken != nil {
+		object["slackBotToken"], err = json.Marshal(a.SlackBotToken)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackBotToken': %w", err)
+		}
+	}
+
+	if a.SlackBotTokenSet != nil {
+		object["slackBotTokenSet"], err = json.Marshal(a.SlackBotTokenSet)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackBotTokenSet': %w", err)
+		}
+	}
+
+	if a.SlackChannelId != nil {
+		object["slackChannelId"], err = json.Marshal(a.SlackChannelId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackChannelId': %w", err)
+		}
+	}
+
+	if a.SlackDelivery != nil {
+		object["slackDelivery"], err = json.Marshal(a.SlackDelivery)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackDelivery': %w", err)
+		}
+	}
+
+	if a.SlackIntegrationId != nil {
+		object["slackIntegrationId"], err = json.Marshal(a.SlackIntegrationId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackIntegrationId': %w", err)
+		}
+	}
+
+	if a.SlackWebhook != nil {
+		object["slackWebhook"], err = json.Marshal(a.SlackWebhook)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackWebhook': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiTriggersJSONBody_2_ActionParams. Returns the specified
+// element and whether it was found
+func (a PostApiTriggersJSONBody_2_ActionParams) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiTriggersJSONBody_2_ActionParams
+func (a *PostApiTriggersJSONBody_2_ActionParams) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_2_ActionParams to handle AdditionalProperties
+func (a *PostApiTriggersJSONBody_2_ActionParams) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["bodyTemplate"]; found {
+		err = json.Unmarshal(raw, &a.BodyTemplate)
+		if err != nil {
+			return fmt.Errorf("error reading 'bodyTemplate': %w", err)
+		}
+		delete(object, "bodyTemplate")
+	}
+
+	if raw, found := object["contentType"]; found {
+		err = json.Unmarshal(raw, &a.ContentType)
+		if err != nil {
+			return fmt.Errorf("error reading 'contentType': %w", err)
+		}
+		delete(object, "contentType")
+	}
+
+	if raw, found := object["headers"]; found {
+		err = json.Unmarshal(raw, &a.Headers)
+		if err != nil {
+			return fmt.Errorf("error reading 'headers': %w", err)
+		}
+		delete(object, "headers")
+	}
+
+	if raw, found := object["method"]; found {
+		err = json.Unmarshal(raw, &a.Method)
+		if err != nil {
+			return fmt.Errorf("error reading 'method': %w", err)
+		}
+		delete(object, "method")
+	}
+
+	if raw, found := object["signingSecret"]; found {
+		err = json.Unmarshal(raw, &a.SigningSecret)
+		if err != nil {
+			return fmt.Errorf("error reading 'signingSecret': %w", err)
+		}
+		delete(object, "signingSecret")
+	}
+
+	if raw, found := object["url"]; found {
+		err = json.Unmarshal(raw, &a.Url)
+		if err != nil {
+			return fmt.Errorf("error reading 'url': %w", err)
+		}
+		delete(object, "url")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_2_ActionParams to handle AdditionalProperties
+func (a PostApiTriggersJSONBody_2_ActionParams) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.BodyTemplate != nil {
+		object["bodyTemplate"], err = json.Marshal(a.BodyTemplate)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'bodyTemplate': %w", err)
+		}
+	}
+
+	if a.ContentType != nil {
+		object["contentType"], err = json.Marshal(a.ContentType)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'contentType': %w", err)
+		}
+	}
+
+	if a.Headers != nil {
+		object["headers"], err = json.Marshal(a.Headers)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'headers': %w", err)
+		}
+	}
+
+	if a.Method != nil {
+		object["method"], err = json.Marshal(a.Method)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'method': %w", err)
+		}
+	}
+
+	if a.SigningSecret != nil {
+		object["signingSecret"], err = json.Marshal(a.SigningSecret)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'signingSecret': %w", err)
+		}
+	}
+
+	object["url"], err = json.Marshal(a.Url)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'url': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiTriggersJSONBody_3_ActionParams. Returns the specified
+// element and whether it was found
+func (a PostApiTriggersJSONBody_3_ActionParams) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiTriggersJSONBody_3_ActionParams
+func (a *PostApiTriggersJSONBody_3_ActionParams) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_3_ActionParams to handle AdditionalProperties
+func (a *PostApiTriggersJSONBody_3_ActionParams) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["datasetId"]; found {
+		err = json.Unmarshal(raw, &a.DatasetId)
+		if err != nil {
+			return fmt.Errorf("error reading 'datasetId': %w", err)
+		}
+		delete(object, "datasetId")
+	}
+
+	if raw, found := object["datasetMapping"]; found {
+		err = json.Unmarshal(raw, &a.DatasetMapping)
+		if err != nil {
+			return fmt.Errorf("error reading 'datasetMapping': %w", err)
+		}
+		delete(object, "datasetMapping")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_3_ActionParams to handle AdditionalProperties
+func (a PostApiTriggersJSONBody_3_ActionParams) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["datasetId"], err = json.Marshal(a.DatasetId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'datasetId': %w", err)
+	}
+
+	object["datasetMapping"], err = json.Marshal(a.DatasetMapping)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'datasetMapping': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiTriggersJSONBody_4_ActionParams. Returns the specified
+// element and whether it was found
+func (a PostApiTriggersJSONBody_4_ActionParams) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiTriggersJSONBody_4_ActionParams
+func (a *PostApiTriggersJSONBody_4_ActionParams) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_4_ActionParams to handle AdditionalProperties
+func (a *PostApiTriggersJSONBody_4_ActionParams) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["annotators"]; found {
+		err = json.Unmarshal(raw, &a.Annotators)
+		if err != nil {
+			return fmt.Errorf("error reading 'annotators': %w", err)
+		}
+		delete(object, "annotators")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiTriggersJSONBody_4_ActionParams to handle AdditionalProperties
+func (a PostApiTriggersJSONBody_4_ActionParams) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Annotators != nil {
+		object["annotators"], err = json.Marshal(a.Annotators)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'annotators': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PatchApiTriggersByIdJSONBodyActionParams0. Returns the specified
+// element and whether it was found
+func (a PatchApiTriggersByIdJSONBodyActionParams0) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PatchApiTriggersByIdJSONBodyActionParams0
+func (a *PatchApiTriggersByIdJSONBodyActionParams0) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams0 to handle AdditionalProperties
+func (a *PatchApiTriggersByIdJSONBodyActionParams0) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["members"]; found {
+		err = json.Unmarshal(raw, &a.Members)
+		if err != nil {
+			return fmt.Errorf("error reading 'members': %w", err)
+		}
+		delete(object, "members")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams0 to handle AdditionalProperties
+func (a PatchApiTriggersByIdJSONBodyActionParams0) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Members != nil {
+		object["members"], err = json.Marshal(a.Members)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'members': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PatchApiTriggersByIdJSONBodyActionParams1. Returns the specified
+// element and whether it was found
+func (a PatchApiTriggersByIdJSONBodyActionParams1) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PatchApiTriggersByIdJSONBodyActionParams1
+func (a *PatchApiTriggersByIdJSONBodyActionParams1) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams1 to handle AdditionalProperties
+func (a *PatchApiTriggersByIdJSONBodyActionParams1) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["slackBotToken"]; found {
+		err = json.Unmarshal(raw, &a.SlackBotToken)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackBotToken': %w", err)
+		}
+		delete(object, "slackBotToken")
+	}
+
+	if raw, found := object["slackBotTokenSet"]; found {
+		err = json.Unmarshal(raw, &a.SlackBotTokenSet)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackBotTokenSet': %w", err)
+		}
+		delete(object, "slackBotTokenSet")
+	}
+
+	if raw, found := object["slackChannelId"]; found {
+		err = json.Unmarshal(raw, &a.SlackChannelId)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackChannelId': %w", err)
+		}
+		delete(object, "slackChannelId")
+	}
+
+	if raw, found := object["slackDelivery"]; found {
+		err = json.Unmarshal(raw, &a.SlackDelivery)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackDelivery': %w", err)
+		}
+		delete(object, "slackDelivery")
+	}
+
+	if raw, found := object["slackIntegrationId"]; found {
+		err = json.Unmarshal(raw, &a.SlackIntegrationId)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackIntegrationId': %w", err)
+		}
+		delete(object, "slackIntegrationId")
+	}
+
+	if raw, found := object["slackWebhook"]; found {
+		err = json.Unmarshal(raw, &a.SlackWebhook)
+		if err != nil {
+			return fmt.Errorf("error reading 'slackWebhook': %w", err)
+		}
+		delete(object, "slackWebhook")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams1 to handle AdditionalProperties
+func (a PatchApiTriggersByIdJSONBodyActionParams1) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.SlackBotToken != nil {
+		object["slackBotToken"], err = json.Marshal(a.SlackBotToken)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackBotToken': %w", err)
+		}
+	}
+
+	if a.SlackBotTokenSet != nil {
+		object["slackBotTokenSet"], err = json.Marshal(a.SlackBotTokenSet)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackBotTokenSet': %w", err)
+		}
+	}
+
+	if a.SlackChannelId != nil {
+		object["slackChannelId"], err = json.Marshal(a.SlackChannelId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackChannelId': %w", err)
+		}
+	}
+
+	if a.SlackDelivery != nil {
+		object["slackDelivery"], err = json.Marshal(a.SlackDelivery)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackDelivery': %w", err)
+		}
+	}
+
+	if a.SlackIntegrationId != nil {
+		object["slackIntegrationId"], err = json.Marshal(a.SlackIntegrationId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackIntegrationId': %w", err)
+		}
+	}
+
+	if a.SlackWebhook != nil {
+		object["slackWebhook"], err = json.Marshal(a.SlackWebhook)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'slackWebhook': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PatchApiTriggersByIdJSONBodyActionParams2. Returns the specified
+// element and whether it was found
+func (a PatchApiTriggersByIdJSONBodyActionParams2) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PatchApiTriggersByIdJSONBodyActionParams2
+func (a *PatchApiTriggersByIdJSONBodyActionParams2) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams2 to handle AdditionalProperties
+func (a *PatchApiTriggersByIdJSONBodyActionParams2) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["bodyTemplate"]; found {
+		err = json.Unmarshal(raw, &a.BodyTemplate)
+		if err != nil {
+			return fmt.Errorf("error reading 'bodyTemplate': %w", err)
+		}
+		delete(object, "bodyTemplate")
+	}
+
+	if raw, found := object["contentType"]; found {
+		err = json.Unmarshal(raw, &a.ContentType)
+		if err != nil {
+			return fmt.Errorf("error reading 'contentType': %w", err)
+		}
+		delete(object, "contentType")
+	}
+
+	if raw, found := object["headers"]; found {
+		err = json.Unmarshal(raw, &a.Headers)
+		if err != nil {
+			return fmt.Errorf("error reading 'headers': %w", err)
+		}
+		delete(object, "headers")
+	}
+
+	if raw, found := object["method"]; found {
+		err = json.Unmarshal(raw, &a.Method)
+		if err != nil {
+			return fmt.Errorf("error reading 'method': %w", err)
+		}
+		delete(object, "method")
+	}
+
+	if raw, found := object["signingSecret"]; found {
+		err = json.Unmarshal(raw, &a.SigningSecret)
+		if err != nil {
+			return fmt.Errorf("error reading 'signingSecret': %w", err)
+		}
+		delete(object, "signingSecret")
+	}
+
+	if raw, found := object["url"]; found {
+		err = json.Unmarshal(raw, &a.Url)
+		if err != nil {
+			return fmt.Errorf("error reading 'url': %w", err)
+		}
+		delete(object, "url")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams2 to handle AdditionalProperties
+func (a PatchApiTriggersByIdJSONBodyActionParams2) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.BodyTemplate != nil {
+		object["bodyTemplate"], err = json.Marshal(a.BodyTemplate)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'bodyTemplate': %w", err)
+		}
+	}
+
+	if a.ContentType != nil {
+		object["contentType"], err = json.Marshal(a.ContentType)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'contentType': %w", err)
+		}
+	}
+
+	if a.Headers != nil {
+		object["headers"], err = json.Marshal(a.Headers)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'headers': %w", err)
+		}
+	}
+
+	if a.Method != nil {
+		object["method"], err = json.Marshal(a.Method)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'method': %w", err)
+		}
+	}
+
+	if a.SigningSecret != nil {
+		object["signingSecret"], err = json.Marshal(a.SigningSecret)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'signingSecret': %w", err)
+		}
+	}
+
+	object["url"], err = json.Marshal(a.Url)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'url': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PatchApiTriggersByIdJSONBodyActionParams3. Returns the specified
+// element and whether it was found
+func (a PatchApiTriggersByIdJSONBodyActionParams3) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PatchApiTriggersByIdJSONBodyActionParams3
+func (a *PatchApiTriggersByIdJSONBodyActionParams3) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams3 to handle AdditionalProperties
+func (a *PatchApiTriggersByIdJSONBodyActionParams3) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["datasetId"]; found {
+		err = json.Unmarshal(raw, &a.DatasetId)
+		if err != nil {
+			return fmt.Errorf("error reading 'datasetId': %w", err)
+		}
+		delete(object, "datasetId")
+	}
+
+	if raw, found := object["datasetMapping"]; found {
+		err = json.Unmarshal(raw, &a.DatasetMapping)
+		if err != nil {
+			return fmt.Errorf("error reading 'datasetMapping': %w", err)
+		}
+		delete(object, "datasetMapping")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams3 to handle AdditionalProperties
+func (a PatchApiTriggersByIdJSONBodyActionParams3) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["datasetId"], err = json.Marshal(a.DatasetId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'datasetId': %w", err)
+	}
+
+	object["datasetMapping"], err = json.Marshal(a.DatasetMapping)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'datasetMapping': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PatchApiTriggersByIdJSONBodyActionParams4. Returns the specified
+// element and whether it was found
+func (a PatchApiTriggersByIdJSONBodyActionParams4) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PatchApiTriggersByIdJSONBodyActionParams4
+func (a *PatchApiTriggersByIdJSONBodyActionParams4) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams4 to handle AdditionalProperties
+func (a *PatchApiTriggersByIdJSONBodyActionParams4) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["annotators"]; found {
+		err = json.Unmarshal(raw, &a.Annotators)
+		if err != nil {
+			return fmt.Errorf("error reading 'annotators': %w", err)
+		}
+		delete(object, "annotators")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PatchApiTriggersByIdJSONBodyActionParams4 to handle AdditionalProperties
+func (a PatchApiTriggersByIdJSONBodyActionParams4) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Annotators != nil {
+		object["annotators"], err = json.Marshal(a.Annotators)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'annotators': %w", err)
 		}
 	}
 
@@ -46405,6 +52224,32 @@ func (t *PostApiDatasetJSONBody_ColumnTypes_Type) MergePostApiDatasetJSONBodyCol
 	return err
 }
 
+// AsPostApiDatasetJSONBodyColumnTypesType12 returns the union data inside the PostApiDatasetJSONBody_ColumnTypes_Type as a PostApiDatasetJSONBodyColumnTypesType12
+func (t PostApiDatasetJSONBody_ColumnTypes_Type) AsPostApiDatasetJSONBodyColumnTypesType12() (PostApiDatasetJSONBodyColumnTypesType12, error) {
+	var body PostApiDatasetJSONBodyColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDatasetJSONBodyColumnTypesType12 overwrites any union data inside the PostApiDatasetJSONBody_ColumnTypes_Type as the provided PostApiDatasetJSONBodyColumnTypesType12
+func (t *PostApiDatasetJSONBody_ColumnTypes_Type) FromPostApiDatasetJSONBodyColumnTypesType12(v PostApiDatasetJSONBodyColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDatasetJSONBodyColumnTypesType12 performs a merge with any union data inside the PostApiDatasetJSONBody_ColumnTypes_Type, using the provided PostApiDatasetJSONBodyColumnTypesType12
+func (t *PostApiDatasetJSONBody_ColumnTypes_Type) MergePostApiDatasetJSONBodyColumnTypesType12(v PostApiDatasetJSONBodyColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiDatasetJSONBody_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -46805,6 +52650,32 @@ func (t *PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) FromPatchApiDataset
 
 // MergePatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11 performs a merge with any union data inside the PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type, using the provided PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11
 func (t *PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) MergePatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11(v PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 returns the union data inside the PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type as a PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12
+func (t PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) AsPatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12() (PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12, error) {
+	var body PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 overwrites any union data inside the PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type as the provided PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12
+func (t *PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) FromPatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12(v PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 performs a merge with any union data inside the PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type, using the provided PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12
+func (t *PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) MergePatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12(v PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -49103,6 +54974,32 @@ func (t *GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type
 	return err
 }
 
+// AsGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -49415,6 +55312,32 @@ func (t *GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inli
 
 // MergeGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -49747,6 +55670,32 @@ func (t *PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Typ
 	return err
 }
 
+// AsPostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -50059,6 +56008,32 @@ func (t *PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inl
 
 // MergePostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -50391,6 +56366,32 @@ func (t *GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_
 	return err
 }
 
+// AsGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -50703,6 +56704,32 @@ func (t *GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_
 
 // MergeGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -51035,6 +57062,32 @@ func (t *PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_
 	return err
 }
 
+// AsPutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsPutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromPutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergePutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -51347,6 +57400,32 @@ func (t *PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_
 
 // MergePutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -51679,6 +57758,32 @@ func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnT
 	return err
 }
 
+// AsPostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -51991,6 +58096,32 @@ func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrat
 
 // MergePostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -52323,6 +58454,32 @@ func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData
 	return err
 }
 
+// AsPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -52635,6 +58792,32 @@ func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData
 
 // MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -52967,6 +59150,32 @@ func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_
 	return err
 }
 
+// AsPostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -53279,6 +59488,32 @@ func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Dem
 
 // MergePostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -53611,6 +59846,32 @@ func (t *GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_Colu
 	return err
 }
 
+// AsGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -53923,6 +60184,32 @@ func (t *GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonst
 
 // MergeGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -54255,6 +60542,32 @@ func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonst
 	return err
 }
 
+// AsPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -54567,6 +60880,32 @@ func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Prompti
 
 // MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -64289,6 +70628,3862 @@ func (t *PostApiTriggerSlackJSONBody_Filters_TracesOrigin) UnmarshalJSON(b []byt
 	return err
 }
 
+// AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0 returns the union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0
+func (t GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0() (GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0, error) {
+	var body GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0 overwrites any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1 returns the union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1
+func (t GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1() (GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1, error) {
+	var body GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1 overwrites any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2 returns the union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2
+func (t GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2() (GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2, error) {
+	var body GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2 overwrites any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3 returns the union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3
+func (t GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3() (GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3, error) {
+	var body GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3 overwrites any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4 returns the union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4
+func (t GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4() (GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4, error) {
+	var body GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4 overwrites any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5 returns the union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5
+func (t GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5() (GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5, error) {
+	var body GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5 overwrites any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5(v GetApiTriggers200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTriggers200JSONResponseBodyReportSource0 returns the union data inside the GetApiTriggers200JSONResponseBody_Report_Source as a GetApiTriggers200JSONResponseBodyReportSource0
+func (t GetApiTriggers200JSONResponseBody_Report_Source) AsGetApiTriggers200JSONResponseBodyReportSource0() (GetApiTriggers200JSONResponseBodyReportSource0, error) {
+	var body GetApiTriggers200JSONResponseBodyReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyReportSource0 overwrites any union data inside the GetApiTriggers200JSONResponseBody_Report_Source as the provided GetApiTriggers200JSONResponseBodyReportSource0
+func (t *GetApiTriggers200JSONResponseBody_Report_Source) FromGetApiTriggers200JSONResponseBodyReportSource0(v GetApiTriggers200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyReportSource0 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_Report_Source, using the provided GetApiTriggers200JSONResponseBodyReportSource0
+func (t *GetApiTriggers200JSONResponseBody_Report_Source) MergeGetApiTriggers200JSONResponseBodyReportSource0(v GetApiTriggers200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggers200JSONResponseBodyReportSource1 returns the union data inside the GetApiTriggers200JSONResponseBody_Report_Source as a GetApiTriggers200JSONResponseBodyReportSource1
+func (t GetApiTriggers200JSONResponseBody_Report_Source) AsGetApiTriggers200JSONResponseBodyReportSource1() (GetApiTriggers200JSONResponseBodyReportSource1, error) {
+	var body GetApiTriggers200JSONResponseBodyReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyReportSource1 overwrites any union data inside the GetApiTriggers200JSONResponseBody_Report_Source as the provided GetApiTriggers200JSONResponseBodyReportSource1
+func (t *GetApiTriggers200JSONResponseBody_Report_Source) FromGetApiTriggers200JSONResponseBodyReportSource1(v GetApiTriggers200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyReportSource1 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_Report_Source, using the provided GetApiTriggers200JSONResponseBodyReportSource1
+func (t *GetApiTriggers200JSONResponseBody_Report_Source) MergeGetApiTriggers200JSONResponseBodyReportSource1(v GetApiTriggers200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggers200JSONResponseBodyReportSource2 returns the union data inside the GetApiTriggers200JSONResponseBody_Report_Source as a GetApiTriggers200JSONResponseBodyReportSource2
+func (t GetApiTriggers200JSONResponseBody_Report_Source) AsGetApiTriggers200JSONResponseBodyReportSource2() (GetApiTriggers200JSONResponseBodyReportSource2, error) {
+	var body GetApiTriggers200JSONResponseBodyReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggers200JSONResponseBodyReportSource2 overwrites any union data inside the GetApiTriggers200JSONResponseBody_Report_Source as the provided GetApiTriggers200JSONResponseBodyReportSource2
+func (t *GetApiTriggers200JSONResponseBody_Report_Source) FromGetApiTriggers200JSONResponseBodyReportSource2(v GetApiTriggers200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggers200JSONResponseBodyReportSource2 performs a merge with any union data inside the GetApiTriggers200JSONResponseBody_Report_Source, using the provided GetApiTriggers200JSONResponseBodyReportSource2
+func (t *GetApiTriggers200JSONResponseBody_Report_Source) MergeGetApiTriggers200JSONResponseBodyReportSource2(v GetApiTriggers200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTriggers200JSONResponseBody_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTriggers200JSONResponseBody_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody0 returns the union data inside the PostApiTriggersJSONBody as a PostApiTriggersJSONBody0
+func (t PostApiTriggersJSONBody) AsPostApiTriggersJSONBody0() (PostApiTriggersJSONBody0, error) {
+	var body PostApiTriggersJSONBody0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0 overwrites any union data inside the PostApiTriggersJSONBody as the provided PostApiTriggersJSONBody0
+func (t *PostApiTriggersJSONBody) FromPostApiTriggersJSONBody0(v PostApiTriggersJSONBody0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0 performs a merge with any union data inside the PostApiTriggersJSONBody, using the provided PostApiTriggersJSONBody0
+func (t *PostApiTriggersJSONBody) MergePostApiTriggersJSONBody0(v PostApiTriggersJSONBody0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1 returns the union data inside the PostApiTriggersJSONBody as a PostApiTriggersJSONBody1
+func (t PostApiTriggersJSONBody) AsPostApiTriggersJSONBody1() (PostApiTriggersJSONBody1, error) {
+	var body PostApiTriggersJSONBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1 overwrites any union data inside the PostApiTriggersJSONBody as the provided PostApiTriggersJSONBody1
+func (t *PostApiTriggersJSONBody) FromPostApiTriggersJSONBody1(v PostApiTriggersJSONBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1 performs a merge with any union data inside the PostApiTriggersJSONBody, using the provided PostApiTriggersJSONBody1
+func (t *PostApiTriggersJSONBody) MergePostApiTriggersJSONBody1(v PostApiTriggersJSONBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2 returns the union data inside the PostApiTriggersJSONBody as a PostApiTriggersJSONBody2
+func (t PostApiTriggersJSONBody) AsPostApiTriggersJSONBody2() (PostApiTriggersJSONBody2, error) {
+	var body PostApiTriggersJSONBody2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2 overwrites any union data inside the PostApiTriggersJSONBody as the provided PostApiTriggersJSONBody2
+func (t *PostApiTriggersJSONBody) FromPostApiTriggersJSONBody2(v PostApiTriggersJSONBody2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2 performs a merge with any union data inside the PostApiTriggersJSONBody, using the provided PostApiTriggersJSONBody2
+func (t *PostApiTriggersJSONBody) MergePostApiTriggersJSONBody2(v PostApiTriggersJSONBody2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3 returns the union data inside the PostApiTriggersJSONBody as a PostApiTriggersJSONBody3
+func (t PostApiTriggersJSONBody) AsPostApiTriggersJSONBody3() (PostApiTriggersJSONBody3, error) {
+	var body PostApiTriggersJSONBody3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3 overwrites any union data inside the PostApiTriggersJSONBody as the provided PostApiTriggersJSONBody3
+func (t *PostApiTriggersJSONBody) FromPostApiTriggersJSONBody3(v PostApiTriggersJSONBody3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3 performs a merge with any union data inside the PostApiTriggersJSONBody, using the provided PostApiTriggersJSONBody3
+func (t *PostApiTriggersJSONBody) MergePostApiTriggersJSONBody3(v PostApiTriggersJSONBody3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4 returns the union data inside the PostApiTriggersJSONBody as a PostApiTriggersJSONBody4
+func (t PostApiTriggersJSONBody) AsPostApiTriggersJSONBody4() (PostApiTriggersJSONBody4, error) {
+	var body PostApiTriggersJSONBody4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4 overwrites any union data inside the PostApiTriggersJSONBody as the provided PostApiTriggersJSONBody4
+func (t *PostApiTriggersJSONBody) FromPostApiTriggersJSONBody4(v PostApiTriggersJSONBody4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4 performs a merge with any union data inside the PostApiTriggersJSONBody, using the provided PostApiTriggersJSONBody4
+func (t *PostApiTriggersJSONBody) MergePostApiTriggersJSONBody4(v PostApiTriggersJSONBody4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody0Filters0 returns the union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties as a PostApiTriggersJSONBody0Filters0
+func (t PostApiTriggersJSONBody_0_Filters_AdditionalProperties) AsPostApiTriggersJSONBody0Filters0() (PostApiTriggersJSONBody0Filters0, error) {
+	var body PostApiTriggersJSONBody0Filters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0Filters0 overwrites any union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody0Filters0
+func (t *PostApiTriggersJSONBody_0_Filters_AdditionalProperties) FromPostApiTriggersJSONBody0Filters0(v PostApiTriggersJSONBody0Filters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0Filters0 performs a merge with any union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody0Filters0
+func (t *PostApiTriggersJSONBody_0_Filters_AdditionalProperties) MergePostApiTriggersJSONBody0Filters0(v PostApiTriggersJSONBody0Filters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0Filters1 returns the union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties as a PostApiTriggersJSONBody0Filters1
+func (t PostApiTriggersJSONBody_0_Filters_AdditionalProperties) AsPostApiTriggersJSONBody0Filters1() (PostApiTriggersJSONBody0Filters1, error) {
+	var body PostApiTriggersJSONBody0Filters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0Filters1 overwrites any union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody0Filters1
+func (t *PostApiTriggersJSONBody_0_Filters_AdditionalProperties) FromPostApiTriggersJSONBody0Filters1(v PostApiTriggersJSONBody0Filters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0Filters1 performs a merge with any union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody0Filters1
+func (t *PostApiTriggersJSONBody_0_Filters_AdditionalProperties) MergePostApiTriggersJSONBody0Filters1(v PostApiTriggersJSONBody0Filters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0Filters2 returns the union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties as a PostApiTriggersJSONBody0Filters2
+func (t PostApiTriggersJSONBody_0_Filters_AdditionalProperties) AsPostApiTriggersJSONBody0Filters2() (PostApiTriggersJSONBody0Filters2, error) {
+	var body PostApiTriggersJSONBody0Filters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0Filters2 overwrites any union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody0Filters2
+func (t *PostApiTriggersJSONBody_0_Filters_AdditionalProperties) FromPostApiTriggersJSONBody0Filters2(v PostApiTriggersJSONBody0Filters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0Filters2 performs a merge with any union data inside the PostApiTriggersJSONBody_0_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody0Filters2
+func (t *PostApiTriggersJSONBody_0_Filters_AdditionalProperties) MergePostApiTriggersJSONBody0Filters2(v PostApiTriggersJSONBody0Filters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_0_Filters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_0_Filters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody0GraphAlertTimePeriod0 returns the union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as a PostApiTriggersJSONBody0GraphAlertTimePeriod0
+func (t PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody0GraphAlertTimePeriod0() (PostApiTriggersJSONBody0GraphAlertTimePeriod0, error) {
+	var body PostApiTriggersJSONBody0GraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0GraphAlertTimePeriod0 overwrites any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody0GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody0GraphAlertTimePeriod0(v PostApiTriggersJSONBody0GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0GraphAlertTimePeriod0 performs a merge with any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody0GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody0GraphAlertTimePeriod0(v PostApiTriggersJSONBody0GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0GraphAlertTimePeriod1 returns the union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as a PostApiTriggersJSONBody0GraphAlertTimePeriod1
+func (t PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody0GraphAlertTimePeriod1() (PostApiTriggersJSONBody0GraphAlertTimePeriod1, error) {
+	var body PostApiTriggersJSONBody0GraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0GraphAlertTimePeriod1 overwrites any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody0GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody0GraphAlertTimePeriod1(v PostApiTriggersJSONBody0GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0GraphAlertTimePeriod1 performs a merge with any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody0GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody0GraphAlertTimePeriod1(v PostApiTriggersJSONBody0GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0GraphAlertTimePeriod2 returns the union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as a PostApiTriggersJSONBody0GraphAlertTimePeriod2
+func (t PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody0GraphAlertTimePeriod2() (PostApiTriggersJSONBody0GraphAlertTimePeriod2, error) {
+	var body PostApiTriggersJSONBody0GraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0GraphAlertTimePeriod2 overwrites any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody0GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody0GraphAlertTimePeriod2(v PostApiTriggersJSONBody0GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0GraphAlertTimePeriod2 performs a merge with any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody0GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody0GraphAlertTimePeriod2(v PostApiTriggersJSONBody0GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0GraphAlertTimePeriod3 returns the union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as a PostApiTriggersJSONBody0GraphAlertTimePeriod3
+func (t PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody0GraphAlertTimePeriod3() (PostApiTriggersJSONBody0GraphAlertTimePeriod3, error) {
+	var body PostApiTriggersJSONBody0GraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0GraphAlertTimePeriod3 overwrites any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody0GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody0GraphAlertTimePeriod3(v PostApiTriggersJSONBody0GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0GraphAlertTimePeriod3 performs a merge with any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody0GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody0GraphAlertTimePeriod3(v PostApiTriggersJSONBody0GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0GraphAlertTimePeriod4 returns the union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as a PostApiTriggersJSONBody0GraphAlertTimePeriod4
+func (t PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody0GraphAlertTimePeriod4() (PostApiTriggersJSONBody0GraphAlertTimePeriod4, error) {
+	var body PostApiTriggersJSONBody0GraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0GraphAlertTimePeriod4 overwrites any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody0GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody0GraphAlertTimePeriod4(v PostApiTriggersJSONBody0GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0GraphAlertTimePeriod4 performs a merge with any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody0GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody0GraphAlertTimePeriod4(v PostApiTriggersJSONBody0GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0GraphAlertTimePeriod5 returns the union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as a PostApiTriggersJSONBody0GraphAlertTimePeriod5
+func (t PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody0GraphAlertTimePeriod5() (PostApiTriggersJSONBody0GraphAlertTimePeriod5, error) {
+	var body PostApiTriggersJSONBody0GraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0GraphAlertTimePeriod5 overwrites any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody0GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody0GraphAlertTimePeriod5(v PostApiTriggersJSONBody0GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0GraphAlertTimePeriod5 performs a merge with any union data inside the PostApiTriggersJSONBody_0_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody0GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody0GraphAlertTimePeriod5(v PostApiTriggersJSONBody0GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_0_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody0ReportSource0 returns the union data inside the PostApiTriggersJSONBody_0_Report_Source as a PostApiTriggersJSONBody0ReportSource0
+func (t PostApiTriggersJSONBody_0_Report_Source) AsPostApiTriggersJSONBody0ReportSource0() (PostApiTriggersJSONBody0ReportSource0, error) {
+	var body PostApiTriggersJSONBody0ReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0ReportSource0 overwrites any union data inside the PostApiTriggersJSONBody_0_Report_Source as the provided PostApiTriggersJSONBody0ReportSource0
+func (t *PostApiTriggersJSONBody_0_Report_Source) FromPostApiTriggersJSONBody0ReportSource0(v PostApiTriggersJSONBody0ReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0ReportSource0 performs a merge with any union data inside the PostApiTriggersJSONBody_0_Report_Source, using the provided PostApiTriggersJSONBody0ReportSource0
+func (t *PostApiTriggersJSONBody_0_Report_Source) MergePostApiTriggersJSONBody0ReportSource0(v PostApiTriggersJSONBody0ReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0ReportSource1 returns the union data inside the PostApiTriggersJSONBody_0_Report_Source as a PostApiTriggersJSONBody0ReportSource1
+func (t PostApiTriggersJSONBody_0_Report_Source) AsPostApiTriggersJSONBody0ReportSource1() (PostApiTriggersJSONBody0ReportSource1, error) {
+	var body PostApiTriggersJSONBody0ReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0ReportSource1 overwrites any union data inside the PostApiTriggersJSONBody_0_Report_Source as the provided PostApiTriggersJSONBody0ReportSource1
+func (t *PostApiTriggersJSONBody_0_Report_Source) FromPostApiTriggersJSONBody0ReportSource1(v PostApiTriggersJSONBody0ReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0ReportSource1 performs a merge with any union data inside the PostApiTriggersJSONBody_0_Report_Source, using the provided PostApiTriggersJSONBody0ReportSource1
+func (t *PostApiTriggersJSONBody_0_Report_Source) MergePostApiTriggersJSONBody0ReportSource1(v PostApiTriggersJSONBody0ReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody0ReportSource2 returns the union data inside the PostApiTriggersJSONBody_0_Report_Source as a PostApiTriggersJSONBody0ReportSource2
+func (t PostApiTriggersJSONBody_0_Report_Source) AsPostApiTriggersJSONBody0ReportSource2() (PostApiTriggersJSONBody0ReportSource2, error) {
+	var body PostApiTriggersJSONBody0ReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody0ReportSource2 overwrites any union data inside the PostApiTriggersJSONBody_0_Report_Source as the provided PostApiTriggersJSONBody0ReportSource2
+func (t *PostApiTriggersJSONBody_0_Report_Source) FromPostApiTriggersJSONBody0ReportSource2(v PostApiTriggersJSONBody0ReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody0ReportSource2 performs a merge with any union data inside the PostApiTriggersJSONBody_0_Report_Source, using the provided PostApiTriggersJSONBody0ReportSource2
+func (t *PostApiTriggersJSONBody_0_Report_Source) MergePostApiTriggersJSONBody0ReportSource2(v PostApiTriggersJSONBody0ReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_0_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_0_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody1Filters0 returns the union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties as a PostApiTriggersJSONBody1Filters0
+func (t PostApiTriggersJSONBody_1_Filters_AdditionalProperties) AsPostApiTriggersJSONBody1Filters0() (PostApiTriggersJSONBody1Filters0, error) {
+	var body PostApiTriggersJSONBody1Filters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1Filters0 overwrites any union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody1Filters0
+func (t *PostApiTriggersJSONBody_1_Filters_AdditionalProperties) FromPostApiTriggersJSONBody1Filters0(v PostApiTriggersJSONBody1Filters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1Filters0 performs a merge with any union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody1Filters0
+func (t *PostApiTriggersJSONBody_1_Filters_AdditionalProperties) MergePostApiTriggersJSONBody1Filters0(v PostApiTriggersJSONBody1Filters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1Filters1 returns the union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties as a PostApiTriggersJSONBody1Filters1
+func (t PostApiTriggersJSONBody_1_Filters_AdditionalProperties) AsPostApiTriggersJSONBody1Filters1() (PostApiTriggersJSONBody1Filters1, error) {
+	var body PostApiTriggersJSONBody1Filters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1Filters1 overwrites any union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody1Filters1
+func (t *PostApiTriggersJSONBody_1_Filters_AdditionalProperties) FromPostApiTriggersJSONBody1Filters1(v PostApiTriggersJSONBody1Filters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1Filters1 performs a merge with any union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody1Filters1
+func (t *PostApiTriggersJSONBody_1_Filters_AdditionalProperties) MergePostApiTriggersJSONBody1Filters1(v PostApiTriggersJSONBody1Filters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1Filters2 returns the union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties as a PostApiTriggersJSONBody1Filters2
+func (t PostApiTriggersJSONBody_1_Filters_AdditionalProperties) AsPostApiTriggersJSONBody1Filters2() (PostApiTriggersJSONBody1Filters2, error) {
+	var body PostApiTriggersJSONBody1Filters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1Filters2 overwrites any union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody1Filters2
+func (t *PostApiTriggersJSONBody_1_Filters_AdditionalProperties) FromPostApiTriggersJSONBody1Filters2(v PostApiTriggersJSONBody1Filters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1Filters2 performs a merge with any union data inside the PostApiTriggersJSONBody_1_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody1Filters2
+func (t *PostApiTriggersJSONBody_1_Filters_AdditionalProperties) MergePostApiTriggersJSONBody1Filters2(v PostApiTriggersJSONBody1Filters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_1_Filters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_1_Filters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody1GraphAlertTimePeriod0 returns the union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as a PostApiTriggersJSONBody1GraphAlertTimePeriod0
+func (t PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody1GraphAlertTimePeriod0() (PostApiTriggersJSONBody1GraphAlertTimePeriod0, error) {
+	var body PostApiTriggersJSONBody1GraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1GraphAlertTimePeriod0 overwrites any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody1GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody1GraphAlertTimePeriod0(v PostApiTriggersJSONBody1GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1GraphAlertTimePeriod0 performs a merge with any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody1GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody1GraphAlertTimePeriod0(v PostApiTriggersJSONBody1GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1GraphAlertTimePeriod1 returns the union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as a PostApiTriggersJSONBody1GraphAlertTimePeriod1
+func (t PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody1GraphAlertTimePeriod1() (PostApiTriggersJSONBody1GraphAlertTimePeriod1, error) {
+	var body PostApiTriggersJSONBody1GraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1GraphAlertTimePeriod1 overwrites any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody1GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody1GraphAlertTimePeriod1(v PostApiTriggersJSONBody1GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1GraphAlertTimePeriod1 performs a merge with any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody1GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody1GraphAlertTimePeriod1(v PostApiTriggersJSONBody1GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1GraphAlertTimePeriod2 returns the union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as a PostApiTriggersJSONBody1GraphAlertTimePeriod2
+func (t PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody1GraphAlertTimePeriod2() (PostApiTriggersJSONBody1GraphAlertTimePeriod2, error) {
+	var body PostApiTriggersJSONBody1GraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1GraphAlertTimePeriod2 overwrites any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody1GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody1GraphAlertTimePeriod2(v PostApiTriggersJSONBody1GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1GraphAlertTimePeriod2 performs a merge with any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody1GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody1GraphAlertTimePeriod2(v PostApiTriggersJSONBody1GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1GraphAlertTimePeriod3 returns the union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as a PostApiTriggersJSONBody1GraphAlertTimePeriod3
+func (t PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody1GraphAlertTimePeriod3() (PostApiTriggersJSONBody1GraphAlertTimePeriod3, error) {
+	var body PostApiTriggersJSONBody1GraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1GraphAlertTimePeriod3 overwrites any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody1GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody1GraphAlertTimePeriod3(v PostApiTriggersJSONBody1GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1GraphAlertTimePeriod3 performs a merge with any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody1GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody1GraphAlertTimePeriod3(v PostApiTriggersJSONBody1GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1GraphAlertTimePeriod4 returns the union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as a PostApiTriggersJSONBody1GraphAlertTimePeriod4
+func (t PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody1GraphAlertTimePeriod4() (PostApiTriggersJSONBody1GraphAlertTimePeriod4, error) {
+	var body PostApiTriggersJSONBody1GraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1GraphAlertTimePeriod4 overwrites any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody1GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody1GraphAlertTimePeriod4(v PostApiTriggersJSONBody1GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1GraphAlertTimePeriod4 performs a merge with any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody1GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody1GraphAlertTimePeriod4(v PostApiTriggersJSONBody1GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1GraphAlertTimePeriod5 returns the union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as a PostApiTriggersJSONBody1GraphAlertTimePeriod5
+func (t PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody1GraphAlertTimePeriod5() (PostApiTriggersJSONBody1GraphAlertTimePeriod5, error) {
+	var body PostApiTriggersJSONBody1GraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1GraphAlertTimePeriod5 overwrites any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody1GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody1GraphAlertTimePeriod5(v PostApiTriggersJSONBody1GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1GraphAlertTimePeriod5 performs a merge with any union data inside the PostApiTriggersJSONBody_1_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody1GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody1GraphAlertTimePeriod5(v PostApiTriggersJSONBody1GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_1_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody1ReportSource0 returns the union data inside the PostApiTriggersJSONBody_1_Report_Source as a PostApiTriggersJSONBody1ReportSource0
+func (t PostApiTriggersJSONBody_1_Report_Source) AsPostApiTriggersJSONBody1ReportSource0() (PostApiTriggersJSONBody1ReportSource0, error) {
+	var body PostApiTriggersJSONBody1ReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1ReportSource0 overwrites any union data inside the PostApiTriggersJSONBody_1_Report_Source as the provided PostApiTriggersJSONBody1ReportSource0
+func (t *PostApiTriggersJSONBody_1_Report_Source) FromPostApiTriggersJSONBody1ReportSource0(v PostApiTriggersJSONBody1ReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1ReportSource0 performs a merge with any union data inside the PostApiTriggersJSONBody_1_Report_Source, using the provided PostApiTriggersJSONBody1ReportSource0
+func (t *PostApiTriggersJSONBody_1_Report_Source) MergePostApiTriggersJSONBody1ReportSource0(v PostApiTriggersJSONBody1ReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1ReportSource1 returns the union data inside the PostApiTriggersJSONBody_1_Report_Source as a PostApiTriggersJSONBody1ReportSource1
+func (t PostApiTriggersJSONBody_1_Report_Source) AsPostApiTriggersJSONBody1ReportSource1() (PostApiTriggersJSONBody1ReportSource1, error) {
+	var body PostApiTriggersJSONBody1ReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1ReportSource1 overwrites any union data inside the PostApiTriggersJSONBody_1_Report_Source as the provided PostApiTriggersJSONBody1ReportSource1
+func (t *PostApiTriggersJSONBody_1_Report_Source) FromPostApiTriggersJSONBody1ReportSource1(v PostApiTriggersJSONBody1ReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1ReportSource1 performs a merge with any union data inside the PostApiTriggersJSONBody_1_Report_Source, using the provided PostApiTriggersJSONBody1ReportSource1
+func (t *PostApiTriggersJSONBody_1_Report_Source) MergePostApiTriggersJSONBody1ReportSource1(v PostApiTriggersJSONBody1ReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody1ReportSource2 returns the union data inside the PostApiTriggersJSONBody_1_Report_Source as a PostApiTriggersJSONBody1ReportSource2
+func (t PostApiTriggersJSONBody_1_Report_Source) AsPostApiTriggersJSONBody1ReportSource2() (PostApiTriggersJSONBody1ReportSource2, error) {
+	var body PostApiTriggersJSONBody1ReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody1ReportSource2 overwrites any union data inside the PostApiTriggersJSONBody_1_Report_Source as the provided PostApiTriggersJSONBody1ReportSource2
+func (t *PostApiTriggersJSONBody_1_Report_Source) FromPostApiTriggersJSONBody1ReportSource2(v PostApiTriggersJSONBody1ReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody1ReportSource2 performs a merge with any union data inside the PostApiTriggersJSONBody_1_Report_Source, using the provided PostApiTriggersJSONBody1ReportSource2
+func (t *PostApiTriggersJSONBody_1_Report_Source) MergePostApiTriggersJSONBody1ReportSource2(v PostApiTriggersJSONBody1ReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_1_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_1_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody2Filters0 returns the union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties as a PostApiTriggersJSONBody2Filters0
+func (t PostApiTriggersJSONBody_2_Filters_AdditionalProperties) AsPostApiTriggersJSONBody2Filters0() (PostApiTriggersJSONBody2Filters0, error) {
+	var body PostApiTriggersJSONBody2Filters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2Filters0 overwrites any union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody2Filters0
+func (t *PostApiTriggersJSONBody_2_Filters_AdditionalProperties) FromPostApiTriggersJSONBody2Filters0(v PostApiTriggersJSONBody2Filters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2Filters0 performs a merge with any union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody2Filters0
+func (t *PostApiTriggersJSONBody_2_Filters_AdditionalProperties) MergePostApiTriggersJSONBody2Filters0(v PostApiTriggersJSONBody2Filters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2Filters1 returns the union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties as a PostApiTriggersJSONBody2Filters1
+func (t PostApiTriggersJSONBody_2_Filters_AdditionalProperties) AsPostApiTriggersJSONBody2Filters1() (PostApiTriggersJSONBody2Filters1, error) {
+	var body PostApiTriggersJSONBody2Filters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2Filters1 overwrites any union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody2Filters1
+func (t *PostApiTriggersJSONBody_2_Filters_AdditionalProperties) FromPostApiTriggersJSONBody2Filters1(v PostApiTriggersJSONBody2Filters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2Filters1 performs a merge with any union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody2Filters1
+func (t *PostApiTriggersJSONBody_2_Filters_AdditionalProperties) MergePostApiTriggersJSONBody2Filters1(v PostApiTriggersJSONBody2Filters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2Filters2 returns the union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties as a PostApiTriggersJSONBody2Filters2
+func (t PostApiTriggersJSONBody_2_Filters_AdditionalProperties) AsPostApiTriggersJSONBody2Filters2() (PostApiTriggersJSONBody2Filters2, error) {
+	var body PostApiTriggersJSONBody2Filters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2Filters2 overwrites any union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody2Filters2
+func (t *PostApiTriggersJSONBody_2_Filters_AdditionalProperties) FromPostApiTriggersJSONBody2Filters2(v PostApiTriggersJSONBody2Filters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2Filters2 performs a merge with any union data inside the PostApiTriggersJSONBody_2_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody2Filters2
+func (t *PostApiTriggersJSONBody_2_Filters_AdditionalProperties) MergePostApiTriggersJSONBody2Filters2(v PostApiTriggersJSONBody2Filters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_2_Filters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_2_Filters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody2GraphAlertTimePeriod0 returns the union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as a PostApiTriggersJSONBody2GraphAlertTimePeriod0
+func (t PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody2GraphAlertTimePeriod0() (PostApiTriggersJSONBody2GraphAlertTimePeriod0, error) {
+	var body PostApiTriggersJSONBody2GraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2GraphAlertTimePeriod0 overwrites any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody2GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody2GraphAlertTimePeriod0(v PostApiTriggersJSONBody2GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2GraphAlertTimePeriod0 performs a merge with any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody2GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody2GraphAlertTimePeriod0(v PostApiTriggersJSONBody2GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2GraphAlertTimePeriod1 returns the union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as a PostApiTriggersJSONBody2GraphAlertTimePeriod1
+func (t PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody2GraphAlertTimePeriod1() (PostApiTriggersJSONBody2GraphAlertTimePeriod1, error) {
+	var body PostApiTriggersJSONBody2GraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2GraphAlertTimePeriod1 overwrites any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody2GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody2GraphAlertTimePeriod1(v PostApiTriggersJSONBody2GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2GraphAlertTimePeriod1 performs a merge with any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody2GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody2GraphAlertTimePeriod1(v PostApiTriggersJSONBody2GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2GraphAlertTimePeriod2 returns the union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as a PostApiTriggersJSONBody2GraphAlertTimePeriod2
+func (t PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody2GraphAlertTimePeriod2() (PostApiTriggersJSONBody2GraphAlertTimePeriod2, error) {
+	var body PostApiTriggersJSONBody2GraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2GraphAlertTimePeriod2 overwrites any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody2GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody2GraphAlertTimePeriod2(v PostApiTriggersJSONBody2GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2GraphAlertTimePeriod2 performs a merge with any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody2GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody2GraphAlertTimePeriod2(v PostApiTriggersJSONBody2GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2GraphAlertTimePeriod3 returns the union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as a PostApiTriggersJSONBody2GraphAlertTimePeriod3
+func (t PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody2GraphAlertTimePeriod3() (PostApiTriggersJSONBody2GraphAlertTimePeriod3, error) {
+	var body PostApiTriggersJSONBody2GraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2GraphAlertTimePeriod3 overwrites any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody2GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody2GraphAlertTimePeriod3(v PostApiTriggersJSONBody2GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2GraphAlertTimePeriod3 performs a merge with any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody2GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody2GraphAlertTimePeriod3(v PostApiTriggersJSONBody2GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2GraphAlertTimePeriod4 returns the union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as a PostApiTriggersJSONBody2GraphAlertTimePeriod4
+func (t PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody2GraphAlertTimePeriod4() (PostApiTriggersJSONBody2GraphAlertTimePeriod4, error) {
+	var body PostApiTriggersJSONBody2GraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2GraphAlertTimePeriod4 overwrites any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody2GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody2GraphAlertTimePeriod4(v PostApiTriggersJSONBody2GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2GraphAlertTimePeriod4 performs a merge with any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody2GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody2GraphAlertTimePeriod4(v PostApiTriggersJSONBody2GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2GraphAlertTimePeriod5 returns the union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as a PostApiTriggersJSONBody2GraphAlertTimePeriod5
+func (t PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody2GraphAlertTimePeriod5() (PostApiTriggersJSONBody2GraphAlertTimePeriod5, error) {
+	var body PostApiTriggersJSONBody2GraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2GraphAlertTimePeriod5 overwrites any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody2GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody2GraphAlertTimePeriod5(v PostApiTriggersJSONBody2GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2GraphAlertTimePeriod5 performs a merge with any union data inside the PostApiTriggersJSONBody_2_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody2GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody2GraphAlertTimePeriod5(v PostApiTriggersJSONBody2GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_2_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody2ReportSource0 returns the union data inside the PostApiTriggersJSONBody_2_Report_Source as a PostApiTriggersJSONBody2ReportSource0
+func (t PostApiTriggersJSONBody_2_Report_Source) AsPostApiTriggersJSONBody2ReportSource0() (PostApiTriggersJSONBody2ReportSource0, error) {
+	var body PostApiTriggersJSONBody2ReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2ReportSource0 overwrites any union data inside the PostApiTriggersJSONBody_2_Report_Source as the provided PostApiTriggersJSONBody2ReportSource0
+func (t *PostApiTriggersJSONBody_2_Report_Source) FromPostApiTriggersJSONBody2ReportSource0(v PostApiTriggersJSONBody2ReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2ReportSource0 performs a merge with any union data inside the PostApiTriggersJSONBody_2_Report_Source, using the provided PostApiTriggersJSONBody2ReportSource0
+func (t *PostApiTriggersJSONBody_2_Report_Source) MergePostApiTriggersJSONBody2ReportSource0(v PostApiTriggersJSONBody2ReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2ReportSource1 returns the union data inside the PostApiTriggersJSONBody_2_Report_Source as a PostApiTriggersJSONBody2ReportSource1
+func (t PostApiTriggersJSONBody_2_Report_Source) AsPostApiTriggersJSONBody2ReportSource1() (PostApiTriggersJSONBody2ReportSource1, error) {
+	var body PostApiTriggersJSONBody2ReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2ReportSource1 overwrites any union data inside the PostApiTriggersJSONBody_2_Report_Source as the provided PostApiTriggersJSONBody2ReportSource1
+func (t *PostApiTriggersJSONBody_2_Report_Source) FromPostApiTriggersJSONBody2ReportSource1(v PostApiTriggersJSONBody2ReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2ReportSource1 performs a merge with any union data inside the PostApiTriggersJSONBody_2_Report_Source, using the provided PostApiTriggersJSONBody2ReportSource1
+func (t *PostApiTriggersJSONBody_2_Report_Source) MergePostApiTriggersJSONBody2ReportSource1(v PostApiTriggersJSONBody2ReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody2ReportSource2 returns the union data inside the PostApiTriggersJSONBody_2_Report_Source as a PostApiTriggersJSONBody2ReportSource2
+func (t PostApiTriggersJSONBody_2_Report_Source) AsPostApiTriggersJSONBody2ReportSource2() (PostApiTriggersJSONBody2ReportSource2, error) {
+	var body PostApiTriggersJSONBody2ReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody2ReportSource2 overwrites any union data inside the PostApiTriggersJSONBody_2_Report_Source as the provided PostApiTriggersJSONBody2ReportSource2
+func (t *PostApiTriggersJSONBody_2_Report_Source) FromPostApiTriggersJSONBody2ReportSource2(v PostApiTriggersJSONBody2ReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody2ReportSource2 performs a merge with any union data inside the PostApiTriggersJSONBody_2_Report_Source, using the provided PostApiTriggersJSONBody2ReportSource2
+func (t *PostApiTriggersJSONBody_2_Report_Source) MergePostApiTriggersJSONBody2ReportSource2(v PostApiTriggersJSONBody2ReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_2_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_2_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody3Filters0 returns the union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties as a PostApiTriggersJSONBody3Filters0
+func (t PostApiTriggersJSONBody_3_Filters_AdditionalProperties) AsPostApiTriggersJSONBody3Filters0() (PostApiTriggersJSONBody3Filters0, error) {
+	var body PostApiTriggersJSONBody3Filters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3Filters0 overwrites any union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody3Filters0
+func (t *PostApiTriggersJSONBody_3_Filters_AdditionalProperties) FromPostApiTriggersJSONBody3Filters0(v PostApiTriggersJSONBody3Filters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3Filters0 performs a merge with any union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody3Filters0
+func (t *PostApiTriggersJSONBody_3_Filters_AdditionalProperties) MergePostApiTriggersJSONBody3Filters0(v PostApiTriggersJSONBody3Filters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3Filters1 returns the union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties as a PostApiTriggersJSONBody3Filters1
+func (t PostApiTriggersJSONBody_3_Filters_AdditionalProperties) AsPostApiTriggersJSONBody3Filters1() (PostApiTriggersJSONBody3Filters1, error) {
+	var body PostApiTriggersJSONBody3Filters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3Filters1 overwrites any union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody3Filters1
+func (t *PostApiTriggersJSONBody_3_Filters_AdditionalProperties) FromPostApiTriggersJSONBody3Filters1(v PostApiTriggersJSONBody3Filters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3Filters1 performs a merge with any union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody3Filters1
+func (t *PostApiTriggersJSONBody_3_Filters_AdditionalProperties) MergePostApiTriggersJSONBody3Filters1(v PostApiTriggersJSONBody3Filters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3Filters2 returns the union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties as a PostApiTriggersJSONBody3Filters2
+func (t PostApiTriggersJSONBody_3_Filters_AdditionalProperties) AsPostApiTriggersJSONBody3Filters2() (PostApiTriggersJSONBody3Filters2, error) {
+	var body PostApiTriggersJSONBody3Filters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3Filters2 overwrites any union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody3Filters2
+func (t *PostApiTriggersJSONBody_3_Filters_AdditionalProperties) FromPostApiTriggersJSONBody3Filters2(v PostApiTriggersJSONBody3Filters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3Filters2 performs a merge with any union data inside the PostApiTriggersJSONBody_3_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody3Filters2
+func (t *PostApiTriggersJSONBody_3_Filters_AdditionalProperties) MergePostApiTriggersJSONBody3Filters2(v PostApiTriggersJSONBody3Filters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_3_Filters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_3_Filters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody3GraphAlertTimePeriod0 returns the union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as a PostApiTriggersJSONBody3GraphAlertTimePeriod0
+func (t PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody3GraphAlertTimePeriod0() (PostApiTriggersJSONBody3GraphAlertTimePeriod0, error) {
+	var body PostApiTriggersJSONBody3GraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3GraphAlertTimePeriod0 overwrites any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody3GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody3GraphAlertTimePeriod0(v PostApiTriggersJSONBody3GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3GraphAlertTimePeriod0 performs a merge with any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody3GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody3GraphAlertTimePeriod0(v PostApiTriggersJSONBody3GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3GraphAlertTimePeriod1 returns the union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as a PostApiTriggersJSONBody3GraphAlertTimePeriod1
+func (t PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody3GraphAlertTimePeriod1() (PostApiTriggersJSONBody3GraphAlertTimePeriod1, error) {
+	var body PostApiTriggersJSONBody3GraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3GraphAlertTimePeriod1 overwrites any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody3GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody3GraphAlertTimePeriod1(v PostApiTriggersJSONBody3GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3GraphAlertTimePeriod1 performs a merge with any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody3GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody3GraphAlertTimePeriod1(v PostApiTriggersJSONBody3GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3GraphAlertTimePeriod2 returns the union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as a PostApiTriggersJSONBody3GraphAlertTimePeriod2
+func (t PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody3GraphAlertTimePeriod2() (PostApiTriggersJSONBody3GraphAlertTimePeriod2, error) {
+	var body PostApiTriggersJSONBody3GraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3GraphAlertTimePeriod2 overwrites any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody3GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody3GraphAlertTimePeriod2(v PostApiTriggersJSONBody3GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3GraphAlertTimePeriod2 performs a merge with any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody3GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody3GraphAlertTimePeriod2(v PostApiTriggersJSONBody3GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3GraphAlertTimePeriod3 returns the union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as a PostApiTriggersJSONBody3GraphAlertTimePeriod3
+func (t PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody3GraphAlertTimePeriod3() (PostApiTriggersJSONBody3GraphAlertTimePeriod3, error) {
+	var body PostApiTriggersJSONBody3GraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3GraphAlertTimePeriod3 overwrites any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody3GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody3GraphAlertTimePeriod3(v PostApiTriggersJSONBody3GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3GraphAlertTimePeriod3 performs a merge with any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody3GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody3GraphAlertTimePeriod3(v PostApiTriggersJSONBody3GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3GraphAlertTimePeriod4 returns the union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as a PostApiTriggersJSONBody3GraphAlertTimePeriod4
+func (t PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody3GraphAlertTimePeriod4() (PostApiTriggersJSONBody3GraphAlertTimePeriod4, error) {
+	var body PostApiTriggersJSONBody3GraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3GraphAlertTimePeriod4 overwrites any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody3GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody3GraphAlertTimePeriod4(v PostApiTriggersJSONBody3GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3GraphAlertTimePeriod4 performs a merge with any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody3GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody3GraphAlertTimePeriod4(v PostApiTriggersJSONBody3GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3GraphAlertTimePeriod5 returns the union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as a PostApiTriggersJSONBody3GraphAlertTimePeriod5
+func (t PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody3GraphAlertTimePeriod5() (PostApiTriggersJSONBody3GraphAlertTimePeriod5, error) {
+	var body PostApiTriggersJSONBody3GraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3GraphAlertTimePeriod5 overwrites any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody3GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody3GraphAlertTimePeriod5(v PostApiTriggersJSONBody3GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3GraphAlertTimePeriod5 performs a merge with any union data inside the PostApiTriggersJSONBody_3_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody3GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody3GraphAlertTimePeriod5(v PostApiTriggersJSONBody3GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_3_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody3ReportSource0 returns the union data inside the PostApiTriggersJSONBody_3_Report_Source as a PostApiTriggersJSONBody3ReportSource0
+func (t PostApiTriggersJSONBody_3_Report_Source) AsPostApiTriggersJSONBody3ReportSource0() (PostApiTriggersJSONBody3ReportSource0, error) {
+	var body PostApiTriggersJSONBody3ReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3ReportSource0 overwrites any union data inside the PostApiTriggersJSONBody_3_Report_Source as the provided PostApiTriggersJSONBody3ReportSource0
+func (t *PostApiTriggersJSONBody_3_Report_Source) FromPostApiTriggersJSONBody3ReportSource0(v PostApiTriggersJSONBody3ReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3ReportSource0 performs a merge with any union data inside the PostApiTriggersJSONBody_3_Report_Source, using the provided PostApiTriggersJSONBody3ReportSource0
+func (t *PostApiTriggersJSONBody_3_Report_Source) MergePostApiTriggersJSONBody3ReportSource0(v PostApiTriggersJSONBody3ReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3ReportSource1 returns the union data inside the PostApiTriggersJSONBody_3_Report_Source as a PostApiTriggersJSONBody3ReportSource1
+func (t PostApiTriggersJSONBody_3_Report_Source) AsPostApiTriggersJSONBody3ReportSource1() (PostApiTriggersJSONBody3ReportSource1, error) {
+	var body PostApiTriggersJSONBody3ReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3ReportSource1 overwrites any union data inside the PostApiTriggersJSONBody_3_Report_Source as the provided PostApiTriggersJSONBody3ReportSource1
+func (t *PostApiTriggersJSONBody_3_Report_Source) FromPostApiTriggersJSONBody3ReportSource1(v PostApiTriggersJSONBody3ReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3ReportSource1 performs a merge with any union data inside the PostApiTriggersJSONBody_3_Report_Source, using the provided PostApiTriggersJSONBody3ReportSource1
+func (t *PostApiTriggersJSONBody_3_Report_Source) MergePostApiTriggersJSONBody3ReportSource1(v PostApiTriggersJSONBody3ReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody3ReportSource2 returns the union data inside the PostApiTriggersJSONBody_3_Report_Source as a PostApiTriggersJSONBody3ReportSource2
+func (t PostApiTriggersJSONBody_3_Report_Source) AsPostApiTriggersJSONBody3ReportSource2() (PostApiTriggersJSONBody3ReportSource2, error) {
+	var body PostApiTriggersJSONBody3ReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody3ReportSource2 overwrites any union data inside the PostApiTriggersJSONBody_3_Report_Source as the provided PostApiTriggersJSONBody3ReportSource2
+func (t *PostApiTriggersJSONBody_3_Report_Source) FromPostApiTriggersJSONBody3ReportSource2(v PostApiTriggersJSONBody3ReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody3ReportSource2 performs a merge with any union data inside the PostApiTriggersJSONBody_3_Report_Source, using the provided PostApiTriggersJSONBody3ReportSource2
+func (t *PostApiTriggersJSONBody_3_Report_Source) MergePostApiTriggersJSONBody3ReportSource2(v PostApiTriggersJSONBody3ReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_3_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_3_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody4Filters0 returns the union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties as a PostApiTriggersJSONBody4Filters0
+func (t PostApiTriggersJSONBody_4_Filters_AdditionalProperties) AsPostApiTriggersJSONBody4Filters0() (PostApiTriggersJSONBody4Filters0, error) {
+	var body PostApiTriggersJSONBody4Filters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4Filters0 overwrites any union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody4Filters0
+func (t *PostApiTriggersJSONBody_4_Filters_AdditionalProperties) FromPostApiTriggersJSONBody4Filters0(v PostApiTriggersJSONBody4Filters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4Filters0 performs a merge with any union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody4Filters0
+func (t *PostApiTriggersJSONBody_4_Filters_AdditionalProperties) MergePostApiTriggersJSONBody4Filters0(v PostApiTriggersJSONBody4Filters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4Filters1 returns the union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties as a PostApiTriggersJSONBody4Filters1
+func (t PostApiTriggersJSONBody_4_Filters_AdditionalProperties) AsPostApiTriggersJSONBody4Filters1() (PostApiTriggersJSONBody4Filters1, error) {
+	var body PostApiTriggersJSONBody4Filters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4Filters1 overwrites any union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody4Filters1
+func (t *PostApiTriggersJSONBody_4_Filters_AdditionalProperties) FromPostApiTriggersJSONBody4Filters1(v PostApiTriggersJSONBody4Filters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4Filters1 performs a merge with any union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody4Filters1
+func (t *PostApiTriggersJSONBody_4_Filters_AdditionalProperties) MergePostApiTriggersJSONBody4Filters1(v PostApiTriggersJSONBody4Filters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4Filters2 returns the union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties as a PostApiTriggersJSONBody4Filters2
+func (t PostApiTriggersJSONBody_4_Filters_AdditionalProperties) AsPostApiTriggersJSONBody4Filters2() (PostApiTriggersJSONBody4Filters2, error) {
+	var body PostApiTriggersJSONBody4Filters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4Filters2 overwrites any union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties as the provided PostApiTriggersJSONBody4Filters2
+func (t *PostApiTriggersJSONBody_4_Filters_AdditionalProperties) FromPostApiTriggersJSONBody4Filters2(v PostApiTriggersJSONBody4Filters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4Filters2 performs a merge with any union data inside the PostApiTriggersJSONBody_4_Filters_AdditionalProperties, using the provided PostApiTriggersJSONBody4Filters2
+func (t *PostApiTriggersJSONBody_4_Filters_AdditionalProperties) MergePostApiTriggersJSONBody4Filters2(v PostApiTriggersJSONBody4Filters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_4_Filters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_4_Filters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody4GraphAlertTimePeriod0 returns the union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as a PostApiTriggersJSONBody4GraphAlertTimePeriod0
+func (t PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody4GraphAlertTimePeriod0() (PostApiTriggersJSONBody4GraphAlertTimePeriod0, error) {
+	var body PostApiTriggersJSONBody4GraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4GraphAlertTimePeriod0 overwrites any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody4GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody4GraphAlertTimePeriod0(v PostApiTriggersJSONBody4GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4GraphAlertTimePeriod0 performs a merge with any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody4GraphAlertTimePeriod0
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody4GraphAlertTimePeriod0(v PostApiTriggersJSONBody4GraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4GraphAlertTimePeriod1 returns the union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as a PostApiTriggersJSONBody4GraphAlertTimePeriod1
+func (t PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody4GraphAlertTimePeriod1() (PostApiTriggersJSONBody4GraphAlertTimePeriod1, error) {
+	var body PostApiTriggersJSONBody4GraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4GraphAlertTimePeriod1 overwrites any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody4GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody4GraphAlertTimePeriod1(v PostApiTriggersJSONBody4GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4GraphAlertTimePeriod1 performs a merge with any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody4GraphAlertTimePeriod1
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody4GraphAlertTimePeriod1(v PostApiTriggersJSONBody4GraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4GraphAlertTimePeriod2 returns the union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as a PostApiTriggersJSONBody4GraphAlertTimePeriod2
+func (t PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody4GraphAlertTimePeriod2() (PostApiTriggersJSONBody4GraphAlertTimePeriod2, error) {
+	var body PostApiTriggersJSONBody4GraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4GraphAlertTimePeriod2 overwrites any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody4GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody4GraphAlertTimePeriod2(v PostApiTriggersJSONBody4GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4GraphAlertTimePeriod2 performs a merge with any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody4GraphAlertTimePeriod2
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody4GraphAlertTimePeriod2(v PostApiTriggersJSONBody4GraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4GraphAlertTimePeriod3 returns the union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as a PostApiTriggersJSONBody4GraphAlertTimePeriod3
+func (t PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody4GraphAlertTimePeriod3() (PostApiTriggersJSONBody4GraphAlertTimePeriod3, error) {
+	var body PostApiTriggersJSONBody4GraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4GraphAlertTimePeriod3 overwrites any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody4GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody4GraphAlertTimePeriod3(v PostApiTriggersJSONBody4GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4GraphAlertTimePeriod3 performs a merge with any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody4GraphAlertTimePeriod3
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody4GraphAlertTimePeriod3(v PostApiTriggersJSONBody4GraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4GraphAlertTimePeriod4 returns the union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as a PostApiTriggersJSONBody4GraphAlertTimePeriod4
+func (t PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody4GraphAlertTimePeriod4() (PostApiTriggersJSONBody4GraphAlertTimePeriod4, error) {
+	var body PostApiTriggersJSONBody4GraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4GraphAlertTimePeriod4 overwrites any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody4GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody4GraphAlertTimePeriod4(v PostApiTriggersJSONBody4GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4GraphAlertTimePeriod4 performs a merge with any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody4GraphAlertTimePeriod4
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody4GraphAlertTimePeriod4(v PostApiTriggersJSONBody4GraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4GraphAlertTimePeriod5 returns the union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as a PostApiTriggersJSONBody4GraphAlertTimePeriod5
+func (t PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) AsPostApiTriggersJSONBody4GraphAlertTimePeriod5() (PostApiTriggersJSONBody4GraphAlertTimePeriod5, error) {
+	var body PostApiTriggersJSONBody4GraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4GraphAlertTimePeriod5 overwrites any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod as the provided PostApiTriggersJSONBody4GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) FromPostApiTriggersJSONBody4GraphAlertTimePeriod5(v PostApiTriggersJSONBody4GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4GraphAlertTimePeriod5 performs a merge with any union data inside the PostApiTriggersJSONBody_4_GraphAlert_TimePeriod, using the provided PostApiTriggersJSONBody4GraphAlertTimePeriod5
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) MergePostApiTriggersJSONBody4GraphAlertTimePeriod5(v PostApiTriggersJSONBody4GraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_4_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersJSONBody4ReportSource0 returns the union data inside the PostApiTriggersJSONBody_4_Report_Source as a PostApiTriggersJSONBody4ReportSource0
+func (t PostApiTriggersJSONBody_4_Report_Source) AsPostApiTriggersJSONBody4ReportSource0() (PostApiTriggersJSONBody4ReportSource0, error) {
+	var body PostApiTriggersJSONBody4ReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4ReportSource0 overwrites any union data inside the PostApiTriggersJSONBody_4_Report_Source as the provided PostApiTriggersJSONBody4ReportSource0
+func (t *PostApiTriggersJSONBody_4_Report_Source) FromPostApiTriggersJSONBody4ReportSource0(v PostApiTriggersJSONBody4ReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4ReportSource0 performs a merge with any union data inside the PostApiTriggersJSONBody_4_Report_Source, using the provided PostApiTriggersJSONBody4ReportSource0
+func (t *PostApiTriggersJSONBody_4_Report_Source) MergePostApiTriggersJSONBody4ReportSource0(v PostApiTriggersJSONBody4ReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4ReportSource1 returns the union data inside the PostApiTriggersJSONBody_4_Report_Source as a PostApiTriggersJSONBody4ReportSource1
+func (t PostApiTriggersJSONBody_4_Report_Source) AsPostApiTriggersJSONBody4ReportSource1() (PostApiTriggersJSONBody4ReportSource1, error) {
+	var body PostApiTriggersJSONBody4ReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4ReportSource1 overwrites any union data inside the PostApiTriggersJSONBody_4_Report_Source as the provided PostApiTriggersJSONBody4ReportSource1
+func (t *PostApiTriggersJSONBody_4_Report_Source) FromPostApiTriggersJSONBody4ReportSource1(v PostApiTriggersJSONBody4ReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4ReportSource1 performs a merge with any union data inside the PostApiTriggersJSONBody_4_Report_Source, using the provided PostApiTriggersJSONBody4ReportSource1
+func (t *PostApiTriggersJSONBody_4_Report_Source) MergePostApiTriggersJSONBody4ReportSource1(v PostApiTriggersJSONBody4ReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersJSONBody4ReportSource2 returns the union data inside the PostApiTriggersJSONBody_4_Report_Source as a PostApiTriggersJSONBody4ReportSource2
+func (t PostApiTriggersJSONBody_4_Report_Source) AsPostApiTriggersJSONBody4ReportSource2() (PostApiTriggersJSONBody4ReportSource2, error) {
+	var body PostApiTriggersJSONBody4ReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersJSONBody4ReportSource2 overwrites any union data inside the PostApiTriggersJSONBody_4_Report_Source as the provided PostApiTriggersJSONBody4ReportSource2
+func (t *PostApiTriggersJSONBody_4_Report_Source) FromPostApiTriggersJSONBody4ReportSource2(v PostApiTriggersJSONBody4ReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersJSONBody4ReportSource2 performs a merge with any union data inside the PostApiTriggersJSONBody_4_Report_Source, using the provided PostApiTriggersJSONBody4ReportSource2
+func (t *PostApiTriggersJSONBody_4_Report_Source) MergePostApiTriggersJSONBody4ReportSource2(v PostApiTriggersJSONBody4ReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersJSONBody_4_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersJSONBody_4_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0 returns the union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0
+func (t PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0() (PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0, error) {
+	var body PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0 overwrites any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1 returns the union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1
+func (t PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1() (PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1, error) {
+	var body PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1 overwrites any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2 returns the union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2
+func (t PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2() (PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2, error) {
+	var body PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2 overwrites any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3 returns the union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3
+func (t PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3() (PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3, error) {
+	var body PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3 overwrites any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4 returns the union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4
+func (t PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4() (PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4, error) {
+	var body PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4 overwrites any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5 returns the union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5
+func (t PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5() (PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5, error) {
+	var body PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5 overwrites any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5(v PostApiTriggers201JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyReportSource0 returns the union data inside the PostApiTriggers201JSONResponseBody_Report_Source as a PostApiTriggers201JSONResponseBodyReportSource0
+func (t PostApiTriggers201JSONResponseBody_Report_Source) AsPostApiTriggers201JSONResponseBodyReportSource0() (PostApiTriggers201JSONResponseBodyReportSource0, error) {
+	var body PostApiTriggers201JSONResponseBodyReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyReportSource0 overwrites any union data inside the PostApiTriggers201JSONResponseBody_Report_Source as the provided PostApiTriggers201JSONResponseBodyReportSource0
+func (t *PostApiTriggers201JSONResponseBody_Report_Source) FromPostApiTriggers201JSONResponseBodyReportSource0(v PostApiTriggers201JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyReportSource0 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_Report_Source, using the provided PostApiTriggers201JSONResponseBodyReportSource0
+func (t *PostApiTriggers201JSONResponseBody_Report_Source) MergePostApiTriggers201JSONResponseBodyReportSource0(v PostApiTriggers201JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyReportSource1 returns the union data inside the PostApiTriggers201JSONResponseBody_Report_Source as a PostApiTriggers201JSONResponseBodyReportSource1
+func (t PostApiTriggers201JSONResponseBody_Report_Source) AsPostApiTriggers201JSONResponseBodyReportSource1() (PostApiTriggers201JSONResponseBodyReportSource1, error) {
+	var body PostApiTriggers201JSONResponseBodyReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyReportSource1 overwrites any union data inside the PostApiTriggers201JSONResponseBody_Report_Source as the provided PostApiTriggers201JSONResponseBodyReportSource1
+func (t *PostApiTriggers201JSONResponseBody_Report_Source) FromPostApiTriggers201JSONResponseBodyReportSource1(v PostApiTriggers201JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyReportSource1 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_Report_Source, using the provided PostApiTriggers201JSONResponseBodyReportSource1
+func (t *PostApiTriggers201JSONResponseBody_Report_Source) MergePostApiTriggers201JSONResponseBodyReportSource1(v PostApiTriggers201JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggers201JSONResponseBodyReportSource2 returns the union data inside the PostApiTriggers201JSONResponseBody_Report_Source as a PostApiTriggers201JSONResponseBodyReportSource2
+func (t PostApiTriggers201JSONResponseBody_Report_Source) AsPostApiTriggers201JSONResponseBodyReportSource2() (PostApiTriggers201JSONResponseBodyReportSource2, error) {
+	var body PostApiTriggers201JSONResponseBodyReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggers201JSONResponseBodyReportSource2 overwrites any union data inside the PostApiTriggers201JSONResponseBody_Report_Source as the provided PostApiTriggers201JSONResponseBodyReportSource2
+func (t *PostApiTriggers201JSONResponseBody_Report_Source) FromPostApiTriggers201JSONResponseBodyReportSource2(v PostApiTriggers201JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggers201JSONResponseBodyReportSource2 performs a merge with any union data inside the PostApiTriggers201JSONResponseBody_Report_Source, using the provided PostApiTriggers201JSONResponseBodyReportSource2
+func (t *PostApiTriggers201JSONResponseBody_Report_Source) MergePostApiTriggers201JSONResponseBodyReportSource2(v PostApiTriggers201JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggers201JSONResponseBody_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggers201JSONResponseBody_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 returns the union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0
+func (t GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0() (GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0, error) {
+	var body GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 returns the union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1
+func (t GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1() (GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1, error) {
+	var body GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 returns the union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2
+func (t GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2() (GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2, error) {
+	var body GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 returns the union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3
+func (t GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3() (GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3, error) {
+	var body GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 returns the union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4
+func (t GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4() (GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4, error) {
+	var body GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 returns the union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5
+func (t GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5() (GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5, error) {
+	var body GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergeGetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5(v GetApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyReportSource0 returns the union data inside the GetApiTriggersById200JSONResponseBody_Report_Source as a GetApiTriggersById200JSONResponseBodyReportSource0
+func (t GetApiTriggersById200JSONResponseBody_Report_Source) AsGetApiTriggersById200JSONResponseBodyReportSource0() (GetApiTriggersById200JSONResponseBodyReportSource0, error) {
+	var body GetApiTriggersById200JSONResponseBodyReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyReportSource0 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_Report_Source as the provided GetApiTriggersById200JSONResponseBodyReportSource0
+func (t *GetApiTriggersById200JSONResponseBody_Report_Source) FromGetApiTriggersById200JSONResponseBodyReportSource0(v GetApiTriggersById200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyReportSource0 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_Report_Source, using the provided GetApiTriggersById200JSONResponseBodyReportSource0
+func (t *GetApiTriggersById200JSONResponseBody_Report_Source) MergeGetApiTriggersById200JSONResponseBodyReportSource0(v GetApiTriggersById200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyReportSource1 returns the union data inside the GetApiTriggersById200JSONResponseBody_Report_Source as a GetApiTriggersById200JSONResponseBodyReportSource1
+func (t GetApiTriggersById200JSONResponseBody_Report_Source) AsGetApiTriggersById200JSONResponseBodyReportSource1() (GetApiTriggersById200JSONResponseBodyReportSource1, error) {
+	var body GetApiTriggersById200JSONResponseBodyReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyReportSource1 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_Report_Source as the provided GetApiTriggersById200JSONResponseBodyReportSource1
+func (t *GetApiTriggersById200JSONResponseBody_Report_Source) FromGetApiTriggersById200JSONResponseBodyReportSource1(v GetApiTriggersById200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyReportSource1 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_Report_Source, using the provided GetApiTriggersById200JSONResponseBodyReportSource1
+func (t *GetApiTriggersById200JSONResponseBody_Report_Source) MergeGetApiTriggersById200JSONResponseBodyReportSource1(v GetApiTriggersById200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTriggersById200JSONResponseBodyReportSource2 returns the union data inside the GetApiTriggersById200JSONResponseBody_Report_Source as a GetApiTriggersById200JSONResponseBodyReportSource2
+func (t GetApiTriggersById200JSONResponseBody_Report_Source) AsGetApiTriggersById200JSONResponseBodyReportSource2() (GetApiTriggersById200JSONResponseBodyReportSource2, error) {
+	var body GetApiTriggersById200JSONResponseBodyReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTriggersById200JSONResponseBodyReportSource2 overwrites any union data inside the GetApiTriggersById200JSONResponseBody_Report_Source as the provided GetApiTriggersById200JSONResponseBodyReportSource2
+func (t *GetApiTriggersById200JSONResponseBody_Report_Source) FromGetApiTriggersById200JSONResponseBodyReportSource2(v GetApiTriggersById200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTriggersById200JSONResponseBodyReportSource2 performs a merge with any union data inside the GetApiTriggersById200JSONResponseBody_Report_Source, using the provided GetApiTriggersById200JSONResponseBodyReportSource2
+func (t *GetApiTriggersById200JSONResponseBody_Report_Source) MergeGetApiTriggersById200JSONResponseBodyReportSource2(v GetApiTriggersById200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTriggersById200JSONResponseBody_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTriggersById200JSONResponseBody_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyActionParams0 returns the union data inside the PatchApiTriggersByIdJSONBody_ActionParams as a PatchApiTriggersByIdJSONBodyActionParams0
+func (t PatchApiTriggersByIdJSONBody_ActionParams) AsPatchApiTriggersByIdJSONBodyActionParams0() (PatchApiTriggersByIdJSONBodyActionParams0, error) {
+	var body PatchApiTriggersByIdJSONBodyActionParams0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyActionParams0 overwrites any union data inside the PatchApiTriggersByIdJSONBody_ActionParams as the provided PatchApiTriggersByIdJSONBodyActionParams0
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) FromPatchApiTriggersByIdJSONBodyActionParams0(v PatchApiTriggersByIdJSONBodyActionParams0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyActionParams0 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_ActionParams, using the provided PatchApiTriggersByIdJSONBodyActionParams0
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) MergePatchApiTriggersByIdJSONBodyActionParams0(v PatchApiTriggersByIdJSONBodyActionParams0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyActionParams1 returns the union data inside the PatchApiTriggersByIdJSONBody_ActionParams as a PatchApiTriggersByIdJSONBodyActionParams1
+func (t PatchApiTriggersByIdJSONBody_ActionParams) AsPatchApiTriggersByIdJSONBodyActionParams1() (PatchApiTriggersByIdJSONBodyActionParams1, error) {
+	var body PatchApiTriggersByIdJSONBodyActionParams1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyActionParams1 overwrites any union data inside the PatchApiTriggersByIdJSONBody_ActionParams as the provided PatchApiTriggersByIdJSONBodyActionParams1
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) FromPatchApiTriggersByIdJSONBodyActionParams1(v PatchApiTriggersByIdJSONBodyActionParams1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyActionParams1 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_ActionParams, using the provided PatchApiTriggersByIdJSONBodyActionParams1
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) MergePatchApiTriggersByIdJSONBodyActionParams1(v PatchApiTriggersByIdJSONBodyActionParams1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyActionParams2 returns the union data inside the PatchApiTriggersByIdJSONBody_ActionParams as a PatchApiTriggersByIdJSONBodyActionParams2
+func (t PatchApiTriggersByIdJSONBody_ActionParams) AsPatchApiTriggersByIdJSONBodyActionParams2() (PatchApiTriggersByIdJSONBodyActionParams2, error) {
+	var body PatchApiTriggersByIdJSONBodyActionParams2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyActionParams2 overwrites any union data inside the PatchApiTriggersByIdJSONBody_ActionParams as the provided PatchApiTriggersByIdJSONBodyActionParams2
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) FromPatchApiTriggersByIdJSONBodyActionParams2(v PatchApiTriggersByIdJSONBodyActionParams2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyActionParams2 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_ActionParams, using the provided PatchApiTriggersByIdJSONBodyActionParams2
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) MergePatchApiTriggersByIdJSONBodyActionParams2(v PatchApiTriggersByIdJSONBodyActionParams2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyActionParams3 returns the union data inside the PatchApiTriggersByIdJSONBody_ActionParams as a PatchApiTriggersByIdJSONBodyActionParams3
+func (t PatchApiTriggersByIdJSONBody_ActionParams) AsPatchApiTriggersByIdJSONBodyActionParams3() (PatchApiTriggersByIdJSONBodyActionParams3, error) {
+	var body PatchApiTriggersByIdJSONBodyActionParams3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyActionParams3 overwrites any union data inside the PatchApiTriggersByIdJSONBody_ActionParams as the provided PatchApiTriggersByIdJSONBodyActionParams3
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) FromPatchApiTriggersByIdJSONBodyActionParams3(v PatchApiTriggersByIdJSONBodyActionParams3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyActionParams3 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_ActionParams, using the provided PatchApiTriggersByIdJSONBodyActionParams3
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) MergePatchApiTriggersByIdJSONBodyActionParams3(v PatchApiTriggersByIdJSONBodyActionParams3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyActionParams4 returns the union data inside the PatchApiTriggersByIdJSONBody_ActionParams as a PatchApiTriggersByIdJSONBodyActionParams4
+func (t PatchApiTriggersByIdJSONBody_ActionParams) AsPatchApiTriggersByIdJSONBodyActionParams4() (PatchApiTriggersByIdJSONBodyActionParams4, error) {
+	var body PatchApiTriggersByIdJSONBodyActionParams4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyActionParams4 overwrites any union data inside the PatchApiTriggersByIdJSONBody_ActionParams as the provided PatchApiTriggersByIdJSONBodyActionParams4
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) FromPatchApiTriggersByIdJSONBodyActionParams4(v PatchApiTriggersByIdJSONBodyActionParams4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyActionParams4 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_ActionParams, using the provided PatchApiTriggersByIdJSONBodyActionParams4
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) MergePatchApiTriggersByIdJSONBodyActionParams4(v PatchApiTriggersByIdJSONBodyActionParams4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiTriggersByIdJSONBody_ActionParams) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiTriggersByIdJSONBody_ActionParams) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyFilters0 returns the union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties as a PatchApiTriggersByIdJSONBodyFilters0
+func (t PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) AsPatchApiTriggersByIdJSONBodyFilters0() (PatchApiTriggersByIdJSONBodyFilters0, error) {
+	var body PatchApiTriggersByIdJSONBodyFilters0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyFilters0 overwrites any union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties as the provided PatchApiTriggersByIdJSONBodyFilters0
+func (t *PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) FromPatchApiTriggersByIdJSONBodyFilters0(v PatchApiTriggersByIdJSONBodyFilters0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyFilters0 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties, using the provided PatchApiTriggersByIdJSONBodyFilters0
+func (t *PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) MergePatchApiTriggersByIdJSONBodyFilters0(v PatchApiTriggersByIdJSONBodyFilters0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyFilters1 returns the union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties as a PatchApiTriggersByIdJSONBodyFilters1
+func (t PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) AsPatchApiTriggersByIdJSONBodyFilters1() (PatchApiTriggersByIdJSONBodyFilters1, error) {
+	var body PatchApiTriggersByIdJSONBodyFilters1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyFilters1 overwrites any union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties as the provided PatchApiTriggersByIdJSONBodyFilters1
+func (t *PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) FromPatchApiTriggersByIdJSONBodyFilters1(v PatchApiTriggersByIdJSONBodyFilters1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyFilters1 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties, using the provided PatchApiTriggersByIdJSONBodyFilters1
+func (t *PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) MergePatchApiTriggersByIdJSONBodyFilters1(v PatchApiTriggersByIdJSONBodyFilters1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyFilters2 returns the union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties as a PatchApiTriggersByIdJSONBodyFilters2
+func (t PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) AsPatchApiTriggersByIdJSONBodyFilters2() (PatchApiTriggersByIdJSONBodyFilters2, error) {
+	var body PatchApiTriggersByIdJSONBodyFilters2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyFilters2 overwrites any union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties as the provided PatchApiTriggersByIdJSONBodyFilters2
+func (t *PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) FromPatchApiTriggersByIdJSONBodyFilters2(v PatchApiTriggersByIdJSONBodyFilters2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyFilters2 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties, using the provided PatchApiTriggersByIdJSONBodyFilters2
+func (t *PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) MergePatchApiTriggersByIdJSONBodyFilters2(v PatchApiTriggersByIdJSONBodyFilters2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0 returns the union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as a PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0
+func (t PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0() (PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0, error) {
+	var body PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0 overwrites any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1 returns the union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as a PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1
+func (t PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1() (PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1, error) {
+	var body PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1 overwrites any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2 returns the union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as a PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2
+func (t PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2() (PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2, error) {
+	var body PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2 overwrites any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3 returns the union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as a PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3
+func (t PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3() (PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3, error) {
+	var body PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3 overwrites any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4 returns the union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as a PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4
+func (t PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4() (PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4, error) {
+	var body PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4 overwrites any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5 returns the union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as a PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5
+func (t PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) AsPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5() (PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5, error) {
+	var body PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5 overwrites any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod as the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) FromPatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) MergePatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5(v PatchApiTriggersByIdJSONBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiTriggersByIdJSONBody_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyReportSource0 returns the union data inside the PatchApiTriggersByIdJSONBody_Report_Source as a PatchApiTriggersByIdJSONBodyReportSource0
+func (t PatchApiTriggersByIdJSONBody_Report_Source) AsPatchApiTriggersByIdJSONBodyReportSource0() (PatchApiTriggersByIdJSONBodyReportSource0, error) {
+	var body PatchApiTriggersByIdJSONBodyReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyReportSource0 overwrites any union data inside the PatchApiTriggersByIdJSONBody_Report_Source as the provided PatchApiTriggersByIdJSONBodyReportSource0
+func (t *PatchApiTriggersByIdJSONBody_Report_Source) FromPatchApiTriggersByIdJSONBodyReportSource0(v PatchApiTriggersByIdJSONBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyReportSource0 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_Report_Source, using the provided PatchApiTriggersByIdJSONBodyReportSource0
+func (t *PatchApiTriggersByIdJSONBody_Report_Source) MergePatchApiTriggersByIdJSONBodyReportSource0(v PatchApiTriggersByIdJSONBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyReportSource1 returns the union data inside the PatchApiTriggersByIdJSONBody_Report_Source as a PatchApiTriggersByIdJSONBodyReportSource1
+func (t PatchApiTriggersByIdJSONBody_Report_Source) AsPatchApiTriggersByIdJSONBodyReportSource1() (PatchApiTriggersByIdJSONBodyReportSource1, error) {
+	var body PatchApiTriggersByIdJSONBodyReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyReportSource1 overwrites any union data inside the PatchApiTriggersByIdJSONBody_Report_Source as the provided PatchApiTriggersByIdJSONBodyReportSource1
+func (t *PatchApiTriggersByIdJSONBody_Report_Source) FromPatchApiTriggersByIdJSONBodyReportSource1(v PatchApiTriggersByIdJSONBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyReportSource1 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_Report_Source, using the provided PatchApiTriggersByIdJSONBodyReportSource1
+func (t *PatchApiTriggersByIdJSONBody_Report_Source) MergePatchApiTriggersByIdJSONBodyReportSource1(v PatchApiTriggersByIdJSONBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersByIdJSONBodyReportSource2 returns the union data inside the PatchApiTriggersByIdJSONBody_Report_Source as a PatchApiTriggersByIdJSONBodyReportSource2
+func (t PatchApiTriggersByIdJSONBody_Report_Source) AsPatchApiTriggersByIdJSONBodyReportSource2() (PatchApiTriggersByIdJSONBodyReportSource2, error) {
+	var body PatchApiTriggersByIdJSONBodyReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersByIdJSONBodyReportSource2 overwrites any union data inside the PatchApiTriggersByIdJSONBody_Report_Source as the provided PatchApiTriggersByIdJSONBodyReportSource2
+func (t *PatchApiTriggersByIdJSONBody_Report_Source) FromPatchApiTriggersByIdJSONBodyReportSource2(v PatchApiTriggersByIdJSONBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersByIdJSONBodyReportSource2 performs a merge with any union data inside the PatchApiTriggersByIdJSONBody_Report_Source, using the provided PatchApiTriggersByIdJSONBodyReportSource2
+func (t *PatchApiTriggersByIdJSONBody_Report_Source) MergePatchApiTriggersByIdJSONBodyReportSource2(v PatchApiTriggersByIdJSONBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiTriggersByIdJSONBody_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiTriggersByIdJSONBody_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 returns the union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0
+func (t PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0() (PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0, error) {
+	var body PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 returns the union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1
+func (t PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1() (PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1, error) {
+	var body PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 returns the union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2
+func (t PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2() (PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2, error) {
+	var body PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 returns the union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3
+func (t PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3() (PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3, error) {
+	var body PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 returns the union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4
+func (t PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4() (PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4, error) {
+	var body PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 returns the union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as a PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5
+func (t PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) AsPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5() (PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5, error) {
+	var body PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod as the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) FromPatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod, using the provided PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MergePatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5(v PatchApiTriggersById200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyReportSource0 returns the union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source as a PatchApiTriggersById200JSONResponseBodyReportSource0
+func (t PatchApiTriggersById200JSONResponseBody_Report_Source) AsPatchApiTriggersById200JSONResponseBodyReportSource0() (PatchApiTriggersById200JSONResponseBodyReportSource0, error) {
+	var body PatchApiTriggersById200JSONResponseBodyReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyReportSource0 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source as the provided PatchApiTriggersById200JSONResponseBodyReportSource0
+func (t *PatchApiTriggersById200JSONResponseBody_Report_Source) FromPatchApiTriggersById200JSONResponseBodyReportSource0(v PatchApiTriggersById200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyReportSource0 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source, using the provided PatchApiTriggersById200JSONResponseBodyReportSource0
+func (t *PatchApiTriggersById200JSONResponseBody_Report_Source) MergePatchApiTriggersById200JSONResponseBodyReportSource0(v PatchApiTriggersById200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyReportSource1 returns the union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source as a PatchApiTriggersById200JSONResponseBodyReportSource1
+func (t PatchApiTriggersById200JSONResponseBody_Report_Source) AsPatchApiTriggersById200JSONResponseBodyReportSource1() (PatchApiTriggersById200JSONResponseBodyReportSource1, error) {
+	var body PatchApiTriggersById200JSONResponseBodyReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyReportSource1 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source as the provided PatchApiTriggersById200JSONResponseBodyReportSource1
+func (t *PatchApiTriggersById200JSONResponseBody_Report_Source) FromPatchApiTriggersById200JSONResponseBodyReportSource1(v PatchApiTriggersById200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyReportSource1 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source, using the provided PatchApiTriggersById200JSONResponseBodyReportSource1
+func (t *PatchApiTriggersById200JSONResponseBody_Report_Source) MergePatchApiTriggersById200JSONResponseBodyReportSource1(v PatchApiTriggersById200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiTriggersById200JSONResponseBodyReportSource2 returns the union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source as a PatchApiTriggersById200JSONResponseBodyReportSource2
+func (t PatchApiTriggersById200JSONResponseBody_Report_Source) AsPatchApiTriggersById200JSONResponseBodyReportSource2() (PatchApiTriggersById200JSONResponseBodyReportSource2, error) {
+	var body PatchApiTriggersById200JSONResponseBodyReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiTriggersById200JSONResponseBodyReportSource2 overwrites any union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source as the provided PatchApiTriggersById200JSONResponseBodyReportSource2
+func (t *PatchApiTriggersById200JSONResponseBody_Report_Source) FromPatchApiTriggersById200JSONResponseBodyReportSource2(v PatchApiTriggersById200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiTriggersById200JSONResponseBodyReportSource2 performs a merge with any union data inside the PatchApiTriggersById200JSONResponseBody_Report_Source, using the provided PatchApiTriggersById200JSONResponseBodyReportSource2
+func (t *PatchApiTriggersById200JSONResponseBody_Report_Source) MergePatchApiTriggersById200JSONResponseBodyReportSource2(v PatchApiTriggersById200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiTriggersById200JSONResponseBody_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiTriggersById200JSONResponseBody_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0
+func (t PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0() (PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1
+func (t PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1() (PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2
+func (t PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2() (PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3
+func (t PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3() (PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4
+func (t PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4() (PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5
+func (t PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5() (PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5(v PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyReportSource0 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source as a PostApiTriggersByIdDisable200JSONResponseBodyReportSource0
+func (t PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) AsPostApiTriggersByIdDisable200JSONResponseBodyReportSource0() (PostApiTriggersByIdDisable200JSONResponseBodyReportSource0, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyReportSource0 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source as the provided PostApiTriggersByIdDisable200JSONResponseBodyReportSource0
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) FromPostApiTriggersByIdDisable200JSONResponseBodyReportSource0(v PostApiTriggersByIdDisable200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyReportSource0 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source, using the provided PostApiTriggersByIdDisable200JSONResponseBodyReportSource0
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) MergePostApiTriggersByIdDisable200JSONResponseBodyReportSource0(v PostApiTriggersByIdDisable200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyReportSource1 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source as a PostApiTriggersByIdDisable200JSONResponseBodyReportSource1
+func (t PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) AsPostApiTriggersByIdDisable200JSONResponseBodyReportSource1() (PostApiTriggersByIdDisable200JSONResponseBodyReportSource1, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyReportSource1 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source as the provided PostApiTriggersByIdDisable200JSONResponseBodyReportSource1
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) FromPostApiTriggersByIdDisable200JSONResponseBodyReportSource1(v PostApiTriggersByIdDisable200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyReportSource1 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source, using the provided PostApiTriggersByIdDisable200JSONResponseBodyReportSource1
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) MergePostApiTriggersByIdDisable200JSONResponseBodyReportSource1(v PostApiTriggersByIdDisable200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdDisable200JSONResponseBodyReportSource2 returns the union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source as a PostApiTriggersByIdDisable200JSONResponseBodyReportSource2
+func (t PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) AsPostApiTriggersByIdDisable200JSONResponseBodyReportSource2() (PostApiTriggersByIdDisable200JSONResponseBodyReportSource2, error) {
+	var body PostApiTriggersByIdDisable200JSONResponseBodyReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdDisable200JSONResponseBodyReportSource2 overwrites any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source as the provided PostApiTriggersByIdDisable200JSONResponseBodyReportSource2
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) FromPostApiTriggersByIdDisable200JSONResponseBodyReportSource2(v PostApiTriggersByIdDisable200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdDisable200JSONResponseBodyReportSource2 performs a merge with any union data inside the PostApiTriggersByIdDisable200JSONResponseBody_Report_Source, using the provided PostApiTriggersByIdDisable200JSONResponseBodyReportSource2
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) MergePostApiTriggersByIdDisable200JSONResponseBodyReportSource2(v PostApiTriggersByIdDisable200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersByIdDisable200JSONResponseBody_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0
+func (t PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0() (PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1
+func (t PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1() (PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2
+func (t PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2() (PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3
+func (t PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3() (PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4
+func (t PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4() (PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as a PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5
+func (t PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) AsPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5() (PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod as the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) FromPostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod, using the provided PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) MergePostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5(v PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertTimePeriod5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyReportSource0 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source as a PostApiTriggersByIdEnable200JSONResponseBodyReportSource0
+func (t PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) AsPostApiTriggersByIdEnable200JSONResponseBodyReportSource0() (PostApiTriggersByIdEnable200JSONResponseBodyReportSource0, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyReportSource0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyReportSource0 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source as the provided PostApiTriggersByIdEnable200JSONResponseBodyReportSource0
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) FromPostApiTriggersByIdEnable200JSONResponseBodyReportSource0(v PostApiTriggersByIdEnable200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyReportSource0 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source, using the provided PostApiTriggersByIdEnable200JSONResponseBodyReportSource0
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) MergePostApiTriggersByIdEnable200JSONResponseBodyReportSource0(v PostApiTriggersByIdEnable200JSONResponseBodyReportSource0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyReportSource1 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source as a PostApiTriggersByIdEnable200JSONResponseBodyReportSource1
+func (t PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) AsPostApiTriggersByIdEnable200JSONResponseBodyReportSource1() (PostApiTriggersByIdEnable200JSONResponseBodyReportSource1, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyReportSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyReportSource1 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source as the provided PostApiTriggersByIdEnable200JSONResponseBodyReportSource1
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) FromPostApiTriggersByIdEnable200JSONResponseBodyReportSource1(v PostApiTriggersByIdEnable200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyReportSource1 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source, using the provided PostApiTriggersByIdEnable200JSONResponseBodyReportSource1
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) MergePostApiTriggersByIdEnable200JSONResponseBodyReportSource1(v PostApiTriggersByIdEnable200JSONResponseBodyReportSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiTriggersByIdEnable200JSONResponseBodyReportSource2 returns the union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source as a PostApiTriggersByIdEnable200JSONResponseBodyReportSource2
+func (t PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) AsPostApiTriggersByIdEnable200JSONResponseBodyReportSource2() (PostApiTriggersByIdEnable200JSONResponseBodyReportSource2, error) {
+	var body PostApiTriggersByIdEnable200JSONResponseBodyReportSource2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiTriggersByIdEnable200JSONResponseBodyReportSource2 overwrites any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source as the provided PostApiTriggersByIdEnable200JSONResponseBodyReportSource2
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) FromPostApiTriggersByIdEnable200JSONResponseBodyReportSource2(v PostApiTriggersByIdEnable200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiTriggersByIdEnable200JSONResponseBodyReportSource2 performs a merge with any union data inside the PostApiTriggersByIdEnable200JSONResponseBody_Report_Source, using the provided PostApiTriggersByIdEnable200JSONResponseBodyReportSource2
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) MergePostApiTriggersByIdEnable200JSONResponseBodyReportSource2(v PostApiTriggersByIdEnable200JSONResponseBodyReportSource2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiTriggersByIdEnable200JSONResponseBody_Report_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsListAgents200JSONResponseBodyDataParametersDefaultValue0 returns the union data inside the ListAgents200JSONResponseBody_Data_Parameters_DefaultValue as a ListAgents200JSONResponseBodyDataParametersDefaultValue0
 func (t ListAgents200JSONResponseBody_Data_Parameters_DefaultValue) AsListAgents200JSONResponseBodyDataParametersDefaultValue0() (ListAgents200JSONResponseBodyDataParametersDefaultValue0, error) {
 	var body ListAgents200JSONResponseBodyDataParametersDefaultValue0
@@ -70706,6 +80901,9 @@ type ClientInterface interface {
 
 	PostApiDataset(ctx context.Context, body PostApiDatasetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostApiDatasetAttachmentsWithBody request with any body
+	PostApiDatasetAttachmentsWithBody(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiDatasetDirectUpload request
 	PostApiDatasetDirectUpload(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -70760,6 +80958,9 @@ type ClientInterface interface {
 
 	// PostApiDatasetBySlugOrIdUpload request
 	PostApiDatasetBySlugOrIdUpload(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiDatasetBySlugEntries request
+	GetApiDatasetBySlugEntries(ctx context.Context, slug string, params *GetApiDatasetBySlugEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PostApiDatasetBySlugEntriesWithBody request with any body
 	PostApiDatasetBySlugEntriesWithBody(ctx context.Context, slug string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -71393,6 +81594,9 @@ type ClientInterface interface {
 	// GetApiSimulationRunsByScenarioRunId request
 	GetApiSimulationRunsByScenarioRunId(ctx context.Context, scenarioRunId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiSlackConnections request
+	GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetApiSuites request
 	GetApiSuites(ctx context.Context, params *GetApiSuitesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -71514,6 +81718,18 @@ type ClientInterface interface {
 	PatchApiTriggersByIdWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PatchApiTriggersById(ctx context.Context, id string, body PatchApiTriggersByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiTriggersByIdDisable request
+	PostApiTriggersByIdDisable(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiTriggersByIdEnable request
+	PostApiTriggersByIdEnable(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiTriggersByIdFires request
+	GetApiTriggersByIdFires(ctx context.Context, id string, params *GetApiTriggersByIdFiresParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiTriggersByIdTestFire request
+	PostApiTriggersByIdTestFire(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAgents request
 	ListAgents(ctx context.Context, params *ListAgentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -72327,6 +82543,18 @@ func (c *Client) PostApiDataset(ctx context.Context, body PostApiDatasetJSONRequ
 	return c.Client.Do(req)
 }
 
+func (c *Client) PostApiDatasetAttachmentsWithBody(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetAttachmentsRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) PostApiDatasetDirectUpload(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiDatasetDirectUploadRequest(c.Server)
 	if err != nil {
@@ -72557,6 +82785,18 @@ func (c *Client) PatchApiDatasetBySlugOrIdRecordsByRecordId(ctx context.Context,
 
 func (c *Client) PostApiDatasetBySlugOrIdUpload(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiDatasetBySlugOrIdUploadRequest(c.Server, slugOrId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiDatasetBySlugEntries(ctx context.Context, slug string, params *GetApiDatasetBySlugEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiDatasetBySlugEntriesRequest(c.Server, slug, params)
 	if err != nil {
 		return nil, err
 	}
@@ -75327,6 +85567,18 @@ func (c *Client) GetApiSimulationRunsByScenarioRunId(ctx context.Context, scenar
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiSlackConnectionsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetApiSuites(ctx context.Context, params *GetApiSuitesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiSuitesRequest(c.Server, params)
 	if err != nil {
@@ -75857,6 +86109,54 @@ func (c *Client) PatchApiTriggersByIdWithBody(ctx context.Context, id string, co
 
 func (c *Client) PatchApiTriggersById(ctx context.Context, id string, body PatchApiTriggersByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPatchApiTriggersByIdRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiTriggersByIdDisable(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiTriggersByIdDisableRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiTriggersByIdEnable(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiTriggersByIdEnableRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiTriggersByIdFires(ctx context.Context, id string, params *GetApiTriggersByIdFiresParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiTriggersByIdFiresRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiTriggersByIdTestFire(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiTriggersByIdTestFireRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -78409,6 +88709,58 @@ func NewPostApiDatasetRequestWithBody(server string, contentType string, body io
 	return req, nil
 }
 
+// NewPostApiDatasetAttachmentsRequestWithBody generates requests for PostApiDatasetAttachments with any type of body
+func NewPostApiDatasetAttachmentsRequestWithBody(server string, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/dataset/attachments")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "projectId", params.ProjectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewPostApiDatasetDirectUploadRequest generates requests for PostApiDatasetDirectUpload
 func NewPostApiDatasetDirectUploadRequest(server string) (*http.Request, error) {
 	var err error
@@ -79002,6 +89354,79 @@ func NewPostApiDatasetBySlugOrIdUploadRequest(server string, slugOrId string) (*
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiDatasetBySlugEntriesRequest generates requests for GetApiDatasetBySlugEntries
+func NewGetApiDatasetBySlugEntriesRequest(server string, slug string, params *GetApiDatasetBySlugEntriesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "slug", slug, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/dataset/%s/entries", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -86785,6 +97210,33 @@ func NewGetApiSimulationRunsByScenarioRunIdRequest(server string, scenarioRunId 
 	return req, nil
 }
 
+// NewGetApiSlackConnectionsRequest generates requests for GetApiSlackConnections
+func NewGetApiSlackConnectionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/slack-connections")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetApiSuitesRequest generates requests for GetApiSuites
 func NewGetApiSuitesRequest(server string, params *GetApiSuitesParams) (*http.Request, error) {
 	var err error
@@ -88160,6 +98612,181 @@ func NewPatchApiTriggersByIdRequestWithBody(server string, id string, contentTyp
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostApiTriggersByIdDisableRequest generates requests for PostApiTriggersByIdDisable
+func NewPostApiTriggersByIdDisableRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/triggers/%s/disable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiTriggersByIdEnableRequest generates requests for PostApiTriggersByIdEnable
+func NewPostApiTriggersByIdEnableRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/triggers/%s/enable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetApiTriggersByIdFiresRequest generates requests for GetApiTriggersByIdFires
+func NewGetApiTriggersByIdFiresRequest(server string, id string, params *GetApiTriggersByIdFiresParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/triggers/%s/fires", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiTriggersByIdTestFireRequest generates requests for PostApiTriggersByIdTestFire
+func NewPostApiTriggersByIdTestFireRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/triggers/%s/test-fire", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -91424,6 +102051,9 @@ type ClientWithResponsesInterface interface {
 
 	PostApiDatasetWithResponse(ctx context.Context, body PostApiDatasetJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDatasetResponse, error)
 
+	// PostApiDatasetAttachmentsWithBodyWithResponse request with any body
+	PostApiDatasetAttachmentsWithBodyWithResponse(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsResponse, error)
+
 	// PostApiDatasetDirectUploadWithResponse request
 	PostApiDatasetDirectUploadWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostApiDatasetDirectUploadResponse, error)
 
@@ -91478,6 +102108,9 @@ type ClientWithResponsesInterface interface {
 
 	// PostApiDatasetBySlugOrIdUploadWithResponse request
 	PostApiDatasetBySlugOrIdUploadWithResponse(ctx context.Context, slugOrId string, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugOrIdUploadResponse, error)
+
+	// GetApiDatasetBySlugEntriesWithResponse request
+	GetApiDatasetBySlugEntriesWithResponse(ctx context.Context, slug string, params *GetApiDatasetBySlugEntriesParams, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugEntriesResponse, error)
 
 	// PostApiDatasetBySlugEntriesWithBodyWithResponse request with any body
 	PostApiDatasetBySlugEntriesWithBodyWithResponse(ctx context.Context, slug string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetBySlugEntriesResponse, error)
@@ -92111,6 +102744,9 @@ type ClientWithResponsesInterface interface {
 	// GetApiSimulationRunsByScenarioRunIdWithResponse request
 	GetApiSimulationRunsByScenarioRunIdWithResponse(ctx context.Context, scenarioRunId string, reqEditors ...RequestEditorFn) (*GetApiSimulationRunsByScenarioRunIdResponse, error)
 
+	// GetApiSlackConnectionsWithResponse request
+	GetApiSlackConnectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiSlackConnectionsResponse, error)
+
 	// GetApiSuitesWithResponse request
 	GetApiSuitesWithResponse(ctx context.Context, params *GetApiSuitesParams, reqEditors ...RequestEditorFn) (*GetApiSuitesResponse, error)
 
@@ -92232,6 +102868,18 @@ type ClientWithResponsesInterface interface {
 	PatchApiTriggersByIdWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiTriggersByIdResponse, error)
 
 	PatchApiTriggersByIdWithResponse(ctx context.Context, id string, body PatchApiTriggersByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiTriggersByIdResponse, error)
+
+	// PostApiTriggersByIdDisableWithResponse request
+	PostApiTriggersByIdDisableWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*PostApiTriggersByIdDisableResponse, error)
+
+	// PostApiTriggersByIdEnableWithResponse request
+	PostApiTriggersByIdEnableWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*PostApiTriggersByIdEnableResponse, error)
+
+	// GetApiTriggersByIdFiresWithResponse request
+	GetApiTriggersByIdFiresWithResponse(ctx context.Context, id string, params *GetApiTriggersByIdFiresParams, reqEditors ...RequestEditorFn) (*GetApiTriggersByIdFiresResponse, error)
+
+	// PostApiTriggersByIdTestFireWithResponse request
+	PostApiTriggersByIdTestFireWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*PostApiTriggersByIdTestFireResponse, error)
 
 	// ListAgentsWithResponse request
 	ListAgentsWithResponse(ctx context.Context, params *ListAgentsParams, reqEditors ...RequestEditorFn) (*ListAgentsResponse, error)
@@ -93965,6 +104613,76 @@ func (r PostApiDatasetResponse) ContentType() string {
 	return ""
 }
 
+type PostApiDatasetAttachmentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// MediaType The media type the file is stored under.
+		MediaType string `json:"mediaType"`
+
+		// Name The file name the reference carries.
+		Name string `json:"name"`
+
+		// SizeBytes The size of the stored file, in bytes.
+		SizeBytes float32 `json:"sizeBytes"`
+
+		// Url The value to write into the cell, and the address the file is served from.
+		Url string `json:"url"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON413 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON415 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON429 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiDatasetAttachmentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiDatasetAttachmentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiDatasetAttachmentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PostApiDatasetDirectUploadResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -94459,6 +105177,35 @@ func (r PostApiDatasetBySlugOrIdUploadResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PostApiDatasetBySlugOrIdUploadResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiDatasetBySlugEntriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiDatasetBySlugEntriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiDatasetBySlugEntriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiDatasetBySlugEntriesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -105840,6 +116587,67 @@ func (r GetApiSimulationRunsByScenarioRunIdResponse) ContentType() string {
 	return ""
 }
 
+type GetApiSlackConnectionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]struct {
+		CreatedAt string `json:"createdAt"`
+
+		// Id What an automation's `slackIntegrationId` names to post through this connection.
+		Id string `json:"id"`
+
+		// Kind `bot` posts as the LangWatch Slack app and needs a `slackChannelId` on the automation; `webhook` posts to its incoming webhook's channel.
+		Kind      GetApiSlackConnections200JSONResponseBodyKind      `json:"kind"`
+		Name      string                                             `json:"name"`
+		ScopeId   string                                             `json:"scopeId"`
+		ScopeName string                                             `json:"scopeName"`
+		ScopeType GetApiSlackConnections200JSONResponseBodyScopeType `json:"scopeType"`
+
+		// SlackTeamName The Slack workspace a bot connection posts into.
+		SlackTeamName *string `json:"slackTeamName"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiSlackConnectionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiSlackConnectionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiSlackConnectionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetApiSuitesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -107191,6 +117999,7 @@ type PostApiTriggerSlackResponse struct {
 		Message string `json:"message"`
 	}
 	JSON403 *PostApiTriggerSlack403JSONResponseBody
+	JSON422 *PostApiTriggerSlack422JSONResponseBody
 }
 
 // Status returns HTTPResponse.Status
@@ -107221,17 +118030,52 @@ type GetApiTriggersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]struct {
-		Action       GetApiTriggers200JSONResponseBodyAction     `json:"action"`
-		ActionParams map[string]interface{}                      `json:"actionParams"`
-		Active       bool                                        `json:"active"`
-		AlertType    *GetApiTriggers200JSONResponseBodyAlertType `json:"alertType"`
-		CreatedAt    string                                      `json:"createdAt"`
-		Filters      map[string]interface{}                      `json:"filters"`
-		Id           string                                      `json:"id"`
-		Message      *string                                     `json:"message"`
-		Name         string                                      `json:"name"`
-		PlatformUrl  string                                      `json:"platformUrl"`
-		UpdatedAt    string                                      `json:"updatedAt"`
+		Action GetApiTriggers200JSONResponseBodyAction `json:"action"`
+
+		// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+		ActionParams  map[string]interface{}                      `json:"actionParams"`
+		Active        bool                                        `json:"active"`
+		AlertType     *GetApiTriggers200JSONResponseBodyAlertType `json:"alertType"`
+		CreatedAt     string                                      `json:"createdAt"`
+		CustomGraphId *string                                     `json:"customGraphId"`
+		FilterQuery   *string                                     `json:"filterQuery"`
+		Filters       map[string]interface{}                      `json:"filters"`
+
+		// GraphAlert The rule an alert fires by. Null for anything that is not one.
+		GraphAlert *struct {
+			Operator   GetApiTriggers200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+			SeriesName string                                                  `json:"seriesName"`
+			Threshold  float32                                                 `json:"threshold"`
+			TimePeriod GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+		} `json:"graphAlert"`
+		Id string `json:"id"`
+
+		// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+		Kind                GetApiTriggers200JSONResponseBodyKind `json:"kind"`
+		Message             *string                               `json:"message"`
+		Name                string                                `json:"name"`
+		NotificationCadence *string                               `json:"notificationCadence"`
+		PlatformUrl         string                                `json:"platformUrl"`
+
+		// Report What a report renders and when. Null for anything else.
+		Report *struct {
+			CompareToPrevious bool `json:"compareToPrevious"`
+			Schedule          struct {
+				Cron     string `json:"cron"`
+				Timezone string `json:"timezone"`
+			} `json:"schedule"`
+			Source GetApiTriggers200JSONResponseBody_Report_Source `json:"source"`
+		} `json:"report"`
+
+		// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+		Templates struct {
+			EmailBodyTemplate    *string                                                      `json:"emailBodyTemplate,omitempty"`
+			EmailSubjectTemplate *string                                                      `json:"emailSubjectTemplate,omitempty"`
+			SlackTemplate        *string                                                      `json:"slackTemplate,omitempty"`
+			SlackTemplateType    *GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+		} `json:"templates"`
+		TraceDebounceMs *float32 `json:"traceDebounceMs"`
+		UpdatedAt       string   `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Error   string  `json:"error"`
@@ -107279,17 +118123,52 @@ type PostApiTriggersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
-		Action       PostApiTriggers201JSONResponseBodyAction     `json:"action"`
-		ActionParams map[string]interface{}                       `json:"actionParams"`
-		Active       bool                                         `json:"active"`
-		AlertType    *PostApiTriggers201JSONResponseBodyAlertType `json:"alertType"`
-		CreatedAt    string                                       `json:"createdAt"`
-		Filters      map[string]interface{}                       `json:"filters"`
-		Id           string                                       `json:"id"`
-		Message      *string                                      `json:"message"`
-		Name         string                                       `json:"name"`
-		PlatformUrl  string                                       `json:"platformUrl"`
-		UpdatedAt    string                                       `json:"updatedAt"`
+		Action PostApiTriggers201JSONResponseBodyAction `json:"action"`
+
+		// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+		ActionParams  map[string]interface{}                       `json:"actionParams"`
+		Active        bool                                         `json:"active"`
+		AlertType     *PostApiTriggers201JSONResponseBodyAlertType `json:"alertType"`
+		CreatedAt     string                                       `json:"createdAt"`
+		CustomGraphId *string                                      `json:"customGraphId"`
+		FilterQuery   *string                                      `json:"filterQuery"`
+		Filters       map[string]interface{}                       `json:"filters"`
+
+		// GraphAlert The rule an alert fires by. Null for anything that is not one.
+		GraphAlert *struct {
+			Operator   PostApiTriggers201JSONResponseBodyGraphAlertOperator     `json:"operator"`
+			SeriesName string                                                   `json:"seriesName"`
+			Threshold  float32                                                  `json:"threshold"`
+			TimePeriod PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+		} `json:"graphAlert"`
+		Id string `json:"id"`
+
+		// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+		Kind                PostApiTriggers201JSONResponseBodyKind `json:"kind"`
+		Message             *string                                `json:"message"`
+		Name                string                                 `json:"name"`
+		NotificationCadence *string                                `json:"notificationCadence"`
+		PlatformUrl         string                                 `json:"platformUrl"`
+
+		// Report What a report renders and when. Null for anything else.
+		Report *struct {
+			CompareToPrevious bool `json:"compareToPrevious"`
+			Schedule          struct {
+				Cron     string `json:"cron"`
+				Timezone string `json:"timezone"`
+			} `json:"schedule"`
+			Source PostApiTriggers201JSONResponseBody_Report_Source `json:"source"`
+		} `json:"report"`
+
+		// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+		Templates struct {
+			EmailBodyTemplate    *string                                                       `json:"emailBodyTemplate,omitempty"`
+			EmailSubjectTemplate *string                                                       `json:"emailSubjectTemplate,omitempty"`
+			SlackTemplate        *string                                                       `json:"slackTemplate,omitempty"`
+			SlackTemplateType    *PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+		} `json:"templates"`
+		TraceDebounceMs *float32 `json:"traceDebounceMs"`
+		UpdatedAt       string   `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Error   string  `json:"error"`
@@ -107390,17 +118269,52 @@ type GetApiTriggersByIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Action       GetApiTriggersById200JSONResponseBodyAction     `json:"action"`
-		ActionParams map[string]interface{}                          `json:"actionParams"`
-		Active       bool                                            `json:"active"`
-		AlertType    *GetApiTriggersById200JSONResponseBodyAlertType `json:"alertType"`
-		CreatedAt    string                                          `json:"createdAt"`
-		Filters      map[string]interface{}                          `json:"filters"`
-		Id           string                                          `json:"id"`
-		Message      *string                                         `json:"message"`
-		Name         string                                          `json:"name"`
-		PlatformUrl  string                                          `json:"platformUrl"`
-		UpdatedAt    string                                          `json:"updatedAt"`
+		Action GetApiTriggersById200JSONResponseBodyAction `json:"action"`
+
+		// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+		ActionParams  map[string]interface{}                          `json:"actionParams"`
+		Active        bool                                            `json:"active"`
+		AlertType     *GetApiTriggersById200JSONResponseBodyAlertType `json:"alertType"`
+		CreatedAt     string                                          `json:"createdAt"`
+		CustomGraphId *string                                         `json:"customGraphId"`
+		FilterQuery   *string                                         `json:"filterQuery"`
+		Filters       map[string]interface{}                          `json:"filters"`
+
+		// GraphAlert The rule an alert fires by. Null for anything that is not one.
+		GraphAlert *struct {
+			Operator   GetApiTriggersById200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+			SeriesName string                                                      `json:"seriesName"`
+			Threshold  float32                                                     `json:"threshold"`
+			TimePeriod GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+		} `json:"graphAlert"`
+		Id string `json:"id"`
+
+		// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+		Kind                GetApiTriggersById200JSONResponseBodyKind `json:"kind"`
+		Message             *string                                   `json:"message"`
+		Name                string                                    `json:"name"`
+		NotificationCadence *string                                   `json:"notificationCadence"`
+		PlatformUrl         string                                    `json:"platformUrl"`
+
+		// Report What a report renders and when. Null for anything else.
+		Report *struct {
+			CompareToPrevious bool `json:"compareToPrevious"`
+			Schedule          struct {
+				Cron     string `json:"cron"`
+				Timezone string `json:"timezone"`
+			} `json:"schedule"`
+			Source GetApiTriggersById200JSONResponseBody_Report_Source `json:"source"`
+		} `json:"report"`
+
+		// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+		Templates struct {
+			EmailBodyTemplate    *string                                                          `json:"emailBodyTemplate,omitempty"`
+			EmailSubjectTemplate *string                                                          `json:"emailSubjectTemplate,omitempty"`
+			SlackTemplate        *string                                                          `json:"slackTemplate,omitempty"`
+			SlackTemplateType    *GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+		} `json:"templates"`
+		TraceDebounceMs *float32 `json:"traceDebounceMs"`
+		UpdatedAt       string   `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Error   string  `json:"error"`
@@ -107452,17 +118366,52 @@ type PatchApiTriggersByIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Action       PatchApiTriggersById200JSONResponseBodyAction     `json:"action"`
-		ActionParams map[string]interface{}                            `json:"actionParams"`
-		Active       bool                                              `json:"active"`
-		AlertType    *PatchApiTriggersById200JSONResponseBodyAlertType `json:"alertType"`
-		CreatedAt    string                                            `json:"createdAt"`
-		Filters      map[string]interface{}                            `json:"filters"`
-		Id           string                                            `json:"id"`
-		Message      *string                                           `json:"message"`
-		Name         string                                            `json:"name"`
-		PlatformUrl  string                                            `json:"platformUrl"`
-		UpdatedAt    string                                            `json:"updatedAt"`
+		Action PatchApiTriggersById200JSONResponseBodyAction `json:"action"`
+
+		// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+		ActionParams  map[string]interface{}                            `json:"actionParams"`
+		Active        bool                                              `json:"active"`
+		AlertType     *PatchApiTriggersById200JSONResponseBodyAlertType `json:"alertType"`
+		CreatedAt     string                                            `json:"createdAt"`
+		CustomGraphId *string                                           `json:"customGraphId"`
+		FilterQuery   *string                                           `json:"filterQuery"`
+		Filters       map[string]interface{}                            `json:"filters"`
+
+		// GraphAlert The rule an alert fires by. Null for anything that is not one.
+		GraphAlert *struct {
+			Operator   PatchApiTriggersById200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+			SeriesName string                                                        `json:"seriesName"`
+			Threshold  float32                                                       `json:"threshold"`
+			TimePeriod PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+		} `json:"graphAlert"`
+		Id string `json:"id"`
+
+		// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+		Kind                PatchApiTriggersById200JSONResponseBodyKind `json:"kind"`
+		Message             *string                                     `json:"message"`
+		Name                string                                      `json:"name"`
+		NotificationCadence *string                                     `json:"notificationCadence"`
+		PlatformUrl         string                                      `json:"platformUrl"`
+
+		// Report What a report renders and when. Null for anything else.
+		Report *struct {
+			CompareToPrevious bool `json:"compareToPrevious"`
+			Schedule          struct {
+				Cron     string `json:"cron"`
+				Timezone string `json:"timezone"`
+			} `json:"schedule"`
+			Source PatchApiTriggersById200JSONResponseBody_Report_Source `json:"source"`
+		} `json:"report"`
+
+		// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+		Templates struct {
+			EmailBodyTemplate    *string                                                            `json:"emailBodyTemplate,omitempty"`
+			EmailSubjectTemplate *string                                                            `json:"emailSubjectTemplate,omitempty"`
+			SlackTemplate        *string                                                            `json:"slackTemplate,omitempty"`
+			SlackTemplateType    *PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+		} `json:"templates"`
+		TraceDebounceMs *float32 `json:"traceDebounceMs"`
+		UpdatedAt       string   `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Error   string  `json:"error"`
@@ -107504,6 +118453,323 @@ func (r PatchApiTriggersByIdResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PatchApiTriggersByIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiTriggersByIdDisableResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Action PostApiTriggersByIdDisable200JSONResponseBodyAction `json:"action"`
+
+		// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+		ActionParams  map[string]interface{}                                  `json:"actionParams"`
+		Active        bool                                                    `json:"active"`
+		AlertType     *PostApiTriggersByIdDisable200JSONResponseBodyAlertType `json:"alertType"`
+		CreatedAt     string                                                  `json:"createdAt"`
+		CustomGraphId *string                                                 `json:"customGraphId"`
+		FilterQuery   *string                                                 `json:"filterQuery"`
+		Filters       map[string]interface{}                                  `json:"filters"`
+
+		// GraphAlert The rule an alert fires by. Null for anything that is not one.
+		GraphAlert *struct {
+			Operator   PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+			SeriesName string                                                              `json:"seriesName"`
+			Threshold  float32                                                             `json:"threshold"`
+			TimePeriod PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+		} `json:"graphAlert"`
+		Id string `json:"id"`
+
+		// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+		Kind                PostApiTriggersByIdDisable200JSONResponseBodyKind `json:"kind"`
+		Message             *string                                           `json:"message"`
+		Name                string                                            `json:"name"`
+		NotificationCadence *string                                           `json:"notificationCadence"`
+		PlatformUrl         string                                            `json:"platformUrl"`
+
+		// Report What a report renders and when. Null for anything else.
+		Report *struct {
+			CompareToPrevious bool `json:"compareToPrevious"`
+			Schedule          struct {
+				Cron     string `json:"cron"`
+				Timezone string `json:"timezone"`
+			} `json:"schedule"`
+			Source PostApiTriggersByIdDisable200JSONResponseBody_Report_Source `json:"source"`
+		} `json:"report"`
+
+		// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+		Templates struct {
+			EmailBodyTemplate    *string                                                                  `json:"emailBodyTemplate,omitempty"`
+			EmailSubjectTemplate *string                                                                  `json:"emailSubjectTemplate,omitempty"`
+			SlackTemplate        *string                                                                  `json:"slackTemplate,omitempty"`
+			SlackTemplateType    *PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+		} `json:"templates"`
+		TraceDebounceMs *float32 `json:"traceDebounceMs"`
+		UpdatedAt       string   `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON404 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiTriggersByIdDisableResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiTriggersByIdDisableResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiTriggersByIdDisableResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiTriggersByIdEnableResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Action PostApiTriggersByIdEnable200JSONResponseBodyAction `json:"action"`
+
+		// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+		ActionParams  map[string]interface{}                                 `json:"actionParams"`
+		Active        bool                                                   `json:"active"`
+		AlertType     *PostApiTriggersByIdEnable200JSONResponseBodyAlertType `json:"alertType"`
+		CreatedAt     string                                                 `json:"createdAt"`
+		CustomGraphId *string                                                `json:"customGraphId"`
+		FilterQuery   *string                                                `json:"filterQuery"`
+		Filters       map[string]interface{}                                 `json:"filters"`
+
+		// GraphAlert The rule an alert fires by. Null for anything that is not one.
+		GraphAlert *struct {
+			Operator   PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+			SeriesName string                                                             `json:"seriesName"`
+			Threshold  float32                                                            `json:"threshold"`
+			TimePeriod PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+		} `json:"graphAlert"`
+		Id string `json:"id"`
+
+		// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+		Kind                PostApiTriggersByIdEnable200JSONResponseBodyKind `json:"kind"`
+		Message             *string                                          `json:"message"`
+		Name                string                                           `json:"name"`
+		NotificationCadence *string                                          `json:"notificationCadence"`
+		PlatformUrl         string                                           `json:"platformUrl"`
+
+		// Report What a report renders and when. Null for anything else.
+		Report *struct {
+			CompareToPrevious bool `json:"compareToPrevious"`
+			Schedule          struct {
+				Cron     string `json:"cron"`
+				Timezone string `json:"timezone"`
+			} `json:"schedule"`
+			Source PostApiTriggersByIdEnable200JSONResponseBody_Report_Source `json:"source"`
+		} `json:"report"`
+
+		// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+		Templates struct {
+			EmailBodyTemplate    *string                                                                 `json:"emailBodyTemplate,omitempty"`
+			EmailSubjectTemplate *string                                                                 `json:"emailSubjectTemplate,omitempty"`
+			SlackTemplate        *string                                                                 `json:"slackTemplate,omitempty"`
+			SlackTemplateType    *PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+		} `json:"templates"`
+		TraceDebounceMs *float32 `json:"traceDebounceMs"`
+		UpdatedAt       string   `json:"updatedAt"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON404 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiTriggersByIdEnableResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiTriggersByIdEnableResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiTriggersByIdEnableResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiTriggersByIdFiresResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Fires One page of fires, newest first.
+		Fires []struct {
+			CustomGraphId *string `json:"customGraphId"`
+			FiredAt       string  `json:"firedAt"`
+			Id            string  `json:"id"`
+			ResolvedAt    *string `json:"resolvedAt"`
+			TriggerId     string  `json:"triggerId"`
+		} `json:"fires"`
+
+		// NextCursor Pass as `cursor` to read the page after this one. Null on the last page.
+		NextCursor *string `json:"nextCursor"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON404 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiTriggersByIdFiresResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiTriggersByIdFiresResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiTriggersByIdFiresResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiTriggersByIdTestFireResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Channel PostApiTriggersByIdTestFire200JSONResponseBodyChannel `json:"channel"`
+		Errors  []string                                              `json:"errors"`
+
+		// HttpStatus Webhook only: what the endpoint answered with.
+		HttpStatus       *float32 `json:"httpStatus,omitempty"`
+		MissingVariables []string `json:"missingVariables"`
+		RecipientCount   float32  `json:"recipientCount"`
+
+		// UsedDefault Whether the LangWatch default message was rendered because this automation states no template of its own.
+		UsedDefault bool `json:"usedDefault"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON404 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiTriggersByIdTestFireResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiTriggersByIdTestFireResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiTriggersByIdTestFireResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -113326,6 +124592,15 @@ func (c *ClientWithResponses) PostApiDatasetWithResponse(ctx context.Context, bo
 	return ParsePostApiDatasetResponse(rsp)
 }
 
+// PostApiDatasetAttachmentsWithBodyWithResponse request with arbitrary body returning *PostApiDatasetAttachmentsResponse
+func (c *ClientWithResponses) PostApiDatasetAttachmentsWithBodyWithResponse(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsResponse, error) {
+	rsp, err := c.PostApiDatasetAttachmentsWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetAttachmentsResponse(rsp)
+}
+
 // PostApiDatasetDirectUploadWithResponse request returning *PostApiDatasetDirectUploadResponse
 func (c *ClientWithResponses) PostApiDatasetDirectUploadWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostApiDatasetDirectUploadResponse, error) {
 	rsp, err := c.PostApiDatasetDirectUpload(ctx, reqEditors...)
@@ -113499,6 +124774,15 @@ func (c *ClientWithResponses) PostApiDatasetBySlugOrIdUploadWithResponse(ctx con
 		return nil, err
 	}
 	return ParsePostApiDatasetBySlugOrIdUploadResponse(rsp)
+}
+
+// GetApiDatasetBySlugEntriesWithResponse request returning *GetApiDatasetBySlugEntriesResponse
+func (c *ClientWithResponses) GetApiDatasetBySlugEntriesWithResponse(ctx context.Context, slug string, params *GetApiDatasetBySlugEntriesParams, reqEditors ...RequestEditorFn) (*GetApiDatasetBySlugEntriesResponse, error) {
+	rsp, err := c.GetApiDatasetBySlugEntries(ctx, slug, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiDatasetBySlugEntriesResponse(rsp)
 }
 
 // PostApiDatasetBySlugEntriesWithBodyWithResponse request with arbitrary body returning *PostApiDatasetBySlugEntriesResponse
@@ -115513,6 +126797,15 @@ func (c *ClientWithResponses) GetApiSimulationRunsByScenarioRunIdWithResponse(ct
 	return ParseGetApiSimulationRunsByScenarioRunIdResponse(rsp)
 }
 
+// GetApiSlackConnectionsWithResponse request returning *GetApiSlackConnectionsResponse
+func (c *ClientWithResponses) GetApiSlackConnectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiSlackConnectionsResponse, error) {
+	rsp, err := c.GetApiSlackConnections(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiSlackConnectionsResponse(rsp)
+}
+
 // GetApiSuitesWithResponse request returning *GetApiSuitesResponse
 func (c *ClientWithResponses) GetApiSuitesWithResponse(ctx context.Context, params *GetApiSuitesParams, reqEditors ...RequestEditorFn) (*GetApiSuitesResponse, error) {
 	rsp, err := c.GetApiSuites(ctx, params, reqEditors...)
@@ -115903,6 +127196,42 @@ func (c *ClientWithResponses) PatchApiTriggersByIdWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParsePatchApiTriggersByIdResponse(rsp)
+}
+
+// PostApiTriggersByIdDisableWithResponse request returning *PostApiTriggersByIdDisableResponse
+func (c *ClientWithResponses) PostApiTriggersByIdDisableWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*PostApiTriggersByIdDisableResponse, error) {
+	rsp, err := c.PostApiTriggersByIdDisable(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiTriggersByIdDisableResponse(rsp)
+}
+
+// PostApiTriggersByIdEnableWithResponse request returning *PostApiTriggersByIdEnableResponse
+func (c *ClientWithResponses) PostApiTriggersByIdEnableWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*PostApiTriggersByIdEnableResponse, error) {
+	rsp, err := c.PostApiTriggersByIdEnable(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiTriggersByIdEnableResponse(rsp)
+}
+
+// GetApiTriggersByIdFiresWithResponse request returning *GetApiTriggersByIdFiresResponse
+func (c *ClientWithResponses) GetApiTriggersByIdFiresWithResponse(ctx context.Context, id string, params *GetApiTriggersByIdFiresParams, reqEditors ...RequestEditorFn) (*GetApiTriggersByIdFiresResponse, error) {
+	rsp, err := c.GetApiTriggersByIdFires(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiTriggersByIdFiresResponse(rsp)
+}
+
+// PostApiTriggersByIdTestFireWithResponse request returning *PostApiTriggersByIdTestFireResponse
+func (c *ClientWithResponses) PostApiTriggersByIdTestFireWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*PostApiTriggersByIdTestFireResponse, error) {
+	rsp, err := c.PostApiTriggersByIdTestFire(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiTriggersByIdTestFireResponse(rsp)
 }
 
 // ListAgentsWithResponse request returning *ListAgentsResponse
@@ -118304,6 +129633,114 @@ func ParsePostApiDatasetResponse(rsp *http.Response) (*PostApiDatasetResponse, e
 	return response, nil
 }
 
+// ParsePostApiDatasetAttachmentsResponse parses an HTTP response from a PostApiDatasetAttachmentsWithResponse call
+func ParsePostApiDatasetAttachmentsResponse(rsp *http.Response) (*PostApiDatasetAttachmentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiDatasetAttachmentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// MediaType The media type the file is stored under.
+			MediaType string `json:"mediaType"`
+
+			// Name The file name the reference carries.
+			Name string `json:"name"`
+
+			// SizeBytes The size of the stored file, in bytes.
+			SizeBytes float32 `json:"sizeBytes"`
+
+			// Url The value to write into the cell, and the address the file is served from.
+			Url string `json:"url"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParsePostApiDatasetDirectUploadResponse parses an HTTP response from a PostApiDatasetDirectUploadWithResponse call
 func ParsePostApiDatasetDirectUploadResponse(rsp *http.Response) (*PostApiDatasetDirectUploadResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -118674,6 +130111,22 @@ func ParsePostApiDatasetBySlugOrIdUploadResponse(rsp *http.Response) (*PostApiDa
 	}
 
 	response := &PostApiDatasetBySlugOrIdUploadResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseGetApiDatasetBySlugEntriesResponse parses an HTTP response from a GetApiDatasetBySlugEntriesWithResponse call
+func ParseGetApiDatasetBySlugEntriesResponse(rsp *http.Response) (*GetApiDatasetBySlugEntriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiDatasetBySlugEntriesResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -132377,6 +143830,87 @@ func ParseGetApiSimulationRunsByScenarioRunIdResponse(rsp *http.Response) (*GetA
 	return response, nil
 }
 
+// ParseGetApiSlackConnectionsResponse parses an HTTP response from a GetApiSlackConnectionsWithResponse call
+func ParseGetApiSlackConnectionsResponse(rsp *http.Response) (*GetApiSlackConnectionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiSlackConnectionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []struct {
+			CreatedAt string `json:"createdAt"`
+
+			// Id What an automation's `slackIntegrationId` names to post through this connection.
+			Id string `json:"id"`
+
+			// Kind `bot` posts as the LangWatch Slack app and needs a `slackChannelId` on the automation; `webhook` posts to its incoming webhook's channel.
+			Kind      GetApiSlackConnections200JSONResponseBodyKind      `json:"kind"`
+			Name      string                                             `json:"name"`
+			ScopeId   string                                             `json:"scopeId"`
+			ScopeName string                                             `json:"scopeName"`
+			ScopeType GetApiSlackConnections200JSONResponseBodyScopeType `json:"scopeType"`
+
+			// SlackTeamName The Slack workspace a bot connection posts into.
+			SlackTeamName *string `json:"slackTeamName"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetApiSuitesResponse parses an HTTP response from a GetApiSuitesWithResponse call
 func ParseGetApiSuitesResponse(rsp *http.Response) (*GetApiSuitesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -133962,6 +145496,13 @@ func ParsePostApiTriggerSlackResponse(rsp *http.Response) (*PostApiTriggerSlackR
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest PostApiTriggerSlack422JSONResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -133983,17 +145524,52 @@ func ParseGetApiTriggersResponse(rsp *http.Response) (*GetApiTriggersResponse, e
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest []struct {
-			Action       GetApiTriggers200JSONResponseBodyAction     `json:"action"`
-			ActionParams map[string]interface{}                      `json:"actionParams"`
-			Active       bool                                        `json:"active"`
-			AlertType    *GetApiTriggers200JSONResponseBodyAlertType `json:"alertType"`
-			CreatedAt    string                                      `json:"createdAt"`
-			Filters      map[string]interface{}                      `json:"filters"`
-			Id           string                                      `json:"id"`
-			Message      *string                                     `json:"message"`
-			Name         string                                      `json:"name"`
-			PlatformUrl  string                                      `json:"platformUrl"`
-			UpdatedAt    string                                      `json:"updatedAt"`
+			Action GetApiTriggers200JSONResponseBodyAction `json:"action"`
+
+			// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+			ActionParams  map[string]interface{}                      `json:"actionParams"`
+			Active        bool                                        `json:"active"`
+			AlertType     *GetApiTriggers200JSONResponseBodyAlertType `json:"alertType"`
+			CreatedAt     string                                      `json:"createdAt"`
+			CustomGraphId *string                                     `json:"customGraphId"`
+			FilterQuery   *string                                     `json:"filterQuery"`
+			Filters       map[string]interface{}                      `json:"filters"`
+
+			// GraphAlert The rule an alert fires by. Null for anything that is not one.
+			GraphAlert *struct {
+				Operator   GetApiTriggers200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+				SeriesName string                                                  `json:"seriesName"`
+				Threshold  float32                                                 `json:"threshold"`
+				TimePeriod GetApiTriggers200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+			} `json:"graphAlert"`
+			Id string `json:"id"`
+
+			// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+			Kind                GetApiTriggers200JSONResponseBodyKind `json:"kind"`
+			Message             *string                               `json:"message"`
+			Name                string                                `json:"name"`
+			NotificationCadence *string                               `json:"notificationCadence"`
+			PlatformUrl         string                                `json:"platformUrl"`
+
+			// Report What a report renders and when. Null for anything else.
+			Report *struct {
+				CompareToPrevious bool `json:"compareToPrevious"`
+				Schedule          struct {
+					Cron     string `json:"cron"`
+					Timezone string `json:"timezone"`
+				} `json:"schedule"`
+				Source GetApiTriggers200JSONResponseBody_Report_Source `json:"source"`
+			} `json:"report"`
+
+			// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+			Templates struct {
+				EmailBodyTemplate    *string                                                      `json:"emailBodyTemplate,omitempty"`
+				EmailSubjectTemplate *string                                                      `json:"emailSubjectTemplate,omitempty"`
+				SlackTemplate        *string                                                      `json:"slackTemplate,omitempty"`
+				SlackTemplateType    *GetApiTriggers200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+			} `json:"templates"`
+			TraceDebounceMs *float32 `json:"traceDebounceMs"`
+			UpdatedAt       string   `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -134061,17 +145637,52 @@ func ParsePostApiTriggersResponse(rsp *http.Response) (*PostApiTriggersResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
-			Action       PostApiTriggers201JSONResponseBodyAction     `json:"action"`
-			ActionParams map[string]interface{}                       `json:"actionParams"`
-			Active       bool                                         `json:"active"`
-			AlertType    *PostApiTriggers201JSONResponseBodyAlertType `json:"alertType"`
-			CreatedAt    string                                       `json:"createdAt"`
-			Filters      map[string]interface{}                       `json:"filters"`
-			Id           string                                       `json:"id"`
-			Message      *string                                      `json:"message"`
-			Name         string                                       `json:"name"`
-			PlatformUrl  string                                       `json:"platformUrl"`
-			UpdatedAt    string                                       `json:"updatedAt"`
+			Action PostApiTriggers201JSONResponseBodyAction `json:"action"`
+
+			// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+			ActionParams  map[string]interface{}                       `json:"actionParams"`
+			Active        bool                                         `json:"active"`
+			AlertType     *PostApiTriggers201JSONResponseBodyAlertType `json:"alertType"`
+			CreatedAt     string                                       `json:"createdAt"`
+			CustomGraphId *string                                      `json:"customGraphId"`
+			FilterQuery   *string                                      `json:"filterQuery"`
+			Filters       map[string]interface{}                       `json:"filters"`
+
+			// GraphAlert The rule an alert fires by. Null for anything that is not one.
+			GraphAlert *struct {
+				Operator   PostApiTriggers201JSONResponseBodyGraphAlertOperator     `json:"operator"`
+				SeriesName string                                                   `json:"seriesName"`
+				Threshold  float32                                                  `json:"threshold"`
+				TimePeriod PostApiTriggers201JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+			} `json:"graphAlert"`
+			Id string `json:"id"`
+
+			// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+			Kind                PostApiTriggers201JSONResponseBodyKind `json:"kind"`
+			Message             *string                                `json:"message"`
+			Name                string                                 `json:"name"`
+			NotificationCadence *string                                `json:"notificationCadence"`
+			PlatformUrl         string                                 `json:"platformUrl"`
+
+			// Report What a report renders and when. Null for anything else.
+			Report *struct {
+				CompareToPrevious bool `json:"compareToPrevious"`
+				Schedule          struct {
+					Cron     string `json:"cron"`
+					Timezone string `json:"timezone"`
+				} `json:"schedule"`
+				Source PostApiTriggers201JSONResponseBody_Report_Source `json:"source"`
+			} `json:"report"`
+
+			// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+			Templates struct {
+				EmailBodyTemplate    *string                                                       `json:"emailBodyTemplate,omitempty"`
+				EmailSubjectTemplate *string                                                       `json:"emailSubjectTemplate,omitempty"`
+				SlackTemplate        *string                                                       `json:"slackTemplate,omitempty"`
+				SlackTemplateType    *PostApiTriggers201JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+			} `json:"templates"`
+			TraceDebounceMs *float32 `json:"traceDebounceMs"`
+			UpdatedAt       string   `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -134218,17 +145829,52 @@ func ParseGetApiTriggersByIdResponse(rsp *http.Response) (*GetApiTriggersByIdRes
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Action       GetApiTriggersById200JSONResponseBodyAction     `json:"action"`
-			ActionParams map[string]interface{}                          `json:"actionParams"`
-			Active       bool                                            `json:"active"`
-			AlertType    *GetApiTriggersById200JSONResponseBodyAlertType `json:"alertType"`
-			CreatedAt    string                                          `json:"createdAt"`
-			Filters      map[string]interface{}                          `json:"filters"`
-			Id           string                                          `json:"id"`
-			Message      *string                                         `json:"message"`
-			Name         string                                          `json:"name"`
-			PlatformUrl  string                                          `json:"platformUrl"`
-			UpdatedAt    string                                          `json:"updatedAt"`
+			Action GetApiTriggersById200JSONResponseBodyAction `json:"action"`
+
+			// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+			ActionParams  map[string]interface{}                          `json:"actionParams"`
+			Active        bool                                            `json:"active"`
+			AlertType     *GetApiTriggersById200JSONResponseBodyAlertType `json:"alertType"`
+			CreatedAt     string                                          `json:"createdAt"`
+			CustomGraphId *string                                         `json:"customGraphId"`
+			FilterQuery   *string                                         `json:"filterQuery"`
+			Filters       map[string]interface{}                          `json:"filters"`
+
+			// GraphAlert The rule an alert fires by. Null for anything that is not one.
+			GraphAlert *struct {
+				Operator   GetApiTriggersById200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+				SeriesName string                                                      `json:"seriesName"`
+				Threshold  float32                                                     `json:"threshold"`
+				TimePeriod GetApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+			} `json:"graphAlert"`
+			Id string `json:"id"`
+
+			// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+			Kind                GetApiTriggersById200JSONResponseBodyKind `json:"kind"`
+			Message             *string                                   `json:"message"`
+			Name                string                                    `json:"name"`
+			NotificationCadence *string                                   `json:"notificationCadence"`
+			PlatformUrl         string                                    `json:"platformUrl"`
+
+			// Report What a report renders and when. Null for anything else.
+			Report *struct {
+				CompareToPrevious bool `json:"compareToPrevious"`
+				Schedule          struct {
+					Cron     string `json:"cron"`
+					Timezone string `json:"timezone"`
+				} `json:"schedule"`
+				Source GetApiTriggersById200JSONResponseBody_Report_Source `json:"source"`
+			} `json:"report"`
+
+			// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+			Templates struct {
+				EmailBodyTemplate    *string                                                          `json:"emailBodyTemplate,omitempty"`
+				EmailSubjectTemplate *string                                                          `json:"emailSubjectTemplate,omitempty"`
+				SlackTemplate        *string                                                          `json:"slackTemplate,omitempty"`
+				SlackTemplateType    *GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+			} `json:"templates"`
+			TraceDebounceMs *float32 `json:"traceDebounceMs"`
+			UpdatedAt       string   `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -134306,17 +145952,473 @@ func ParsePatchApiTriggersByIdResponse(rsp *http.Response) (*PatchApiTriggersByI
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Action       PatchApiTriggersById200JSONResponseBodyAction     `json:"action"`
-			ActionParams map[string]interface{}                            `json:"actionParams"`
-			Active       bool                                              `json:"active"`
-			AlertType    *PatchApiTriggersById200JSONResponseBodyAlertType `json:"alertType"`
-			CreatedAt    string                                            `json:"createdAt"`
-			Filters      map[string]interface{}                            `json:"filters"`
-			Id           string                                            `json:"id"`
-			Message      *string                                           `json:"message"`
-			Name         string                                            `json:"name"`
-			PlatformUrl  string                                            `json:"platformUrl"`
-			UpdatedAt    string                                            `json:"updatedAt"`
+			Action PatchApiTriggersById200JSONResponseBodyAction `json:"action"`
+
+			// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+			ActionParams  map[string]interface{}                            `json:"actionParams"`
+			Active        bool                                              `json:"active"`
+			AlertType     *PatchApiTriggersById200JSONResponseBodyAlertType `json:"alertType"`
+			CreatedAt     string                                            `json:"createdAt"`
+			CustomGraphId *string                                           `json:"customGraphId"`
+			FilterQuery   *string                                           `json:"filterQuery"`
+			Filters       map[string]interface{}                            `json:"filters"`
+
+			// GraphAlert The rule an alert fires by. Null for anything that is not one.
+			GraphAlert *struct {
+				Operator   PatchApiTriggersById200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+				SeriesName string                                                        `json:"seriesName"`
+				Threshold  float32                                                       `json:"threshold"`
+				TimePeriod PatchApiTriggersById200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+			} `json:"graphAlert"`
+			Id string `json:"id"`
+
+			// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+			Kind                PatchApiTriggersById200JSONResponseBodyKind `json:"kind"`
+			Message             *string                                     `json:"message"`
+			Name                string                                      `json:"name"`
+			NotificationCadence *string                                     `json:"notificationCadence"`
+			PlatformUrl         string                                      `json:"platformUrl"`
+
+			// Report What a report renders and when. Null for anything else.
+			Report *struct {
+				CompareToPrevious bool `json:"compareToPrevious"`
+				Schedule          struct {
+					Cron     string `json:"cron"`
+					Timezone string `json:"timezone"`
+				} `json:"schedule"`
+				Source PatchApiTriggersById200JSONResponseBody_Report_Source `json:"source"`
+			} `json:"report"`
+
+			// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+			Templates struct {
+				EmailBodyTemplate    *string                                                            `json:"emailBodyTemplate,omitempty"`
+				EmailSubjectTemplate *string                                                            `json:"emailSubjectTemplate,omitempty"`
+				SlackTemplate        *string                                                            `json:"slackTemplate,omitempty"`
+				SlackTemplateType    *PatchApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+			} `json:"templates"`
+			TraceDebounceMs *float32 `json:"traceDebounceMs"`
+			UpdatedAt       string   `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiTriggersByIdDisableResponse parses an HTTP response from a PostApiTriggersByIdDisableWithResponse call
+func ParsePostApiTriggersByIdDisableResponse(rsp *http.Response) (*PostApiTriggersByIdDisableResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiTriggersByIdDisableResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Action PostApiTriggersByIdDisable200JSONResponseBodyAction `json:"action"`
+
+			// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+			ActionParams  map[string]interface{}                                  `json:"actionParams"`
+			Active        bool                                                    `json:"active"`
+			AlertType     *PostApiTriggersByIdDisable200JSONResponseBodyAlertType `json:"alertType"`
+			CreatedAt     string                                                  `json:"createdAt"`
+			CustomGraphId *string                                                 `json:"customGraphId"`
+			FilterQuery   *string                                                 `json:"filterQuery"`
+			Filters       map[string]interface{}                                  `json:"filters"`
+
+			// GraphAlert The rule an alert fires by. Null for anything that is not one.
+			GraphAlert *struct {
+				Operator   PostApiTriggersByIdDisable200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+				SeriesName string                                                              `json:"seriesName"`
+				Threshold  float32                                                             `json:"threshold"`
+				TimePeriod PostApiTriggersByIdDisable200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+			} `json:"graphAlert"`
+			Id string `json:"id"`
+
+			// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+			Kind                PostApiTriggersByIdDisable200JSONResponseBodyKind `json:"kind"`
+			Message             *string                                           `json:"message"`
+			Name                string                                            `json:"name"`
+			NotificationCadence *string                                           `json:"notificationCadence"`
+			PlatformUrl         string                                            `json:"platformUrl"`
+
+			// Report What a report renders and when. Null for anything else.
+			Report *struct {
+				CompareToPrevious bool `json:"compareToPrevious"`
+				Schedule          struct {
+					Cron     string `json:"cron"`
+					Timezone string `json:"timezone"`
+				} `json:"schedule"`
+				Source PostApiTriggersByIdDisable200JSONResponseBody_Report_Source `json:"source"`
+			} `json:"report"`
+
+			// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+			Templates struct {
+				EmailBodyTemplate    *string                                                                  `json:"emailBodyTemplate,omitempty"`
+				EmailSubjectTemplate *string                                                                  `json:"emailSubjectTemplate,omitempty"`
+				SlackTemplate        *string                                                                  `json:"slackTemplate,omitempty"`
+				SlackTemplateType    *PostApiTriggersByIdDisable200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+			} `json:"templates"`
+			TraceDebounceMs *float32 `json:"traceDebounceMs"`
+			UpdatedAt       string   `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiTriggersByIdEnableResponse parses an HTTP response from a PostApiTriggersByIdEnableWithResponse call
+func ParsePostApiTriggersByIdEnableResponse(rsp *http.Response) (*PostApiTriggersByIdEnableResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiTriggersByIdEnableResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Action PostApiTriggersByIdEnable200JSONResponseBodyAction `json:"action"`
+
+			// ActionParams Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused.
+			ActionParams  map[string]interface{}                                 `json:"actionParams"`
+			Active        bool                                                   `json:"active"`
+			AlertType     *PostApiTriggersByIdEnable200JSONResponseBodyAlertType `json:"alertType"`
+			CreatedAt     string                                                 `json:"createdAt"`
+			CustomGraphId *string                                                `json:"customGraphId"`
+			FilterQuery   *string                                                `json:"filterQuery"`
+			Filters       map[string]interface{}                                 `json:"filters"`
+
+			// GraphAlert The rule an alert fires by. Null for anything that is not one.
+			GraphAlert *struct {
+				Operator   PostApiTriggersByIdEnable200JSONResponseBodyGraphAlertOperator     `json:"operator"`
+				SeriesName string                                                             `json:"seriesName"`
+				Threshold  float32                                                            `json:"threshold"`
+				TimePeriod PostApiTriggersByIdEnable200JSONResponseBody_GraphAlert_TimePeriod `json:"timePeriod"`
+			} `json:"graphAlert"`
+			Id string `json:"id"`
+
+			// Kind What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+			Kind                PostApiTriggersByIdEnable200JSONResponseBodyKind `json:"kind"`
+			Message             *string                                          `json:"message"`
+			Name                string                                           `json:"name"`
+			NotificationCadence *string                                          `json:"notificationCadence"`
+			PlatformUrl         string                                           `json:"platformUrl"`
+
+			// Report What a report renders and when. Null for anything else.
+			Report *struct {
+				CompareToPrevious bool `json:"compareToPrevious"`
+				Schedule          struct {
+					Cron     string `json:"cron"`
+					Timezone string `json:"timezone"`
+				} `json:"schedule"`
+				Source PostApiTriggersByIdEnable200JSONResponseBody_Report_Source `json:"source"`
+			} `json:"report"`
+
+			// Templates The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel.
+			Templates struct {
+				EmailBodyTemplate    *string                                                                 `json:"emailBodyTemplate,omitempty"`
+				EmailSubjectTemplate *string                                                                 `json:"emailSubjectTemplate,omitempty"`
+				SlackTemplate        *string                                                                 `json:"slackTemplate,omitempty"`
+				SlackTemplateType    *PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType `json:"slackTemplateType,omitempty"`
+			} `json:"templates"`
+			TraceDebounceMs *float32 `json:"traceDebounceMs"`
+			UpdatedAt       string   `json:"updatedAt"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiTriggersByIdFiresResponse parses an HTTP response from a GetApiTriggersByIdFiresWithResponse call
+func ParseGetApiTriggersByIdFiresResponse(rsp *http.Response) (*GetApiTriggersByIdFiresResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiTriggersByIdFiresResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// Fires One page of fires, newest first.
+			Fires []struct {
+				CustomGraphId *string `json:"customGraphId"`
+				FiredAt       string  `json:"firedAt"`
+				Id            string  `json:"id"`
+				ResolvedAt    *string `json:"resolvedAt"`
+				TriggerId     string  `json:"triggerId"`
+			} `json:"fires"`
+
+			// NextCursor Pass as `cursor` to read the page after this one. Null on the last page.
+			NextCursor *string `json:"nextCursor"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiTriggersByIdTestFireResponse parses an HTTP response from a PostApiTriggersByIdTestFireWithResponse call
+func ParsePostApiTriggersByIdTestFireResponse(rsp *http.Response) (*PostApiTriggersByIdTestFireResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiTriggersByIdTestFireResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Channel PostApiTriggersByIdTestFire200JSONResponseBodyChannel `json:"channel"`
+			Errors  []string                                              `json:"errors"`
+
+			// HttpStatus Webhook only: what the endpoint answered with.
+			HttpStatus       *float32 `json:"httpStatus,omitempty"`
+			MissingVariables []string `json:"missingVariables"`
+			RecipientCount   float32  `json:"recipientCount"`
+
+			// UsedDefault Whether the LangWatch default message was rendered because this automation states no template of its own.
+			UsedDefault bool `json:"usedDefault"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

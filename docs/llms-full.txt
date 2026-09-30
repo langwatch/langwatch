@@ -36158,7 +36158,7 @@ An automation with the **Add to dataset** action appends a row for every trace t
   </Frame>
 </div>
 
-3. Pick **Add to dataset** as the action, choose the dataset, and map the trace fields to its columns. Columns named `input`, `output`, `expected_output`, `contexts`, `total_cost`, `spans`, `trace_id` and `timestamp` are mapped for you; any other column maps to the metadata key with the same name until you change it.
+3. Pick **Add to dataset** as the action and choose the dataset. Its columns are mapped to trace fields for you, as described in [The column mapping](#the-column-mapping).
 
 <Frame caption="Add To Dataset">
 <img
@@ -36169,6 +36169,50 @@ An automation with the **Add to dataset** action appends a row for every trace t
 </Frame>
 
 4. Save. From then on, every trace that matches the filter adds one row to the dataset.
+
+## The column mapping
+
+When you pick a dataset, LangWatch builds the mapping from the dataset's column names:
+
+| Column name | Filled from |
+|-------------|-------------|
+| `input`, `question`, `user_input` | The trace input |
+| `output`, `answer`, `response`, `result`, `expected_output` | The trace output |
+| `contexts` | The retrieved contexts, as a list of strings |
+| `total_cost` | The trace's total cost |
+| `spans` | The trace's spans |
+| `trace_id`, `timestamp` | The trace id and its timestamp |
+| Any other name | The trace **metadata key with the same name** as the column |
+
+So a column named `customer_tier` is filled from the trace's `customer_tier` metadata. A trace without that key leaves the cell empty.
+
+The mapping is stored on the automation as `actionParams.datasetMapping`. Each column maps to a `{ source, key, subkey }` entry: `source` is the trace field, `key` narrows a keyed source (the metadata key for `metadata`, for example), and `subkey` narrows it further (one field of an evaluation, for example).
+
+```json
+{
+  "datasetId": "<datasetId>",
+  "datasetMapping": {
+    "mapping": {
+      "input": { "source": "input", "key": "", "subkey": "" },
+      "output": { "source": "output", "key": "", "subkey": "" },
+      "customer_tier": { "source": "metadata", "key": "customer_tier", "subkey": "" }
+    },
+    "expansions": []
+  }
+}
+```
+
+A `source` is one of `trace_id`, `thread_id`, `timestamp`, `input`, `output`, `contexts`, `contexts.string_list`, `metrics.total_cost`, `metrics.first_token_ms`, `metrics.total_time_ms`, `metrics.prompt_tokens`, `metrics.completion_tokens`, `metrics.total_tokens`, `spans`, `spans.llm.input`, `spans.llm.output`, `metadata`, `evaluations`, `annotations` or `events`.
+
+### Changing the mapping later
+
+The automation drawer has no per-column mapping editor: it derives the mapping from the dataset's columns, and choosing the dataset again derives it again. To map a column to a different source after the automation exists, update the automation's delivery configuration with the whole mapping you want, with the CLI:
+
+```bash
+langwatch trigger update <automationId> --action-params '{"datasetId":"<datasetId>","datasetMapping":{"mapping":{"input":{"source":"input"},"customer_tier":{"source":"metadata","key":"tier"}},"expansions":[]}}'
+```
+
+or with `PATCH /api/triggers/{id}` and the same `actionParams`. `actionParams` replaces the stored configuration as a whole, so send every column, not only the one you change. See the [Triggers API](/api-reference/triggers/overview).
 
 **Also check:** [Automations](/features/automations) for the delivery options and the automation history, and [Datasets](/datasets/overview) for the full list of trace fields a column can map to.
 
@@ -38836,13 +38880,17 @@ title: Alerts and Automations
 description: Configure Alerts and Automations in LangWatch to detect regressions, notify teams, and enforce automated guardrails for AI agent testing.
 ---
 
-## Create automations based on LangWatch filters
+An automation watches something in your project and acts when it happens. There are three kinds:
 
-LangWatch offers you the possibility to create automations based on your selected filters. You can use these automations to send notifications to either Slack or selected team email addresses.
+- **Automations** act on each trace that matches a filter: send an email, a Slack message or a webhook, add the trace to a dataset, or send it to an annotation queue.
+- **Alerts** watch a series on a custom graph and fire when it crosses a threshold, for example p95 latency above 8 seconds.
+- **Reports** send a dashboard, a single graph or a table of traces on a schedule, for example every Monday at 09:00.
 
-#### Usage
+All three live on the **Automations** page of your project, which has three tabs: **Overview** shows what is firing and everything your automations have done recently, **Automations** lists automations and alerts, and **Reports** lists scheduled reports.
 
-To create an automation in the LangWatch dashboard, follow these steps:
+<Info>**Also check:** [Triggers API](/api-reference/triggers/overview) to manage automations over REST, the CLI or MCP, and [Datasets from traces](/datasets/automatically-from-traces) for the dataset column mapping.</Info>
+
+## Create an automation from a filter
 
 - Click the filter button located at the top right of the LangWatch dashboard.
 - After creating a filter, an automation button will appear.
@@ -38867,7 +38915,9 @@ To create an automation in the LangWatch dashboard, follow these steps:
 />
 </Frame>
 
-Once the automation is created, you will receive an alert whenever a message meets the criteria of the automation. These automation checks are run on the minute but not instantaneously, as the data needs time to be processed. You can find the created automations under the Settings section, where you can deactivate or delete an automation to stop receiving notifications.
+Once the automation is created, it acts on every trace that meets its conditions. Conditions are checked shortly after a trace arrives, not instantly, because the trace needs time to be processed. Notifications are grouped into a digest (every five minutes for a new automation) so a broad condition does not send one message per trace.
+
+A condition on an evaluation result names the **monitor** that ran the evaluation, not the evaluator. The dashboard picks this for you; over the API, see [Evaluation keys are monitor ids](/api-reference/triggers/overview#evaluation-keys-are-monitor-ids).
 
 **Automation settings**
 
@@ -38878,6 +38928,40 @@ Once the automation is created, you will receive an alert whenever a message mee
   alt="LangWatch"
 />
 </Frame>
+
+## Slack
+
+A Slack automation posts through a **Slack connection**. Connections live under **Settings → Integrations → Slack**, where each one is listed with its name, kind, scope and how many automations use it. Add one with **Add Slack connection**, or with **New Slack connection** while setting up an automation's Slack delivery; the new connection comes back selected.
+
+A connection is one of two kinds:
+
+- **Bot**: a Slack app bot token. Pick a channel for each automation, and the app posts there with every block of the message. Invite the app to the channel first.
+- **Incoming webhook**: one webhook URL, which posts to the one channel Slack tied it to. Charts and tables are sent as text.
+
+Each connection has a scope:
+
+- **Organization**: every project in the organization can use it. Adding, editing or deleting one needs permission to manage the organization.
+- **Project**: only that project can use it. Adding, editing or deleting one needs permission to update the project.
+
+A token or URL is stored once per organization: adding a connection with a secret another connection already holds is refused, naming that connection. Replacing a connection's token or URL takes effect for every automation that uses it, with no automation edited. Deleting a connection that active automations use asks you to confirm how many stop delivering.
+
+<Note>
+Automations used to carry their own webhook URL or bot token, and a project had one Slack integration. Each of those secrets is now a connection, and every automation points at the connection holding its secret: automations that shared a secret within one project share a project connection, and a secret shared across projects became an organization connection. You do not need to re-enter any secret.
+</Note>
+
+## Alerts and reports
+
+An **alert** is set up on a custom graph: pick the series to watch, the comparison (above, below, equal), the threshold and the window (1 minute to 1 day). It fires when the series crosses the threshold and records when it recovers.
+
+A **report** renders a dashboard, one graph, or a table of the top traces for a filter, and sends it by email or Slack on a cron schedule in the timezone you choose. A report sends at most once every 15 minutes.
+
+Both can also be created with `langwatch trigger create --graph-alert` and `--report`; see the [Triggers API](/api-reference/triggers/overview#alerts-on-a-graph).
+
+## Pause, test and history
+
+- **Pause** an automation to stop it acting without deleting it, and resume it later. A paused report stops sending.
+- **Test** sends the automation's message to its saved destination so you can check it arrives. A test is not recorded as a fire.
+- **History**, in an automation's details, lists every fire, newest first; **Overview** shows the recent fires across all of them. The same history is available with `GET /api/triggers/{id}/fires`, `langwatch trigger fires <id>` and the MCP tool `platform_list_trigger_fires`, each paged by cursor.
 
 ---
 
@@ -39863,6 +39947,45 @@ Both query doors need `analytics:view`; the trace search and the facets endpoint
 need `traces:view`. A column your key cannot read is listed with
 `available: false` and names the permission it needs, rather than being hidden,
 so you can see what a wider key would reach.
+
+---
+
+# FILE: ./features/topic-clustering.mdx
+
+---
+title: Topic clustering
+description: Group your traces into topics and subtopics automatically, choose the model it uses, and run it on demand from Settings.
+---
+
+Topic clustering reads the inputs of your traces and groups them into topics, each split into subtopics, so you can see what your users ask about without reading traces one by one. Each clustered trace carries its topic and subtopic, and you can filter on them in the Trace Explorer and in [automations](/features/automations) (`topics.topics` and `topics.subtopics`).
+
+## Set it up
+
+Topic clustering calls a model on your behalf, so it needs one:
+
+1. Add a [model provider](/platform/model-providers) for your project.
+2. In **Settings → Model Providers → Default Models**, choose the model and the embeddings model for topic clustering.
+
+Until both are set, runs are skipped with "no topic clustering model is set up".
+
+## When it runs
+
+Once a project receives traces, topic clustering is scheduled to run on its own, about once a day. A run does one of two things:
+
+- **Rebuild all topics** from your recent traces. A rebuild needs at least 10 traces with an input, and is not repeated for a few days after the last one (two to seven, depending on how many traces are already clustered), so the topics stay stable.
+- **Sort new traces into your existing topics**, once enough traces are clustered. This keeps the topics you have and assigns each new trace to one of them.
+
+A scheduled run with too few new traces, or too soon after the last rebuild, is recorded as skipped, with the reason.
+
+## The Topic Clustering settings page
+
+**Settings → Topic Clustering** (project admins only) shows:
+
+- **Schedule**: the outcome of the last run (completed, skipped, failed, running or interrupted), when it ran, and for a completed run how many traces it organised into how many topics and subtopics. A failed run caused by your model provider, such as rejected credentials or an exhausted quota, says what to fix.
+- **Manual topic clustering**: **Run topic clustering** starts a run now instead of waiting for the next scheduled one. It can take several minutes. If a run is already in progress, the page says so rather than starting a second one.
+- **Run history**: the recent runs and their outcomes.
+
+There is no public REST, CLI or MCP endpoint to start a run or change the schedule. The topics themselves can be read with [LangWatchQL](/api-reference/query/overview) (`topics` view) and used as trace filters.
 
 ---
 
@@ -41460,6 +41583,25 @@ Saved evaluators are pre-configured evaluation setups that you create on the Lan
 </Frame>
 
 You can also manage saved evaluators from the dedicated Evaluators page at `/{project}/evaluators`.
+
+## Custom (Code) evaluators
+
+A code evaluator is a saved evaluator whose logic is your own Python. Create one on the Evaluators page with **New Evaluator → Custom (Code)**: declare its inputs (for example `output` and `expected_output`) and write a `Code` class whose `__call__` takes those inputs and returns a dictionary with any of `passed`, `score`, `label` and `details`.
+
+```python
+class Code:
+    def __call__(self, output: str, expected_output: str):
+        passed = expected_output.lower() in output.lower()
+        return {"passed": passed, "score": 1.0 if passed else 0.0}
+```
+
+From code you can:
+
+- **Run it** like any saved evaluator: `POST /api/evaluations/evaluators/{slug}/evaluate`, with `data` holding one value per declared input.
+- **Find it**: `GET /api/evaluators` lists it with `type: "code"`, and `GET /api/evaluators/{idOrSlug}` returns its code and inputs in `config`.
+- **Monitor with it**: run it on incoming traces with `POST /api/monitors`, sending the evaluator's id as `evaluatorId` and `code/<evaluatorId>` as `checkType`, plus `mappings` from trace fields to its inputs.
+
+Creating a code evaluator and editing its code are done on the Evaluators page: `POST /api/evaluators` only creates built-in evaluator types.
 
 ## Using Saved Evaluators
 
@@ -58397,7 +58539,21 @@ When something is worth watching past a single question, ask Langy to set up an 
 - "Create a trigger that flags any trace where the answer-correctness eval fails."
 - "Watch my daily token spend and tell me if it jumps."
 
-Langy sets these up with `langwatch monitor create` and `langwatch trigger create`, so the alert or automation lives in your project like any other, not inside the chat. You change or remove it the same way you would one you made yourself.
+Langy sets these up with the `langwatch` CLI, so the alert or automation lives in your project like any other, not inside the chat. You change or remove it the same way you would one you made yourself:
+
+- A **latency, cost or volume alert** is a graph alert: it needs a custom graph of the metric (`langwatch graph create`, or one you already have) and an alert on one of that graph's series (`langwatch trigger create --custom-graph-id --graph-alert`). For "p95 latency on the checkout agent above 8s", that is a graph of `performance.completion_time` at p95 filtered to the checkout agent, and an alert like this:
+
+  ```bash
+  langwatch trigger create "Checkout p95 latency" \
+    --action SEND_SLACK_MESSAGE --slack-connection <connectionId> --slack-channel C0123456789 \
+    --custom-graph-id <graphId> --alert-type WARNING \
+    --graph-alert '{"seriesName":"0/performance.completion_time/p95","operator":"gt","threshold":8000,"timePeriod":15}'
+  ```
+
+  The threshold is in milliseconds, and `timePeriod` is the window in minutes. The Slack connection is one listed under **Settings → Integrations → Slack**; a webhook connection needs no `--slack-channel`.
+- A **per-trace automation**, such as flagging every trace where an evaluation fails, is `langwatch trigger create --filters`, keyed by the id of the monitor that runs the evaluation. If no monitor runs it yet, Langy adds one with `langwatch monitor create`.
+
+The [Triggers API](/api-reference/triggers/overview) has every option.
 
 <Note>These are things you ask Langy to do, on the window and metric you name. Langy analyzes your traces and sets up monitors when you ask; it does not watch and act on its own.</Note>
 
@@ -67147,6 +67303,9 @@ To make a call to the Annotations API, you will need to pass through your LangWa
 - `GET /api/annotations/trace/:id` - Get the annotations for a single trace
 - `POST /api/annotations/trace/:id` - Create annotations for traces to support domain labeling, evaluation scoring, and agent testing workflows.
 
+#### Annotation queues
+
+Annotation queues have no REST endpoints yet. To send traces to a queue from code, create an automation with the `ADD_TO_ANNOTATION_QUEUE` action ([Triggers API](/api-reference/triggers/overview)); to read queues and their items, query the `annotation_queues` and `annotation_queue_items` views with [LangWatchQL](/api-reference/query/overview). See [Annotation queues](/annotations/queues#from-code).
 
 ---
 
@@ -67550,6 +67709,15 @@ openapi: "POST /api/dataset/evaluate"
 ---
 title: "Get a dataset by its slug or id"
 openapi: "GET /api/dataset/{slugOrId}"
+---
+
+---
+
+# FILE: ./api-reference/datasets/get-entries.mdx
+
+---
+title: "List entries of a dataset"
+openapi: "GET /api/dataset/{slug}/entries"
 ---
 
 ---
@@ -70196,7 +70364,8 @@ Governance views are keyed by the organization's hidden `internal_governance` pr
 | `governance_daily_cost_rollup` | Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs`, `output` | one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId) | `Day` |
 | `governance_hourly_kpis` | Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, SourceId, HourBucket, TraceId) | `HourBucket` |
 | `governance_security_events` | Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `output` | one row per (TenantId, EventId) | `EventTime` |
-| `automation_events` | Audit log of automation trigger executions and actions | None | one row per EventId | `OccurredAt` |
+
+Automation firing history is not an analytics view. Read it per automation with [`GET /api/triggers/{id}/fires`](/api-reference/triggers/get-fires), `langwatch trigger fires <id>`, or the MCP tool `platform_list_trigger_fires`, each paged by cursor.
 
 #### Legacy
 
@@ -71942,6 +72111,33 @@ openapi: "PATCH /api/traces/{traceId}/metadata"
 
 ---
 
+# FILE: ./api-reference/triggers/action-disable.mdx
+
+---
+title: "Pause an automation"
+openapi: "POST /api/triggers/{id}/disable"
+---
+
+---
+
+# FILE: ./api-reference/triggers/action-enable.mdx
+
+---
+title: "Resume an automation"
+openapi: "POST /api/triggers/{id}/enable"
+---
+
+---
+
+# FILE: ./api-reference/triggers/action-test-fire.mdx
+
+---
+title: "Send a test fire"
+openapi: "POST /api/triggers/{id}/test-fire"
+---
+
+---
+
 # FILE: ./api-reference/triggers/create-a-slack-alert-trigger.mdx
 
 ---
@@ -71969,11 +72165,29 @@ openapi: "DELETE /api/triggers/{id}"
 
 ---
 
+# FILE: ./api-reference/triggers/get-fires.mdx
+
+---
+title: "List an automation's fires"
+openapi: "GET /api/triggers/{id}/fires"
+---
+
+---
+
 # FILE: ./api-reference/triggers/get-triggers.mdx
 
 ---
 title: "Get a trigger by its ID"
 openapi: "GET /api/triggers/{id}"
+---
+
+---
+
+# FILE: ./api-reference/triggers/list-slack-connections.mdx
+
+---
+title: "List Slack Connections"
+openapi: "GET /api/slack-connections"
 ---
 
 ---
@@ -71991,12 +72205,193 @@ openapi: "GET /api/triggers"
 
 ---
 title: "Overview"
-description: "Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses."
+description: "Create, change, pause and inspect automations over the REST API: trace conditions, graph alerts, scheduled reports, Slack delivery and fire history."
 ---
 
-## Intro
+An automation (a *trigger* in the API) watches something in your project and acts when it happens. It is one of three kinds:
 
-Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.
+| Kind | What it watches | What you send |
+|------|-----------------|---------------|
+| `AUTOMATION` | Each trace that matches its conditions | `filters` or `filterQuery` |
+| `ALERT` | A series on a custom graph crossing a threshold | `customGraphId`, `graphAlert` and `alertType` |
+| `REPORT` | A schedule | `report` |
+
+Every automation delivers on one channel, set by `action` when it is created and fixed afterwards: `SEND_EMAIL`, `SEND_SLACK_MESSAGE`, `SEND_WEBHOOK`, `ADD_TO_DATASET` or `ADD_TO_ANNOTATION_QUEUE`. The channel's configuration goes in `actionParams`.
+
+Every endpoint authenticates with your project API key in the `X-Auth-Token` header. The same operations are in the CLI (`langwatch trigger …`) and the MCP server (the `platform_*trigger*` tools); see [CLI and MCP](#cli-and-mcp).
+
+<Info>**Also check:** [Alerts and Automations](/features/automations) for the dashboard, and [Datasets from traces](/datasets/automatically-from-traces) for the dataset column mapping.</Info>
+
+## Trace conditions: `filters`
+
+`filters` is a JSON object whose keys are filter fields and whose values say what to match. A create with no conditions (no `filters`, or `{}`) is refused, because it would match every trace.
+
+Most fields are **unkeyed**: the value is a list, and a trace matches if it has any of the listed values.
+
+```json
+{ "traces.error": ["true"] }
+```
+
+Some fields are **keyed**: they only mean something for one evaluation, one metadata key or one event type, so the list sits under that key. A keyed field sent as a bare list names no key and could never match a trace, so it is refused with `422 trigger_filter_key_required`; the error message shows the nested shape to send instead.
+
+| Family | Fields | Shape | Example |
+|--------|--------|-------|---------|
+| Trace | `traces.error`, `traces.name`, `traces.origin` | Unkeyed | `{"traces.name": ["checkout"]}` |
+| Metadata | `metadata.user_id`, `metadata.thread_id`, `metadata.customer_id`, `metadata.labels`, `metadata.prompt_ids`, `metadata.key` | Unkeyed | `{"metadata.labels": ["production"]}` |
+| Metadata value | `metadata.value` | Keyed by metadata key | `{"metadata.value": {"plan": ["enterprise"]}}` |
+| Spans | `spans.type`, `spans.model` | Unkeyed | `{"spans.model": ["openai/gpt-5-mini"]}` |
+| Topics | `topics.topics`, `topics.subtopics` | Unkeyed, a list of topic ids | `{"topics.topics": ["<topicId>"]}` |
+| Evaluation present | `evaluations.evaluator_id`, `evaluations.evaluator_id.guardrails_only`, `evaluations.evaluator_id.has_passed`, `evaluations.evaluator_id.has_score`, `evaluations.evaluator_id.has_label` | Unkeyed, a list of monitor ids | `{"evaluations.evaluator_id": ["<monitorId>"]}` |
+| Evaluation result | `evaluations.passed`, `evaluations.score`, `evaluations.label`, `evaluations.state` | Keyed by monitor id | `{"evaluations.passed": {"<monitorId>": ["false"]}}` |
+| Events | `events.event_type` | Unkeyed | `{"events.event_type": ["thumbs_up_down"]}` |
+| Event details | `events.metrics.key`, `events.event_details.key` | Keyed by event type | `{"events.event_details.key": {"thumbs_up_down": ["feedback"]}}` |
+| Event metric value | `events.metrics.value` | Keyed by event type, then by metric key | `{"events.metrics.value": {"thumbs_up_down": {"vote": ["-1", "0"]}}}` |
+| Annotations | `annotations.hasAnnotation` | Unkeyed | `{"annotations.hasAnnotation": ["true"]}` |
+
+The numeric fields (`evaluations.score`, `events.metrics.value`) take a two-item list, `[min, max]`: `{"evaluations.score": {"<monitorId>": ["0", "0.5"]}}` matches scores from 0 to 0.5.
+
+### Evaluation keys are monitor ids
+
+An evaluation result is recorded under the id of the **monitor** (the online evaluation) that produced it, so every `evaluations.*` condition names a monitor id. Read them from [`GET /api/monitors`](/api-reference/monitors/list-monitors) (or `langwatch monitor list`): use each monitor's `id`, not its `evaluatorId`. A condition keyed or listed by an evaluator id is refused with `422 trigger_filter_monitor_required`, and the message names the monitors that run that evaluator so you can pick one.
+
+```bash
+curl -s "https://app.langwatch.ai/api/monitors" -H "X-Auth-Token: $LANGWATCH_API_KEY"
+```
+
+### The alternative: `filterQuery`
+
+Instead of `filters` you can send `filterQuery`, a trace query in the syntax of the Trace Explorer search bar, for example `status:error`. When both are set, `filterQuery` wins. Send `null` on an update to clear it.
+
+## Create an automation
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/triggers" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Failed answer correctness",
+    "action": "SEND_EMAIL",
+    "actionParams": { "members": ["oncall@example.com"] },
+    "filters": { "evaluations.passed": { "<monitorId>": ["false"] } }
+  }'
+```
+
+The response is the automation, with a `platformUrl` that opens it in the dashboard. Optional on every kind: `message`, `alertType` (`CRITICAL`, `WARNING` or `INFO`), `templates` (Liquid templates for the Slack and email message), `notificationCadence` (how often a notification may send; a new automation starts on a five-minute digest) and `traceDebounceMs` (how long to wait for a trace to settle before its conditions are read).
+
+What `actionParams` holds for each channel:
+
+| `action` | `actionParams` |
+|----------|----------------|
+| `SEND_EMAIL` | `members`: the addresses to email |
+| `SEND_SLACK_MESSAGE` | See [Slack delivery](#slack-delivery) |
+| `SEND_WEBHOOK` | `url` (https only), and optionally `method`, `headers`, `bodyTemplate`, `contentType`, `signingSecret` |
+| `ADD_TO_DATASET` | `datasetId` and `datasetMapping`; see [Datasets from traces](/datasets/automatically-from-traces#the-column-mapping) |
+| `ADD_TO_ANNOTATION_QUEUE` | `annotators`: a list of `{ "id", "name" }`, where `id` is `user-<userId>` for a person or `queue-<queueId>` for an annotation queue |
+
+## Slack delivery
+
+A `SEND_SLACK_MESSAGE` automation posts through a Slack connection, named by `actionParams.slackIntegrationId`. Connections are added in the dashboard under **Settings → Integrations → Slack**, and listed there or with [`GET /api/slack-connections`](/api-reference/triggers/list-slack-connections) (`langwatch slack-connection list` on the CLI), which returns names and ids, never secrets; the API can use any connection the project can use, which is its own project connections and its organization's organization connections.
+
+- A **bot** connection also needs `slackChannelId`, the channel the LangWatch Slack app posts in.
+- An **incoming webhook** connection needs no further setup: the webhook posts to the channel Slack tied it to.
+
+```json
+{ "action": "SEND_SLACK_MESSAGE", "actionParams": { "slackIntegrationId": "<connectionId>", "slackChannelId": "C0123456789" } }
+```
+
+Reading the automation back returns `slackIntegrationId` and never a token or URL. A connection that is deleted, or that belongs to another project, fails delivery with `slack_integration_missing`.
+
+<Note>
+For one release the API still accepts the legacy fields: `slackWebhook` (an incoming webhook URL, with `slackDelivery` absent or `"webhook"`) or `slackBotToken` with `slackChannelId` (with `slackDelivery: "bot"`). Send `slackIntegrationId` in new integrations.
+
+The server stores the secret as a connection, reusing a connection this project can already use that holds it (its own, else its organization's) or creating a project connection, and the automation keeps only that connection's id. An automation saved before connections existed has its stored secret moved into a connection the same way the next time it is updated.
+
+The older [`POST /api/trigger/slack`](/api-reference/triggers/create-a-slack-alert-trigger) takes exactly one destination: `slack_connection_id` (plus `slack_channel_id` for a bot connection), or `slack_webhook`, which is stored as a connection in the same way.
+</Note>
+
+## Alerts on a graph
+
+An alert watches one series of a [custom graph](/api-reference/graphs/overview) and fires when it crosses a threshold. Send `customGraphId`, `alertType` and `graphAlert`:
+
+| `graphAlert` field | What it is |
+|--------------------|------------|
+| `seriesName` | The series to watch, written `<index>/<metric>/<aggregation>`, for example `0/performance.completion_time/p95`. The leading index picks the series on the graph, counting from 0. |
+| `operator` | `gt`, `gte`, `lt`, `lte` or `eq` |
+| `threshold` | The number to compare with, in the metric's unit (milliseconds for latency) |
+| `timePeriod` | The window in minutes: `1`, `5`, `15`, `30`, `60` or `1440` |
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/triggers" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Checkout p95 latency",
+    "action": "SEND_SLACK_MESSAGE",
+    "actionParams": { "slackIntegrationId": "<connectionId>" },
+    "customGraphId": "<graphId>",
+    "alertType": "WARNING",
+    "graphAlert": { "seriesName": "0/performance.completion_time/p95", "operator": "gt", "threshold": 8000, "timePeriod": 15 }
+  }'
+```
+
+An alert's conditions are the graph's own filters, so an alert takes no `filters`.
+
+## Scheduled reports
+
+A report renders something on a schedule and sends it by email or Slack. Send `report`:
+
+| `report` field | What it is |
+|----------------|------------|
+| `source` | What to render: `{"kind": "dashboard", "dashboardId": "..."}`, `{"kind": "customGraph", "customGraphId": "..."}`, or `{"kind": "traceQuery", "filters": {...}, "topN": 5}` for a table of traces |
+| `schedule` | `{"cron": "0 9 * * 1", "timezone": "Europe/Amsterdam"}`: a five-field cron expression and an IANA timezone. A report sends at most once every 15 minutes. |
+| `compareToPrevious` | `true` adds a this-period-against-last comparison |
+
+```json
+{
+  "name": "Weekly quality dashboard",
+  "action": "SEND_EMAIL",
+  "actionParams": { "members": ["team@example.com"] },
+  "report": {
+    "source": { "kind": "dashboard", "dashboardId": "<dashboardId>" },
+    "schedule": { "cron": "0 9 * * 1", "timezone": "UTC" }
+  }
+}
+```
+
+## Update, pause, resume and test
+
+- `PATCH /api/triggers/{id}` changes any field; what you leave out stays as it is. `actionParams` is the exception: it replaces the delivery configuration as a whole. Credentials read back as `[redacted]`; send `[redacted]` back to keep the stored value. The channel and the kind cannot be changed.
+- `POST /api/triggers/{id}/disable` pauses an automation and `POST /api/triggers/{id}/enable` resumes it. A paused report stops claiming its schedule.
+- `POST /api/triggers/{id}/test-fire` sends the automation's message to its saved destination, so you can check it arrives. It is not recorded as a fire. Dataset and annotation queue automations write records rather than send a message, so they cannot be test-fired.
+
+## Fire history
+
+`GET /api/triggers/{id}/fires` lists what an automation has done, newest first: each fire's `id`, `firedAt` and, for an alert, `resolvedAt`. It carries no trace ids and no trace content.
+
+It pages by cursor. `limit` sets the page size (1 to 100, default 20). The response is `{ "fires": [...], "nextCursor": "..." }`; send `nextCursor` back as `cursor` to read the page after this one. `nextCursor` is `null` on the last page. A cursor this endpoint did not issue is refused with a 422.
+
+```bash
+curl "https://app.langwatch.ai/api/triggers/<id>/fires?limit=50" -H "X-Auth-Token: $LANGWATCH_API_KEY"
+curl "https://app.langwatch.ai/api/triggers/<id>/fires?limit=50&cursor=<nextCursor>" -H "X-Auth-Token: $LANGWATCH_API_KEY"
+```
+
+The CLI and the MCP server page the same way: `langwatch trigger fires <id> --cursor <nextCursor>`, or the `platform_list_trigger_fires` tool with `cursor`.
+
+## CLI and MCP
+
+| Task | CLI | MCP tool |
+|------|-----|----------|
+| List, read | `langwatch trigger list`, `langwatch trigger get <id>` | `platform_list_triggers`, `platform_get_trigger` |
+| Create a trace automation | `langwatch trigger create <name> --action … --filters '<json>'`, or `--filter-query '<query>'` | `platform_create_trigger` with `filters` or `filterQuery` |
+| Create an alert | `langwatch trigger create <name> --action … --custom-graph-id <id> --graph-alert '<json>' --alert-type WARNING` | `platform_create_trigger` with `customGraphId`, `graphAlert` and `alertType` |
+| Create a report | `langwatch trigger create <name> --action SEND_EMAIL --action-params '{"members":["team@example.com"]}' --report '<json>'` | `platform_create_trigger` with `report` |
+| Update | `langwatch trigger update <id> …` | `platform_update_trigger` |
+| Pause, resume | `langwatch trigger disable <id>`, `langwatch trigger enable <id>` | `platform_update_trigger` with `active` |
+| Test fire | `langwatch trigger test-fire <id>` | `platform_test_fire_trigger` |
+| Fire history | `langwatch trigger fires <id> [--limit <n>] [--cursor <cursor>]` | `platform_list_trigger_fires` |
+| Delete | `langwatch trigger delete <id>` | `platform_delete_trigger` |
+
+In the CLI, `--action-params` takes the channel's configuration as JSON, and `--slack-connection <id>` with `--slack-channel <id>` (for a bot connection) are shortcuts for Slack delivery; `--slack-webhook <url>` is the legacy shortcut and is stored as a connection. In MCP, `platform_create_trigger` takes `actionParams` as an optional object.
 
 ---
 

@@ -1013,6 +1013,11 @@ const presentations = {
     describe: () =>
       "It may have been removed along with its run. Reload to see the current steps.",
   },
+  email_provider_not_configured: {
+    title: "Email is not set up on this installation",
+    describe: () =>
+      "No email was sent. An administrator has to set up an email provider before LangWatch can send email.",
+  },
   email_already_registered: {
     // Reached from the sign-up screen, and the reader there is usually looking
     // at their own account: either a previous sign-up created it and could not
@@ -2495,6 +2500,16 @@ const presentations = {
       "This is a self-hosted deployment, so plans are managed outside the app.",
   },
 
+  // ---- analytics ----
+  analytics_series_percentage_unsupported: {
+    // A percentage is the series divided by the same measurement without the
+    // series' own filters. A per-entity measurement (average per user, sum per
+    // thread) also changes which entities exist once filtered, so the two
+    // halves stop being comparable — the author has to drop one of the two.
+    title: "This series can't be shown as a percentage",
+    describe: () =>
+      "Turn the percentage toggle off for this series, or remove its per user, per thread or per customer breakdown.",
+  },
   // ---- identity ----
   identity_verification_invalid: {
     title: "That verification link didn't work",
@@ -3361,9 +3376,48 @@ const presentations = {
     title: "Slack webhook missing",
     describe: () => "Paste a Slack incoming webhook URL to continue.",
   },
-  missing_slack_bot_token: {
-    title: "Slack isn't connected",
-    describe: () => "Connect Slack before sending to a channel.",
+  slack_integration_invalid_token: {
+    title: "Slack didn't accept that token",
+    // `meta.slackError` is the code Slack's auth.test answered with, and only
+    // a few of them tell the customer anything they can act on. The rest read
+    // as provider slugs, so they stay in the log line and this falls back to
+    // the general instruction.
+    describe: (error) => {
+      switch (str(error, "slackError", "")) {
+        case "token_revoked":
+          return "That token was revoked in Slack. Reinstall the app and paste the new token.";
+        case "account_inactive":
+          return "That Slack app was removed from the workspace. Reinstall it and paste the new token.";
+        default:
+          return "Slack says this token isn't valid. Check you copied the whole Bot User OAuth token (it starts with xoxb-), or reinstall the app to get a new one.";
+      }
+    },
+  },
+  slack_integration_missing: {
+    title: "This automation has no Slack connection",
+    describe: () =>
+      "Pick a Slack connection in its delivery settings, or add one in the project's integration settings.",
+  },
+  slack_connection_exists: {
+    title: "That Slack secret is already saved",
+    // The name is customer-authored, so it is clamped like any other prose.
+    describe: (error) => {
+      const name = safeProse(str(error, "connectionName", ""));
+      return name
+        ? `It is already saved as "${name}". Use that connection instead.`
+        : "It is already saved as another connection. Use that one instead.";
+    },
+  },
+  slack_connection_in_use: {
+    title: "Automations still use this Slack connection",
+    describe: (error) => {
+      const count = num(error, "dependentAutomations", 0);
+      if (count === 1)
+        return "1 automation delivers through it and would stop.";
+      if (count > 1)
+        return `${count} automations deliver through it and would stop.`;
+      return "Automations deliver through it and would stop.";
+    },
   },
   missing_annotator: {
     title: "No annotator assigned",
@@ -3402,11 +3456,144 @@ const presentations = {
         : "Configure the destination first.";
     },
   },
+  trigger_action_immutable: {
+    title: "The delivery channel is fixed",
+    describe: () =>
+      "An automation keeps the channel it was created with, because the " +
+      "credentials it holds belong to that channel. Create a new automation " +
+      "on the channel you want.",
+  },
+
+  trigger_action_params_unknown_fields: {
+    title: "Some of those fields are not part of this channel",
+    // Both lists are the caller's own vocabulary: what it sent, and what this
+    // channel has. Naming them is the whole remediation — a misspelt field is
+    // invisible otherwise.
+    describe: (error) => {
+      const fields = strList(error, "fields");
+      const accepted = strList(error, "accepted");
+      const named = fields.length > 0 ? `${fields.join(", ")}. ` : "";
+      return accepted.length > 0
+        ? `${named}This channel reads: ${accepted.join(", ")}.`
+        : `${named}Check the fields against the channel you are configuring.`;
+    },
+  },
+
+  trigger_rule_fields_misplaced: {
+    title: "The rule belongs in its own field",
+    describe: (error) => {
+      const where = str(error, "expectedField", "");
+      return where
+        ? `State it in "${where}" rather than inside the delivery ` +
+            "configuration, which is only about where the message goes."
+        : "State it in its own field rather than inside the delivery " +
+            "configuration, which is only about where the message goes.";
+    },
+  },
+
+  trigger_test_fire_rate_limited: {
+    title: "That is a lot of test fires",
+    // `meta.resetAt` is the instant the window ends, which is the one thing
+    // the caller wants: how long to wait. A window that has already passed by
+    // the time this renders reads as "try again", not as a negative wait.
+    describe: (error) => {
+      const resetAt = error.meta.resetAt;
+      const seconds =
+        typeof resetAt === "number"
+          ? Math.ceil((resetAt - Date.now()) / 1000)
+          : 0;
+      return seconds > 0
+        ? `This project has sent as many as a minute allows. Try again in ${seconds} second${seconds === 1 ? "" : "s"}.`
+        : "This project has sent as many as a minute allows. Try again now.";
+    },
+  },
+
+  trigger_kind_immutable: {
+    title: "This cannot become a different kind of automation",
+    describe: () =>
+      "An automation that watches traces, one that watches a graph and a " +
+      "report are set up differently. Create the one you want and delete this one.",
+  },
+
+  trigger_filter_key_required: {
+    title: "This condition needs a key",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This field"))}" selects by a key, ` +
+      "such as a monitor or a metadata key, so a plain list matches nothing. " +
+      "Pick the key, then the values.",
+  },
+
+  trigger_filter_monitor_required: {
+    title: "Key this condition by a monitor",
+    describe: () =>
+      "Evaluation results carry the id of the monitor that ran, not the " +
+      "evaluator's, so this condition would match nothing. Choose the " +
+      "monitor instead.",
+  },
+
+  trigger_filter_query_invalid: {
+    title: "This trace query could not be read",
+    describe: () =>
+      "Check it against the query syntax the traces view uses. It was not " +
+      "saved, so nothing has changed.",
+  },
+
+  graph_alert_incomplete: {
+    title: "This automation is missing something it needs",
+    // `meta.reason` carries the sentence the service wrote for the exact
+    // missing piece — the rule, the severity, the channel — which the
+    // generic line cannot name.
+    describe: (error) =>
+      safeProse(str(error, "reason", "")) ||
+      "Add the rule it fires by, the severity it fires at and a channel that " +
+        "can notify.",
+  },
+
+  graph_not_found: {
+    title: "That graph is not in this project",
+    describe: () =>
+      "An automation can only watch a graph in its own project. Check the graph id.",
+  },
+
+  report_channel_unsupported: {
+    title: "A report cannot be delivered that way",
+    describe: () =>
+      "Reports are delivered by email or to Slack. Pick one of those channels.",
+  },
+
+  report_incomplete: {
+    title: "This report is missing something it needs",
+    describe: () =>
+      "Say what it sends — a dashboard, a graph or a trace query — and the " +
+      "schedule it sends on.",
+  },
+
+  webhook_header_values_required: {
+    title: "Send the header values with the new destination",
+    describe: () =>
+      "Header values belong to the endpoint they authenticate against, so " +
+      "they are not carried over to a new one. Include each header's value " +
+      "in the same request as the new URL.",
+  },
+
   trigger_filters_required: {
     title: "This automation needs a condition",
     describe: () =>
       "Add a filter or a query that says which traces it is about. " +
       "Without one it would fire on every single trace.",
+  },
+
+  trigger_filters_unsupported: {
+    title: "None of these conditions can be used",
+    describe: () =>
+      "Every condition on this automation names something this platform no " +
+      "longer filters on. Add at least one condition it can act on.",
+  },
+
+  trigger_not_found: {
+    title: "This automation no longer exists",
+    describe: () =>
+      "It may have been deleted. Reload the list to see what is there now.",
   },
 
   // ==========================================================================
@@ -3680,7 +3867,7 @@ const presentations = {
     // `resource_limit_exceeded`, whose fix is upgrading with us.
     title: "You've reached your OpenAI plan's limit",
     describe: () =>
-      "Codex runs on your OpenAI account, and it has no allowance left for now. Wait for it to reset, or raise the limit with OpenAI.",
+      "Your OpenAI account has no allowance left for now. Wait for it to reset, or raise the limit with OpenAI.",
   },
   langy_model_not_allowed: {
     title: "That model isn't available here",
