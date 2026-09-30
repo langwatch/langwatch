@@ -29,6 +29,7 @@ describe("given a connected agent is added as a target", () => {
 
       expect(inputs.map((input) => input.identifier)).toEqual([
         "input",
+        "attachment",
         "model",
         "plan",
         "max_tools",
@@ -72,9 +73,10 @@ describe("given a connected agent is added as a target", () => {
   });
 
   describe("when the agent declares no parameters", () => {
-    it("reads the turn alone", () => {
+    it("reads the turn and the attachment beside it", () => {
       expect(connectedTargetFields({}).inputs).toEqual([
         { identifier: "input", type: "str" },
+        { identifier: "attachment", type: "file", optional: true },
       ]);
     });
   });

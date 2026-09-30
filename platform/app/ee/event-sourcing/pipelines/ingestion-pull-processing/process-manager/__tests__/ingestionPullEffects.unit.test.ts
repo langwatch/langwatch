@@ -2,6 +2,7 @@ import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 
 import {
   createIngestionPullRunHandler,
@@ -48,6 +49,10 @@ function commandsStub(
   return {
     recordRunCompleted: vi.fn(),
     recordRunFailed: vi.fn(),
+    recordAgentsListed: vi.fn(),
+    recordAgentsListingRefused: vi.fn(),
+    recordPeopleListed: vi.fn(),
+    recordPeopleListingRefused: vi.fn(),
     ...overrides,
   };
 }
@@ -56,6 +61,8 @@ describe("ingestion pull outbox effect", () => {
   it("records a durable completion with the returned cursor", async () => {
     const recordRunCompleted = vi.fn();
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+      peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: {
         run: vi
           .fn()
@@ -79,6 +86,8 @@ describe("ingestion pull outbox effect", () => {
   it("reports the errors a partly-succeeded run stepped over", async () => {
     const recordRunCompleted = vi.fn();
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+      peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: {
         run: vi.fn().mockResolvedValue({
           nextCursor: "cursor-2",
@@ -97,6 +106,8 @@ describe("ingestion pull outbox effect", () => {
 
   it("rethrows before the final attempt so the outbox retries", async () => {
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+      peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
       commands: () => commandsStub(),
     });
@@ -106,6 +117,8 @@ describe("ingestion pull outbox effect", () => {
   it("records a durable failure on the final attempt", async () => {
     const recordRunFailed = vi.fn();
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+      peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
       commands: () => commandsStub({ recordRunFailed }),
       clock: () => 200,
@@ -124,9 +137,134 @@ describe("ingestion pull outbox effect", () => {
     );
   });
 
+  describe("when the provider refuses the source's credentials on the first attempt", () => {
+    const refusal = () =>
+      new DispatchError({
+        message: "HTTP 401 (anthropic cost_report): key refused",
+        retryable: false,
+        customerMessage:
+          "Anthropic refused this key. Check the admin key and its permissions.",
+      });
+
+    /** @scenario "A refused key ends the run at once and the source keeps its schedule" */
+    it("records the failure at once with the customer sentence and does not rethrow", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: { run: vi.fn().mockRejectedValue(refusal()) },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+      });
+
+      await expect(handler(intent, context(1))).resolves.toBeUndefined();
+      expect(recordRunFailed).toHaveBeenCalledTimes(1);
+      expect(recordRunFailed).toHaveBeenCalledWith({
+        tenantId: "gov-project",
+        occurredAt: 200,
+        sourceId: "source-1",
+        runId: "run-1",
+        scheduledFor: 100,
+        error:
+          "Anthropic refused this key. Check the admin key and its permissions.",
+        errorCode: "pull_refused",
+        retryable: false,
+        retryAfterMs: null,
+      });
+    });
+
+    /** @scenario "A refusal with no customer sentence shows the generic failure text" */
+    it("records a refusal without a customer sentence under the generic failed code, never the refused one", async () => {
+      // The status layer shows the refused code's text as written, so a
+      // refusal that only carries the adapter's diagnostic must not be
+      // filed under it: the diagnostic goes to the event for the log, and
+      // the generic code makes the page fall back to its fixed sentence.
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockRejectedValue(
+            new DispatchError({
+              message: "HTTP 403 (anthropic cost_report): sk-admin refused",
+              retryable: false,
+            }),
+          ),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+      });
+
+      await expect(handler(intent, context(1))).resolves.toBeUndefined();
+      expect(recordRunFailed).toHaveBeenCalledTimes(1);
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: "HTTP 403 (anthropic cost_report): sk-admin refused",
+          errorCode: "pull_failed",
+          retryable: false,
+        }),
+      );
+    });
+
+    it("counts it as a final failure, never as retryable noise", async () => {
+      const before = await metricValue({
+        name: "ingestion_pull_total",
+        labels: { outcome: "failed_final" },
+      });
+      const retryableBefore = await metricValue({
+        name: "ingestion_pull_total",
+        labels: { outcome: "failed_retryable" },
+      });
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: { run: vi.fn().mockRejectedValue(refusal()) },
+        commands: () => commandsStub(),
+      });
+
+      await handler(intent, context(1));
+      expect(
+        await metricValue({
+          name: "ingestion_pull_total",
+          labels: { outcome: "failed_final" },
+        }),
+      ).toBe(before + 1);
+      expect(
+        await metricValue({
+          name: "ingestion_pull_total",
+          labels: { outcome: "failed_retryable" },
+        }),
+      ).toBe(retryableBefore);
+    });
+
+    it("still retries a rejection the provider marked as worth retrying", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockRejectedValue(
+            new DispatchError({
+              message: "Anthropic rate limit exceeded (HTTP 429).",
+              retryable: true,
+              retryAfterMs: 120_000,
+            }),
+          ),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+      });
+
+      await expect(handler(intent, context(1))).rejects.toMatchObject({
+        retryAfterMs: 120_000,
+      });
+      expect(recordRunFailed).not.toHaveBeenCalled();
+    });
+  });
+
   it("does not translate a completion-command failure into a pull failure", async () => {
     const recordRunFailed = vi.fn();
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+      peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: {
         run: vi.fn().mockResolvedValue({ nextCursor: null, eventCount: 1 }),
       },
@@ -156,6 +294,8 @@ describe("pull outcome metrics (ADR-054)", () => {
         },
       });
       const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
         commands: () => commandsStub(),
         clock: () => 200,
@@ -188,6 +328,8 @@ describe("pull outcome metrics (ADR-054)", () => {
         },
       });
       const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
         commands: () => commandsStub(),
         clock: () => 200,
@@ -213,6 +355,155 @@ describe("pull outcome metrics (ADR-054)", () => {
           },
         }),
       ).toBe(beforeFinal);
+    });
+  });
+
+  /**
+   * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+   *
+   * The replacement records the abandonment because it is the only party that
+   * knows both ids. The run it replaced ended when this one was minted, and
+   * until this is written the history shows a run that started and no run that
+   * ended — which reads on every screen as a source still working.
+   */
+  describe("given a run minted to replace one that outlived its allowance", () => {
+    const replacing = {
+      sourceId: "source-1",
+      runId: "run-2",
+      scheduledFor: 100,
+      cursor: "cursor-1",
+      abandonedRunId: "run-1",
+    };
+
+    /** @scenario "A run replaced before it finished records that it was abandoned" */
+    it("records that the earlier run was abandoned", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockResolvedValue({ nextCursor: "c2", eventCount: 0 }),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+      });
+
+      await handler(replacing, context(1));
+
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({ runId: "run-1", errorCode: "run_abandoned" }),
+      );
+    });
+
+    /** @scenario "A run replaced before it finished records that it was abandoned" */
+    it("records which run replaced it", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockResolvedValue({ nextCursor: "c2", eventCount: 0 }),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+      });
+
+      await handler(replacing, context(1));
+
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({ replacedByRunId: "run-2" }),
+      );
+    });
+
+    /**
+     * The abandonment write is what closes the replaced run. If it is the call
+     * that failed, the outbox redelivers this handler at a higher attempt, and
+     * a first-attempt-only guard would mean the replaced run is never closed at
+     * all -- a source that reads as still working forever.
+     */
+    /** @scenario "A run replaced before it finished records that it was abandoned" */
+    it("still records the abandonment when the outbox redelivers the intent", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockResolvedValue({ nextCursor: "c2", eventCount: 0 }),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+      });
+
+      await handler(replacing, context(2));
+
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({ runId: "run-1", errorCode: "run_abandoned" }),
+      );
+    });
+
+    it("records nothing about an abandonment on a run that replaced nothing", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: {
+          run: vi.fn().mockResolvedValue({ nextCursor: "c2", eventCount: 0 }),
+        },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+      });
+
+      await handler(intent, context(1));
+
+      expect(recordRunFailed).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The wait leaves with the run. Every attempt has now been refused, so the
+   * thing that must not walk back into the closed window is the next wake, and
+   * it reads this off the connection rather than off the dead run.
+   */
+  describe("given a provider that refused every attempt and named a wait", () => {
+    /** @scenario "A provider answering that too many requests were made has its wait read" */
+    it("carries the wait onto the failure the connection reads", async () => {
+      const recordRunFailed = vi.fn();
+      const refusal = Object.assign(new Error("HTTP 429"), {
+        retryAfterMs: 120_000,
+      });
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: { run: vi.fn().mockRejectedValue(refusal) },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+        maxAttempts: 1,
+      });
+
+      await handler(intent, context(1));
+
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({ retryAfterMs: 120_000 }),
+      );
+    });
+
+    /** @scenario "A wait that cannot be read as a length of time is treated as no wait" */
+    it("records no wait for a failure that named none", async () => {
+      const recordRunFailed = vi.fn();
+      const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: { list: () => Promise.reject(new Error("unused")) },
+        runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
+        commands: () => commandsStub({ recordRunFailed }),
+        clock: () => 200,
+        maxAttempts: 1,
+      });
+
+      await handler(intent, context(1));
+
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({ retryAfterMs: null }),
+      );
     });
   });
 });

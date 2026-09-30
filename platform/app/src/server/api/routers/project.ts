@@ -6,6 +6,10 @@ import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import {
+  checkOrganizationPermission,
+  checkTeamPermission,
+} from "~/server/app-layer/authz/permission-adapters";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
@@ -20,7 +24,6 @@ import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
-import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 /**
@@ -178,6 +181,10 @@ export const projectRouter = createTRPCRouter({
         },
       });
 
+      // Best-effort and never throws: without its key-map row the project
+      // reads zero rows from LangWatchQL until the next deploy's backfill.
+      await getApp().projects.syncLwqlKeyMapRow(project);
+
       // (The eager per-project Langy service key that used to be minted here is
       // gone — Langy now mints a per-turn, per-user session key scoped to exactly
       // what the caller holds; no long-lived project key is provisioned.)
@@ -206,13 +213,14 @@ export const projectRouter = createTRPCRouter({
       return { success: true, projectSlug: project.slug };
     }),
   /**
-   * The base key is a project-level write credential, so reading it is gated
-   * with `project:update` to match the access it grants. Rotation stays at
-   * `project:manage`.
+   * The base key grants full access to one project. Revealing it is therefore
+   * an administrator action, just like rotating it.
    */
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:update")
+    .permission("project:manage", {
+      nondisclosure: "not-found-outside-organization",
+    })
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 

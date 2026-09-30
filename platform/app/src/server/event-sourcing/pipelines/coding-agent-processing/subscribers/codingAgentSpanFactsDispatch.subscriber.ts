@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { codexAuxiliarySessionFacts } from "~/server/app-layer/traces/codex-auxiliary-thread";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace-processing/schemas/constants";
@@ -454,7 +455,15 @@ function liftContribution({
     name: span.name,
     attrs: span.spanAttributes,
   });
-  const facts = liftSpanFacts(span.spanAttributes);
+  const facts = {
+    ...liftSpanFacts(span.spanAttributes),
+    // A codex helper thread's request span says so through its request id;
+    // the fold reads the derived fact, never the vendor literal.
+    ...codexAuxiliarySessionFacts({
+      scopeName: span.instrumentationScope.name,
+      attributes: span.spanAttributes,
+    }),
+  };
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
     facts["service.version"] = serviceVersion;

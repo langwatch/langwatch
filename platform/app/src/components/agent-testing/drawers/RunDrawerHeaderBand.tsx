@@ -29,6 +29,7 @@ import type {
   RunScenarioState,
   useRunDrawerStop,
 } from "./useRunDrawerState";
+import { shouldShowWholeCallAudio, WholeCallAudio } from "./WholeCallAudio";
 
 export type RunDrawerHeaderBandProps = Pick<
   RunDrawerState,
@@ -212,6 +213,17 @@ export function RunDrawerHeaderBand({
       </HStack>
 
       <ChipStrip detail={detail} scenarioState={scenarioState} />
+
+      {shouldShowWholeCallAudio({
+        langwatch: scenarioState.metadata?.langwatch,
+        scenarioRunId: scenarioState.scenarioRunId,
+        projectId: detail.project?.id,
+      }) && (
+        <WholeCallAudio
+          scenarioRunId={scenarioState.scenarioRunId}
+          projectId={detail.project!.id}
+        />
+      )}
     </VStack>
   );
 }

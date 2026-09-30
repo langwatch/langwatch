@@ -19,6 +19,9 @@ function row(overrides: Partial<SpendEventRow> = {}): SpendEventRow {
     tokensCacheRead: 5,
     tokensCacheWrite: 3,
     tokensReasoning: 2,
+    tokensInputImage: 0,
+    tokensOutputImage: 0,
+    imageCount: 0,
     costUsd: "0.001234",
     costNanoUsd: 1_234_000,
     rateVersion: "catalog@2026-07-26",
@@ -58,6 +61,9 @@ describe("spend event envelope", () => {
       cache_read_input_tokens: 5,
       cache_creation_input_tokens: 3,
       reasoning_tokens: 2,
+      input_image_tokens: 0,
+      output_image_tokens: 0,
+      image_count: 0,
     });
     expect(envelope.data.cost).toEqual({
       total_usd: "0.001234",
@@ -67,6 +73,52 @@ describe("spend event envelope", () => {
     expect(envelope.data.end_user_id).toBe("end-user-7");
     expect(envelope.data.metadata).toEqual({ call_site: "summary" });
     expect(envelope.data.occurred_at).toBe("2026-07-27T14:03:11.482Z");
+  });
+
+  it("publishes the image quantities of an image request beside zero text output", () => {
+    const envelope = spendRowToEnvelope(
+      row({
+        model: "openai/gpt-image-2",
+        requestType: "image_generation",
+        tokensInput: 23,
+        tokensOutput: 0,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        tokensReasoning: 0,
+        tokensInputImage: 0,
+        tokensOutputImage: 158,
+        imageCount: 1,
+      }),
+    );
+    expect(envelope.data.usage).toEqual({
+      input_tokens: 23,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      reasoning_tokens: 0,
+      input_image_tokens: 0,
+      output_image_tokens: 158,
+      image_count: 1,
+    });
+  });
+
+  it("publishes the input image tokens and image count of an image edit", () => {
+    const envelope = spendRowToEnvelope(
+      row({
+        model: "openai/gpt-image-2",
+        requestType: "image_edit",
+        tokensInput: 21,
+        tokensOutput: 0,
+        tokensInputImage: 1024,
+        tokensOutputImage: 196,
+        imageCount: 1,
+      }),
+    );
+    const usage = envelope.data.usage as Record<string, number>;
+    expect(usage.input_tokens).toBe(21);
+    expect(usage.input_image_tokens).toBe(1024);
+    expect(usage.output_image_tokens).toBe(196);
+    expect(usage.image_count).toBe(1);
   });
 
   it("nulls empty attribution and collapses garbage metadata to an empty object", () => {

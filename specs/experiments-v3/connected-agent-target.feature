@@ -54,6 +54,14 @@ Feature: A connected agent is a column in the workbench
     Then the cell shows the message content
     And an evaluator mapped to the column output reads the same text
 
+  @unit
+  Scenario: An attachment travels with the message
+    Given a connected agent column with "input" mapped to a text column
+    And "attachment" mapped to an image column
+    When the row runs
+    Then the user message carries a text part and an image part
+    And the image part holds the base64 data URL of the cell
+
   @integration
   Scenario: The evaluators grade the agent's answer
     Given a connected agent column and an exact match evaluator

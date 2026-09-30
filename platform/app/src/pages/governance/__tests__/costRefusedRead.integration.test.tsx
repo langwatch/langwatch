@@ -63,6 +63,10 @@ vi.mock("~/utils/api", () => {
   return {
     api: {
       governanceCost: {
+        // The day-split read answers nothing here: it is its own panel with
+        // its own tests, and these stay about their own subject.
+        dailyByProvider: { useQuery: () => ({ data: undefined }) },
+        spendByModel: { useQuery: () => ({ data: undefined }) },
         summary: {
           useQuery: () => ({
             data: undefined,

@@ -30,7 +30,7 @@
  *
  * @see ./LazyLangWatchQLWidgetChart — the Vega boundary this mounts
  * @see ../hooks/useLangWatchQLWidgetRun — when to run, and which response wins
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";

@@ -163,18 +163,43 @@ describe("given a dev checkout running on a non-default port", () => {
       const response = await post(app, `http://localhost:${APP_PORT}`);
 
       expect(response.status).toBe(401);
+      // The refusal reaches the wire as the handled-error envelope, whose
+      // `error` is the stable code. Better than the raw better-auth string it
+      // replaced: one shape for every refusal, and the words a customer reads
+      // come from the presentation registry keyed by this code, not from here.
       expect(await response.json()).toMatchObject({
-        code: "INVALID_EMAIL_OR_PASSWORD",
+        error: "identity_sign_in_refused",
+        fault: "customer",
       });
     });
   });
 
   describe("when the post comes from somewhere else entirely", () => {
+    /** @scenario A cross-site sign-in post reaches no further than the refusal */
     it("is still refused, so the gate has not been weakened", async () => {
       const response = await post(app, "http://evil.example.com");
 
       expect(response.status).toBe(403);
       expect(await response.json()).toMatchObject({ code: "INVALID_ORIGIN" });
+    });
+
+    it("lets an IdP POST reach BetterAuth only at the exact SAML ACS path", async () => {
+      const response = await app.request(
+        "/api/auth/sso/saml2/sp/acs/unknown-provider",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            origin: "https://idp.example.com",
+          },
+          body: new URLSearchParams({ SAMLResponse: "not-a-saml-response" }),
+        },
+      );
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).not.toMatchObject({
+        code: "INVALID_ORIGIN",
+      });
     });
 
     /** @scenario The refused address is recorded for whoever runs the installation */
@@ -191,6 +216,46 @@ describe("given a dev checkout running on a non-default port", () => {
         expect.stringContaining("origin"),
       );
       warn.mockRestore();
+    });
+  });
+
+  describe("when a signed-in user calls the plugin's native registration route", () => {
+    it("refuses before provider persistence or discovery traffic", async () => {
+      const signIn = await post(app, `http://localhost:${APP_PORT}`, PASSWORD);
+      const cookie = signIn.headers.get("set-cookie");
+      expect(cookie).not.toBeNull();
+
+      const before = await prisma.ssoProvider.count({
+        where: { providerId: "native-registration-must-not-write" },
+      });
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+      const response = await app.request("/api/auth/sso/register", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: cookie?.split(";")[0] ?? "",
+          origin: `http://localhost:${APP_PORT}`,
+        },
+        body: JSON.stringify({
+          providerId: "native-registration-must-not-write",
+          issuer: "https://attacker.example.com",
+          domain: "example.com",
+          oidcConfig: { clientId: "client" },
+        }),
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        message: "SSO provider registration is disabled",
+      });
+      expect(
+        await prisma.ssoProvider.count({
+          where: { providerId: "native-registration-must-not-write" },
+        }),
+      ).toBe(before);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
     });
   });
 });

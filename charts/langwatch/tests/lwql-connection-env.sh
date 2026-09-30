@@ -1,38 +1,27 @@
 #!/usr/bin/env bash
 #
-# Renders the chart and asserts the LangWatchQL RESTRICTED CONNECTION is wired
-# completely, not just its password. This is the P1 from review 5115397477: with
-# LWQL_SELF_PROVISION off (chart-managed ClickHouse), lwqlConnectionFromEnv
-# (platform/app/src/server/analytics/lwql/executor.ts) requires ALL of
-# LWQL_CLICKHOUSE_URL, LWQL_CLICKHOUSE_USER, LWQL_DATABASE, LWQL_TENANT_SETTING
-# and LWQL_CLICKHOUSE_PASSWORD, and returns null on any missing one. Emitting
-# only the passwords made the executor refuse EVERY default-install query as
-# unconfigured — invisible in the template source, visible only in the render.
+# Renders the chart and asserts the LangWatchQL query credentials are wired
+# exactly (issue #8258: the app always owns the LWQL access model, on every
+# ClickHouse/PostgreSQL posture). The chart's only job is handing the app and
+# workers the two passwords it converges the access model from —
+# LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD, both from a
+# Secret (the chart-owned LWQL password Secret, or the operator's
+# existingSecret) — and nothing else. No chart-rendered connection vars
+# (LWQL_CLICKHOUSE_URL/USER/DATABASE/TENANT_SETTING), no DDL switch
+# (LWQL_SELF_PROVISION no longer exists — the app never reads it), and no
+# LWQL_MANAGE_POSTGRES_READER (the app converges lwql_ro on every path from
+# LWQL_POSTGRES_READER_PASSWORD, so there is nothing left to switch on). Each
+# of the two passwords must also be a valueFrom/secretKeyRef, never a plain
+# literal value — the chart never has an actual password to inline.
 #
 # Postures pinned:
-#   - chart-managed (default): app AND workers get all five ClickHouse vars plus
-#     the PostgreSQL reader password, and NOT LWQL_SELF_PROVISION (the subchart
-#     owns provisioning); the subchart emits the lwql_postgres bridge dialing the
-#     chart's own PostgreSQL as the dedicated read-only role lwql_ro, on the
-#     database the app itself uses (postgresql.auth.database).
-#   - external ClickHouse: the app self-provisions, so it emits
-#     LWQL_SELF_PROVISION=true and derives URL/user/database/tenant from
-#     CLICKHOUSE_URL itself — the chart must NOT emit the four chart-managed vars.
-#   - external PostgreSQL with the bridge host cancelled to "": the bridge
-#     renders disabled (no CLICKHOUSE_LWQL_PG_HOST at all) rather than
-#     silently dialing a Service that does not exist, and the app Deployment
-#     carries a langwatch.io/lwql-postgres-bridge: disabled annotation. A
-#     PARTIAL override (some other postgres.* field set while host stays
-#     empty) still fails the render as a likely mistake.
-#   - external PostgreSQL with an EXPLICIT (non-empty) bridge host: the operator
-#     wants the bridge live against their own PostgreSQL, so the render REQUIRES
-#     an operator-supplied clickhouse.lwqlAccessModel.existingSecret carrying the
-#     reader password (the chart never provisions lwql_ro on a PostgreSQL it does
-#     not own). Missing it fails closed with reader-role guidance; supplied, the
-#     bridge renders live, the subchart mounts the operator's Secret, and the app
-#     is still withheld the reader-management flag.
+#   - chart-managed ClickHouse (default): app AND workers get exactly the two
+#     passwords, nothing else LWQL-shaped.
+#   - external ClickHouse: identical two vars.
+#   - external PostgreSQL: identical two vars, render succeeds.
+#   - lwql.enabled=false: none of the LWQL vars at all.
 #
-# Each test carries a plain "# Verifies:" line naming what it pins.
+# Each test that binds to a feature scenario carries a "# @scenario \"...\"" line.
 #
 # Usage (from charts/langwatch):
 #   helm dependency build .
@@ -78,34 +67,59 @@ has_env() {
   printf '%s\n' "$1" | grep -qxF "$2"
 }
 
-# The literal value emitted for `- name: <var>` anywhere in the render (the
-# subchart's bridge env, unlike the app's, is a plain value not a secretKeyRef).
-# Reads the `value:` on the line following the name and strips its quotes.
-env_value_of() {
-  local render="$1" var="$2"
-  awk -v want="$var" '
-    $0 ~ "- name: " want "$" { getline; sub(/^[[:space:]]*value:[[:space:]]*/, ""); gsub(/"/, ""); print; exit }
-  ' "$render"
-}
-
-# The secretKeyRef the app env var $3 resolves FROM, within ONE deployment's
-# Source block ($2). Prints "<secretName> <key>" (space-separated); empty if the
-# var is absent or is not a secretKeyRef. Used to prove which Secret a
-# valueFrom.secretKeyRef env var (unlike a plain value:) points at.
-secret_ref_of() {
+# True if the `- name: <var>` entry within ONE deployment's Source block ($2)
+# is a valueFrom/secretKeyRef (as opposed to a plain `value:` literal). Scoped
+# to the Source block so it cannot cross into another workload's block of the
+# same multi-doc render.
+is_secret_ref() {
   local render="$1" src="$2" var="$3"
   awk -v want="$src" -v v="$var" '
-    /^# Source:/ { insrc = (index($0, want) > 0) }
-    insrc && $0 ~ "- name: " v "$" { found=1; inref=0; sn=""; next }
-    insrc && /^[[:space:]]*- name:[[:space:]]/ && $0 !~ ("- name: " v "$") { found=0; inref=0 }
-    found && /secretKeyRef:/ { inref=1; next }
-    found && inref && /name:/ { sub(/^[[:space:]]*name:[[:space:]]*/, ""); gsub(/"/, ""); sn=$0 }
-    found && inref && /key:/  { sub(/^[[:space:]]*key:[[:space:]]*/, "");  gsub(/"/, ""); print sn, $0; exit }
+    /^# Source:/ { insrc = (index($0, want) > 0); found=0; vf=0 }
+    insrc && $0 ~ "- name: " v "$" { found=1; next }
+    insrc && /^[[:space:]]*- name:[[:space:]]/ && $0 !~ ("- name: " v "$") { found=0 }
+    found && /valueFrom:/ { vf=1 }
+    found && vf && /secretKeyRef:/ { print "yes"; exit }
+  ' "$render" | grep -qxF "yes"
+}
+
+# Echoes the plain `value:` of the `- name: <var>` entry within ONE deployment's
+# Source block ($2). Empty if the var is absent or is a valueFrom entry.
+env_value_in() {
+  local render="$1" src="$2" var="$3"
+  awk -v want="$src" -v v="$var" '
+    /^# Source:/ { insrc = (index($0, want) > 0); found=0 }
+    insrc && $0 ~ "- name: " v "$" { found=1; next }
+    insrc && /^[[:space:]]*- name:[[:space:]]/ && $0 !~ ("- name: " v "$") { found=0 }
+    found && /^[[:space:]]*value:[[:space:]]/ {
+      sub(/^[[:space:]]*value:[[:space:]]*/, ""); gsub(/"/, ""); print; exit
+    }
   ' "$render"
 }
 
-# Verifies: Chart-managed ClickHouse emits the full LangWatchQL connection on app and workers
-test_chart_managed_full_connection() {
+assert_two_passwords_only() {
+  local names="$1" workload="$2" label="$3" render="$4"
+  local var
+  for var in LWQL_CLICKHOUSE_PASSWORD LWQL_POSTGRES_READER_PASSWORD; do
+    if ! has_env "$names" "$var"; then
+      fail "$label-missing-$workload-$var" \
+        "$workload does not emit $var. The app always converges the LWQL access model from these two passwords, on every posture."
+      continue
+    fi
+    if ! is_secret_ref "$render" "$workload" "$var"; then
+      fail "$label-not-secretref-$workload-$var" \
+        "$workload emits $var as a plain value, not a valueFrom/secretKeyRef. Both LWQL passwords must always come from a Secret, never a literal in the rendered manifest."
+    fi
+  done
+  for var in LWQL_SELF_PROVISION LWQL_MANAGE_POSTGRES_READER LWQL_CLICKHOUSE_URL LWQL_CLICKHOUSE_USER LWQL_DATABASE LWQL_TENANT_SETTING; do
+    if has_env "$names" "$var"; then
+      fail "$label-unexpected-$workload-$var" \
+        "$workload emits $var. It no longer exists (issue #8258) — the app derives everything but the two passwords itself."
+    fi
+  done
+}
+
+# @scenario "The application self-provisions the LangWatchQL access model on every deployment"
+test_chart_managed_two_passwords_only() {
   local out="${TMPDIR:-/tmp}/lwql-conn-managed.yaml"
   local err="${TMPDIR:-/tmp}/lwql-conn-managed.err"
   if ! render_to "$out" "$err" t --set autogen.enabled=true; then
@@ -114,20 +128,7 @@ $(cat "$err")"
     return
   fi
 
-  # Chart-managed ClickHouse + chart-managed PostgreSQL (the default): the app
-  # owns the reader role, so it gets the explicit LWQL_MANAGE_POSTGRES_READER
-  # flag AND the reader password. Never the flag on any external-PostgreSQL path.
-  local required=(
-    LWQL_CLICKHOUSE_URL
-    LWQL_CLICKHOUSE_USER
-    LWQL_DATABASE
-    LWQL_TENANT_SETTING
-    LWQL_CLICKHOUSE_PASSWORD
-    LWQL_MANAGE_POSTGRES_READER
-    LWQL_POSTGRES_READER_PASSWORD
-  )
-
-  local workload names var
+  local workload names
   for workload in "app/deployment.yaml" "workers/deployment.yaml"; do
     names="$(env_names_in "$out" "$workload")"
     if [[ -z "$names" ]]; then
@@ -135,258 +136,233 @@ $(cat "$err")"
         "no env vars found for $workload — did the Source path change?"
       continue
     fi
-    for var in "${required[@]}"; do
-      if ! has_env "$names" "$var"; then
-        fail "managed-missing-$workload-$var" \
-          "$workload does not emit $var. With LWQL_SELF_PROVISION off, lwqlConnectionFromEnv requires the full set and refuses every query when one is missing."
-      fi
-    done
-    # The DDL switch belongs only to the self-provisioning (external) path.
-    if has_env "$names" "LWQL_SELF_PROVISION"; then
-      fail "managed-selfprovision-$workload" \
-        "$workload emits LWQL_SELF_PROVISION on chart-managed ClickHouse. The subchart owns provisioning here; a second SQL owner would wedge the same entity names."
-    fi
+    assert_two_passwords_only "$names" "$workload" "managed" "$out"
   done
 
-  # The boot-time ClickHouse catalog references the lwql_postgres named
-  # collection; the subchart renders it only when the bridge host resolves.
-  # Auto-derived to the chart's own PostgreSQL, it must be present by default.
-  if ! grep -q 'CLICKHOUSE_LWQL_PG_HOST' "$out"; then
-    fail "managed-no-pg-bridge" \
-      "the clickhouse-serverless subchart did not emit CLICKHOUSE_LWQL_PG_HOST, so the lwql_postgres named collection is omitted and the boot-time catalog provisioning fails on it. The bridge host must auto-derive to the chart's PostgreSQL on the default path."
-  fi
-
-  # The bridge must dial as the dedicated read-only role, never the superuser:
-  # the superuser's password lives under a different Secret key, so a superuser
-  # bridge cannot even authenticate, and it would discard the reader isolation.
-  local pg_user
-  pg_user="$(env_value_of "$out" "CLICKHOUSE_LWQL_PG_USER")"
-  if [[ "$pg_user" != "lwql_ro" ]]; then
-    fail "managed-pg-user" \
-      "the lwql_postgres bridge connects as '${pg_user:-<empty>}', expected the dedicated reader 'lwql_ro'. A superuser bridge fails to authenticate (its password is under postgres-password, not lwql_pg_password) and discards reader isolation."
-  fi
-
-  # The bridge reads the app's OWN database. It must track postgresql.auth.database,
-  # not a hardcoded literal — render with a non-default database and require it to
-  # follow.
-  local dbout="${TMPDIR:-/tmp}/lwql-conn-managed-db.yaml"
-  local dberr="${TMPDIR:-/tmp}/lwql-conn-managed-db.err"
-  if render_to "$dbout" "$dberr" t \
-      --set autogen.enabled=true \
-      --set postgresql.auth.database=analytics_db \
-      --set clickhouse.lwqlAccessModel.postgres.database=analytics_db; then
-    local pg_db
-    pg_db="$(env_value_of "$dbout" "CLICKHOUSE_LWQL_PG_DATABASE")"
-    if [[ "$pg_db" != "analytics_db" ]]; then
-      fail "managed-pg-db" \
-        "the lwql_postgres bridge reads database '${pg_db:-<empty>}', expected 'analytics_db' (postgresql.auth.database). The bridge must read the app's own database."
-    fi
-  else
-    fail "managed-pg-db-render" "render with a non-default database failed:
-$(cat "$dberr")"
+  # No chart template renders any part of the access model any more — the
+  # subchart's CLICKHOUSE_LWQL_* config env must be entirely gone.
+  if grep -q 'CLICKHOUSE_LWQL_' "$out"; then
+    fail "managed-clickhouse-lwql-config" \
+      "the render still emits CLICKHOUSE_LWQL_* config env. Issue #8258 removes the chart's rendered LWQL access-model path entirely — the app self-provisions instead."
   fi
 }
 
-# Verifies: External ClickHouse self-provisions and omits the chart-managed connection vars
-test_external_self_provision() {
-  local out="${TMPDIR:-/tmp}/lwql-conn-external.yaml"
-  local err="${TMPDIR:-/tmp}/lwql-conn-external.err"
+# @scenario "The application self-provisions the LangWatchQL access model on every deployment"
+test_external_clickhouse_two_passwords_only() {
+  local out="${TMPDIR:-/tmp}/lwql-conn-external-ch.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-conn-external-ch.err"
   if ! render_to "$out" "$err" t \
       --set autogen.enabled=true \
       --set clickhouse.chartManaged=false \
       --set clickhouse.external.url.value="http://user:pass@ch.example:8123/langwatch"; then
-    fail "external-render" "external render failed:
+    fail "external-ch-render" "external ClickHouse render failed:
 $(cat "$err")"
     return
   fi
 
   local names
   names="$(env_names_in "$out" "app/deployment.yaml")"
-
-  if ! has_env "$names" "LWQL_SELF_PROVISION"; then
-    fail "external-no-selfprovision" \
-      "external ClickHouse must emit LWQL_SELF_PROVISION=true so the app provisions the access model itself; it was absent."
-  fi
-  if ! has_env "$names" "LWQL_CLICKHOUSE_PASSWORD"; then
-    fail "external-no-password" \
-      "external ClickHouse must still emit LWQL_CLICKHOUSE_PASSWORD (the app authenticates as langwatch_lwql regardless of who provisioned it)."
-  fi
-
-  # The four chart-managed vars must NOT appear: the app derives them from
-  # CLICKHOUSE_URL, and emitting a fixed URL/database here would split
-  # provisioning from querying.
-  local var
-  for var in LWQL_CLICKHOUSE_URL LWQL_CLICKHOUSE_USER LWQL_DATABASE LWQL_TENANT_SETTING; do
-    if has_env "$names" "$var"; then
-      fail "external-unexpected-$var" \
-        "external ClickHouse emitted $var. Self-provisioning derives it from CLICKHOUSE_URL; a chart-emitted value would target a different server than the one queries provisioned."
-    fi
-  done
+  assert_two_passwords_only "$names" "app/deployment.yaml" "external-ch" "$out"
 }
 
-# Verifies: external PostgreSQL with the bridge host cancelled to "" (every
-# external-PostgreSQL example/profile does this) renders successfully with the
-# bridge disabled — surfaced via the app Deployment's annotation — and emits no
-# CLICKHOUSE_LWQL_PG_HOST at all, instead of silently pointing it at the
-# nonexistent in-cluster PostgreSQL Service.
-test_external_postgres_no_host_disables_bridge() {
-  local out="${TMPDIR:-/tmp}/lwql-conn-extpg.yaml"
-  local err="${TMPDIR:-/tmp}/lwql-conn-extpg.err"
+# @scenario "The application self-provisions the LangWatchQL access model on every deployment"
+test_external_postgres_two_passwords_only() {
+  local out="${TMPDIR:-/tmp}/lwql-conn-external-pg.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-conn-external-pg.err"
   if ! render_to "$out" "$err" t \
       --set autogen.enabled=true \
       --set postgresql.chartManaged=false \
-      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
-      --set clickhouse.lwqlAccessModel.postgres.host=""; then
-    fail "extpg-no-host-render-failed" \
-      "render failed with postgresql.chartManaged=false and the bridge host cancelled to \"\". This must render successfully with the bridge disabled (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387) — got:
+      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch"; then
+    fail "external-pg-render" "external PostgreSQL render failed:
 $(cat "$err")"
     return
   fi
-  if ! grep -q 'langwatch.io/lwql-postgres-bridge: "disabled"' "$out"; then
-    fail "extpg-no-host-annotation" \
-      "render succeeded but did not annotate the app Deployment with langwatch.io/lwql-postgres-bridge: disabled."
-  fi
-  if grep -q 'CLICKHOUSE_LWQL_PG_HOST' "$out"; then
-    fail "extpg-no-host-env-emitted" \
-      "render emitted CLICKHOUSE_LWQL_PG_HOST although the bridge host was cancelled to \"\" for an external PostgreSQL — this would silently target the non-existent in-cluster PostgreSQL Service."
-  fi
 
-  # External PostgreSQL owns lwql_ro out of band: the app must NOT be told to
-  # manage the reader role (LWQL_MANAGE_POSTGRES_READER) or handed a reader
-  # password it must not use. Running CREATE/ALTER ROLE against an operator's
-  # PostgreSQL as the DATABASE_URL user would crashloop the pod or rotate the
-  # operator's reader password.
   local names
   names="$(env_names_in "$out" "app/deployment.yaml")"
-  local var
-  for var in LWQL_MANAGE_POSTGRES_READER LWQL_POSTGRES_READER_PASSWORD; do
-    if has_env "$names" "$var"; then
-      fail "extpg-no-host-$var" \
-        "external PostgreSQL emitted $var on the app. The reader role is owned out of band here; the app must neither manage it nor hold its credential."
-    fi
+  assert_two_passwords_only "$names" "app/deployment.yaml" "external-pg" "$out"
+}
+
+# Verifies: lwql.enabled=false emits no LangWatchQL env at all
+test_disabled_emits_nothing() {
+  local out="${TMPDIR:-/tmp}/lwql-conn-disabled.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-conn-disabled.err"
+  if ! render_to "$out" "$err" t \
+      --set autogen.enabled=true \
+      --set lwql.enabled=false; then
+    fail "disabled-render" "render with lwql.enabled=false failed:
+$(cat "$err")"
+    return
+  fi
+
+  local workload names var
+  for workload in "app/deployment.yaml" "workers/deployment.yaml"; do
+    names="$(env_names_in "$out" "$workload")"
+    for var in LWQL_CLICKHOUSE_PASSWORD LWQL_POSTGRES_READER_PASSWORD LWQL_SELF_PROVISION LWQL_MANAGE_POSTGRES_READER; do
+      if has_env "$names" "$var"; then
+        fail "disabled-unexpected-$workload-$var" \
+          "$workload emits $var with lwql.enabled=false. Disabling the feature must emit no LWQL env at all."
+      fi
+    done
   done
 }
 
-# Verifies: a PARTIAL external-PostgreSQL bridge override (some other
-# postgres.* field changed while host stays empty) still fails closed — that
-# looks like a forgotten host, not a deliberate disable.
-test_external_postgres_partial_config_fails() {
-  local out="${TMPDIR:-/tmp}/lwql-conn-extpg-partial.yaml"
-  local err="${TMPDIR:-/tmp}/lwql-conn-extpg-partial.err"
-  if render_to "$out" "$err" t \
-      --set autogen.enabled=true \
-      --set postgresql.chartManaged=false \
-      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
-      --set clickhouse.lwqlAccessModel.postgres.host="" \
-      --set clickhouse.lwqlAccessModel.postgres.database=analytics_db; then
-    fail "extpg-partial-rendered" \
-      "render succeeded with clickhouse.lwqlAccessModel.postgres.database overridden but .host left empty — that is a partial, likely-mistaken configuration and must fail closed."
-    return
-  fi
-  if ! grep -q 'clickhouse.lwqlAccessModel.postgres.host is empty but' "$err"; then
-    fail "extpg-partial-message" \
-      "render failed, but not with the expected partial-config guidance. Got:
-$(cat "$err")"
-  fi
-}
-
-# Verifies: external PostgreSQL WITH an explicit (non-empty) bridge host but NO
-# operator-supplied clickhouse.lwqlAccessModel.existingSecret fails the render.
-# The bridge would dial the operator's own PostgreSQL as lwql_ro, but the app
-# never provisions that role on a PostgreSQL it does not own and url-secret.yaml's
-# autogenerated lwql_pg_password is a password nobody set there — so the guard
-# forces the operator to supply a real reader credential via a Secret they own.
-test_external_postgres_explicit_host_requires_secret() {
-  local out="${TMPDIR:-/tmp}/lwql-conn-extpg-host-nosecret.yaml"
-  local err="${TMPDIR:-/tmp}/lwql-conn-extpg-host-nosecret.err"
-  if render_to "$out" "$err" t \
-      --set autogen.enabled=true \
-      --set postgresql.chartManaged=false \
-      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
-      --set clickhouse.lwqlAccessModel.postgres.host="extpg.example.com"; then
-    fail "extpg-host-nosecret-rendered" \
-      "render succeeded with an explicit external-PostgreSQL bridge host but no clickhouse.lwqlAccessModel.existingSecret. ClickHouse would dial lwql_ro with a password nobody set — this must fail closed."
-    return
-  fi
-  # The guidance must name the reader role the operator has to create.
-  if ! grep -q 'lwql_ro' "$err"; then
-    fail "extpg-host-nosecret-message" \
-      "render failed, but not with the expected reader-role guidance (no mention of lwql_ro). Got:
-$(cat "$err")"
-  fi
-}
-
-# Verifies: external PostgreSQL WITH an explicit bridge host AND an
-# operator-supplied clickhouse.lwqlAccessModel.existingSecret renders
-# successfully; the lwql_postgres bridge is present, dials the explicit host, and
-# the subchart mounts the OPERATOR's Secret (not the default ClickHouse
-# credentials Secret / url-secret.yaml's autogenerated value). The app is still
-# NOT told to manage the reader role — external PostgreSQL owns lwql_ro.
-test_external_postgres_explicit_host_with_secret() {
-  local secret="operator-lwql-secret"
-  local host="extpg.example.com"
-  local out="${TMPDIR:-/tmp}/lwql-conn-extpg-host-secret.yaml"
-  local err="${TMPDIR:-/tmp}/lwql-conn-extpg-host-secret.err"
-  if ! render_to "$out" "$err" t \
-      --set autogen.enabled=true \
-      --set postgresql.chartManaged=false \
-      --set postgresql.external.connectionString.value="postgresql://u:p@extpg:5432/langwatch" \
-      --set clickhouse.lwqlAccessModel.postgres.host="$host" \
-      --set clickhouse.lwqlAccessModel.existingSecret="$secret"; then
-    fail "extpg-host-secret-render" \
-      "render failed with an explicit external-PostgreSQL bridge host and an operator-supplied existingSecret — this is the compliant posture and must render:
+# @scenario "Chart-managed ClickHouse leaves the access-model mode at its rendered default"
+test_chart_managed_mode_is_rendered_default() {
+  local out="${TMPDIR:-/tmp}/lwql-mode-managed.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-mode-managed.err"
+  if ! render_to "$out" "$err" t --set autogen.enabled=true; then
+    fail "managed-mode-render" "default render failed:
 $(cat "$err")"
     return
   fi
-
-  # The bridge renders and dials the explicit host.
-  local pg_host
-  pg_host="$(env_value_of "$out" "CLICKHOUSE_LWQL_PG_HOST")"
-  if [[ "$pg_host" != "$host" ]]; then
-    fail "extpg-host-secret-bridge" \
-      "the lwql_postgres bridge host is '${pg_host:-<empty>}', expected the explicit '$host'. The bridge must render live against the operator's PostgreSQL."
-  fi
-
-  # The subchart must mount the OPERATOR's Secret, so the reader password is the
-  # one the operator set on lwql_ro — never the default clickhouse credentials
-  # Secret carrying url-secret.yaml's autogenerated lwql_pg_password.
-  if ! grep -q "secretName: $secret" "$out"; then
-    fail "extpg-host-secret-mount" \
-      "the render does not mount the operator's Secret '$secret' (clickhouse.lwqlAccessModel.existingSecret). ClickHouse must dial lwql_ro with the operator-set password, not the autogenerated one."
-  fi
-
-  # The operator's Secret backs the langwatch_lwql QUERY IDENTITY too, not only
-  # the bridge reader: existingSecret redirects langwatch.clickhouse.lwqlSecretName,
-  # so the app's LWQL_CLICKHOUSE_PASSWORD must resolve from the operator Secret
-  # via key lwql_password — NOT the chart's default ClickHouse credentials Secret.
-  # The mount is optional:true, so a Secret carrying only lwql_pg_password would
-  # silently leave langwatch_lwql with a password nobody set and refuse every
-  # query — this pins that the same operator Secret sources both credentials.
-  local ch_ref ch_secret ch_key
-  ch_ref="$(secret_ref_of "$out" "app/deployment.yaml" "LWQL_CLICKHOUSE_PASSWORD")"
-  ch_secret="${ch_ref%% *}"
-  ch_key="${ch_ref##* }"
-  if [[ "$ch_secret" != "$secret" || "$ch_key" != "lwql_password" ]]; then
-    fail "extpg-host-secret-ch-password" \
-      "LWQL_CLICKHOUSE_PASSWORD resolves from Secret '${ch_secret:-<empty>}' key '${ch_key:-<empty>}', expected the operator Secret '$secret' key 'lwql_password'. clickhouse.lwqlAccessModel.existingSecret must back the langwatch_lwql query identity too (via langwatch.clickhouse.lwqlSecretName), not only the bridge reader password — otherwise the identity gets a password nobody set and every LangWatchQL query is refused (optional:true mount)."
-  fi
-
-  # External PostgreSQL owns lwql_ro out of band: the app must NOT be told to
-  # manage the reader role even when the bridge is live.
   local names
   names="$(env_names_in "$out" "app/deployment.yaml")"
-  if has_env "$names" "LWQL_MANAGE_POSTGRES_READER"; then
-    fail "extpg-host-secret-manage-flag" \
-      "the app emits LWQL_MANAGE_POSTGRES_READER on external PostgreSQL. The reader role is owned out of band here; the app must never run role DDL against a PostgreSQL it does not own."
+  if has_env "$names" "LWQL_ACCESS_MODEL_MODE"; then
+    fail "managed-mode-set" \
+      "app/deployment.yaml sets LWQL_ACCESS_MODEL_MODE on chart-managed ClickHouse. It must stay unset so the app renders (the chart delivers the model via the access Secret + Job), not run SQL DDL. The default when unset is 'rendered'."
   fi
 }
 
-test_chart_managed_full_connection
-test_external_self_provision
-test_external_postgres_no_host_disables_bridge
-test_external_postgres_partial_config_fails
-test_external_postgres_explicit_host_requires_secret
-test_external_postgres_explicit_host_with_secret
+# @scenario "The external-ClickHouse overlay selects sql mode"
+test_external_overlay_selects_sql_mode() {
+  local out="${TMPDIR:-/tmp}/lwql-mode-external.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-mode-external.err"
+  if ! render_to "$out" "$err" t \
+      --set autogen.enabled=true \
+      -f examples/overlays/clickhouse-external.yaml \
+      --set clickhouse.external.url.value="http://user:pass@ch.example:8123/langwatch"; then
+    fail "external-mode-render" "external overlay render failed:
+$(cat "$err")"
+    return
+  fi
+  local mode single
+  mode="$(env_value_in "$out" "app/deployment.yaml" "LWQL_ACCESS_MODEL_MODE")"
+  if [[ "$mode" != "sql" ]]; then
+    fail "external-mode-not-sql" \
+      "app/deployment.yaml sets LWQL_ACCESS_MODEL_MODE=${mode:-<unset>} under the clickhouse-external overlay; BYO ClickHouse cannot receive a rendered config file, so it must be 'sql'."
+  fi
+  single="$(env_value_in "$out" "app/deployment.yaml" "LWQL_ACCESS_MODEL_SQL_SINGLE_NODE")"
+  if [[ "$single" != "true" ]]; then
+    fail "external-mode-no-single-node-ack" \
+      "the clickhouse-external overlay does not acknowledge single-node scope (LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true) — AC9 aborts sql-mode provisioning on an unacknowledged single node."
+  fi
+}
+
+# @scenario "The access model is delivered by one Job into one Secret, mounted once per pod"
+# @scenario "A chart upgrade that changes the access model rolls every ClickHouse pod"
+test_render_delivery_topology() {
+  local out="${TMPDIR:-/tmp}/lwql-topology.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-topology.err"
+  if ! render_to "$out" "$err" lw --set autogen.enabled=true; then
+    fail "topology-render" "default render failed:
+$(cat "$err")"
+    return
+  fi
+
+  # One render Job (revision-suffixed name) that runs the app image and renders
+  # the access files. It is MAIN-PHASE on install and a PRE-UPGRADE hook on
+  # upgrade (asserted below): the render reads the app + PostgreSQL Secrets, which
+  # exist only in the main phase, so a pre-install hook would fail on a first
+  # install; on upgrade those Secrets already exist and the render must precede
+  # the StatefulSet roll.
+  if ! grep -qE "name: lw-lwql-access-render-[0-9]+" "$out"; then
+    fail "topology-no-job" "no revision-named lw-lwql-access-render-<n> Job rendered on chart-managed ClickHouse."
+  fi
+  if ! grep -q "renderLwqlAccessConfig" "$out"; then
+    fail "topology-no-render-cmd" "the access-render Job does not invoke renderLwqlAccessConfig."
+  fi
+  # Isolate the render Job document from the rendered template — it also emits the
+  # ServiceAccount/Role/RoleBinding, which ARE hooks (below), so a whole-file hook
+  # grep could not tell the Job apart.
+  job_doc() {
+    awk '/^---[[:space:]]*$/ { if (buf ~ /kind: Job/) print buf; buf=""; next }
+         { buf = buf $0 "\n" }
+         END { if (buf ~ /kind: Job/) print buf }' "$1"
+  }
+  # On INSTALL the render JOB must be MAIN-PHASE (no helm hook): a pre-install Job
+  # cannot read DATABASE_URL from the main-phase PostgreSQL Secret.
+  local only="${TMPDIR:-/tmp}/lwql-render-only.yaml"
+  if helm template lw . --set autogen.enabled=true \
+       --show-only templates/clickhouse/lwql-access-render.yaml >"$only" 2>/dev/null; then
+    if job_doc "$only" | grep -q 'helm.sh/hook:'; then
+      fail "topology-install-job-not-hook" "on install the render Job must be main-phase (no helm hook) so it reads DATABASE_URL from the main-phase PostgreSQL Secret on a first install."
+    fi
+    # The RBAC (ServiceAccount/Role/RoleBinding) MUST be
+    # pre-install,pre-upgrade,pre-rollback hooks at a lower weight than the Job:
+    # both they and the LWQL passwords are new in this version, so on a first
+    # upgrade from a pre-LWQL release neither exists in the main phase yet when the
+    # pre-upgrade hook Job runs; pre-rollback so `helm rollback`/`--atomic` also
+    # has them before the pods roll.
+    if [[ "$(grep -c 'helm.sh/hook: pre-install,pre-upgrade,pre-rollback' "$only")" -lt 3 ]]; then
+      fail "topology-rbac-hooks" "the render ServiceAccount/Role/RoleBinding must each be pre-install,pre-upgrade,pre-rollback hooks so they back the pre-upgrade/pre-rollback hook Job."
+    fi
+    if ! grep -q 'helm.sh/hook-weight: "-10"' "$only"; then
+      fail "topology-rbac-weight" "the render RBAC hooks must sit at a lower hook-weight (-10) than the Job so they are created first."
+    fi
+  fi
+  # On UPGRADE (and ROLLBACK — both set .Release.IsUpgrade) the render Job MUST be
+  # a pre-upgrade,pre-rollback hook: the new access Secret has to be written
+  # BEFORE the StatefulSet's catalog annotation rolls the pods, or every subPath
+  # mount freezes the previous release's model. Rollback reverts the annotation
+  # and rolls the pods too, so it needs the same pre-hook render. The input
+  # Secrets already exist on an upgrade/rollback, so the hook has what it needs.
+  local upgrade_only="${TMPDIR:-/tmp}/lwql-render-upgrade-only.yaml"
+  if helm template lw . --is-upgrade --set autogen.enabled=true \
+       --show-only templates/clickhouse/lwql-access-render.yaml >"$upgrade_only" 2>/dev/null; then
+    if ! job_doc "$upgrade_only" | grep -q 'helm.sh/hook: pre-upgrade,pre-rollback'; then
+      fail "topology-upgrade-hook" "on upgrade/rollback the render Job must be a pre-upgrade,pre-rollback hook so the new access Secret lands before the StatefulSet roll."
+    fi
+  else
+    fail "topology-upgrade-render" "the access-render template failed to render with --is-upgrade."
+  fi
+  # The LWQL password Secret must ALSO be a pre-install,pre-upgrade,pre-rollback
+  # hook carrying both keys, so the render Job finds the passwords on a first
+  # upgrade (and on rollback) before the main phase would heal the app Secret.
+  local pw_only="${TMPDIR:-/tmp}/lwql-passwords-only.yaml"
+  if helm template lw . --set autogen.enabled=true \
+       --show-only templates/lwql-passwords-secret.yaml >"$pw_only" 2>/dev/null; then
+    if ! grep -q 'helm.sh/hook: pre-install,pre-upgrade,pre-rollback' "$pw_only"; then
+      fail "topology-passwords-hook" "the LWQL password Secret must be a pre-install,pre-upgrade,pre-rollback hook."
+    fi
+    if ! grep -q 'LWQL_CLICKHOUSE_PASSWORD:' "$pw_only" || ! grep -q 'LWQL_POSTGRES_READER_PASSWORD:' "$pw_only"; then
+      fail "topology-passwords-keys" "the LWQL password Secret must carry both LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD."
+    fi
+  else
+    fail "topology-passwords-render" "the LWQL password Secret template failed to render."
+  fi
+  # The Role is scoped to the one Secret name for get/update/patch (create cannot
+  # be name-scoped in Kubernetes RBAC, so it is a separate namespaced rule).
+  if ! grep -q 'resourceNames: \["lw-lwql-clickhouse-access"\]' "$out"; then
+    fail "topology-role-scope" "the access-render Role is not resourceName-scoped to lw-lwql-clickhouse-access."
+  fi
+
+  # Every ClickHouse pod mounts the Secret at the two contract paths.
+  local mount_users mount_config
+  mount_users=$(grep -c "mountPath: /etc/clickhouse-server/users.d/lwql-access.yaml" "$out")
+  mount_config=$(grep -c "mountPath: /etc/clickhouse-server/config.d/lwql-named-collection.yaml" "$out")
+  if [[ "$mount_users" -lt 1 || "$mount_config" -lt 1 ]]; then
+    fail "topology-mount" "the ClickHouse pod does not mount the access Secret at both users.d and config.d paths."
+  fi
+  if ! grep -q "secretName: 'lw-lwql-clickhouse-access'" "$out" \
+     && ! grep -q 'secretName: lw-lwql-clickhouse-access' "$out"; then
+    fail "topology-volume" "the ClickHouse pod has no volume backed by the lw-lwql-clickhouse-access Secret."
+  fi
+
+  # Upgrade refresh: the ClickHouse pod template carries the catalog-version
+  # annotation that rolls the StatefulSet when the app catalog changes.
+  if ! grep -q "langwatch.com/lwql-access-catalog:" "$out"; then
+    fail "topology-annotation" "the ClickHouse pod template carries no langwatch.com/lwql-access-catalog annotation, so an upgrade would not re-mount a changed access Secret."
+  fi
+}
+
+test_chart_managed_two_passwords_only
+test_external_clickhouse_two_passwords_only
+test_external_postgres_two_passwords_only
+test_disabled_emits_nothing
+test_chart_managed_mode_is_rendered_default
+test_external_overlay_selects_sql_mode
+test_render_delivery_topology
 
 if [[ $failures -gt 0 ]]; then
   echo
@@ -394,4 +370,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: all 6 LangWatchQL connection postures pinned — (1) chart-managed ClickHouse + chart-managed PostgreSQL wires the full connection plus the reader-management flag on app and workers; (2) external ClickHouse self-provisions and omits the chart-managed vars; (3) external PostgreSQL with the bridge host cancelled renders the bridge disabled and hands the app neither the manage flag nor the reader password; (4) a partial external-PostgreSQL override fails closed; (5) external PostgreSQL with an explicit bridge host but no operator existingSecret fails closed with reader-role guidance; (6) external PostgreSQL with an explicit host AND an operator existingSecret renders live, mounts the operator's Secret, sources the app's LWQL_CLICKHOUSE_PASSWORD (langwatch_lwql query identity) from that same operator Secret via key lwql_password, and still withholds the reader-management flag"
+echo "PASS: all LangWatchQL connection/mode/delivery postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope; (7) chart-managed ClickHouse renders one render Job (main-phase on install, pre-upgrade,pre-rollback hook on upgrade/rollback) with its RBAC and the LWQL password Secret as pre-install,pre-upgrade,pre-rollback hooks at a lower weight, a name-scoped Role, mounts the access Secret on every pod at both paths, and carries the catalog-version roll annotation"

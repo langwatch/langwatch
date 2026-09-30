@@ -25,9 +25,9 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { formatDuration } from "~/shared/format/time";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
 import { useSpansFull } from "../../hooks/useSpansFull";
-import { formatDuration } from "../../utils/formatters";
 import {
   extractPromptReference,
   type PromptReference,

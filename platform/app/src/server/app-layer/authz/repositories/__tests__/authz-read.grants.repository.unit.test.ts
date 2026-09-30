@@ -1,22 +1,58 @@
+import { AuthzEngine } from "@langwatch/authz";
+import type { GrantRowShape } from "@langwatch/authz-server";
 import { describe, expect, it, vi } from "vitest";
+
 import type { Prisma } from "~/generated/prisma/client";
+
 import { GrantsAuthzReadRepository } from "../authz-read.grants.repository";
 
-/**
- * The grants-head adapter's contract with Prisma, the mirror of
- * authz-read.prisma.repository.unit.test.ts: the same questions, asked of
- * `Grant` / `Role` / `GrantUsage`. What matters here is that the answers stay
- * the ones the legacy heads gave - every binding read fenced on CURRENT
- * organization membership, an API key's private role staying with the key it
- * was minted for, share reads keyed on the presented tokens - and that the
- * facts a cut-over organization stores but does not yet act on (lite-member
- * and friends) are skipped rather than translated into a decision.
- */
+/** Grants remain tenant-scoped, membership-gated, and private to their owner. */
 const clientFor = (models: Record<string, unknown>) =>
   models as unknown as Prisma.TransactionClient;
 
 const member = () =>
   vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
+
+const bindingGrantSelect = {
+  id: true,
+  organizationId: true,
+  principalType: true,
+  principalId: true,
+  roleKey: true,
+  legacyRole: true,
+  source: true,
+  scopeType: true,
+  scopeId: true,
+  token: true,
+  permission: true,
+  resourceKind: true,
+  projectId: true,
+  createdByUserId: true,
+  expiresAt: true,
+  maxViews: true,
+  occurredAt: true,
+} as const satisfies Prisma.GrantSelect;
+
+const grantRow = (overrides: Partial<GrantRowShape> = {}): GrantRowShape => ({
+  id: "grant-1",
+  organizationId: "org-1",
+  principalType: "USER",
+  principalId: "alice",
+  roleKey: "member",
+  legacyRole: null,
+  source: "grants-service",
+  scopeType: "TEAM",
+  scopeId: "team-1",
+  token: null,
+  permission: null,
+  resourceKind: null,
+  projectId: null,
+  createdByUserId: null,
+  expiresAt: null,
+  maxViews: null,
+  occurredAt: new Date("2025-01-01T00:00:00.000Z"),
+  ...overrides,
+});
 
 describe("GrantsAuthzReadRepository", () => {
   describe("when findOrganizationMembership reads the membership row", () => {
@@ -61,14 +97,16 @@ describe("GrantsAuthzReadRepository", () => {
   });
 
   describe("when findUserBindings collects a user's grants", () => {
+    /** @scenario "A grant collection reads live grant facts" */
     it("reads the user's own grants at the three binding scopes", async () => {
       const findMany = vi.fn().mockResolvedValue([
-        { roleKey: "admin", scopeType: "TEAM", scopeId: "team-1" },
-        {
+        grantRow({ roleKey: "admin" }),
+        grantRow({
+          id: "grant-2",
           roleKey: "custom:role-9",
           scopeType: "PROJECT",
           scopeId: "proj-1",
-        },
+        }),
       ]);
       const repository = new GrantsAuthzReadRepository(
         clientFor({
@@ -90,19 +128,17 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true },
+        select: bindingGrantSelect,
       });
       expect(bindings).toEqual([
         {
-          role: "ADMIN",
-          customRoleId: null,
+          roleKey: "admin",
           scopeType: "TEAM",
           scopeId: "team-1",
           viaGroupId: null,
         },
         {
-          role: "CUSTOM",
-          customRoleId: "role-9",
+          roleKey: "custom:role-9",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
@@ -110,18 +146,79 @@ describe("GrantsAuthzReadRepository", () => {
       ]);
     });
 
-    it("translates member and viewer keys onto their legacy roles", async () => {
+    /** @scenario "Migrated custom bindings retain their permission restrictions" */
+    it.each([
+      "ORGANIZATION",
+      "TEAM",
+      "PROJECT",
+    ] as const)("collects the canonical custom key beside legacy ADMIN at %s scope", async (scopeType) => {
+      const scopeIds = {
+        ORGANIZATION: "org-1",
+        TEAM: "team-1",
+        PROJECT: "project-1",
+      };
       const repository = new GrantsAuthzReadRepository(
         clientFor({
           organizationUser: { findFirst: member() },
           grant: {
             findMany: vi.fn().mockResolvedValue([
-              {
+              grantRow({
+                roleKey: "custom:restricted",
+                legacyRole: "ADMIN",
+                scopeType,
+                scopeId: scopeIds[scopeType],
+              }),
+            ]),
+          },
+        }),
+      );
+      const bindings = await repository.findUserBindings({
+        userId: "alice",
+        organizationId: "org-1",
+      });
+      const grants = {
+        principal: { type: "user", id: "alice" } as const,
+        organizationId: "org-1",
+        organizationRole: "MEMBER" as const,
+        isOrgMember: true,
+        membershipDisabled: false,
+        bindings,
+        customRolePermissions: new Map([["restricted", ["traces:view"]]]),
+      };
+      const scope = {
+        type: "project",
+        id: "project-1",
+        teamId: "team-1",
+        organizationId: "org-1",
+      } as const;
+      const engine = new AuthzEngine();
+      expect(
+        engine.decide({ grants, permission: "traces:view", scope }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({ grants, permission: "project:delete", scope }).allowed,
+      ).toBe(false);
+      expect(
+        engine.decide({
+          grants: { ...grants, customRolePermissions: new Map() },
+          permission: "traces:view",
+          scope,
+        }).allowed,
+      ).toBe(false);
+    });
+
+    it("preserves member and viewer role keys", async () => {
+      const repository = new GrantsAuthzReadRepository(
+        clientFor({
+          organizationUser: { findFirst: member() },
+          grant: {
+            findMany: vi.fn().mockResolvedValue([
+              grantRow({
                 roleKey: "member",
                 scopeType: "ORGANIZATION",
                 scopeId: "org-1",
-              },
-              { roleKey: "viewer", scopeType: "TEAM", scopeId: "team-1" },
+              }),
+              grantRow({ roleKey: "viewer" }),
             ]),
           },
         }),
@@ -133,8 +230,8 @@ describe("GrantsAuthzReadRepository", () => {
             userId: "alice",
             organizationId: "org-1",
           })
-        ).map((binding) => binding.role),
-      ).toEqual(["MEMBER", "VIEWER"]);
+        ).map((binding) => binding.roleKey),
+      ).toEqual(["member", "viewer"]);
     });
 
     describe("when the user has left the organization", () => {
@@ -167,18 +264,36 @@ describe("GrantsAuthzReadRepository", () => {
             organizationUser: { findFirst: member() },
             grant: {
               findMany: vi.fn().mockResolvedValue([
-                {
+                grantRow({
+                  id: "grant-resource",
+                  principalType: "ANYONE",
+                  principalId: null,
+                  roleKey: null,
+                  scopeType: "RESOURCE",
+                  scopeId: "trace-1",
+                  token: "share-token",
+                  permission: "traces:view",
+                  resourceKind: "TRACE",
+                  projectId: "project-1",
+                }),
+                grantRow({
                   roleKey: "lite-member",
                   scopeType: "ORGANIZATION",
                   scopeId: "org-1",
-                },
-                { roleKey: null, scopeType: "TEAM", scopeId: "team-1" },
-                {
+                }),
+                grantRow({ id: "grant-2", roleKey: null }),
+                grantRow({
+                  id: "grant-3",
                   roleKey: "future-key",
                   scopeType: "PROJECT",
                   scopeId: "proj-1",
-                },
-                { roleKey: "admin", scopeType: "TEAM", scopeId: "team-2" },
+                }),
+                grantRow({
+                  id: "grant-4",
+                  roleKey: "admin",
+                  scopeType: "TEAM",
+                  scopeId: "team-2",
+                }),
               ]),
             },
           }),
@@ -195,8 +310,7 @@ describe("GrantsAuthzReadRepository", () => {
           }),
         ).toEqual([
           {
-            role: "ADMIN",
-            customRoleId: null,
+            roleKey: "admin",
             scopeType: "TEAM",
             scopeId: "team-2",
             viaGroupId: null,
@@ -212,12 +326,13 @@ describe("GrantsAuthzReadRepository", () => {
         .fn()
         .mockResolvedValue([{ groupId: "group-1" }, { groupId: "group-2" }]);
       const grantFindMany = vi.fn().mockResolvedValue([
-        {
+        grantRow({
+          principalType: "GROUP",
+          principalId: "group-2",
           roleKey: "member",
           scopeType: "PROJECT",
           scopeId: "proj-1",
-          principalId: "group-2",
-        },
+        }),
       ]);
       const repository = new GrantsAuthzReadRepository(
         clientFor({
@@ -244,17 +359,11 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: {
-          roleKey: true,
-          scopeType: true,
-          scopeId: true,
-          principalId: true,
-        },
+        select: bindingGrantSelect,
       });
       expect(bindings).toEqual([
         {
-          role: "MEMBER",
-          customRoleId: null,
+          roleKey: "member",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: "group-2",
@@ -286,11 +395,15 @@ describe("GrantsAuthzReadRepository", () => {
 
   describe("when findApiKeyBindings collects a key's grants", () => {
     it("reads the key's own grants with no membership gate", async () => {
-      const findMany = vi
-        .fn()
-        .mockResolvedValue([
-          { roleKey: "viewer", scopeType: "PROJECT", scopeId: "proj-1" },
-        ]);
+      const findMany = vi.fn().mockResolvedValue([
+        grantRow({
+          principalType: "API_KEY",
+          principalId: "key-1",
+          roleKey: "viewer",
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+        }),
+      ]);
       const repository = new GrantsAuthzReadRepository(
         clientFor({ grant: { findMany } }),
       );
@@ -310,69 +423,16 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true },
+        select: bindingGrantSelect,
       });
       expect(bindings).toEqual([
         {
-          role: "VIEWER",
-          customRoleId: null,
+          roleKey: "viewer",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
         },
       ]);
-    });
-  });
-
-  describe("when findLegacyTeamMemberships reads the legacy team rows", () => {
-    it("reads the same TeamUser rows as the legacy repository, tenancy-fenced", async () => {
-      // Deliberately NOT empty for a cut-over organization: the rows live
-      // until contract deletes them, and the engine's org-level union quirk
-      // must keep inferring from them identically over both heads (the
-      // dormant-fact principle) - an empty answer here made the two readers
-      // disagree at organization scope for every ordinary member.
-      const findMany = vi.fn().mockResolvedValue([
-        {
-          teamId: "team-1",
-          role: "MEMBER",
-          assignedRoleId: null,
-          team: { isPersonal: false },
-        },
-      ]);
-      const repository = new GrantsAuthzReadRepository(
-        clientFor({ teamUser: { findMany } }),
-      );
-
-      expect(
-        await repository.findLegacyTeamMemberships({
-          userId: "alice",
-          organizationId: "org-1",
-        }),
-      ).toEqual([
-        {
-          teamId: "team-1",
-          role: "MEMBER",
-          customRoleId: null,
-          isPersonal: false,
-        },
-      ]);
-      expect(findMany).toHaveBeenCalledWith({
-        where: {
-          userId: "alice",
-          team: {
-            organizationId: "org-1",
-            organization: {
-              members: { some: { userId: "alice", disabledAt: null } },
-            },
-          },
-        },
-        select: {
-          teamId: true,
-          role: true,
-          assignedRoleId: true,
-          team: { select: { isPersonal: true } },
-        },
-      });
     });
   });
 
@@ -436,11 +496,11 @@ describe("GrantsAuthzReadRepository", () => {
           },
         ]);
         const grantFindMany = vi.fn().mockResolvedValue([
-          {
+          grantRow({
             roleKey: "custom:role-1",
             principalType: "API_KEY",
             principalId: "key-1",
-          },
+          }),
         ]);
         const repository = new GrantsAuthzReadRepository(
           clientFor({
@@ -469,7 +529,7 @@ describe("GrantsAuthzReadRepository", () => {
             roleKey: { in: ["custom:role-1"] },
             revokedAt: null,
           },
-          select: { roleKey: true, principalType: true, principalId: true },
+          select: bindingGrantSelect,
         });
         expect(rows).toEqual([{ id: "role-1", permissions: ["traces:view"] }]);
       });
@@ -486,16 +546,17 @@ describe("GrantsAuthzReadRepository", () => {
             },
             grant: {
               findMany: vi.fn().mockResolvedValue([
-                {
+                grantRow({
                   roleKey: "custom:role-1",
                   principalType: "API_KEY",
                   principalId: "key-1",
-                },
-                {
+                }),
+                grantRow({
+                  id: "grant-2",
                   roleKey: "custom:role-1",
                   principalType: "USER",
                   principalId: "alice",
-                },
+                }),
               ]),
             },
           }),
@@ -890,7 +951,10 @@ describe("GrantsAuthzReadRepository", () => {
 
       expect(
         await repository.findProjectLineage({ projectId: "proj-1" }),
-      ).toEqual({ teamId: "team-1", organizationId: "org-1" });
+      ).toEqual({
+        teamId: "team-1",
+        organizationId: "org-1",
+      });
       expect(
         await repository.findProjectLineage({ projectId: "proj-ghost" }),
       ).toBeNull();
@@ -909,7 +973,9 @@ describe("GrantsAuthzReadRepository", () => {
 
       expect(
         await repository.findTeamOrganization({ teamId: "team-1" }),
-      ).toEqual({ organizationId: "org-1" });
+      ).toEqual({
+        organizationId: "org-1",
+      });
       expect(
         await repository.findTeamOrganization({ teamId: "team-ghost" }),
       ).toBeNull();

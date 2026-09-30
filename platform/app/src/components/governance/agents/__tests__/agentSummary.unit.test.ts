@@ -206,6 +206,45 @@ describe("summarizeAgentFleet", () => {
       expect(summary.fleet.registrations.at(-1)).toBe(1);
       expect(summary.fleet.registrations[0]).toBe(0);
     });
+
+    /** @scenario "The fleet caption says which agents the line cannot include" */
+    it("says in the caption that the line covers fewer agents than the count", () => {
+      // Without this clause the card reads as 2 agents above a line reaching
+      // 1, and a reader cannot tell which of the two numbers is broken.
+      expect(summary.fleet.caption).toBe(
+        "No new agents in the last 30 days · registered over time, excluding 1 found at a provider with no registration date",
+      );
+    });
+
+    /** @scenario "The fleet caption says which agents the line cannot include" */
+    it("tells a reader who hovers the line the same thing", () => {
+      expect(summary.fleet.registrationsLabel).toBe(
+        "Total agents registered, by month over the last 12 months, excluding 1 found at a provider with no registration date",
+      );
+    });
+  });
+
+  describe("when every agent has a registration date", () => {
+    const summary = summarizeAgentFleet({
+      rows: [
+        agentRow({ id: "dated", registeredDaysAgo: 200 }),
+        agentRow({ id: "also-dated", registeredDaysAgo: 12 }),
+      ],
+    });
+
+    /** @scenario "The fleet caption says which agents the line cannot include" */
+    it("stays quiet, because the count and the line describe one population", () => {
+      // The count and the line agree here, so an exclusion clause would be a
+      // caveat about a gap that does not exist.
+      expect(summary.fleet.caption).toBe(
+        "+1 in the last 30 days · registered over time",
+      );
+      expect(summary.fleet.registrationsLabel).toBe(
+        "Total agents registered, by month over the last 12 months",
+      );
+      expect(summary.fleet.count).toBe(2);
+      expect(summary.fleet.registrations.at(-1)).toBe(2);
+    });
   });
 
   describe("when nothing is unclaimed", () => {

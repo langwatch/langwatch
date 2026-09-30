@@ -89,6 +89,14 @@ export function toIngestionSourceDto({
     // report every source as healthy.
     errorCount: number;
     lastSuccessAt: Date | null;
+    /**
+     * How far the last run read, and whether it reached the end. Required for
+     * the reason the two above are: the badge is derived from them, and a
+     * `select` that stopped fetching them would report every half-read source
+     * as fully collected.
+     */
+    lastReadThroughAt: Date | null;
+    lastRunCompleteness: string | null;
     lastEventAt: Date | null;
     archivedAt: Date | null;
     createdAt: Date;
@@ -156,6 +164,19 @@ export function toIngestionSourceDto({
      */
     errorCount: row.errorCount,
     lastSuccessAt: row.lastSuccessAt,
+    /**
+     * How far the last run got, and whether it finished.
+     *
+     * A run stopped by a page limit or a deadline reports no error, so the
+     * failure count says the source is fine while it is quietly collecting a
+     * fraction of its data. These two are the only evidence that separates it
+     * from a healthy quiet source, which is why the badge reads them.
+     *
+     * Null on both means unknown — every row written before runs said how far
+     * they read — and unknown must never render as either answer.
+     */
+    lastReadThroughAt: row.lastReadThroughAt,
+    lastRunCompleteness: row.lastRunCompleteness,
     pullStatus: sourcePullStatus({
       sourceType: row.sourceType,
       cursor: row.pollerCursor,

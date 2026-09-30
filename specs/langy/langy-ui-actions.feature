@@ -44,6 +44,22 @@ Feature: Langy drives the open page through typed UI actions
     When the action entry reaches it
     Then the page does not claim, leaving the server free to fall back
 
+  @unit
+  Scenario: An action that arrives while its page is still mounting is held for that page
+    Given the browser is on the page that owns the dispatched kind
+    And the page has not registered its handlers yet
+    When the action entry reaches it
+    Then the page claims the action at once, so the server does not fall back to saved state
+    And the handler runs as soon as the page registers it
+    And the completion reports what the live page did
+
+  @unit
+  Scenario: A page that never finishes mounting reports it instead of leaving the agent waiting
+    Given the browser is on the page that owns the dispatched kind
+    And the page never registers a handler for it
+    When the hold runs out
+    Then the action completes as failed with the code "langy_ui_page_not_ready"
+
   @integration
   Scenario: With page control rolled back, the open page ignores dispatched actions
     Given agent-driven page control is switched off for my project

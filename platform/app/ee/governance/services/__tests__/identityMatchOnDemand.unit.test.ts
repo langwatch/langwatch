@@ -25,9 +25,9 @@
  *
  * What is asserted is absence, and absence is the direction a scan fails
  * silently in: a reader that sees nothing reports the same clean result as a
- * codebase that contains nothing. So the scan is asked for the comparator's
- * key too, which IS registered next door, and must find both of its spellings
- * in the two files that carry them.
+ * codebase that contains nothing. So the scan is asked for the report
+ * scheduler's key too, which IS registered, and must find both of its
+ * spellings in the two files that carry them.
  *
  * Node environment on purpose — this reads source and evaluates none of it.
  *
@@ -48,9 +48,9 @@ const IDENTITY_MATCH_KEY = [
 ];
 
 /** Both spellings of a key that IS registered, so the scan proves it reads. */
-const COMPARATOR_KEY = [
-  /["'`]governanceCostRollupComparator["'`]/,
-  /\bCOST_ROLLUP_COMPARATOR_TARGET_TYPE\b/,
+const REPORT_KEY = [
+  /["'`]reportTrigger["'`]/,
+  /\bREPORT_SCHEDULER_TARGET_TYPE\b/,
 ];
 
 /** Files naming any spelling of `key`, as paths relative to `platform/app`. */
@@ -85,11 +85,11 @@ describe("Feature: what books the match engine to run", () => {
    * This one fails if it ever does.
    */
   describe("given the scan itself", () => {
-    it("finds the comparator's key where it is defined and where it is registered", () => {
-      const found = filesNaming(COMPARATOR_KEY);
+    it("finds the report key where it is defined and where it is registered", () => {
+      const found = filesNaming(REPORT_KEY);
 
       expect(found).toContain(
-        "ee/governance/services/costRollupComparator.service.ts",
+        "src/server/app-layer/automations/report.builder.ts",
       );
       expect(found).toContain("src/server/app-layer/presets.ts");
     });

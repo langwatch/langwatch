@@ -68,6 +68,28 @@ describe("LangyTracesCard", () => {
     });
   });
 
+  describe("given recorded rows that lost their trace id", () => {
+    describe("when the card renders", () => {
+      /** @scenario "Rows the card cannot identify render as unreadable, never as an empty result" */
+      it("says it could not read the result instead of claiming nothing matched", () => {
+        renderCard({
+          traces: [
+            {
+              "…": "5 more keys truncated",
+              error: null,
+              input: { value: "refund?" },
+            },
+            "… 12 more items truncated, 13 total",
+          ],
+          pagination: { totalHits: 13 },
+        });
+
+        expect(screen.getByText(/Couldn.t read this result/)).toBeTruthy();
+        expect(screen.queryByText("No traces matched.")).toBeNull();
+      });
+    });
+  });
+
   describe("given output the card cannot read", () => {
     // Truncated JSON: fails the contract parse AND the digest parse.
     const truncated = '{"traces":[{"trace_id":"trace_1","input":{"va';

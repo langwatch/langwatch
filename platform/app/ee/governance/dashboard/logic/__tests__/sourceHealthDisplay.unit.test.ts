@@ -4,6 +4,7 @@
  * the "no data since" line appears under it.
  *
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+ * Spec: specs/governance/ingestion-source-health.feature
  * Decision: ADR-128.
  *
  * The load-bearing case is a DISABLED source that is also failing. Both facts
@@ -16,6 +17,7 @@ import { UNHEALTHY_AFTER_CONSECUTIVE_FAILURES } from "@ee/governance/services/pu
 import { describe, expect, it } from "vitest";
 import {
   noDataSinceNotice,
+  SOURCE_PARTIAL_META,
   SOURCE_STATUS_META,
   SOURCE_UNHEALTHY_META,
   sourceBadge,
@@ -145,5 +147,192 @@ describe("noDataSinceNotice", () => {
         ).toBeNull();
       });
     });
+  });
+});
+
+/**
+ * A run that stopped at a page limit or ran out of time ends with nothing to
+ * report as an error, so the source read as active and the moment that run
+ * finished read as the point the data reaches. Both are wrong, and the second
+ * is the worse of the two: it is the one sentence on the page a reader would
+ * take as proof the period is whole.
+ */
+describe("given a source whose last run stopped before the end", () => {
+  // A read that got as far as mid-morning, on a run that then finished at
+  // noon. The gap between the two is the whole subject.
+  const readThroughAt = new Date("2026-01-15T10:30:00.000Z");
+  const runFinishedAt = new Date("2026-01-15T12:00:00.000Z");
+
+  describe("when a viewer looks at the source", () => {
+    /** @scenario "A source whose last run stopped early is shown as partly collected" */
+    it("reads as partly collected rather than as active", () => {
+      expect(
+        sourceBadge({
+          status: "active",
+          errorCount: 0,
+          completeness: "truncated",
+        }),
+      ).toBe(SOURCE_PARTIAL_META);
+      expect(SOURCE_PARTIAL_META.label).toBe("Partly collected");
+    });
+
+    /** @scenario "A source whose last run stopped early is shown as partly collected" */
+    it("names the date and the time it read through to, and no date for the collection that never finished", () => {
+      const notice = noDataSinceNotice({
+        status: "active",
+        errorCount: 0,
+        lastSuccessAt: runFinishedAt,
+        completeness: "truncated",
+        readThroughAt,
+      });
+
+      // Never null for a truncated source, however healthy its failure count
+      // makes it look.
+      expect(notice).not.toBeNull();
+      // The point carries a time as well as a date: a page limit stops in the
+      // middle of a day, and a date alone rounds that day up to reached.
+      expect(notice).toEqual({
+        readThroughIso: "2026-01-15T10:30:00.000Z",
+        finished: false,
+      });
+      // And the instant the run happened to finish is not offered as a date
+      // anything was collected through.
+      expect(JSON.stringify(notice)).not.toContain("12:00:00");
+    });
+
+    /** @scenario "A source whose last run stopped early is shown as partly collected" */
+    it("still reads as active when the last run did reach the end", () => {
+      // The arm from the far side: without it the rule above is satisfied by
+      // a badge that calls every source partly collected.
+      expect(
+        sourceBadge({
+          status: "active",
+          errorCount: 0,
+          completeness: "complete",
+        }),
+      ).toBe(SOURCE_STATUS_META.active);
+    });
+  });
+});
+
+/**
+ * A source that is STUCK, as opposed to one that stopped early once.
+ *
+ * Nothing on the page separates the two except the point itself: a source
+ * that truncated once and then finished reads as active again with a later
+ * point, and one that is stuck reads as partly collected with a point that
+ * never moves. Elapsed time is not something anything here measures, so the
+ * point is the only evidence available — which is why it must be read off
+ * what the run actually reached and never off the run's own clock, the one
+ * value that DOES move on every attempt.
+ */
+describe("given a source whose runs keep stopping at the same point", () => {
+  /** Every run reaches the same bucket and then gives up. */
+  const stuckAt = new Date("2026-01-15T10:30:00.000Z");
+  /** Each attempt finishes later than the last, and none of them read further. */
+  const runsFinishedAt = [
+    new Date("2026-01-15T12:00:00.000Z"),
+    new Date("2026-01-16T12:00:00.000Z"),
+    new Date("2026-01-17T12:00:00.000Z"),
+  ];
+
+  describe("when a viewer looks at it after several of those runs", () => {
+    /** @scenario "A source stuck half-read keeps reporting the same stopped-at point" */
+    it("still reads as partly collected and reports the point the run before it did", () => {
+      const seenAfterEachRun = runsFinishedAt.map((lastSuccessAt) => ({
+        badge: sourceBadge({
+          status: "active",
+          errorCount: 0,
+          completeness: "truncated",
+        }),
+        notice: noDataSinceNotice({
+          status: "active",
+          errorCount: 0,
+          lastSuccessAt,
+          completeness: "truncated",
+          readThroughAt: stuckAt,
+        }),
+      }));
+
+      // Asserted before the loop: a `for` over an empty list passes without
+      // checking anything, which is how a test like this stops being one.
+      expect(seenAfterEachRun).toHaveLength(3);
+      for (const seen of seenAfterEachRun) {
+        expect(seen.badge).toBe(SOURCE_PARTIAL_META);
+        expect(seen.notice).toEqual({
+          readThroughIso: "2026-01-15T10:30:00.000Z",
+          finished: false,
+        });
+      }
+    });
+
+    /** @scenario "A source stuck half-read keeps reporting the same stopped-at point" */
+    it("reads as active again with a later point once a run does reach the end", () => {
+      // The other half of the only distinction the page offers. Without it,
+      // a display that froze the point forever would satisfy the rule above.
+      const finishedAt = new Date("2026-01-18T12:00:00.000Z");
+
+      expect(
+        sourceBadge({
+          status: "active",
+          errorCount: 0,
+          completeness: "complete",
+        }),
+      ).toBe(SOURCE_STATUS_META.active);
+      expect(
+        noDataSinceNotice({
+          status: "active",
+          errorCount: 0,
+          lastSuccessAt: finishedAt,
+          completeness: "complete",
+          readThroughAt: finishedAt,
+        }),
+      ).toBeNull();
+    });
+  });
+});
+
+/**
+ * A status that names something on Object's prototype.
+ *
+ * `status` is a free-form column, so the badge table gets indexed by a string
+ * this build never chose. Every unknown word falls back correctly except the
+ * handful naming an inherited member: those resolve up the prototype chain to
+ * a real value, and `??` only treats null and undefined as missing. The badge
+ * then carries no icon, and rendering an undefined component throws, so the
+ * page dies rather than degrading to "Awaiting first event".
+ *
+ * `__proto__` is in the list because it is the one that does not fit the
+ * summary. The others resolve to a Function; `__proto__` resolves to
+ * Object.prototype, an object. Anything asserting "not a function" would wave
+ * it through, which is why the load-bearing assertion below is identity
+ * against the fallback and not a typeof check.
+ *
+ * The control case is the point of the whole block. A test that reaches for a
+ * plausible unknown word passes against the broken lookup, because ordinary
+ * words are not inherited. Only naming the inherited ones finds it.
+ */
+describe("a status naming an inherited property", () => {
+  const INHERITED = [
+    "toString",
+    "constructor",
+    "valueOf",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "__proto__",
+  ];
+
+  it.each(INHERITED)("falls back to the awaiting badge for %s", (status) => {
+    const badge = sourceBadge({ status, errorCount: 0 });
+
+    // Identity, not shape: `__proto__` would satisfy a shape check.
+    expect(badge).toBe(SOURCE_STATUS_META.awaiting_first_event);
+    expect(badge.icon).toBeDefined();
+  });
+
+  it("control: an ordinary unknown word already fell back before the fix", () => {
+    expect(sourceBadge({ status: "quota_exhausted_v2", errorCount: 0 })).toBe(
+      SOURCE_STATUS_META.awaiting_first_event,
+    );
   });
 });

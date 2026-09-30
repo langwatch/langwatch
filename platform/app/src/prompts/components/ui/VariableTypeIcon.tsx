@@ -5,6 +5,7 @@ import {
   Image,
   List,
   MessageSquare,
+  Paperclip,
   ToggleLeft,
   Type,
 } from "lucide-react";
@@ -60,6 +61,9 @@ export const VariableTypeIcon = ({
     case "image":
       return <Image {...iconProps} />;
 
+    case "file":
+      return <Paperclip {...iconProps} />;
+
     default:
       return <Type {...iconProps} />;
   }
@@ -78,6 +82,7 @@ export const TYPE_LABELS: Record<string, string> = {
   bool: "Boolean",
   boolean: "Boolean",
   image: "Image",
+  file: "File",
   list: "List",
   "list[str]": "List",
   "list[float]": "List",

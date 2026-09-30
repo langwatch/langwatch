@@ -3,11 +3,6 @@ import {
   type GatewayDebitsProcessDeps,
   gatewayDebitsPM,
 } from "@ee/governance/process-manager/gatewayDebits.process";
-import { GOVERNANCE_COST_ROLLUP_PROJECTION_NAME } from "@ee/governance/projections/governanceCostRollup.constants";
-import {
-  GovernanceCostRollupFoldProjection,
-  type GovernanceCostRollupState,
-} from "@ee/governance/projections/governanceCostRollup.foldProjection";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryProcessDeps,
@@ -47,9 +42,6 @@ export interface GatewaySpendProcessingPipelineDeps {
   /** The M2 settlement sweeper: settles admissions whose confirmation
    *  never arrived inside the grace window. */
   settlement?: SpendSettlementProcessDeps;
-  /** ADR-128's daily cost rollup, the gateway half. Absent without the
-   *  ClickHouse rollup table (the per-request ledger is unaffected). */
-  costRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
 }
 
 /**
@@ -87,15 +79,10 @@ export function createGatewaySpendProcessingPipeline(
     .withCommand("confirmSpend", ConfirmSpendCommand)
     .withCommand("failSpend", FailSpendCommand)
     .withCommand("settleSpend", SettleSpendCommand);
-  // The daily cost rollup's gateway half (ADR-128). Optional for the same
-  // reason the debits process manager is: a deployment without the rollup
-  // table still records every request, it just does not summarize it.
-  if (deps.costRollupStore) {
-    pipeline = pipeline.withFoldProjection(
-      GOVERNANCE_COST_ROLLUP_PROJECTION_NAME,
-      new GovernanceCostRollupFoldProjection({ store: deps.costRollupStore }),
-    );
-  }
+  // No daily cost rollup here, on purpose. The governance cost screen reads
+  // the metered lane straight off `gateway_spend` (the per-request ledger this
+  // pipeline projects), so a rollup half for it summarized cells nothing ever
+  // read. The rollup fold stays on the pulled-usage pipeline alone.
   if (deps.webhookDelivery) {
     pipeline = pipeline.withProcessManager(
       WEBHOOK_DELIVERY_PROCESS_NAME,

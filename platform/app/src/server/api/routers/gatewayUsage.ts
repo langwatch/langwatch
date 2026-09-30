@@ -14,6 +14,7 @@ import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 import { getApp } from "~/server/app-layer/app";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { VirtualKeyNotFoundError } from "~/server/gateway/errors";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
@@ -21,8 +22,6 @@ import {
   loadMembershipSet,
 } from "~/server/gateway/virtualKey.authz";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-
-import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 function usageService(prisma: PrismaClient) {

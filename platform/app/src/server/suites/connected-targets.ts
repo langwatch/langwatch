@@ -125,7 +125,9 @@ async function resolveConnectedReference({
       name: reference.name,
       environment: reference.environment,
     });
-    const picked = pickReferencedAgent({ rows, actor });
+    const picked =
+      pickReferencedAgent({ rows, actor }) ??
+      pickForeignPersonalAgent({ rows, actor });
     return picked ? { ...target, referenceId: picked.id } : target;
   }
   if (target.referenceId.includes("@")) return target;
@@ -147,6 +149,11 @@ async function resolveConnectedReference({
  * `<name>@<environment>` reference is, then the picks are read for presence.
  * Development wins when a process is connected there; otherwise the one
  * other environment with a process connected.
+ *
+ * When nothing the caller may run is connected but another person's
+ * personal agent is, that agent is picked so the run is refused as
+ * owner-only, naming the owner. Without it the refusal would say no process
+ * is connected while the process is printing that it is online.
  */
 async function pickAgentByNameAlone({
   name,
@@ -167,26 +174,34 @@ async function pickAgentByNameAlone({
     ...new Set(rows.map((row) => row.environment ?? DEVELOPMENT_ENVIRONMENT)),
   ];
   const candidates = registeredEnvironments.flatMap((environment) => {
-    const picked = pickReferencedAgent({
-      rows: rows.filter(
-        (row) => (row.environment ?? DEVELOPMENT_ENVIRONMENT) === environment,
-      ),
-      actor,
-    });
-    return picked ? [{ environment, row: picked }] : [];
+    const inEnvironment = rows.filter(
+      (row) => (row.environment ?? DEVELOPMENT_ENVIRONMENT) === environment,
+    );
+    const picked = pickReferencedAgent({ rows: inEnvironment, actor });
+    if (picked) return [{ environment, row: picked, foreign: false }];
+    const foreign = pickForeignPersonalAgent({ rows: inEnvironment, actor });
+    return foreign ? [{ environment, row: foreign, foreign: true }] : [];
   });
   const presences = await presence({
     projectId,
     agents: candidates.map(({ row }) => ({ id: row.id, type: "connected" })),
   });
   const online = candidates.filter(
-    ({ row }) => presences.get(row.id)?.status === "online",
+    ({ row, foreign }) =>
+      !foreign && presences.get(row.id)?.status === "online",
   );
   const development = online.find(
     ({ environment }) => environment === DEVELOPMENT_ENVIRONMENT,
   );
   if (development) return development.row;
   if (online.length === 1) return online[0]?.row;
+  if (online.length === 0) {
+    const foreignOnline = candidates.find(
+      ({ row, foreign }) =>
+        foreign && presences.get(row.id)?.status === "online",
+    );
+    if (foreignOnline) return foreignOnline.row;
+  }
   throw new AgentEnvironmentUnresolvedError({
     agentName: name,
     registeredEnvironments,
@@ -214,6 +229,29 @@ function pickReferencedAgent<
   if (own) return own;
   const shared = rows.filter((row) => row.ownerUserId === null);
   return shared.length === 1 ? shared[0] : undefined;
+}
+
+/**
+ * A personal agent of someone other than the actor, among the rows that
+ * carry a reference's name and environment; nothing when there is none.
+ *
+ * Picked only after `pickReferencedAgent` found nothing the caller may run.
+ * The run is then refused by `assertConnectedAgentsRunnable` as owner-only,
+ * which names the owner: a better answer than "not found" for a process the
+ * customer can see running.
+ */
+function pickForeignPersonalAgent<
+  Row extends Pick<AgentIdentityRow, "ownerUserId">,
+>({
+  rows,
+  actor,
+}: {
+  rows: readonly Row[];
+  actor: RunActor | undefined;
+}): Row | undefined {
+  return rows.find(
+    (row) => row.ownerUserId !== null && row.ownerUserId !== actor?.id,
+  );
 }
 
 /**

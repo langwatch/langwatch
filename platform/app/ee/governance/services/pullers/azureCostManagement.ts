@@ -62,6 +62,58 @@ import type { NormalizedPullEvent } from "./pullerAdapter";
  */
 export const AZURE_COST_REREAD_DAYS = 7;
 
+/**
+ * How far back the first read of each day reaches.
+ *
+ * A month of corrections has to be picked up eventually, and this provider
+ * restates well past the trailing week. Reading a month on EVERY run would
+ * multiply this connection's traffic by its cadence for no extra truth, so it
+ * happens once a day and the rest of the day's runs keep to the week above.
+ *
+ * The day it last happened is remembered in the connection's own cursor, which
+ * is what makes this cost nothing to schedule: there is no new timer, only a
+ * different window on a run that was going to happen anyway.
+ */
+export const AZURE_COST_DEEP_READ_DAYS = 30;
+
+/**
+ * The meter categories this source treats as AI spend.
+ *
+ * A subscription bills Foundry Models beside load balancers, storage and
+ * everything else the environment runs on, and the captured reply is mostly
+ * the latter: 44 rows, of which the AI lines are a handful. Recording the
+ * whole bill as AI spend puts a customer's networking bill in their AI
+ * budget, which is a wrong number that looks entirely plausible.
+ *
+ * Exported and used TWICE, on purpose, and the second use is not redundancy.
+ * `azureCostRequestBody` below asks Azure for only these categories. The
+ * Copilot Studio Dataverse puller filters the days it got back against the
+ * same list before handing them on to be recorded.
+ *
+ * The ask and the answer are separate trust boundaries. Asking politely is one
+ * filter and one is not enough: a request-side filter Azure ignores, silently
+ * drops or applies to a different field would put a customer's networking bill
+ * in their AI budget, and nothing downstream could tell. One exported list
+ * rather than two spellings is what stops the ask and the check drifting into
+ * disagreeing about what counts as AI spend.
+ *
+ * Neither use is in this file's own parser or event builder, and that is
+ * deliberate: `readAzureCostRows` records faithfully what Azure said, and
+ * `azureCostEvents` promises exactly one event per day the reply named.
+ * Dropping rows inside either would falsify a stated contract.
+ *
+ * Naming categories rather than meters: the category is the finest grain
+ * Azure publishes a daily total at, and it is the grain the grouping below
+ * already uses. A new Foundry meter arrives inside a category already named
+ * here; a whole new category is the case that needs this list edited, and
+ * that is a rarer and more visible event than a new meter.
+ */
+export const AZURE_AI_METER_CATEGORIES = [
+  "Foundry Models",
+  "Copilot Studio",
+  "Cognitive Services",
+] as const;
+
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -307,13 +359,37 @@ function utcDay(ms: number): string {
 export function azureCostReadWindow({
   nowMs,
   pricedThroughDay,
+  deepReadDay,
 }: {
   nowMs: number;
   /** The last day a previous run priced, or null on a first read. */
   pricedThroughDay: string | null;
-}): { fromDay: string; toDay: string } {
+  /**
+   * The day the last deep read FINISHED.
+   *
+   * Three states, and all three are meant. `null` is a caller that tracks deep
+   * reads and has never finished one, so the next run owes the month. A day
+   * earlier than today is the same. Today means the month is already read and
+   * the rest of the day keeps to the trailing week.
+   *
+   * OMITTED is the fourth and different: a caller that does not do deep reads
+   * at all, which gets the trailing window it always got. Absence is not "no
+   * deep read yet" here, because a function that silently widened every
+   * existing caller's ask by a month would be deciding that on their behalf.
+   *
+   * Reading the FINISHING day rather than the asking one is what makes a deep
+   * read that broke off get tried again: a day whose deep read never completed
+   * has not been read, and stamping it when the request went out would lose it.
+   */
+  deepReadDay?: string | null;
+}): { fromDay: string; toDay: string; isDeepRead: boolean } {
   const toDay = utcDay(nowMs);
-  const trailingStartMs = nowMs - (AZURE_COST_REREAD_DAYS - 1) * ONE_DAY_MS;
+  // The first run of each day reaches a month back; the rest keep to the week.
+  const isDeepRead = deepReadDay !== undefined && deepReadDay !== toDay;
+  const reachDays = isDeepRead
+    ? AZURE_COST_DEEP_READ_DAYS
+    : AZURE_COST_REREAD_DAYS;
+  const trailingStartMs = nowMs - (reachDays - 1) * ONE_DAY_MS;
 
   const pricedThroughMs = pricedThroughDay
     ? Date.parse(`${pricedThroughDay}T00:00:00.000Z`)
@@ -322,7 +398,11 @@ export function azureCostReadWindow({
     ? pricedThroughMs + ONE_DAY_MS
     : Number.POSITIVE_INFINITY;
 
-  return { fromDay: utcDay(Math.min(trailingStartMs, resumeMs)), toDay };
+  return {
+    fromDay: utcDay(Math.min(trailingStartMs, resumeMs)),
+    toDay,
+    isDeepRead,
+  };
 }
 
 /**
@@ -358,6 +438,16 @@ export function azureCostRequestBody({
         totalCostUSD: { name: "CostUSD", function: "Sum" },
       },
       grouping: [{ type: "Dimension", name: "MeterCategory" }],
+      // Asked for at the provider, not filtered on the way back, so the rows
+      // that arrive are the rows that matter and the page walk is not spent
+      // carrying a subscription's whole infrastructure bill across the wire.
+      filter: {
+        dimensions: {
+          name: "MeterCategory",
+          operator: "In",
+          values: [...AZURE_AI_METER_CATEGORIES],
+        },
+      },
     },
   } as const;
 }
@@ -445,8 +535,104 @@ export function readAzureCostRows({
   return { days, unreadableRows, nextLink, malformed: false };
 }
 
+/**
+ * The bill was read and it named no AI lines at all.
+ *
+ * Only reachable because the request now asks for the AI categories and
+ * nothing else: before that filter existed a live subscription always
+ * answered with SOMETHING, so an empty answer could be treated as "this
+ * window cost nothing" and quietly get away with it. Now an empty answer
+ * means one of the two things that are actually wrong -- the categories the
+ * customer bills AI under are not the ones named here, or the credential
+ * reads a scope with no AI spend in it -- and neither is a day worth pricing.
+ *
+ * Not retryable: the next run asks the identical question of the identical
+ * subscription and gets the identical answer. Retrying spends quota to be
+ * told the same thing.
+ */
+export const AZURE_NO_AI_METERS = "azure_no_ai_meters" as const;
+
+/**
+ * The reply could not be read, which is evidence about the reply and not
+ * about the customer's meters.
+ *
+ * Kept apart from `AZURE_NO_AI_METERS` deliberately. Reporting "no AI meters"
+ * for a body nobody could parse would tell a customer something false about
+ * their Azure setup and send them hunting through their meter list for an
+ * absence that is probably not there -- on the strength of a parse failure.
+ * So this holds the window instead: a reply we could not read says nothing
+ * about whether the window can be read later, exactly as an unarrived bill
+ * does.
+ */
+export const AZURE_REPLY_UNREADABLE = "azure_reply_unreadable" as const;
+
+/**
+ * What one cost read amounts to, before the cursor is moved.
+ *
+ * Three outcomes, and `code`/`retryable` are optional rather than split into
+ * a discriminated union because callers read `outcome` first and the field is
+ * only meaningful on the two that are not `priced`.
+ */
+export interface AzureCostReadVerdict {
+  outcome: "priced" | "held" | "failed";
+  code?: typeof AZURE_NO_AI_METERS | typeof AZURE_REPLY_UNREADABLE;
+  retryable?: boolean;
+}
+
+/**
+ * What a read amounts to: money to record, a window to hold, or a failure.
+ *
+ * Pure, and separate from the cursor rule below, because the two answer
+ * different questions: this one says what the reply WAS, and
+ * `nextAzureCostCursor` says where that leaves the read position.
+ */
+export function azureCostReadVerdict({
+  read,
+}: {
+  read: AzureCostRead;
+}): AzureCostReadVerdict {
+  if (read.malformed) {
+    return { outcome: "held", code: AZURE_REPLY_UNREADABLE };
+  }
+
+  if (read.days.length === 0) {
+    // Rows arrived and none of them could be read. The reply was not the
+    // empty-but-real kind, so blaming the meters would be the same false
+    // statement the malformed branch above refuses to make.
+    if (read.unreadableRows > 0) {
+      return { outcome: "held", code: AZURE_REPLY_UNREADABLE };
+    }
+    return { outcome: "failed", code: AZURE_NO_AI_METERS, retryable: false };
+  }
+
+  return { outcome: "priced" };
+}
+
 /** The verb these events carry, so a reader can tell them from a conversation. */
 export const AZURE_COST_ACTION = "cost_report" as const;
+
+/** ISO 4217 for the currency `costMinor` is already denominated in as dollars. */
+const USD = "USD";
+
+/**
+ * The dollar figure for a day, or nothing at all.
+ *
+ * Three cases, and only the middle one is new. Azure published `CostUSD`
+ * beside the billed amount: that is the figure, and it is Microsoft's own
+ * conversion rather than a rate of ours. It published none and the
+ * subscription bills in dollars: the billed amount already IS dollars. It
+ * published none and the subscription bills in something else: there is no
+ * dollar figure, and the field is absent.
+ *
+ * The third case is what this exists for. `"0"` there would assert that
+ * Microsoft published a dollar figure and that the figure was nothing, and
+ * that zero would land in a customer's total as real money they did not spend.
+ */
+function azureDollarFigure(day: AzureDailyCost): { cost_usd?: string } {
+  if (day.costUsd !== null) return { cost_usd: day.costUsd };
+  if (day.currencyCode === USD) return { cost_usd: day.costMinor };
+  return {};
+}
 
 /**
  * The days a read produced, as the events the run hands back.
@@ -493,7 +679,20 @@ export function azureCostEvents({
       actor: "",
       action: AZURE_COST_ACTION,
       target: day.meterCategory,
-      cost_usd: day.costMinor,
+      // ONLY Microsoft's own published dollar figure, and absent when it
+      // published none. `cost_usd` is named for dollars, so the euro amount
+      // that used to sit here was read downstream as dollars. A "0" in its
+      // place would be worse than the absence: it asserts that Microsoft
+      // published a dollar figure and that the figure was nothing, and it
+      // lands in a total as a real, wrong zero.
+      // A subscription billed in dollars is the third case, and it keeps its
+      // figure: `costMinor` IS dollars there, so dropping it would withhold a
+      // real amount in the name of not inventing one.
+      ...azureDollarFigure(day),
+      // The billed amount leaves under a name that admits its currency, so
+      // the day is still exported whether or not anyone converted it.
+      cost_amount: day.costMinor,
+      cost_currency: day.currencyCode,
       tokens_input: 0,
       tokens_output: 0,
       raw_payload: JSON.stringify(day),
@@ -546,20 +745,62 @@ export function nextAzureCostCursor({
   nowMs,
   previous,
   outcome,
+  wasDeepRead = false,
 }: {
   nowMs: number;
   previous: { pricedThroughDay: string | null; heldSinceMs: number | null };
   outcome: "priced" | "held";
+  /**
+   * Whether the window this run asked about was the once-a-day month.
+   *
+   * Defaulted rather than required: an ordinary run is the common case, and a
+   * caller that does not know about deep reads describes one correctly by
+   * saying nothing.
+   */
+  wasDeepRead?: boolean;
 }): {
   pricedThroughDay: string | null;
   heldSinceMs: number | null;
   readAtMs: number;
+  /**
+   * The day a deep read finished on, present ONLY when this run was a deep
+   * read that priced its window.
+   *
+   * Absent — not null — on every other outcome, and that is the whole
+   * mechanism for "a deep read that fails before it finishes is tried again on
+   * the next run": a held or abandoned deep read writes no day, so the next
+   * run of the same day still sees the month as owed. Absent on an ordinary
+   * run for the same reason `abandonedSpan` is absent on a good one: the
+   * cursor a run writes should be exactly the fields it actually learned.
+   *
+   * Handed back for the caller to merge onto what it already holds, rather
+   * than carried through here, so this function keeps saying only what THIS
+   * run established.
+   */
+  deepReadDay?: string;
+  /**
+   * The days this run walked past without ever pricing them, inclusive.
+   *
+   * Present ONLY on the give-up branch. A run that priced its window or is
+   * still holding it has abandoned nothing, and a span reported on every
+   * outcome would widen the unpriced window on runs that read the bill
+   * perfectly well. Absent rather than null on those branches so the cursor a
+   * good run writes is exactly the three fields it has always been.
+   *
+   * Handed back rather than stored. The caller merges it into the unpriced
+   * window the source already keeps (widen-only), which is the window a
+   * reader is shown as unknown rather than zero. Persisting it as a field of
+   * its own would be a second answer to a question that already has one.
+   */
+  abandonedSpan?: { fromDay: string; toDay: string } | null;
 } {
   if (outcome === "priced") {
     return {
       pricedThroughDay: utcDay(nowMs),
       heldSinceMs: null,
       readAtMs: nowMs,
+      // Recorded when the month is READ, not when it is asked for.
+      ...(wasDeepRead ? { deepReadDay: utcDay(nowMs) } : {}),
     };
   }
 
@@ -575,9 +816,24 @@ export function nextAzureCostCursor({
   // Give up: mark the day BEFORE the trailing window's own start as priced, so
   // the next run asks about the last seven days and the ask stops widening.
   const trailingStartMs = nowMs - (AZURE_COST_REREAD_DAYS - 1) * ONE_DAY_MS;
+  const pricedThroughDay = utcDay(trailingStartMs - ONE_DAY_MS);
   return {
-    pricedThroughDay: utcDay(trailingStartMs - ONE_DAY_MS),
+    pricedThroughDay,
     heldSinceMs: null,
     readAtMs: nowMs,
+    // From the day after the last one actually priced, through the day the
+    // source is now jumping to. Null when nothing was ever priced: there is
+    // no first abandoned day to name, and the whole history before this is
+    // already unknown for want of a read.
+    abandonedSpan:
+      previous.pricedThroughDay === null
+        ? null
+        : {
+            fromDay: utcDay(
+              Date.parse(`${previous.pricedThroughDay}T00:00:00.000Z`) +
+                ONE_DAY_MS,
+            ),
+            toDay: pricedThroughDay,
+          },
   };
 }

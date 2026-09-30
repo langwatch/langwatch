@@ -72,6 +72,15 @@ vi.mock("~/utils/api", () => {
               isError: false,
               refetch: vi.fn(),
             });
+          // The page's sync control holds a mutation. This file asserts
+          // nothing about it; it exists so the page can mount.
+          if (property === "useMutation")
+            return () => ({
+              mutate: vi.fn(),
+              mutateAsync: vi.fn(),
+              isPending: false,
+              variables: undefined,
+            });
           return node();
         },
       },

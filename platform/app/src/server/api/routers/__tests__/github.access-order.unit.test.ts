@@ -39,13 +39,18 @@ const { appConfig } = vi.hoisted(() => ({
     configured: true,
   },
 }));
-// The declared permission seam resolves its service from the App.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return appPermissionsMock();
-});
+// The declared permission seam resolves its canonical service from the App.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    permissions: {
+      getDecision: async ({ permission }: { permission: string }) => {
+        permissionsAsked.push(permission);
+        return { permitted: hasOrgPermission(), organizationRole: null };
+      },
+    },
+  }),
+  tryGetApp: () => null,
+}));
 
 vi.mock("~/server/app-layer/github/githubAppConfig", () => ({
   getGithubAppConfig: () => appConfig,
@@ -59,19 +64,6 @@ const { githubHost } = vi.hoisted(() => ({
 vi.mock("~/server/app-layer/github/githubHost", () => ({
   getGithubWebBase: () => githubHost.webBase,
 }));
-
-vi.mock("~/server/api/rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: vi.fn(
-      async (_ctx: unknown, _organizationId: string, permission: string) => {
-        permissionsAsked.push(permission);
-        return hasOrgPermission();
-      },
-    ),
-  };
-});
 
 vi.mock("~/server/app-layer", () => ({
   getApp: () => ({
@@ -99,6 +91,11 @@ const user = { id: "user-1", email: "user@example.com", emailVerified: true };
 function caller() {
   return githubRouter.createCaller(
     createInnerTRPCContext({
+      // Not a suite about the second-factor gate. Without this the gate runs
+      // inside the permission middleware, reads the scope's owner from a Prisma
+      // double that has only this router's models, and fails there instead of
+      // here — and only where the deployment switches it on.
+      mfaGate: { offered: () => false },
       session: { user, expires: "1" } as any,
       permissionChecked: false,
     }),

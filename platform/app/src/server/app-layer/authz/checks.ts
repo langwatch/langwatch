@@ -1,31 +1,23 @@
 /**
- * The checking service, composed per call for the permission seams in
- * `rbac.ts` and `role-binding-resolver.ts`.
- *
- * Deliberately NOT composed in runtime.ts. The legacy vocabulary module
- * (`~/server/api/rbac`) is imported by client code for its role-group enums,
- * so anything it pulls at module scope lands in the browser bundle and in
- * every jsdom test graph — and the composition root imports prisma, redis and
- * the EE audit writer. Composing here from the caller's own Prisma handle
- * keeps that graph server-side. The services are stateless, so an instance
- * per call costs three allocations and shares nothing.
- *
- * The narrower rule: nothing here may import the app-wide prisma client
- * (`~/server/db`) or redis at module scope. A repository class over a handle
- * the caller already holds carries no such state. The boundary is enforced as
- * a graph by `src/server/__tests__/frontend-boundary.unit.test.ts`.
+ * The checking service, composed once per Prisma handle for permission checks.
+ * It is built from the caller's Prisma handle so this helper stays server-only
+ * without importing the app-wide database or other process resources.
  */
 import { AuthzCollectorService, AuthzService } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { demoProjectId } from "./demo-project";
-import { CutoverAwareAuthzReadRepository } from "./repositories/authz-read.cutover.repository";
+import { GrantsAuthzReadRepository } from "./repositories/authz-read.grants.repository";
+
+const checksByPrisma = new WeakMap<PrismaClient, AuthzService>();
 
 export function authzChecksFor(prisma: PrismaClient): AuthzService {
-  return new AuthzService(
-    // The per-organization repository the composition root also collects
-    // through: an organization the engine is answering for reads from the
-    // grants head, which is what finishing the migration switched it to.
-    new AuthzCollectorService(new CutoverAwareAuthzReadRepository(prisma)),
+  const existing = checksByPrisma.get(prisma);
+  if (existing) return existing;
+
+  const service = new AuthzService(
+    new AuthzCollectorService(new GrantsAuthzReadRepository(prisma)),
     { demoProjectId },
   );
+  checksByPrisma.set(prisma, service);
+  return service;
 }

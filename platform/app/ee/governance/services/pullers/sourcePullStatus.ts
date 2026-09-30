@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { PULL_REFUSED_ERROR_CODE } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { z } from "zod";
 import type { IngestionPullRunProjection } from "~/generated/prisma/client";
 
 export type PullRunSummary = Pick<
   IngestionPullRunProjection,
-  "LastRunAt" | "LastRunOutcome" | "LastRunError"
+  "LastRunAt" | "LastRunOutcome" | "LastRunError" | "LastRunErrorCode"
 >;
+
 const progressSchema = z.object({
   startingAt: z.string().datetime(),
   watermark: z.string().datetime().nullish(),
@@ -40,7 +42,17 @@ function billingProgress(sourceType: string, cursor: unknown) {
   }
 }
 
-function failureMessage(error: string | null | undefined): string {
+function failureMessage({
+  error,
+  errorCode,
+}: {
+  error: string | null | undefined;
+  errorCode: string | null | undefined;
+}): string {
+  // The refused code is only ever written beside a sentence we wrote
+  // ourselves (the run handler's non-retryable branch), so it is the one
+  // failure whose text can be shown as written.
+  if (errorCode === PULL_REFUSED_ERROR_CODE && error) return error;
   if (/Too many simultaneous queries/i.test(error ?? ""))
     return "The database is busy.";
   if (/HTTP 429|rate limit exceeded/i.test(error ?? ""))
@@ -66,7 +78,10 @@ export function sourcePullStatus({
     outcome: pullRun?.LastRunOutcome ?? null,
     error:
       pullRun?.LastRunOutcome === "failed"
-        ? failureMessage(pullRun.LastRunError)
+        ? failureMessage({
+            error: pullRun.LastRunError,
+            errorCode: pullRun.LastRunErrorCode,
+          })
         : null,
     ...billingProgress(sourceType, cursor),
   };

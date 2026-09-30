@@ -17,7 +17,7 @@
  * it would refuse and teaching a caller the wrong rule.
  *
  * @see ~/server/analytics/lwql — the service and everything under it
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 import { z } from "zod";
@@ -135,7 +135,8 @@ const query = protectedProcedure
     });
 
     return getLangWatchQLService().execute({
-      project,
+      // A workbench run is bound to the one project the surface is showing.
+      projects: [project],
       protections,
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),

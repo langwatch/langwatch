@@ -483,6 +483,7 @@ export class ActivityMonitorService {
       tenantId: govProjectId,
       thisStart: thisWindowStart,
       prevStart: previousWindowStart,
+      windowEnd: now,
     });
 
     return {
@@ -538,6 +539,7 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendByUser({
       tenantId: govProjectId,
       windowStart: now - windowMs,
+      windowEnd: now,
       sortBy: input.sortBy ?? "spend",
       sortDir: input.sortDir ?? "desc",
       limit: input.limit ?? 50,
@@ -612,6 +614,7 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendByDepartment({
       tenantIds,
       windowStart,
+      windowEnd: now,
     });
 
     return assembleDepartmentRows({
@@ -729,6 +732,7 @@ export class ActivityMonitorService {
       tenantId: govProjectId,
       thisStart: now - windowMs,
       prevStart: previousWindowStart,
+      windowEnd: now,
     });
     if (sourceRows.length === 0) return [];
 
@@ -799,6 +803,7 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendOverTime({
       tenantId: govProjectId,
       windowStart,
+      windowEnd: now,
       groupBy: input.groupBy,
     });
 
@@ -1037,10 +1042,18 @@ export class ActivityMonitorService {
 
     const source = await this.prisma.ingestionSource.findFirst({
       where: { id: input.sourceId, organizationId: input.organizationId },
-      select: { errorCount: true, lastSuccessAt: true },
+      select: {
+        errorCount: true,
+        lastSuccessAt: true,
+        // How far the run actually READ. A day the run never reached is not
+        // a day it collected, and reasoning from the run clock instead marks
+        // the whole window covered the moment any run finishes.
+        lastReadThroughAt: true,
+      },
     });
     const consecutiveFailures = source?.errorCount ?? 0;
     const lastSuccessfulPullMs = source?.lastSuccessAt?.getTime() ?? null;
+    const readThroughMs = source?.lastReadThroughAt?.getTime() ?? null;
 
     return {
       health: deriveSourceHealth({ consecutiveFailures }),
@@ -1050,7 +1063,11 @@ export class ActivityMonitorService {
         const dayStartMs = windowStart + i * dayMs;
         return {
           dayStartIso: new Date(dayStartMs).toISOString(),
-          covered: isDayCoveredByPull({ dayStartMs, lastSuccessfulPullMs }),
+          covered: isDayCoveredByPull({
+            dayStartMs,
+            lastSuccessfulPullMs,
+            readThroughMs,
+          }),
         };
       }),
     };

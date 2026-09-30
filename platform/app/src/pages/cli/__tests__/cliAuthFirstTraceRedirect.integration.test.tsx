@@ -153,6 +153,15 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => ({ data: undefined, isLoading: false }),
         },
       },
+      authz: {
+        effectivePermissions: {
+          useQuery: () => ({
+            data: { permissions: [] },
+            isLoading: false,
+            isFetched: true,
+          }),
+        },
+      },
       // Org admin ceiling so the device-session flow defaults to a full
       // organization scope selection and the Approve button stays enabled;
       // the key-selection UI itself is covered by

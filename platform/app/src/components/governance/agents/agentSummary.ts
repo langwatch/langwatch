@@ -63,7 +63,10 @@ export interface AgentFleetCount {
   registrations: number[];
   /** What that line is a picture of, for a reader who cannot see it. */
   registrationsLabel: string;
-  /** How many arrived recently, and what the line above is. */
+  /**
+   * How many arrived recently, what the line above is, and — when the two
+   * describe different populations — which agents the line cannot include.
+   */
   caption: string;
 }
 
@@ -116,8 +119,12 @@ const HEALTH_TONES: Record<AgentHealth, GovernanceSummaryTone> = {
  *
  * "Custom and Databricks", not "Custom, Databricks". The card has room for the
  * word and a reader should not have to parse punctuation to read a sentence.
+ *
+ * Exported for the page's empty states, which name connected providers in a
+ * sentence and would otherwise grow a second copy of this that punctuates two
+ * items differently from the summary strip a few pixels above it.
  */
-function spokenList(items: readonly string[]): string {
+export function spokenList(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? "";
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]!}`;
 }
@@ -142,6 +149,26 @@ function registrationCurve(rows: readonly GovernanceAgentRow[]): number[] {
   });
 }
 
+/**
+ * What the line and the caption leave out, said in the caption's own words.
+ *
+ * The headline counts every agent, and the line beneath it counts only the
+ * ones with a registration date, because an agent a provider named has no such
+ * date to place — see `buildAgentInventory`. Left unsaid, that is a card
+ * contradicting itself: twelve above a line that reaches four, and no way for
+ * a reader to tell whether the count is wrong, the line is wrong, or agents
+ * went missing. Naming the gap turns it from an apparent error into a fact.
+ *
+ * The clause covers the arrivals figure as well as the line, which is correct:
+ * both are folds over the same dated rows.
+ */
+function trendExclusion(rows: readonly GovernanceAgentRow[]): string {
+  const undated = rows.filter((row) => row.registeredDaysAgo === null).length;
+  return undated === 0
+    ? ""
+    : `, excluding ${undated} found at a provider with no registration date`;
+}
+
 /** The fleet card: how many there are, how that grew, and what changed lately. */
 function summarizeFleet(rows: readonly GovernanceAgentRow[]): AgentFleetCount {
   const recent = rows.filter(
@@ -155,6 +182,11 @@ function summarizeFleet(rows: readonly GovernanceAgentRow[]): AgentFleetCount {
       ? `No new agents in the last ${RECENT_WINDOW_DAYS} days`
       : `+${recent} in the last ${RECENT_WINDOW_DAYS} days`;
 
+  // The same sentence in both places. A reader who hovers the line and a
+  // reader who only reads the caption are told the same thing about the same
+  // gap, rather than one of them finding out and the other not.
+  const excluded = trendExclusion(rows);
+
   return {
     count: rows.length,
     unit: rows.length === 1 ? "agent" : "agents",
@@ -164,8 +196,8 @@ function summarizeFleet(rows: readonly GovernanceAgentRow[]): AgentFleetCount {
     // window, so "agents registered over the last twelve months" would name a
     // different and smaller number than the line draws. This is the sparkline's
     // only description for a reader who cannot see it.
-    registrationsLabel: `Total agents registered, by month over the last ${REGISTRATION_MONTHS} months`,
-    caption: `${arrivals} · registered over time`,
+    registrationsLabel: `Total agents registered, by month over the last ${REGISTRATION_MONTHS} months${excluded}`,
+    caption: `${arrivals} · registered over time${excluded}`,
   };
 }
 

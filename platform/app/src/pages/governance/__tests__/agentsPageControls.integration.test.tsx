@@ -105,6 +105,15 @@ vi.mock("~/utils/api", () => {
               isError: false,
               refetch: vi.fn(),
             });
+          // The page's sync control holds a mutation. This file asserts
+          // nothing about it; it exists so the page can mount.
+          if (property === "useMutation")
+            return () => ({
+              mutate: vi.fn(),
+              mutateAsync: vi.fn(),
+              isPending: false,
+              variables: undefined,
+            });
           return node();
         },
       },
@@ -306,13 +315,23 @@ describe("the agents page sample rows", () => {
       ).className;
 
       const actions = within(headerRow).getAllByRole("button");
-      expect(actions).toHaveLength(2);
+      // Three: the sync control, the sample toggle, and the create action.
+      // The count is not the rule — the two assertions below it are — but
+      // pinning it is what catches a fourth control arriving unweighed.
+      expect(actions).toHaveLength(3);
       expect(
         within(headerRow).getByRole("button", { name: /Register agent/ })
           .className,
       ).toBe(outlineSmall);
       expect(
         within(headerRow).getByRole("button", { name: "See sample data" })
+          .className,
+      ).toBe(ghostSmall);
+      // Ghost too. Asking a provider to list what it has changes nothing of
+      // the organization's own, so it may not be drawn as loudly as the one
+      // control here that does.
+      expect(
+        within(headerRow).getByRole("button", { name: /Sync agents/ })
           .className,
       ).toBe(ghostSmall);
       // Being outlined is what marks the create action out now that nothing in

@@ -158,6 +158,75 @@ describe("the events one Azure cost read produces", () => {
     });
   });
 
+  /**
+   * Reads the three money fields the export is growing. `cost_usd` becomes
+   * optional here, so this reader also has to be able to see it absent.
+   */
+  const widened = (
+    event: unknown,
+  ): {
+    cost_usd?: string;
+    cost_amount?: string;
+    cost_currency?: string;
+    // Field not yet on the port (held by PR #8043 work)
+  } =>
+    event as {
+      cost_usd?: string;
+      cost_amount?: string;
+      cost_currency?: string;
+    };
+
+  describe("when the provider issued the bill in euros", () => {
+    /** @scenario "A bill the provider issued in euros is not exported as a dollar figure" */
+    it("keeps the euro amount in euros and states only Microsoft's own dollars", () => {
+      const [event] = eventsFor([
+        day({ currencyCode: "EUR", costMinor: "12.34", costUsd: "13.50" }),
+      ]);
+      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
+        string,
+        unknown
+      >;
+
+      // The euro figure, still in euros.
+      expect(hint.costUsd).toBe("12.34");
+      expect(hint.currency).toBe("EUR");
+      // The only dollar figure anywhere on the event is the one Microsoft
+      // itself published beside the native amount. Nothing here converts.
+      expect(hint.costUsdBiller).toBe("13.50");
+      expect(event?.cost_usd).toBe("13.50");
+      // And the billed amount travels beside it under a name that admits its
+      // currency, so a reader never has to guess which of the two it holds.
+      expect(widened(event).cost_amount).toBe("12.34");
+      expect(widened(event).cost_currency).toBe("EUR");
+    });
+
+    /** @scenario "A bill the provider issued in euros is not exported as a dollar figure" */
+    it("states no dollar figure at all when Microsoft published none", () => {
+      // The canonical event's money field is named for dollars and predates
+      // currencies, so a euro amount placed in it is read downstream as
+      // dollars. Nobody converted this day, so there is no dollar figure to
+      // state. A "0" would be worse than silence: it asserts both that
+      // Microsoft published a dollar figure and that the figure was nothing,
+      // and it would land in a total as a real, wrong zero. The field is
+      // absent instead, and the amount leaves in the currency it was billed
+      // in.
+      const [event] = eventsFor([
+        day({ currencyCode: "EUR", costMinor: "12.34", costUsd: null }),
+      ]);
+      const hint = event?.extra?.[PULLED_USAGE_HINT_KEY] as Record<
+        string,
+        unknown
+      >;
+
+      expect(widened(event).cost_usd).toBeUndefined();
+      // Not merely absent: absent AND still exported, in euros.
+      expect(widened(event).cost_amount).toBe("12.34");
+      expect(widened(event).cost_currency).toBe("EUR");
+      expect(hint.costUsd).toBe("12.34");
+      expect(hint.currency).toBe("EUR");
+    });
+  });
+
   describe("when the subscription is billed in dollars", () => {
     /** @scenario "The daily bill is read as the currency the customer is billed in" */
     it("carries no separate biller conversion, since the amount is already one", () => {

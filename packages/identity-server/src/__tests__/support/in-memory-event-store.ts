@@ -15,14 +15,15 @@ import { type InMemoryHeads, T0 } from "./in-memory-heads";
  * already holds, and the store absorbs them: the caller is handed the rows
  * that landed the first time, and nothing is written twice.
  *
- * That is not decoration on a double. It is the ONLY reason a retried
- * born-finalized sign-up converges on one identifier: the identifier id is
- * derived from `(user, provider, subject, value, occurredAt)` and `occurredAt`
- * is the row's own `createdAt`, so a retry a second later legitimately derives
- * a DIFFERENT identifier id. What makes the two the same fact is the command
- * id, which the entrance pins. A double that appended whatever it was handed
- * showed two identifiers whenever the two attempts straddled a second
- * boundary — a suite failing on the clock, for a convergence production has.
+ * That is not decoration on a double. It is the ONLY reason a restated
+ * attach converges on one identifier: the identifier id is derived from
+ * `(user, provider, subject, value, occurredAt)`, so a pass that restates a
+ * second later legitimately derives a DIFFERENT identifier id. What makes the
+ * two the same fact is the command id, which every restating caller pins —
+ * the backfill through `adoptUserEmailCommandId`, a ceremony through its own
+ * staged re-run. A double that appended whatever it was handed showed two
+ * identifiers whenever the two attempts straddled a second boundary — a suite
+ * failing on the clock, for a convergence production has.
  */
 export class InMemoryIdentityEventStore {
   /** `<commandId>:<index>` → the fact that landed under it. */

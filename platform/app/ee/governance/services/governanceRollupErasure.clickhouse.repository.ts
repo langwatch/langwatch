@@ -17,12 +17,21 @@
  * which days it deleted — the caller records the ones it could not rebuild
  * rather than pretending the totals are unchanged.
  *
+ * TWO TABLES, TWO METHODS. The restatement index beside the totals carries the
+ * same identifier and is NOT reached by that replay, so it needs its own step
+ * — and takes the opposite shape, an in-place overwrite, because there the
+ * column is payload and the row is worth keeping. See
+ * {@link GovernanceRollupErasureClickHouseRepository.renameActorInRestatementIndex}.
+ *
  * Spec: specs/governance/governance-identity-and-erasure.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 
-import { GOVERNANCE_COST_ROLLUP_TABLE } from "../projections/governanceCostRollup.constants";
+import {
+  GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE,
+  GOVERNANCE_COST_ROLLUP_TABLE,
+} from "../projections/governanceCostRollup.constants";
 
 const logger = createLogger("langwatch:governance:rollup-erasure");
 
@@ -121,6 +130,69 @@ export class GovernanceRollupErasureClickHouseRepository {
         logger.error(
           { error, tenantId },
           "Failed to delete erased actor rows from governance_cost_rollup_1d — the erasure is incomplete for this tenant",
+        );
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Puts the stand-in over the identifier in the restatement index, leaving
+   * every other column where it is.
+   *
+   * OVERWRITTEN RATHER THAN DELETED, which is the opposite choice from the
+   * totals above and for a reason that does not apply there. This table's whole
+   * content is an address: given a provider's restatement key, which cell that
+   * charge was filed under. Delete the row and the next reissue of that charge
+   * is filed as new spend on top of the old figure instead of recognised as a
+   * replacement, so the day quietly carries the bill twice. The identifier is
+   * PII; the day and the source are not, and they are the part worth keeping.
+   *
+   * The mutation is legal here and refused on the totals because of where the
+   * column sits: `ORDER BY (TenantId, RestatementKey)` and nothing else, so
+   * `RawActorId` is payload. It is also outside the TTL expression, so the row
+   * keeps its existing expiry.
+   *
+   * The replay does not reach this table. The rollup write files a restatement
+   * key once and skips it on every later pull, so replaying the erased days
+   * rewrites the cells under the stand-in and leaves these rows exactly as they
+   * were — which is why the identifier survives here after an erasure that
+   * looks complete everywhere else, for the full 13-month TTL.
+   *
+   * COST. `RawActorId` leads no index, so this reads every index row of the
+   * tenant. That is acceptable for an operation that runs once per erasure and
+   * must not miss a row; it would not be acceptable on a read path.
+   *
+   * `mutations_sync: "1"` for the same reason as the delete: the caller replays
+   * immediately afterwards and an asynchronous mutation could otherwise land
+   * after the replay has rewritten the cells.
+   */
+  async renameActorInRestatementIndex({
+    tenantIds,
+    rawActorId,
+    pseudonymousActorId,
+  }: {
+    tenantIds: string[];
+    rawActorId: string;
+    pseudonymousActorId: string;
+  }): Promise<void> {
+    for (const tenantId of tenantIds) {
+      const client = await this.resolveClient(tenantId);
+      try {
+        await client.exec({
+          query: `
+            ALTER TABLE ${GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE}
+            UPDATE RawActorId = {pseudonymousActorId:String}
+            WHERE TenantId = {tenantId:String}
+              AND RawActorId = {rawActorId:String}
+          `,
+          query_params: { tenantId, rawActorId, pseudonymousActorId },
+          clickhouse_settings: { mutations_sync: "1" },
+        });
+      } catch (error) {
+        logger.error(
+          { error, tenantId },
+          "Failed to overwrite the erased actor id in governance_cost_rollup_restatement_index — the erasure is incomplete for this tenant",
         );
         throw error;
       }

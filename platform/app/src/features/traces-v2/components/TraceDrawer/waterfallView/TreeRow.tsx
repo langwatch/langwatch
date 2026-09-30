@@ -12,9 +12,10 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
+import { formatDuration } from "~/shared/format/time";
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
-import { formatCost, formatDuration } from "../../../utils/formatters";
+import { formatCost } from "../../../utils/formatters";
 import { AnchorCommentButton } from "../anchoredComments/AnchorCommentButton";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { isSkillSpan } from "../transcript/skillInvocation";

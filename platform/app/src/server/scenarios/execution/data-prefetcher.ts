@@ -52,7 +52,10 @@ import {
   AgentRepository,
   type TypedAgent,
 } from "../../agents/agent.repository";
-import { parseVoiceAgentConfig } from "../../agents/voice/voice-agent.config";
+import {
+  parseVoiceAgentConfig,
+  voiceAgentExternalId,
+} from "../../agents/voice/voice-agent.config";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
@@ -63,6 +66,10 @@ import {
   findElevenLabsProviderForProject,
   getElevenLabsApiCredential,
 } from "../../gateway/elevenLabsCredential.service";
+import {
+  findTwilioProviderForProject,
+  getTwilioCredential,
+} from "../../gateway/twilioCredential.service";
 import {
   PromptService,
   type VersionedPrompt,
@@ -1025,11 +1032,54 @@ async function fetchConnectedAgentData({
 }
 
 /**
- * The child reaches an ElevenLabs voice agent with the project's provider key,
- * so the job carries the transport, the agent id on it, and the credential
- * resolved from the provider row. The agent stores no secret; the key comes
- * from the ElevenLabs model provider, and is `null` when the project has none,
- * which the child surfaces as a named failure.
+ * The transport credential a voice run carries to the child, resolved from the
+ * project's model-provider row for the target's transport. The agent stores no
+ * secret; ElevenLabs reads its API key and host, phone reads the Twilio account
+ * SID, auth token and from-number. `null` when the project has no provider row
+ * for the transport, which the child surfaces as the transport's named
+ * missing-key failure (there is no operator env for either credential).
+ */
+export async function resolveVoiceTarget({
+  projectId,
+  config,
+}: {
+  projectId: string;
+  config: ReturnType<typeof parseVoiceAgentConfig>;
+}): Promise<VoiceAgentData["voiceTarget"]> {
+  switch (config.transport) {
+    case "elevenlabs_convai": {
+      const provider = await findElevenLabsProviderForProject({ projectId });
+      const credential = provider
+        ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
+        : null;
+      return {
+        transport: "elevenlabs_convai",
+        agentId: voiceAgentExternalId(config),
+        credential: credential ? { kind: "elevenlabs", ...credential } : null,
+      };
+    }
+    case "phone": {
+      const provider = await findTwilioProviderForProject({ projectId });
+      const credential = provider
+        ? await getTwilioCredential({ modelProviderId: provider.id })
+        : null;
+      return {
+        transport: "phone",
+        agentId: voiceAgentExternalId(config),
+        credential: credential ? { kind: "twilio", ...credential } : null,
+        callDirection: config.callDirection,
+      };
+    }
+  }
+}
+
+/**
+ * The child reaches a voice agent with the project's provider credential, so
+ * the job carries the transport, the agent id on it (the ElevenLabs agent id,
+ * or the phone number for a phone target), and the credential resolved from the
+ * provider row. The agent stores no secret; the key comes from the ElevenLabs
+ * or Twilio model provider, and is `null` when the project has none, which the
+ * child surfaces as a named failure.
  */
 async function fetchVoiceAgentData({
   projectId,
@@ -1044,11 +1094,7 @@ async function fetchVoiceAgentData({
   if (agent?.type !== "voice") return null;
 
   const config = parseVoiceAgentConfig(agent.config);
-
-  const provider = await findElevenLabsProviderForProject({ projectId });
-  const credential = provider
-    ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
-    : null;
+  const voiceTarget = await resolveVoiceTarget({ projectId, config });
 
   // The SDK builds its own OpenAI client from the child's process env for the
   // caller's TTS and for the transcription the judge uses. The platform's
@@ -1071,11 +1117,7 @@ async function fetchVoiceAgentData({
   return {
     type: "voice",
     agentId: agent.id,
-    voiceTarget: {
-      transport: config.transport,
-      agentId: config.agentId,
-      credential,
-    },
+    voiceTarget,
     callerEnv,
     // The whole-call budget the child enforces and the transport clamps a turn
     // to. Read here (not in the child) so a run records the limit it started

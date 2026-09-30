@@ -301,6 +301,11 @@ export class IdentityErasureService {
         organizationId,
         discoveredPersonId,
         rawActorId: original,
+        // The same value the fold will substitute when it rebuilds these days,
+        // because both come from `erasureDigest` over the original identifier.
+        // Passed rather than re-derived so there is no second place for the two
+        // to drift apart.
+        pseudonym,
         // A previous attempt that got as far as recording a plan keeps it: by
         // now the rows it was about to delete may already be gone, so asking
         // ClickHouse again would answer "no days affected" and quietly drop the
@@ -451,20 +456,27 @@ export class IdentityErasureService {
    * resolver, which filters archived projects — one archive and this method
    * would erase nothing and report success.
    *
-   * Delete rather than edit. The identifier is part of what addresses a row, so
-   * there is no edit that removes it; the rows go, and a rebuild puts them back
-   * with the fold substituting the pseudonym on its way past.
+   * Delete rather than edit, for the totals. The identifier is part of what
+   * addresses a row, so there is no edit that removes it; the rows go, and a
+   * rebuild puts them back with the fold substituting the pseudonym on its way
+   * past.
+   *
+   * Edit rather than delete, for the note beside them. There the identifier is
+   * payload, the rest of the row is the address a later reissue of the charge
+   * is matched against, and the rebuild never revisits it.
    */
   private async eraseFromMoneyRows({
     organizationId,
     discoveredPersonId,
     rawActorId,
+    pseudonym,
     recordedRebuildSince,
     at,
   }: {
     organizationId: string;
     discoveredPersonId: string;
     rawActorId: string;
+    pseudonym: string;
     recordedRebuildSince: string | null;
     at: Date;
   }): Promise<{
@@ -506,6 +518,22 @@ export class IdentityErasureService {
     await this.deps.rollupErasure.deleteRowsCarryingActor({
       tenantIds,
       rawActorId,
+    });
+
+    // The note of where each of those charges was filed, which the rebuild
+    // below does not reach: the rollup write files a restatement key once and
+    // skips it forever after, so a replayed day rewrites the cell and leaves
+    // this row untouched. Overwritten rather than deleted — the row is what
+    // lets a later reissue of the same charge replace the old figure instead
+    // of landing on top of it, and only the identifier in it is PII.
+    //
+    // After the delete, and it does not matter which order: the two tables are
+    // independent and neither is read by the other's write. Placed here so the
+    // pending marker above still covers both.
+    await this.deps.rollupErasure.renameActorInRestatementIndex({
+      tenantIds,
+      rawActorId,
+      pseudonymousActorId: pseudonym,
     });
 
     return { affectedDays, daysNotRebuilt, rebuiltFrom };

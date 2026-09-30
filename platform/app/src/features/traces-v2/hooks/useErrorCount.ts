@@ -1,6 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 
 const FALLBACK_INTERVAL_MS = 60_000;
@@ -15,7 +15,7 @@ export function useErrorCount(): number {
   // table, that's a contradiction the UI shouldn't manufacture.
   // `debouncedTimeRange` drives all other network reads, so we use it
   // here too (avoids a refetch storm while the user drags the range).
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
 
   // SSE invalidates `tracesV2.newCount` (all args) on trace_summary_updated,
   // so this query is kept fresh without polling whenever SSE is healthy.

@@ -40,3 +40,24 @@ Feature: Governance samples respect the connected source's data
     When their cards render
     Then both measurements remain visible as zero
 
+  @unit @regression
+  Scenario: An operator-only HTTP status never reaches a customer
+    Given a listing outcome recorded with the provider's raw HTTP status
+    When a customer-facing surface is built
+    Then no customer-facing file names the status columns
+    And the customer is shown the outcome and a sentence they can act on
+
+  @unit @regression
+  Scenario: The mirror carries no sensitive value onto a customer row
+    Given a run status holding both HTTP statuses and the withheld person count
+    When the ingestion source mirror is built from it
+    Then none of the three values appear in the mirror
+    And no mirror field carries one of them under another name
+
+  @unit @regression
+  Scenario: The erasure count never rides a span
+    Given every command that exports a telemetry span
+    When its span attributes are collected
+    Then the attribute keys are exactly those declared for that command
+    And the withheld person count is not among them
+

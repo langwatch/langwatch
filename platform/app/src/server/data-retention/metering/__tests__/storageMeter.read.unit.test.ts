@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rbacMocks = vi.hoisted(() => ({ batchScopePermissions: vi.fn() }));
-vi.mock("~/server/api/rbac", () => rbacMocks);
+vi.mock("~/server/app-layer/authz/permission-adapters", () => rbacMocks);
 
 const appMocks = vi.hoisted(() => ({
   getTotalStorageBytes: vi.fn(),

@@ -20,6 +20,20 @@ Feature: Finding failed traces from the CLI
     Then only the ordinary empty-state advice appears
 
   @unit
+  Scenario: An email-shaped query that finds nothing explains redaction
+    Given a query carrying an email address
+    When the search returns no traces
+    Then the reply says email addresses are redacted before a trace is stored under the project's data privacy settings
+    And it names what to search by instead
+
+  @unit
+  Scenario: The machine document carries the hint
+    Given a query the empty result has something to say about
+    When the search returns no traces under a machine format
+    Then the document carries the same hint beside the empty list
+    And a document that holds traces carries no hint
+
+  @unit
   Scenario: Search only traces that contain an error
     Given the user wants the traces that failed
     When they search with the errors-only flag

@@ -55,6 +55,11 @@ import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
+import {
+  handleVoiceNonceRegisterMessage,
+  isVoiceNonceRegisterMessage,
+} from "./voice/voice-nonce-handoff";
+import { getVoiceNonceRegistry } from "./voice/voice-nonce-registry";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -536,6 +541,61 @@ export async function executeScenarioRun(
 }
 
 /**
+ * Wire the parent's side of the voice nonce handoff onto a spawned child:
+ * answer the child's nonce-registration IPC message by writing it into this
+ * process's registry and acking. This process is exactly the one the
+ * voice-ws-listener reads (both boot together on every worker, see
+ * worker-boot-plan.ts), so the registration and the eventual `consume()`
+ * lookup share memory by construction. Only ever called for a voice child —
+ * every other target's child has no IPC channel to listen on.
+ */
+function registerVoiceNonceHandoffListener(child: ChildProcess): void {
+  child.on("message", (message: unknown) => {
+    if (!isVoiceNonceRegisterMessage(message)) return;
+    const ack = handleVoiceNonceRegisterMessage({
+      message,
+      child,
+      registry: getVoiceNonceRegistry(),
+    });
+    child.send?.(ack);
+  });
+}
+
+/**
+ * Spawn the scenario's child process, wiring the voice nonce handoff channel
+ * (see {@link registerVoiceNonceHandoffListener}) when the target is voice.
+ * A voice target's child mints its own Twilio stream nonce and must tell the
+ * parent about it before dialling — that round trip needs a Node IPC
+ * channel, absent from every other target's plain pipe stdio. Isolated here
+ * so the voice-only stdio/IPC branching does not live in the caller.
+ */
+function spawnScenarioChild({
+  command,
+  args,
+  childEnv,
+  packageRoot,
+  isVoiceChild,
+}: {
+  command: string;
+  args: string[];
+  childEnv: NodeJS.ProcessEnv;
+  packageRoot: string;
+  isVoiceChild: boolean;
+}): ChildProcess {
+  const child: ChildProcess = spawn(command, args, {
+    env: childEnv,
+    stdio: isVoiceChild
+      ? ["pipe", "pipe", "pipe", "ipc"]
+      : ["pipe", "pipe", "pipe"],
+    cwd: packageRoot,
+  });
+  if (isVoiceChild) {
+    registerVoiceNonceHandoffListener(child);
+  }
+  return child;
+}
+
+/**
  * Spawn a child process to execute the scenario with isolated OTEL context.
  */
 async function spawnScenarioChildProcess(
@@ -582,11 +642,14 @@ async function spawnScenarioChildProcess(
       packageRoot,
       nodeEnv: process.env.NODE_ENV,
     });
+    const isVoiceChild = childProcessData.adapterData?.type === "voice";
     log("info", "Spawning scenario child process", { command, args });
-    const child: ChildProcess = spawn(command, args, {
-      env: childEnv,
-      stdio: ["pipe", "pipe", "pipe"],
-      cwd: packageRoot,
+    const child = spawnScenarioChild({
+      command,
+      args,
+      childEnv,
+      packageRoot,
+      isVoiceChild,
     });
     log("info", "Child process spawned", {
       pid: child.pid,

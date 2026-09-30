@@ -73,10 +73,26 @@ vi.mock("~/utils/api", () => {
     api: {
       governanceCost: {
         spenders: recording(undefined),
+        dailyByProvider: recording(undefined),
+        spendByModel: recording(undefined),
         summary: recording({
           unavailableReason: null,
-          billed: { amountUsd: 900, cellsWithoutAmount: 0 },
-          gateway: { amountUsd: 700, cellsWithoutAmount: 0 },
+          billed: {
+            amountUsd: 900,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 900, cellsWithoutAmount: 0 },
+            ],
+          },
+          gateway: {
+            amountUsd: 700,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 700, cellsWithoutAmount: 0 },
+            ],
+          },
           seats: { status: "awaiting_data" },
           series: [
             // Two days inside the same quarter. Drawn by day they are two
@@ -88,7 +104,7 @@ vi.mock("~/utils/api", () => {
               billedCellsWithoutAmount: 0,
               gatewayCellsWithoutAmount: 0,
               billedRevisedAt: null,
-              billedPreviousUsd: null,
+              billedByCurrency: [],
               billedProvisional: false,
             },
             {
@@ -98,7 +114,7 @@ vi.mock("~/utils/api", () => {
               billedCellsWithoutAmount: 0,
               gatewayCellsWithoutAmount: 0,
               billedRevisedAt: null,
-              billedPreviousUsd: null,
+              billedByCurrency: [],
               billedProvisional: false,
             },
           ],

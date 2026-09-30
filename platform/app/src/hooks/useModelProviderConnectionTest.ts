@@ -15,10 +15,10 @@ import { api } from "../utils/api";
  * goes out and a verdict comes back.
  *
  * The three verdicts are kept apart on purpose. "We could not check this" is
- * an answer, not a soft yes: six of the sixteen providers cannot be probed at
- * all, and a control that rendered them as working would be wrong about more
- * than a third of the list — worse than offering nothing, because the
- * customer would stop looking too.
+ * an answer, not a soft yes: a control that rendered an unchecked provider as
+ * working would be worse than offering nothing, because the customer would
+ * stop looking too. A chat provider now reaches that verdict rarely, since
+ * the check sends a real generation rather than listing models.
  */
 
 /**
@@ -57,7 +57,7 @@ const uncheckedMessage = (reason: UncheckedReason): string => {
     // already entered is the misdiagnosis this whole area exists to avoid.
     return "No credential could be read for this provider.";
   }
-  return "This provider can't be tested automatically — its settings are checked when you first use it.";
+  return "This provider can't be tested from here. Its settings are checked the first time you use it.";
 };
 
 /**

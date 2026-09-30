@@ -448,6 +448,70 @@ describe("given the one-app registration switch", () => {
     });
   });
 
+  describe("when the admin leaves the directory switch alone", () => {
+    /** @scenario "An untouched switch saves the state it was showing" */
+    it("reads the directory, because an untouched form means the default", () => {
+      const config = buildCopilotStudioDataversePullConfig(composer(REQUIRED));
+
+      // The switch renders on for a form nobody has touched, so an absent
+      // value has to mean the same thing here. Any other answer and the admin
+      // is shown a directory read the saved source does not do.
+      const parsed = copilotStudioDataversePullConfigSchema.parse(config);
+      expect(parsed.readDirectory).toBe(true);
+    });
+
+    /** @scenario "An untouched switch saves the state it was showing" */
+    it("turns the switch's string into the boolean the adapter's schema wants", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer({ ...REQUIRED, readDirectory: "true" }),
+      ) as Record<string, unknown>;
+
+      // Not just truthy: the schema is `z.boolean()`, so the string "true"
+      // reaching it unconverted fails the run rather than enabling anything.
+      expect(config.readDirectory).toBe(true);
+    });
+
+    /** @scenario "An untouched switch saves the state it was showing" */
+    it("keeps it out of parserConfig, which wins the server-side merge", () => {
+      const parserConfig = buildParserConfig(
+        composer({ ...REQUIRED, readDirectory: "true" }),
+      );
+
+      expect(parserConfig).not.toHaveProperty("readDirectory");
+    });
+  });
+
+  describe("when the admin refuses the directory read", () => {
+    /** @scenario "A refusal is saved as a refusal" */
+    it("carries the refusal through as a real false", () => {
+      const config = buildCopilotStudioDataversePullConfig(
+        composer({ ...REQUIRED, readDirectory: "false" }),
+      );
+
+      const parsed = copilotStudioDataversePullConfigSchema.parse(config);
+      expect(parsed.readDirectory).toBe(false);
+    });
+
+    /** @scenario "A refusal is saved as a refusal" */
+    it("survives being reopened on the edit form", () => {
+      // The consent here covers every user in the tenant, so a refusal that
+      // came back on because the admin edited an unrelated field is the
+      // failure this pins.
+      const seeded = seedComposerParserConfig({
+        sourceType: "copilot_studio_dataverse",
+        storedParserConfig: { readDirectory: false },
+      });
+      expect(seeded.readDirectory).toBe("false");
+
+      const config = buildCopilotStudioDataversePullConfig(
+        composer({ ...REQUIRED, readDirectory: seeded.readDirectory ?? "" }),
+      );
+
+      const parsed = copilotStudioDataversePullConfigSchema.parse(config);
+      expect(parsed.readDirectory).toBe(false);
+    });
+  });
+
   describe("when the flag would clash with the stored parserConfig", () => {
     /** @scenario "The one-app choice is saved alongside the configuration" */
     it("keeps the raw form string out of parserConfig, like the other switches", () => {

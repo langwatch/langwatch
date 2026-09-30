@@ -18,7 +18,7 @@ import { useTraceQueryArgs } from "./useTraceQueryArgs";
  */
 export function useSpanLangwatchSignals() {
   const shared = useSharedTrace();
-  const { isLive, isReady, queryArgs } = useTraceQueryArgs();
+  const { isLive, isReady, hintReady, queryArgs } = useTraceQueryArgs();
   // SSE-aware polling (see `useSpanTree` for the rationale): poll only
   // when `useTraceFreshness`'s SSE subscription isn't keeping the cache
   // fresh via invalidations.
@@ -27,7 +27,7 @@ export function useSpanLangwatchSignals() {
   );
 
   const query = api.tracesV2.spanLangwatchSignals.useQuery(queryArgs, {
-    enabled: isReady && !shared,
+    enabled: isReady && hintReady && !shared,
     staleTime: 300_000,
     gcTime: 1_800_000,
     placeholderData: keepPreviousData,

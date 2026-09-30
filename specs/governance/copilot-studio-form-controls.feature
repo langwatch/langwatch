@@ -12,7 +12,10 @@ Feature: The Copilot Studio create form reads by purpose, and one app registrati
   prepaid declaration (azure-billing-identity.feature). Secrets never
   echoing back to the browser is generic. Read seats stay in the Advanced
   group by their own documented decision — the usage group here is the
-  conversation credential, not the seats switch.
+  conversation credential, not the seats switch. The directory switch is
+  the deliberate exception to that decision and has a rule of its own
+  below: it looks like the seats switch and is not, because turning it off
+  empties the screens that name people.
 
   Everything edit-mode is out of scope: this source type is not editable
   today, and making it so is issue #7777 (the sealed-credential envelope
@@ -95,6 +98,38 @@ Feature: The Copilot Studio create form reads by purpose, and one app registrati
       And the admin typed a billing credential of its own
       When the admin saves the source with the one-app switch off
       Then the saved configuration records that two apps were chosen
+
+  Rule: The directory read is offered on the way in, and read unless refused
+
+    @unit
+    Scenario: A new source starts set to record people and departments
+      When the admin opens the form for a new source
+      Then the directory switch is on
+      And it stands among the fields the admin can see without expanding
+        anything
+      # Not in the Advanced group beside the seats switch, which it
+      # otherwise resembles. Turning this one off leaves every person and
+      # department screen empty and every agent unowned, and a choice with
+      # that consequence is made in front of the admin, not behind a
+      # collapsed heading they never opened.
+
+    @unit
+    Scenario: An untouched switch saves the state it was showing
+      Given the admin typed the conversation credential
+      When the admin saves the source without touching the directory switch
+      Then the saved configuration reads the directory
+      # The switch and the builder read one declared default. Split, the
+      # form shows a directory read that the saved source does not do.
+
+    @unit
+    Scenario: A refusal is saved as a refusal
+      Given the admin typed the conversation credential
+      And the admin turned the directory switch off
+      When the admin saves the source
+      Then the saved configuration does not read the directory
+      # The consent is real: reading the directory needs a permission that
+      # covers every user in the tenant. An admin who declines it must not
+      # find the setting back on because they never wrote anything down.
 
   Rule: The copy is made at save time, from what the form holds now
 

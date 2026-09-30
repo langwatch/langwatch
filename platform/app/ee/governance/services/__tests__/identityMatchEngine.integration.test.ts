@@ -86,6 +86,7 @@ const eraser = () =>
     rollupErasure: {
       findDaysCarryingActor: async () => [],
       deleteRowsCarryingActor: async () => {},
+      renameActorInRestatementIndex: async () => {},
     } as never,
     replay: { replaySince: async () => {} },
     replayHorizon: () => null,
@@ -579,6 +580,7 @@ describe("Feature: the match engine, against the database that holds its rules",
               },
             });
           },
+          renameActorInRestatementIndex: async () => {},
         } as never,
         replay: { replaySince: async () => {} },
         replayHorizon: () => null,

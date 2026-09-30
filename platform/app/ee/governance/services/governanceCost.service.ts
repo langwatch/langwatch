@@ -34,6 +34,10 @@
 import { DiscoveredPersonRepository } from "@ee/governance/repositories/governanceIdentity.repository";
 import type { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import type {
+  GovernanceGatewaySpendClickHouseRepository,
+  GovernanceGatewaySpendDayRow,
+} from "@ee/governance/services/governanceGatewaySpend.clickhouse.repository";
+import type {
   GovernanceOcsfEventsClickHouseRepository,
   GovernanceSeatReportRow,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
@@ -41,8 +45,13 @@ import { resolveGovProjectId } from "@ee/governance/services/govProject";
 import { noDataSinceNotice } from "@ee/governance/services/pullers/sourceHealth";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
+import type { ProjectRepository } from "~/server/app-layer/projects/repositories/project.repository";
 import {
+  nanoMinorToDecimalString,
+  nanoUsdToDecimalString,
+} from "~/server/gateway/wireMoney";
+import {
+  GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
   GOVERNANCE_SETTLING_WINDOW_DAYS,
 } from "../projections/governanceCostRollup.constants";
@@ -98,6 +107,47 @@ export interface GovernanceCostLaneDto {
    * claiming a currency it cannot support.
    */
   currenciesWithoutUsdAmount: string[];
+  /**
+   * One total per currency the lane was BILLED in, sorted by code.
+   *
+   * These REPLACE the single dollar figure rather than sitting beside it: the
+   * US dollar entry IS `amountUsd`, stated once, so a screen cannot show a
+   * withheld total next to a stated one for the same money. Money the provider
+   * priced in euros gets a line of its own instead of counting as money we
+   * hold no amount for, and NO RATE is ever applied between two lines — there
+   * is none to apply, and inventing one would put a number on the screen
+   * nobody was charged (ADR-128 §3).
+   */
+  currencyTotals: GovernanceCostCurrencyTotalDto[];
+  /**
+   * The METERED LANE ONLY: how many requests over the window carry no dollar
+   * amount — priced at zero with tokens consumed (free or unpriced, the ledger
+   * cannot tell which), or settled with the cost never confirmed.
+   *
+   * Optional because it is a gateway-only concept and the other lanes never
+   * set it. Unlike the billed lane's `cellsWithoutAmount`, a count here does
+   * NOT withhold the total: the metered lane marks instead of withholding
+   * (ADR-128), so `amountUsd` still states the priced requests and this rides
+   * beside it. The screen renders "N requests with no dollar amount" when N is
+   * above zero.
+   */
+  requestsWithoutAmount?: number;
+}
+
+/**
+ * One currency's total for a lane.
+ *
+ * `amount` is in that currency's own units and is withheld under exactly the
+ * same rule as the lane figure: any cell of the line holding no amount at all
+ * withholds the whole line, because the priced part alone reads as the
+ * complete one. Zero and "no amount at all" are written the same way in the
+ * provider's own figure, which is why the count rides beside it.
+ */
+export interface GovernanceCostCurrencyTotalDto {
+  /** ISO code, or empty for cells the provider named no currency for. */
+  currencyCode: string;
+  amount: number | null;
+  cellsWithoutAmount: number;
 }
 
 /**
@@ -160,12 +210,26 @@ export interface GovernanceCostDayDto {
    */
   billedRevisedAt: number | null;
   /**
-   * What the billed lane said this day cost before that restatement. Null when
-   * no restatement happened, and null when any cell of the day can state no
-   * prior figure — a partial "was" reads as the whole one, which is the same
-   * lie `billedUsd` refuses to tell.
+   * The billed lane's day, split by the currency it was billed in, and what
+   * each currency held immediately before `billedRevisedAt`.
+   *
+   * There is no single prior dollar figure any more, and that is the point: a
+   * day reissued between two currencies that are not dollars has nothing such
+   * a field could say, which is the case this whole batch exists to get right.
+   * Each line's `previousAmount` is withheld under the same rule the figure
+   * beside it is — a partial "was" reads as the whole one — and is null rather
+   * than zero when the currency simply was not on this day before the
+   * revision.
    */
-  billedPreviousUsd: number | null;
+  billedByCurrency: GovernanceCostDayCurrencyLineDto[];
+  /**
+   * Currencies whose spend the day's dollar figure LEAVES OUT, sorted.
+   *
+   * Needed because a mixed day now shows a dollar figure that is only part of
+   * the day: money the provider priced in euros no longer withholds it. Left
+   * unsaid, the bar would read as the day's total.
+   */
+  billedCurrenciesWithoutUsdAmount: string[];
   /**
    * Whether the day is still inside its settling window, i.e. a pull touched
    * it recently enough that the provider may still move it (§15).
@@ -176,6 +240,24 @@ export interface GovernanceCostDayDto {
    * independent facts and the common case is both.
    */
   billedProvisional: boolean;
+}
+
+/**
+ * One currency of one billed day: what it holds, and what it held immediately
+ * before the day's latest revision.
+ *
+ * Amounts are in the currency's own units. Two lines are never added together
+ * and no rate is applied between them.
+ */
+export interface GovernanceCostDayCurrencyLineDto {
+  currencyCode: string;
+  amount: number | null;
+  /**
+   * Null when the currency names no earlier amount — either it was not on this
+   * day before the revision at all, or part of what the line covers can state
+   * no prior figure and a partial "was" is withheld whole.
+   */
+  previousAmount: number | null;
 }
 
 /**
@@ -280,6 +362,82 @@ export interface GovernanceSpenderRowDto {
   cellsWithoutAmount: number;
 }
 
+/**
+ * One (day, provider) figure of the billed lane.
+ *
+ * A separate figure per pair, never one for the day and one for the provider:
+ * the whole point is to say which provider a day belongs to.
+ */
+export interface GovernanceCostProviderDayRowDto {
+  /** `YYYY-MM-DD`, the provider's business day in UTC. */
+  day: string;
+  provider: string;
+  /** Withheld (null) unless every cell behind it holds an amount. */
+  amountUsd: number | null;
+  cellsWithoutAmount: number;
+  /**
+   * Currencies this figure leaves out: cells that hold an amount the provider
+   * billed, with no dollar conversion to add into the sum. A short figure with
+   * `cellsWithoutAmount: 0` is explained here and nowhere else. Empty when the
+   * figure is whole. At most a handful, sampled — see the read's limit.
+   */
+  currenciesWithoutUsdAmount: string[];
+}
+
+export interface GovernanceCostProviderDayBreakdownDto {
+  unavailableReason: GovernanceCostUnavailableReason | null;
+  /** Oldest day first, provider-alphabetical within a day. Empty while unavailable. */
+  rows: GovernanceCostProviderDayRowDto[];
+  windowDays: number;
+}
+
+/**
+ * One model's spend over the window.
+ *
+ * The model string is repeated EXACTLY as the provider billed it. A provider
+ * that charges per token kind sends a line item rather than a bare model name,
+ * and the puller stores it unsplit on purpose; re-cutting it here would invent
+ * a grouping the bill does not make and merge two figures a reader may need
+ * apart.
+ */
+export interface GovernanceCostModelRowDto {
+  /** Empty when the provider's rows named no model. */
+  model: string;
+  /** Withheld (null) unless every cell behind it is priced in USD. */
+  amountUsd: number | null;
+  cellsWithoutAmount: number;
+}
+
+export interface GovernanceCostModelBreakdownDto {
+  unavailableReason: GovernanceCostUnavailableReason | null;
+  /** Largest spend first; withheld figures last. Empty while unavailable. */
+  rows: GovernanceCostModelRowDto[];
+  windowDays: number;
+}
+
+/**
+ * One record behind a (day, provider) figure: what it was for and what it
+ * cost.
+ *
+ * Two facts and no third. The screen asked for what a charge was for and what
+ * it came to, and every extra dimension offered here is one a reader has to
+ * decide to ignore.
+ */
+export interface GovernanceCostDayRecordDto {
+  /** The model, and the agent beside it when the provider named one. */
+  label: string;
+  amountUsd: number | null;
+  cellsWithoutAmount: number;
+  /** As on the figure above it — see {@link GovernanceCostProviderDayRowDto}. */
+  currenciesWithoutUsdAmount: string[];
+}
+
+export interface GovernanceCostDayRecordsDto {
+  unavailableReason: GovernanceCostUnavailableReason | null;
+  /** Largest figure first, withheld ones after. Empty while unavailable. */
+  records: GovernanceCostDayRecordDto[];
+}
+
 export interface GovernanceSpenderBreakdownDto {
   unavailableReason: GovernanceCostUnavailableReason | null;
   /**
@@ -299,6 +457,7 @@ function laneWithoutFigure(): GovernanceCostLaneDto {
     amountUsd: null,
     cellsWithoutAmount: 0,
     currenciesWithoutUsdAmount: [],
+    currencyTotals: [],
   };
 }
 
@@ -346,6 +505,19 @@ export class GovernanceCostService {
        * what awaiting says.
        */
       ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
+      /**
+       * The metered lane's source: the gateway's own per-request ledger.
+       * `undefined` on the same deployment the rollup is absent from, and the
+       * metered lane then holds no figure — the screen is already UNAVAILABLE
+       * for want of a cost store, so the lane never has to stand on its own.
+       */
+      gatewaySpend: GovernanceGatewaySpendClickHouseRepository | undefined;
+      /**
+       * Where the metered lane's tenant scope comes from: every project of
+       * the organization, since `gateway_spend.TenantId` is the traffic's own
+       * project id rather than the hidden governance tenant.
+       */
+      projects: ProjectRepository;
     },
   ) {}
 
@@ -353,12 +525,22 @@ export class GovernanceCostService {
     prisma,
     costRollup,
     ocsfEvents,
+    gatewaySpend,
+    projects,
   }: {
     prisma: PrismaClient;
     costRollup: GovernanceCostRollupClickHouseRepository | undefined;
     ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
+    gatewaySpend: GovernanceGatewaySpendClickHouseRepository | undefined;
+    projects: ProjectRepository;
   }): GovernanceCostService {
-    return new GovernanceCostService({ prisma, costRollup, ocsfEvents });
+    return new GovernanceCostService({
+      prisma,
+      costRollup,
+      ocsfEvents,
+      gatewaySpend,
+      projects,
+    });
   }
 
   /**
@@ -376,7 +558,7 @@ export class GovernanceCostService {
     windowDays: number;
     now?: Date;
   }): Promise<GovernanceCostSummaryDto> {
-    const { costRollup, prisma } = this.deps;
+    const { costRollup, prisma, projects } = this.deps;
     if (!costRollup) {
       return unavailable({ reason: "no_cost_store", windowDays });
     }
@@ -387,6 +569,16 @@ export class GovernanceCostService {
     if (!tenantId) {
       return unavailable({ reason: "no_governance_project", windowDays });
     }
+
+    // The metered lane reads the gateway's per-request ledger, which is keyed
+    // by the traffic's own PROJECT tenant, not the hidden governance tenant
+    // the rollup reads under. So it is scoped to every project of the
+    // organization, archived ones included — the one place the two lanes'
+    // tenant scopes differ, and the whole reason the metered lane used to
+    // read empty.
+    const gatewayTenantIds = await projects.findAllIdsByOrganization({
+      organizationId,
+    });
 
     const toDay = utcDay(now);
     const fromDay = utcDay(
@@ -401,15 +593,45 @@ export class GovernanceCostService {
     // still fails the whole summary: this screen is about money, and a money
     // lane that swallowed its own failure would render an absence as a
     // measurement.
-    const [rows, seats, staleSources, azureBilling, unpricedWindow, providers] =
-      await Promise.all([
-        costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
-        this.readSeats({ tenantId }),
-        this.readStaleSources({ organizationId }),
-        this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
-        this.readUnpricedWindow({ organizationId }),
-        costRollup.sumWindowByProvider({ tenantId, fromDay, toDay }),
-      ]);
+    const [
+      rows,
+      gatewayDays,
+      seats,
+      staleSources,
+      azureBilling,
+      unpricedWindow,
+      providers,
+      billedCurrencies,
+    ] = await Promise.all([
+      // PULLED ONLY. The metered lane no longer lives in the rollup, and the
+      // fold's leftover gateway rows must be read by nothing — so the billed
+      // day series asks for pulled rows by predicate, not by a filter the
+      // caller could forget.
+      costRollup.sumDaysByLane({
+        tenantId,
+        fromDay,
+        toDay,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      }),
+      this.readGatewayDays({ tenantIds: gatewayTenantIds, fromDay, toDay }),
+      this.readSeats({ tenantId }),
+      this.readStaleSources({ organizationId }),
+      this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
+      this.readUnpricedWindow({ organizationId }),
+      costRollup.sumWindowByProvider({ tenantId, fromDay, toDay }),
+      // The billed lane's currency lines come from their OWN window read
+      // rather than from folding the day rows, because the lane's headline
+      // does too. Both describe the same snapshot that way, which is the
+      // guarantee the read below the comment is about; folding one from days
+      // and reading the other from the window would let a backfill land
+      // between them and put two answers for the same money on one card.
+      costRollup.sumWindowByCurrency({
+        tenantId,
+        fromDay,
+        toDay,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      }),
+    ]);
 
     return {
       unavailableReason: null,
@@ -422,19 +644,49 @@ export class GovernanceCostService {
             providers.flatMap((row) => row.currenciesWithoutUsdAmount),
           ),
         ].sort(),
+        currencyTotals: currencyTotalsFrom(billedCurrencies),
       },
       providers: providers.map((row) => ({
         provider: row.provider,
         ...spenderFigure([row]),
       })),
-      gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
+      gateway: gatewayLaneFrom(gatewayDays),
       azureBilling,
       seats,
-      series: seriesFrom(rows, now),
+      series: seriesFrom(rows, gatewayDays, now),
       windowDays,
       staleSources,
       unpricedWindow,
     };
+  }
+
+  /**
+   * The metered lane's days from the gateway ledger, or none when the ledger
+   * store is absent.
+   *
+   * A broken ledger read fails here, not silently: the metered lane is money,
+   * and a lane that swallowed its own failure would render an absence as a
+   * measurement — the same rule the pulled read at the top of `summary` obeys.
+   * The absent-store case is different: no gateway repository means no cost
+   * store at all, and the screen is already UNAVAILABLE for that reason, so
+   * this simply reports no metered days rather than inventing a zero.
+   */
+  private async readGatewayDays({
+    tenantIds,
+    fromDay,
+    toDay,
+  }: {
+    tenantIds: string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GovernanceGatewaySpendDayRow[]> {
+    const { gatewaySpend } = this.deps;
+    if (!gatewaySpend) return [];
+    return gatewaySpend.sumDaysForOrganizationProjects({
+      tenantIds,
+      fromDay,
+      toDay,
+    });
   }
 
   /**
@@ -521,6 +773,200 @@ export class GovernanceCostService {
     }
 
     return { unavailableReason: null, rows, windowDays };
+  }
+
+  /**
+   * The billed lane split by day AND provider over the window.
+   *
+   * The screen could already say what a provider cost over a quarter, and what
+   * the organization spent on a given day. It could not say which provider
+   * caused a day that stood out, which is the first question anybody asks of a
+   * day that stood out.
+   *
+   * Each figure obeys the same withholding rule as every other on this screen:
+   * a (day, provider) holding any cell we have no amount for states no figure,
+   * because the priced part alone reads as the whole one and the reader has no
+   * way to see it is short.
+   */
+  async dailyByProvider({
+    organizationId,
+    windowDays,
+    now = new Date(),
+  }: {
+    organizationId: string;
+    windowDays: number;
+    now?: Date;
+  }): Promise<GovernanceCostProviderDayBreakdownDto> {
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) {
+      return { unavailableReason: "no_cost_store", rows: [], windowDays };
+    }
+    const tenantId = await resolveGovProjectId({ prisma, organizationId });
+    if (!tenantId) {
+      return {
+        unavailableReason: "no_governance_project",
+        rows: [],
+        windowDays,
+      };
+    }
+
+    const toDay = utcDay(now);
+    const fromDay = utcDay(
+      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
+    );
+    const groups = await costRollup.sumDaysByProvider({
+      tenantId,
+      fromDay,
+      toDay,
+    });
+
+    return {
+      unavailableReason: null,
+      rows: groups.map((group) => ({
+        day: group.day,
+        provider: group.provider,
+        ...spenderFigure([group]),
+      })),
+      windowDays,
+    };
+  }
+
+  /**
+   * The billed lane split by MODEL over the window, largest first.
+   *
+   * This panel used to read the metered trace store, which in a deployment
+   * whose only money arrives on pulled bills holds nothing — so a screen with
+   * a fully populated `Model` column sat there reporting "nothing in this
+   * window yet". Same rollup as every other figure on this screen now — but
+   * NOT the same withholding rule: this read withholds on a cell with no USD
+   * amount, the billed lane beside it only on a cell with no amount in any
+   * currency, so a window holding one euro cell shows a withheld model list
+   * next to a lane that states a figure. `sumWindowByModel`
+   * (governanceCostRollup.clickhouse.repository) carries why the model read
+   * keeps the stricter rule.
+   *
+   * Ordered by spend rather than alphabetically, because the panel is a ranked
+   * list and the question it answers is which model costs the most. A withheld
+   * figure sorts last: it is not a small number, it is an unknown one, and
+   * putting it at the top or in the middle would read as a measurement.
+   *
+   * Each figure obeys that stricter rule: a model holding any cell we have no
+   * USD amount for states no figure, because the priced part alone reads as
+   * the whole one.
+   */
+  async spendByModel({
+    organizationId,
+    windowDays,
+    now = new Date(),
+  }: {
+    organizationId: string;
+    windowDays: number;
+    now?: Date;
+  }): Promise<GovernanceCostModelBreakdownDto> {
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) {
+      return { unavailableReason: "no_cost_store", rows: [], windowDays };
+    }
+    const tenantId = await resolveGovProjectId({ prisma, organizationId });
+    if (!tenantId) {
+      return {
+        unavailableReason: "no_governance_project",
+        rows: [],
+        windowDays,
+      };
+    }
+
+    const toDay = utcDay(now);
+    const fromDay = utcDay(
+      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
+    );
+    const groups = await costRollup.sumWindowByModel({
+      tenantId,
+      fromDay,
+      toDay,
+    });
+
+    const rows = groups.map((group) => ({
+      model: group.model,
+      ...spenderFigure([group]),
+    }));
+    // Sorted here rather than in SQL: the ordering is over the WITHHELD figure,
+    // which only exists once the withholding rule has been applied, and that
+    // rule lives in this layer.
+    rows.sort((left, right) => {
+      if (left.amountUsd === null && right.amountUsd === null) {
+        return left.model.localeCompare(right.model);
+      }
+      if (left.amountUsd === null) return 1;
+      if (right.amountUsd === null) return -1;
+      if (right.amountUsd !== left.amountUsd) {
+        return right.amountUsd - left.amountUsd;
+      }
+      // Ties broken by name so the list does not reshuffle between reads.
+      return left.model.localeCompare(right.model);
+    });
+
+    return { unavailableReason: null, rows, windowDays };
+  }
+
+  /**
+   * The records behind ONE PERIOD at ONE provider: what each was for, and what
+   * it cost.
+   *
+   * "What it was for" is the model, and the agent beside it when the provider
+   * named one — those are the dimensions the figure was grouped by, so the
+   * records add up to exactly the figure a reader clicked and no residue is
+   * left over for them to wonder about.
+   *
+   * A PERIOD, not a day: the screen this answers has no day interval to offer
+   * — month, quarter and year are the widths its Time Interval chip carries —
+   * so the bar a reader clicks always covers a span. The span arrives already
+   * resolved to its first and last day, because the fold that decided where
+   * one period ends and the next begins lives on the screen and there is no
+   * second copy of that arithmetic here to disagree with it.
+   */
+  async periodRecords({
+    organizationId,
+    fromDay,
+    toDay,
+    provider,
+  }: {
+    organizationId: string;
+    /** `YYYY-MM-DD`, the period's first day in UTC, included. */
+    fromDay: string;
+    /** `YYYY-MM-DD`, the period's last day in UTC, included. */
+    toDay: string;
+    provider: string;
+  }): Promise<GovernanceCostDayRecordsDto> {
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) {
+      return { unavailableReason: "no_cost_store", records: [] };
+    }
+    const tenantId = await resolveGovProjectId({ prisma, organizationId });
+    if (!tenantId) {
+      return { unavailableReason: "no_governance_project", records: [] };
+    }
+
+    const groups = await costRollup.sumPeriodRecordsByProvider({
+      tenantId,
+      fromDay,
+      toDay,
+      provider,
+    });
+
+    return {
+      unavailableReason: null,
+      records: groups
+        .map((group) => ({
+          label: recordLabel(group),
+          ...spenderFigure([group]),
+        }))
+        .sort(
+          (a, b) =>
+            (b.amountUsd ?? -1) - (a.amountUsd ?? -1) ||
+            a.label.localeCompare(b.label),
+        ),
+    };
   }
 
   private readonly people = new DiscoveredPersonRepository();
@@ -612,9 +1058,25 @@ export class GovernanceCostService {
         errorCount: source.errorCount,
         lastSuccessAt: source.lastSuccessAt,
       });
-      return notice
-        ? [{ name: source.name, lastSuccessIso: notice.lastSuccessIso }]
-        : [];
+      // The notice has two shapes, and this guard is a FENCE FOR LATER rather
+      // than a filter doing work today: the call above passes neither
+      // `completeness` nor `readThroughAt`, so the read-through shape is
+      // currently unreachable from here and every non-null notice names a last
+      // success.
+      //
+      // It stays because the day someone selects those two columns and passes
+      // them through -- which is a one-line change and an obvious one to make
+      // -- the read-through point would otherwise land in a field called
+      // "oldest last success" and date an outage from a run that never failed.
+      // A page-capped run did not fail. That is a wrong answer wearing the
+      // shape of a right one, which survives review far better than a crash.
+      //
+      // The sources screen already reports the read-through point in its own
+      // words. Whether this screen should say anything separate about a
+      // half-read source is deliberately unanswered: no scenario asks for it,
+      // and inventing the sentence would commit us to a meaning nobody agreed.
+      if (notice === null || !("lastSuccessIso" in notice)) return [];
+      return [{ name: source.name, lastSuccessIso: notice.lastSuccessIso }];
     });
     if (stopped.length === 0) return null;
 
@@ -762,18 +1224,17 @@ function seatsFrom(
     : { status: "awaiting_data" };
 }
 
-type LaneRow = {
-  day: string;
-  costSource: string;
-  amountNanoUsd: number | null;
-  cellsWithoutAmount: number;
-  currenciesWithoutUsdAmount: string[];
-  /** Unix SECONDS — see the repository; these two are `DateTime` columns. */
-  revisedAt: number | null;
-  previousAmountNanoUsd: number | null;
-  cellsWithoutPreviousAmount: number;
-  lastObservedAt: number;
-};
+/**
+ * One (day, lane) row, exactly as the repository answers it.
+ *
+ * DERIVED rather than restated. It used to be a hand-written mirror of the
+ * repository's return type, which is a second place to remember: a field added
+ * to the read landed here as a compile error only if somebody thought to
+ * copy it, and a field whose meaning changed would not have shown up at all.
+ */
+type LaneRow = Awaited<
+  ReturnType<GovernanceCostRollupClickHouseRepository["sumDaysByLane"]>
+>[number];
 
 /**
  * Nano-USD to the dollar figure the screen renders, or null.
@@ -839,6 +1300,29 @@ type SpenderGroup = Awaited<
   ReturnType<GovernanceCostRollupClickHouseRepository["sumWindowBySpender"]>
 >[number];
 
+/**
+ * What one record was for, in the provider's own words.
+ *
+ * The model alone when that is all the provider named, and "model (agent)"
+ * when it named both — one spender spends through several agents and a list
+ * showing the model twice with two different figures reads as a bug. Neither
+ * is translated or prettified here: a reader matches this against the
+ * provider's own invoice, and a name we improved is a name that no longer
+ * matches.
+ */
+function recordLabel({
+  model,
+  agentId,
+}: {
+  model: string;
+  agentId: string;
+}): string {
+  if (model === "" && agentId === "") return "Not named";
+  if (agentId === "") return model;
+  if (model === "") return agentId;
+  return `${model} (${agentId})`;
+}
+
 /** NUL never appears in a provider name, so the key cannot be forged by an id. */
 function spenderKey(provider: string, rawActorId: string): string {
   return `${provider}\u0000${rawActorId}`;
@@ -848,20 +1332,44 @@ function spenderKey(provider: string, rawActorId: string): string {
  * A spender row's figure, under the same withholding rule as every lane
  * total (`figureFor`): any unpriced cell withholds the whole figure, because
  * the priced part alone reads as the complete one.
+ *
+ * The currencies come out beside the figure and NOT folded into the count,
+ * because they are the other half of "why is this short" and the two halves
+ * are different failures. A cell with no amount in any currency is spend we
+ * could not price at all; a cell billed in euros with no conversion is spend
+ * we can see and cannot add. A figure can be short for either reason, and the
+ * reader can only act on the second one.
  */
 function spenderFigure(
-  rows: readonly Pick<SpenderGroup, "amountNanoUsd" | "cellsWithoutAmount">[],
+  rows: readonly (Pick<SpenderGroup, "amountNanoUsd" | "cellsWithoutAmount"> & {
+    /**
+     * Optional because `sumWindowBySpender` does not select it. Not because
+     * spender rows cannot be short for this reason — they can — but because
+     * the spender panel has nowhere to say so, and a column read to be
+     * discarded is a cost with no reader. Add it there when that panel grows
+     * a place to put it.
+     */
+    currenciesWithoutUsdAmount?: readonly string[];
+  })[],
 ): {
   amountUsd: number | null;
   cellsWithoutAmount: number;
+  currenciesWithoutUsdAmount: string[];
 } {
   const withoutAmount = rows.reduce(
     (count, row) => count + row.cellsWithoutAmount,
     0,
   );
+  const currencies = [
+    ...new Set(rows.flatMap((row) => row.currenciesWithoutUsdAmount ?? [])),
+  ].sort();
   const priced = rows.filter((row) => row.amountNanoUsd !== null);
   if (priced.length === 0) {
-    return { amountUsd: null, cellsWithoutAmount: withoutAmount };
+    return {
+      amountUsd: null,
+      cellsWithoutAmount: withoutAmount,
+      currenciesWithoutUsdAmount: currencies,
+    };
   }
   const totalNanoUsd = priced.reduce(
     (sum, row) => sum + BigInt(row.amountNanoUsd ?? 0),
@@ -870,6 +1378,7 @@ function spenderFigure(
   return {
     amountUsd: usdFigure({ totalNanoUsd, cellsWithoutAmount: withoutAmount }),
     cellsWithoutAmount: withoutAmount,
+    currenciesWithoutUsdAmount: currencies,
   };
 }
 
@@ -913,27 +1422,182 @@ function previousFigureFor(row: LaneRow): number | null {
 }
 
 /**
- * One lane's window total.
+ * One figure in a currency that may not be dollars, under the same withholding
+ * rule every other figure on this screen obeys.
  *
- * A lane with no rows at all, a lane whose every row holds no figure, and a
- * lane holding a mix all come back null; `cellsWithoutAmount` is what tells
- * the three apart, and the currencies say what the unpriced part was billed
- * in.
+ * `nanoMinorToDecimalString` rather than the USD one because nothing about the
+ * arithmetic is dollar-specific — the stored unit is nano of the currency's
+ * major unit either way — and calling the USD function would be a claim about
+ * the currency in the name of a value that is not in it.
  */
-function totalFor(
-  rows: readonly LaneRow[],
-  costSource: string,
+function minorFigure({
+  totalNanoMinor,
+  cellsWithoutAmount,
+}: {
+  totalNanoMinor: number | null;
+  cellsWithoutAmount: number;
+}): number | null {
+  if (cellsWithoutAmount > 0 || totalNanoMinor === null) return null;
+  return Number(nanoMinorToDecimalString(BigInt(totalNanoMinor)));
+}
+
+/** The lane's per-currency window totals, as the per-currency read answers them. */
+function currencyTotalsFrom(
+  rows: readonly {
+    currencyCode: string;
+    amountNanoMinor: number | null;
+    cellsWithoutAmount: number;
+  }[],
+): GovernanceCostCurrencyTotalDto[] {
+  return rows
+    .map((row) => ({
+      currencyCode: row.currencyCode,
+      amount: minorFigure({
+        totalNanoMinor: row.amountNanoMinor,
+        cellsWithoutAmount: row.cellsWithoutAmount,
+      }),
+      cellsWithoutAmount: row.cellsWithoutAmount,
+    }))
+    .sort((a, b) => a.currencyCode.localeCompare(b.currencyCode));
+}
+
+/**
+ * The billed day's currency lines, and what each held before its revision.
+ *
+ * A day whose read answers no currency lines at all falls back to the single
+ * US dollar line the day-level figures already describe. That is not a shape
+ * the store produces — a day that holds cells holds at least one currency —
+ * but a day read through anything that answers only the day-level fields
+ * still holds dollars, and a card with no line at all would say the day held
+ * nothing.
+ */
+function dayCurrencyLinesFrom(
+  row: LaneRow,
+): GovernanceCostDayCurrencyLineDto[] {
+  if (row.byCurrency.length === 0) {
+    return [
+      {
+        currencyCode: GOVERNANCE_COST_CURRENCY_USD,
+        amount: figureFor([row]),
+        previousAmount: previousFigureFor(row),
+      },
+    ];
+  }
+  return row.byCurrency.map((line) => ({
+    currencyCode: line.currencyCode,
+    amount: minorFigure({
+      totalNanoMinor: line.amountNanoMinor,
+      cellsWithoutAmount: line.cellsWithoutAmount,
+    }),
+    // A day nobody revised names no earlier amount on any of its lines: there
+    // is no moment to have held something before, and the marker that would
+    // carry it is not rendered anyway.
+    previousAmount:
+      row.revisedAt === null
+        ? null
+        : minorFigure({
+            totalNanoMinor: line.previousAmountNanoMinor,
+            cellsWithoutAmount: line.cellsWithoutPreviousAmount,
+          }),
+  }));
+}
+
+/**
+ * Whether a set of metered requests supports a dollar figure at all.
+ *
+ * THE RULE, applied to a day and to the window alike: the figure stands when
+ * at least one charged request was priced, or when requests were charged and
+ * none of them lacks an amount — every charged request priced at zero with
+ * nothing consumed, so nothing was spent and nothing is unknown, and $0.00 is
+ * honest. Otherwise null: no charged request at all (a day of only settled
+ * requests), or charged requests that are ALL in the unpriced count (priced
+ * at zero with tokens consumed — free or unpriced, the ledger cannot tell
+ * which). In that last case the zero sum is not a measurement, and a "$0.00"
+ * beside "N requests with no dollar amount" would claim free where the ledger
+ * says unknown.
+ *
+ * `pricedRequestCount` is the ledger's own count, never charged minus
+ * unpriced: the unpriced count also holds settled requests, which are not
+ * charged.
+ */
+function gatewayFigureStands(counts: {
+  requestCount: number;
+  pricedRequestCount: number;
+  requestsWithoutAmount: number;
+}): boolean {
+  if (counts.pricedRequestCount > 0) return true;
+  return counts.requestCount > 0 && counts.requestsWithoutAmount === 0;
+}
+
+/**
+ * A day's metered figure, or null when the day cannot state one.
+ *
+ * Null by the rule in `gatewayFigureStands`: no charged request, or charged
+ * requests the ledger could not price. When the figure stands, the sum is
+ * shown even at zero, and the requests carrying no dollar amount are the
+ * marker beside it, never a reason to withhold it.
+ */
+function gatewayDayUsd(day: GovernanceGatewaySpendDayRow): number | null {
+  if (!gatewayFigureStands(day)) return null;
+  return Number(nanoUsdToDecimalString(BigInt(day.amountNanoUsd)));
+}
+
+/**
+ * The metered lane's window total, from the gateway ledger's days.
+ *
+ * DELIBERATE DEVIATION from the billed lane's withhold rule (ADR-128): a
+ * request with no dollar amount is COUNTED beside the total, never allowed to
+ * withhold it. The ledger names exactly what is left out — the count is the
+ * caveat — where the billed lane's unpriced cell hides an unknown share of a
+ * bill and so withholds. So `cellsWithoutAmount` is always 0 here (the gateway
+ * withholds nothing) and `requestsWithoutAmount` carries the count instead.
+ *
+ * `amountUsd` is null by the rule in `gatewayFigureStands`, applied to the
+ * window's summed counts: no charged request at all, or charged requests the
+ * ledger could not price — a window of only such requests has an unknown
+ * cost, not a zero one.
+ */
+function gatewayLaneFrom(
+  days: readonly GovernanceGatewaySpendDayRow[],
 ): GovernanceCostLaneDto {
-  const lane = rows.filter((row) => row.costSource === costSource);
+  const requestCount = days.reduce((n, day) => n + day.requestCount, 0);
+  const pricedRequestCount = days.reduce(
+    (n, day) => n + day.pricedRequestCount,
+    0,
+  );
+  const requestsWithoutAmount = days.reduce(
+    (n, day) => n + day.requestsWithoutAmount,
+    0,
+  );
+  // Each day is guarded to the safe integer range at the repository; the
+  // BigInt fold, per ADR-128 §3, keeps the window sum exact when the days
+  // together pass 2^53 nano-USD.
+  const totalNanoUsd = days.reduce(
+    (sum, day) => sum + BigInt(day.amountNanoUsd),
+    0n,
+  );
+  const amountUsd = gatewayFigureStands({
+    requestCount,
+    pricedRequestCount,
+    requestsWithoutAmount,
+  })
+    ? Number(nanoUsdToDecimalString(totalNanoUsd))
+    : null;
   return {
-    amountUsd: figureFor(lane),
-    cellsWithoutAmount: lane.reduce(
-      (count, row) => count + row.cellsWithoutAmount,
-      0,
-    ),
-    currenciesWithoutUsdAmount: [
-      ...new Set(lane.flatMap((row) => row.currenciesWithoutUsdAmount)),
-    ].sort(),
+    amountUsd,
+    cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
+    currencyTotals:
+      amountUsd === null
+        ? []
+        : [
+            {
+              currencyCode: GOVERNANCE_COST_CURRENCY_USD,
+              amount: amountUsd,
+              cellsWithoutAmount: 0,
+            },
+          ],
+    requestsWithoutAmount,
   };
 }
 
@@ -951,46 +1615,62 @@ function totalFor(
  */
 function seriesFrom(
   rows: readonly LaneRow[],
+  gatewayDays: readonly GovernanceGatewaySpendDayRow[],
   now: Date,
 ): GovernanceCostDayDto[] {
   const byDay = new Map<string, GovernanceCostDayDto>();
-  for (const row of rows) {
-    const entry = byDay.get(row.day) ?? {
-      day: row.day,
+  const entryFor = (day: string): GovernanceCostDayDto => {
+    const existing = byDay.get(day);
+    if (existing) return existing;
+    const fresh: GovernanceCostDayDto = {
+      day,
       billedUsd: null,
       gatewayUsd: null,
       billedCellsWithoutAmount: 0,
       gatewayCellsWithoutAmount: 0,
       billedRevisedAt: null,
-      billedPreviousUsd: null,
+      billedByCurrency: [],
+      billedCurrenciesWithoutUsdAmount: [],
       billedProvisional: false,
     };
-    if (row.costSource === GOVERNANCE_COST_SOURCE.PULLED) {
-      entry.billedUsd = figureFor([row]);
-      entry.billedCellsWithoutAmount = row.cellsWithoutAmount;
-      entry.billedRevisedAt =
-        row.revisedAt === null ? null : row.revisedAt * 1000;
-      entry.billedPreviousUsd = previousFigureFor(row);
-      // The settling window is per SOURCE, and this row spans every source the
-      // billed lane holds that day. Every source runs on the default today —
-      // only Anthropic's window has been measured, and the rest are provisional
-      // constants until they are — so the default is exactly right here rather
-      // than an approximation. It stops being so the day a source is measured
-      // to differ, and that is the day this read has to group by source.
-      entry.billedProvisional = isWithinSettlingWindow({
-        lastObservedAtSeconds: row.lastObservedAt,
-        windowDays: GOVERNANCE_SETTLING_WINDOW_DAYS,
-        now,
-      });
-    } else if (row.costSource === GOVERNANCE_COST_SOURCE.GATEWAY) {
-      entry.gatewayUsd = figureFor([row]);
-      entry.gatewayCellsWithoutAmount = row.cellsWithoutAmount;
-      // The gateway lane is EXEMPT from both markers (§15). We metered these
-      // rows ourselves in real time and no provider restates them, so "can
-      // still move" on the product's most-viewed and most-final numbers would
-      // be a warning about a thing that cannot happen.
-    }
-    byDay.set(row.day, entry);
+    byDay.set(day, fresh);
+    return fresh;
+  };
+
+  // The billed lane, from the pulled rollup. The read is already pulled-only,
+  // so a leftover gateway row cannot reach here — but the guard stays, so a
+  // future unfiltered caller cannot quietly fold gateway money into the billed
+  // series.
+  for (const row of rows) {
+    if (row.costSource !== GOVERNANCE_COST_SOURCE.PULLED) continue;
+    const entry = entryFor(row.day);
+    entry.billedUsd = figureFor([row]);
+    entry.billedCellsWithoutAmount = row.cellsWithoutAmount;
+    entry.billedRevisedAt =
+      row.revisedAt === null ? null : row.revisedAt * 1000;
+    entry.billedByCurrency = dayCurrencyLinesFrom(row);
+    entry.billedCurrenciesWithoutUsdAmount = row.currenciesWithoutUsdAmount;
+    // The settling window is per SOURCE, and this row spans every source the
+    // billed lane holds that day. Every source runs on the default today —
+    // only Anthropic's window has been measured, and the rest are provisional
+    // constants until they are — so the default is exactly right here rather
+    // than an approximation. It stops being so the day a source is measured to
+    // differ, and that is the day this read has to group by source.
+    entry.billedProvisional = isWithinSettlingWindow({
+      lastObservedAtSeconds: row.lastObservedAt,
+      windowDays: GOVERNANCE_SETTLING_WINDOW_DAYS,
+      now,
+    });
   }
+
+  // The metered lane, from the gateway ledger. EXEMPT from both §15 markers:
+  // we metered these ourselves in real time and no provider restates them, so
+  // "can still move" on the product's most-viewed and most-final numbers would
+  // be a warning about a thing that cannot happen. The lane never withholds a
+  // day's figure, so `gatewayCellsWithoutAmount` stays zero.
+  for (const day of gatewayDays) {
+    entryFor(day.day).gatewayUsd = gatewayDayUsd(day);
+  }
+
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
 }

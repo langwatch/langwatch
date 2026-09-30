@@ -29,7 +29,11 @@ const laneDay = (
     billedCellsWithoutAmount: number;
     gatewayCellsWithoutAmount: number;
     billedRevisedAt: number | null;
-    billedPreviousUsd: number | null;
+    billedByCurrency: Array<{
+      currencyCode: string;
+      amount: number | null;
+      previousAmount: number | null;
+    }>;
     billedProvisional: boolean;
   }> = {},
 ) => ({
@@ -39,7 +43,7 @@ const laneDay = (
   billedCellsWithoutAmount: 0,
   gatewayCellsWithoutAmount: 0,
   billedRevisedAt: null,
-  billedPreviousUsd: null,
+  billedByCurrency: [],
   billedProvisional: false,
   ...overrides,
 });
@@ -187,11 +191,15 @@ describe("aggregateLaneSeries", () => {
         [
           laneDay("2026-07-04", {
             billedRevisedAt: 1_000,
-            billedPreviousUsd: 90,
+            billedByCurrency: [
+              { currencyCode: "USD", amount: 100, previousAmount: 90 },
+            ],
           }),
           laneDay("2026-08-09", {
             billedRevisedAt: 9_000,
-            billedPreviousUsd: 70,
+            billedByCurrency: [
+              { currencyCode: "USD", amount: 80, previousAmount: 70 },
+            ],
             billedProvisional: true,
           }),
         ],
@@ -199,7 +207,13 @@ describe("aggregateLaneSeries", () => {
       );
 
       expect(folded[0]?.billedRevisedAt).toBe(9_000);
-      expect(folded[0]?.billedPreviousUsd).toBe(160);
+      // The fold adds each currency to its own line down the period, never
+      // across lines. Both days are dollars here, so the dollar line carries
+      // the whole 160.
+      expect(
+        folded[0]?.billedByCurrency.find((line) => line.currencyCode === "USD")
+          ?.previousAmount,
+      ).toBe(160);
       expect(folded[0]?.billedProvisional).toBe(true);
     });
   });
@@ -210,15 +224,24 @@ describe("aggregateLaneSeries", () => {
         [
           laneDay("2026-07-04", {
             billedRevisedAt: 1_000,
-            billedPreviousUsd: 90,
+            billedByCurrency: [
+              { currencyCode: "USD", amount: 100, previousAmount: 90 },
+            ],
           }),
-          laneDay("2026-07-09"),
+          laneDay("2026-07-09", {
+            billedByCurrency: [
+              { currencyCode: "USD", amount: 50, previousAmount: null },
+            ],
+          }),
         ],
         "month",
       );
 
       expect(folded[0]?.billedRevisedAt).toBe(1_000);
-      expect(folded[0]?.billedPreviousUsd).toBeNull();
+      expect(
+        folded[0]?.billedByCurrency.find((line) => line.currencyCode === "USD")
+          ?.previousAmount,
+      ).toBeNull();
     });
   });
 });

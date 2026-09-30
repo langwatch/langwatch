@@ -2,7 +2,7 @@ Feature: Dashboard widgets placed on a dashboard
 
   A persisted dashboard widget is a `CustomGraph` row of kind
   `dashboard_srcdoc`, the same table a builder graph or a placed workbench
-  chart uses (see specs/analytics/lwql-saved-charts.feature for the workbench
+  chart uses (see specs/lwql/saved-charts.feature for the workbench
   precedent this mirrors). Placement was previously refused everywhere: the
   card-level procedures never admitted the kind, so a widget with a
   `dashboardId` still never appeared on the grid. This feature opens that
@@ -63,6 +63,12 @@ Feature: Dashboard widgets placed on a dashboard
     Given a dashboard grid holding a dashboard widget
     When the dashboard's period selector changes
     Then the widget's queries re-run against the new period, the same one control every other card on the grid reads
+
+  @integration
+  Scenario: A new widget previews against the dashboard's period
+    Given a dashboard whose period selector shows the last 30 days
+    When a member opens "Add chart" to draft a widget
+    Then the draft's preview is asked for that same period, not a fixed last 24 hours
 
   # Persistence invariants for the write path (dashboardWidget.service):
   # placement scoped to the target, dashboard ownership enforced, and partial

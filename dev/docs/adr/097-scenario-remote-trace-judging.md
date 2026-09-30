@@ -34,6 +34,12 @@ The decision-then-verdict split costs one extra judge LLM call per automatic run
 
 Judges can verify internal behavior for blackbox HTTP agents, and criteria like "the agent wrote the extracted requirement into the results table" become testable. Verdicts on HTTP targets wait for trace ingestion on the final turn, bounded by the per-project budget. The customer's server needs one change, adopting the incoming `traceparent` (zero lines under standard OTel HTTP auto-instrumentation), and must report traces to the same project that runs the scenarios. Non-HTTP targets keep the local judge; enabling remote fetch for workflow and code targets is a follow-up once nlpgo's participation in the propagated trace is verified.
 
+## Amendment (2026-09-20): quiet period and inconclusive criteria
+
+Parent resolution settled traces too early in practice. A tool span that ends after its parent was exported lands one or two seconds later; the judge, seeing every parent resolved, read the verdict without it and called the tool criterion inconclusive. The SDK now also requires the trace's span set to stay unchanged for `traceQuietPeriodMs` (default two seconds) once the parents resolve. A change restarts the period, unresolved parents clear it, and the deadline settles a live candidate cleanly. The platform passes `TRACE_QUIET_PERIOD_MS` (two seconds) through the run configuration next to the wait budget.
+
+The judge also maps each criterion by its schema key instead of by position, and reports the criteria it could not decide as `inconclusiveCriteria` next to `unmetCriteria` (an inconclusive criterion is still unmet). The platform stores them in `simulation_runs.InconclusiveCriteria`, the run detail reads them apart from the failed ones, and the export carries them.
+
 ## References
 
 - Related ADRs: ADR-098 (agent dev tunnel)

@@ -211,7 +211,11 @@ export function aggregateLaneSeries<
     billedCellsWithoutAmount: number;
     gatewayCellsWithoutAmount: number;
     billedRevisedAt: number | null;
-    billedPreviousUsd: number | null;
+    billedByCurrency: ReadonlyArray<{
+      currencyCode: string;
+      amount: number | null;
+      previousAmount: number | null;
+    }>;
     billedProvisional: boolean;
   },
 >(series: readonly T[], interval: TimeInterval): T[] {
@@ -232,14 +236,61 @@ export function aggregateLaneSeries<
       gatewayCellsWithoutAmount:
         held.gatewayCellsWithoutAmount + day.gatewayCellsWithoutAmount,
       billedRevisedAt: laterOf(held.billedRevisedAt, day.billedRevisedAt),
-      billedPreviousUsd: addOrWithhold(
-        held.billedPreviousUsd,
-        day.billedPreviousUsd,
+      billedByCurrency: addCurrencyLines(
+        held.billedByCurrency,
+        day.billedByCurrency,
       ),
       billedProvisional: held.billedProvisional || day.billedProvisional,
     });
   }
   return [...byBucket.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/**
+ * Two days' currency lines added DOWN each currency, never across them.
+ *
+ * A period holding dollars and euros holds two figures, exactly as a day does,
+ * and there is no rate here to make one of them out of the other. Each line
+ * withholds on the same rule the period's own figure does: one day of the
+ * period missing a figure withholds the period's, because a partial sum reads
+ * as the whole one.
+ */
+function addCurrencyLines(
+  held: ReadonlyArray<{
+    currencyCode: string;
+    amount: number | null;
+    previousAmount: number | null;
+  }>,
+  day: ReadonlyArray<{
+    currencyCode: string;
+    amount: number | null;
+    previousAmount: number | null;
+  }>,
+): Array<{
+  currencyCode: string;
+  amount: number | null;
+  previousAmount: number | null;
+}> {
+  const byCode = new Map(held.map((line) => [line.currencyCode, line]));
+  for (const line of day) {
+    const standing = byCode.get(line.currencyCode);
+    byCode.set(
+      line.currencyCode,
+      standing
+        ? {
+            currencyCode: line.currencyCode,
+            amount: addOrWithhold(standing.amount, line.amount),
+            previousAmount: addOrWithhold(
+              standing.previousAmount,
+              line.previousAmount,
+            ),
+          }
+        : line,
+    );
+  }
+  return [...byCode.values()].sort((a, b) =>
+    a.currencyCode.localeCompare(b.currencyCode),
+  );
 }
 
 /** Sum two lane figures, or withhold the sum when either is missing. */

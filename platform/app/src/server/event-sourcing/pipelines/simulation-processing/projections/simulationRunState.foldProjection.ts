@@ -235,6 +235,8 @@ export interface SimulationRunStateData {
   Reasoning: string | null;
   MetCriteria: string[];
   UnmetCriteria: string[];
+  /** Criteria the judge could not decide; each is also in UnmetCriteria. */
+  InconclusiveCriteria: string[];
   Error: string | null;
   /**
    * One result per evaluator that ran on the scenario, in the order they
@@ -478,6 +480,7 @@ export class SimulationRunStateFoldProjection
       Reasoning: null,
       MetCriteria: [],
       UnmetCriteria: [],
+      InconclusiveCriteria: [],
       Error: null,
       Evaluations: [],
       DurationMs: null,
@@ -749,6 +752,7 @@ export class SimulationRunStateFoldProjection
       Reasoning: results?.reasoning ?? null,
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
+      InconclusiveCriteria: results?.inconclusiveCriteria ?? [],
       Error: results?.error ?? null,
       // A scenario run from code sends its evaluations with the finished
       // event. An evaluated event that folded before this one (business time

@@ -4,6 +4,8 @@ import { LANGY_RELEASE_FLAG } from "~/utils/langyReleaseFlag";
 
 type LangyAccessUser = {
   id: string;
+  /** Present on a session user; an API key's owner carries none. */
+  email?: string | null;
 };
 
 type LangyFlagEvaluator = Pick<typeof featureFlagService, "isEnabled">;
@@ -40,6 +42,7 @@ export async function hasLangyAccess({
 }): Promise<boolean> {
   return flags.isEnabled(LANGY_RELEASE_FLAG, {
     distinctId: user.id,
+    userEmail: user.email,
     projectId: projectId ?? NOT_TARGETED,
     organizationId: organizationId ?? NOT_TARGETED,
   });

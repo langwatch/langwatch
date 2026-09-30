@@ -3,9 +3,10 @@
 /**
  * Identifiers for the daily governance cost rollup (ADR-128 wave 1).
  *
- * The fold is registered on TWO pipelines — gateway spend and pulled usage —
- * so its name, version and table live here rather than under either pipeline's
- * own `schemas/`.
+ * The fold is registered on the pulled-usage pipeline alone; the metered lane
+ * is read straight off the gateway ledger and never reaches it. The name,
+ * version and table still live here rather than under that pipeline's own
+ * `schemas/`, because the comparator and the cost screen read them too.
  */
 
 export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME = "governanceCostRollup";
@@ -19,6 +20,23 @@ export const GOVERNANCE_COST_ROLLUP_PROJECTION_NAME = "governanceCostRollup";
 export const GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST = "2026-08-28";
 
 export const GOVERNANCE_COST_ROLLUP_TABLE = "governance_cost_rollup_1d";
+
+/**
+ * Where each restatement key currently sits (challenge settlement 9).
+ *
+ * One row per (tenant, restatement key), carrying the cell the key was first
+ * filed under. The puller reads it before writing an observation: a key that
+ * turns up under a different cell is a REISSUE of the charge already recorded
+ * there, and the old cell has to be retracted or the day carries the one bill
+ * twice.
+ *
+ * It is written by the rollup store in the same write as the cell and derived
+ * from the same event, so a rebuild from history reproduces it. Held only in
+ * memory it would be lost by every restart; looked for by scanning the day it
+ * would mean reading every row of that day on every correction.
+ */
+export const GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE =
+  "governance_cost_rollup_restatement_index";
 
 /**
  * Which lane the money came from.

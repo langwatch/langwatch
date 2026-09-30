@@ -1,7 +1,6 @@
-import { builtinRolePermissions } from "@langwatch/authz";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
+import { builtinRolePermissions, permissionGrantTiers } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
-import type { Permission } from "~/server/api/rbac";
-import { isOrgExclusivePermission } from "~/server/api/rbac";
 import { defaultCliKeyPermissions } from "~/server/api-key/cli-key-defaults";
 import { defaultCliKeyScopes } from "../cliKeyScopeDefaults";
 
@@ -219,7 +218,11 @@ describe("defaultCliKeyScopes()", () => {
       // ORGANIZATION binding, and this bag has nothing else to give.
       const bag = [...builtinRolePermissions("org-member")];
       expect(
-        bag.filter((p) => isOrgExclusivePermission(p as Permission)),
+        bag.filter((p) =>
+          permissionGrantTiers(p as Permission).every(
+            (tier) => tier === "organization",
+          ),
+        ),
       ).toEqual(bag);
     });
   });

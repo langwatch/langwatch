@@ -97,10 +97,12 @@ jobs:
       # It also fixes the draft case, which was silently wrong: a draft got
       # `shards: [1]` and still ran `--shard=1/4`, so it executed a quarter of
       # its files while reporting a pass over all of them.
-      # At 602 files per shard, healthy runs hit the four-minute hard floor.
-      # Five shards give the full suite headroom without weakening that floor.
-      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5]' || '[1]' }}
-      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '5' || '1' }}
+      # PR2's full 2,513-file run reached only 426/628 files on its slowest
+      # healthy shard before the four-minute floor. At that measured rate,
+      # eight shards put about 315 files and three minutes on each runner,
+      # preserving the floor's intended minute of headroom.
+      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6,7,8]' || '[1]' }}
+      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '8' || '1' }}
       # Six became four when the component lane took the files that never
       # needed a datastore. 540 of the 1017 integration files declare jsdom and
       # name no database, queue or cache; they now run on `test-component`
@@ -492,9 +494,17 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:unit --run --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-              --dangerouslyIgnoreUnhandledErrors
+            # `vitest --changed` over an empty change set crashes natively on
+            # Linux, so skip it when vitest would select nothing anyway. If the
+            # helper itself fails, vitest runs as before.
+            CHANGED=$(bash ../../.github/scripts/vitest-changed-files.sh origin/main) || CHANGED="(git failed)"
+            if [ -z "$CHANGED" ]; then
+              echo "No files changed since origin/main, no unit tests selected."
+            else
+              pnpm test:unit --run --changed origin/main --passWithNoTests \
+                --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+                --dangerouslyIgnoreUnhandledErrors
+            fi
           else
             # shellcheck disable=SC2086
             pnpm test:unit --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }} $COV $DUR \
@@ -627,9 +637,15 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:component --run --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-              --dangerouslyIgnoreUnhandledErrors
+            # Same empty change set guard as test-unit.
+            CHANGED=$(bash ../../.github/scripts/vitest-changed-files.sh origin/main) || CHANGED="(git failed)"
+            if [ -z "$CHANGED" ]; then
+              echo "No files changed since origin/main, no component tests selected."
+            else
+              pnpm test:component --run --changed origin/main --passWithNoTests \
+                --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+                --dangerouslyIgnoreUnhandledErrors
+            fi
           else
             # shellcheck disable=SC2086
             pnpm test:component --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.component-shard-count }} $COV $DUR \
@@ -886,9 +902,15 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:integration --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
-              --outputFile=test-results.json
+            # Same empty change set guard as test-unit.
+            CHANGED=$(bash ../../.github/scripts/vitest-changed-files.sh origin/main) || CHANGED="(git failed)"
+            if [ -z "$CHANGED" ]; then
+              echo "No files changed since origin/main, no integration tests selected."
+            else
+              pnpm test:integration --changed origin/main --passWithNoTests \
+                --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
+                --outputFile=test-results.json
+            fi
           else
             # shellcheck disable=SC2086
             pnpm test:integration --shard=${{ matrix.shard }}/${{ matrix.count }} $COV $DUR \
@@ -1387,10 +1409,12 @@ jobs:
       # catch runtime boot failures (white screens from chunk-init errors).
       # Uses the runner's preinstalled Google Chrome (no browser download).
       - name: Boot smoke test
+        timeout-minutes: 8
         working-directory: platform/app
         env:
           SMOKE_BROWSER_CHANNEL: chrome
         run: |
+          node --test scripts/__tests__/smoke-boot.browser.test.mjs
           pnpm exec vite preview --port 4173 --outDir dist/client &
           PREVIEW_PID=$!
           trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
@@ -1428,6 +1452,9 @@ jobs:
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
 
+      - name: Test vitest-changed-files.sh
+        run: bash .github/scripts/__tests__/vitest-changed-files.test.sh
+
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
@@ -1439,6 +1466,9 @@ jobs:
 
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
+
+      - name: Test check-added-images.sh
+        run: bash .github/scripts/__tests__/check-added-images.test.sh
 
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which

@@ -79,6 +79,13 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
+  // The identity front-door e2e pass runs against a live app with no other
+  // suite behind it — a Playwright ceremony against a real virtual WebAuthn
+  // authenticator and a real Postgres-backed verification token is the only
+  // place several of these scenarios are proven end-to-end. Without this
+  // root their `@scenario` bindings would be invisible to the checker even
+  // though the tests exist and run in `e2e-ci.yml`.
+  "tests/agentic-e2e/tests",
   // The agent plugin is hand-authored manifests plus a bundle, so its only
   // tests are the ones that read those manifests and spawn that bundle. Without
   // this root, every scenario describing what the published plugin does could
@@ -313,7 +320,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
-  "specs/ai-gateway/governance/sessions-and-devices.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
   "specs/ai-gateway/governance/template-ottl-authoring.feature",
   "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
@@ -335,7 +341,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/wrapper-e2e/cursor.feature",
   "specs/ai-gateway/wrapper-e2e/gemini.feature",
   "specs/ai-gateway/wrapper-e2e/opencode.feature",
-  "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
   "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
@@ -357,14 +362,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/personal-sessions.feature",
   "specs/ai-governance/sessions/sessions-inventory.feature",
   "specs/analytics/posthog-cost-control.feature",
-  "specs/audit-log/audit-log.feature",
-  "specs/auth/auth-signin-flows.feature",
-  "specs/auth/dev-port-origin-alignment.feature",
-  "specs/auth/diagnostic-logging-on-auth-failure.feature",
-  "specs/auth/impersonation-banner.feature",
-  "specs/auth/sign-in-failure-messages.feature",
-  "specs/auth/sso-orphan-user-linking.feature",
-  "specs/auth/sso-wrong-provider-recovery.feature",
   "specs/automations/dispatch-timing.feature",
   "specs/automations/notification-templates.feature",
   // ADR-093's design contract, every scenario @unimplemented on purpose: the
@@ -377,7 +374,6 @@ const LEGACY_INERT: string[] = [
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
   "specs/ci/migration-order.feature",
-  "specs/ci/no-committed-screenshots.feature",
   "specs/ci/no-docker-integration-tests.feature",
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",
@@ -385,11 +381,9 @@ const LEGACY_INERT: string[] = [
   "specs/coding-agent/personal-usage.feature",
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
-  "specs/data-retention/ingestion-stamping.feature",
   "specs/data-retention/monitoring.feature",
   "specs/data-retention/plan-gated-retention-menu.feature",
   "specs/data-retention/retention-policy-configuration.feature",
-  "specs/data-retention/retroactive-update.feature",
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",
   "specs/data-retention/visibility-window-teaser-redaction.feature",
@@ -424,7 +418,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/table-display.feature",
   "specs/experiments-v3/undo-redo.feature",
   "specs/features/agent-cli.feature",
-  "specs/features/analytics-cli.feature",
   "specs/features/annotation-cli.feature",
   "specs/features/dashboard-cli.feature",
   "specs/features/dataset-python-sdk.feature",
@@ -458,14 +451,18 @@ const LEGACY_INERT: string[] = [
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
+  // PLANNED, NOT YET BUILT (ADR-135). Every scenario is @unimplemented because
+  // the dispatch-and-read write path does not exist yet — tagging them now
+  // would report bindings that are not there. Each scenario names the tag it
+  // becomes; the implementation swaps them and DELETES THIS ENTRY. If this
+  // line is still here when the change is called done, the change is not done.
+  "specs/identity/one-decision-per-write.feature",
   "specs/identity/org-admin-identity-surface.feature",
-  "specs/identity/platform-ops-identity-lookup.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-command-bar-activation.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
-  "specs/langy/langy-event-sourced-conversations.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
@@ -565,6 +562,12 @@ const LEGACY_INERT: string[] = [
   "specs/server/spa-fallback.feature",
   "specs/settings/decompose-model-provider-form-hook.feature",
   "specs/settings/settings-table-responsiveness.feature",
+  // The voice epic's two contract journeys (#7978). Both describe the whole
+  // user journey end to end and neither is built yet, so both scenarios are
+  // @unimplemented and the files are inert by design. They leave this list
+  // when the journeys have e2e tests bound to them.
+  "specs/simulation-testing/voice-agents/testing-elevenlabs-convai.feature",
+  "specs/simulation-testing/voice-agents/testing-phone-agents.feature",
   "specs/setup/docker-dev-worktree-isolation.feature",
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
@@ -599,8 +602,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/metrics.feature",
   "specs/traces-v2/model-chip-interactive-card.feature",
   "specs/traces-v2/multiplayer-presence.feature",
-  "specs/traces-v2/onboarding-empty-state.feature",
-  "specs/traces-v2/origin-badge-filter.feature",
   "specs/traces-v2/prompt-facets.feature",
   "specs/traces-v2/prompt-integration.feature",
   "specs/traces-v2/skill-invocation-highlight.feature",
@@ -609,7 +610,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/span-view.feature",
   "specs/traces-v2/tour-visibility-and-persistence.feature",
   "specs/traces-v2/trace-drawer-panes.feature",
-  "specs/traces-v2/trace-drawer-shell.feature",
   "specs/traces-v2/trace-header-full-content-resolution.feature",
   "specs/traces-v2/trace-peek.feature",
   "specs/traces-v2/trace-table.feature",
@@ -664,7 +664,20 @@ const LEGACY_INERT: string[] = [
  *   - Every entry must still be partially tagged.
  */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
+  // and the unknown-metric refusal, which its three new scenarios enforce.
+  // The six older scenarios describe the query presets and stay untagged.
+  "specs/features/analytics-cli.feature",
+  // Reason: left LEGACY_INERT when deep links started carrying the partition
+  // hint; the "Deep links carry the partition hint" rule is enforced. The
+  // rest of the drawer shell is described here and tested elsewhere, untagged.
+  "specs/traces-v2/trace-drawer-shell.feature",
   "sdks/typescript/specs/cli/daemon.feature",
+  // Reason: the gateway half of this file is still unwritten and stays
+  // @unimplemented. It left LEGACY_INERT because the trail now enforces one
+  // real scenario - that a signed-in caller cannot fill it with refusals -
+  // and a file enforcing something is no longer inert.
+  "specs/audit-log/audit-log.feature",
   // Reason: arrived from main already partially tagged (#7778 self-mapped
   // Azure deployments on the dispatch path). Its six untagged scenarios
   // describe gateway endpoint derivation, which this branch does not own.
@@ -682,6 +695,12 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-gateway/governance/ingestion-sources.feature",
   "specs/ai-gateway/governance/ingestion-templates-catalog.feature",
   "specs/ai-gateway/governance/my-usage-dashboard.feature",
+  // Reason: #7960 tagged and bound the four scenarios the devices tab now
+  // answers, and retired its LEGACY_INERT entry. The eight untagged ones
+  // describe the org-wide max-session-duration policy and the admin sessions
+  // widget, neither of which is built, and the bulk revoke of every
+  // credential class at once, which is.
+  "specs/ai-gateway/governance/sessions-and-devices.feature",
   // Reason: #8041 tagged and bound two scenarios (opaque id placement on
   // export, and the drop of an opaque email beside a user id) and retired
   // its LEGACY_INERT entry. The eleven untagged scenarios describe the wider
@@ -697,12 +716,25 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-governance/cli-onboarding/login-unified.feature",
   "specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature",
   "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
+  // Reason: #7960 tagged and bound the scenario for logout retiring the
+  // ingest keys its session minted, and retired the file's LEGACY_INERT
+  // entry. The twenty-one untagged ones describe the rest of what logout
+  // unwires locally, settings.json, the plugin, the codex blocks and the
+  // shell rc, which that change did not touch.
+  "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
   "specs/ai-governance/personal-portal/admin-catalog-editor.feature",
   "specs/ai-governance/personal-portal/tool-catalog-rbac.feature",
   "specs/ai-governance/puller-framework/s3-polling.feature",
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/event-sourced-analytics-materialization.feature",
+  // Reason: left LEGACY_INERT once this branch tagged and bound the
+  // enterprise-OAuth callback-path outline to `legacyCallbackParity.test.ts`.
+  // The other two scenarios (on-prem credentials, Google OAuth) are
+  // deliberately untagged per the file's own header — they document live
+  // behaviour proven by browser QA and other unit tests, not a single bound
+  // assertion, so tagging them would misstate what covers them.
+  "specs/auth/auth-signin-flows.feature",
   "specs/automations/authoring-drawer.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
@@ -715,6 +747,23 @@ const LEGACY_PARTIAL: string[] = [
   "specs/clickhouse/windowed-read-fallback.feature",
   "specs/coding-agent/cache-write-ttl-pricing.feature",
   "specs/coding-agent/terminal-view.feature",
+  // Reason: left LEGACY_INERT when this branch bound its scenarios. All four
+  // this branch authored are now tagged and bound. The six that remain
+  // untagged predate it and describe retention stamping it does not own:
+  // two need a test in the scenario and experiment pipelines, which assert
+  // no _retention_days today; one is a ClickHouse MATERIALIZED column only an
+  // integration test can prove; one is an absence-of-restamping invariant;
+  // and the trace-pipeline pair is proven for event_log but not yet for
+  // stored_metric_records or dspy_steps. Each needs a test, not a tag.
+  "specs/data-retention/ingestion-stamping.feature",
+  // Reason: left LEGACY_INERT once this branch tagged and bound the three
+  // event-log-category scenarios (category selection, per-tenant/category/
+  // table rate limiting, and parallel category mutations) to
+  // `retroactiveUpdate.unit.test.ts`. The seven that remain untagged predate
+  // this branch and describe the UI/progress-card side (confirmation dialog,
+  // progress tracking, kill-mutation button) and the immediate-vs-retroactive
+  // stamping contract, which this branch does not own.
+  "specs/data-retention/retroactive-update.feature",
   "specs/datasets/add-to-dataset-span-mapping.feature",
   "specs/dependencies/zod-first-schema-source-of-truth.feature",
   "specs/event-sourcing/payload-cost.feature",
@@ -777,6 +826,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/skills/skills-testing.feature",
   "specs/suites/suite-model-selection.feature",
   "specs/topic-clustering/event-sourced-scheduling.feature",
+  // Reason: the first-trace poll scenario is the one the Trace Explorer
+  // binds; the other scenarios describe the onboarding journey, which no
+  // test on this branch is tagged against.
+  "specs/traces-v2/onboarding-empty-state.feature",
   "specs/traces-v2/annotations.feature",
   "specs/traces-v2/bulk-actions.feature",
   "specs/traces-v2/code-block-language-fallback.feature",
@@ -1114,7 +1167,26 @@ export function findScenarioAnnotations(
   return found;
 }
 
-function isFollowedByTestCall(src: string, start: number): boolean {
+/**
+ * Whether an extracted annotation actually binds to a test.
+ *
+ * Exported because extraction is not the rule. An annotation this returns
+ * false for is dropped at the call site with no diagnostic — it is not an
+ * unknown scenario, it is not an unbound one, it is nothing at all, and the
+ * run stays green. That silence is the whole reason a guard exists over this,
+ * and a guard that checks extraction instead measures a different question.
+ *
+ * THE WALK CANNOT LEAVE A COMMENT IT STARTS INSIDE. It begins at the end of
+ * the match and skips whitespace, block comments and line comments. An
+ * annotation that closes its own comment starts the walk outside, where the
+ * next thing is the test. One written as a line WITHIN a longer block starts
+ * the walk on the prose that follows it, which is none of those three, so the
+ * walk falls through to the test-call match, fails it, and returns false.
+ *
+ * So the authoring rule is "the annotation must CLOSE its comment", not "open
+ * it" — putting it on the first line of a thirty-line block binds nothing.
+ */
+export function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
   let i = start;
   while (i < len) {
@@ -1136,7 +1208,10 @@ function isFollowedByTestCall(src: string, start: number): boolean {
       continue;
     }
     const rest = src.slice(i);
-    const m = rest.match(/^(?:it|test)(?:\.[a-zA-Z]+)?\s*\(/);
+    // Vitest's typed table form is still a test call: `it.each<T>([...])`.
+    // Keep the type argument narrow and line-local so proximity remains a
+    // lexical check rather than attempting to parse arbitrary TypeScript.
+    const m = rest.match(/^(?:it|test)(?:\.[a-zA-Z]+)?(?:<[^>\n]+>)?\s*\(/);
     return m !== null;
   }
   return false;
@@ -1894,8 +1969,37 @@ interface ParityAnalysis {
   listErrors: string[];
 }
 
+/**
+ * `LEGACY_INERT` says a file yields NO enforced scenario. `LEGACY_UNBOUND` and
+ * `LEGACY_PARTIAL` both say it yields some. A file on the inert list and on
+ * either of the other two is therefore always a mistake, and it is one two
+ * branches can make without conflicting: one tags a scenario in the file and
+ * moves it to `LEGACY_PARTIAL`, the other leaves it untagged and adds it to
+ * `LEGACY_INERT`, and main gets both. The stale-entry check then fails on the
+ * copy that no longer describes the file, which is what this catches first.
+ *
+ * `LEGACY_UNBOUND` and `LEGACY_PARTIAL` are not exclusive of each other: a
+ * file can have enforced scenarios that are unbound and untagged ones beside
+ * them, and it needs both entries to be tolerated.
+ */
+function validateNoCrossListEntries(): string[] {
+  const inert = new Set(LEGACY_INERT);
+  return [
+    { name: "LEGACY_UNBOUND", entries: LEGACY_UNBOUND },
+    { name: "LEGACY_PARTIAL", entries: LEGACY_PARTIAL },
+  ].flatMap(({ name, entries }) =>
+    entries
+      .filter((entry) => inert.has(entry))
+      .map(
+        (entry) =>
+          `${entry} is listed in LEGACY_INERT and ${name} — the first says the file enforces nothing, the second says it enforces something, keep the one that matches the file and delete the other`,
+      ),
+  );
+}
+
 function validateAllExemptionLists(allFeatures: string[]): string[] {
   return [
+    ...validateNoCrossListEntries(),
     ...validateExemptionList({
       name: "LEGACY_UNBOUND",
       entries: LEGACY_UNBOUND,

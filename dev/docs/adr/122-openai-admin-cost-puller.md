@@ -112,9 +112,10 @@ restated here because it is easy to reintroduce and silent when wrong.
 
 > **[CORRECTED — see revision v3.]** This decision was written as "`actor`
 > carries `user_email`". The adapter shipped the opposite and deliberately
-> so: `actor` carries the provider's **opaque `user-…` id**, and the email
-> reaches `raw_payload` only, through the row schema's `.passthrough()`
-> (`openaiAdmin.puller.ts:403,864` and the comments above them). The id is the
+> so: `actor` carries the provider's **opaque `user-…` id**, and the email is
+> now dropped from the row before it is stringified into `raw_payload`
+> (`openaiAdmin.puller.ts:416-428,885-891` and the comments above them), so
+> the address is never stored. The id is the
 > stable key, the erasure suppression list is keyed on exactly that string,
 > and a raw address is heavier on a money row. The decision below stands with
 > "the raw user id" read wherever it says "`user_email`".
@@ -303,7 +304,8 @@ can exist, so there is nothing to repair.
 | No float round-trip on money | Sub-cent figures keep every digit | `amount` parsed as `string \| number` and stringified once; a string input survives byte-identical |
 | A costless read writes no money | A missing row never overwrites a present one | Unit test: a bucket whose row vanished emits an event with **no** `pulled_usage` key, and `buildPulledUsageRecord` returns null |
 | Re-pulling an unchanged window records nothing new | At-least-once delivery is free | Same window pulled twice; ledger row count unchanged |
-| Identity reaches the audit row | Attribution is visible where a surface already reads it | OCSF row asserts the actor field = the row's raw `user_id`, and `metadata.extension.actorUserId` / `.apiKeyId` = the row's raw ids. **[v3: as shipped that actor field was the OCSF actor *email* column — the divergence Decision 6 records. v4: resolved. An opaque id now lands in `ActorUserId` with `ActorEmail` left blank, asserted against the real mapper rather than a copy of it (`pullerWorker.ocsfMapping.unit.test.ts:125-151`). The address itself still reaches `raw_payload` only.]** |
+| Identity reaches the audit row | Attribution is visible where a surface already reads it | OCSF row asserts the actor field = the row's raw `user_id`, and `metadata.extension.actorUserId` / `.apiKeyId` = the row's raw ids. **[v3: as shipped that actor field was the OCSF actor *email* column — the divergence Decision 6 records. v4: resolved. An opaque id now lands in `ActorUserId` with `ActorEmail` left blank, asserted against the real mapper rather than a copy of it (`pullerWorker.ocsfMapping.unit.test.ts:125-151`). The address itself is now dropped before `raw_payload` is written, so it is
+stored nowhere.]** |
 | The watermark never moves backwards | A re-read window, or a page returned out of order, must not rewind progress | Unit test: a response whose last bucket precedes the stored watermark leaves the watermark unchanged |
 | A corrected bucket replaces, never adds | Restatement is the whole point of the re-read window | Same window pulled twice with a changed `amount.value`; the ledger shows the new figure once, and the row count is unchanged |
 | Below the floor the day survives, only the key is lost | A 400 on key grouping must not cost history | Unit test: a floor 400 triggers one retry with `user_id` only, and the resulting rows still carry `user_id` |
@@ -447,11 +449,11 @@ bucket lands beside the old rows instead of replacing them. Whether
 attribution claim carries an untested assumption. Key-level detail is absent
 below the provider's floor.
 
-The provider's user id, email and key id are exported to any third-party
-SIEM the organization has wired up, because `raw_payload` is required on
-every pull event and the whole raw row ships inside `RawOcsfJson`. That is
-inherited framework behaviour, not new here, and it is why Decision 6
-changes nothing about exposure.
+The provider's user id and key id are exported to any third-party SIEM the
+organization has wired up, because `raw_payload` is required on every pull
+event and the raw row ships inside `RawOcsfJson`. The email address is not
+among them: the adapter drops it before the row is stored, so it never
+egresses.
 
 **Neutral.** `openai_compliance` stays registered, listed and inert. The
 adapter duplicates cursor logic a third provider may justify factoring out.
@@ -550,10 +552,12 @@ adapter duplicates cursor logic a third provider may justify factoring out.
   decision survives.
   - **Decision 6's `actor` is the raw `user_id`, not `user_email`.** The
     adapter reads the id deliberately and says why in its own comment
-    (`openaiAdmin.puller.ts:390-401,835-851`): the id is stable, the erasure
+    (`openaiAdmin.puller.ts:416-428,885-891`): the id is stable, the erasure
     suppression list is keyed on exactly that string, and the address is
-    heavier on a money row. The email is not dropped — it survives into
-    `raw_payload` through the row schema's `.passthrough()`.
+    heavier on a money row. At v3 the email was not dropped — it survived into
+    `raw_payload` through the row schema's `.passthrough()`. **[No longer true:
+    the adapter now drops the address before the row is stringified into
+    `raw_payload`, so it is stored nowhere.]**
   - **Consequence, recorded rather than ruled on:** the worker wrote
     `actorEmail: event.actor` and `actorUserId: ""`, so at v3 the OCSF column
     named for an email address held an opaque provider id while the actor id
@@ -638,3 +642,13 @@ adapter duplicates cursor logic a third provider may justify factoring out.
     intact; no owner and no date are attached to changing that.
   - Stale citations refreshed: `ingestionSourceCatalog.tsx:142-149` →
     `:171-181`; `ingestionSourceCatalog.tsx:293` → `:324`.
+
+- **v6 (2026-09-10) — the stored payload no longer carries the address.** No
+  decision is taken here. `costEvent` drops `user_email` before the row is
+  stringified into `raw_payload` (`openaiAdmin.puller.ts:885-891`), so the
+  address is stored nowhere and does not reach a wired-up SIEM; the four
+  places this ADR said otherwise are corrected in place
+  (langwatch/langwatch-saas#1225, item 1).
+  - Stale citations refreshed: `openaiAdmin.puller.ts:403,864` →
+    `:416-428,885-891`; `openaiAdmin.puller.ts:390-401,835-851` →
+    `:416-428,885-891`.

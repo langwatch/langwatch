@@ -17,6 +17,7 @@ function canary() {
     transport: "rest",
     url: "https://example.invalid/api/collector",
     authToken: "token",
+    projectId: "project_1",
     body: { hello: "world" },
   });
 }

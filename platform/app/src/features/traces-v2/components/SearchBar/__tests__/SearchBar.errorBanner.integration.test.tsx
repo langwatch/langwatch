@@ -19,7 +19,7 @@ import "@testing-library/jest-dom/vitest";
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: undefined,
-    organization: undefined,
+    organization: { id: "org-1" },
     team: undefined,
     isFetching: false,
   }),
@@ -42,6 +42,33 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
 // out — server search is covered by its own dedicated suite.
 vi.mock("../../../hooks/useFacetSearch", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
+}));
+
+// Enter on a sentence calls `tracesV2.routeSearch`; nothing here presses
+// Enter, so the mutation hook is stubbed rather than mounting tRPC.
+vi.mock("~/utils/api", () => ({
+  api: {
+    tracesV2: {
+      routeSearch: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      instantEval: {
+        estimate: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+        start: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+      },
+    },
+    // The Instant Evals gate reads this flag; stub it enabled so nothing
+    // in this suite's crash-path renders the unreleased popover instead.
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: true }, isLoading: false }),
+      },
+    },
+  },
 }));
 
 vi.mock("@paper-design/shaders-react", () => ({
@@ -72,7 +99,7 @@ vi.mock("~/features/langy/stores/langyStore", () => {
 
 import { explainAnyError } from "~/features/errors";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
-import { useFilterStore } from "../../../stores/filterStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { SearchBar } from "../SearchBar";
 
 /**
@@ -100,11 +127,11 @@ function registryCopy(cause: unknown): string {
 
 afterEach(() => {
   cleanup();
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 function renderSearchBar() {
@@ -119,13 +146,13 @@ describe("<SearchBar /> unified error banner", () => {
   describe("given a parse error in the store", () => {
     beforeEach(() => {
       // Trigger a parse error by submitting an unclosed string literal
-      useFilterStore.getState().applyQueryText('@status:"unclosed');
+      useExplorerStore.getState().applyQueryText('@status:"unclosed');
     });
 
     it("renders the parse error message in the banner", () => {
       renderSearchBar();
       // The banner should contain the parse error message text
-      const parseError = useFilterStore.getState().parseError;
+      const parseError = useExplorerStore.getState().parseError;
       expect(parseError).not.toBeNull();
       expect(screen.getByText(parseError!)).toBeInTheDocument();
     });
@@ -147,7 +174,7 @@ describe("<SearchBar /> unified error banner", () => {
         renderSearchBar();
         const user = userEvent.setup();
         await user.click(screen.getByLabelText(/dismiss error/i));
-        expect(useFilterStore.getState().parseError).toBeNull();
+        expect(useExplorerStore.getState().parseError).toBeNull();
       });
 
       it("clears parse error in store after dismiss (banner exit animation fires async)", async () => {
@@ -157,7 +184,7 @@ describe("<SearchBar /> unified error banner", () => {
         // AnimatePresence exit animations run async in jsdom so we verify
         // store state rather than DOM removal.
         await user.click(screen.getByLabelText(/dismiss error/i));
-        expect(useFilterStore.getState().parseError).toBeNull();
+        expect(useExplorerStore.getState().parseError).toBeNull();
       });
     });
   });
@@ -176,7 +203,7 @@ describe("<SearchBar /> unified error banner", () => {
     };
 
     beforeEach(() => {
-      useFilterStore.getState().setAiError(aiError);
+      useExplorerStore.getState().setAiError(aiError);
     });
 
     it("renders the registry's copy for the failure's code", () => {
@@ -233,7 +260,7 @@ describe("<SearchBar /> unified error banner", () => {
         renderSearchBar();
         const user = userEvent.setup();
         await user.click(screen.getByLabelText(/dismiss error/i));
-        expect(useFilterStore.getState().aiError).toBeNull();
+        expect(useExplorerStore.getState().aiError).toBeNull();
       });
     });
   });
@@ -245,7 +272,7 @@ describe("<SearchBar /> unified error banner", () => {
     };
 
     beforeEach(() => {
-      useFilterStore.getState().setAiError(simpleAiError);
+      useExplorerStore.getState().setAiError(simpleAiError);
     });
 
     it("renders the generic unknown copy, not the raw failure", () => {
@@ -275,8 +302,8 @@ describe("<SearchBar /> unified error banner", () => {
 
     beforeEach(() => {
       // Set both errors
-      useFilterStore.getState().applyQueryText('@status:"unclosed');
-      useFilterStore.getState().setAiError(aiError);
+      useExplorerStore.getState().applyQueryText('@status:"unclosed');
+      useExplorerStore.getState().setAiError(aiError);
     });
 
     it("shows the AI error message (AI error wins priority)", () => {
@@ -286,7 +313,7 @@ describe("<SearchBar /> unified error banner", () => {
 
     it("does not show the parse error message while AI error is active", () => {
       renderSearchBar();
-      const parseError = useFilterStore.getState().parseError!;
+      const parseError = useExplorerStore.getState().parseError!;
       expect(screen.queryByText(parseError)).not.toBeInTheDocument();
     });
   });
@@ -307,23 +334,23 @@ describe("<SearchBar /> unified error banner", () => {
 
     it("the error remains in the store after explicit set (simulating close of AI mode without unmount cleanup)", () => {
       // Set error (simulates AiQueryComposer pushing error via useEffect)
-      useFilterStore.getState().setAiError(aiError);
+      useExplorerStore.getState().setAiError(aiError);
       // Verify it persists without being cleared
-      expect(useFilterStore.getState().aiError).toEqual(aiError);
+      expect(useExplorerStore.getState().aiError).toEqual(aiError);
       renderSearchBar();
       expect(screen.getByText(registryCopy(aiError.cause))).toBeInTheDocument();
     });
 
     it("clears when clearAll is called", () => {
-      useFilterStore.getState().setAiError(aiError);
-      useFilterStore.getState().clearAll();
-      expect(useFilterStore.getState().aiError).toBeNull();
+      useExplorerStore.getState().setAiError(aiError);
+      useExplorerStore.getState().clearAll();
+      expect(useExplorerStore.getState().aiError).toBeNull();
     });
 
     it("clears when a new query is typed via applyQueryText", () => {
-      useFilterStore.getState().setAiError(aiError);
-      useFilterStore.getState().applyQueryText("@status:error");
-      expect(useFilterStore.getState().aiError).toBeNull();
+      useExplorerStore.getState().setAiError(aiError);
+      useExplorerStore.getState().applyQueryText("@status:error");
+      expect(useExplorerStore.getState().aiError).toBeNull();
     });
   });
 });

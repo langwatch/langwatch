@@ -16,7 +16,7 @@ import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { confirmArchiveSource } from "../logic/confirmArchiveSource";
 import { shortPullCadence } from "../logic/pullCadence";
-import { sourceBadge } from "../logic/sourceHealthDisplay";
+import { runCompleteness, sourceBadge } from "../logic/sourceHealthDisplay";
 import {
   groupForMode,
   modeForSourceType,
@@ -185,9 +185,18 @@ function SourceTableRow({
   const status = sourceBadge({
     status: source.status,
     errorCount: source.errorCount,
+    // A run stopped by a page limit reports no error, so without this the
+    // badge reads Active on a source collecting a fraction of its data.
+    completeness: runCompleteness(source.lastRunCompleteness),
   });
   const StatusIcon = status.icon;
-  const typeLabel = SOURCE_TYPE_LABEL[sourceType] ?? source.sourceType;
+  // Own-property test: see sourceHealthDisplay. `sourceType` is cast from a
+  // free-form column one line above, so the union it claims to be is a promise
+  // the database never made. An inherited name would resolve up the prototype
+  // chain and render as a Function instead of falling back to the raw string.
+  const typeLabel = Object.hasOwn(SOURCE_TYPE_LABEL, sourceType)
+    ? SOURCE_TYPE_LABEL[sourceType]
+    : source.sourceType;
   const mode = modeForSourceType({ sourceType });
   const delivery = deliveryFor(source);
   const cadence = shortPullCadence(source.pullSchedule);

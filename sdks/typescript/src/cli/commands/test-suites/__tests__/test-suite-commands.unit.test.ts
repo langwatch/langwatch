@@ -8,6 +8,7 @@
  * Spec: specs/features/test-suite-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stdoutDocuments } from "../../../utils/__tests__/stdout-documents";
 import { TestSuitesApiError } from "@/client-sdk/services/test-suites";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
@@ -100,16 +101,6 @@ const makeRunResult = (overrides: Record<string, unknown> = {}) => ({
  * flip the human-path tests into a machine format.
  */
 let savedAgentEnv: Record<string, string | undefined> = {};
-
-/** Every JSON document the command printed on stdout. */
-const printedDocuments = (): string[] =>
-  vi
-    .mocked(console.log)
-    .mock.calls.map((call) => call[0] as unknown)
-    .filter(
-      (line): line is string =>
-        typeof line === "string" && line.trimStart().startsWith("{"),
-    );
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -746,6 +737,11 @@ describe("runTestSuiteCommand()", () => {
           ),
       );
 
+      // The spec says no OTHER line reaches stdout: the spy on the raw
+      // stream is what catches a write that bypasses `console.log`.
+      const stdoutWrite = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation(() => true);
       vi.useFakeTimers();
       try {
         const promise = runTestSuiteCommand({
@@ -762,8 +758,10 @@ describe("runTestSuiteCommand()", () => {
         vi.useRealTimers();
       }
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
+      expect(stdoutWrite).not.toHaveBeenCalled();
+      expect(console.log).toHaveBeenCalledTimes(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("passed");
       expect(document.tallies).toEqual({

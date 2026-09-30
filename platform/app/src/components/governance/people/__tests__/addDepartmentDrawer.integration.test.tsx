@@ -30,11 +30,14 @@ const VIEWER = ["organization:view", "governance:view"];
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const rbac =
-    await vi.importActual<typeof import("~/server/api/rbac")>(
-      "~/server/api/rbac",
+    await vi.importActual<typeof import("@langwatch/authz")>(
+      "@langwatch/authz",
     );
   const holds = (permission: string) =>
-    rbac.hasPermissionWithHierarchy(harness.permissions, permission);
+    rbac.permissionSatisfiedBy({
+      granted: new Set(harness.permissions),
+      requested: permission,
+    });
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,

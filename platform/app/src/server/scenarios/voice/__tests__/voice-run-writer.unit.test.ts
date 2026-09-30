@@ -69,6 +69,8 @@ describe("writeVoiceCallRun", () => {
           agentRowId: "agent_1",
           agentDisplayName: "Support Bot",
           record: fakeRecord({ isCutAtLimit: true }),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: [],
         });
 
         const { metadata } = mockStartRun.mock.calls[0]?.[0] as {
@@ -97,6 +99,8 @@ describe("writeVoiceCallRun", () => {
           agentRowId: "agent_1",
           agentDisplayName: "Support Bot",
           record,
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: ["trace_0"],
         };
 
         await expect(writeVoiceCallRun(args)).rejects.toThrow();
@@ -121,6 +125,8 @@ describe("writeVoiceCallRun", () => {
           agentRowId: "agent_1",
           agentDisplayName: "Support Bot",
           record,
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: ["trace_0", "trace_0"],
         };
 
         await writeVoiceCallRun(args);
@@ -134,6 +140,39 @@ describe("writeVoiceCallRun", () => {
           ).messages.map((m) => m.id);
         expect(idsOf(0)).toEqual(["run_1-0", "run_1-1"]);
         expect(idsOf(0)).toEqual(idsOf(1));
+      });
+    });
+
+    describe("when the turns carry per-exchange trace ids", () => {
+      /** @scenario "A finished browser call writes one trace per exchange and every message links to its exchange's trace" */
+      it("sets trace_id on each message and lists the ids on the snapshot", async () => {
+        const record = fakeRecord({
+          turns: [
+            { role: "caller", text: "hi" },
+            { role: "agent", text: "hello" },
+          ],
+        });
+
+        await writeVoiceCallRun({
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record,
+          // Both turns are one exchange, so they share the trace id.
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: ["trace_a", "trace_a"],
+        });
+
+        const snapshot = mockMessageSnapshot.mock.calls[0]?.[0] as {
+          messages: { trace_id?: string }[];
+          traceIds: string[];
+        };
+        expect(snapshot.messages.map((m) => m.trace_id)).toEqual([
+          "trace_a",
+          "trace_a",
+        ]);
+        expect(snapshot.traceIds).toEqual(["trace_a", "trace_a"]);
       });
     });
   });

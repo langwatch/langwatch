@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  COST_ROLLUP_WATCH_PROCESS_NAME,
+  costRollupWatchPM,
+} from "@ee/governance/process-manager/costRollupWatch.process";
+import {
   PULLED_USAGE_LEDGER_PROCESS_NAME,
   type PulledUsageLedgerProcessDeps,
   pulledUsageLedgerPM,
@@ -10,10 +14,14 @@ import {
   GovernanceCostRollupFoldProjection,
   type GovernanceCostRollupState,
 } from "@ee/governance/projections/governanceCostRollup.foldProjection";
+import type { CostRollupComparatorDayComparer } from "@ee/governance/services/costRollupComparator.service";
 import { definePipeline } from "~/server/event-sourcing";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
-import { RecordPulledUsageCommand } from "./commands";
+import {
+  RecordPulledUsageCommand,
+  RetractPulledUsageCommand,
+} from "./commands";
 import {
   PULLED_USAGE_AGGREGATE_TYPE,
   PULLED_USAGE_PIPELINE_NAME,
@@ -28,7 +36,12 @@ import type { PulledUsageProcessingEvent } from "./schemas/events";
  * figure it corrects instead of beside it.
  *
  * Write surface: `recordPulledUsage`, dispatched from the puller effect in the
- * same loop that writes the OCSF audit row.
+ * same loop that writes the OCSF audit row, and `retractPulledUsage`,
+ * dispatched by this pipeline's OWN process manager when it recognises that a
+ * charge has been reissued into a different rollup cell. The second command is
+ * registered unconditionally even though only the process manager sends it: a
+ * deployment that drops the ledger dep still has to be able to APPLY a
+ * withdrawal that an earlier deployment wrote to the log.
  *
  * Process manager: `pulledUsageLedger` — the sole writer of pulled cost into
  * `gateway_budget_ledger_events`. Optional, and absent it the pipeline still
@@ -42,28 +55,43 @@ import type { PulledUsageProcessingEvent } from "./schemas/events";
  * the same fold for its own lane, so a deployment running no pullers at all
  * still summarizes gateway spend; the two lanes are different rows by
  * construction (`CostSource` is in the key) and can never contend.
+ *
+ * Process manager: `costRollupWatch` (ADR-128) — the drift check, armed by the
+ * charges themselves. Mounted only where BOTH the summary store and the
+ * comparator exist, because the comparison reads the summary this pipeline's
+ * own projection writes: a deployment holding one without the other mounts
+ * nothing rather than asking for comparisons that would either die in the
+ * outbox five attempts at a time or report success without reading anything.
  */
 export function createPulledUsageProcessingPipeline(
   deps: {
     ledger?: PulledUsageLedgerProcessDeps;
     costRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
+    costRollupComparator?: CostRollupComparatorDayComparer;
   } = {},
 ) {
   let pipeline = definePipeline<PulledUsageProcessingEvent>()
     .withName(PULLED_USAGE_PIPELINE_NAME)
     .withAggregateType(PULLED_USAGE_AGGREGATE_TYPE)
-    .withCommand("recordPulledUsage", RecordPulledUsageCommand);
+    .withCommand("recordPulledUsage", RecordPulledUsageCommand)
+    .withCommand("retractPulledUsage", RetractPulledUsageCommand);
   if (deps.costRollupStore) {
     pipeline = pipeline.withFoldProjection(
       GOVERNANCE_COST_ROLLUP_PROJECTION_NAME,
       new GovernanceCostRollupFoldProjection({ store: deps.costRollupStore }),
     );
   }
-  if (!deps.ledger) return pipeline.build();
-  return pipeline
-    .withProcessManager(
+  if (deps.ledger) {
+    pipeline = pipeline.withProcessManager(
       PULLED_USAGE_LEDGER_PROCESS_NAME,
       pulledUsageLedgerPM(deps.ledger),
-    )
-    .build();
+    );
+  }
+  if (deps.costRollupStore && deps.costRollupComparator) {
+    pipeline = pipeline.withProcessManager(
+      COST_ROLLUP_WATCH_PROCESS_NAME,
+      costRollupWatchPM({ comparator: deps.costRollupComparator }),
+    );
+  }
+  return pipeline.build();
 }

@@ -7,8 +7,8 @@
  * the server names it as the whole registry when it validates a specification
  * it holds no rows for.
  *
- * @see specs/analytics/lwql-workbench.feature
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/workbench.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 /** The dataset name the workbench registers its query result under. */

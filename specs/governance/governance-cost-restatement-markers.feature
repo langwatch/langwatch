@@ -104,11 +104,17 @@ Feature: A cost day says how much to trust its own figure
     Given a day where one spender's cost was restated two weeks before another's
     When the cost screen reads that day
     Then the day names the later restatement as when it changed
-    And the earlier amount it names is what the day held just before that
+    And the dollar line names what it held just before that
     # Not what it held before the FIRST of the two. The spender restated two
     # weeks earlier was already carrying the new figure by then, so counting
     # its old one reports a move spanning both restatements under the later
     # one's date. A cell nobody restated still contributes what it holds.
+    #
+    # On the line rather than on the day. A day holds one earlier amount per
+    # currency, and a day reissued between two currencies that are not dollars
+    # has no single earlier figure at all — so a day-level one is a second
+    # answer to a question the lines already answer, and it goes empty exactly
+    # where this batch needs an answer.
 
   @integration
   Scenario: The markers survive a read taken before storage compacts
@@ -127,3 +133,30 @@ Feature: A cost day says how much to trust its own figure
     # The deliberate backfill. The pullers look thirty days back, so any day
     # genuinely still settling is re-stamped by the next daily pull, and any
     # day this called settled was one no pull was going to touch again.
+
+  @integration
+  Scenario: A day reissued in another currency names what it held before, not the two amounts added together
+    Given a day whose dollar charge was retracted and reissued in euros
+    When the cost screen reads that day
+    Then the dollars name what they held before the reissue
+    And the euros name no earlier amount, because they held none before it
+    And nothing names the retracted and the reissued amount added together
+    # A day's prior total is each cell's amount as it stood immediately
+    # before that day's latest revision. The cell the reissue CREATED did not
+    # exist then, so it contributes nothing. Discriminating instead on
+    # whether a cell was revised drops that cell into the untouched bucket,
+    # where it contributes its NEW amount on top of the retracted cell's
+    # prior one, and the day claims it previously held about twice what it
+    # held. Per currency throughout: a reissue across currencies is a day
+    # holding two of them, and there is no one figure that covers both.
+
+  @unit
+  Scenario: A bill reissued in another currency reads as a revision, not as new spend
+    Given a day was reported from a bill in one currency
+    When the provider reissues that bill in another currency
+    Then the day is marked as revised
+    And the currency it was first billed in names what it held before the reissue
+    And the currency it was reissued into names no earlier amount
+    # A currency change is the provider correcting one charge, not a second
+    # charge arriving. Read as new spend it would both double the day and
+    # leave the reader with no marker explaining why the figure moved.

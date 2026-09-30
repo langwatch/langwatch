@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
+import { GovernanceGatewaySpendClickHouseRepository } from "@ee/governance/services/governanceGatewaySpend.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -11,8 +12,11 @@ import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.cl
 import type { RedisConnection } from "@langwatch/redis-client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import type { EventSourcing } from "~/server/event-sourcing";
 
 type ClickHouseClientLike = ClickHouseClient;
 
@@ -45,6 +49,7 @@ export function installClickHouseTestApp({
   resolveClient,
   resolveOrganizationClient,
   redis,
+  eventSourcing,
 }: {
   /**
    * Per-tenant resolver, usually a closure over the test's container client.
@@ -68,6 +73,9 @@ export function installClickHouseTestApp({
    * test whose route needs Redis passes the one it already opened.
    */
   redis?: RedisConnection | null;
+  /** Optional real authz event-sourcing composition for route tests that
+   * mint or mutate authorization grants. */
+  eventSourcing?: EventSourcing;
 }): void {
   const required: ClickHouseClientResolver = async (tenantId) => {
     const client = await resolveClient(tenantId);
@@ -108,6 +116,10 @@ export function installClickHouseTestApp({
       personalUsage: new PersonalUsageClickHouseRepository(required),
       activityMonitor: new ActivityMonitorClickHouseRepository(required),
       costRollup: new GovernanceCostRollupClickHouseRepository(required),
+      gatewaySpend: new GovernanceGatewaySpendClickHouseRepository(required),
+      // Real: the metered lane scopes the ledger read by the organization's
+      // project ids, which a route test seeds in the same Postgres.
+      projects: new PrismaProjectRepository(prisma),
       // The erasure needs Postgres repositories and the ops replay service,
       // neither of which this ClickHouse-only harness composes. A suite that
       // drives an erasure builds it directly.
@@ -121,6 +133,9 @@ export function installClickHouseTestApp({
       required,
       requiredOrg,
     ),
+    // Real: the REST project routes read and write projects through it.
+    projects: new ProjectService(new PrismaProjectRepository(prisma)),
+    _eventSourcing: eventSourcing,
   });
 }
 

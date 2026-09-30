@@ -4,6 +4,7 @@ import { ListTable } from "~/components/ui/ListTable";
 
 import {
   AGENT_NEVER_RUN,
+  AgentEnvironment,
   AgentValue,
   agentCostMissingReason,
   formatAgentCost,
@@ -111,9 +112,7 @@ export function AgentsTable({
             </Table.Cell>
 
             <Table.Cell whiteSpace="nowrap">
-              <Text textStyle="sm" color="fg.muted">
-                {agent.environment}
-              </Text>
+              <AgentEnvironment environment={agent.environment} />
             </Table.Cell>
 
             <Table.Cell whiteSpace="nowrap">

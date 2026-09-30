@@ -302,3 +302,87 @@ describe("updateSource, when the edit changes which subscription's bill is read"
     });
   });
 });
+
+/**
+ * The same rule on the edit path, for the identity the provider reports.
+ *
+ * Create and edit are two ways to reach the same forbidden state — two
+ * connections reading one account's spend — and guarding only the first leaves
+ * the second as the way round it. The account is asked for on both, so the
+ * refusal is the same sentence either way.
+ *
+ * Spec: specs/ai-gateway/governance/ingestion-sources.feature
+ * Decision: 00d claim C, settlement 6.
+ */
+describe("updateSource, when the edit changes which provider account is read", () => {
+  const ACCOUNT = "org_test_anthropic_0001";
+  const OTHER_ACCOUNT = "org_test_anthropic_0002";
+  const NEW_KEY = "sk-ant-admin-SECONDKEY-000000000";
+
+  const anthropicRow = (over: Record<string, unknown> = {}) =>
+    rowWith({
+      sourceType: "anthropic_admin",
+      name: "Anthropic spend",
+      parserConfig: {
+        adapter: "anthropic_admin",
+        report: "cost",
+        credentials: "enc:v1:abcdef",
+      },
+      providerAccountId: ACCOUNT,
+      ...over,
+    });
+
+  describe("given two connections reading two different provider accounts", () => {
+    /** @scenario "An edit that points a connection at an account another connection reads is refused" */
+    it("refuses the edit and names the connection that already reads it", async () => {
+      const other = anthropicRow({
+        id: "src_other",
+        name: "Anthropic spend, first",
+        providerAccountId: OTHER_ACCOUNT,
+      });
+      const { client, update } = fakePrisma(anthropicRow(), [other]);
+
+      await expect(
+        // Not yet implemented: the save-time account lookup, injected at the
+        // service seam. Here it answers with the account the OTHER connection
+        // already reads, which is what the swapped-in key belongs to.
+        IngestionSourceService.create(client, {
+          lookUpProviderAccount: vi.fn().mockResolvedValue(OTHER_ACCOUNT),
+        }).updateSource({
+          id: SOURCE_ID,
+          organizationId: ORG,
+          parserConfig: {
+            report: "cost",
+            credentials: { apiKey: NEW_KEY },
+          },
+        }),
+      ).rejects.toThrow(/Anthropic spend, first/);
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a connection reading a provider account", () => {
+    /** @scenario "Saving a connection without changing the account it reads is allowed" */
+    it("accepts a rename saved against the same account", async () => {
+      // A connection is not its own duplicate. Without this the guard refuses
+      // every edit any admin ever makes to a working connection.
+      const { client, update } = fakePrisma(anthropicRow());
+      const lookUpProviderAccount = vi.fn().mockResolvedValue(ACCOUNT);
+
+      await IngestionSourceService.create(client, {
+        lookUpProviderAccount,
+      }).updateSource({
+        id: SOURCE_ID,
+        organizationId: ORG,
+        name: "Anthropic spend, renamed",
+        parserConfig: { report: "cost" },
+      });
+
+      // Both halves, because either alone passes for the wrong reason: a
+      // service that never asks the provider accepts every edit, and a
+      // service that asks but never compares accepts every edit too.
+      expect(lookUpProviderAccount).toHaveBeenCalledOnce();
+      expect(update).toHaveBeenCalledOnce();
+    });
+  });
+});

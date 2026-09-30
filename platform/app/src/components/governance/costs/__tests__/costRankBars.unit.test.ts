@@ -20,6 +20,32 @@ import { describe, expect, it } from "vitest";
 import { rankBarGeometry } from "../CostCharts";
 
 describe("the ranked bar geometry", () => {
+  describe("given a row whose figure is withheld", () => {
+    it("draws it no bar and does not let it size the others", () => {
+      // Its `value` is a stand-in, not a measurement. Letting the placeholder
+      // into the scale would size every real bar against a number nobody
+      // measured; drawing a bar for it would state a length for a figure the
+      // screen is explicitly declining to state.
+      const geometry = rankBarGeometry([
+        { key: "a", label: "Alpha", value: 40 },
+        { key: "b", label: "Beta", value: 0, unpriced: true, unpricedCells: 3 },
+      ]);
+
+      expect(geometry.map((row) => row.widthPct)).toEqual([100, 0]);
+    });
+
+    it("does not read its placeholder zero as a credit", () => {
+      // A withheld row carries zero because the type needs a number there.
+      // Read as money that zero is not negative, but a future placeholder
+      // that is would draw the outline this screen reserves for refunds.
+      const geometry = rankBarGeometry([
+        { key: "a", label: "Alpha", value: -5, unpriced: true },
+      ]);
+
+      expect(geometry[0]?.isCredit).toBe(false);
+    });
+  });
+
   describe("given every row is a charge", () => {
     it("gives the leader the full bar and scales the rest against it", () => {
       const geometry = rankBarGeometry([

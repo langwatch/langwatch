@@ -28,6 +28,10 @@ export const AGENT_UNMEASURED = "The platform has not measured this yet.";
 /** What a dash means where the agent has registered and never been called. */
 export const AGENT_NEVER_RUN = "This agent has registered but has never run.";
 
+/** What a dash means in the environment column. */
+export const AGENT_ENVIRONMENT_UNDECLARED =
+  "This agent has not declared which environment it runs in.";
+
 /**
  * Why an agent's spend is missing, which is not the same sentence for every
  * source. Both layouts ask this rather than each carrying the branch, so a
@@ -86,6 +90,32 @@ export function AgentValue({
   return (
     <Text textStyle="sm" fontWeight="medium">
       {value}
+    </Text>
+  );
+}
+
+/**
+ * Where the agent runs.
+ *
+ * Here rather than at the two call sites for the reason everything else in
+ * this file is here: the card puts it beside the name and the table puts it in
+ * a column, and neither gets to decide on its own what an agent that declared
+ * no environment looks like. Muted and unweighted, because the environment is
+ * context for the name next to it rather than a figure being compared.
+ */
+export function AgentEnvironment({
+  environment,
+}: {
+  environment: string | null;
+}) {
+  if (environment === null) {
+    return (
+      <AgentValue value={null} missingReason={AGENT_ENVIRONMENT_UNDECLARED} />
+    );
+  }
+  return (
+    <Text textStyle="sm" color="fg.muted">
+      {environment}
     </Text>
   );
 }

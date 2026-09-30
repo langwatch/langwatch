@@ -9,7 +9,9 @@ import {
 } from "./schemas/constants";
 import {
   type PulledUsageObservedEventData,
+  type PulledUsageRetractedEventData,
   pulledUsageObservedEventDataSchema,
+  pulledUsageRetractedEventDataSchema,
 } from "./schemas/events";
 
 /**
@@ -55,6 +57,61 @@ function pulledUsageObservationKey(data: PulledUsageObservedEventData): string {
     data.observedAtMs,
   ].join(":");
 }
+
+/**
+ * The retraction key — what makes one withdrawal a distinct fact.
+ *
+ * Prefixed, and the prefix is the point. `findCostEventsForDay` collapses the
+ * day's events on `(TenantId, AggregateType, AggregateId, IdempotencyKey)`,
+ * and a retraction shares its aggregate id with every observation of the same
+ * charge. A key that could collide with an observation's would let one of the
+ * two silently replace the other in the comparator's read of the day; the
+ * literal makes that impossible by construction rather than by luck.
+ *
+ * The rest is the RETRACTED cell's address plus the observation instant that
+ * superseded it. Address, because two different cells of one charge are two
+ * different withdrawals; instant, because a charge corrected twice must
+ * withdraw twice. Re-delivering the same superseding observation reproduces
+ * the same key and is dropped here, which is what keeps an at-least-once
+ * outbox from filing the one withdrawal twice.
+ */
+function pulledUsageRetractionKey(data: PulledUsageRetractedEventData): string {
+  return [
+    "retract",
+    data.restatementKey,
+    data.currencyCode,
+    data.agentId,
+    data.rawActorId,
+    data.model,
+    data.observedAtMs,
+  ].join(":");
+}
+
+/**
+ * Withdraws the version of a charge that a later pull superseded.
+ *
+ * Same `aggregateId` as the observation it corrects — the restatement key —
+ * because the fold has to see the withdrawal and the charge on one ordered
+ * stream. A retraction on its own stream would be applied against whatever
+ * the projection happened to hold at the time, which is the race the single
+ * stream exists to remove.
+ */
+export const RetractPulledUsageCommand = defineCommand({
+  commandType: PULLED_USAGE_COMMAND_TYPES.RETRACT,
+  eventType: PULLED_USAGE_EVENT_TYPES.RETRACTED,
+  eventVersion: PULLED_USAGE_EVENT_VERSIONS.RETRACTED,
+  aggregateType: PULLED_USAGE_AGGREGATE_TYPE,
+  schema: pulledUsageRetractedEventDataSchema,
+  aggregateId: (data) => data.restatementKey,
+  idempotencyKey: (data) => pulledUsageRetractionKey(data),
+  spanAttributes: (data) => ({
+    "payload.source": data.source,
+    "payload.ingestion_source_id": data.ingestionSourceId,
+    "payload.currency_code": data.currencyCode,
+    "payload.retracted_model": data.model,
+  }),
+  makeJobId: (data) => pulledUsageRetractionKey(data),
+});
 
 /**
  * Records one priced pulled usage item.

@@ -122,6 +122,46 @@ describe("currency on a pulled usage record", () => {
     });
   });
 
+  describe("when the event names a currency for an amount the hint overrides", () => {
+    /** @scenario "A record from a provider that bills in another currency says which" */
+    it("names the currency of the amount it actually used", () => {
+      // The event's own pair is euros; the hint holds a separate, more precise
+      // dollar figure and says nothing about currency, which means dollars.
+      // Reading the amount from one and the currency from the other reports
+      // the dollar figure as euros — a wrong number with a straight face.
+      const built = buildPulledUsageRecord({
+        event: {
+          ...costEvent({ costUsd: "2.50" }),
+          cost_amount: "2.15",
+          cost_currency: "EUR",
+        },
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      expect(built?.costNanoMinor).toBe(2_500_000_000);
+      expect(built?.currencyCode).toBe("USD");
+    });
+
+    /** @scenario "A record from a provider that bills in another currency says which" */
+    it("takes both halves from the event when the hint holds no amount", () => {
+      const built = buildPulledUsageRecord({
+        event: {
+          ...costEvent({}),
+          cost_amount: "2.15",
+          cost_currency: "EUR",
+        },
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      expect(built?.costNanoMinor).toBe(2_150_000_000);
+      expect(built?.currencyCode).toBe("EUR");
+    });
+  });
+
   describe("when a record was written before money carried a currency", () => {
     /** @scenario "Records already on the durable log still read after the change" */
     it("reads its money as dollars with no biller conversion", () => {

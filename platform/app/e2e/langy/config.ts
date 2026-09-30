@@ -6,13 +6,39 @@
 export const APP_BASE =
   process.env.LANGY_APP_URL ??
   "https://app.langy-workspace.langwatch.localhost:1355";
-export const PROJECT_ID = process.env.LANGY_PROJECT_ID ?? "local-dev-project";
-export const PROJECT_SLUG =
+// Live bindings: a suite that seeds its own project (the guided onboarding
+// files create a fresh organization per run) points every helper at it with
+// `useProject`, and each importer reads the current value at call time.
+export let PROJECT_ID = process.env.LANGY_PROJECT_ID ?? "local-dev-project";
+export let PROJECT_SLUG =
   process.env.LANGY_PROJECT_SLUG ?? process.env.LANGY_PROJECT_ID ?? PROJECT_ID;
-export const ADMIN_EMAIL =
+
+/** Point the whole suite at another project for the rest of the process. */
+export function useProject({ id, slug }: { id: string; slug: string }): void {
+  PROJECT_ID = id;
+  PROJECT_SLUG = slug;
+}
+export let ADMIN_EMAIL =
   process.env.LANGY_ADMIN_EMAIL ?? "admin@haven.localhost";
-export const ADMIN_PASSWORD =
+export let ADMIN_PASSWORD =
   process.env.LANGY_ADMIN_PASSWORD ?? "LocalHavenAdmin!2026";
+
+/**
+ * Run the rest of the process as another account: every sign-in from here
+ * on, the tRPC helper's and the browser QA pass's alike, uses it. The guided
+ * fixtures sign a fresh user up per file, so no other session on the shared
+ * dogfooding account is a member of the organizations they seed.
+ */
+export function useAccount({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}): void {
+  ADMIN_EMAIL = email;
+  ADMIN_PASSWORD = password;
+}
 // langwatch-api.ts's Layer-2 REST verification defaulted to a stale
 // http://localhost:5560 (pre-haven port scheme) independent of APP_BASE
 // above — silently pointing every Layer-2 check at a dead port unless

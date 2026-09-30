@@ -2,11 +2,15 @@
  * What the Agents page shows for one agent, and the invented set it shows when
  * there is nothing real to show.
  *
- * The row shape is deliberately wider than any read the platform has today.
- * `agents.getAll` is project-scoped and the governance section is
- * organization-scoped, so nothing here is fetched — see the page for why. When
- * an organization-wide read lands it fills this same shape, and the cards stop
- * caring where the rows came from.
+ * The row shape is wider than what any one table holds. It is filled from two
+ * of them — an agent registered from code (ADR-128) and an agent a provider
+ * was asked to list — by `buildAgentInventory` on the server, and the cards do
+ * not care which one a row came from.
+ *
+ * It is still wider than what the platform MEASURES. Spend, request counts and
+ * health have no organization-wide read behind them yet, so a real row leaves
+ * all three null and the page draws a dash. The sample rows carry figures
+ * because they are illustrating what the page will hold.
  *
  * Every figure is nullable on purpose. A connected agent that registered this
  * morning and has never been called has no spend and no request count, and a
@@ -54,8 +58,16 @@ export const AGENT_HEALTH_LABELS: Record<AgentHealth, string> = {
 export interface GovernanceAgentRow {
   id: string;
   name: string;
-  /** Part of the agent's identity, not a tag: ADR-128 keys a row on it. */
-  environment: string;
+  /**
+   * Part of the agent's identity, not a tag: ADR-128 keys a row on it.
+   *
+   * `null` where no stage was declared. A provider-side agent is always null
+   * here: a Dataverse environment address and a Databricks workspace host name
+   * a PLACE, and this column is scanned for a stage, so putting one in the
+   * other's column would make "production" and "acme.crm4.dynamics.com"
+   * answers to the same question.
+   */
+  environment: string | null;
   /** `null` is the unclaimed case, which is the whole point of the filter. */
   owner: string | null;
   models: string[];

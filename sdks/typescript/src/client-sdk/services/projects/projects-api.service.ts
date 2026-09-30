@@ -144,6 +144,19 @@ export class ProjectsApiService {
     );
   }
 
+  /**
+   * The project's ingest key. The platform hands it out only to a credential
+   * with `project:update` on the project, so a 403 here is the answer "this
+   * login may not", not a transport failure.
+   */
+  async getApiKey(id: string): Promise<string> {
+    const answer = await this.request<{ apiKey: string }>(
+      `get api key of project "${id}"`,
+      `/api/projects/${encodeURIComponent(id)}/api-key`,
+    );
+    return answer.apiKey;
+  }
+
   async create(input: CreateProjectInput): Promise<ProjectWithServiceKey> {
     return this.request<ProjectWithServiceKey>(
       "create project",

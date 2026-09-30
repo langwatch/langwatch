@@ -2,6 +2,7 @@ import { Badge, Box, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 
 import {
   AGENT_NEVER_RUN,
+  AgentEnvironment,
   AgentFigure,
   agentCostMissingReason,
   formatAgentCost,
@@ -51,9 +52,7 @@ export function AgentCard({
     >
       <HStack gap={2} align="baseline" wrap="wrap">
         <Text fontWeight="semibold">{agent.name}</Text>
-        <Text textStyle="sm" color="fg.muted">
-          {agent.environment}
-        </Text>
+        <AgentEnvironment environment={agent.environment} />
         <Box flex="1" />
         <Badge size="xs" variant="subtle" colorPalette="purple">
           {AGENT_SOURCE_LABELS[agent.source]}

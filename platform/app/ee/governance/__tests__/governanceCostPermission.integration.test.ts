@@ -22,8 +22,9 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { hasOrganizationPermission } from "~/server/api/rbac";
+import { hasOrganizationPermission } from "~/server/app-layer/authz/permission-adapters";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 const ns = `govcost-${nanoid(8)}`;
@@ -95,28 +96,24 @@ describe("reading an organization's cost figures", () => {
     // does not escalate (rbac.ts, the universal personal-context floor). So the
     // grants have to be bindings, or the "admin can read" controls below would
     // fail for a reason that has nothing to do with this permission.
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb_${ns}_admin_here`,
-        organizationId: organization.id,
-        userId: adminHereId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb_${ns}_admin_here`,
+      organizationId: organization.id,
+      userId: adminHereId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organization.id,
     });
     // The cross-org actor's grant lives ONLY over there. No binding of any
     // kind names them in `organization` — their membership here is the bare
     // MEMBER row above.
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb_${ns}_admin_there`,
-        organizationId: otherOrganization.id,
-        userId: memberHereAdminThereId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: otherOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb_${ns}_admin_there`,
+      organizationId: otherOrganization.id,
+      userId: memberHereAdminThereId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: otherOrganization.id,
     });
   });
 
@@ -124,6 +121,8 @@ describe("reading an organization's cost figures", () => {
     await cleanupTestRows(prisma, [
       ["roleBinding", { organizationId: organization.id }],
       ["roleBinding", { organizationId: otherOrganization.id }],
+      ["grant", { organizationId: organization.id }],
+      ["grant", { organizationId: otherOrganization.id }],
       ["organizationUser", { organizationId: organization.id }],
       ["organizationUser", { organizationId: otherOrganization.id }],
       ["user", { id: memberHereAdminThereId }],

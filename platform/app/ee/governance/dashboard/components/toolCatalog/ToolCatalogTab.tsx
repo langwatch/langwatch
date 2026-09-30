@@ -2,7 +2,6 @@
 
 import { HStack, Spinner, Text } from "@chakra-ui/react";
 import { Boxes } from "lucide-react";
-import type { ReactNode } from "react";
 
 import { GovernanceEmptyState } from "~/components/governance/empty";
 import type { AiToolEntry } from "~/components/me/tiles/types";
@@ -61,7 +60,6 @@ export function ToolCatalogTab({
   error,
   sampleActive,
   layout,
-  addToolAction,
   renderActions,
 }: {
   /**
@@ -84,14 +82,6 @@ export function ToolCatalogTab({
   error: unknown;
   sampleActive: boolean;
   layout: ToolCatalogLayout;
-  /**
-   * The page header's own create control, rendered again inside the empty
-   * state. It is the SAME component the header renders, so it carries one
-   * label, one weight and one flow, which is what the create-on-top rule
-   * actually asks for. The rule forbids a second, differently-worded door,
-   * not a second way to reach the same one.
-   */
-  addToolAction?: ReactNode;
   /** The per-tool overflow menu, when the reader may act on the tool. */
   renderActions?: ToolCardActions;
 }) {
@@ -139,7 +129,6 @@ export function ToolCatalogTab({
         // the catalog, because "no tools" alone reads as something broken on a
         // page whose whole job is to say what the organization runs.
         description="Register the AI tools this organization runs and they appear here with what they cost and who uses them."
-        action={addToolAction}
       />
     );
   }
