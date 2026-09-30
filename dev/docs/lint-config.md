@@ -36,7 +36,7 @@ per rule).
   config, then architecture-enforcer; CI blocks on the oxlint half plus the
   enforcer policies already at zero by id.
 - **The cut is measured.** CPU time per rule, from a timer around each rule's
-  `create` and visitors. A rule moves when it holds
+  `create` and visitors (a local patch in `.claude/tmp/rule-timing/`, never committed). A rule moves when it holds
   5% or more of the plugin's time and removing it cuts the whole-tree run by 10%
   or more (2026-09-30: `comment-block-size`, about 46% of plugin time and 20% of
   user CPU; `pass-through-class` read 18% under the timer but its removal moved

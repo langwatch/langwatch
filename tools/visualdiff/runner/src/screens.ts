@@ -227,7 +227,7 @@ export const flowProject = ({
 
 /**
  * captureFlow runs one flow's steps on one page, each step's first action opening its own
- * screen, and stops at the first step that fails. Check mode photographs only expects and the failure.
+ * screen, and stops at the first failing step. Check mode photographs only expects and the failure.
  */
 export const captureFlow = async ({
   plan,

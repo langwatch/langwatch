@@ -118,7 +118,7 @@ describe("given the checked-in module lists", () => {
         dependencies: Record<string, string>;
       };
 
-      // The generator keeps the kernel declared on the server half (tools/devscripts/generatemodules.go).
+      // The generator keeps the kernel declared on the server half (generatemodules.go).
       expect(Object.keys(owner.dependencies).toSorted((a, b) => a.localeCompare(b))).toEqual(
         [...imported, "@langwatch/kernel"].toSorted((a, b) => a.localeCompare(b)),
       );

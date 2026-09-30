@@ -49,7 +49,7 @@ function pkg(kind: "contract" | "process" | "browser", feature = "widget"): Clas
   };
 }
 
-/** The generated module list a real process installs from; see tools/devscripts/generatemodules.go. */
+/** The generated module list a process installs from (tools/devscripts/generatemodules.go). */
 function generatedModuleList(identifiers: readonly string[] = []): void {
   write(
     "packages/installed-server-modules/src/server-modules.generated.ts",

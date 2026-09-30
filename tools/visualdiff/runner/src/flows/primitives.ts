@@ -138,7 +138,7 @@ const selectBox = async (context: ActionContext): Promise<Locator> => {
     .first();
 };
 
-/** select picks an option in a native select, or opens a combobox and picks the option in its list. */
+/** select picks an option in a native select, or opens a combobox and picks from its list. */
 export const select: Action = async (context) => {
   const option = argument({ context, name: "option" });
   const box = await selectBox(context);
@@ -154,7 +154,7 @@ export const select: Action = async (context) => {
   await context.side.page.getByRole("option", { name: option }).first().click({ timeout: 6000 });
 };
 
-/** type puts text into a box (placeholder, test id, label or selector) and optionally submits it. */
+/** type puts text into a box (placeholder, test id, label or selector), optionally submitting. */
 export const type: Action = async (context) => {
   const { side } = context;
   const box = isTargeted(context.args)
