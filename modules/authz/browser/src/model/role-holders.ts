@@ -79,7 +79,7 @@ export function holdersOfCustomRole({
     const holder = holderOf(binding);
     if (!holders.has(holder.key)) holders.set(holder.key, holder);
   }
-  return [...holders.values()].sort(
+  return [...holders.values()].toSorted(
     (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name),
   );
 }
@@ -118,7 +118,7 @@ export function scopesOfCustomRole({
       scopeName: binding.scopeName,
     });
   }
-  return [...scopes.values()].sort(
+  return [...scopes.values()].toSorted(
     (a, b) =>
       SCOPE_ORDER[a.scopeType] - SCOPE_ORDER[b.scopeType] ||
       (a.scopeName ?? "").localeCompare(b.scopeName ?? ""),

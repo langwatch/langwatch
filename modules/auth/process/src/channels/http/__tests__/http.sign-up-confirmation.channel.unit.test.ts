@@ -73,7 +73,7 @@ function harness(answer: (token: string) => Confirmed) {
 
   return {
     post,
-    async registered() {
+    registered: async () => {
       const response = await post("/sign-up/email", HOLDER);
       const { user } = SIGNED_UP.parse(await response.json());
       users.set(HOLDER.email, user.id);

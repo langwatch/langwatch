@@ -163,7 +163,8 @@ function scoreOther(tally, node) {
 }
 
 function prune(tally, node) {
-  while (tally.open.length > 0 && tally.open.at(-1).node.end <= node.start) tally.open.pop();
+  const { open } = tally;
+  while (open.length > 0 && open.at(-1).node.end <= node.start) open.pop();
   tally.frames = tally.frames.filter((frame) => frame.end > node.start);
 }
 

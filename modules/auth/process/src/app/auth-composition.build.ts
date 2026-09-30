@@ -151,7 +151,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
   }
 }
 
-/** The identity ceremonies, over identity's `*Api`: a user delete erases, an account write attaches. */
+/** Identity ceremonies over identity's `*Api`: a user delete erases, an account write attaches. */
 export class IdentityBetterAuthCeremonies extends BetterAuthIdentityCeremonies {
   static create(identity: Pick<IdentityApi, "ceremonies">): IdentityBetterAuthCeremonies {
     return new IdentityBetterAuthCeremonies(identity);

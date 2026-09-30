@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { SsoSelfServeContext } from "@langwatch/enterprise-sso-contract";
+import type {
+  SsoSelfServeAvailability,
+  SsoSelfServeContext,
+} from "@langwatch/enterprise-sso-contract";
 import {
   SsoLicenseRequiredError,
   SsoSelfServeUnavailableError,
@@ -105,7 +108,11 @@ export class SsoSelfServeContextService {
     };
   }
 
-  async availability({ organizationId }: { organizationId: string }) {
+  async availability({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SsoSelfServeAvailability> {
     return ssoSelfServeAvailability(await this.resolve({ organizationId }));
   }
 

@@ -35,10 +35,14 @@ function fakeStripe(): Stripe {
 }
 
 function composeService(licenseFeatures?: LicenseFeaturesResolver) {
-  const sendLicenseEmail = vi.fn(async (_: LicenseEmailDelivery) => undefined);
+  const sendLicenseEmail = vi.fn<(delivery: LicenseEmailDelivery) => Promise<undefined>>(
+    async () => undefined,
+  );
   const notifyLicensePurchase = vi.fn(async () => undefined);
   const delivery: LicensePurchaseDelivery = {
-    recordLicense: vi.fn(async (_: { licenseKey: string }) => undefined),
+    recordLicense: vi.fn<(license: { licenseKey: string }) => Promise<undefined>>(
+      async () => undefined,
+    ),
     sendLicenseEmail,
     notifyLicensePurchase,
   };

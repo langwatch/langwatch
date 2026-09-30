@@ -23,12 +23,9 @@ export const codexAgent: CodingAgentDefinition = {
   deriveSessionKeyFromSpan: ({ name, attrs }) => {
     // The helper's request span names its thread only through the ingestion stamp; its own
     // `thread.id` is a tokio worker id.
-    const threadId =
-      name === "turn/start"
-        ? attrs["langwatch.thread.id"]
-        : name === "session_task.turn"
-          ? attrs["thread.id"]
-          : null;
+    let threadId: unknown = null;
+    if (name === "turn/start") threadId = attrs["langwatch.thread.id"];
+    else if (name === "session_task.turn") threadId = attrs["thread.id"];
     return typeof threadId === "string" && threadId.includes("-") ? threadId : null;
   },
 

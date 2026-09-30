@@ -21,9 +21,11 @@ describe("the CLI's management permissions", () => {
         fs.readFileSync(HINT_SOURCE, "utf8"),
       )?.[1];
 
+      const byName = (a: string, b: string) => a.localeCompare(b);
+
       expect(
-        [...(listed ?? "").matchAll(/"([^"]+)"/g)].map((match) => match[1]).toSorted(),
-      ).toEqual(cliKeyManagementPermissions().toSorted());
+        [...(listed ?? "").matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? "").toSorted(byName),
+      ).toEqual(cliKeyManagementPermissions().toSorted(byName));
     });
   });
 });

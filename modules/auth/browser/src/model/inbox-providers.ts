@@ -1,8 +1,7 @@
 /**
- * The mailboxes most people have, and the door to each. Domains match exactly
- * (after the last "@", case-insensitively), never by suffix: a company's own
- * domain gets no guess, because a wrong guess is a login page for a mailbox
- * the person does not have.
+ * The mailboxes most people have, and the door to each. Domains match exactly (after the last
+ * "@", case-insensitively), never by suffix: a company's own domain gets no guess, because a
+ * wrong guess is a login page for a mailbox the person does not have.
  */
 export type InboxProviderId = "gmail" | "outlook" | "yahoo" | "icloud" | "proton" | "aol";
 

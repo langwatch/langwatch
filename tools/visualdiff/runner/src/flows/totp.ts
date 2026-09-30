@@ -62,9 +62,8 @@ const EDGE_MILLIS = 1500;
 
 /**
  * totp keeps the current code for a shared secret as `{as}` (default `{totpCode}`). The secret is
- * `secret` (a captured value), else the text of the element named by `from` (test id) or
- * `fromSelector`. With a `testId`, `selector`, `label` or `placeholder` it also types the code
- * there (`submit: "true"` presses Enter), as the `type` action does.
+ * `secret`, else the text of the element named by `from` (test id) or `fromSelector`. With a
+ * `testId`, `selector`, `label` or `placeholder` it also types the code (`submit: "true"` enters).
  */
 export const totp: Action = async (context) => {
   const { args, side } = context;

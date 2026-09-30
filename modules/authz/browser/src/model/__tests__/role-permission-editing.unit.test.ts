@@ -24,7 +24,7 @@ describe("given a role being edited one resource at a time", () => {
       permission: datasets("manage"),
       selected: [],
     });
-    expect([...next].sort()).toEqual([...DATASETS].sort());
+    expect([...next].toSorted()).toEqual([...DATASETS].toSorted());
   });
 
   /** @scenario Ticking a write action grants view with it */
@@ -34,7 +34,7 @@ describe("given a role being edited one resource at a time", () => {
       permission: datasets("update"),
       selected: [],
     });
-    expect([...next].sort()).toEqual([datasets("update"), datasets("view")].sort());
+    expect([...next].toSorted()).toEqual([datasets("update"), datasets("view")].toSorted());
   });
 
   /** @scenario Unticking view withdraws the writes that depend on it */

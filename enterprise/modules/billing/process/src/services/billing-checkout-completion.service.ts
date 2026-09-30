@@ -7,6 +7,7 @@ import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
  * the annual billing threshold.
  */
 import { createLogger } from "@langwatch/observability";
+import { Temporal } from "@langwatch/time";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
@@ -123,7 +124,9 @@ export class BillingCheckoutCompletionService {
       await this.announcer?.checkoutCompleted({
         organizationId,
         subscriptionId,
-        checkoutCreatedAt: new Date(checkoutSession.created * 1000).toISOString(),
+        checkoutCreatedAt: Temporal.Instant.fromEpochMilliseconds(
+          checkoutSession.created * 1000,
+        ).toString(),
       });
     }
   }

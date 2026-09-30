@@ -621,7 +621,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     // scan's own floor from anything that scales with page size.
     observe(rows.length > 0 ? "hit" : "empty");
 
-    // Marked sessions left with the dedup group above; this repeats the rule on the settled version.
+    // Marked sessions left with the dedup group above; this repeats the rule on the settled row.
     return dedupToLatestPerSession(rows)
       .map(fromRecord)
       .filter((row) => !row.auxiliary)

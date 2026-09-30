@@ -447,8 +447,8 @@ export function detectRequiredJoin(esField: string): CHTable | null {
  */
 export function getFieldsRequiringTable(table: CHTable): string[] {
   return Object.entries(fieldMappings)
-    .filter(([_, mapping]) => mapping.table === table)
-    .map(([field, _]) => field);
+    .filter(([, mapping]) => mapping.table === table)
+    .map(([field]) => field);
 }
 
 /**

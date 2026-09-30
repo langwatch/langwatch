@@ -5,17 +5,17 @@ import { judgeBody, readField } from "./expect.ts";
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
 /**
- * request sends an API call the UI cannot make, as the step's page: its session cookies, or
- * `auth` (a captured key) as X-Auth-Token. `method` defaults to POST, `body` is JSON text, `path`
- * takes {slug}. `status` (default any 2xx) is asserted; `field` with `equals`, `contains` or `min`
- * judges the reply as an api expect does; `as` keeps `field` (the whole body when unset) as `{as}`.
+ * request sends an API call the UI cannot make, as the step's page (`auth` is X-Auth-Token).
+ * `method` defaults to POST, `body` is JSON text, `path` takes {slug}, `status` defaults to any
+ * 2xx. `field` with `equals`, `contains` or `min` judges the reply; `as` keeps `field` as `{as}`.
  */
 export const request: Action = async (context) => {
   const { args, side } = context;
   const method = (args.method ?? "POST").toUpperCase();
   if (!METHODS.includes(method)) throw new Error(`request: unknown method "${method}"`);
   const path = fillPath({ path: argument({ context, name: "path" }), slug: context.slug });
-  const headers: Record<string, string> = args.auth === undefined ? {} : { "X-Auth-Token": args.auth };
+  const headers: Record<string, string> =
+    args.auth === undefined ? {} : { "X-Auth-Token": args.auth };
   if (args.body !== undefined) headers["Content-Type"] = "application/json";
   const response = await side.page.request.fetch(side.baseUrl + path, {
     method,
@@ -26,7 +26,8 @@ export const request: Action = async (context) => {
   });
   const status = response.status();
   const label = `${method} ${path}`;
-  if (args.status === undefined ? !response.ok() : String(status) !== args.status) {
+  const refused = args.status === undefined ? !response.ok() : String(status) !== args.status;
+  if (refused) {
     const text = (await response.text().catch(() => "")).slice(0, 120);
     throw new Error(`request ${label} answered ${status}, want ${args.status ?? "2xx"}: ${text}`);
   }
@@ -38,7 +39,9 @@ export const request: Action = async (context) => {
   if (args.as === undefined) return;
   const kept = readField({ body, path: args.field });
   if (kept === undefined || kept === null || kept === "") {
-    throw new Error(`request ${label}: nothing at ${args.field ?? "the body"} to keep as ${args.as}`);
+    throw new Error(
+      `request ${label}: nothing at ${args.field ?? "the body"} to keep as ${args.as}`,
+    );
   }
   context.values[args.as] = typeof kept === "string" ? kept : JSON.stringify(kept);
 };

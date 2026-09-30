@@ -2,13 +2,11 @@
  * @vitest-environment jsdom
  *
  * What a role can do, and who holds one (main's RolesPanel suite).
- *
  * Spec: specs/identity/org-access-cluster.feature
  */
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 
 const { api, state } = vi.hoisted(() => {
   const state = {

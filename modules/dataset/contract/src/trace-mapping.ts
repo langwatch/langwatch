@@ -335,7 +335,7 @@ const namedScoreOptions = ({
 
   return Object.fromEntries(
     Object.entries(scoreOptions as Record<string, AnnotationScoreOption | null>)
-      .filter(([_, score]) => score && score.value !== null)
+      .filter(([, score]) => score && score.value !== null)
       .map(([scoreId, score]) => [
         projectScores?.find((option) => option.id === scoreId)?.name ?? scoreId,
         score as AnnotationScoreOption,

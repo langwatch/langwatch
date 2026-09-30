@@ -472,7 +472,7 @@ function warnNonSerializableProps({
   params: Record<string, unknown>;
 }): void {
   const badKeys = Object.entries(params)
-    .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
+    .filter(([, v]) => typeof v === "function" || typeof v === "symbol")
     .map(([k]) => k);
   if (badKeys.length === 0) return;
   logger.warn(

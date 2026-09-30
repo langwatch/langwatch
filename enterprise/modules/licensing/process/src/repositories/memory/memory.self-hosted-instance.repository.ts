@@ -15,7 +15,7 @@ export class MemorySelfHostedInstanceRepository implements SelfHostedInstanceRep
   }
 
   readonly #rows = new Map<string, SelfHostedInstanceRecord>();
-  readonly #reports: (SelfHostedReportRecord & { instanceId: string })[] = [];
+  readonly #reports: { instanceId: string; record: SelfHostedReportRecord }[] = [];
 
   private constructor() {}
 
@@ -32,11 +32,13 @@ export class MemorySelfHostedInstanceRepository implements SelfHostedInstanceRep
 
   async appendReport(report: SelfHostedReportInsert): Promise<void> {
     this.#reports.push({
-      id: `self-hosted-report-${this.#reports.length + 1}`,
       instanceId: report.instanceId,
-      receivedAt: report.receivedAt,
-      version: report.version,
-      unknownFields: report.unknownFields,
+      record: {
+        id: `self-hosted-report-${this.#reports.length + 1}`,
+        receivedAt: report.receivedAt,
+        version: report.version,
+        unknownFields: report.unknownFields,
+      },
     });
   }
 
@@ -79,9 +81,9 @@ export class MemorySelfHostedInstanceRepository implements SelfHostedInstanceRep
   }): Promise<SelfHostedReportRecord[]> {
     return this.#reports
       .filter((report) => report.instanceId === instanceId)
+      .map(({ record }) => record)
       .toSorted((a, b) => b.receivedAt.epochMilliseconds - a.receivedAt.epochMilliseconds)
-      .slice(0, limit)
-      .map(({ instanceId: _, ...report }) => report);
+      .slice(0, limit);
   }
 }
 

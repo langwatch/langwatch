@@ -4,7 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
 // account, so nothing here reads a hand-saved auth.json any more.
 
 /* Lean headless Chromium: no GPU, no anti-aliasing, no /dev/shm, capped V8 heap.
- * Leaves out --single-process/--no-zygote: they crash Chromium once a test opens a second context. */
+ * Leaves out --single-process/--no-zygote: they crash Chromium once a test opens a second
+ * context. */
 const CHROMIUM_ARGS = [
   "--disable-gpu",
   "--disable-canvas-aa",

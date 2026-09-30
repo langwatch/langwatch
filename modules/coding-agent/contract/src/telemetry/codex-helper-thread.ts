@@ -21,7 +21,7 @@ const TEMPORARY_STRUCTURED_REQUEST_ID_PREFIX = "temporary-structured-";
 const QUEUE_KEY_THREAD_ID =
   /thread_id: "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/;
 
-/** Scope-gated: the request id shape is codex's own, and a foreign span reusing it marks nothing. */
+/** Scope-gated: the request id shape is codex's own; a foreign span reusing it marks nothing. */
 export function isCodexTemporaryStructuredRequestSpan({
   scopeName,
   attributes,

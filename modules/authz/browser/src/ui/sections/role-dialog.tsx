@@ -217,7 +217,6 @@ function RoleIdentityFields({
             maxLength: { value: 50, message: "Keep the name under 50 characters" },
           })}
           placeholder="Support analyst"
-          autoFocus
         />
         {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
       </Field.Root>
