@@ -5,8 +5,8 @@ description: >-
   one isolated worker subprocess per conversation, with per-request credential
   injection. Internal-only service consumed by the LangWatch control plane.
 type: application
-version: 3.19.2
-appVersion: 3.19.2
+version: 3.19.3
+appVersion: 3.19.3
 keywords:
   - langwatch
   - langy
