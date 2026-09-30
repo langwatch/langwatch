@@ -20,7 +20,10 @@ import {
 import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
+import {
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
 import { RoleService } from "../role/role.service";
@@ -68,7 +71,10 @@ const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
 
 import { createLogger } from "@langwatch/observability";
 import { TeamUserRole } from "~/generated/prisma/client";
-import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
+import {
+  DeveloperSeatNoSharedAccessError,
+  LiteMemberViewerOnlyError,
+} from "~/server/app-layer/teams/team.service";
 import { getApp } from "../app-layer/app";
 import type {
   PlanProvider,
@@ -205,6 +211,9 @@ interface TeamAssignmentInput {
  * they are written, but invitations stored before the rule may still promise
  * more; the seat corrects them here, the same way a seat change corrects
  * stored access rows, rather than refusing the person who clicked the link.
+ *
+ * A Developer seat (ADR-143) grants no team at all: whatever the stored
+ * invitation promised, the person lands with their personal team only.
  */
 export function resolveInviteTeamMemberships({
   role,
@@ -215,6 +224,8 @@ export function resolveInviteTeamMemberships({
   teamIds: string;
   teamAssignments: unknown;
 }): Array<{ teamId: string; role: TeamUserRole; customRoleId?: string }> {
+  if (!holdsSharedAccess(role)) return [];
+
   let memberships: Array<{
     teamId: string;
     role: TeamUserRole;
@@ -540,6 +551,13 @@ export class InviteService {
     role: OrganizationUserRole;
     teamAssignments?: TeamAssignmentInput[];
   }): void {
+    // A Developer seat (ADR-143) cannot be invited onto any team.
+    if (!holdsSharedAccess(role)) {
+      if ((teamAssignments ?? []).length > 0) {
+        throw new DeveloperSeatNoSharedAccessError();
+      }
+      return;
+    }
     if (role !== OrganizationUserRole.EXTERNAL) return;
     for (const assignment of teamAssignments ?? []) {
       if (assignment.customRoleId || assignment.role !== TeamUserRole.VIEWER) {
@@ -860,6 +878,8 @@ export class InviteService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<ResolvedInviteTeams | null> {
+    const seatOnly = this.resolveInviteTeamsForSeat(invite);
+    if (seatOnly) return seatOnly;
     if (invite.teams && invite.teams.length > 0) {
       return this.resolveExplicitInviteTeams({
         organizationId,
@@ -879,6 +899,19 @@ export class InviteService {
       return { teamAssignments: [], teamIdsString: "" };
     }
     return null;
+  }
+
+  /**
+   * A Developer seat (ADR-143) is invited onto no team, so an invite for one
+   * resolves to an empty team list before either storage form is read. The
+   * seat assertion has already refused explicit assignments; this covers the
+   * legacy comma-separated form, which would otherwise imply a default role.
+   */
+  private resolveInviteTeamsForSeat(
+    invite: { role: OrganizationUserRole },
+  ): ResolvedInviteTeams | null {
+    if (holdsSharedAccess(invite.role)) return null;
+    return { teamAssignments: [], teamIdsString: "" };
   }
 
   /**
@@ -1595,7 +1628,12 @@ export class InviteService {
       fallback: "inviteService",
     });
 
-    if (invite.role !== OrganizationUserRole.EXTERNAL) {
+    // No ORGANIZATION-scoped grant for a Lite Member (access comes from
+    // their teams) nor for a Developer (ADR-143: personal team only).
+    if (
+      invite.role !== OrganizationUserRole.EXTERNAL &&
+      holdsSharedAccess(invite.role)
+    ) {
       await writer.revokeBindingsWhere({
         organizationId: invite.organizationId,
         where: {

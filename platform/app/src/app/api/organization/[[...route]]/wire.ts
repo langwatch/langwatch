@@ -25,7 +25,10 @@ import type { OrganizationMemberSummary } from "~/server/app-layer/organizations
 import type { InviteService } from "~/server/invites/invite.service";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import type { RoleBindingService } from "~/server/role-bindings/role-binding.service";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
+import {
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "~/utils/memberRoleConstraints";
 
 /** The provider context every handler in this family receives. */
 export type OrganizationFamilyApp = BaseApp & {
@@ -230,6 +233,8 @@ export const storedTeamAssignmentSchema = z.object({
  * comma-separated team ids that imply the organization role's default).
  */
 export const inviteTeams = (invite: OrganizationInvite) => {
+  // A Developer seat (ADR-143) is invited onto no team, whatever the row says.
+  if (!holdsSharedAccess(invite.role)) return [];
   if (Array.isArray(invite.teamAssignments)) {
     return z
       .array(storedTeamAssignmentSchema.nullable().catch(null))
