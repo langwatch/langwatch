@@ -25,7 +25,7 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(conversation(ConversationId), 'Did the agent refuse the request?') AS refused
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
 FROM analytics.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId

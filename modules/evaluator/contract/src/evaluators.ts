@@ -50,3 +50,18 @@ export const findEvaluatorDefinitions = (evaluatorType: string): EvaluatorDefini
 
   return definition ? [definition] : [];
 };
+
+/**
+ * The prompt-driven LLM judges: they answer a free-form question about the
+ * content, so by default they read the whole trace or thread, tool calls and
+ * results included, rather than its first input and last output.
+ * @see specs/evaluators/judges-read-tool-evidence.feature
+ */
+export const LLM_JUDGE_EVALUATOR_TYPES = [
+  "langevals/llm_boolean",
+  "langevals/llm_score",
+  "langevals/llm_category",
+] as const;
+
+export const isLlmJudgeEvaluator = (evaluatorType: string): boolean =>
+  (LLM_JUDGE_EVALUATOR_TYPES as readonly string[]).includes(evaluatorType);

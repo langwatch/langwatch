@@ -327,3 +327,16 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     When the statement is hydrated
     Then the whole conversation is sent
     And the cell does not report itself truncated
+
+  # ---------------------------------------------------------------------------
+  # What the published examples teach
+  # ---------------------------------------------------------------------------
+
+  # Agents copy the published example. A question about what the agent did is
+  # decided by a tool result, which `conversation` names but does not hold.
+  @unit
+  Scenario: The eval function examples judge the thread's steps view
+    Given the published eval function catalog
+    When each eval function's example is read
+    Then its text is llm_readable_thread over the conversation
+    And no example judges the chat-only conversation view

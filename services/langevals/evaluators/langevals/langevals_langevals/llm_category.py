@@ -127,7 +127,7 @@ class CustomLLMCategoryEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "a short reasoning for the decision, written before the label",
+                                    "description": "A short justification, written before the label: the evidence in the content that decides the category (quote the values or name the tool result)",
                                 },
                                 "label": {
                                     "type": "string",
@@ -140,7 +140,7 @@ class CustomLLMCategoryEvaluator(
                             },
                             "required": ["reasoning", "label"],
                         },
-                        "description": "Record the category of the message: a short reasoning first, then the label.",
+                        "description": "Record the category of the message: a short justification that cites the evidence in the content, then the label.",
                     },
                 },
             ],
