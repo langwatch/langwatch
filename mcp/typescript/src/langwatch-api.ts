@@ -312,6 +312,8 @@ export async function makeRequest(
  */
 export async function searchTraces(params: {
   query?: string;
+  /** Exact trace ids: a primary-key seek on trace_summaries, not a scan (ADR-164). */
+  traceIds?: string[];
   filters?: Record<string, string[]>;
   /**
    * The Trace Explorer's query language, as one string. Combined server-side
