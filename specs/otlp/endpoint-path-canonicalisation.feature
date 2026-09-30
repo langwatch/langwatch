@@ -54,6 +54,11 @@ Feature: OTLP endpoint path canonicalisation
       When an exporter posts spans to the canonical path with a trailing slash
       Then the request is served as trace ingestion
 
+    @unit
+    Scenario: An endpoint with a doubled slash before the signal
+      When an exporter posts metrics to the canonical path with a doubled slash before the signal
+      Then the request is served as metric ingestion
+
   Rule: The appended suffix decides the signal, not the base endpoint
 
     @unit

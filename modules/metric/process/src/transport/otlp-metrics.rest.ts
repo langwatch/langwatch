@@ -90,6 +90,26 @@ export const otlpMetricsRest = defineRestRouter(MetricApi)
     return response.write({ status, mediaType: PRODUCES_JSON, body: JSON.stringify(body) });
   })
 
+  // A stray double slash before the signal: the receiver canonicalises the path itself.
+  .post("/:otlpBase{.+}/v1//metrics", "ingestOtlpMetricsAliasDoubled")
+  .withParams(otlpMetricAliasParamsSchema)
+  .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withAccess(PUBLIC_ACCESS)
+  .withResponse("protocol", { produces: PRODUCES_JSON, because: OTLP_PROTOCOL_REASON })
+  .withDocs({ hide: true })
+  .handle(async ({ app, raw, request, response }) => {
+    const { status, body } = otlpMetricAnswer(
+      await app.receiveOtlpMetrics({
+        method: request.method,
+        path: new URL(request.url).pathname,
+        headers: Object.fromEntries(request.headers),
+        body: raw,
+      }),
+    );
+    return response.write({ status, mediaType: PRODUCES_JSON, body: JSON.stringify(body) });
+  })
+
   .post("/v1/metrics", "ingestOtlpMetricsRootV1")
   .withRawBody("bytes")
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
