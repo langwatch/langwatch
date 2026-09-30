@@ -327,3 +327,16 @@ func TestCORSPreflightFromTheAppOrigin(t *testing.T) {
 		t.Fatalf("foreign preflight = %d %v", refused.StatusCode, refused.Header)
 	}
 }
+
+func TestSeedStoresSampleObjectsReadableOverS3(t *testing.T) {
+	ts := newTestServerWith(t, Config{Seed: true})
+	out, err := ts.sdk(devKey).GetObject(t.Context(), &s3.GetObjectInput{Bucket: aws.String("langwatch"), Key: aws.String("seed/hello.txt")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = out.Body.Close() }()
+	body, _ := io.ReadAll(out.Body)
+	if string(body) != "Hello from storagesim.\n" || aws.ToString(out.ContentType) != "text/plain" {
+		t.Fatalf("seeded object = %q %q", body, aws.ToString(out.ContentType))
+	}
+}

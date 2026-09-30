@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"hash/fnv"
 	"io"
 	"mime"
 	"net"
@@ -31,6 +32,9 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+// objectStripes is how many independent object locks there are; a power of two.
+const objectStripes = 64
 
 // maxObjectSize is S3's single-PUT ceiling.
 const maxObjectSize = 5 << 30
@@ -50,6 +54,9 @@ type Config struct {
 	// Buckets exist from the start (STORAGESIM_BUCKETS, comma-separated). Empty
 	// means every bucket exists; otherwise others answer NoSuchBucket until created.
 	Buckets []string
+	// Seed stores a couple of sample objects in the langwatch bucket at start
+	// (STORAGESIM_SEED=1).
+	Seed bool
 }
 
 // LoadConfig reads storagesim's configuration from the environment.
@@ -61,6 +68,7 @@ func LoadConfig() Config {
 		SecretAccessKey: os.Getenv("STORAGESIM_SECRET_ACCESS_KEY"),
 		CORSOrigins:     splitList(os.Getenv("STORAGESIM_CORS_ORIGINS")),
 		Buckets:         splitList(os.Getenv("STORAGESIM_BUCKETS")),
+		Seed:            os.Getenv("STORAGESIM_SEED") == "1",
 	}
 	if cfg.Addr == "" {
 		cfg.Addr = ":5590"
@@ -85,9 +93,11 @@ func splitList(raw string) []string {
 type Server struct {
 	cfg Config
 	now func() time.Time
-	// ponytail: one lock for every object; per-key locks if it ever matters.
-	mu      sync.Mutex
-	buckets map[string]bool // nil: every bucket exists
+	// stripes serialise writes against reads of the same object, so load on
+	// one key never blocks another; bucketMu guards the bucket set alone.
+	stripes  [objectStripes]sync.Mutex
+	bucketMu sync.RWMutex
+	buckets  map[string]bool // nil: every bucket exists
 	// console is the embedded bundle; log holds the recent S3 requests it lists.
 	console  http.Handler
 	log      *requestLog
@@ -121,6 +131,11 @@ func NewServer(cfg Config) (*Server, error) {
 		s.buckets = map[string]bool{}
 		for _, b := range cfg.Buckets {
 			s.buckets[b] = true
+		}
+	}
+	if cfg.Seed {
+		if err := s.seed(); err != nil {
+			return nil, fmt.Errorf("seeding %s: %w", cfg.DataDir, err)
 		}
 	}
 	return s, nil
@@ -238,8 +253,8 @@ func validate(obj object) *s3Error {
 }
 
 func (s *Server) bucketExists(bucket string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.bucketMu.RLock()
+	defer s.bucketMu.RUnlock()
 	return s.buckets == nil || s.buckets[bucket]
 }
 
@@ -247,11 +262,11 @@ func (s *Server) bucketExists(bucket string) bool {
 func (s *Server) serveBucket(w http.ResponseWriter, r *http.Request, requestID string, obj object) {
 	switch r.Method {
 	case http.MethodPut:
-		s.mu.Lock()
+		s.bucketMu.Lock()
 		if s.buckets != nil {
 			s.buckets[obj.bucket] = true
 		}
-		s.mu.Unlock()
+		s.bucketMu.Unlock()
 		w.Header().Set("Location", "/"+obj.bucket)
 		w.WriteHeader(http.StatusOK)
 	case http.MethodHead:
@@ -312,6 +327,15 @@ func (s *Server) path(obj object) string {
 	return filepath.Join(s.cfg.DataDir, hex.EncodeToString(sum[:]))
 }
 
+// lockObject takes the stripe the object's file name hashes to and returns its unlock.
+func (s *Server) lockObject(target string) (unlock func()) {
+	h := fnv.New32a()
+	_, _ = io.WriteString(h, target)
+	mu := &s.stripes[h.Sum32()%objectStripes]
+	mu.Lock()
+	return mu.Unlock
+}
+
 // expectedLength is the body length S3 requires up front: Content-Length, or
 // x-amz-decoded-content-length under aws-chunked framing.
 func expectedLength(r *http.Request, obj object) (int64, *s3Error) {
@@ -364,12 +388,12 @@ func (s *Server) putObject(w http.ResponseWriter, r *http.Request, obj object) *
 	}
 	raw, _ := json.Marshal(m)
 	target := s.path(obj)
-	s.mu.Lock()
+	unlock := s.lockObject(target)
 	err = s.writeSidecar(target+".json", raw)
 	if err == nil {
 		err = os.Rename(tmp.Name(), target) // replaces a planted symlink, never follows it
 	}
-	s.mu.Unlock()
+	unlock()
 	if err != nil {
 		return new(obj.fail(http.StatusInternalServerError, "InternalError", err.Error()))
 	}
@@ -425,10 +449,10 @@ func readMeta(name string) (meta, bool) {
 
 func (s *Server) getObject(w http.ResponseWriter, r *http.Request, obj object) *s3Error {
 	target := s.path(obj)
-	s.mu.Lock()
+	unlock := s.lockObject(target)
 	m, ok := readMeta(target + ".json")
 	f, info, openErr := openRegular(target)
-	s.mu.Unlock()
+	unlock()
 	if !ok || openErr != nil {
 		if f != nil {
 			_ = f.Close()
@@ -446,10 +470,9 @@ func (s *Server) getObject(w http.ResponseWriter, r *http.Request, obj object) *
 
 func (s *Server) deleteObject(obj object) {
 	target := s.path(obj)
-	s.mu.Lock()
+	defer s.lockObject(target)()
 	_ = os.Remove(target)
 	_ = os.Remove(target + ".json")
-	s.mu.Unlock()
 }
 
 // inlineTypes may render in a browser tab; SVG is absent because it can carry script.

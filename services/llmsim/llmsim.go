@@ -41,15 +41,31 @@ type Config struct {
 	Addr string
 	// Stack is the haven stack slug the console names (LLMSIM_STACK).
 	Stack string
+	// MaxCalls is how many calls the console remembers (LLMSIM_MAX_CALLS, default 500).
+	MaxCalls int
+	// MaxBodyBytes is the request body kept per call; a larger one is kept as
+	// a size and a head (LLMSIM_MAX_BODY_BYTES, default 262144).
+	MaxBodyBytes int
 }
 
 // LoadConfig reads llmsim's configuration from the environment.
 func LoadConfig() Config {
-	cfg := Config{Addr: os.Getenv("LLMSIM_ADDR"), Stack: os.Getenv("LLMSIM_STACK")}
+	cfg := Config{
+		Addr: os.Getenv("LLMSIM_ADDR"), Stack: os.Getenv("LLMSIM_STACK"),
+		MaxCalls:     envInt("LLMSIM_MAX_CALLS", defaultRecentCalls),
+		MaxBodyBytes: envInt("LLMSIM_MAX_BODY_BYTES", defaultBodyBytes),
+	}
 	if cfg.Addr == "" {
 		cfg.Addr = ":5595"
 	}
 	return cfg
+}
+
+func envInt(key string, fallback int) int {
+	if n, err := strconv.Atoi(os.Getenv(key)); err == nil && n > 0 {
+		return n
+	}
+	return fallback
 }
 
 // Server answers the provider calls and keeps the console's record of them.
@@ -64,7 +80,13 @@ type Server struct {
 
 // NewServer builds the Markov chain once and the server over it.
 func NewServer(cfg Config) *Server {
-	return &Server{cfg: cfg, chain: newMarkov(corpus), console: newConsole(embeddedConsole()), calls: newRing(recentCalls)}
+	if cfg.MaxCalls < 1 {
+		cfg.MaxCalls = defaultRecentCalls
+	}
+	if cfg.MaxBodyBytes < 1 {
+		cfg.MaxBodyBytes = defaultBodyBytes
+	}
+	return &Server{cfg: cfg, chain: newMarkov(corpus), console: newConsole(embeddedConsole()), calls: newRing(cfg.MaxCalls)}
 }
 
 // Handler routes provider calls by path suffix, so /v1/chat/completions,
@@ -143,7 +165,7 @@ func (s *Server) serveProvider(w http.ResponseWriter, r *http.Request, path stri
 		fail(http.StatusBadRequest, "request body is not a JSON object: "+err.Error())
 		return
 	}
-	rec.Request = recordedBody(raw)
+	rec.Request = recordedBody(raw, s.cfg.MaxBodyBytes)
 	rec.Model = str(body["model"])
 	if status := s.forcedStatus(r.Header, rec.Model); status != 0 {
 		if status == http.StatusTooManyRequests {
@@ -243,7 +265,23 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 // Models are what /models lists; any model name is answered regardless.
-var Models = []string{"markov-small", "markov-json", "langy-echo", "text-embedding-llmsim"}
+var Models = []string{"markov-small", "markov-json", "langy-echo", "text-embedding-llmsim", "canned-hello", "canned-ok", "canned-json"}
+
+// canned are the fixed answers a "canned-<name>" model returns, whatever the prompt.
+var canned = map[string]string{
+	"hello": "Hello from llmsim. This answer is canned: the same for every prompt.",
+	"ok":    "OK",
+	"json":  `{"answer":"canned","source":"llmsim"}`,
+}
+
+func cannedFor(model string) (string, bool) {
+	for name, text := range canned {
+		if strings.Contains(model, "canned-"+name) {
+			return text, true
+		}
+	}
+	return "", false
+}
 
 func writeModels(w http.ResponseWriter, r *http.Request) {
 	data := make([]map[string]any, 0, len(Models))

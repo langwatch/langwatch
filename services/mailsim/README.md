@@ -19,6 +19,12 @@ make service-watch svc=mailsim      # live reload via air
 MAILSIM_DATA_DIR=/tmp/mailsim make service svc=mailsim   # messages survive a restart
 ```
 
+## Limits and seed
+
+The inbox keeps the newest `MAILSIM_MAX_MESSAGES` messages (default 10000) and
+evicts the oldest, from disk too; lookups by id and recipient are indexed.
+`MAILSIM_SEED=1` delivers three sample messages at start (haven sets it).
+
 ## The HTTP API
 
 ```
