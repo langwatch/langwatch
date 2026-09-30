@@ -1,0 +1,25 @@
+# dataset: journeys interactionsimulator completed, for a builder lane to adopt into
+# tools/visualdiff/flows. Unreviewed: prefer test ids over the role selectors before adopting.
+flows:
+  - id: sim-dataset-create
+    title: Create a dataset and see it listed
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: new-dataset
+      - action: fill
+        with:
+          selector: role=textbox[name="Name"s]
+          value: Sim dataset {uid}
+      - action: click
+        with:
+          selector: role=button[name="Save"s]
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: expect
+        with:
+          text: Sim dataset {uid}
