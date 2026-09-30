@@ -690,9 +690,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
     validateCreateData: (data) => {
       const records = createRecords(data);
       for (const d of records) {
-        if (!d) return "create requires a data payload";
+        if (!d) return "requires a data payload";
         if (typeof d.organizationId !== "string") {
-          return "create requires an organizationId in the data payload";
+          return "requires an organizationId in the data payload";
         }
       }
       return null;

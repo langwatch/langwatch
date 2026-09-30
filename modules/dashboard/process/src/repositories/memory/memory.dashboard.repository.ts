@@ -1,3 +1,4 @@
+import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
   dashboardSchema,
   graphSchema,
@@ -184,17 +185,12 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return chart ? graphOf(chart) : undefined;
   }
 
-  async findLastGraphGridRow(input: {
-    projectId: string;
-    dashboardId: string;
-  }): Promise<number | undefined> {
-    const rows = this.#charts
-      .filter(
+  async findNextFreeGridRow(input: { projectId: string; dashboardId: string }): Promise<number> {
+    return chartGridBottomRow(
+      this.#charts.filter(
         (chart) => chart.projectId === input.projectId && chart.dashboardId === input.dashboardId,
-      )
-      .toSorted((left, right) => right.gridRow - left.gridRow);
-
-    return rows[0]?.gridRow;
+      ),
+    );
   }
 
   async createGraph(input: {

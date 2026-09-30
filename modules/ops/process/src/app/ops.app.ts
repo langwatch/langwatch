@@ -229,6 +229,7 @@ import {
   submitBugReportSchema,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import { storesOwner } from "@langwatch/process-stores/config";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
@@ -625,6 +626,8 @@ export interface OpsAppInfrastructure {
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
+  /** Whether a caller manages an organization, which opens the checkup's details. */
+  authz: Pick<AuthzApiContract, "hasPermission">;
   featureFlags: FeatureFlagApi;
   projects: ProjectApiContract;
   auditLog: AuditLogApi;
@@ -710,6 +713,8 @@ export class OpsApp implements OpsApi {
   static readonly config = opsConfig;
   static readonly secrets = {
     licensePrivateKey: licensingSecrets.licensePrivateKey,
+    /** The stores' own handle: goose reads migration status from the same ClickHouse. */
+    clickhouseUrl: storesOwner.secrets.clickhouse,
   } as const;
   static readonly publicConfig = opsBrowserConfig.project;
   static readonly reads = [
@@ -772,7 +777,12 @@ export class OpsApp implements OpsApi {
       },
       repositories: {
         postgres: PrismaPostgresHealthRepository.create(members.prisma),
-        clickhouse: ClickHouseClickHouseHealthRepository.create(members.clickhouse),
+        clickhouse: await setup.secrets.into(OpsApp.secrets.clickhouseUrl, (connectionUrl) =>
+          ClickHouseClickHouseHealthRepository.create({
+            clickhouse: members.clickhouse,
+            connectionUrl,
+          }),
+        ),
         redis: RedisRedisHealthRepository.create(members.redis),
       },
       channels: {
@@ -839,6 +849,7 @@ export class OpsApp implements OpsApi {
 
     return new OpsApp({
       ops: members.createCapability(dependencies),
+      authz: dependencies.authz,
       inbox,
       intake: BugReportIntakeService.create({
         reports: repositories.bugReports,
@@ -1405,6 +1416,23 @@ export class OpsApp implements OpsApi {
     return this.#operatorOf(operator) !== null;
   }
 
+  /** The checkup's details: an install admin's, or a manager's of the organization asked about. */
+  async #readsCheckupDetails({
+    organizationId,
+    operator,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<boolean> {
+    if (this.#isInstallAdmin(operator)) return true;
+    if (!operator) return false;
+    return this.#dependencies.authz.hasPermission({
+      userId: operator.id,
+      permission: "organization:manage",
+      organizationId,
+    });
+  }
+
   // -- the operator-only ClickHouse EXPLAIN ----------------------------------
 
   /**
@@ -1778,7 +1806,7 @@ export class OpsApp implements OpsApi {
     if (checkup.isSaas) return { deployment: "saas" };
     const result = await checkup.cheapFor({
       organizationId,
-      installAdmin: this.#isInstallAdmin(operator),
+      installAdmin: await this.#readsCheckupDetails({ organizationId, operator }),
       requestedBy: "checkup",
     });
     return { deployment: "self-hosted", ...result };
@@ -1799,7 +1827,7 @@ export class OpsApp implements OpsApi {
     const result = await checkup.explicitFor({
       ...input,
       organizationId,
-      installAdmin: this.#isInstallAdmin(operator),
+      installAdmin: await this.#readsCheckupDetails({ organizationId, operator }),
       requestedBy: requestedBy ?? "checkup",
     });
     return { deployment: "self-hosted", ...result };
@@ -1816,13 +1844,13 @@ export class OpsApp implements OpsApi {
     if (checkup.isSaas) return { deployment: "saas" };
     const report = await checkup.usageReportFor({
       organizationId,
-      installAdmin: this.#isInstallAdmin(operator),
+      installAdmin: await this.#readsCheckupDetails({ organizationId, operator }),
     });
     return { deployment: "self-hosted", ...report };
   }
 
   async setUsageReportSwitches({
-    organizationId: _organizationId,
+    organizationId,
     operator,
     ...switches
   }: {
@@ -1833,7 +1861,9 @@ export class OpsApp implements OpsApi {
   }): Promise<UsageReportAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
-    this.admitOperator(operator, "ops:manage");
+    if (!(await this.#readsCheckupDetails({ organizationId, operator }))) {
+      throw new OpsOperatorRequiredError("ops:manage");
+    }
     const report = await checkup.setUsageReportSwitches(switches);
     return { deployment: "self-hosted", ...report };
   }

@@ -56,6 +56,26 @@ Feature: Migration order check
     When the PR adds no migrations
     Then the check passes
 
+  Scenario: A PR into a long-running branch ports a migration main already released
+    Given the PR targets a branch other than main
+    And that branch's newest migration is numbered above one main has released
+    When the PR adds main's released migration under its exact name
+    Then the check passes, because main is read as a release line whose migrations are history
+    And a migration the PR adds that main never released is still judged against the branch
+
+  Scenario: A new migration shares a key with a released migration the PR ports
+    Given the PR ports a migration main released, numbered 41
+    When the PR also adds a migration main never released, numbered 41
+    Then the check fails
+    And the comment says the key is taken by the ported migration
+    And the renumbering it offers lands above the ported migration's key
+
+  Scenario: A ported migration differs from the copy main released
+    Given main released a migration, under its old migration root or the current one
+    When the PR adds a migration with that exact name but different contents
+    Then the check fails, because migrations that have run somewhere cannot change
+    And the comment gives the commands that restore main's copy under the current root
+
   Scenario: The comment goes away once the migration is renumbered
     Given a PR carries a migration-order comment
     When the author applies the rename and pushes

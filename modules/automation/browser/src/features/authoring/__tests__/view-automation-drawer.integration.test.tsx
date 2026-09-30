@@ -19,6 +19,7 @@ vi.mock("../../../behavior/automation-session.ts", () => ({
     organization: { id: "org-1" },
     team: { slug: "team-1" },
   }),
+  useCloseAddressedDrawer: () => vi.fn(),
 }));
 
 vi.mock("../../../ui/elements/filter-display.tsx", () => ({

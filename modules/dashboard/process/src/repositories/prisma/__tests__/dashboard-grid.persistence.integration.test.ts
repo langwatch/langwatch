@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { CHART_GRID_DEFAULT_ROW_SPAN } from "@langwatch/analytics-contract/chart-grid";
 import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import {
@@ -165,7 +166,10 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     });
 
     await expect(graphRow(builder.id)).resolves.toEqual({ gridRow: 4, kind: "builder" });
-    await expect(graphRow(placed.id)).resolves.toEqual({ gridRow: 5, kind: "workbench_sql" });
+    await expect(graphRow(placed.id)).resolves.toEqual({
+      gridRow: 4 + CHART_GRID_DEFAULT_ROW_SPAN,
+      kind: "workbench_sql",
+    });
   });
 
   /** @scenario "Placing a saved workbench chart does not let a builder chart land on top of it" */
@@ -195,7 +199,10 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     });
 
     await expect(graphRow(saved.id)).resolves.toEqual({ gridRow: 4, kind: "workbench_sql" });
-    await expect(graphRow(builder.id)).resolves.toEqual({ gridRow: 5, kind: "builder" });
+    await expect(graphRow(builder.id)).resolves.toEqual({
+      gridRow: 4 + CHART_GRID_DEFAULT_ROW_SPAN,
+      kind: "builder",
+    });
   });
 
   it("maps an explicit saved-chart id collision through the repository's Prisma catch", async () => {

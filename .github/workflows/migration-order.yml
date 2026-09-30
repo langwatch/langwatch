@@ -80,7 +80,13 @@ jobs:
       - name: Fetch base branch
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+        run: |
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          # A PR into a long-running branch may port migrations main already
+          # released; they keep their names, so main is read as history too.
+          if [ "${BASE_REF}" != "main" ]; then
+            git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          fi
 
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -92,7 +98,10 @@ jobs:
       - name: Check migration order
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: go run ./cmd/migrationorder -base "origin/${BASE_REF}" -json > findings.json
+        run: |
+          released=()
+          [ "${BASE_REF}" != "main" ] && released=(-released origin/main)
+          go run ./cmd/migrationorder -base "origin/${BASE_REF}" "${released[@]}" -json > findings.json
 
       # Fork PRs get a read-only GITHUB_TOKEN, so the POST would 403. The check
       # below still fails them — they just read the reason in the job log.
@@ -167,4 +176,7 @@ jobs:
       - name: Fail if out of order
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: go run ./cmd/migrationorder -base "origin/${BASE_REF}"
+        run: |
+          released=()
+          [ "${BASE_REF}" != "main" ] && released=(-released origin/main)
+          go run ./cmd/migrationorder -base "origin/${BASE_REF}" "${released[@]}"

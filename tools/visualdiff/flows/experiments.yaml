@@ -270,14 +270,18 @@ flows:
                 localPromptConfig:
                   llm: { model: openai/gpt-4o-mini }
                   messages:
-                    - { role: user, content: "Repeat the input back exactly and nothing else: {{input}}" }
+                    - {
+                        role: user,
+                        content: "Repeat the input back exactly and nothing else: {{input}}",
+                      }
                   inputs: [{ identifier: input, type: str }]
                   outputs: [{ identifier: output, type: str }]
                 inputs: [{ identifier: input, type: str }]
                 outputs: [{ identifier: output, type: str }]
                 mappings:
                   test-data:
-                    input: { type: source, source: dataset, sourceId: test-data, sourceField: input }
+                    input:
+                      { type: source, source: dataset, sourceId: test-data, sourceField: input }
         as:
           expSlug: slug
       - post: /api/experiments/{expSlug}/run
@@ -361,7 +365,49 @@ flows:
                 inline:
                   columns: *runnableColumns
                   records:
-                    input: [vd row 00, vd row 01, vd row 02, vd row 03, vd row 04, vd row 05, vd row 06, vd row 07, vd row 08, vd row 09, vd row 10, vd row 11, vd row 12, vd row 13, vd row 14, vd row 15, vd row 16, vd row 17, vd row 18, vd row 19, vd row 20, vd row 21, vd row 22, vd row 23, vd row 24, vd row 25, vd row 26, vd row 27, vd row 28, vd row 29, vd row 30, vd row 31, vd row 32, vd row 33, vd row 34, vd row 35, vd row 36, vd row 37, vd row 38, vd row 39]
+                    input:
+                      [
+                        vd row 00,
+                        vd row 01,
+                        vd row 02,
+                        vd row 03,
+                        vd row 04,
+                        vd row 05,
+                        vd row 06,
+                        vd row 07,
+                        vd row 08,
+                        vd row 09,
+                        vd row 10,
+                        vd row 11,
+                        vd row 12,
+                        vd row 13,
+                        vd row 14,
+                        vd row 15,
+                        vd row 16,
+                        vd row 17,
+                        vd row 18,
+                        vd row 19,
+                        vd row 20,
+                        vd row 21,
+                        vd row 22,
+                        vd row 23,
+                        vd row 24,
+                        vd row 25,
+                        vd row 26,
+                        vd row 27,
+                        vd row 28,
+                        vd row 29,
+                        vd row 30,
+                        vd row 31,
+                        vd row 32,
+                        vd row 33,
+                        vd row 34,
+                        vd row 35,
+                        vd row 36,
+                        vd row 37,
+                        vd row 38,
+                        vd row 39,
+                      ]
                 columns: *runnableColumns
         as:
           expSlug: slug
@@ -500,7 +546,8 @@ flows:
                 mappings:
                   test-data:
                     target-1:
-                      output: { type: source, source: target, sourceId: target-1, sourceField: output }
+                      output:
+                        { type: source, source: target, sourceId: target-1, sourceField: output }
         as:
           expSlug: slug
     steps:
@@ -547,7 +594,8 @@ flows:
                 mappings:
                   test-data:
                     target-1:
-                      output: { type: source, source: target, sourceId: target-1, sourceField: output }
+                      output:
+                        { type: source, source: target, sourceId: target-1, sourceField: output }
         as:
           expSlug: slug
     steps:
@@ -659,8 +707,22 @@ flows:
               cost: 0.002
               duration: 140
           evaluations:
-            - { evaluator: vd-exact, name: Exact match, status: processed, index: 0, score: 1, passed: true }
-            - { evaluator: vd-exact, name: Exact match, status: processed, index: 1, score: 0, passed: false }
+            - {
+                evaluator: vd-exact,
+                name: Exact match,
+                status: processed,
+                index: 0,
+                score: 1,
+                passed: true,
+              }
+            - {
+                evaluator: vd-exact,
+                name: Exact match,
+                status: processed,
+                index: 1,
+                score: 0,
+                passed: false,
+              }
           timestamps:
             created_at: 1790726400000
             finished_at: 1790726405000

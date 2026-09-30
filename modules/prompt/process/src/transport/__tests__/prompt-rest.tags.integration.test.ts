@@ -233,9 +233,14 @@ describe("the prompt tag routes", () => {
 
     describe("when a tag name carries a null byte", () => {
       /** @scenario "a prompt field carrying a null byte is refused as a bad request" */
-      it("answers 400 on create and on rename instead of a database failure", async () => {
-        expect((await api.createTag("ca\u0000nary")).status).toBe(400);
-        expect((await api.renameTag("staging", "ca\u0000nary")).status).toBe(400);
+      it("refuses it as a validation error on create and on rename instead of a database failure", async () => {
+        const refusals = [
+          await api.createTag("ca\u0000nary"),
+          await api.renameTag("staging", "ca\u0000nary"),
+        ];
+
+        expect(refusals.map((refusal) => refusal.status)).toEqual([422, 422]);
+        expect(await api.listTagNames()).toContain("staging");
       });
     });
 

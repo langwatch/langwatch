@@ -35,6 +35,7 @@ import {
   type ServerContribution,
   type ServerLogger,
 } from "./server.ts";
+import { processShutdownDeadlineMs } from "./shutdown-deadline.ts";
 import { assetBaseOrigin, normalizeAssetBase } from "./transport/asset-base.ts";
 import { projectPublicConfig } from "./transport/bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./transport/config-owner.ts";
@@ -58,7 +59,10 @@ export class ProcessServer implements ProcessBoot {
       logger: options.logger,
       ownsProcess: options.ownsProcess,
       healthPort: options.healthPort ?? settings.port,
-      shutdownDeadlineMs: settings.shutdownDeadlineMs,
+      shutdownDeadlineMs: processShutdownDeadlineMs({
+        deadlineMs: settings.shutdownDeadlineMs,
+        queueDrainMs: (options.config.stores as StoresConfig | undefined)?.shutdownDrainTimeoutMs,
+      }),
     });
     return new ProcessServer({
       server,

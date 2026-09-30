@@ -116,7 +116,7 @@ describe("LangWatchQLHydrationService.hydrate", () => {
     await expect(
       service.hydrate({
         projectIds: ["project-1"],
-        protections: {},
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
         calls: [{ column: "trace", function: "trace_json", options: [] }],
         columns: [{ name: "trace", type: "String" }],
         rows: Array.from({ length: cap + 1 }, (_, index) => ({ trace: `trace-${index}` })),

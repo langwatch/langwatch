@@ -1519,11 +1519,10 @@ jobs:
     needs: [
         changes,
         # `affected` decides test-unit's matrix, and test-unit is an allowed
-        # skip. So if this job failed and were not named here, test-unit would
-        # skip, the skip would be allowed, and the lane would report green
-        # having run no unit tests at all. It is deliberately NOT in
-        # allowed-skips below: a graph that cannot answer must stop the merge,
-        # not quietly excuse the tests it was meant to select.
+        # skip. It is named here so its own result votes: a failed `affected`
+        # fails this gate, since allowed-skips excuses only a skip. It is
+        # also in allowed-skips because it skips when `changes` found no
+        # relevant path, and then there is nothing for it to select.
         affected,
         typecheck,
         test-unit,
@@ -1542,4 +1541,4 @@ jobs:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, package-suites, lint, feature-parity, openapi-drift, build, ci-scripts-test, ci-self-test
+          allowed-skips: affected, typecheck, test-unit, package-suites, lint, feature-parity, openapi-drift, build, ci-scripts-test, ci-self-test

@@ -3,35 +3,44 @@
  * takes and what it answers, stated once in the package both sides import.
  * Spec: dashboard-service.feature.
  */
+import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
+} from "@langwatch/analytics-contract/chart-grid";
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { triggerSchema } from "@langwatch/automation-contract";
 import { z } from "zod";
 
 import { graphSchema } from "./graph.ts";
 
-/**
- * Where a card sits on the dashboard grid. Shared as loose fields rather than
- * a schema because `create` takes each one optionally and the layout writes
- * take them all.
- */
-export const graphApiLayoutShape = {
-  gridColumn: z.number().min(0).max(1),
-  gridRow: z.number().min(0),
-  colSpan: z.number().min(1).max(2),
-  rowSpan: z.number().min(1).max(2),
+const fitsGridWidth = {
+  message: "gridColumn + colSpan must not exceed the grid's columns",
+  path: ["colSpan"],
 };
 
-export const graphApiCreateInputSchema = z.object({
-  projectId: z.string(),
-  name: z.string(),
-  graph: z.string(),
-  filterParams: z.any().optional(),
-  dashboardId: z.string().optional(),
-  gridColumn: graphApiLayoutShape.gridColumn.optional(),
-  gridRow: graphApiLayoutShape.gridRow.optional(),
-  colSpan: graphApiLayoutShape.colSpan.optional(),
-  rowSpan: graphApiLayoutShape.rowSpan.optional(),
-});
+/**
+ * `create` takes each placement field optionally and persists the grid's
+ * default for an omitted one, so the width check runs on the placement the
+ * row will carry.
+ */
+export const graphApiCreateInputSchema = z
+  .object({
+    projectId: z.string(),
+    name: z.string(),
+    graph: z.string(),
+    filterParams: z.any().optional(),
+    dashboardId: z.string().optional(),
+    ...chartGridPlacementSchema.partial().shape,
+  })
+  .refine(
+    (value) =>
+      fitsChartGridWidth({
+        gridColumn: value.gridColumn ?? 0,
+        colSpan: value.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+      }),
+    fitsGridWidth,
+  );
 
 /** One project's graphs, optionally narrowed to one dashboard. */
 export const graphApiListInputSchema = z.object({
@@ -53,15 +62,21 @@ export const graphApiUpdateInputSchema = z.object({
   filterParams: z.any().optional(),
 });
 
-export const graphApiUpdateLayoutInputSchema = z.object({
-  projectId: z.string(),
-  graphId: z.string(),
-  ...graphApiLayoutShape,
-});
+export const graphApiUpdateLayoutInputSchema = z
+  .object({
+    projectId: z.string(),
+    graphId: z.string(),
+    ...chartGridPlacementSchema.shape,
+  })
+  .refine(fitsChartGridWidth, fitsGridWidth);
 
 export const graphApiBatchUpdateLayoutsInputSchema = z.object({
   projectId: z.string(),
-  layouts: z.array(z.object({ graphId: z.string(), ...graphApiLayoutShape })),
+  layouts: z.array(
+    z
+      .object({ graphId: z.string(), ...chartGridPlacementSchema.shape })
+      .refine(fitsChartGridWidth, fitsGridWidth),
+  ),
 });
 
 export type GraphApiCreateInput = z.infer<typeof graphApiCreateInputSchema>;

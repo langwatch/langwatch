@@ -19,20 +19,20 @@ flows:
       - action: fill
         with:
           field: Flag failing traces
-          value: 'vd-hook-{uid}'
+          value: "vd-hook-{uid}"
       - action: click
         with:
           text: /^\s*Code\s*$/
       - action: click
         with:
-          text: 'status:error'
+          text: "status:error"
       - action: click
         with:
           text: /^\s*Webhook/
       - action: fill
         with:
-          field: 'https://example.com/hooks/langwatch'
-          value: 'https://example.com/hooks/vd-{uid}'
+          field: "https://example.com/hooks/langwatch"
+          value: "https://example.com/hooks/vd-{uid}"
       - action: click
         with:
           text: /^\s*Done\s*$/
@@ -52,7 +52,7 @@ flows:
           path: /{slug}/automations/automations
       - action: expect
         with:
-          label: 'Actions for vd-hook-{uid}'
+          label: "Actions for vd-hook-{uid}"
 
   - id: automation-condition-preview-and-save
     title: Build a condition from the query chips, see the trace preview and keep it after saving
@@ -69,13 +69,13 @@ flows:
       - action: fill
         with:
           field: Flag failing traces
-          value: 'vd-cond-{uid}'
+          value: "vd-cond-{uid}"
       - action: click
         with:
           text: /^\s*Code\s*$/
       - action: click
         with:
-          text: 'model:gpt*'
+          text: "model:gpt*"
       - action: expect
         with:
           text: /matched/
@@ -85,8 +85,8 @@ flows:
           text: /^\s*Email/
       - action: fill
         with:
-          field: 'alerts@partner.com'
-          value: 'vd-{uid}@example.com'
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
       - action: click
         with:
           text: Add email
@@ -105,10 +105,10 @@ flows:
           path: /{slug}/automations/automations
       - action: expect
         with:
-          label: 'Actions for vd-cond-{uid}'
+          label: "Actions for vd-cond-{uid}"
       - action: expect
         with:
-          text: 'model:gpt*'
+          text: "model:gpt*"
 
   - id: automation-from-traces-view
     title: Automate the current trace filter from the traces toolbar and find the automation listed
@@ -139,14 +139,14 @@ flows:
       - action: fill
         with:
           field: Flag failing traces
-          value: 'vd-fromtraces-{uid}'
+          value: "vd-fromtraces-{uid}"
       - action: click
         with:
           text: /^\s*Email/
       - action: fill
         with:
-          field: 'alerts@partner.com'
-          value: 'vd-{uid}@example.com'
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
       - action: click
         with:
           text: Add email
@@ -165,10 +165,10 @@ flows:
           path: /{slug}/automations/automations
       - action: expect
         with:
-          label: 'Actions for vd-fromtraces-{uid}'
+          label: "Actions for vd-fromtraces-{uid}"
       - action: expect
         with:
-          text: 'status:error'
+          text: "status:error"
 
   - id: automation-action-add-to-dataset
     title: Add matching traces to a dataset and read the dataset id back from the API
@@ -196,13 +196,13 @@ flows:
       - action: fill
         with:
           field: Flag failing traces
-          value: 'vd-autods-{uid}'
+          value: "vd-autods-{uid}"
       - action: click
         with:
           text: /^\s*Code\s*$/
       - action: click
         with:
-          text: 'status:error'
+          text: "status:error"
       - action: click
         with:
           text: /^\s*Add to dataset/
@@ -211,7 +211,7 @@ flows:
           text: Select Dataset
       - action: click
         with:
-          text: 'vd-autods-{uid}'
+          text: "vd-autods-{uid}"
       - action: click
         with:
           text: /^\s*Done\s*$/
@@ -225,13 +225,13 @@ flows:
       - action: expect
         with:
           api: /api/triggers
-          contains: '{dsId}'
+          contains: "{dsId}"
       - action: go
         with:
           path: /{slug}/automations/automations
       - action: expect
         with:
-          label: 'Actions for vd-autods-{uid}'
+          label: "Actions for vd-autods-{uid}"
 
   - id: automation-action-add-to-annotation-queue
     title: Queue matching traces for annotation and read the action back from the API
@@ -248,13 +248,13 @@ flows:
       - action: fill
         with:
           field: Flag failing traces
-          value: 'vd-autoq-{uid}'
+          value: "vd-autoq-{uid}"
       - action: click
         with:
           text: /^\s*Code\s*$/
       - action: click
         with:
-          text: 'status:error'
+          text: "status:error"
       - action: click
         with:
           text: /^\s*Add to annotation queue/
@@ -266,7 +266,7 @@ flows:
           selector: '[role="option"]'
       - action: click
         with:
-          text: 'Send to:'
+          text: "Send to:"
       - action: click
         with:
           text: /^\s*Done\s*$/
@@ -282,7 +282,7 @@ flows:
           path: /{slug}/automations/automations
       - action: expect
         with:
-          label: 'Actions for vd-autoq-{uid}'
+          label: "Actions for vd-autoq-{uid}"
 
   - id: automation-channel-slack-bot
     title: Configure a Slack app delivery with a token and channel and find the automation after a reload
@@ -299,27 +299,27 @@ flows:
       - action: fill
         with:
           field: Flag failing traces
-          value: 'vd-slack-{uid}'
+          value: "vd-slack-{uid}"
       - action: click
         with:
           text: /^\s*Code\s*$/
       - action: click
         with:
-          text: 'status:error'
+          text: "status:error"
       - action: click
         with:
           text: /^\s*Slack/
       - action: fill
         with:
-          field: 'xoxb-'
-          value: 'xoxb-vd-{uid}'
+          field: "xoxb-"
+          value: "xoxb-vd-{uid}"
       - action: wait
         with:
-          millis: '2500'
+          millis: "2500"
       - action: type
         with:
-          placeholder: 'C0123'
-          text: 'C0VD1234567'
+          placeholder: "C0123"
+          text: "C0VD1234567"
           submit: true
       - action: click
         with:
@@ -336,7 +336,7 @@ flows:
           path: /{slug}/automations/automations
       - action: expect
         with:
-          label: 'Actions for vd-slack-{uid}'
+          label: "Actions for vd-slack-{uid}"
 
   - id: automation-webhook-send-a-test
     title: Send a test request from the webhook channel and see the outcome under the button
@@ -353,27 +353,27 @@ flows:
       - action: fill
         with:
           field: Flag failing traces
-          value: 'vd-hooktest-{uid}'
+          value: "vd-hooktest-{uid}"
       - action: click
         with:
           text: /^\s*Code\s*$/
       - action: click
         with:
-          text: 'status:error'
+          text: "status:error"
       - action: click
         with:
           text: /^\s*Webhook/
       - action: fill
         with:
-          field: 'https://example.com/hooks/langwatch'
-          value: 'https://example.com/hooks/vd-{uid}'
+          field: "https://example.com/hooks/langwatch"
+          value: "https://example.com/hooks/vd-{uid}"
       - action: click
         with:
           text: Send a test
       - action: expect
         with:
           testId: webhook-test-result
-          timeout: '20000'
+          timeout: "20000"
 
   - id: automation-email-send-a-test-reaches-inbox
     title: Send a test email from the email channel and read it back from the mail sink
@@ -390,20 +390,20 @@ flows:
       - action: fill
         with:
           field: Flag failing traces
-          value: 'vd-mailtest-{uid}'
+          value: "vd-mailtest-{uid}"
       - action: click
         with:
           text: /^\s*Code\s*$/
       - action: click
         with:
-          text: 'status:error'
+          text: "status:error"
       - action: click
         with:
           text: /^\s*Email/
       - action: fill
         with:
-          field: 'alerts@partner.com'
-          value: 'vd-{uid}@example.com'
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
       - action: click
         with:
           text: Add email
@@ -412,5 +412,5 @@ flows:
           text: Send a test
       - action: mail
         with:
-          to: '{actor}'
+          to: "{actor}"
           as: testMailLink

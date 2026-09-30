@@ -121,6 +121,7 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 }));
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
+import { signUpHref } from "../../../model/carried-email.ts";
 import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
 import { VerificationFirstSignUp } from "../verification-first-sign-up.tsx";
 
@@ -340,17 +341,12 @@ describe("given the sign-up screen", () => {
       registerMock.mockRejectedValue(invalidOrigin);
 
       const { container } = renderScreen();
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
       await screen.findByTestId("unconfirmed-address");
 
       await fillPasswordPair(container, "a-good-password");
-      await userEvent.click(
-        screen.getByRole("button", { name: "Create account" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Create account" }));
 
       expect(
         await screen.findByText(
@@ -365,10 +361,7 @@ describe("given the sign-up screen", () => {
       requestVerificationMock.mockRejectedValue(invalidOrigin);
 
       renderScreen();
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
       expect(
@@ -378,6 +371,37 @@ describe("given the sign-up screen", () => {
       ).toBeTruthy();
       expect(screen.queryByTestId("verification-sent")).toBeNull();
       expect(screen.queryByTestId("unconfirmed-address")).toBeNull();
+    });
+  });
+
+  describe("when the log-in door hands over an unconfirmed proof", () => {
+    afterEach(() => {
+      window.history.replaceState(null, "", "/");
+    });
+
+    /** @scenario An address with no account on an installation that cannot send email goes to the password step */
+    it("opens on the password step for the carried address and asks for nothing again", async () => {
+      window.history.replaceState(
+        null,
+        "",
+        signUpHref({ email: "sam@acme.com", addressProof: "unconfirmed_proof" }),
+      );
+
+      const { container } = renderScreen();
+
+      expect(await screen.findByTestId("unconfirmed-address")).toHaveTextContent(
+        "sam@acme.com is not confirmed",
+      );
+      expect(enrollmentMock).toHaveBeenCalledWith({
+        email: "sam@acme.com",
+        addressProof: "unconfirmed_proof",
+      });
+      expect(requestVerificationMock).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      await waitFor(() => {
+        expect(container.querySelector('input[type="password"]')).not.toBeNull();
+      });
+      expect(window.location.hash).toBe("");
     });
   });
 

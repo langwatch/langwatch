@@ -78,7 +78,9 @@ export const isCovered = ({
   if (within({ path, dir: ownRoot })) return true;
   if (!isDirectory) {
     const inDependency = dependencyRoots.some((dir) => within({ path, dir }));
-    return (inDependency && !notProduction.test(path)) || globs.some((glob) => matches({ path, glob }));
+    return (
+      (inDependency && !notProduction.test(path)) || globs.some((glob) => matches({ path, glob }))
+    );
   }
   const areas = [ownRoot, ...dependencyRoots, ...globs.map(globBase)];
   return areas.some((area) => within({ path, dir: area }) || within({ path: area, dir: path }));
@@ -112,7 +114,9 @@ export const readLogs = (dir: string): Map<string, Set<string>> => {
   const recorded = new Map<string, Set<string>>();
   if (!existsSync(dir)) return recorded;
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".log"))) {
-    const name = basename(file, ".log").replace(/\.\d+$/, "").replace("__", "/");
+    const name = basename(file, ".log")
+      .replace(/\.\d+$/, "")
+      .replace("__", "/");
     const paths = recorded.get(name) ?? new Set<string>();
     for (const line of readFileSync(join(dir, file), "utf8").split("\n")) {
       if (line !== "") paths.add(line);

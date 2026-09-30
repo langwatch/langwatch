@@ -3145,7 +3145,7 @@ model TriggerSent {
   @@index([customGraphId])
   @@index([resolvedAt])
   // Backs the fire-history keyset walk: filter on (projectId, triggerId),
-  // order by (createdAt, id) descending — served by a backward scan.
+  // order by (createdAt, id) descending, served by a backward scan.
   @@index([projectId, triggerId, createdAt, id])
 }
 

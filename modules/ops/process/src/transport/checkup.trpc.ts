@@ -1,7 +1,7 @@
 /**
- * Settings, Checkup (specs/self-hosting/checkup/checkup.feature). Reading is any
- * member's, running a paid check or changing the report an organization manager's;
- * details and the install-wide report only an install admin's (checkup-audience.feature).
+ * Settings, Checkup (specs/self-hosting/checkup/checkup.feature). Reading is any member's,
+ * running a paid check or changing the report an organization manager's; the details and
+ * the install-wide report an organization manager's or an install admin's.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { checkupTrpc, OpsApi } from "@langwatch/ops-contract";

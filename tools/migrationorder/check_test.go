@@ -237,6 +237,89 @@ func TestCheck(t *testing.T) {
 			},
 		},
 		{
+			name: "a migration sharing a key with a released migration the branch ports is reported",
+			in: migrationorder.Input{
+				Set:       clickhouse,
+				BaseRef:   "origin/feature",
+				Base:      []string{"00040_a.sql"},
+				MergeBase: []string{"00040_a.sql"},
+				Head:      []string{"00040_a.sql", "00041_new.sql", "00041_released.sql"},
+				Released:  []string{"00040_a.sql", "00041_released.sql"},
+			},
+			want: []migrationorder.Finding{{
+				Set:     "ClickHouse",
+				Entry:   "00041_new.sql",
+				Problem: "shares key 41 with 00041_released.sql, a released migration this branch ports",
+				Fix: "git mv packages/clickhouse-migrations/migrations/00041_new.sql " +
+					"packages/clickhouse-migrations/migrations/00042_new.sql",
+			}},
+		},
+		{
+			name: "suggested keys skip the keys of released migrations the branch ports",
+			in: migrationorder.Input{
+				Set:       clickhouse,
+				BaseRef:   "origin/feature",
+				Base:      []string{"00040_a.sql"},
+				MergeBase: []string{"00040_a.sql"},
+				Head:      []string{"00039_late.sql", "00040_a.sql", "00045_released.sql"},
+				Released:  []string{"00045_released.sql"},
+			},
+			want: []migrationorder.Finding{{
+				Set:     "ClickHouse",
+				Entry:   "00039_late.sql",
+				Problem: "is numbered below 40, the newest migration on feature, so it runs out of order or not at all",
+				Fix: "git mv packages/clickhouse-migrations/migrations/00039_late.sql " +
+					"packages/clickhouse-migrations/migrations/00046_late.sql",
+			}},
+		},
+		{
+			name: "a ported migration whose contents differ from the release is reported with a restore",
+			in: migrationorder.Input{
+				Set:       prisma,
+				BaseRef:   "origin/feature",
+				Base:      []string{"20260901000000_a"},
+				MergeBase: []string{"20260901000000_a"},
+				Head:      []string{"20260901000000_a", "20260928120001_released"},
+				Released:  []string{"20260901000000_a", "20260928120001_released"},
+				Diverged: []migrationorder.Divergence{{
+					Entry: "20260928120001_released",
+					Ref:   "origin/main",
+					Path:  "platform/app/prisma/migrations/20260928120001_released",
+				}},
+			},
+			want: []migrationorder.Finding{{
+				Set:   "Prisma",
+				Entry: "20260928120001_released",
+				Problem: "differs from origin/main:platform/app/prisma/migrations/20260928120001_released, " +
+					"and migrations that have run somewhere cannot change",
+				Fix: "git rm -r -q packages/prisma-client/prisma/migrations/20260928120001_released && " +
+					"git checkout origin/main -- platform/app/prisma/migrations/20260928120001_released && " +
+					"git mv platform/app/prisma/migrations/20260928120001_released " +
+					"packages/prisma-client/prisma/migrations/20260928120001_released",
+			}},
+		},
+		{
+			name: "a ported migration that differs from the release at the same path is restored in place",
+			in: migrationorder.Input{
+				Set:      clickhouse,
+				BaseRef:  "origin/feature",
+				Head:     []string{"00041_released.sql"},
+				Released: []string{"00041_released.sql"},
+				Diverged: []migrationorder.Divergence{{
+					Entry: "00041_released.sql",
+					Ref:   "origin/main",
+					Path:  "packages/clickhouse-migrations/migrations/00041_released.sql",
+				}},
+			},
+			want: []migrationorder.Finding{{
+				Set:   "ClickHouse",
+				Entry: "00041_released.sql",
+				Problem: "differs from origin/main:packages/clickhouse-migrations/migrations/00041_released.sql, " +
+					"and migrations that have run somewhere cannot change",
+				Fix: "git checkout origin/main -- packages/clickhouse-migrations/migrations/00041_released.sql",
+			}},
+		},
+		{
 			name: "a hostile migration name is quoted in the suggested fix",
 			in: migrationorder.Input{
 				Set:       clickhouse,

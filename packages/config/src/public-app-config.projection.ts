@@ -67,6 +67,14 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
   identity: {
     /** Offered unless "off", as auth's own switch reads it: the dev server drew no passkeys. */
     passkeys: c.env("PASSKEYS_ENABLED", z.enum(["off", "on"]).optional()),
+    /** The address readers sign in on, as auth projects it for copy-paste snippets. */
+    publicUrl: c.env(
+      "NEXTAUTH_URL",
+      z
+        .string()
+        .optional()
+        .transform((value) => value?.trim() || void 0),
+    ),
   },
   licensePaymentUrl: c.env("STRIPE_LICENSE_PAYMENT_LINK_URL", z.string().min(1).optional()),
   hideDevIndicator: c.env("HIDE_DEV_INDICATOR", onOff),
@@ -131,6 +139,7 @@ export type PublicAppConfigSource = Readonly<{
   LANGWATCH_NLP_LAMBDA_CONFIG?: string;
   LANGEVALS_ENDPOINT?: string;
   PASSKEYS_ENABLED?: string;
+  NEXTAUTH_URL?: string;
   STRIPE_LICENSE_PAYMENT_LINK_URL?: string;
 }> &
   Readonly<Record<string, unknown>>;
@@ -232,6 +241,7 @@ function projectPublicAppConfig(
       passkeys: config.identity.passkeys !== "off",
       identityFrontDoor: true,
       authProvider: config.authProviderName ?? config.authProvider,
+      ...(config.identity.publicUrl ? { publicUrl: config.identity.publicUrl } : {}),
     },
     authz: { demoProjectSlug: config.demoProjectSlug },
     billing: { licensePaymentUrl: config.licensePaymentUrl },

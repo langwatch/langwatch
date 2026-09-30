@@ -25,12 +25,12 @@ sits under them.
 **1. A read declares its tier on its contract.** `defineTrpcContract(...).query(name, { cache: { tier, persist } })`
 (`packages/api/src/contract/trpc-contract.ts`). Tiers:
 
-| tier        | staleTime | for                                                                |
-| ----------- | --------- | ------------------------------------------------------------------ |
-| `live`      | 0         | runs, traces, anything streaming                                   |
-| `session`   | Infinity  | org graph, permissions, flags, plan, `user.isAdmin`                |
-| `reference` | 1 hour    | model provider lists, catalogues                                   |
-| undeclared  | 30 s      | everything else, unchanged                                         |
+| tier        | staleTime | for                                                 |
+| ----------- | --------- | --------------------------------------------------- |
+| `live`      | 0         | runs, traces, anything streaming                    |
+| `session`   | Infinity  | org graph, permissions, flags, plan, `user.isAdmin` |
+| `reference` | 1 hour    | model provider lists, catalogues                    |
+| undeclared  | 30 s      | everything else, unchanged                          |
 
 `@langwatch/browser-host/cache-tiers` folds the declared contracts into a plan
 and applies it with `queryClient.setQueryDefaults` keyed by procedure path, so

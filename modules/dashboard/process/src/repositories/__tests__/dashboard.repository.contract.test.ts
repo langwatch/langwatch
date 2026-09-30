@@ -100,11 +100,11 @@ function contractCases(backend: Backend): void {
         repository.findGraph({ projectId: backend.projectId(), graphId: "graph_absent" }),
       ).resolves.toBeUndefined();
       await expect(
-        repository.findLastGraphGridRow({
+        repository.findNextFreeGridRow({
           projectId: backend.projectId(),
           dashboardId: "dash_absent",
         }),
-      ).resolves.toBeUndefined();
+      ).resolves.toBe(0);
       await expect(
         repository.findAllSavedWorkbenchCharts({ projectId: backend.projectId() }),
       ).resolves.toEqual([]);
@@ -316,11 +316,11 @@ function contractCases(backend: Backend): void {
 
       expect(listed.map((row) => row.id)).toEqual([upper.id, lower.id]);
       await expect(
-        repository.findLastGraphGridRow({
+        repository.findNextFreeGridRow({
           projectId: backend.projectId(),
           dashboardId: created.id,
         }),
-      ).resolves.toBe(3);
+      ).resolves.toBe(3 + LAYOUT.rowSpan);
     });
 
     it("edits the fields it was given and leaves the rest alone", async () => {

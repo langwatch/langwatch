@@ -6,6 +6,7 @@ import {
   customGraphInputSchema,
   dashboardCreateInputSchema,
   graphLayoutSchema,
+  graphPlacementSchema,
   savedWorkbenchChartDefinitionSchema,
   savedWorkbenchChartPlacementSchema,
 } from "../index.ts";
@@ -19,15 +20,22 @@ describe("dashboard contract", () => {
     });
   });
 
-  it("keeps graph layout values integer and within the persisted grid", () => {
+  it("keeps graph layout values integer and within the eight-column grid", () => {
+    const layout = { gridColumn: 0, gridRow: 0, colSpan: 8, rowSpan: 3 };
+
+    expect(graphLayoutSchema.validate(layout)).toBe(true);
+    expect(graphLayoutSchema.validate({ ...layout, gridColumn: 8, colSpan: 1 })).toBe(false);
+    expect(graphLayoutSchema.validate({ ...layout, colSpan: 9 })).toBe(false);
+    expect(graphLayoutSchema.validate({ ...layout, colSpan: 1.5 })).toBe(false);
+  });
+
+  it("refuses a graph placement that runs past the grid's right edge", () => {
     expect(
-      graphLayoutSchema.validate({
-        gridColumn: 2,
-        gridRow: 0,
-        colSpan: 1,
-        rowSpan: 1,
-      }),
+      graphPlacementSchema.validate({ gridColumn: 6, gridRow: 0, colSpan: 4, rowSpan: 3 }),
     ).toBe(false);
+    expect(
+      graphPlacementSchema.validate({ gridColumn: 4, gridRow: 0, colSpan: 4, rowSpan: 3 }),
+    ).toBe(true);
   });
 
   it("requires the versioned saved-workbench definition shape", () => {

@@ -75,10 +75,7 @@ function judgment(overrides: Partial<InstantEvalJudgmentWire> = {}): InstantEval
   };
 }
 
-function mount(
-  api: Partial<InstantEvalApi>,
-  holds: (permission: string) => boolean = () => true,
-) {
+function mount(api: Partial<InstantEvalApi>, holds: (permission: string) => boolean = () => true) {
   const stub = createApiFixture<InstantEvalApi>(api);
   const hono = createRestRuntime({
     identity: {
@@ -145,8 +142,9 @@ describe("Feature: The Instant Eval run over REST", () => {
       it("refuses the create and the cancel with 403, and lists runs", async () => {
         const createRun = vi.fn<InstantEvalApi["createRun"]>();
         const cancelRun = vi.fn<InstantEvalApi["cancelRun"]>();
-        const api = mount({ createRun, cancelRun, findRuns: async () => [] }, (permission) =>
-          permission === "analytics:view",
+        const api = mount(
+          { createRun, cancelRun, findRuns: async () => [] },
+          (permission) => permission === "analytics:view",
         );
 
         const created = await api.post("", { sql: SQL });

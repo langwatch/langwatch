@@ -6,15 +6,15 @@ haven runs it as the `storage` lane (`tools/thuishaven/app/plan_storage.go`).
 
 ## What the product calls
 
-| Caller | Operation | Auth | Notes |
-| --- | --- | --- | --- |
-| `packages/process-stores/src/object-storage-s3.ts` `signObjectUpload` (stored-object `createUpload`, e.g. dataset uploads) | PutObject | presigned query | signs `host;content-length;content-type`; the browser PUTs with that content type |
-| same, `signObjectDownload` | GetObject | presigned query | download links |
-| same, `writeObject` / `readObject` / `remove` / `probe` | PutObject, GetObject, DeleteObject, HeadBucket | SigV4 header | `forcePathStyle`, checksums only when required |
-| same, `heldDigest` | HeadObject (`x-amz-checksum-mode: ENABLED`) | SigV4 header | no stored checksum is answered, so the product hashes the bytes itself |
-| `modules/stored-object/.../s3.stored-object-blob.repository.ts`, `s3.object-storage-migration-blob.repository.ts` | Put, Get, Head, Delete object | SigV4 header | path-style |
-| `modules/stored-object/.../s3.payload-staging.repository.ts` | PutObject, then a presigned GetObject | header, then query | the presigned GET is fetched by nlpgo and langevals |
-| `modules/trace/.../s3.trace-legacy-spool.channel.ts` | GetObject, DeleteObject | SigV4 header | |
+| Caller                                                                                                                     | Operation                                      | Auth               | Notes                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------ | --------------------------------------------------------------------------------- |
+| `packages/process-stores/src/object-storage-s3.ts` `signObjectUpload` (stored-object `createUpload`, e.g. dataset uploads) | PutObject                                      | presigned query    | signs `host;content-length;content-type`; the browser PUTs with that content type |
+| same, `signObjectDownload`                                                                                                 | GetObject                                      | presigned query    | download links                                                                    |
+| same, `writeObject` / `readObject` / `remove` / `probe`                                                                    | PutObject, GetObject, DeleteObject, HeadBucket | SigV4 header       | `forcePathStyle`, checksums only when required                                    |
+| same, `heldDigest`                                                                                                         | HeadObject (`x-amz-checksum-mode: ENABLED`)    | SigV4 header       | no stored checksum is answered, so the product hashes the bytes itself            |
+| `modules/stored-object/.../s3.stored-object-blob.repository.ts`, `s3.object-storage-migration-blob.repository.ts`          | Put, Get, Head, Delete object                  | SigV4 header       | path-style                                                                        |
+| `modules/stored-object/.../s3.payload-staging.repository.ts`                                                               | PutObject, then a presigned GetObject          | header, then query | the presigned GET is fetched by nlpgo and langevals                               |
+| `modules/trace/.../s3.trace-legacy-spool.channel.ts`                                                                       | GetObject, DeleteObject                        | SigV4 header       |                                                                                   |
 
 Not pointed at storagesim: governance's `ListObjectsV2` reads a customer's own
 bucket. Go services only fetch presigned URLs over plain HTTP.

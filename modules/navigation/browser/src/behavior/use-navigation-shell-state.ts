@@ -5,6 +5,7 @@
 
 import { useBreakpointValue } from "@chakra-ui/react";
 
+import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
 import {
   showsDevelopmentIndicator,
   useNavigationHost,
@@ -49,6 +50,8 @@ export interface NavigationShellReadyState {
 export type NavigationShellState =
   | { status: "not-found" }
   | { status: "loading" }
+  /** The root resolver for a reader with no organization: no chrome to draw, only the redirect. */
+  | { status: "chromeless" }
   | NavigationShellReadyState;
 
 export function useNavigationShellState({
@@ -79,6 +82,10 @@ export function useNavigationShellState({
     isOnOwnPersonalProject: !!team?.isPersonal && team.ownerUserId === user?.id,
   });
 
+  if (user && route.isResolverRoute && isOrgless(host)) {
+    return { status: "chromeless" };
+  }
+
   if (!user || isShellDataPending({ host, route })) {
     return { status: "loading" };
   }
@@ -97,6 +104,14 @@ export function useNavigationShellState({
     isMobile,
     menuWidth: isCompactSidebar ? SHELL_SIDEBAR_WIDTH_COMPACT : SHELL_SIDEBAR_WIDTH_EXPANDED,
   };
+}
+
+function isOrgless(host: ReturnType<typeof useNavigationHost>): boolean {
+  return belongsToNoOrganization({
+    isWorkspaceResolving: host.isLoading(),
+    organization: host.organization(),
+    organizations: host.organizations(),
+  });
 }
 
 /**

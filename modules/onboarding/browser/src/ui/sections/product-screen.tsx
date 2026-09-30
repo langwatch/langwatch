@@ -6,6 +6,7 @@ import { AnalyticsBoundary } from "react-contextual-analytics";
 
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useProductFlow } from "../../behavior/use-product-flow.ts";
+import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { LoadingScreen } from "../blocks/loading-screen.tsx";
 import { OnboardingContainer } from "../blocks/onboarding-container.tsx";
 import { ScreenLifecycle } from "../elements/screen-lifecycle.tsx";
@@ -18,7 +19,15 @@ export const ProductScreen: React.FC = () => {
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
   });
-  const { project: activeProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
+  const { project: resolvedProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
+  // The scope graph carries no credentials, so the key the setup screens print
+  // is asked of the host for the project this screen resolved.
+  const host = useOnboardingHost();
+  const apiKey = resolvedProject ? host.revealProjectApiKey(resolvedProject.id) : void 0;
+  const activeProject = useMemo(
+    () => (resolvedProject && apiKey ? { ...resolvedProject, apiKey } : resolvedProject),
+    [resolvedProject, apiKey],
+  );
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);

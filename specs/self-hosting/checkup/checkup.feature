@@ -78,6 +78,12 @@ Feature: The checkup page of a self-hosted install
     And the ClickHouse migrations row reads not checked
 
   @unit
+  Scenario: The ClickHouse migrations row asks goose about the ClickHouse this process uses
+    Given the process is configured with a ClickHouse URL
+    When the checkup reads the ClickHouse migration status
+    Then goose is asked for its status on that same ClickHouse
+
+  @unit
   Scenario: The usage report row reads the last report and its refusal
     Given the last usage report was refused with "usage_report_refused_413"
     When the checkup runs
@@ -179,6 +185,13 @@ Feature: The checkup page of a self-hosted install
     And "http://other-app:5560" is none of the addresses this app is reached at
     When the explicit gateway control plane check runs
     Then the gateway control plane row reads fail with code "checkup_gateway_control_plane_mismatch"
+
+  @unit
+  Scenario: The chart tells the app the control plane address its gateway dials
+    Given the chart runs the gateway beside the app
+    When the chart is rendered
+    Then the app receives GATEWAY_CONTROL_PLANE_URL equal to the address the gateway dials
+    And gateway.controlPlane.baseUrl replaces it on both when the operator sets one
 
   # Not yet on this branch: see the merge of #8326 (a peer operation is needed).
   @unit @unimplemented

@@ -8,9 +8,13 @@ describe("Feature: visualdiff flows assert outcomes", () => {
 
     /** @scenario A flow's expect proves the feature did its job on both sides */
     it("holds when the field contains the text, has enough items or equals the value", () => {
-      expect(judgeBody({ body, args: { api: "/api/x", field: "data", contains: "VD Alert" } })).toBe("");
+      expect(
+        judgeBody({ body, args: { api: "/api/x", field: "data", contains: "VD Alert" } }),
+      ).toBe("");
       expect(judgeBody({ body, args: { api: "/api/x", field: "data", min: "2" } })).toBe("");
-      expect(judgeBody({ body, args: { api: "/api/x", field: "data.0.name", equals: "VD Alert" } })).toBe("");
+      expect(
+        judgeBody({ body, args: { api: "/api/x", field: "data.0.name", equals: "VD Alert" } }),
+      ).toBe("");
     });
 
     /** @scenario A flow's expect proves the feature did its job on both sides */

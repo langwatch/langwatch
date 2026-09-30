@@ -180,7 +180,7 @@ flows:
         with:
           label: Search filters or type what you are looking for
           text: 'eval:"the reply mentions vd{uid}"'
-          submit: 'true'
+          submit: "true"
       - action: expect
         with:
           api: /api/v1/instant-evals

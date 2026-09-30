@@ -124,7 +124,7 @@ flows:
       - action: click
         with:
           selector: '[data-testid^="run-dialog-agent-"]'
-          text: '{agentName}'
+          text: "{agentName}"
       - action: fill
         with:
           testId: run-dialog-name
@@ -233,7 +233,7 @@ flows:
       - action: click
         with:
           selector: '[data-testid^="run-dialog-agent-"]'
-          text: '{agentName}'
+          text: "{agentName}"
       - action: fill
         with:
           testId: run-dialog-name

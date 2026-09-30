@@ -52,6 +52,7 @@ export type OpsTestAppOptions = Readonly<{
   apiKeys?: ApiKeyApi;
   projects?: ProjectApi;
   featureFlags?: FeatureFlagApi;
+  authz?: AuthzApi;
   repositories?: OpsRepositories;
   checkup?: OpsCheckupService;
 }>;
@@ -103,7 +104,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
       identity: createApiFixture<IdentityApi>(),
-      authz: createApiFixture<AuthzApi>(),
+      authz: options.authz ?? createApiFixture<AuthzApi>(),
       retention: createApiFixture<DataRetentionApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       auditLog:

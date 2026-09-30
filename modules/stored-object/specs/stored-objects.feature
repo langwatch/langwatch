@@ -114,6 +114,13 @@ Feature: Stored Objects service and API
     And failed physical cleanup remains retryable from that same row
     And repeating deletion is safe
 
+  @unit
+  Scenario: The storage checkup probe writes and removes one canary object
+    Given a project whose storage destination accepts writes
+    When the storage checkup probe runs for it
+    Then one canary object is written under the project's checkup prefix
+    And the canary object is removed again
+
   @unimplemented @integration @api @authorization
   Scenario: The public API uses the unified API package
     Given the Stored Objects public API is installed

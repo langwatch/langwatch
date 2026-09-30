@@ -4,12 +4,19 @@
  * to one hook since both are read together on every onboarding screen.
  */
 
+import type { TimeInput } from "@langwatch/time";
 import { useMemo } from "react";
 
 import type { OnboardingOrganization, OnboardingTeam } from "../model/onboarding-host.ts";
 import { onboardingApi } from "./onboarding-api.ts";
 
-type GraphProject = { id: string; name: string; slug: string; apiKey?: string | null };
+type GraphProject = {
+  id: string;
+  name: string;
+  slug: string;
+  apiKey?: string | null;
+  createdAt?: TimeInput | null;
+};
 type GraphTeam = {
   id: string;
   name: string;
@@ -38,6 +45,7 @@ function toHostTeams(entry: GraphOrganization): OnboardingTeam[] {
       id: project.id,
       name: project.name,
       slug: project.slug,
+      createdAt: project.createdAt ?? null,
     })),
   }));
 }
@@ -58,8 +66,25 @@ export type OnboardingOrganizationGraph = {
   organization: OnboardingOrganization | undefined;
   organizations: readonly OnboardingOrganization[] | undefined;
   activeProject: OnboardingActiveProject | undefined;
+  /**
+   * The base key of any project in the graph, as the server redacted it: the
+   * empty string it sends a reader who may not manage the project reads as absent.
+   */
+  projectApiKey: (projectId: string) => string | undefined;
   isLoading: boolean;
 };
+
+function apiKeysByProject(graph: GraphOrganization[] | undefined): ReadonlyMap<string, string> {
+  const keys = new Map<string, string>();
+  for (const organization of graph ?? []) {
+    for (const team of organization.teams) {
+      for (const project of team.projects) {
+        if (project.apiKey) keys.set(project.id, project.apiKey);
+      }
+    }
+  }
+  return keys;
+}
 
 function findActiveProject(
   organization: GraphOrganization | undefined,
@@ -82,10 +107,12 @@ export function useOnboardingOrganizationGraph(input: {
 
   return useMemo(() => {
     const rawOrganization = graph?.find((candidate) => candidate.id === input.organizationId);
+    const apiKeys = apiKeysByProject(graph);
     return {
       organization: rawOrganization ? toHostOrganization(rawOrganization) : void 0,
       organizations: graph?.map(toHostOrganization),
       activeProject: findActiveProject(rawOrganization, input.projectId),
+      projectApiKey: (projectId: string) => apiKeys.get(projectId),
       isLoading: graphQuery.isLoading,
     };
   }, [graph, graphQuery.isLoading, input.organizationId, input.projectId]);

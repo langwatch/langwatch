@@ -56,21 +56,6 @@ interface ViewAutomationDrawerProps {
   onEdit: (automationId: string) => void;
 }
 
-/**
- * The registry's `viewAutomation`, as main registered it: Edit hands over to the `automation`
- * drawer on the same automation, and closing closes the stack.
- */
-export function RegisteredViewAutomationDrawer({ automationId }: { automationId: string }) {
-  const host = useAutomationHost();
-  return (
-    <ViewAutomationDrawer
-      automationId={automationId}
-      onClose={() => host.closeDrawer()}
-      onEdit={(id) => host.openDrawer({ drawer: "automation", params: { automationId: id } })}
-    />
-  );
-}
-
 /** The panel as the registry opens it at `?drawer.open=viewAutomation`; the host closes it. */
 export function RegisteredViewAutomationDrawer({ automationId }: { automationId: string }) {
   const host = useAutomationHost();
