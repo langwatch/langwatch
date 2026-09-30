@@ -43,6 +43,7 @@ func NewHandler(deps HandlerDeps) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("POST /go/evaluators/{family}/{evaluator}/evaluate",
 		requireInternalSecret(deps.InternalSecret, evaluateHandler(deps.API, deps.MaxBodyBytes)))
+	MountTopicClustering(mux, TopicClusteringRoutes{API: deps.API, InternalSecret: deps.InternalSecret})
 	return mux
 }
 
