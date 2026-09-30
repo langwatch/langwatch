@@ -197,6 +197,73 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the entry is evicted from the cache
       And the next request with that VK calls /resolve-key fresh and is rejected
 
+  Rule: A change-feed eviction keeps the last known config as an outage fallback
+    Every debit emits BUDGET_UPDATED, so a busy project's keys are evicted by
+    the change feed every few minutes and the next request pays a cold config
+    fetch. When that fetch times out or the control plane answers 5xx, the key
+    it was serving a minute ago must not start answering auth_upstream_unavailable.
+    The evicted entry is kept aside and served again, for at most one hour after
+    its config was last confirmed by the control plane. A definitive answer about
+    the key itself (revoked, disabled, rotated, invalid, expired) never gets this
+    fallback.
+
+    @unit @regression
+    Scenario: a key evicted by a budget change keeps serving when the refetch times out
+      Given the cache holds a key with known-good credentials
+      And the change feed reports a budget update for its project
+      And the config fetch then times out
+      When I send a request with that VK
+      Then the last known credentials are served
+      And a warning names the key and the failed refresh
+      And the next request is served from the cache without waiting on the control plane
+      And the next refresh asks for the config outright rather than revalidating it
+
+    @unit
+    Scenario: the fallback recovers as soon as the control plane answers
+      Given a key is being served from its last known config after a failed refetch
+      When the control plane answers the next refresh
+      Then the fresh config replaces the last known one
+
+    @unit
+    Scenario: a not-modified answer counts as a confirmation of the last known config
+      Given the cache holds a key whose config was last downloaded more than one hour ago
+      And the control plane has since answered a revalidation with 304 Not Modified
+      When the change feed evicts the key and the refetch times out
+      Then the last known config is served
+      And it may be served for up to one hour after that 304
+
+    @unit
+    Scenario: the last known config expires one hour after it was last confirmed
+      Given the cache evicted a key whose config was last confirmed more than one hour ago
+      And the config fetch fails with a transport error
+      When I send a request with that VK
+      Then the request is rejected with error.type "auth_upstream_unavailable" (503, retryable)
+      And an entry that crosses the one hour mark while the refetch is running is not served either
+
+    @unit
+    Scenario: the fallback never outlives the key's own expiration date
+      Given the cache evicted a key after a budget update
+      And resolve-key answers with a token carrying the key's expiration date
+      But the config fetch times out
+      When I send a request with that VK
+      Then the last known config is served under the fresh token
+      And it stops being served at the key's expiration date
+      And a key whose date has already passed is refused with virtual_key_expired
+
+    @unit
+    Scenario: revoking, disabling or rotating a key leaves no fallback behind
+      Given the cache holds a key with known-good credentials
+      When the change feed reports that key revoked, disabled or rotated
+      And the control plane is then unreachable
+      Then the request is rejected rather than served from the last known config
+
+    @unit
+    Scenario: a definitive rejection from the control plane is never overridden by the fallback
+      Given the cache evicted a key after a budget update
+      When the control plane answers the refetch that the key is invalid, or the config fetch finds it deleted (404)
+      Then the request is rejected with that answer
+      And the last known config is discarded
+
   Rule: Short-lived JWT is refreshed before expiry
 
     @unit @unimplemented
