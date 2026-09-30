@@ -20,9 +20,7 @@ export const CORE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = 
   },
 
   Project: {
-    name: "projects",
     description: "The caller's project, with its display name and slug.",
-    aliases: { ProjectName: "name", ProjectSlug: "slug" },
     descriptions: {
       ProjectName: "Display name of the project.",
       ProjectSlug: "URL-safe name of the project.",
@@ -31,9 +29,7 @@ export const CORE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = 
   },
 
   LlmPromptConfig: {
-    name: "prompts",
     description: "One row per prompt configuration, with the name its versions are known by.",
-    aliases: { PromptId: "id", PromptName: "name", PromptHandle: "handle" },
     descriptions: {
       PromptId:
         "Prompt identifier. Matches `traces.LastUsedPromptId` and `traces.SelectedPromptId`.",
@@ -45,13 +41,7 @@ export const CORE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = 
   },
 
   LlmPromptConfigVersion: {
-    name: "prompt_versions",
     description: "One row per version of a prompt, carrying the version number a trace records.",
-    aliases: {
-      PromptVersionId: "id",
-      PromptId: "configId",
-      VersionNumber: "version",
-    },
     descriptions: {
       PromptVersionId: "Version identifier. Matches `traces.LastUsedPromptVersionId`.",
       PromptId: "Prompt this is a version of. Join key to `prompts`.",
@@ -63,11 +53,6 @@ export const CORE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = 
 
   Experiment: {
     description: "One row per experiment, with its display name and kind.",
-    aliases: {
-      ExperimentName: "name",
-      ExperimentSlug: "slug",
-      ExperimentType: "type",
-    },
     descriptions: {
       ExperimentId: "Experiment identifier, as carried by the fact tables that reference it.",
       ExperimentName: "Display name of the experiment, null when it was never named.",
@@ -82,12 +67,6 @@ export const CORE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = 
     description:
       "One row per offline batch evaluation of a dataset row, with its score, outcome and cost.",
     columnUnits: { Cost: "USD" },
-    // The validator gates by bare column name across the catalog, and the
-    // ClickHouse `evaluations` view already gates `Details` on both content
-    // permissions (it quotes the evaluated input and output), so the
-    // Postgres column must carry the same gates or one view withholds what
-    // the other publishes.
-    columnGates: { Details: ["input", "output"] },
     descriptions: {
       BatchEvaluationId: "Batch evaluation identifier, unique within the project.",
       ExperimentId: "Experiment this batch evaluation belongs to. Join key to `experiments`.",

@@ -7,6 +7,7 @@
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service.ts";
 import {
   LWQL_APP_FUNCTION_CATALOG,
@@ -30,13 +31,14 @@ const schema = LangWatchQLSchemaService.create();
 
 /** A caller holding every content permission. */
 const FULL: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,
 };
 
 /** A caller holding none, which is what an unresolved policy resolves to. */
-const NONE: LangWatchQLProtections = {};
+const NONE: LangWatchQLProtections = { catalogue: EVERY_CATALOGUE_PERMISSION };
 
 describe("given the app-function catalog", () => {
   describe("when its names are read", () => {
@@ -244,7 +246,7 @@ describe("given the schema endpoint's app functions section", () => {
     it("withholds a function needing both", () => {
       const functions = schema.describeAppFunctions({
         database: DATABASE,
-        protections: { canSeeCapturedInput: true },
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION, canSeeCapturedInput: true },
       });
       const byName = new Map(functions.map((entry) => [entry.name, entry.available]));
 

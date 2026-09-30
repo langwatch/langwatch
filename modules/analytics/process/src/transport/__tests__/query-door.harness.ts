@@ -15,10 +15,12 @@ import { Hono } from "hono";
 
 import { LWQL_EXAMPLE_DATABASE } from "../../rules/langwatch-ql-examples.rules.ts";
 import { buildQueryReference } from "../../rules/query-reference.rules.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import type { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { AnalyticsQueryApi, queryRest } from "../query.rest.ts";
 
 const FULLY_PERMITTED: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,

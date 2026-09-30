@@ -13,12 +13,14 @@ import {
 } from "../../repositories/langwatch-ql-executor.repository.ts";
 import { LangWatchQLCapabilityService } from "../langwatch-ql-capability.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 const BOUNDED_TRACES =
   "SELECT TraceId FROM analytics.traces " +
   "WHERE OccurredAt >= toDateTime64('2026-02-16 00:00:00', 3)";
 
 const EVERYTHING_VISIBLE = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,

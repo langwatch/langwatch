@@ -87,6 +87,23 @@ async function appOver(input: {
       }),
       authz: createApiFixture<AuthzApi>({
         hasApiKeyPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        can: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        canBatchPermissionsByIds: ({ permissions, teams, projects }) =>
+          Promise.resolve({
+            organizationRole: null,
+            byPermission: new Map(
+              permissions.map((permission) => {
+                const held = input.grants.includes(permission);
+                return [
+                  permission,
+                  {
+                    teams: new Map(teams.map(({ teamId }) => [teamId, held])),
+                    projects: new Map(projects.map(({ projectId }) => [projectId, held])),
+                  },
+                ];
+              }),
+            ),
+          }),
       }),
       dataPrivacy: createApiFixture<DataPrivacyApi>({
         getResolvedForProject: () => Promise.resolve(PLATFORM_DEFAULT_DATA_PRIVACY),

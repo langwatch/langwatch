@@ -385,20 +385,23 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    reaching in. Closed to values only: an `import type` / `export type` of a browser package
    crosses, because types are erased (Alex, 2026-09-27).
 2. **A kit is a leaf.** It may import contracts (any module's),
-   `design-system`, `browser-host` and `@langwatch/api/web` (its client's
-   derivation). It may not import its own module's browser package (the rule
-   that broke the nine cyclic web pairs), any other `*-browser`, or another kit.
-   It may import a module's portable library (§2), which is no kit (Alex, 2026-09-30).
-3. **A kit owns its module's client, store and UI for one concept** (Alex,
-   2026-09-29). It derives its client from its own contract, and the owner's
-   browser package imports that client and store from the kit rather than
-   holding a second copy; consumers render the kit. It never calls a peer's
+   `design-system` and `browser-host`, and nothing else in `@langwatch/*`. It may not import its own
+   module's browser package (the rule that broke the nine cyclic web pairs), any other `*-browser`,
+   or another kit. It may import a module's portable library (§2), which is no kit (Alex, 2026-09-30).
+   **Amended 2026-09-30** to match the `browser-kit-dependencies` policy, which outranks this record:
+   `@langwatch/api/web` is not a kit dependency. A kit component that needs data takes it as props
+   and each consumer fetches its own: analytics' `LwqlEditor` takes `schema` and `markers`.
+3. **A kit owns its module's store and UI for one concept** (Alex, 2026-09-29;
+   its client clause withdrawn 2026-09-30, the linter wins). It holds no client: its
+   components take data as props and each consumer derives its own client from the
+   owner's contract; the owner's browser package imports the store from the kit
+   rather than holding a second copy, and consumers render the kit. It never calls a peer's
    procedure and never reads a `*HostApi`; a component that needs either stays
-   in its owner (rule 7). Rule 2 keeps it a leaf. The case: identity's kit holds
-   identity's `twoStepVerification` client and the requirement UI (user,
-   organization and ops render it), while the passkey, two-step and
-   sign-in-method ceremonies call auth's endpoints and so live in auth's kit
-   (Alex, 2026-09-29).
+   in its owner (rule 7). Rule 2 keeps it a leaf. The case: identity's kit holds the
+   two-step requirement UI (user, organization and ops render it, each through its
+   own client), while the passkey, two-step and sign-in-method ceremonies call
+   auth's endpoints and so live in auth (Alex, 2026-09-29). Kits that still hold a
+   client (identity, user, stored-object) are findings of rule 2, moved as touched.
 4. **A kit is a package, not a subpath** — a subpath is invisible to the
    dependency graph, so it cannot break a cycle or be budgeted. A package
    makes every cross-module browser edge a visible, lintable manifest line.
@@ -448,6 +451,30 @@ decides it, and no layer, projection or screen re-derives another's answer.
 LangWatch support" (SaaS) or "contact your administrator" (self-hosted), never why. A reader holding
 the permission that could fix it may be told what is missing, through a read only that permission
 answers: the explanation is never in public config or in any page's HTML for everyone.
+
+**The LangWatchQL catalogue names who may read** (Alex, 2026-09-30; ADR-082 amended). Analytics'
+`LWQL_CATALOG` is `defineLwqlCatalog({ <view>: defineTableCatalogue({ sourceTable, access, columns }) })`.
+The row type is looked up from `sourceTable`, never passed, so completeness is checked against the
+stored table. `access` is `{ allOf }` or `{ anyOf }` over authz permissions, never empty. Every stored
+column has an entry, or the catalogue fails to compile: `"inherit"` (its own name, table access only),
+`"omit"` (exposed nowhere, never a `source`) or `{ source?, access?, content? }`. Keys are exposed
+names and `source` names the stored column. `content` is `"input"`, `"output"` or both, decided by
+data-privacy's policy, never by authz; a cost column carries `access: { allOf: ["cost:view"] }`. The
+database's column grants derive from the same catalogue and stay the backstop.
+
+It resolves per principal and scope through `AuthzApi` (`resolveAccessibleCatalog`, no new operation);
+the project as principal holds everything. As before, a table the caller may not read is hidden and
+refused with `TABLE_NOT_ALLOWED`; a column is listed unavailable with its gate and refused with
+`GATED_COLUMN`. Privacy group audiences apply: group ids come from `AuthzApi.getAccessBreakdown`, read
+only when an audience names a group, and a failed read means no groups. A key spanning projects fails
+closed: a table is refused if any of its projects lacks it. Filtering per project within one statement
+is a tracked gap (`@unimplemented` in `specs/lwql/catalogue-grants.feature`).
+
+**Authority fails closed, tooling fails open** (Alex, 2026-09-30). A failed authz check is a plain 500
+with no rows, never a partial answer. The LWQL editor still edits without a schema (grammar only), a
+failed validation clears its markers, and Run always asks the server. Its markers come from the
+`analytics.lwql.validate` query (Alex, 2026-09-30), the server's own validator, which never executes;
+the browser never validates.
 
 The shell's lent services (session, navigation, storage, toasts, drawers) are **host
 services**, not capabilities (§16). Enforcement is prose for now; a lint rule follows once email is

@@ -12,7 +12,7 @@ import {
   LWQL_COLUMNS_MANIFEST,
 } from "./lwql-columns-manifest.rules.ts";
 import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
-import type { FieldProtection } from "./lwql-field-protection.rules.ts";
+import type { LwqlGate } from "./lwql-gate.rules.ts";
 
 /** How a derived view deduplicates, mirroring {@link LangWatchQLViewDedup}. */
 export interface DerivedDatasetDedup {
@@ -45,10 +45,10 @@ export interface DefineDatasetFromTableInput {
   /** How far behind the write path the view can be. */
   readonly freshness: string;
   /** Permissions a caller must hold to reach the view at all. Defaults to none. */
-  readonly gates?: readonly FieldProtection[];
+  readonly gates?: readonly LwqlGate[];
   readonly dedup: DerivedDatasetDedup;
   /** Per-column gates, keyed by the *exposed* column name. */
-  readonly columnGates?: Readonly<Record<string, readonly FieldProtection[]>>;
+  readonly columnGates?: Readonly<Record<string, readonly LwqlGate[]>>;
   /** Per-column unit, keyed by the exposed column name. */
   readonly columnUnits?: Readonly<Record<string, LangWatchQLColumnUnit>>;
   /** Renames: `{ exposedName: sourceColumn }`. */
@@ -322,7 +322,7 @@ function buildViewColumn({
   tableName,
 }: {
   column: ExposedColumn;
-  columnGates: Readonly<Record<string, readonly FieldProtection[]>>;
+  columnGates: Readonly<Record<string, readonly LwqlGate[]>>;
   columnUnits: Readonly<Record<string, LangWatchQLColumnUnit>>;
   descriptions: Readonly<Record<string, string>>;
   aggregating: boolean;
@@ -501,8 +501,8 @@ export function defaultColumnGates({
 }: {
   name: string;
   type: string;
-}): readonly FieldProtection[] {
-  if (COST_NAME.test(name)) return ["costs"];
+}): readonly LwqlGate[] {
+  if (COST_NAME.test(name)) return ["cost:view"];
   // A map is never content-gated: it is content-*filtered* instead (every
   // captured-content key removed, mirroring `spans.SpanAttributes`), so the
   // whole column stays readable while its content keys do not.
@@ -520,10 +520,10 @@ export interface DatasetOverride {
   readonly joinKeys: readonly string[];
   readonly timeColumn: string;
   readonly freshness: string;
-  readonly gates: readonly FieldProtection[];
+  readonly gates: readonly LwqlGate[];
   readonly dedup: DerivedDatasetDedup;
   /** Per-column gates; set `[]` to opt a column out of its default gate. */
-  readonly columnGates: Readonly<Record<string, readonly FieldProtection[]>>;
+  readonly columnGates: Readonly<Record<string, readonly LwqlGate[]>>;
   readonly columnUnits: Readonly<Record<string, LangWatchQLColumnUnit>>;
   readonly aliases: Readonly<Record<string, string>>;
   /** Source columns not to expose, each mapped to the reason it is omitted. */
@@ -582,8 +582,8 @@ function defaultDedup({
 /** The default column gates for every exposed column of one derived table. */
 function computeDefaultColumnGates(
   exposed: readonly ExposedColumn[],
-): Record<string, readonly FieldProtection[]> {
-  const computed: Record<string, readonly FieldProtection[]> = {};
+): Record<string, readonly LwqlGate[]> {
+  const computed: Record<string, readonly LwqlGate[]> = {};
   for (const column of exposed) {
     const gates = defaultColumnGates({
       name: column.exposedName,
@@ -648,7 +648,7 @@ interface DerivedDatasetShape {
   readonly aliases: Readonly<Record<string, string>>;
   readonly skipColumns: Readonly<Record<string, string>>;
   readonly tenantColumn: string;
-  readonly columnGates: Record<string, readonly FieldProtection[]>;
+  readonly columnGates: Record<string, readonly LwqlGate[]>;
   readonly exposedSortKey: readonly string[];
   readonly grainColumns: readonly string[];
   readonly timeColumn: string;

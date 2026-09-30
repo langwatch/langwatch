@@ -144,6 +144,7 @@ async function pipeline({
       peers: {
         findProjectCaller: async () => ({ id: PROJECT_ID, lwqlKey: "key-1" }),
         resolveProjectProtections: async () => ({
+          catalogue: { permissions: [] },
           canSeeCosts: true,
           canSeeCapturedInput: true,
           canSeeCapturedOutput: true,

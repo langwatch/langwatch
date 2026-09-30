@@ -19,6 +19,7 @@ import {
 import { langWatchQLPassSql } from "../../rules/langwatch-ql-pass-sql.rules.ts";
 import { LangWatchQLCapabilityService } from "../langwatch-ql-capability.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 const PROJECT = { id: "project-1", lwqlKey: "key-1" };
 const STATEMENT =
@@ -81,7 +82,7 @@ describe("LangWatchQLService.executePass", () => {
       for (const pass of EVERY_PASS) {
         await service.executePass({
           project: PROJECT,
-          protections: {},
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
           sql: STATEMENT,
           pass,
           isInstantEvalsEnabled: true,
@@ -108,7 +109,7 @@ describe("LangWatchQLService.executePass", () => {
 
       await serviceOver(executor).executePass({
         project: PROJECT,
-        protections: {},
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
         sql: `${STATEMENT} WHERE TraceName = {name:String}`,
         parameters: { name: "hello" },
         pass: { kind: "page", traceIds: ["t1"] },
@@ -130,7 +131,7 @@ describe("LangWatchQLService.executePass", () => {
       const refusal = await refusalOf(
         serviceOver(executor).executePass({
           project: PROJECT,
-          protections: {},
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
           sql: `SELECT * FROM (\n${STATEMENT}\n) AS q LIMIT 0`,
           pass: { kind: "probe" },
           isInstantEvalsEnabled: true,
@@ -148,7 +149,7 @@ describe("LangWatchQLService.executePass", () => {
       const refusal = await refusalOf(
         serviceOver(executor).executePass({
           project: PROJECT,
-          protections: {},
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
           sql: "SELECT name FROM system.tables",
           pass: { kind: "count", limit: 10 },
           isInstantEvalsEnabled: true,
@@ -166,7 +167,7 @@ describe("LangWatchQLService.executePass", () => {
       const refusal = await refusalOf(
         serviceOver(executor).executePass({
           project: PROJECT,
-          protections: {},
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
           sql: STATEMENT,
           pass: { kind: "probe" },
         }),
@@ -203,7 +204,7 @@ describe("LangWatchQLService.executePass", () => {
       const refusal = await refusalOf(
         serviceOver(executor).executePass({
           project: PROJECT,
-          protections: {},
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
           sql: STATEMENT,
           pass: { kind: "count", limit: 1.5 },
           isInstantEvalsEnabled: true,
@@ -220,7 +221,7 @@ describe("LangWatchQLService.executePass", () => {
       const refusal = await refusalOf(
         serviceOver(null).executePass({
           project: PROJECT,
-          protections: {},
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
           sql: STATEMENT,
           pass: { kind: "probe" },
           isInstantEvalsEnabled: true,

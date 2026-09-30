@@ -20,6 +20,7 @@ const PROJECT_ID = "project-1";
 const RUN_ID = "run-1";
 const AT = Temporal.Instant.from("2026-09-18T10:00:00Z");
 const PROTECTIONS = {
+  catalogue: { permissions: [] },
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,

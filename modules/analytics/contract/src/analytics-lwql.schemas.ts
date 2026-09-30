@@ -5,6 +5,7 @@
  */
 import { defineRestMiddleware } from "@langwatch/api/contract";
 import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
+import { authzPermissionSchema } from "@langwatch/authz-contract";
 import { z } from "zod";
 
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
@@ -20,6 +21,7 @@ export const langWatchQLProtectionsSchema: z.ZodType<LangWatchQLProtections> = z
     canSeeCosts: z.boolean().nullable().optional(),
     canSeeCapturedInput: z.boolean().nullable().optional(),
     canSeeCapturedOutput: z.boolean().nullable().optional(),
+    catalogue: z.object({ permissions: z.array(authzPermissionSchema).readonly() }).strict(),
   })
   .strict();
 

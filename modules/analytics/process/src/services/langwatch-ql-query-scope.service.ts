@@ -9,14 +9,15 @@ import type {
   LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 import type { RestProjectCredentialPrincipal } from "@langwatch/api/rest";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { PROJECT_KIND, type Project, type ProjectApi } from "@langwatch/project-contract";
 
 import { strictestLangWatchQLProtections } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "./langwatch-ql-capability.service.ts";
-import { WorkbenchProtectionsService } from "./workbench-protections.service.ts";
+import {
+  WorkbenchProtectionsService,
+  type WorkbenchProtectionsDependencies,
+} from "./workbench-protections.service.ts";
 
 /** The projects one query may read, and the protections its content is redacted by. */
 export type LangWatchQLQueryScope = Readonly<{
@@ -24,11 +25,8 @@ export type LangWatchQLQueryScope = Readonly<{
   protections: LangWatchQLProtections;
 }>;
 
-type ScopeDependencies = Readonly<{
-  authz: Pick<AuthzApi, "hasPermission" | "hasApiKeyPermission">;
-  dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject">;
-  projects: Pick<ProjectApi, "findById" | "listByOrganization">;
-}>;
+type ScopeDependencies = WorkbenchProtectionsDependencies &
+  Readonly<{ projects: Pick<ProjectApi, "findById" | "listByOrganization"> }>;
 
 type ReadableProject = Readonly<{
   project: Pick<Project, "id" | "lwqlKey" | "teamId">;

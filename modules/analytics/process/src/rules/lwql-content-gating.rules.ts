@@ -11,12 +11,12 @@ import {
 } from "@langwatch/data-privacy-contract";
 
 import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
-import type { FieldProtection } from "./lwql-field-protection.rules.ts";
+import type { LwqlGate } from "./lwql-gate.rules.ts";
 
 /**
  * Which read-time gate governs each data-privacy content category.
  */
-const CATEGORY_GATE: Record<ContentCategory, FieldProtection> = {
+const CATEGORY_GATE: Record<ContentCategory, LwqlGate> = {
   input: "input",
   output: "output",
   system: "input",
@@ -43,7 +43,7 @@ export const CONTENT_ATTRIBUTE_KEY_PREFIXES: readonly string[] = CONTENT_ATTRIBU
 );
 
 /** The gate governing a content category, per {@link CATEGORY_GATE}. */
-export function gateForContentCategory(category: ContentCategory): FieldProtection {
+export function gateForContentCategory(category: ContentCategory): LwqlGate {
   return CATEGORY_GATE[category];
 }
 

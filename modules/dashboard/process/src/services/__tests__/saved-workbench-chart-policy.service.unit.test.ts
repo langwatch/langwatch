@@ -5,7 +5,10 @@
  */
 
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
-import { createLangWatchQLService } from "@langwatch/analytics-process/testing";
+import {
+  EVERY_CATALOGUE_PERMISSION,
+  createLangWatchQLService,
+} from "@langwatch/analytics-process/testing";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
@@ -25,6 +28,7 @@ const CONTENT_SQL = "SELECT CapturedInput AS value FROM analytics.traces";
 
 /** Everything visible: the author the gate is measured against. */
 const FULLY_PERMITTED = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,
@@ -32,6 +36,7 @@ const FULLY_PERMITTED = {
 
 /** No captured content — the shape a `restrict` privacy policy produces. */
 const WITHOUT_CONTENT = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: false,
   canSeeCapturedOutput: false,
   canSeeCosts: true,
@@ -68,7 +73,7 @@ describe("SavedWorkbenchChartPolicyService", () => {
     expect(() =>
       policy().validate({
         projectId: PROJECT_ID,
-        protections: { canSeeCosts: true },
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION, canSeeCosts: true },
         definition: permittedDefinition,
       }),
     ).not.toThrow();
@@ -81,7 +86,7 @@ describe("SavedWorkbenchChartPolicyService", () => {
       expect(() =>
         policy().validate({
           projectId: PROJECT_ID,
-          protections: { canSeeCapturedInput: false },
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION, canSeeCapturedInput: false },
           definition: { ...permittedDefinition, sql: CONTENT_SQL },
         }),
       ).toThrowError(expect.objectContaining({ code: "lwql_not_permitted" }));
@@ -166,7 +171,7 @@ describe("SavedWorkbenchChartPolicyService", () => {
       expect(() =>
         policy().validate({
           projectId: PROJECT_ID,
-          protections: { canSeeCosts: true },
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION, canSeeCosts: true },
           definition: {
             ...permittedDefinition,
             vegaLiteSpec: {

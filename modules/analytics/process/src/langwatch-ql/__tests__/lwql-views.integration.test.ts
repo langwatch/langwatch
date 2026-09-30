@@ -9,6 +9,7 @@ import { CONTENT_CATEGORIES, CONTENT_KEY_CATALOG } from "@langwatch/data-privacy
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
@@ -821,6 +822,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
   it("refuses a gated field in every expression position, over the canonical gated set", () => {
     const withoutContent = catalogShapes.gatedColumns({
       protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
         canSeeCapturedInput: false,
         canSeeCapturedOutput: false,
         canSeeCosts: true,
@@ -872,6 +874,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       ...policy,
       gatedColumns: catalogShapes.gatedColumns({
         protections: {
+          catalogue: EVERY_CATALOGUE_PERMISSION,
           canSeeCapturedInput: true,
           canSeeCapturedOutput: true,
           canSeeCosts: true,

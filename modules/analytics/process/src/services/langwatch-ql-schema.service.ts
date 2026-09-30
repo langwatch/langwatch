@@ -17,7 +17,9 @@ import {
 } from "../rules/langwatch-ql-app-function-catalog.rules.ts";
 import type { LangWatchQLAppFunctionDefinition } from "../rules/langwatch-ql-app-function-shapes.rules.ts";
 import { LWQL_ALLOWED_FUNCTION_NAMES } from "../rules/langwatch-ql-functions.rules.ts";
-import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
+import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
+import { publishedLwqlGates } from "../rules/lwql-gate.rules.ts";
+import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
@@ -165,11 +167,13 @@ export class LangWatchQLSchemaService {
     database,
     protections,
     views = LWQL_VIEW_CATALOG,
+    catalog = LWQL_CATALOG,
     isInstantEvalsEnabled = false,
   }: {
     database: string;
     protections: LangWatchQLProtections;
     views?: readonly LangWatchQLViewDefinition[];
+    catalog?: LwqlCatalogue;
     isInstantEvalsEnabled?: boolean;
   }): LangWatchQLSchema {
     const withheld = new Set(catalogShapes.gatedColumns({ protections, views }));
@@ -177,7 +181,7 @@ export class LangWatchQLSchemaService {
     return {
       database,
       functions: LWQL_ALLOWED_FUNCTION_NAMES,
-      views: catalogShapes.visibleViews({ protections, views }).map((view) => ({
+      views: catalogShapes.visibleViews({ protections, views, catalog }).map((view) => ({
         name: `${database}.${view.name}`,
         description: view.description,
         grain: view.grain,
@@ -189,7 +193,7 @@ export class LangWatchQLSchemaService {
           type: column.type,
           description: column.description,
           unit: column.unit ?? null,
-          gates: catalogShapes.columnGates({ view, column }),
+          gates: publishedLwqlGates(catalogShapes.columnGates({ view, column })),
           available: !withheld.has(column.name),
         })),
         exampleSql: this.exampleSql({ database, view }),

@@ -10,6 +10,7 @@ import type {
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
+import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
   SavedWorkbenchChartDashboardNotFoundError,
@@ -32,7 +33,7 @@ import {
   type SavedWorkbenchChartRepository,
 } from "../saved-workbench-chart.service.ts";
 
-const PROTECTIONS: LangWatchQLProtections = {};
+const PROTECTIONS: LangWatchQLProtections = { catalogue: EVERY_CATALOGUE_PERMISSION };
 
 function definition(overrides: Partial<SavedWorkbenchChartDefinition> = {}) {
   return {

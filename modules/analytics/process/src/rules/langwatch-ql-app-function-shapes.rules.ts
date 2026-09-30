@@ -6,7 +6,7 @@
 
 import type { LangWatchQLJudgement } from "@langwatch/analytics-contract";
 
-import type { FieldProtection } from "./lwql-field-protection.rules.ts";
+import type { LwqlGate } from "./lwql-gate.rules.ts";
 
 /**
  * What a function's key resolves to, which decides how it is fetched and
@@ -83,7 +83,7 @@ export interface LangWatchQLAppFunctionDefinition {
    * Permissions a caller must hold, all of them, to call it at all: a function
    * returning captured content is as restricted as a column holding it.
    */
-  readonly gates: readonly FieldProtection[];
+  readonly gates: readonly LwqlGate[];
   /** A runnable statement, built with the deployment's LangWatchQL database. */
   readonly example: (database: string) => string;
 }

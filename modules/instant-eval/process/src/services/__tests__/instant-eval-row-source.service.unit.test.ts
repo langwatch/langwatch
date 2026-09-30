@@ -15,7 +15,11 @@ import {
 } from "../instant-eval-row-source.service.ts";
 
 const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
-const PROTECTIONS = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
+const PROTECTIONS = {
+  catalogue: { permissions: [] },
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
 const SQL = "SELECT TraceId, eval(x, 'y') AS annoyed FROM analytics.traces";
 
 function result(overrides: Partial<LangWatchQLQueryResult> = {}): LangWatchQLQueryResult {

@@ -6,7 +6,7 @@
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   BOUNDABLE_TIME_COLUMN_TYPE,
@@ -14,6 +14,7 @@ import {
 } from "../../services/langwatch-ql-schema.service.ts";
 
 const lwqlSchema = LangWatchQLSchemaService.create();
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixture.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
 
@@ -22,18 +23,20 @@ const catalogShapes = LangWatchQLCatalogShapesService.create();
 const DATABASE = "analytics";
 
 const FULLY_PERMITTED: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,
 };
 
 const WITHOUT_CONTENT: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: false,
   canSeeCapturedOutput: false,
   canSeeCosts: true,
 };
 
-const WITHOUT_ANYTHING: LangWatchQLProtections = {};
+const WITHOUT_ANYTHING: LangWatchQLProtections = { catalogue: EVERY_CATALOGUE_PERMISSION };
 
 function schemaFor(protections: LangWatchQLProtections) {
   return lwqlSchema.describe({ database: DATABASE, protections });
@@ -150,7 +153,7 @@ describe("given the LangWatchQL schema catalog when a column is withheld from th
     // for, so a collapsed boolean could not pass this.
     expect(byName.get("analytics.traces.CapturedInput")!.gates).toEqual(["input"]);
     expect(byName.get("analytics.traces.CapturedOutput")!.gates).toEqual(["output"]);
-    expect(byName.get("analytics.traces.TotalCost")!.gates).toEqual(["costs"]);
+    expect(byName.get("analytics.traces.TotalCost")!.gates).toEqual(["costs", "cost:view"]);
     // A column that needs two permissions says both.
     expect(byName.get("analytics.simulations.MessageContents")!.gates).toEqual(["input", "output"]);
   });
@@ -283,7 +286,12 @@ describe("given the LangWatchQL schema catalog when a dataset's example query is
 describe("given the LangWatchQL schema catalog when a dataset is outside the caller's permissions", () => {
   const views = [...LWQL_VIEW_CATALOG, GATED_DATASET];
   const schemaWith = (protections: LangWatchQLProtections) =>
-    lwqlSchema.describe({ database: DATABASE, protections, views });
+    lwqlSchema.describe({
+      database: DATABASE,
+      protections,
+      views,
+      catalog: { ...LWQL_CATALOG, [GATED_DATASET.name]: LWQL_CATALOG.traces },
+    });
 
   it("leaves it out of the published schema entirely", () => {
     expect(schemaWith(WITHOUT_CONTENT).views.map((dataset) => dataset.name)).not.toContain(

@@ -13,6 +13,8 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
+  type LangWatchQLTimeWindow,
+  type LangWatchQLValidationResult,
 } from "@langwatch/analytics-contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { moduleApi } from "@langwatch/kernel/module-api";
@@ -40,6 +42,14 @@ export interface AnalyticsLwqlApi {
     projectId: string;
     protections: LangWatchQLProtections;
   }): Promise<LangWatchQLSchema>;
+  /** The statement's refusals for this member with their positions; nothing is run. */
+  diagnoseLangWatchQL(input: {
+    projectId: string;
+    userId: string;
+    sql: string;
+    parameters?: Readonly<Record<string, unknown>>;
+    timeWindow?: LangWatchQLTimeWindow;
+  }): Promise<LangWatchQLValidationResult>;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 }
 
@@ -71,6 +81,20 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
         projectId: input.projectId,
         userId: actor.id,
       }),
+    });
+  })
+
+  .procedure("validate")
+  .withPermission("analytics:view")
+  .handle(async ({ app, input, actor }) => {
+    await assertWorkbenchEnabled(app, input.projectId);
+
+    return app.diagnoseLangWatchQL({
+      projectId: input.projectId,
+      userId: actor.id,
+      sql: input.sql,
+      ...(input.parameters ? { parameters: input.parameters } : {}),
+      ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
     });
   })
 
