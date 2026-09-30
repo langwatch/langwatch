@@ -90,6 +90,9 @@ override-dependencies = [
     "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
     # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
     "json-repair>=0.60.1",
+    # security: PyJWT advisories covering <=2.13.0, including a CRITICAL; patched in 2.14.0. An override replaces the requirement, so the
+    # crypto extra that mcp asks for has to be restated here.
+    "pyjwt[crypto]>=2.14.0",
     # --- Security floors below carry no API change for this workspace. Each is
     # the first patched release named by the advisory that produced the alert;
     # raise a floor rather than removing it, so a transitive downgrade can never
