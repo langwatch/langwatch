@@ -78,7 +78,7 @@ tsc is the whole build. `rewriteRelativeImportExtensions` rewrites the `.ts` and
 `.tsx` specifiers to `.js` on the way out, so no bundler has to be taught the
 package's shape, and `dist` mirrors `src` file for file.
 
-`pnpm ensure:built` (`cmd/devscripts`) rebuilds it when `src` is newer than `dist`. The
+`pnpm ensure:built` (`cmd/devscripts`) runs its Nx `build`, which rebuilds or restores it when an input changed. The
 `predev` hook of the api and the worker runs it, as do their `pretest` hooks, and
 the image builds it the way pnpm builds any workspace dependency. Running one of
 those is what keeps a rebuild out of your hands.
