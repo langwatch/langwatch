@@ -1527,7 +1527,9 @@ a type error.
 
 Worker semantics: delivery is at-least-once, so subscribers are idempotent;
 ordering is per aggregate via the group queue, so one poisoned aggregate
-retries with backoff without blocking neighbours; projections fold from the
+retries with backoff without blocking neighbours; a group waiting out its backoff frees its tenant
+soft-cap slot and keeps its active lock, so its order holds while it runs nothing (Alex, 2026-09-30);
+projections fold from the
 same ordered stream; every consumer registers drain-first on the server.
 The hand-off from an append to its projections, subscribers and process managers is durable: a
 lane that cannot be staged is recorded in the process store's outbox and re-driven, a fold or state

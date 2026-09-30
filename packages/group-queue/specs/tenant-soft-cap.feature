@@ -45,10 +45,12 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Then "proj_acme"'s in-flight slot expiry is bumped in lockstep with the activeKey heartbeat
 
   @integration @tenant-cap @lifecycle
-  Scenario: RETRY_RESTAGE bumps the in-flight slot expiry to the retry window
-    Given a tenant "proj_acme" with one in-flight group entering retry backoff
-    When RETRY_RESTAGE_LUA reschedules the job
-    Then "proj_acme"'s in-flight slot expiry is set to the retry window
+  Scenario: A group waiting out its retry backoff frees its tenant slot and keeps its order
+    Given a tenant "proj_acme" with cap=1, one in-flight group and one parked group
+    When RETRY_RESTAGE_LUA reschedules the in-flight group's job with a backoff
+    Then "proj_acme"'s in-flight slot for that group is freed
+    And the parked group is unparked into the freed slot
+    And the retrying group stays locked, so none of its later jobs dispatch before the retry
 
   @integration @tenant-cap @enforcement
   Scenario: DISPATCH_BATCH_LUA refuses to dispatch when tenant is at cap
