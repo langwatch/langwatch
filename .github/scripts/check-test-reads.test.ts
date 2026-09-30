@@ -39,8 +39,7 @@ const run = ({
     sharedGlobals: ["pnpm-workspace.yaml"],
     uncached: new Set(["@fix/harness"]),
     ignoredOf: (paths) => new Set(paths.filter((path) => path.startsWith(".vitest-tmp/"))),
-    kindOf: (path) =>
-      absent.has(path) ? undefined : directories.has(path) ? "directory" : "file",
+    kindOf: (path) => (absent.has(path) ? undefined : directories.has(path) ? "directory" : "file"),
   });
 
 void describe("given the reads a package's cached tests made", () => {

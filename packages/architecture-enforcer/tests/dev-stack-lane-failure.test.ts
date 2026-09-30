@@ -16,7 +16,9 @@ const REPO_ROOT = path.resolve(HERE, "../../..");
 const DEV_STACK = path.join(REPO_ROOT, "dev/scripts/dev-stack.sh");
 
 function concurrentlyFlagsOf(script: string): string[] {
-  const block = /exec pnpm --silent exec concurrently \\\n([\s\S]*?)"\$\{COMMANDS\[@\]\}"/.exec(script);
+  const block = /exec pnpm --silent exec concurrently \\\n([\s\S]*?)"\$\{COMMANDS\[@\]\}"/.exec(
+    script,
+  );
   const body = block?.[1];
   if (!body) throw new Error("dev-stack.sh no longer runs concurrently the expected way");
   return body

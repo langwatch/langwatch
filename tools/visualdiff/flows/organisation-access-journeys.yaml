@@ -18,8 +18,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-invmail-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-invmail-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -44,8 +44,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-inv-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-inv-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -88,7 +88,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-role-{uid}'
+          value: "vd-role-{uid}"
       - action: fill
         with:
           label: Search permissions
@@ -115,7 +115,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-role-renamed-{uid}'
+          value: "vd-role-renamed-{uid}"
       - action: click
         with:
           text: /^\s*Save role\s*$/
@@ -340,4 +340,4 @@ flows:
         with:
           selector: 'xpath=(//input[@name="name"])[2]'
           as: projectName
-          match: '^vd-projset-{uid}$'
+          match: "^vd-projset-{uid}$"

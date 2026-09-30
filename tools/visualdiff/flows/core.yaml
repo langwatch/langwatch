@@ -22,8 +22,8 @@ flows:
           text: /^\s*Email/
       - action: fill
         with:
-          field: 'alerts@partner.com'
-          value: 'vd-{uid}@example.com'
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
       - action: click
         with:
           text: Add email

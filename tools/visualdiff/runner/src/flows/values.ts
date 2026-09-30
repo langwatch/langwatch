@@ -15,7 +15,10 @@ export const fillValues = ({
   text: string;
   values: Record<string, string>;
 }): string =>
-  Object.entries(values).reduce((filled, [name, value]) => filled.replaceAll(`{${name}}`, value), text);
+  Object.entries(values).reduce(
+    (filled, [name, value]) => filled.replaceAll(`{${name}}`, value),
+    text,
+  );
 
 /** fillArgs fills every argument of a step. */
 export const fillArgs = ({

@@ -107,7 +107,12 @@ The two halves agree by file, in the run directory `.fuzz/<run>/`:
   "signature": "console-error :: TypeError: x is not a function",
   "message": "TypeError: x is not a function",
   "trail": ["goto /messages", "click button 'New'", "fill input#name 'fuzzer'"],
-  "evidence": { "screenshot": "ui/0007.png", "url": "https://.../messages", "console": ["..."], "requests": ["GET /api/x 500"] },
+  "evidence": {
+    "screenshot": "ui/0007.png",
+    "url": "https://.../messages",
+    "console": ["..."],
+    "requests": ["GET /api/x 500"]
+  },
   "navigation": "reload|in-app",
   "capturedAt": "2026-09-30T12:00:07Z"
 }

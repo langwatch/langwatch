@@ -422,12 +422,12 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
 "Capability" means exactly these four layers. Each has one owner and one answer; nothing else
 decides it, and no layer, projection or screen re-derives another's answer.
 
-| Layer | Question | Owner and where it is answered | How the browser learns it |
-| --- | --- | --- | --- |
+| Layer                   | Question                                                                   | Owner and where it is answered                                                                                                          | How the browser learns it                                                                                                               |
+| ----------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Deployment availability | Does this install have it (email, object storage, langevals, the gateway)? | The owning module's process member, which holds the config and the secrets, answered once through a declared supply token (§3.3 rule 4) | A public-config boolean projected from that same answer after members are built; never recomputed from config leaves or secret presence |
-| Entitlement | May this organization use it (plan, licence)? | `EntitlementApi`; routes stay mounted and refuse per organization (§11) | An entitlement read through the owner's `*Api` |
-| Permission | May this user do it? | authz; the service checks before acting | The session's `hasPermission` / `hasOrganizationPermission` |
-| Release flag | Is it rolled out here yet? | Feature flags | The flags host service |
+| Entitlement             | May this organization use it (plan, licence)?                              | `EntitlementApi`; routes stay mounted and refuse per organization (§11)                                                                 | An entitlement read through the owner's `*Api`                                                                                          |
+| Permission              | May this user do it?                                                       | authz; the service checks before acting                                                                                                 | The session's `hasPermission` / `hasOrganizationPermission`                                                                             |
+| Release flag            | Is it rolled out here yet?                                                 | Feature flags                                                                                                                           | The flags host service                                                                                                                  |
 
 **Off is opaque by default.** The feature is hidden or disabled, and the screen says only "contact
 LangWatch support" (SaaS) or "contact your administrator" (self-hosted), never why. A reader holding
@@ -2197,20 +2197,20 @@ This document names the target. **Landed 2026-09-18:** the tree rename
 dissolved into `entitlement-contract`, and `.withStores(stores)` on the
 chain. New code uses the left column only.
 
-| Target                                        | Today                                                              |
-| --------------------------------------------- | ------------------------------------------------------------------ |
-| `@langwatch/module` (light core)              | `@langwatch/kernel`'s token half                                   |
-| `@langwatch/process`                          | `@langwatch/process-server` + kernel's boot AND declaration halves |
-| `@langwatch/browser`                          | `@langwatch/ui-kernel` (boot half)                                 |
-| `createProcessApp(role)`                      | none — apps compose directly (see note below)                      |
-| `openStores(config)`                          | `createProcessMembers({ config })`                                 |
-| `defineProcessModule` / `defineBrowserModule` | `defineServerModule` / `defineWebModule`                           |
-| `traceProcessModule` / `processModules`       | `traceServer` / `serverModules`                                    |
-| `TraceModule` + `.withApi(...)`               | `TraceApp` + `.withApp(...)`                                       |
-| `<f>.module.ts` / `<f>.web.ts` file stems     | `<f>.server.ts` / `<f>.web.ts`                                     |
-| `definePipeline(...).withEvents(schemas)`     | `defineAggregate({ events: defineEvents([...type strings]) })`     |
-| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers) |
-| `enterprise/modules/audit-log` (§4)           | `modules/audit-log`                                                |
+| Target                                                                                   | Today                                                              |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `@langwatch/module` (light core)                                                         | `@langwatch/kernel`'s token half                                   |
+| `@langwatch/process`                                                                     | `@langwatch/process-server` + kernel's boot AND declaration halves |
+| `@langwatch/browser`                                                                     | `@langwatch/ui-kernel` (boot half)                                 |
+| `createProcessApp(role)`                                                                 | none — apps compose directly (see note below)                      |
+| `openStores(config)`                                                                     | `createProcessMembers({ config })`                                 |
+| `defineProcessModule` / `defineBrowserModule`                                            | `defineServerModule` / `defineWebModule`                           |
+| `traceProcessModule` / `processModules`                                                  | `traceServer` / `serverModules`                                    |
+| `TraceModule` + `.withApi(...)`                                                          | `TraceApp` + `.withApp(...)`                                       |
+| `<f>.module.ts` / `<f>.web.ts` file stems                                                | `<f>.server.ts` / `<f>.web.ts`                                     |
+| `definePipeline(...).withEvents(schemas)`                                                | `defineAggregate({ events: defineEvents([...type strings]) })`     |
+| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers)        |
+| `enterprise/modules/audit-log` (§4)                                                      | `modules/audit-log`                                                |
 
 `createProcessApp` stays the target shape. Its previous implementation, the
 generated `createServerApp` and its `serverModuleChunk0..9`,

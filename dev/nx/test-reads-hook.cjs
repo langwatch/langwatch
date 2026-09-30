@@ -87,7 +87,15 @@ if (out && name && cachedTarget) {
     }
   }
   // A child process reads its working directory; name it when that lies outside the package.
-  for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"]) {
+  for (const method of [
+    "spawn",
+    "spawnSync",
+    "exec",
+    "execSync",
+    "execFile",
+    "execFileSync",
+    "fork",
+  ]) {
     wrap({
       owner: childProcess,
       method,

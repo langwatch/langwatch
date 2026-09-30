@@ -16,6 +16,9 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
+    // Twelve suites mock the ops api binding with different shapes, so each
+    // file needs its own module registry or one file's mock leaks into the next.
+    isolate: true,
     test: {
       environment: "jsdom",
       include: ["src/**/*.test.{ts,tsx}"],

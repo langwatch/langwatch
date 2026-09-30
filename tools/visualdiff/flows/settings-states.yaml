@@ -183,12 +183,12 @@ flows:
           count: 'input[placeholder="Enter secret value"]'
       - action: fill
         with:
-          field: 'e.g., OPENAI_API_KEY'
-          value: 'vdstate{uid}'
+          field: "e.g., OPENAI_API_KEY"
+          value: "vdstate{uid}"
       - action: fill
         with:
           field: Enter secret value
-          value: 'sv-state-{uid}'
+          value: "sv-state-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/

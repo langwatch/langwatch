@@ -17,7 +17,7 @@ flows:
       - action: fill
         with:
           field: Project Name
-          value: 'vd-onb-{uid}'
+          value: "vd-onb-{uid}"
       - action: click
         with:
           selector: 'button[type="submit"]'
@@ -45,7 +45,7 @@ flows:
       - action: expect
         with:
           text: /Integration configured/
-          equals: '0'
+          equals: "0"
       - action: expect
         with:
           label: API key
@@ -59,11 +59,11 @@ flows:
       - action: expect
         with:
           text: /Integration configured/
-          timeout: '20000'
+          timeout: "20000"
       - action: expect
         with:
           text: Waiting for first trace
-          equals: '0'
+          equals: "0"
 
   - id: onboarding-welcome-sends-a-member-home
     title: A member who already belongs to an organisation is sent past the welcome screen
@@ -92,8 +92,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-onb-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-onb-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/

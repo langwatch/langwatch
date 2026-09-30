@@ -6,17 +6,14 @@
  * @see specs/lwql/langy-authoring.feature
  * @vitest-environment node
  */
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+
 import {
   langWatchQLCallerProtections,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { createLangWatchQLService } from "@langwatch/analytics-process/testing";
+import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -26,13 +23,15 @@ import {
 } from "../../app/__tests__/dashboard.fixture.ts";
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
-import {
-  savedWorkbenchChartRest,
-  savedWorkbenchChartUrl,
-} from "../saved-workbench-chart.rest.ts";
+import { savedWorkbenchChartRest, savedWorkbenchChartUrl } from "../saved-workbench-chart.rest.ts";
 
 const PLATFORM_URL = "https://app.langwatch.test/project-one/analytics/workbench";
-const EVERY_PERMISSION = ["analytics:view", "analytics:create", "analytics:update", "analytics:delete"];
+const EVERY_PERMISSION = [
+  "analytics:view",
+  "analytics:create",
+  "analytics:update",
+  "analytics:delete",
+];
 const VIEW_ONLY = ["analytics:view"];
 const WITHOUT_CONTENT: LangWatchQLProtections = { ...FULLY_PERMITTED, canSeeCapturedInput: false };
 
@@ -64,6 +63,12 @@ const boundaryErrorHandler: RestErrorHandler = (error) => {
   return Response.json({ code: "unhandled", error: String(error) }, { status: 500 });
 };
 
+/** What the production door throws when a key lacks the permission a route names. */
+class PermissionDeniedTestError extends Error {
+  readonly httpStatus = 403;
+  readonly code = "api_key_permission_denied";
+}
+
 /** One project's key over the shared repositories, holding exactly the permissions named. */
 function mountKey({
   repositories,
@@ -94,9 +99,12 @@ function mountKey({
   };
   const runtime = createRestRuntime({
     identity: {
-      authenticate: () => caller,
+      // A project-tier route asks its permission of the door itself.
+      authenticate: ({ permission }) => {
+        if (!held.includes(permission)) throw new PermissionDeniedTestError();
+        return caller;
+      },
       identify: () => caller,
-      authorize: ({ permission }) => ({ permitted: held.includes(permission), organizationRole: null }),
     },
   });
   const hono = runtime.mount(savedWorkbenchChartRest.router(), {
@@ -109,7 +117,11 @@ function mountKey({
   });
   const base = `/api/v1/projects/${projectId}/analytics/charts`;
 
-  const send = async ({ path = "", method = "GET", body }: {
+  const send = async ({
+    path = "",
+    method = "GET",
+    body,
+  }: {
     path?: string;
     method?: string;
     body?: unknown;
@@ -132,14 +144,16 @@ function mountKey({
     create: (body: unknown) => send({ method: "POST", body }),
     update: (id: string, body: unknown) => send({ path: `/${id}`, method: "PATCH", body }),
     remove: (id: string) => send({ path: `/${id}`, method: "DELETE" }),
-    place: (id: string, body: unknown) =>
-      send({ path: `/${id}/placement`, method: "PUT", body }),
+    place: (id: string, body: unknown) => send({ path: `/${id}/placement`, method: "PUT", body }),
     unplace: (id: string) => send({ path: `/${id}/placement`, method: "DELETE" }),
   };
 }
 
 async function seededChart(repositories: DashboardRepositories) {
-  const created = await mountKey({ repositories }).create({ name: "Spend", definition: DEFINITION });
+  const created = await mountKey({ repositories }).create({
+    name: "Spend",
+    definition: DEFINITION,
+  });
   expect(created.status).toBe(201);
 
   return created.json.id as string;
@@ -319,7 +333,9 @@ describe("given the saved workbench chart REST family", () => {
       const stranger = mountKey({ repositories, projectId: "project-2" });
 
       const foreign = await stranger.place(foreignId, { dashboardId: "dashboard-2" });
-      const unknown = await stranger.place("chart-that-never-existed", { dashboardId: "dashboard-2" });
+      const unknown = await stranger.place("chart-that-never-existed", {
+        dashboardId: "dashboard-2",
+      });
 
       expect(foreign.status).toBe(404);
       expect(unknown).toEqual(foreign);

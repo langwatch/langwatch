@@ -9,7 +9,7 @@ with resource knowledge — the matrix that makes a role name interpretable), §
 (one Access surface, with `explain()` built in), §10 (offboarding with proof —
 the shipped precedent for evidence as a product surface), §13 (the grants
 ledger: one writer, two views, one insert-only audit subscriber), and the
-"What falls out for free" entry *Access reviews / SOC 2 evidence*, which this
+"What falls out for free" entry _Access reviews / SOC 2 evidence_, which this
 ADR implements. Nothing in ADR-092 is superseded.
 [ADR-110](110-grant-aggregates-are-grants.md) (grant aggregates; the
 `occurredAt` / `acceptedAt` pair and the deterministic ids this relies on).
@@ -39,16 +39,16 @@ A SOC 2 Type II engagement does not ask for "an authorization model". Against
 the common criteria for logical access (CC6.1-CC6.3) it asks three concrete
 questions, and it asks them the same way every year:
 
-1. **User access review.** *"Show me, for a period, the list of everyone with
+1. **User access review.** _"Show me, for a period, the list of everyone with
    access to this system and what that access was, and show me that a
-   responsible person looked at it."* The evidence is a list plus a date plus a
+   responsible person looked at it."_ The evidence is a list plus a date plus a
    name. The list has to be complete and it has to be interpretable — a column
    saying `custom:role_2f8` proves nothing to a reader who cannot see what that
    role grants.
-2. **Termination / offboarding.** *"Pick five leavers. Show me their access was
-   removed, and when."* The evidence is per-person and needs a timestamp.
-3. **Change history.** *"Show me every access change in the period, and that
-   each was authorised."* The evidence is a log that cannot be edited after the
+2. **Termination / offboarding.** _"Pick five leavers. Show me their access was
+   removed, and when."_ The evidence is per-person and needs a timestamp.
+3. **Change history.** _"Show me every access change in the period, and that
+   each was authorised."_ The evidence is a log that cannot be edited after the
    fact.
 
 We can answer (2) today and half of (1). We cannot answer (3) as one artefact,
@@ -65,7 +65,7 @@ surface rather than about storage.
   `effectivePermissions(dave, acme) == ∅` (`proveNothingResolves`,
   `offboard.ts:96-122`), rolling the whole thing back and raising
   `offboard_incomplete` if anything still resolves. This is the precedent: the
-  product does not *assert* that access is gone, it *asks the engine* and fails
+  product does not _assert_ that access is gone, it _asks the engine_ and fails
   loudly on disagreement. An access review is the same move with the question
   inverted.
 - **The pure query.** `AuthzService.effectivePermissions`
@@ -76,26 +76,26 @@ surface rather than about storage.
   for anybody but the caller: the only tRPC surface over it
   (`platform/app/src/server/api/routers/authz.ts:13-44`) hard-codes
   `principal: { type: "user", id: ctx.session.user.id }` and says so in its
-  comment — *"it never answers for other principals"*.
+  comment — _"it never answers for other principals"_.
 - **The state, with its dates.** Since the grants ledger, `Grant` rows carry
   `occurredAt` (business time of the attach, backdated for imported facts),
   `expiresAt` (the stated end — the expiring-grants term), `revokedAt` and
   `revokedReason`. Critically, **a revoke marks the row rather than deleting
   it**: `prisma/schema.prisma:2712-2720` states the reason in the schema —
-  *"Deleting made the projection order-dependent … and it threw away the answer
-  to when a grant ended and why."* The same holds for `Role.deletedAt`.
+  _"Deleting made the projection order-dependent … and it threw away the answer
+  to when a grant ended and why."_ The same holds for `Role.deletedAt`.
 - **The change log.** The audit subscriber
   (`.../pipelines/authz-grants/subscribers/authzAuditTrail.subscriber.ts`) turns
   six event types — attach, role_change, revoke, role_defined,
   role_permissions_changed, role_deleted — into `AuditLog` rows prefixed
   `authz.grants.` (`schemas/constants.ts:73`). The sink is insert-only with an
   id derived from the event id and `ON CONFLICT DO NOTHING`
-  (`repositories/authz-audit-trail.prisma.repository.ts:18-35`): *"There is no
+  (`repositories/authz-audit-trail.prisma.repository.ts:18-35`): _"There is no
   update path at all — a re-delivered event describes the same moment, so the
-  second write must be a no-op, not an overwrite."*
+  second write must be a no-op, not an overwrite."_
 - **The vocabulary.** `packages/authz/src/registry.ts` declares every resource,
   its actions and the scope tiers it is grantable at, and `roles.ts` declares the
-  built-in bags as differences. Between them they *are* the role → permission
+  built-in bags as differences. Between them they _are_ the role → permission
   matrix. What does not exist is the artefact: ADR-092 §1 promises
   `pnpm authz:matrix → diffable markdown table` and **no such script is in the
   repository today**. The data is there; the rendering is not.
@@ -145,7 +145,7 @@ engine's question, so the review should ask the engine.
 
 ### The as-of question, answered honestly
 
-The tempting scope is *"who could see project chatbot on 30 June"*. We assessed
+The tempting scope is _"who could see project chatbot on 30 June"_. We assessed
 whether the ledger supports it today. It does not, and the reason is a missing
 **fact**, not a missing query.
 
@@ -161,8 +161,8 @@ Not reconstructable:
 1. **A grant's role is mutated in place.** `grant_role_changed` writes
    `roleKey: event.data.to` onto the same row
    (`projections/authzGrantsWrite.projection.ts:163`), and grant ids are stable
-   by design — `ledger/grant-identity.ts:28`: *"`grant_role_changed` on the same
-   id, not a new fact."* The projection knows the role a grant carries **now**
+   by design — `ledger/grant-identity.ts:28`: _"`grant_role_changed` on the same
+   id, not a new fact."_ The projection knows the role a grant carries **now**
    and never the role it carried in June.
 2. **A role's permission set is mutated in place.** `role_permissions_changed`
    replaces `Role.permissions` wholesale. A grant whose role never changed still
@@ -173,7 +173,7 @@ Not reconstructable:
    (`prisma/schema.prisma:2592-2602`), and both relations are
    `onDelete: Cascade`. A removal is a hard delete. Since COLLECT unions
    `{user} ∪ groups`, a user who was in `sec-eng` on 30 June and left in July
-   leaves **no trace in any table** — so an as-of answer would be *wrong*, not
+   leaves **no trace in any table** — so an as-of answer would be _wrong_, not
    merely incomplete, and wrong in the direction that understates past access.
    That is the worst direction an audit answer can be wrong in.
 4. **Offboarding hard-deletes membership and legacy team rows.** The sweep
@@ -191,8 +191,8 @@ cannot say who was in which group — gap (3) survives the replay. And
 (`.../migrations/00032_add_retention_and_size_columns.sql:34-38`), a horizon
 shorter than a multi-year lookback.
 
-**Verdict: no as-of reconstruction in v1.** Scope v1 to *current state plus
-change history since the last review*, which is what the user-access-review
+**Verdict: no as-of reconstruction in v1.** Scope v1 to _current state plus
+change history since the last review_, which is what the user-access-review
 control actually tests — the reviewer certifies access **as it stands** and the
 auditor tests that the review happened and that removals took effect. As-of is a
 later phase with a named prerequisite (§8).
@@ -275,7 +275,7 @@ when a resource is added.
 
 Two shapes over one engine, both on the Access surface, neither ops-only:
 
-- **`accessReview.reach`** — *"who can reach project chatbot"*. Interactive, one
+- **`accessReview.reach`** — _"who can reach project chatbot"_. Interactive, one
   scope, answers immediately, sits next to the existing bindings table where the
   question is asked.
 - **`accessReview.export`** — the whole-org bundle. A job (§7), not a request.
@@ -301,8 +301,8 @@ Three alternatives, and why not:
   able to change it. Gating evidence on a write permission forces every reviewer
   to become an admin, which inverts the point of the review.
 - **`complianceExport:view`** — exists, is org-scoped and read-only, and means
-  something else. The codebase states its meaning in its own words: *"bulk
-  export of an org's data is egress, not access"*
+  something else. The codebase states its meaning in its own words: _"bulk
+  export of an org's data is egress, not access"_
   (`platform/app/src/server/app-layer/langy/langyPermissionPolicy.ts:199`). A
   review bundle contains no traces, no prompts, no messages — it is access
   metadata. Overloading the two would let a customer who granted data egress
@@ -311,8 +311,8 @@ Three alternatives, and why not:
 - **A new `accessReview` resource** — costs a registry entry, a role-bag
   decision across four built-in tiers, a presentation entry, and a decision for
   every one of the 464 custom roles in production about whether they gain it.
-  `auditLog:view` already means *"you may read the record of who did what
-  here"*, and *"who can do what here"* is the same reader's question. If a
+  `auditLog:view` already means _"you may read the record of who did what
+  here"_, and _"who can do what here"_ is the same reader's question. If a
   customer later needs them separated, that is a registry entry then.
 
 ### 3. "Who can reach X" is `effectivePermissions`, run for other principals
@@ -343,7 +343,7 @@ the path:
 
 `via[]` is `explain()`'s matched-binding data
 (`packages/authz/src/engine.ts:145-214`) kept rather than discarded. A reviewer
-who reads "alice can view traces in chatbot" and cannot see *why* has to go and
+who reads "alice can view traces in chatbot" and cannot see _why_ has to go and
 find out, and that hunt is the manual work the review is supposed to abolish. It
 is also what makes the answer falsifiable: a path that names a grant id can be
 checked against `grants.jsonl`.
@@ -360,10 +360,10 @@ by the scope count for no gain.
 Said precisely, because the free-list entry's phrasing invites a stronger
 reading than the engine can support. The engine does not know which spans
 contain personal data and this ADR does not give it an opinion. What the
-registry knows is that a resource *is* a category of data — `traces`,
+registry knows is that a resource _is_ a category of data — `traces`,
 `annotations`, `datasets`, `prompts`, `secrets`, `gatewayLogs` — so a review
-question is asked as a permission set (*"everyone who resolves `traces:view` at
-or above project chatbot"*) and the answer is exact **for that question**.
+question is asked as a permission set (_"everyone who resolves `traces:view` at
+or above project chatbot"_) and the answer is exact **for that question**.
 Whether `traces` in chatbot contains PII is a classification question owned by
 the data-privacy surface, and pointing the review at a permission set rather
 than a classification is what keeps the answer verifiable rather than plausible.
@@ -397,7 +397,7 @@ Two omissions are stated in the manifest rather than hidden:
   lists the excluded sources so this reads as a stated rule rather than a hole.
 - **The window can be older than retention.** The manifest carries both the count
   of rows found and the `createdAt` of the oldest `authz.grants.` row in the
-  table, so *"no changes in the period"* and *"no history for the period"* cannot
+  table, so _"no changes in the period"_ and _"no history for the period"_ cannot
   be confused. Distinguishing those two is most of what the manifest is for.
 
 ### 5. The registry matrix, versioned
@@ -490,7 +490,7 @@ discarded rather than published: half a review reads as a complete one.
   state machine, no reminder emails. Those are process tooling, they are the part
   every GRC platform already sells, and building them here would put us in the
   business of workflow rather than evidence. The bundle is designed to be
-  *imported* by that tooling — which is most of why the streams are JSONL and the
+  _imported_ by that tooling — which is most of why the streams are JSONL and the
   summary is a file. A later layer can add attestation on top of an artefact that
   already exists; it cannot be usefully built first.
 - **No PII classification of data.** §3 states the exact claim. The review
@@ -511,7 +511,7 @@ nightly snapshot of who-can-do-what, queried at review time. It answers as-of
 dates, which is the thing v1 gives up. It is rejected because a snapshot is a
 second source of truth about access, and a second source of truth about access is
 exactly the class of bug ADR-092 was written to end. A snapshot that drifts from
-the engine produces an audit artefact that is *confidently wrong*, and nobody
+the engine produces an audit artefact that is _confidently wrong_, and nobody
 finds out until an auditor does. Deriving from the engine means the review and the
 product cannot disagree; if they ever do, the offboarding proof already
 demonstrates the right response — fail loudly.
@@ -541,8 +541,8 @@ declared rather than pretended away.
 
 ## Consequences
 
-- The Access surface gains a second question. Today it answers *"what bindings
-  exist"*; it will also answer *"who can reach this, and how"* — and the second
+- The Access surface gains a second question. Today it answers _"what bindings
+  exist"_; it will also answer _"who can reach this, and how"_ — and the second
   question is the one people actually ask in Slack.
 - `effectivePermissions` gains a caller that passes a principal other than the
   session user. That is a real widening of a sensitive surface and it is gated at
@@ -565,7 +565,7 @@ declared rather than pretended away.
 
 - ADR-092 §1 (registry + matrix codegen), §6 (`explain`), §10 (offboarding with
   proof), §13 (the grants ledger, the audit subscriber), and the free-list entry
-  *Access reviews / SOC 2 evidence* —
+  _Access reviews / SOC 2 evidence_ —
   `dev/docs/adr/092-unified-authorization-engine.md`.
 - ADR-110 (grant aggregates; `occurredAt` / `acceptedAt`, deterministic ids).
 - ADR-161 (a session is not a grant) —
