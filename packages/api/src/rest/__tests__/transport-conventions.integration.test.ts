@@ -350,3 +350,46 @@ describe("a store refusal thrown past the service", () => {
     expect(body).toMatchObject({ code: "conflict", trace_id: traceIds.traceId });
   });
 });
+
+describe("a database with no connection to give", () => {
+  const busy = {
+    P2024: "Timed out fetching a new connection from the connection pool",
+    P2028: "Transaction API error: Unable to start a transaction in the given time",
+  };
+
+  /** @scenario "A database with no connection to give is a retryable 503, never a 500" */
+  it.each(Object.entries(busy))("answers %s as a retryable 503", (code, message) => {
+    const { status, body } = canonicalErrorFor(Object.assign(new Error(message), { code }));
+
+    expect(status).toBe(503);
+    expect(body).toMatchObject({ retryable: true });
+  });
+
+  /** @scenario "A database with no connection to give is a retryable 503, never a 500" */
+  it("carries Retry-After on the wire", async () => {
+    const { app, run } = actionsApp();
+    run.mockRejectedValueOnce(Object.assign(new Error(busy.P2028), { code: "P2028" }));
+
+    const response = await app.request(`${BASE}/archive`, { method: "POST", headers: JSON_TYPE });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("1");
+    await expect(response.json()).resolves.toMatchObject({ retryable: true });
+  });
+
+  /** @scenario "A family's own error handler cannot turn a busy database back into a 500" */
+  it("hands a family's own handler the handled 503", async () => {
+    const familyOnError: ErrorHandler = (error, c) =>
+      HandledError.isHandled(error)
+        ? canonicalErrorResponse(error, c)
+        : new Response(null, { status: 500 });
+
+    const { app, run } = actionsApp({ onError: familyOnError });
+    run.mockRejectedValueOnce(Object.assign(new Error(busy.P2024), { code: "P2024" }));
+
+    const response = await app.request(`${BASE}/archive`, { method: "POST", headers: JSON_TYPE });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("1");
+  });
+});

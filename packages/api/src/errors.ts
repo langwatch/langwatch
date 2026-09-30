@@ -330,6 +330,30 @@ export interface ResolvedError {
   traceId?: string;
 }
 
+/** Prisma's codes for a pool with no connection to lend (P2024) or no transaction slot (P2028). */
+const DATABASE_BUSY_CODES: readonly unknown[] = ["P2024", "P2028"];
+
+/** Whether the failure is Prisma running out of Postgres connections. */
+export function isDatabaseBusy(error: unknown): boolean {
+  return error instanceof Error && "code" in error && DATABASE_BUSY_CODES.includes(error.code);
+}
+
+/** Postgres had no connection to give in time. The request did nothing wrong; retry shortly. */
+export class DatabaseBusyError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "The service is busy. Retry shortly.", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+      meta: { retryAfterMs: 1000 },
+    });
+
+    this.name = "DatabaseBusyError";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Hono onError handler
 // ---------------------------------------------------------------------------
@@ -344,7 +368,8 @@ export function createErrorHandler(): (err: Error, c: Context) => Response | Pro
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
-    const effective = isZodLikeError(err) ? validationErrorFromZod(err) : err;
+    const promoted = isDatabaseBusy(err) ? new DatabaseBusyError() : err;
+    const effective = isZodLikeError(promoted) ? validationErrorFromZod(promoted) : promoted;
     const { status, body } = formatError({ err: effective });
 
     const resolved: ResolvedError = {

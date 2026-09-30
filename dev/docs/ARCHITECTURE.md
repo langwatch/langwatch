@@ -1309,6 +1309,8 @@ re-assertion that must stay idempotent asks the ledger to `skip` rather than bei
 - The REST framework maps what no feature can know in advance, once, in `canonicalErrorFor`: an escaped ZodError
   is the 422, a Postgres data exception (SQLSTATE 22, such as a NUL byte) is the 422, and an unchecked unique
   violation is the 409 `conflict`. A failure a feature can know is still its own HandledError (Alex, 2026-09-30).
+  Prisma running out of Postgres connections (P2024, P2028) is the retryable 503 `DatabaseBusyError` with
+  `Retry-After`, promoted the same way by tRPC's `handledErrors` (Alex, 2026-09-30).
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
