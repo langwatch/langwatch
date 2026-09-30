@@ -492,6 +492,8 @@ export interface GovernanceClickHouseClient {
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, number>;
+    /** One organisation's projects a `TenantId IN (...)` read binds, exactly. */
+    tenantIds?: readonly string[];
   }): Promise<GovernanceClickHouseResult>;
 }
 

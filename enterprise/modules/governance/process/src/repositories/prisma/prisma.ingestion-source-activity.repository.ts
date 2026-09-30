@@ -629,6 +629,9 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
 
     const projectDepartmentById = new Map(projects.map((p) => [p.id, p.departmentId] as const));
     const tenantIds = projects.map((p) => p.id);
+    // A declared tenant set (ARCHITECTURE.md "Routing is folded into the `clickhouse` member").
+    const tenantPlaceholders = tenantIds.map((_, index) => `{tenant${index}:String}`).join(", ");
+    const tenantParams = Object.fromEntries(tenantIds.map((id, index) => [`tenant${index}`, id]));
 
     const { userDepartmentByEmail, userTeamDepartmentByEmail } = await this.resolveUserDepartments(
       input.organizationId,
@@ -647,13 +650,13 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           toString(count()) AS requests,
           toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastActivityMs
         FROM trace_summaries ts
-        WHERE ts.TenantId IN ({tenantIds:Array(String)})
+        WHERE ts.TenantId IN (${tenantPlaceholders})
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
           AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
-            WHERE TenantId IN ({tenantIds:Array(String)})
+            WHERE TenantId IN (${tenantPlaceholders})
               AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
               AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             GROUP BY TenantId, TraceId
@@ -662,12 +665,13 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       `,
       query_params: {
         windowEnd: now,
-        tenantIds,
+        ...tenantParams,
         windowStart,
         userKey: ATTR_USER_ID,
       },
       format: "JSONEachRow",
       clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
+      tenantIds,
     });
     const rows = (await result.json()) as {
       projectId: string;

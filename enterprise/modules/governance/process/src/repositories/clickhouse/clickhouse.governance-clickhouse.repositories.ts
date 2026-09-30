@@ -88,16 +88,18 @@ function memberGovernanceClickHouseResolver(
     async getClient(): Promise<GovernanceClickHouseClient> {
       return {
         async query(input) {
-          const tenantId = input.query_params?.tenantId;
+          const tenantId = input.tenantIds?.[0] ?? input.query_params?.tenantId;
           if (typeof tenantId !== "string" || tenantId === "") {
             throw new Error(
-              "GovernanceClickHouseClient.query: every statement must bind its own tenantId query param",
+              "GovernanceClickHouseClient.query: every statement must bind its own tenantId query param or declare its tenantIds",
             );
           }
           const result = await clickhouse.query({
             tenantId,
             sql: input.query,
             params: input.query_params ?? {},
+            ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
+            ...(input.clickhouse_settings ? { settings: input.clickhouse_settings } : {}),
           });
           return { json: async () => result.rows };
         },

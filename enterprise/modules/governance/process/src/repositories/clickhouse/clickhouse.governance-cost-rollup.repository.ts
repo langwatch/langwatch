@@ -35,13 +35,15 @@ const KEY_COLUMNS = [
   "RawActorId",
 ] as const;
 
-/** No USD figure, and nothing in another currency either. */
+/**
+ * No USD figure, and no non-zero amount in another currency either. Main's `OR` chain, by De
+ * Morgan: the tenant guard refuses an `OR` at its predicate's depth, which varies per statement.
+ */
 const HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL = `
             LatestAmountNanoUsd IS NULL
-            AND (
-              CurrencyCode = {usd:String}
-              OR CurrencyCode = ''
-              OR LatestAmountNanoMinor = 0
+            AND NOT (
+              CurrencyCode NOT IN ({usd:String}, '')
+              AND LatestAmountNanoMinor != 0
             )`;
 
 const CURRENCIES_WITHOUT_USD_SQL = `arraySort(groupUniqArrayIf(${UNPRICED_CURRENCY_SAMPLE_LIMIT})(

@@ -238,6 +238,13 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     Then the department rollup contains zero spend from the other org
     And every underlying ClickHouse query filters by TenantId first
 
+  @bdd @departments @birds-eye @unit
+  Scenario: Spend by department reads the organization's projects as one declared tenant set
+    Given an organization with two projects
+    When the dashboard asks for spend by department
+    Then the read binds one tenant parameter per project and declares exactly that set
+    And the tenant guard accepts it rather than failing the card
+
   @bdd @departments @birds-eye @integration
   Scenario: Marketing-versus-engineering comparison reads from departments
     Given members in "Marketing" and members in "Engineering" both have
