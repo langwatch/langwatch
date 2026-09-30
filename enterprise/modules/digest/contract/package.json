@@ -1,0 +1,33 @@
+{
+  "name": "@langwatch/enterprise-digest-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Weekly digest emails: the Api, the Cloud-admin gallery's tRPC declarations, and the public unsubscribe and click shapes.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
