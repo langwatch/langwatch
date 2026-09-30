@@ -1519,12 +1519,10 @@ jobs:
     needs: [
         changes,
         # `affected` decides test-unit's matrix, and test-unit is an allowed
-        # skip. So if this job failed and were not named here, test-unit would
-        # skip, the skip would be allowed, and the lane would report green
-        # having run no unit tests at all. A failed `affected` still fails
-        # this gate: allowed-skips excuses only a skip, and this job skips
-        # only when `changes` found no relevant path, so there is nothing
-        # for it to select.
+        # skip. It is named here so its own result votes: a failed `affected`
+        # fails this gate, since allowed-skips excuses only a skip. It is
+        # also in allowed-skips because it skips when `changes` found no
+        # relevant path, and then there is nothing for it to select.
         affected,
         typecheck,
         test-unit,
