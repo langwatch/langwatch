@@ -20,7 +20,7 @@ function importsOf(file: string): string[] {
 describe("the permission vocabulary the UI reads", () => {
   /** @scenario "The permission vocabulary the UI reads pulls in no server code" */
   it("pulls in no server code", () => {
-    for (const file of ["permission-catalogue.ts", "permission-matrix.ts"]) {
+    for (const file of ["permission-catalogue.ts", "permission-matrix.ts", "role-permissions.ts"]) {
       expect(importsOf(file).filter((spec) => RUNS_AT_IMPORT.includes(spec))).toEqual([]);
       expect(importsOf(file).some((spec) => spec.startsWith("@langwatch/authz-process"))).toBe(
         false,

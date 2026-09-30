@@ -72,6 +72,58 @@ describe("the built-in roles", () => {
     });
   });
 
+  describe("when a card claims what a tier can do", () => {
+    const granted = (teamRole: "ADMIN" | "MEMBER" | "VIEWER") =>
+      new Set<string>(builtinRoleGrantedPermissions(teamRole));
+
+    /** @scenario A predefined role card describes the role it actually is */
+    it("says Viewer changes nothing, and Viewer can change nothing", () => {
+      const viewer = BUILTIN_ROLE_CARDS.find((card) => card.teamRole === "VIEWER");
+
+      expect(viewer?.description).toContain("change none of it");
+      for (const permission of granted("VIEWER")) {
+        expect(permission.endsWith(":view")).toBe(true);
+      }
+    });
+
+    /** @scenario A predefined role card describes the role it actually is */
+    it("says Member creates and changes the work, and stops short of the team", () => {
+      const member = granted("MEMBER");
+
+      expect(member.has("datasets:manage")).toBe(true);
+      expect(member.has("prompts:manage")).toBe(true);
+      expect(member.has("evaluations:manage")).toBe(true);
+      expect(member.has("experiments:manage")).toBe(true);
+      expect(member.has("traces:create")).toBe(true);
+      expect(member.has("virtualKeys:create")).toBe(true);
+
+      expect(member.has("team:manage")).toBe(false);
+      expect(member.has("project:delete")).toBe(false);
+    });
+
+    /** @scenario A predefined role card describes the role it actually is */
+    it("says Admin holds the team, its projects and the gateway, and it does", () => {
+      const admin = granted("ADMIN");
+
+      expect(admin.has("team:manage")).toBe(true);
+      expect(admin.has("project:manage")).toBe(true);
+      expect(admin.has("project:delete")).toBe(true);
+      expect(admin.has("gatewayProviders:manage")).toBe(true);
+      expect(admin.has("gatewayBudgets:manage")).toBe(true);
+    });
+
+    /** @scenario A predefined role card describes the role it actually is */
+    it("leads each tier above the base with something the tier below lacks", () => {
+      for (const card of BUILTIN_ROLE_CARDS) {
+        const below = BUILTIN_ROLE_CARDS.find((candidate) => candidate.name === card.inheritsFrom);
+        if (!below) continue;
+        const inherited = granted(below.teamRole);
+
+        expect(card.headline.filter((permission) => inherited.has(permission))).toEqual([]);
+      }
+    });
+  });
+
   describe("when people are counted for a built-in role", () => {
     const held = (overrides: Partial<RoleBinding>): RoleBinding => ({
       id: "b",
