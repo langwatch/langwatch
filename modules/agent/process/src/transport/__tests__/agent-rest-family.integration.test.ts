@@ -302,6 +302,14 @@ describe("given the deprecated /api/agents alias", () => {
       expect(updated.status).toBe(200);
       expect(await updated.json()).toMatchObject({ name: "Aliased Renamed" });
 
+      const replaced = await api.legacy(`/api/agents/${created.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Aliased Put" }),
+      });
+      expect(replaced.status).toBe(200);
+      expect(await replaced.json()).toMatchObject({ name: "Aliased Put" });
+
       const archived = await api.legacy(`/api/agents/${created.id}`, { method: "DELETE" });
       expect(archived.status).toBe(200);
       expect(await archived.json()).toMatchObject({ archivedAt: expect.any(String) });

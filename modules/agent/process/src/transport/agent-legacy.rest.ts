@@ -119,6 +119,20 @@ export const agentLegacyRest: Readonly<{
     response(await app.update({ ...input, projectId: scope.id }), app, facts.projectSlug),
   )
 
+  .put("/:id", "replaceAgent")
+  .withParams(agentRestParamsSchema)
+  .withInput(updateAgentRequestSchema)
+  .withPermission("project:update")
+  .withOutput(legacyResponse)
+  .withDocs({
+    summary: "Update an agent (PUT keeps partial semantics); superseded by /api/v1/agents",
+    hide: true,
+  })
+  .withMiddleware(projectRestFacts)
+  .handle(async ({ app, input, scope }, facts) =>
+    response(await app.update({ ...input, projectId: scope.id }), app, facts.projectSlug),
+  )
+
   .delete("/:id", "archiveAgent")
   .withParams(agentRestParamsSchema)
   .withPermission("project:delete")
