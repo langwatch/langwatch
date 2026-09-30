@@ -23,6 +23,7 @@
 import { IncomingMessage } from "node:http";
 import { Socket } from "node:net";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "~/env.mjs";
 import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
 import type { NextApiRequest } from "~/types/next-stubs";
 import { createInnerTRPCContext } from "../../trpc";
@@ -61,7 +62,9 @@ vi.mock("~/server/mailer/providers", async (importOriginal) => ({
  */
 function requestFrom(peerIp: string): NextApiRequest {
   const incoming = new IncomingMessage(new Socket());
-  incoming.headers = {};
+  // A browser on the installation's own address, so the sign-up origin gate
+  // lets the call reach the budgets under test.
+  incoming.headers = { origin: new URL(env.NEXTAUTH_URL).origin };
   incoming.method = "POST";
   incoming.url = "/api/trpc/auth.route";
   Object.defineProperty(incoming.socket, "remoteAddress", {

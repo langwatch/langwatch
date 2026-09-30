@@ -19,7 +19,11 @@ vi.mock("nodemailer", () => ({
   default: { createTransport: createTransportMock },
 }));
 
-import { buildSmtpTransportOptions, smtpProvider } from "../smtp";
+import {
+  buildSmtpTransportOptions,
+  smtpProvider,
+  smtpSendsCredentials,
+} from "../smtp";
 import { EmailProviderConfigurationError } from "../types";
 
 const setEnv = (values: Record<string, unknown>) => {
@@ -28,6 +32,28 @@ const setEnv = (values: Record<string, unknown>) => {
 };
 
 const sentMessage = () => sendMailMock.mock.calls[0]?.[0];
+
+describe("smtpSendsCredentials", () => {
+  beforeEach(() => setEnv({}));
+
+  it("is true for a connection URL that names a user", () => {
+    setEnv({ SMTP_URL: "smtps://user:pass@relay.corp:465" });
+    expect(smtpSendsCredentials()).toBe(true);
+  });
+
+  it("is false for a connection URL with no user, even beside SMTP_USER", () => {
+    setEnv({ SMTP_URL: "smtp://relay.corp:25", SMTP_USER: "ignored" });
+    expect(smtpSendsCredentials()).toBe(false);
+  });
+
+  it("follows SMTP_USER for discrete host settings", () => {
+    setEnv({ SMTP_HOST: "relay.corp", SMTP_USER: "mailer" });
+    expect(smtpSendsCredentials()).toBe(true);
+
+    setEnv({ SMTP_HOST: "relay.corp" });
+    expect(smtpSendsCredentials()).toBe(false);
+  });
+});
 
 describe("buildSmtpTransportOptions", () => {
   beforeEach(() => {
