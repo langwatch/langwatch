@@ -246,6 +246,9 @@ shared package (options, so the gateway is untouched):
    `evaluation.<type>` is the parent of every judge span `gen_ai.chat` / `gen_ai.embeddings`.
 4. **Loop guard**: stamp `langwatch.reserved.causality_depth >= 1`; with no inbound
    `traceparent`, do not trace at all (the precedent in `workflow-evaluation.service.ts:37-44`).
+   The traceparent TS sends is a fresh trace per evaluation, never the evaluated trace: the fold
+   keeps depth at trace level (`detectFoldedCausalityLoop`), so depth 1 on the evaluated trace
+   would block every later evaluation of it.
 5. **Probe-drop exemption** for origin `evaluation`, so tool-only judge answers are kept.
 6. **Metric names** configurable (`langwatch.nlpgo.evaluators.*` instead of `langwatch.gateway.*`).
 
