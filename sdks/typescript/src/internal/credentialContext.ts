@@ -12,6 +12,12 @@ interface CredentialHolder {
   requestedProject?: string;
   runsOutsideProject?: boolean;
   warnedProjectEnvIgnored?: boolean;
+  /**
+   * Set to "cli" at the CLI's request boundaries (runWithCliCredentialHolder,
+   * below). A plain SDK embed never sets this, so its holder — scoped or
+   * fallback — always reads undefined here.
+   */
+  surface?: "cli";
 }
 
 const storage = new AsyncLocalStorage<CredentialHolder>();
@@ -34,6 +40,18 @@ function currentHolder(): CredentialHolder {
  */
 export function runWithCredentialHolder<T>(fn: () => T): T {
   return storage.run({}, fn);
+}
+
+/**
+ * `runWithCredentialHolder` that marks the holder as a CLI request, so the shared
+ * request-header builders attach `x-langwatch-surface: cli` (cli/daemon/dispatch.ts,
+ * cli/daemon/execution.ts). Spec: specs/observability/traffic-attribution.feature
+ */
+export function runWithCliCredentialHolder<T>({ fn }: { fn: () => T }): T {
+  return runWithCredentialHolder(() => {
+    setScopedSurface({ surface: "cli" });
+    return fn();
+  });
 }
 
 /**
@@ -114,6 +132,23 @@ export function claimProjectEnvIgnoredWarning(): boolean {
 }
 
 /**
+ * Mark the current request's holder as a CLI request. Read by
+ * the shared request-header builders when attaching the surface header.
+ */
+export function setScopedSurface({ surface }: { surface: "cli" }): void {
+  currentHolder().surface = surface;
+}
+
+/**
+ * The surface recorded for the current request, or undefined outside a CLI
+ * request boundary (a plain SDK embed, or a request scope that never called
+ * `runWithCliCredentialHolder`).
+ */
+export function scopedSurface(): "cli" | undefined {
+  return currentHolder().surface;
+}
+
+/**
  * Clear the process-local fallback holder. Test-only: a unit test that sets a
  * key outside any scope would otherwise leak it into the next test.
  */
@@ -122,4 +157,5 @@ export function resetFallbackCredentialHolder(): void {
   fallbackHolder.projectId = undefined;
   fallbackHolder.requestedProject = undefined;
   fallbackHolder.warnedProjectEnvIgnored = undefined;
+  fallbackHolder.surface = undefined;
 }

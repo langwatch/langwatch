@@ -9,10 +9,9 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import type { HandledError } from "@langwatch/handled-error";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { canonicalOtlpPath, createLogger, type Logger } from "@langwatch/observability";
 import {
   applyReceiverProvenance,
-  canonicalOtlpPath,
   decodeBase64OpenTelemetryId,
   ingestDoorRefusalBody,
   ingestDoorRefusalStatus,

@@ -1,7 +1,7 @@
 import chalk from "chalk";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -27,7 +27,7 @@ export const getTriggerCommand = async (id: string): Promise<CommandResult | voi
 
   try {
     const response = await langwatchFetch(`${endpoint}/api/v1/triggers/${encodeURIComponent(id)}`, {
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {

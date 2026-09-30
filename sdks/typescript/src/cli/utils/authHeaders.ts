@@ -4,8 +4,8 @@
  * user-scoped key goes out with no project named and the command 401s.
  */
 
-import { buildAuthHeaders, type LangWatchAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedProjectId } from "@/internal/credentialContext";
 
-export const cliAuthHeaders = ({ apiKey }: { apiKey: string }): LangWatchAuthHeaders =>
-  buildAuthHeaders({ apiKey, projectId: scopedProjectId() });
+export const cliAuthHeaders = ({ apiKey }: { apiKey: string }): Record<string, string> =>
+  buildRequestHeaders({ apiKey, projectId: scopedProjectId() });

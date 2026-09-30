@@ -43,8 +43,6 @@ export {
   type OtlpSourcePolicy,
 } from "./door.ts";
 export {
-  CANONICAL_OTLP_BASE_PATH,
-  canonicalOtlpPath,
   OTLP_CORRECTED_PATH_HEADER,
   readCorrectedPath,
   stampCorrectedPath,

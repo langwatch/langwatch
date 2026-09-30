@@ -1338,6 +1338,30 @@ describe("a route that declares the several answers it may give", () => {
     expect(rows.some((row) => row.level === "error")).toBe(false);
   });
 
+  /** @scenario "The request log line carries the attribution fields" */
+  it("records the endpoint class and the client attribution", async () => {
+    await platformHealthApp().app.request("/api/v1/platform-health", {
+      headers: {
+        "user-agent": "langwatch-sdk-node/3.1.0",
+        "x-langwatch-sdk-name": "langwatch-observability-sdk",
+        "x-langwatch-sdk-language": "typescript",
+        "x-langwatch-sdk-version": "3.1.0",
+      },
+    });
+
+    expect(logsFor("langwatch:api:platform-health")).toContainEqual(
+      expect.objectContaining({
+        fields: expect.objectContaining({
+          endpointClass: "api",
+          clientSource: "sdk",
+          clientSdkName: "langwatch-observability-sdk",
+          clientSdkLanguage: "typescript",
+          clientSdkVersion: "3.1.0",
+        }),
+      }),
+    );
+  });
+
   /** @scenario "An endpoint that declares several answers may not also declare one" */
   it("fails rather than serving a status the declaration never named", async () => {
     const runtime = createRestRuntime({

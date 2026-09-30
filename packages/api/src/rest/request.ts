@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 
 import { HandledError, remediation } from "@langwatch/handled-error";
 import {
+  classifyClient,
   createLogger,
+  endpointClassOf,
   getStatusCodeFromError,
   logHttpRequest,
   type Logger,
@@ -746,6 +748,10 @@ function logRequestOutcome({
     duration,
     userAgent: c.req.header("user-agent") ?? null,
     error: requestError,
+    attribution: {
+      endpointClass: endpointClassOf(c.req.path),
+      ...classifyClient((name) => c.req.header(name)),
+    },
     extra: {
       ...(route ? { route } : {}),
       ...(family ? { family } : {}),
@@ -873,9 +879,9 @@ export function loggerMiddleware(options?: { name?: string }) {
 
 /** Records a declared answer without inventing a cause. */
 function logDeclaredAnswer(logger: Logger, data: RequestLogData): void {
-  const { extra, error: _cause, ...request } = data;
+  const { extra, attribution, error: _cause, ...request } = data;
 
-  logger.info({ ...extra, ...request }, "request handled");
+  logger.info({ ...extra, ...attribution, ...request }, "request handled");
 }
 
 function runAfterSSECompletion({

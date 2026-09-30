@@ -1,9 +1,12 @@
 /** The two MCP transports; each keeps its own records and lifetime. */
 export type McpSessionTransport = "streamable" | "sse";
 
-/** A session record read: the key it was opened with, still encrypted, or nothing. */
+/**
+ * A session record read: the key it was opened with, still encrypted, and the project it was
+ * opened for (absent on records older replicas wrote), or nothing.
+ */
 export type McpSessionRecordLookup =
-  | Readonly<{ kind: "found"; encryptedApiKey: string }>
+  | Readonly<{ kind: "found"; encryptedApiKey: string; projectId: string | undefined }>
   | Readonly<{ kind: "missing" }>;
 
 /**
@@ -19,6 +22,7 @@ export abstract class McpSessionRepository {
     sessionId: string;
     apiKey: string;
     encryptedApiKey: string;
+    projectId?: string;
   }): Promise<void>;
 
   abstract touch(input: {

@@ -12,6 +12,7 @@ import {
   type ObservedRequestInit,
 } from "@/client-sdk/services/_shared/mutation-options";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -222,6 +223,7 @@ export class VirtualKeysApiService {
 
   private headers(): Record<string, string> {
     return {
+      ...buildSdkIdentityHeaders(),
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
       // Org-anchored API keys carry no project of their own; the surface
