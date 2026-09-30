@@ -180,6 +180,7 @@ describe("given the directory removed somebody", () => {
 
 describe("given any connection", () => {
   /** @scenario "The panel points to the connection's event log for changes to the connection itself" */
+  /** @scenario Changes to the connection itself are where they belong, and said so */
   it("says the connection's own changes are in its event log", () => {
     renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
