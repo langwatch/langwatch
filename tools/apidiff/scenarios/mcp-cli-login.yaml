@@ -1,0 +1,130 @@
+# `langwatch login` as sdks/typescript/src/cli/utils/governance/device-flow.ts parses it: the
+# exact statuses it switches on (428 pending, 410 denied, 408 expired) and the fields it reads.
+# The sign-in lane's auth-cli-* scenarios cover the routes loosely; these pin the client's
+# reads (main: platform/app/src/server/routes/auth-cli.ts). Written unrun.
+
+- id: "mcp-cli-login-device-code-carries-every-field-the-cli-reads"
+  endpoint: "POST /api/auth/cli/device-code"
+  auth: "none"
+  request: {"path": "/api/auth/cli/device-code", "body": {}}
+  expect:
+    status: 200
+    body:
+      device_code: "<any>"
+      user_code: "<any>"
+      verification_uri: "<any>"
+      verification_uri_complete: "<any>"
+      expires_in: "<any>"
+      interval: "<any>"
+
+- id: "mcp-cli-login-pending-exchange-is-428-authorization-pending"
+  endpoint: "POST /api/auth/cli/exchange"
+  auth: "none"
+  setup:
+    - request: "POST /api/auth/cli/device-code"
+      body: {}
+      auth: "none"
+      capture: {"deviceCode": "device_code"}
+  request:
+    path: "/api/auth/cli/exchange"
+    body: {"device_code": "{deviceCode}", "client_info": {"hostname": "vd-host", "uname": "vd", "platform": "darwin"}}
+  expect: {"status": 428, "body": {"error": "authorization_pending"}}
+
+- id: "mcp-cli-login-unknown-device-code-is-408-expired-token"
+  endpoint: "POST /api/auth/cli/exchange"
+  auth: "none"
+  request:
+    path: "/api/auth/cli/exchange"
+    body: {"device_code": "nope-{uid}", "client_info": {"hostname": "vd-host", "uname": "vd", "platform": "darwin"}}
+  expect: {"status": 408, "body": {"error": "expired_token"}}
+
+- id: "mcp-cli-login-approved-exchange-carries-every-field-the-cli-reads"
+  endpoint: "POST /api/auth/cli/exchange"
+  auth: "none"
+  setup:
+    - request: "POST /api/auth/cli/device-code"
+      body: {}
+      auth: "none"
+      capture: {"deviceCode": "device_code", "userCode": "user_code"}
+    - request: "POST /api/auth/cli/approve"
+      body: {"user_code": "{userCode}", "organization_id": "{orgId}"}
+      auth: "session"
+  request:
+    path: "/api/auth/cli/exchange"
+    body: {"device_code": "{deviceCode}", "client_info": {"hostname": "vd-host", "uname": "vd", "platform": "darwin"}}
+  capture: {"accessToken": "access_token", "refreshToken": "refresh_token"}
+  expect:
+    status: 200
+    body:
+      kind: "device_session"
+      access_token: "<any>"
+      token_type: "Bearer"
+      expires_in: "<any>"
+      refresh_token: "<any>"
+      refresh_expires_in: "<any>"
+      user: {"id": "<any>", "email": "<any>", "name": "<any>"}
+      organization: {"id": "{orgId}", "name": "<any>", "slug": "<any>"}
+      endpoint: "<any>"
+  verify:
+    - request: "POST /api/auth/cli/refresh"
+      auth: "none"
+      body: {"refresh_token": "{refreshToken}"}
+      expect:
+        status: 200
+        body: {"access_token": "<any>", "refresh_token": "<any>", "expires_in": "<any>"}
+
+# The ceremony reads providers and budget off bootstrap with the access token as a Bearer.
+- id: "mcp-cli-login-bootstrap-carries-providers-and-budget"
+  endpoint: "GET /api/auth/cli/bootstrap"
+  auth: "none"
+  setup:
+    - request: "POST /api/auth/cli/device-code"
+      body: {}
+      auth: "none"
+      capture: {"deviceCode": "device_code", "userCode": "user_code"}
+    - request: "POST /api/auth/cli/approve"
+      body: {"user_code": "{userCode}", "organization_id": "{orgId}"}
+      auth: "session"
+    - request: "POST /api/auth/cli/exchange"
+      body: {"device_code": "{deviceCode}", "client_info": {"hostname": "vd-host", "uname": "vd", "platform": "darwin"}}
+      auth: "none"
+      capture: {"accessToken": "access_token"}
+  request:
+    path: "/api/auth/cli/bootstrap"
+    headers: {"Authorization": "Bearer {accessToken}"}
+  expect:
+    status: 200
+    body:
+      providers: "<any>"
+      budget: {"monthlyUsedUsd": "<any>", "period": "<any>"}
+
+# `langwatch logout` sends the refresh token and, when it has one, the access token; a second
+# logout with the same tokens is still a 200, 401 or 404, which the client treats as gone.
+- id: "mcp-cli-logout-twice-is-idempotent-for-the-client"
+  endpoint: "POST /api/auth/cli/logout"
+  auth: "none"
+  setup:
+    - request: "POST /api/auth/cli/device-code"
+      body: {}
+      auth: "none"
+      capture: {"deviceCode": "device_code", "userCode": "user_code"}
+    - request: "POST /api/auth/cli/approve"
+      body: {"user_code": "{userCode}", "organization_id": "{orgId}"}
+      auth: "session"
+    - request: "POST /api/auth/cli/exchange"
+      body: {"device_code": "{deviceCode}", "client_info": {"hostname": "vd-host", "uname": "vd", "platform": "darwin"}}
+      auth: "none"
+      capture: {"accessToken": "access_token", "refreshToken": "refresh_token"}
+    - request: "POST /api/auth/cli/logout"
+      body: {"refresh_token": "{refreshToken}", "access_token": "{accessToken}"}
+      auth: "none"
+      expect: {"status": 200}
+  request:
+    path: "/api/auth/cli/logout"
+    body: {"refresh_token": "{refreshToken}", "access_token": "{accessToken}"}
+  expect: {"status": [200, 401, 404]}
+  verify:
+    - request: "POST /api/auth/cli/refresh"
+      auth: "none"
+      body: {"refresh_token": "{refreshToken}"}
+      expect: {"status": 401}

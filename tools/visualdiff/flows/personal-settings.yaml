@@ -3,10 +3,9 @@
 # whose name, addresses and second factor every other flow depends on); the admin removes the
 # member at the end. The photo is files-media.yaml, the password change, sessions and sign-out are
 # auth.yaml. Labels and test ids are main's (platform/app/src/components/me/*).
-# Not scripted, and why: passkey create, rename and delete (needs a WebAuthn virtual authenticator,
-# which the runner does not open), two-step enrolment, backup codes and turning it off (needs a
-# TOTP code from the shown secret, which no action computes), delete account and notification
-# preferences (main has neither on a person's own settings). Unrun: first run proves them.
+# Passkeys use the `passkey` action (a virtual authenticator), two-step the `totp` action.
+# Not scripted: delete account and notification preferences (main has neither on a person's own
+# settings). Unrun: first run proves them.
 flows:
   - id: personal-profile-name-round-trip
     title: Change your name, see it kept after a reload and shown in the directory
@@ -434,3 +433,329 @@ flows:
       - action: expect
         with:
           text: Linked Accounts
+
+  # A passkey's whole life as an invited member, on one page with a virtual authenticator: create,
+  # rename, sign out and back in with it, delete. Never the shared admin: a passkey on that
+  # account would change every other flow's sign-in. The admin removes the member at the end.
+  - id: personal-security-passkey-create-rename-sign-in-delete
+    title: Create a passkey, rename it, sign in with it after signing out, then delete it
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-pk-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-pk-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-pk-{uid}@mail.langwatch.localhost
+          name: vd-pk-{uid}
+      - action: signIn
+        with:
+          anonymous: member
+          email: vd-pk-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: go
+        with:
+          path: /settings/security
+          anonymous: member
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: member
+      - action: passkey
+        with:
+          anonymous: member
+      - action: expect
+        with:
+          testId: passkeys-empty
+          timeout: "20000"
+          anonymous: member
+      - action: click
+        with:
+          testId: create-passkey
+          anonymous: member
+      - action: expect
+        with:
+          text: Passkey created
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: '/settings/security'
+          anonymous: member
+      - action: expect
+        with:
+          testId: passkey-card
+          equals: "1"
+          timeout: "20000"
+          anonymous: member
+      - action: click
+        with:
+          label: '/^Actions for /'
+          anonymous: member
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: '/^\s*Rename\s*$/'
+          anonymous: member
+      - action: fill
+        with:
+          testId: passkey-name
+          value: vd-pk-{uid}-renamed
+          anonymous: member
+      - action: click
+        with:
+          testId: save-passkey-name
+          anonymous: member
+      - action: expect
+        with:
+          text: Passkey renamed
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: '/settings/security'
+          anonymous: member
+      - action: expect
+        with:
+          text: vd-pk-{uid}-renamed
+          timeout: "20000"
+          anonymous: member
+      - action: click
+        with:
+          label: '/^Open user menu/'
+          anonymous: member
+      - action: click
+        with:
+          text: Logout
+          anonymous: member
+      - action: go
+        with:
+          path: '/auth/signin'
+          anonymous: member
+      - action: click
+        with:
+          testId: passkey-sign-in
+          anonymous: member
+      - action: expect
+        with:
+          url: '/^\/(?!auth\/)/'
+          timeout: "30000"
+          anonymous: member
+      - action: go
+        with:
+          path: '/settings/security'
+          anonymous: member
+      - action: expect
+        with:
+          text: vd-pk-{uid}-renamed
+          timeout: "20000"
+          anonymous: member
+      - action: click
+        with:
+          label: '/^Actions for /'
+          anonymous: member
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: '/^\s*Remove\s*$/'
+          anonymous: member
+      - action: click
+        with:
+          testId: confirm-remove-passkey
+          anonymous: member
+      - action: expect
+        with:
+          text: Passkey removed
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: '/settings/security'
+          anonymous: member
+      - action: expect
+        with:
+          testId: passkeys-empty
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          label: /^Actions for vd-pk-{uid}/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-pk-{uid}
+          equals: "0"
+
+  # Two-step verification, enrolled and switched off again by an invited member: the secret is read
+  # off the setup dialog, the code computed from it (totp), recovery codes shown, then turned off
+  # with a code. Never the shared admin, whose second factor every other flow's sign-in depends on.
+  - id: personal-security-two-step-enrol-codes-turn-off
+    title: Turn on two-step verification with a computed code, see recovery codes, then turn it off
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-ts-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-ts-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-ts-{uid}@mail.langwatch.localhost
+          name: vd-ts-{uid}
+      - action: signIn
+        with:
+          anonymous: member
+          email: vd-ts-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: go
+        with:
+          path: /settings/security
+          anonymous: member
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: member
+      - action: click
+        with:
+          testId: set-up-two-factor
+          anonymous: member
+      - action: fill
+        with:
+          testId: two-factor-password
+          value: '{actorPassword}'
+          anonymous: member
+      - action: click
+        with:
+          testId: start-two-factor
+          anonymous: member
+      - action: expect
+        with:
+          testId: two-factor-shared-secret
+          timeout: "20000"
+          anonymous: member
+      - action: capture
+        with:
+          selector: '[data-testid="two-factor-shared-secret"] input'
+          as: totpSecret
+          anonymous: member
+      - action: totp
+        with:
+          secret: '{totpSecret}'
+          testId: two-factor-code
+          anonymous: member
+      - action: click
+        with:
+          testId: confirm-two-factor
+          anonymous: member
+      - action: expect
+        with:
+          testId: two-factor-backup-codes
+          timeout: "20000"
+          anonymous: member
+      - action: expect
+        with:
+          testIdPrefix: two-factor-backup-code
+          min: "1"
+          anonymous: member
+      - action: click
+        with:
+          testId: backup-codes-done
+          anonymous: member
+      - action: go
+        with:
+          path: '/settings/security'
+          anonymous: member
+      - action: expect
+        with:
+          testId: two-factor-status
+          hasText: "On"
+          timeout: "20000"
+          anonymous: member
+      - action: click
+        with:
+          testId: turn-off-two-factor
+          anonymous: member
+      - action: fill
+        with:
+          testId: turn-off-password
+          value: '{actorPassword}'
+          anonymous: member
+      - action: totp
+        with:
+          secret: '{totpSecret}'
+          testId: turn-off-code
+          anonymous: member
+      - action: click
+        with:
+          testId: confirm-turn-off-two-factor
+          anonymous: member
+      - action: go
+        with:
+          path: '/settings/security'
+          anonymous: member
+      - action: expect
+        with:
+          testId: two-factor-empty
+          timeout: "20000"
+          anonymous: member
+      - action: expect
+        with:
+          testId: two-factor-status
+          equals: "0"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          label: /^Actions for vd-ts-{uid}/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-ts-{uid}
+          equals: "0"

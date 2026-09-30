@@ -66,6 +66,9 @@ type scenario struct {
 	Capture  map[string]string `yaml:"capture"`
 	Expect   scenarioExpect    `yaml:"expect"`
 	Verify   []scenarioStep    `yaml:"verify"`
+	// Teardown are request steps sent last, whatever the steps before them found,
+	// to remove what the scenario made on a shared org; their failures are not the scenario's.
+	Teardown []scenarioStep `yaml:"teardown"`
 	file     string
 	order    int
 }
@@ -316,6 +319,12 @@ func validateScenario(item *scenario) []string {
 	}
 	for index := range item.Verify {
 		problems = append(problems, validateStep(fmt.Sprintf("verify[%d]", index), &item.Verify[index], true)...)
+	}
+	for index := range item.Teardown {
+		problems = append(problems, validateStep(fmt.Sprintf("teardown[%d]", index), &item.Teardown[index], false)...)
+		if item.Teardown[index].Request == nil {
+			problems = append(problems, fmt.Sprintf("teardown[%d]: only request steps run in teardown", index))
+		}
 	}
 	return problems
 }

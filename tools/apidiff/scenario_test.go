@@ -99,6 +99,7 @@ type fakeStack struct {
 	mu       sync.Mutex
 	datasets map[string][]string
 	created  int
+	torn     int
 	projects int
 	orgs     int
 	badCode  int
@@ -186,6 +187,12 @@ func (stack *fakeStack) dataset(writer http.ResponseWriter, request *http.Reques
 	records, ok := stack.datasets[parts[0]]
 	if !ok {
 		replyJSON(writer, http.StatusNotFound, map[string]any{"error": "gone"})
+		return
+	}
+	if request.Method == http.MethodDelete {
+		stack.torn++
+		delete(stack.datasets, parts[0])
+		writer.WriteHeader(http.StatusNoContent)
 		return
 	}
 	if len(parts) == 2 {
@@ -289,6 +296,43 @@ func TestScenarioPhaseNamesTheFailingSide(t *testing.T) {
 	}
 	if !strings.Contains(report, "FAIL-branch") || !strings.Contains(report, "first failing step") {
 		t.Errorf("report:\n%s", report)
+	}
+}
+
+func TestTeardownRunsWhateverTheScenarioFoundAndNeverFailsIt(t *testing.T) {
+	const tearing = `
+- id: made-then-cleaned-up
+  endpoint: GET /api/dataset/{id}
+  setup:
+    - request: POST /api/dataset
+      body: { name: "vd-{uid}" }
+      capture: { datasetId: id }
+  request: { path: "/api/dataset/{datasetId}" }
+  expect: { status: 404 }
+  teardown:
+    - request: DELETE /api/dataset/{datasetId}
+      expect: { status: [204, 404] }
+    - request: DELETE /api/dataset/{neverCaptured}
+- id: made-and-left-alone
+  endpoint: GET /api/dataset/{id}
+  request: { path: "/api/dataset/none" }
+  expect: { status: 404 }
+  teardown:
+    - request: DELETE /api/dataset/{neverCaptured}
+`
+	branch, main := newFake(), newFake()
+	_, _, results := runFake(t, branch, main, tearing, 1)
+
+	if branch.torn != 1 || main.torn != 1 {
+		t.Errorf("torn down: branch %d, main %d, want one each", branch.torn, main.torn)
+	}
+	for _, result := range results {
+		if result.ID == "made-and-left-alone" && result.Verdict != verdictPass {
+			t.Errorf("a teardown that cannot be built failed the scenario: %s %s", result.Verdict, result.FirstFail)
+		}
+		if result.ID == "made-then-cleaned-up" && result.Verdict == verdictPass {
+			t.Errorf("the scenario's own failure (200, expected 404) was hidden")
+		}
 	}
 }
 
