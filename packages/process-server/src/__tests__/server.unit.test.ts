@@ -170,6 +170,25 @@ describe("binding a port a predecessor still holds", () => {
     });
   });
 
+  describe("given a predecessor that holds the port through many retries", () => {
+    /** @scenario "Retrying a bind leaves no listener behind" */
+    it("leaves no listening or error handler behind from the failed attempts", async () => {
+      const squatter = http.createServer();
+      await new Promise<void>((resolve) => squatter.listen(0, resolve));
+      const port = (squatter.address() as AddressInfo).port;
+      const successor = http.createServer();
+      const listening = successor.listenerCount("listening");
+
+      await expect(bindHttpServer(successor, port, 3_000)).rejects.toMatchObject({
+        code: "EADDRINUSE",
+      });
+
+      expect(successor.listenerCount("listening")).toBe(listening);
+      expect(successor.listenerCount("error")).toBe(0);
+      squatter.close();
+    });
+  });
+
   describe("given something that never releases it", () => {
     /** @scenario "A port another program owns is still a boot failure" */
     it("gives up once the handover window has passed, naming the address", async () => {

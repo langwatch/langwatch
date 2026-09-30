@@ -51,6 +51,7 @@ const storesConfig: StoresConfig = {
     clientsPerProcess: undefined,
   },
   rateLimit: { requests: 60, seconds: 60 },
+  redis: { dbIndex: undefined },
   objectStorage: {
     backend: "file",
     localRoot: "/tmp/langwatch-encryption-member-test",

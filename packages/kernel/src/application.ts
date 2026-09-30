@@ -34,6 +34,7 @@ import {
   buildModuleEventing,
   eventingHostFrom,
   installEventingMaintenance,
+  eventingConsumers,
   type EventingHost,
   type FeatureEventing,
 } from "./module-eventing.ts";
@@ -477,6 +478,7 @@ export class ApplicationBuilder<
     // member with null built something a factory cannot use.
     assertRepositoryBackend(declarations, selections);
     const eventing = eventingHostFrom(eventingMemberFor(declarations, this.source), role);
+    const consumers = eventingConsumers(eventing);
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
@@ -554,7 +556,7 @@ export class ApplicationBuilder<
       provided,
       contributions: contributions.contributions,
       scope,
-      services: [...featureServices, ...this.state.services],
+      services: [...featureServices, ...this.state.services, ...consumers],
       declaredBy: contributions.declaredBy,
       handler,
     });

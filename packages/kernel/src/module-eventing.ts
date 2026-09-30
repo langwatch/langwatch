@@ -5,6 +5,7 @@
  */
 import type { ServerRole } from "./feature-installer.ts";
 import type { ResourceOwnership } from "./resource-scope.ts";
+import type { RuntimeService } from "./runtime-lifecycle.ts";
 
 /**
  * Whether this process only sends on a pipeline, or also drains it: the api produces, the
@@ -206,6 +207,10 @@ export interface EventingHost {
   describe?(definition: unknown): void;
   /** The runtime's own maintenance pipelines (blob, process-manager retention). */
   maintenancePipelines?(): readonly unknown[];
+  /** Keeps what registration would start idle until `startConsumers`. */
+  holdConsumers?(): void;
+  /** Starts consuming; the kernel calls it when the booted runtime starts. */
+  startConsumers?(): void;
 }
 
 /**
@@ -248,7 +253,26 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
     ...(typeof host.maintenancePipelines === "function"
       ? { maintenancePipelines: host.maintenancePipelines.bind(candidate) }
       : {}),
+    ...(typeof host.holdConsumers === "function" && typeof host.startConsumers === "function"
+      ? {
+          holdConsumers: host.holdConsumers.bind(candidate),
+          startConsumers: host.startConsumers.bind(candidate),
+        }
+      : {}),
   };
+}
+
+/**
+ * Holds the runtime's consumers through construction and starts them with the
+ * booted runtime, after every module installed and every peer API is ready.
+ */
+export function eventingConsumers(eventing: EventingHost | undefined): RuntimeService[] {
+  if (eventing?.holdConsumers === void 0 || eventing.startConsumers === void 0) return [];
+  eventing.holdConsumers();
+  // The eventing member closes what these consumers opened, after the drain.
+  return [
+    { name: "eventing consumers", start: () => eventing.startConsumers?.(), stop: () => void 0 },
+  ];
 }
 
 /** Registers a module's several pipelines one by one, and a single one as it is. */

@@ -53,9 +53,11 @@ export function createEventingGroupQueueFactory({
 
     const producer = new GroupQueueProducer(queueDefinition, dependencies);
     let consumer: RunningGroupQueueConsumer<Record<string, unknown>> | undefined;
-    if (consumersEnabled) {
+    // Claiming starts on `start()`, never at construction: a job claimed before
+    // every pipeline registered its handler has nowhere to go.
+    const startConsuming = (): RunningGroupQueueConsumer<Record<string, unknown>> => {
       const configuredConsumer = new GroupQueueConsumer(queueDefinition, dependencies);
-      consumer = eventingDefinition.processBatch
+      return eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
             each: (payload, context) => eventingDefinition.process(payload, context),
             batch: (payloads, context) => eventingDefinition.processBatch!(payloads, context),
@@ -63,11 +65,14 @@ export function createEventingGroupQueueFactory({
         : configuredConsumer.handle((payload, context) =>
             eventingDefinition.process(payload, context),
           );
-    }
+    };
 
     return {
       send: (payload, options) => producer.send(payload, options),
       sendBatch: (payloads, options) => producer.sendBatch(payloads, options),
+      start() {
+        if (consumersEnabled) consumer ??= startConsuming();
+      },
       async waitUntilReady() {
         await Promise.all([producer.waitUntilReady(), consumer?.waitUntilReady()]);
       },

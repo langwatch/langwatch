@@ -317,6 +317,39 @@ describe("given a module that declares its event sourcing with withEventing", ()
     });
   });
 
+  describe("when the runtime can hold its consumers", () => {
+    /** @scenario "Eventing consumers start only once the booted runtime starts" */
+    it("holds them through construction and starts them with the booted runtime", async () => {
+      const calls: string[] = [];
+      const host = {
+        participation: "consume" as const,
+        processStore: { pruned: [] as string[] },
+        register: (definition: unknown) => {
+          calls.push(`register ${(definition as { name: string }).name}`);
+          return { commands: {} };
+        },
+        holdConsumers: () => calls.push("hold"),
+        startConsumers: () => calls.push("start"),
+      };
+      const module = defineServerModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApp(ComposedKeyApp)
+        .withEventing(keyEventing());
+
+      const runtime = await createApp({
+        role: "worker",
+        members: memberSourceOf({ eventing: host }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(calls).toEqual(["hold", "register agent_sandbox_maintenance"]);
+      await runtime.start();
+      expect(calls).toEqual(["hold", "register agent_sandbox_maintenance", "start"]);
+      await runtime.stop();
+    });
+  });
+
   describe("when the runtime offers its own maintenance pipelines", () => {
     const bootOver = async (participation: "produce" | "consume") => {
       const eventing = eventingHost(participation);

@@ -20,6 +20,10 @@ export const storesOwner = {
       serverNodes: c.env("CLICKHOUSE_SERVER_NODES", z.coerce.number().optional()),
       clientsPerProcess: c.env("CLICKHOUSE_CLIENTS_PER_PROCESS", z.coerce.number().optional()),
     },
+    redis: {
+      /** Dev worktree isolation: each stack on one shared server keeps its own queue. */
+      dbIndex: c.env("REDIS_DB_INDEX", z.string().optional()),
+    },
     rateLimit: {
       requests: c.env("API_RATE_LIMIT_REQUESTS", z.coerce.number().int().positive().default(60)),
       seconds: c.env("API_RATE_LIMIT_SECONDS", z.coerce.number().int().positive().default(60)),

@@ -48,6 +48,27 @@ describe("installBootGuard", () => {
     });
   });
 
+  describe("given a Node warning", () => {
+    it("reports it at warn level, never as fatal", () => {
+      const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      const before = process.listeners("warning");
+      const guard = installBootGuard("langwatch-backend", { onFatal: () => undefined });
+
+      try {
+        const added = process.listeners("warning").find((listener) => !before.includes(listener));
+        if (!added) throw new Error("the guard added no warning listener");
+        Reflect.apply(added, process, [new Error("Possible EventEmitter memory leak detected")]);
+      } finally {
+        guard.dispose();
+      }
+
+      expect(JSON.parse(String(write.mock.calls[0]?.[0]))).toMatchObject({
+        level: "warn",
+        msg: "warning: Possible EventEmitter memory leak detected",
+      });
+    });
+  });
+
   describe("given no drain", () => {
     it("exits non-zero on an unhandled rejection", () => {
       vi.spyOn(process.stderr, "write").mockImplementation(() => true);

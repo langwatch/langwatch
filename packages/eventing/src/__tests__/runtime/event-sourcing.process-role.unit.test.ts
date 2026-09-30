@@ -45,12 +45,12 @@ const { createEventingGroupQueueFactory } = await import("../../queues/groupQueu
  * decides whether it consumes or only produces. `consumersEnabled` is where a
  * process role lands here — Redis and deployment shape live outside this package.
  */
-function buildSharedQueue({ consumersEnabled }: { consumersEnabled: boolean }): void {
+function buildSharedQueue({ consumersEnabled }: { consumersEnabled: boolean }) {
   const factory = createEventingGroupQueueFactory({
     dependencies: { redis: {} as never },
     consumersEnabled,
   });
-  factory({
+  return factory({
     name: "event-sourcing/jobs",
     groupKey: () => "group-1",
     score: () => 0,
@@ -60,11 +60,13 @@ function buildSharedQueue({ consumersEnabled }: { consumersEnabled: boolean }): 
 
 describe("the shared event queue a process builds", () => {
   describe("given a process that runs the workers", () => {
-    it("builds the consumer beside the producer", () => {
+    it("builds the consumer beside the producer once the queue is started", () => {
       captured.producers.length = 0;
       captured.consumers.length = 0;
 
-      buildSharedQueue({ consumersEnabled: true });
+      const queue = buildSharedQueue({ consumersEnabled: true });
+      expect(captured.consumers).toEqual([]);
+      queue.start?.();
 
       expect(captured.producers).toEqual(["event-sourcing/jobs"]);
       expect(captured.consumers).toEqual(["event-sourcing/jobs"]);
@@ -76,7 +78,7 @@ describe("the shared event queue a process builds", () => {
       captured.producers.length = 0;
       captured.consumers.length = 0;
 
-      buildSharedQueue({ consumersEnabled: false });
+      buildSharedQueue({ consumersEnabled: false }).start?.();
 
       expect(captured.producers).toEqual(["event-sourcing/jobs"]);
       expect(captured.consumers).toEqual([]);

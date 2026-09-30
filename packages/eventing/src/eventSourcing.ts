@@ -131,6 +131,7 @@ export class EventSourcing {
   private _globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly _globalJobRegistry = new Map<string, JobRegistryEntry>();
   private _initialized = false;
+  private _consumersHeld = false;
   private _loggedDisabledWarning = false;
 
   // Options
@@ -217,9 +218,26 @@ export class EventSourcing {
       this._processRuntimeInstance = new ProcessRuntime({
         store: processStore,
         consumersEnabled: this._consumersEnabled,
+        held: this._consumersHeld,
       });
     }
     return this._processRuntimeInstance;
+  }
+
+  /**
+   * Registers without consuming until `startConsumers()`: a composition holds
+   * before its first pipeline, so no job or intent runs against a half-built process.
+   */
+  holdConsumers(): void {
+    this._consumersHeld = true;
+  }
+
+  /** Starts the global queue's consumer and the process runtime a hold kept idle. */
+  startConsumers(): void {
+    if (!this._consumersHeld) return;
+    this._consumersHeld = false;
+    this._globalQueue?.start?.();
+    this._processRuntimeInstance?.start();
   }
 
   /** The process managers this runtime registered producer-only and will not run. */
@@ -794,6 +812,7 @@ export class EventSourcing {
     this._globalQueue = this._queueFactory
       ? this._queueFactory(definition)
       : new EventSourcedQueueProcessorMemory(definition);
+    if (!this._consumersHeld) this._globalQueue.start?.();
   }
 
   private globalQueueGroupKey(payload: Record<string, unknown>): string {

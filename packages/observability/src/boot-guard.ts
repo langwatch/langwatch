@@ -20,7 +20,9 @@ export function installBootGuard(
   const uncaughtException = (error: unknown) => fatal("uncaught exception", error);
   const unhandledRejection = (reason: unknown) => fatal("unhandled rejection", reason);
   const warning = (warning: unknown) => {
-    writeFatal(service, "warning", warning);
+    process.stderr.write(
+      processFailureLine({ service, event: "warning", error: warning, level: "warn" }),
+    );
   };
   process.on("uncaughtException", uncaughtException);
   process.on("unhandledRejection", unhandledRejection);

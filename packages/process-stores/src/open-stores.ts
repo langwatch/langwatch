@@ -109,7 +109,14 @@ function processConfigOf(options: {
     rateLimit: config.rateLimit,
     ...(urls.database ? { database: { url: urls.database } } : {}),
     ...clickhouse,
-    ...(urls.redis ? { redis: { url: urls.redis } } : {}),
+    ...(urls.redis
+      ? {
+          redis: {
+            url: urls.redis,
+            ...(config.redis.dbIndex === undefined ? {} : { dbIndex: config.redis.dbIndex }),
+          },
+        }
+      : {}),
     eventing: pipelines.configure(config.defaultRetentionDays),
     objectStorage: objectStorageConfig({
       settings: config.objectStorage,

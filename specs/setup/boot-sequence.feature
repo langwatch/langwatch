@@ -181,3 +181,10 @@ Feature: The stack migrates once, quietly, under a lock
     When the successor binds
     Then it gives up once the handover window has passed
     And the failure names the address already in use
+
+  @unit
+  Scenario: Retrying a bind leaves no listener behind
+    Given a port its previous owner has not released yet
+    When the successor retries the bind more than ten times
+    Then the listener carries no leftover listening or error handlers
+    And Node raises no MaxListenersExceededWarning

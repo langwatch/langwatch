@@ -421,14 +421,20 @@ function isAddressInUse(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === "EADDRINUSE";
 }
 
+/** One bind attempt that leaves no listener behind, so a retried bind never accumulates them. */
 function listenOnce(listener: http.Server, port: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const onError = (error: Error): void => reject(error);
-    listener.once("error", onError);
-    listener.listen(port, () => {
+    const onError = (error: Error): void => {
+      listener.off("listening", onListening);
+      reject(error);
+    };
+    const onListening = (): void => {
       listener.off("error", onError);
       resolve();
-    });
+    };
+    listener.once("error", onError);
+    listener.once("listening", onListening);
+    listener.listen(port);
   });
 }
 

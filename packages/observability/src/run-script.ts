@@ -101,17 +101,20 @@ export function scriptFailureRecord({
 
 /**
  * The one line a long-running process writes when it cannot boot or is
- * crashing: fatal level, the error's message as `msg`, trace as one `stack`
+ * crashing (a Node warning, at warn): the message as `msg`, trace as one `stack`
  * string — one record a supervisor renders indented, not a level-less frame per line.
  */
 export function processFailureLine({
   service,
   event,
   error,
+  level = "fatal",
 }: {
   service: string;
   event: string;
   error?: unknown;
+  /** A Node warning is reported, not fatal: the process carries on. */
+  level?: "fatal" | "warn";
 }): string {
   const failure = error instanceof Error ? error : void 0;
   const code = failure === void 0 ? void 0 : (failure as { code?: unknown }).code;
@@ -119,7 +122,7 @@ export function processFailureLine({
     failure?.message ??
     (typeof error === "string" || error === void 0 ? error : JSON.stringify(error));
   return `${JSON.stringify({
-    level: "fatal",
+    level,
     time: nowInstant().toString({ fractionalSecondDigits: 3 }),
     service,
     msg: message === void 0 ? event : `${event}: ${message}`,

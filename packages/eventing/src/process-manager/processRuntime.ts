@@ -270,15 +270,33 @@ export class ProcessRuntime {
   private readonly store: ProcessStore;
   private readonly logger: Logger;
   private readonly consumersEnabled: boolean;
+  /** Whether workers start as they register; a held runtime starts them in `start()`. */
+  private running: boolean;
   private readonly managers = new Map<string, RegisteredProcessManager>();
   private readonly wakeManagers: Record<string, ProcessWakeHandler> = {};
   private readonly hostedOutboxes: ProcessOutboxWorker[] = [];
   private wakeWorker: ProcessWakeWorker | null = null;
 
-  constructor(options: { store: ProcessStore; consumersEnabled: boolean; logger?: Logger }) {
+  constructor(options: {
+    store: ProcessStore;
+    consumersEnabled: boolean;
+    /** Registers without starting anything until `start()`, so none runs before boot ends. */
+    held?: boolean;
+    logger?: Logger;
+  }) {
     this.store = options.store;
     this.consumersEnabled = options.consumersEnabled;
+    this.running = options.consumersEnabled && options.held !== true;
     this.logger = options.logger ?? defaultLogger;
+  }
+
+  /** Starts what a held runtime registered: every outbox, the wake worker and each schedule. */
+  start(): void {
+    if (this.running || !this.consumersEnabled) return;
+    this.running = true;
+    this.wakeWorker?.start();
+    for (const registered of this.managers.values()) this.startManager(registered);
+    for (const outboxWorker of this.hostedOutboxes) outboxWorker.start();
   }
 
   registerPipeline<E extends Event>(params: {
@@ -398,7 +416,7 @@ export class ProcessRuntime {
       stuckDrainTimeoutMs: stuckDrainTimeoutMs(undefined),
     });
     this.hostedOutboxes.push(outboxWorker);
-    if (this.consumersEnabled) outboxWorker.start();
+    if (this.running) outboxWorker.start();
   }
 
   async stop(): Promise<void> {
@@ -452,15 +470,17 @@ export class ProcessRuntime {
             }
           },
         });
-        if (this.consumersEnabled) this.wakeWorker.start();
+        if (this.running) this.wakeWorker.start();
       }
     }
 
-    if (this.consumersEnabled) {
-      outboxWorker.start();
-      if (config.schedule) this.armSchedule({ registered });
-    }
+    if (this.running) this.startManager(registered);
     return registered;
+  }
+
+  private startManager(registered: RegisteredProcessManager): void {
+    registered.outboxWorker.start();
+    if (registered.definition.config.schedule) this.armSchedule({ registered });
   }
 
   private armSchedule({ registered }: { registered: RegisteredProcessManager }): void {

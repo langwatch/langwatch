@@ -102,6 +102,14 @@ Feature: Composing a process declaratively
     And the api registers neither
 
   @unit
+  Scenario: Eventing consumers start only once the booted runtime starts
+    Given an eventing runtime that can hold its consumers
+    When a worker boots a module with a pipeline over it
+    Then the consumers are held before the first pipeline registers
+    And nothing is consumed while modules are still being constructed
+    And the consumers start when the booted runtime starts
+
+  @unit
   Scenario: A module hosts several pipelines
     Given a module that calls withEventing once for each of three pipelines
     When the process boots with an eventing runtime on its pool

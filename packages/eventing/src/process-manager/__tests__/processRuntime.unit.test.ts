@@ -398,6 +398,41 @@ describe("ProcessRuntime", () => {
     });
   });
 
+  describe("given a held runtime registers a scheduled process manager", () => {
+    it("arms nothing until start, then arms the schedule", async () => {
+      const store = InMemoryProcessStore.createForTesting();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: true, held: true });
+      const definition = buildProcessManager<ProcessTestEvent>({
+        name: "heldSweep",
+        applier: (pm) =>
+          pm
+            .state(z.object({ count: z.number() }), { count: 0 })
+            .schedule({ everyMs: 60_000 })
+            .onWake((state) => ({ state }))
+            .intent("noop", z.object({}), async () => {}),
+      });
+      const ref = {
+        processName: "heldSweep",
+        projectId: SCHEDULED_SINGLETON_PROJECT_ID,
+        processKey: "heldSweep",
+      };
+
+      runtime.registerPipeline<ProcessTestEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["heldSweep", definition]]),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(await store.findByRef({ ref })).toBeNull();
+
+      runtime.start();
+      await vi.waitFor(async () => {
+        expect((await store.findByRef({ ref }))?.nextWakeAt).not.toBeNull();
+      });
+
+      await runtime.stop();
+    });
+  });
+
   describe("given schedule arming rejects", () => {
     it("logs the failure via the runtime logger instead of throwing", async () => {
       const store = makeStubStore({
