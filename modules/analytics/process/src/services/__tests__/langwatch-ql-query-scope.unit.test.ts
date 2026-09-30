@@ -100,6 +100,32 @@ function scopeOver(input: {
         asked.push({ projectId: scope.id, permission });
         return Promise.resolve(input.grants[scope.id]?.includes(permission) === true);
       },
+      getScope: ({ projectId = "" }) =>
+        Promise.resolve({
+          type: "project",
+          id: projectId,
+          teamId: `team-${projectId}`,
+          organizationId: ORGANIZATION_ID,
+        }),
+      can: () => Promise.resolve(false),
+      canBatchPermissionsByIds: ({ permissions, projects }) =>
+        Promise.resolve({
+          organizationRole: null,
+          byPermission: new Map(
+            permissions.map((permission) => [
+              permission,
+              {
+                teams: new Map(),
+                projects: new Map(
+                  projects.map(({ projectId }) => [
+                    projectId,
+                    input.grants[projectId]?.includes(permission) === true,
+                  ]),
+                ),
+              },
+            ]),
+          ),
+        }),
     }),
     dataPrivacy: createApiFixture<DataPrivacyApi>({
       getResolvedForProject: ({ projectId }) =>
@@ -167,6 +193,7 @@ describe("given an API key that reaches several projects of its organization", (
         canSeeCosts: false,
         canSeeCapturedInput: false,
         canSeeCapturedOutput: false,
+        catalogue: { permissions: [] },
       },
     });
   });
@@ -185,6 +212,7 @@ describe("given an API key that reaches several projects of its organization", (
       canSeeCosts: true,
       canSeeCapturedInput: false,
       canSeeCapturedOutput: true,
+      catalogue: { permissions: ["analytics:view", "cost:view"] },
     });
   });
 });

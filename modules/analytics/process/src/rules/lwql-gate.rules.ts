@@ -1,8 +1,11 @@
 /**
- * Which read-time gate governs a column: input, output, or spend — the
- * three protections a viewer's `Protections` collapses to. Stated here
- * rather than imported, since nothing about a trace's projection reaches this package.
+ * The gates a LangWatchQL column or app function carries: captured content, which the project's
+ * data-privacy policy decides, or a registry permission, which authz decides. A gate list is allOf.
+ * @see specs/lwql/catalogue-grants.feature
  */
+
+import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 
 import type {
   LangWatchQLViewColumn,
@@ -10,29 +13,28 @@ import type {
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   exposedCatalogueColumns,
+  type LwqlContent,
   type LwqlExposedColumn,
   type LwqlTableCatalogue,
 } from "./lwql-catalogue.rules.ts";
 
-export type FieldProtection = "input" | "output" | "costs";
+export type LwqlGate = LwqlContent | AuthzPermission;
 
 /**
- * The protections a caller actually holds, as the set the catalogue and the
- * reference both gate on.
+ * The gates a caller holds: the catalogue permissions authz granted and the content the policy
+ * shows. `cost:view` needs `canSeeCosts` as well, so the two sources can only narrow each other.
  */
-export function heldFieldProtections(
-  protections: Readonly<{
-    canSeeCapturedInput?: boolean | null;
-    canSeeCapturedOutput?: boolean | null;
-    canSeeCosts?: boolean | null;
-  }>,
-): ReadonlySet<FieldProtection> {
-  const held = new Set<FieldProtection>();
+export function heldLwqlGates(protections: LangWatchQLProtections): ReadonlySet<LwqlGate> {
+  const held = new Set<LwqlGate>(protections.catalogue.permissions);
+  if (protections.canSeeCosts !== true) held.delete("cost:view");
   if (protections.canSeeCapturedInput === true) held.add("input");
   if (protections.canSeeCapturedOutput === true) held.add("output");
-  if (protections.canSeeCosts === true) held.add("costs");
-
   return held;
+}
+
+/** The gates as the schema publishes them: `costs` stays beside `cost:view` for main's readers. */
+export function publishedLwqlGates(gates: readonly LwqlGate[]): readonly (LwqlGate | "costs")[] {
+  return gates.includes("cost:view") ? ["costs", ...gates] : gates;
 }
 
 /** A hand-written view before the catalogue gives it its gates. */
@@ -40,23 +42,21 @@ export type UngatedViewDefinition = Omit<LangWatchQLViewDefinition, "gates" | "c
   Readonly<{ columns: readonly Omit<LangWatchQLViewColumn, "gates">[] }>;
 
 /**
- * The gates a catalogue column carries, until the services read its access directly. A column
- * permission other than `cost:view` has no gate to carry it, so it refuses rather than fail open.
+ * The gates a catalogue column carries: its content, then its permissions. A gate list is allOf,
+ * so a column access of anyOf more than one permission refuses rather than fail open.
  */
-export function catalogueFieldProtections({
+export function catalogueColumnGatesOf({
   column,
 }: {
   column: LwqlExposedColumn;
-}): readonly FieldProtection[] {
+}): readonly LwqlGate[] {
   const content = column.content === undefined ? [] : [column.content].flat();
   if (column.access === undefined) return content;
-  const permissions = "allOf" in column.access ? column.access.allOf : column.access.anyOf;
-  if (permissions.length !== 1 || permissions[0] !== "cost:view") {
-    throw new Error(
-      `lwql column "${column.name}": no gate carries access ${permissions.join(", ")}`,
-    );
+  if ("anyOf" in column.access && column.access.anyOf.length > 1) {
+    throw new Error(`lwql column "${column.name}": a column access cannot be anyOf`);
   }
-  return [...content, "costs"];
+  const permissions = "allOf" in column.access ? column.access.allOf : column.access.anyOf;
+  return [...content, ...permissions];
 }
 
 /** Each exposed column's gates, by name, as the catalogue table declares them. */
@@ -64,11 +64,11 @@ export function catalogueColumnGates({
   table,
 }: {
   table: LwqlTableCatalogue;
-}): Readonly<Record<string, readonly FieldProtection[]>> {
+}): Readonly<Record<string, readonly LwqlGate[]>> {
   return Object.fromEntries(
     exposedCatalogueColumns({ table }).map((column) => [
       column.name,
-      catalogueFieldProtections({ column }),
+      catalogueColumnGatesOf({ column }),
     ]),
   );
 }

@@ -8,6 +8,7 @@
 
 import { randomUUID } from "node:crypto";
 
+import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
 import {
   GraphNotFoundError,
   SavedWorkbenchChartDashboardNotFoundError,
@@ -129,7 +130,7 @@ async function saveChart(
 ): Promise<{ id: string }> {
   return charts().create({
     projectId: overrides.projectId ?? projectId,
-    protections: {},
+    protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
     name: overrides.name ?? "Traces over time",
     definition: DEFINITION,
   });

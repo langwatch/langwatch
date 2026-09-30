@@ -4,7 +4,7 @@
  */
 
 import type { DatasetOverride } from "./lwql-dataset-derivation.rules.ts";
-import type { UngatedViewDefinition } from "./lwql-field-protection.rules.ts";
+import type { UngatedViewDefinition } from "./lwql-gate.rules.ts";
 import { LWQL_SOURCE_ALIAS } from "./lwql-source-alias.rules.ts";
 
 export const CODING_OVERRIDES: Record<string, Partial<DatasetOverride>> = {

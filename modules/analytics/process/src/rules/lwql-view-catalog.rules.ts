@@ -23,7 +23,7 @@ import {
   catalogueColumnGates,
   type UngatedViewDefinition,
   withCatalogueGates,
-} from "./lwql-field-protection.rules.ts";
+} from "./lwql-gate.rules.ts";
 import {
   LWQL_POSTGRES_CATALOG,
   LWQL_POSTGRES_CATALOGUE,

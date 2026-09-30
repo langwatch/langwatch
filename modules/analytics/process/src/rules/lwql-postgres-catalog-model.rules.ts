@@ -4,6 +4,8 @@
  * scope, descriptions), one {@link defineCatalogModel} call per view.
  */
 
+import type { AuthzPermission } from "@langwatch/authz-contract";
+
 import type {
   LangWatchQLColumnUnit,
   LangWatchQLViewColumn,
@@ -333,7 +335,7 @@ export type PostgresCatalogueTable = Pick<LwqlTableCatalogue, "columns"> &
 
 type GatedEntry = Exclude<LwqlColumnEntry, "inherit" | "omit">;
 
-/** A column entry's gates in today's view shape: content as-is, `cost:view` as `costs`. */
+/** A column entry's gates: content as-is, then its permissions; a gate list is allOf. */
 function entryGates({
   view,
   name,
@@ -344,22 +346,21 @@ function entryGates({
   entry: GatedEntry;
 }): LangWatchQLViewColumn["gates"] {
   const permissions = accessPermissions(entry.access);
-  if (permissions.some((permission) => permission !== "cost:view")) {
+  if (entry.access !== undefined && "anyOf" in entry.access && permissions.length > 1) {
     throw new Error(
-      `lwql postgres catalog: view "${view}" column "${name}" needs a permission the view ` +
-        `shape cannot carry yet; only cost:view renders`,
+      `lwql postgres catalog: view "${view}" column "${name}" declares anyOf; a gate list is allOf`,
     );
   }
   const gates: LangWatchQLViewColumn["gates"][number][] = [];
   const content = entry.content;
   if (typeof content === "string") gates.push(content);
   else if (content !== undefined) gates.push(...content);
-  if (permissions.length > 0) gates.push("costs");
+  gates.push(...permissions);
   return gates;
 }
 
 /** Every permission an access names, whether it asks for all of them or any. */
-function accessPermissions(access: LwqlAccess | undefined): readonly string[] {
+function accessPermissions(access: LwqlAccess | undefined): readonly AuthzPermission[] {
   if (access === undefined) return [];
   return "allOf" in access ? access.allOf : access.anyOf;
 }

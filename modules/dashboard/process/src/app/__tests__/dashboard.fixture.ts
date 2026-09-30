@@ -5,6 +5,7 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
+import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
 import { ResourceScope } from "@langwatch/kernel";
@@ -17,6 +18,7 @@ import { DashboardApp } from "../dashboard.app.ts";
 
 /** Everything visible: the caller the gates are measured against. */
 export const FULLY_PERMITTED: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,

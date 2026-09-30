@@ -100,6 +100,36 @@ export function exposedCatalogueColumns({
   });
 }
 
+/** Whether a held permission set satisfies an access: every one of allOf, or one of anyOf. */
+export function isAccessHeld({
+  access,
+  held,
+}: {
+  access: LwqlAccess;
+  held: ReadonlySet<string>;
+}): boolean {
+  return "allOf" in access
+    ? access.allOf.every((permission) => held.has(permission))
+    : access.anyOf.some((permission) => held.has(permission));
+}
+
+/** Every permission a catalogue names, on a table or a column, once each, sorted. */
+export function cataloguePermissions({
+  catalog,
+}: {
+  catalog: LwqlCatalogue;
+}): readonly AuthzPermission[] {
+  const permissionsOf = (access: LwqlAccess | undefined): readonly AuthzPermission[] => {
+    if (access === undefined) return [];
+    return "allOf" in access ? access.allOf : access.anyOf;
+  };
+  const named = Object.values(catalog).flatMap((table) => [
+    ...permissionsOf(table.access),
+    ...exposedCatalogueColumns({ table }).flatMap((column) => permissionsOf(column.access)),
+  ]);
+  return [...new Set(named)].toSorted();
+}
+
 type RowsTable = Readonly<{
   name: string;
   columns: readonly Readonly<{ name: string; type: string }>[];

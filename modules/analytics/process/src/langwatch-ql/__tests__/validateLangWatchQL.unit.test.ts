@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
 
@@ -1027,11 +1028,13 @@ describe("validateLangWatchQL given the shipped catalog's content gates", () => 
   /** @scenario "A content column is gated, not dropped" */
   it("refuses Comment on annotations without content access, and allows it with", () => {
     const withoutContentAccess: LangWatchQLProtections = {
+      catalogue: EVERY_CATALOGUE_PERMISSION,
       canSeeCapturedInput: false,
       canSeeCapturedOutput: false,
       canSeeCosts: true,
     };
     const withContentAccess: LangWatchQLProtections = {
+      catalogue: EVERY_CATALOGUE_PERMISSION,
       canSeeCapturedInput: true,
       canSeeCapturedOutput: true,
       canSeeCosts: true,

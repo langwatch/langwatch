@@ -153,7 +153,7 @@ describe("given the traces exemplar", () => {
     const today = (view?.columns ?? []).map((column) => ({
       name: column.name,
       source: column.sourceColumns[0],
-      ...(column.gates.includes("costs") ? { access: { allOf: ["cost:view"] } } : {}),
+      ...(column.gates.includes("cost:view") ? { access: { allOf: ["cost:view"] } } : {}),
       ...(column.gates.includes("input") ? { content: "input" } : {}),
       ...(column.gates.includes("output") ? { content: "output" } : {}),
     }));

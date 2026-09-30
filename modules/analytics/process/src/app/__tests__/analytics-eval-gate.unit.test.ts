@@ -18,6 +18,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
 import { AnalyticsApp } from "../analytics.app.ts";
 
@@ -78,7 +79,7 @@ async function harness(flagAnswer: boolean) {
     app
       .executeLangWatchQL({
         project: { id: PROJECT_ID, lwqlKey: "lwql-key" },
-        protections: {},
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
         sql,
       })
       .catch(() => void 0);
@@ -97,7 +98,11 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
 
       const schema = await app.describeLangWatchQLSchema({
         projectId: PROJECT_ID,
-        protections: { canSeeCapturedInput: true, canSeeCapturedOutput: true },
+        protections: {
+          catalogue: EVERY_CATALOGUE_PERMISSION,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        },
       });
 
       expect(
@@ -115,7 +120,7 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
 
       const schema = await app.describeLangWatchQLSchema({
         projectId: PROJECT_ID,
-        protections: {},
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       });
 
       expect(appFunction(schema, "eval")?.available).toBe(true);

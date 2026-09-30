@@ -6,7 +6,7 @@
  */
 import type { QueryExampleIntent } from "@langwatch/analytics-contract";
 
-import type { FieldProtection } from "./lwql-field-protection.rules.ts";
+import type { LwqlGate } from "./lwql-gate.rules.ts";
 
 /** One bound parameter a statement declares. */
 export interface LangWatchQLExampleParameter {
@@ -29,7 +29,7 @@ export interface LangWatchQLExample {
   /** Parameters the statement binds. Empty when it binds none. */
   readonly parameters: readonly LangWatchQLExampleParameter[];
   /** Permissions the caller must hold for every column this names. */
-  readonly gates: readonly FieldProtection[];
+  readonly gates: readonly LwqlGate[];
   readonly notes?: string;
 }
 
@@ -132,7 +132,7 @@ GROUP BY Model
 ORDER BY cost_usd DESC
 LIMIT 50`,
     parameters: [],
-    gates: ["costs"],
+    gates: ["cost:view"],
   },
   {
     id: "lwql.busiest-conversations",

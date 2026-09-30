@@ -145,7 +145,7 @@ function harness(
     isQueryIdentityAvailable: () => true,
     resolveCaller: async ({ projectId }) => ({
       project: { id: projectId, lwqlKey: "key-1" },
-      protections: { canSeeCosts: true },
+      protections: { catalogue: { permissions: [] }, canSeeCosts: true },
     }),
     getPlan: async () => ({ name: "Launch", isFree: true }),
     database: () => "analytics",
@@ -217,7 +217,7 @@ describe("creating a run", () => {
       peers: {
         resolveCaller: async ({ projectId }) => ({
           project: { id: projectId, lwqlKey: "" },
-          protections: {},
+          protections: { catalogue: { permissions: [] } },
         }),
       },
     });

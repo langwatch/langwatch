@@ -91,7 +91,7 @@ describe("given the derived Postgres catalog's overrides", () => {
         .get("batch_evaluations")!
         .columns.find((column) => column.name === "Cost")!;
       expect(cost.unit).toBe("USD");
-      expect(cost.gates).toEqual(["costs"]);
+      expect(cost.gates).toEqual(["cost:view"]);
     });
   });
 
@@ -132,9 +132,9 @@ describe("given the derived Postgres catalog's overrides", () => {
       expect(build({ TenantId: { source: "teamId" } })).toThrow(/must declare TenantId/);
     });
 
-    it("refuses a column access the view shape cannot carry yet", () => {
-      const access = { allOf: ["project:update"] } as const;
-      expect(build({ S3Bucket: { source: "s3Bucket", access } })).toThrow(/only cost:view/);
+    it("refuses a column access of anyOf, which a gate list cannot carry", () => {
+      const access = { anyOf: ["project:update", "cost:view"] } as const;
+      expect(build({ S3Bucket: { source: "s3Bucket", access } })).toThrow(/declares anyOf/);
     });
   });
 

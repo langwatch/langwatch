@@ -4928,6 +4928,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config

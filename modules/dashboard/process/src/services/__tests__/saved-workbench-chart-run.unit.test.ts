@@ -3,7 +3,11 @@
  * window and step the surface asked for, through the restricted LangWatchQL
  * identity that owns the bucket budget.
  */
-import { createLangWatchQLService, recordingExecutor } from "@langwatch/analytics-process/testing";
+import {
+  EVERY_CATALOGUE_PERMISSION,
+  createLangWatchQLService,
+  recordingExecutor,
+} from "@langwatch/analytics-process/testing";
 import { describe, expect, it } from "vitest";
 
 import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
@@ -24,6 +28,7 @@ const TIMESERIES_SQL =
 
 /** The runner every case here is measured for: nothing content-gated is hidden. */
 const FULLY_PERMITTED = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,

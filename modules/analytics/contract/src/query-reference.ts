@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 
-import { langWatchQLSchema } from "./analytics.lwql.ts";
+import { langWatchQLGateSchema, langWatchQLSchema } from "./analytics.lwql.ts";
 
 /**
  * The document's shape version. Bumped when a consumer would have to change to
@@ -107,7 +107,7 @@ export const queryReferenceExampleSchema = z
     parameters: z.array(queryReferenceParameterSchema).readonly(),
     requires: z
       .object({
-        gates: z.array(z.string()).readonly(),
+        gates: z.array(langWatchQLGateSchema).readonly(),
         /**
          * App-side LangWatchQL functions the statement calls. Empty until a
          * published example names one, so a consumer parses one shape either way.

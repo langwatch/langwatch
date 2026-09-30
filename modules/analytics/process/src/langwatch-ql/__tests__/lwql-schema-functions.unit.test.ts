@@ -8,9 +8,11 @@ import { describe, expect, it } from "vitest";
 
 import { LWQL_ALLOWED_FUNCTION_NAMES } from "../../rules/langwatch-ql-functions.rules.ts";
 import { LWQL_POSTGRES_CATALOG } from "../../rules/lwql-postgres-view-catalog.rules.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service.ts";
 
 const FULLY_PERMITTED: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,
@@ -32,7 +34,7 @@ describe("LangWatchQLSchemaService.describe", () => {
     it("publishes the same list whatever the caller can see", () => {
       const schema = LangWatchQLSchemaService.create().describe({
         database: "analytics",
-        protections: {},
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       });
 
       expect(schema.functions).toEqual(LWQL_ALLOWED_FUNCTION_NAMES);
