@@ -45,13 +45,18 @@ describe("getGetPromptSnippets()", () => {
       for (const target of [
         "shell_curl",
         "php_curl",
-        "go_native",
         "java_unirest",
       ] as const) {
         const snippet = snippets.find((s) => s.target === target)!;
         expect(snippet.content).toContain("/api/prompts/my-prompt:staging");
         expect(snippet.content).not.toContain("?label=");
       }
+
+      // The Go snippet uses the REST client, so it carries the shorthand handle
+      // (handle:tag) passed to Prompts.Get rather than a raw URL.
+      const go = snippets.find((s) => s.target === "go_native")!;
+      expect(go.content).toContain("my-prompt:staging");
+      expect(go.content).not.toContain("?label=");
     });
 
     it("includes tagged comment in SDK snippets", () => {

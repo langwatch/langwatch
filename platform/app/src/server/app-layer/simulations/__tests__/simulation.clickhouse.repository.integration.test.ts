@@ -9,6 +9,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
 import {
+  ScenarioRunStatus,
+  Verdict,
+} from "~/server/scenarios/scenario-event.enums";
+import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
@@ -1655,6 +1659,95 @@ describe("SimulationClickHouseRepository (integration)", () => {
         });
 
         expect(summary).toBeNull();
+      });
+    });
+
+    describe("when a run of the batch still owes its evaluator results", () => {
+      /** @scenario "A run with attached evaluators reads as pending until they are recorded" */
+      it("reads as PENDING_EVALUATION and holds the batch open", async () => {
+        const setId = `set-pending-${nanoid()}`;
+        const batchRunId = `batch-pending-${nanoid()}`;
+        const scenarioRunId = `run-pending-${nanoid()}`;
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: batchRunId,
+            ScenarioRunId: scenarioRunId,
+            Status: "PENDING_EVALUATION",
+          }),
+        );
+
+        const run = await repo.getScenarioRunData({
+          projectId: tenantId,
+          scenarioRunId,
+        });
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(run?.status).toBe(ScenarioRunStatus.PENDING_EVALUATION);
+        expect(run?.results?.verdict).toBe(Verdict.SUCCESS);
+        expect(summary?.runningCount).toBe(1);
+        expect(summary?.settledCount).toBe(0);
+      });
+
+      it("settles once the results are recorded", async () => {
+        const setId = `set-graded-${nanoid()}`;
+        const batchRunId = `batch-graded-${nanoid()}`;
+        const scenarioRunId = `run-graded-${nanoid()}`;
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: batchRunId,
+            ScenarioRunId: scenarioRunId,
+            Status: "SUCCESS",
+          }),
+        );
+
+        const run = await repo.getScenarioRunData({
+          projectId: tenantId,
+          scenarioRunId,
+        });
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(run?.status).toBe(ScenarioRunStatus.SUCCESS);
+        expect(summary?.settledCount).toBe(1);
+        expect(summary?.runningCount).toBe(0);
+      });
+
+      /** @scenario "The batch and the set aggregates agree on a pending run" */
+      it("is counted as running by the batch and as unsettled by the set", async () => {
+        const setId = `set-pending-agree-${nanoid()}`;
+        const batchRunId = `batch-pending-agree-${nanoid()}`;
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: batchRunId,
+            ScenarioRunId: `run-pending-agree-${nanoid()}`,
+            Status: "PENDING_EVALUATION",
+          }),
+        );
+
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+        const sets = await repo.getExternalSetSummaries({
+          projectId: tenantId,
+        });
+        const set = sets.find((s) => s.scenarioSetId === setId);
+
+        expect(summary?.runningCount).toBe(1);
+        expect(summary?.settledCount).toBe(0);
+        expect(set?.totalCount).toBe(0);
+        expect(set?.passedCount).toBe(0);
       });
     });
   });

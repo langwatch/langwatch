@@ -106,7 +106,6 @@ const createMockOrganizationRepository = (): {
   findMemberTeamBindings: vi.fn(),
   findSettingsById: vi.fn(),
   updateSettings: vi.fn(),
-  deleteMember: vi.fn(),
   setMemberDisabled: vi.fn(),
   updateMemberRole: vi.fn(),
   updateTeamMemberRole: vi.fn(),

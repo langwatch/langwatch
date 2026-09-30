@@ -10,6 +10,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { ProjectRepository } from "~/server/projects/project.repository";
+import { evaluatorAttachmentsSchema } from "~/server/scenarios/evaluator-attachments";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runNoteSchema } from "~/server/scenarios/run-note";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
@@ -226,6 +227,8 @@ export const suiteRouter = createTRPCRouter({
           judgeModel: z.string().nullish(),
           /** The scenarios a hand-picked scope covers; ignored by every other. */
           scenarioIds: z.array(z.string()).optional(),
+          /** The plan's own evaluators, beside the suites' ones. */
+          evaluators: evaluatorAttachmentsSchema.optional(),
         }),
         idempotencyKey: z.string(),
         batchRunId: z.string().optional(),

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDensityStore } from "../stores/densityStore";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import { useRefreshUIStore } from "../stores/refreshUIStore";
-import { useViewStore } from "../stores/viewStore";
 
 interface DimInputs {
   isFetching: boolean;
@@ -26,15 +25,15 @@ export function useViewSwitchingDim({
   isFetched,
   isPlaceholderData,
 }: DimInputs): void {
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
-  const timeRangeFrom = useFilterStore((s) => s.debouncedTimeRange.from);
-  const timeRangeTo = useFilterStore((s) => s.debouncedTimeRange.to);
-  const timeRangeLabel = useFilterStore((s) => s.debouncedTimeRange.label);
-  const page = useFilterStore((s) => s.page);
-  const pageSize = useFilterStore((s) => s.pageSize);
-  const sortColumnId = useViewStore((s) => s.sort.columnId);
-  const sortDirection = useViewStore((s) => s.sort.direction);
-  const activeLensId = useViewStore((s) => s.activeLensId);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
+  const timeRangeFrom = useExplorerStore((s) => s.debouncedTimeRange.from);
+  const timeRangeTo = useExplorerStore((s) => s.debouncedTimeRange.to);
+  const timeRangeLabel = useExplorerStore((s) => s.debouncedTimeRange.label);
+  const page = useExplorerStore((s) => s.page);
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  const sortColumnId = useExplorerStore((s) => s.sort.columnId);
+  const sortDirection = useExplorerStore((s) => s.sort.direction);
+  const activeLensId = useExplorerStore((s) => s.activeLensId);
   const density = useDensityStore((s) => s.density);
 
   const pulse = useRefreshUIStore((s) => s.pulse);

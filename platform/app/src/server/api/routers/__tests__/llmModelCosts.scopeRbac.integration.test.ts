@@ -14,6 +14,7 @@
  * Spec: specs/model-providers/model-cost-scoping.feature
  */
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -21,13 +22,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -90,23 +91,19 @@ describe("llmModelCosts — scope-aware RBAC", () => {
       },
     });
     const roleId = `crole-${uid}`;
-    await prisma.customRole.create({
-      data: {
-        id: roleId,
-        organizationId: orgId,
-        name: roleId,
-        permissions: perms,
-      },
+    await seedCustomRole(prisma, {
+      id: roleId,
+      organizationId: orgId,
+      name: roleId,
+      permissions: perms,
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: orgId,
-        userId: uid,
-        role: TeamUserRole.CUSTOM,
-        customRoleId: roleId,
-        scopeType: scope.scopeType,
-        scopeId: scope.scopeId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: orgId,
+      userId: uid,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: roleId,
+      scopeType: scope.scopeType,
+      scopeId: scope.scopeId,
     });
     return appRouter.createCaller(
       createInnerTRPCContext({
@@ -151,7 +148,9 @@ describe("llmModelCosts — scope-aware RBAC", () => {
       await prisma.customLLMModelCost.deleteMany({
         where: { organizationId: orgId },
       });
+      await prisma.grant.deleteMany({ where: { organizationId: orgId } });
       await prisma.roleBinding.deleteMany({ where: { organizationId: orgId } });
+      await prisma.role.deleteMany({ where: { organizationId: orgId } });
       await prisma.customRole.deleteMany({ where: { organizationId: orgId } });
       await prisma.project.deleteMany({
         where: { team: { organizationId: orgId } },

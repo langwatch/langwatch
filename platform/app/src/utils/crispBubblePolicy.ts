@@ -86,6 +86,11 @@ export function toggleSupportChat(): void {
   crisp.push(["do", "chat:toggle"]);
 }
 
+/** True once Crisp has loaded (cloud builds only; self-hosted never loads it). */
+export function isSupportChatAvailable(): boolean {
+  return getCrisp() !== undefined;
+}
+
 function isCrispContainer(node: Node): boolean {
   if (!(node instanceof Element)) return false;
   return (

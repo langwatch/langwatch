@@ -85,6 +85,14 @@ Feature: The wide run detail drawer
     And no empty "Passed criteria" heading is shown
 
   @integration
+  Scenario: Criteria the judge could not decide read apart from the failed ones
+    Given a finished run whose judge met one criterion, missed one and could not decide one
+    When the results are read
+    Then an "Inconclusive criteria" section reads between the failed and the passed sections
+    And the undecided criterion is listed there and not under "Failed criteria"
+    And its row carries a grey dashed circle
+
+  @integration
   Scenario: The messages carry no heading and no line beside the results
     Given a finished run open in the wide drawer
     When the drawer is read
@@ -112,6 +120,62 @@ Feature: The wide run detail drawer
     Given a failed run open in the drawer
     When the results panel is read
     Then the verdict line reads "FAILED" in red
+
+  # --- Evaluators ---
+  # A run carries one result per evaluator its suite or plan attached. They
+  # read under the criteria: the criteria are what the judge decided, the
+  # evaluators are what the checks beside it said.
+
+  @integration
+  Scenario: The evaluators read under the criteria
+    Given a finished run that carries evaluator results
+    When the results panel is read
+    Then a section headed "Evaluators" reads under the criteria
+    And each evaluator reads on its own row with its name and its verdict
+    And a passed evaluator carries a check and reads "Passed" in green
+    And a failed evaluator carries a cross and reads "Failed" in red
+    And a required evaluator carries a "Required" mark
+
+  @integration
+  Scenario: A run without evaluator results shows no Evaluators section
+    Given a finished run that carries no evaluator results
+    When the results panel is read
+    Then no "Evaluators" heading is drawn
+
+  @integration
+  Scenario: A score evaluator reads its number on its row
+    Given a run whose evaluators include a score
+    When the Evaluators section is read
+    Then the score row carries its number where the pass and fail icons sit
+    And the row reads no verdict word
+
+  @integration
+  Scenario: A skipped evaluator reads muted end to end
+    Given a run on which an evaluator had nothing to read
+    When the Evaluators section is read
+    Then that row reads "Skipped" in muted text
+    And the reason it was skipped reads under its name
+
+  @integration
+  Scenario: The reason an evaluator gave reads under its verdict
+    Given a run whose evaluator explained its result
+    When the Evaluators section is read
+    Then the explanation reads in muted text under the verdict word
+
+  @integration
+  Scenario: A required evaluator that failed names itself in the verdict line
+    Given a run that met every criterion and failed a required evaluator
+    When the results panel is read
+    Then the verdict line reads "FAILED" followed by the name of that evaluator
+    And a run that failed on its criteria alone keeps "FAILED" on its own
+
+  @integration
+  Scenario: The inputs an evaluator read are one click away
+    Given a run whose evaluator recorded the inputs it read
+    When the evaluator row is read
+    Then an "Inputs" control reads under the row
+    And choosing it lists each input by name with its value in monospace
+    And a long value is cut short and readable in full on hover
 
   @integration
   Scenario: What the judge said about the run as a whole reads last

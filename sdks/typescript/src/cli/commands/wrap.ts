@@ -1,4 +1,5 @@
 import { runWrapped } from "@/cli/utils/governance/wrapper";
+import { infoRunKind } from "@/cli/utils/governance/wrapper-info-run";
 
 /**
  * Tiny shim — each `langwatch <tool>` subcommand delegates to
@@ -23,6 +24,7 @@ export const wrapCode = async (args: string[]): Promise<void> => {
   // exists (`openExistingWindow` reuses the live extension host, which never
   // sees this launch's env). Capture only applies to windows this launch
   // creates — say so up front instead of silently not capturing.
+  if (infoRunKind(args)) return runWrapped("code", args);
   process.stderr.write(
     "[langwatch] capture applies to VS Code windows opened by this launch; if VS Code is already running, close it first (or run `code -n`) so Copilot Chat picks up the telemetry env.\n",
   );

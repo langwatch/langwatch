@@ -63,9 +63,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
-  LW_GATEWAY_BASE_URL env entry for the pods that talk to the gateway from
-  inside the cluster (the app and the workers, which both resolve Langy's
-  credentials). Renders nothing when there is no gateway to point at.
+  LW_GATEWAY_BASE_URL and LW_GATEWAY_INTERNAL_URL env entries for the pods that
+  talk to the gateway from inside the cluster (the app and the workers, which
+  both resolve Langy's credentials). Renders nothing when there is no gateway.
+  The app prefers INTERNAL_URL over gateway.publicUrl for its own and the
+  Langy worker's calls; the public URL is only a fallback when it is unset.
 
   gateway.internalUrl wins for non-standard topologies (a gateway run outside
   this release, a service mesh address). Otherwise it is the Service this chart
@@ -81,6 +83,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- if $url }}
 - name: LW_GATEWAY_BASE_URL
+  value: {{ $url | quote }}
+- name: LW_GATEWAY_INTERNAL_URL
   value: {{ $url | quote }}
 {{- end }}
 {{- end -}}
@@ -462,7 +466,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        so the default-named case requires the chart-managed url-secret to
        still render. */}}
   {{- $chSecretName := include "langwatch.clickhouse.secretName" . }}
-  {{- $chDefaultName := printf "%s-clickhouse" .Release.Name }}
+  {{- $chDefaultName := include "langwatch.clickhouse.serviceName" . }}
   {{- if and (not .Values.autogen.enabled) (eq $chSecretName $chDefaultName) }}
     {{- $errors = append $errors (printf "clickhouse.chartManaged=true with autogen.enabled=false requires clickhouse.auth.existingSecret to be set to an operator-owned Secret name different from the default %q. The deployment composes CLICKHOUSE_URL at runtime from the password key when a custom name is used; with the default name the deployment expects the chart-rendered url key, which is gated off when autogen.enabled=false. Either set autogen.enabled=true OR override clickhouse.auth.existingSecret." $chDefaultName) }}
   {{- end }}
@@ -472,6 +476,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
     {{- end }}
   {{- end }}
 {{- end }}
+
 
 {{/* Redis secret template auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
 
@@ -867,7 +872,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # ClickHouse connection
 {{- if .Values.clickhouse.chartManaged }}
 {{- $chSecretName := include "langwatch.clickhouse.secretName" . }}
-{{- $chDefaultName := printf "%s-clickhouse" .Release.Name }}
+{{- $chDefaultName := include "langwatch.clickhouse.serviceName" . }}
 {{- if eq $chSecretName $chDefaultName }}
 {{/* Langwatch-owned secret — URL is stored as a secret key */}}
 - name: CLICKHOUSE_URL
@@ -883,7 +888,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ $chSecretName }}
       key: {{ include "langwatch.clickhouse.secretKey" . }}
 - name: CLICKHOUSE_URL
-  value: "http://default:$(CLICKHOUSE_PASSWORD)@{{ .Release.Name }}-clickhouse:8123/langwatch"
+  value: "http://default:$(CLICKHOUSE_PASSWORD)@{{ include "langwatch.clickhouse.serviceName" . }}:8123/langwatch"
 {{- end }}
 {{- if gt (int (.Values.clickhouse).replicas) 1 }}
 - name: CLICKHOUSE_CLUSTER
@@ -921,6 +926,40 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- $chBackup := (.Values.clickhouse).backup }}
 - name: CLICKHOUSE_BACKUP_METRICS_ENABLED
   value: {{ if or ($chBackup).enabled ($chBackup).metricsEnabled }}"true"{{ else }}"false"{{ end }}
+
+{{/* LangWatchQL query credentials (issue #8258: the app always owns the LWQL
+     access model). The app self-provisions the whole access model at boot —
+     ClickHouse user/profile/policy/grants/named collection, and the
+     PostgreSQL lwql_ro reader — on every path, chart-managed ClickHouse
+     included. The chart's only job is handing over the two passwords the app
+     converges those identities with.
+
+     Where the passwords live: an operator-supplied `secrets.existingSecret`
+     carries them; otherwise, when the chart generates them (autogen), they are
+     in the chart-owned `langwatch.lwql.passwordSecretName` Secret — a
+     pre-install,pre-upgrade,pre-rollback hook, so the render Job finds them on a first upgrade
+     before the app Secret is healed (see templates/lwql-passwords-secret.yaml);
+     with autogen off and no existingSecret the operator hand-creates the app
+     Secret, so they come from there. All three pre-exist before the render hook.
+
+     `optional: true` is deliberate: a Secret without these keys means
+     LangWatchQL simply stays unprovisioned (fail-closed refusals) instead of
+     the pod dying in CreateContainerConfigError. */}}
+{{- if .Values.lwql.enabled }}
+{{- $lwqlPwSecret := .Values.secrets.existingSecret | default (ternary (include "langwatch.lwql.passwordSecretName" .) (include "langwatch.appSecretName" .) .Values.autogen.enabled) }}
+- name: LWQL_CLICKHOUSE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $lwqlPwSecret }}
+      key: LWQL_CLICKHOUSE_PASSWORD
+      optional: true
+- name: LWQL_POSTGRES_READER_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $lwqlPwSecret }}
+      key: LWQL_POSTGRES_READER_PASSWORD
+      optional: true
+{{- end }}
 
 # Credentials encryption key
 {{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
@@ -1099,6 +1138,39 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
+{{- /* The version this install reports in its license sync and its usage
+       report, so we know which release each install runs. The app image tag is
+       the release. Emitted on every render: it names the build and carries no
+       decision. */}}
+- name: SERVICE_VERSION
+  value: {{ .Values.images.app.tag | default .Chart.AppVersion | quote }}
+
+{{- /* LangWatch-hosted services. There is no switch that turns them on: the
+       license decides what an install may call, and a license naming no hosted
+       service reaches nothing. So a default render carries no LANGWATCH_CONNECT_
+       variable, and an install that upgrades and changes no value behaves as it
+       did. What is emitted here is the operator's overrides: the off switch an
+       auditor asks for, and the addresses of a private LangWatch. In sharedEnv
+       beside the license because the workers judge too, and an app and a worker
+       disagreeing about which services are reachable would make the same query
+       behave differently depending on which one ran it. */}}
+{{- if .Values.app.connect.disabled }}
+- name: LANGWATCH_CONNECT_DISABLED
+  value: "true"
+{{- end }}
+{{- if .Values.app.connect.gatewayEndpoint }}
+- name: LANGWATCH_CONNECT_GATEWAY_ENDPOINT
+  value: {{ .Values.app.connect.gatewayEndpoint | quote }}
+{{- end }}
+{{- if .Values.app.connect.licenseEndpoint }}
+- name: LANGWATCH_CONNECT_LICENSE_ENDPOINT
+  value: {{ .Values.app.connect.licenseEndpoint | quote }}
+{{- end }}
+{{- if .Values.app.connect.instanceId }}
+- name: LANGWATCH_CONNECT_INSTANCE_ID
+  value: {{ .Values.app.connect.instanceId | quote }}
+{{- end }}
+
 # Email gateway. Naming a provider is what turns email on. In sharedEnv rather
 # than the app Deployment because scheduled reports and alert notifications are
 # dispatched by the workers, so a workers pod without a gateway configured
@@ -1181,12 +1253,60 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* ============================================================ */}}
 
 {{/* ClickHouse: Secret name — langwatch chart owns the secret (passed to subchart via auth.existingSecret) */}}
+{{/* The chart-managed ClickHouse Service name — its in-cluster DNS name and the
+     stem of the credentials-Secret name. Must equal clickhouse-serverless.fullname
+     EXACTLY: the subchart truncates the release name to 36 chars (leaving room for
+     a -keeper-headless suffix), so any parent reference that did NOT truncate would
+     name a Service that does not exist on a release name past 36 chars — every
+     in-cluster URL would dial a closed host and the default-Secret-name comparison
+     would flip. Single source for both, so the parent and subchart cannot disagree. */}}
+{{- define "langwatch.clickhouse.serviceName" -}}
+  {{- printf "%s-clickhouse" (.Release.Name | trunc 36 | trimSuffix "-") -}}
+{{- end -}}
+
 {{- define "langwatch.clickhouse.secretName" -}}
   {{- if .Values.clickhouse.auth.existingSecret -}}
     {{- tpl .Values.clickhouse.auth.existingSecret . -}}
   {{- else -}}
-    {{- printf "%s-clickhouse" .Release.Name -}}
+    {{- include "langwatch.clickhouse.serviceName" . -}}
   {{- end -}}
+{{- end -}}
+
+{{/*
+  Umbrella fullname. Every resource this chart renders is named after the
+  release (`<release>-app`, `<release>-postgresql`, …), so fullname IS the
+  release name. Kept as a named helper so cross-references read intentionally
+  and a future naming change has one edit site.
+*/}}
+{{- define "langwatch.fullname" -}}
+  {{- .Release.Name -}}
+{{- end -}}
+
+{{/*
+  Name of the Secret the LangWatchQL access-render Job writes and every
+  chart-managed ClickHouse pod mounts (issue #8258). Holds the two rendered
+  files `lwql-access.yaml` (users.d) and `lwql-named-collection.yaml` (config.d).
+  The subchart mount reads this through `clickhouse.lwqlAccess.secretName`, which
+  values.yaml sets to `{{ include "langwatch.lwql.accessSecretName" $ }}`; the
+  ClickHouse subchart's `templates/statefulset.yaml` resolves it with
+  `tpl .Values.lwqlAccess.secretName $`, so `$` is the parent context and the
+  helper resolves there — one source of truth, no literal to keep in sync.
+*/}}
+{{- define "langwatch.lwql.accessSecretName" -}}
+  {{- printf "%s-lwql-clickhouse-access" (include "langwatch.fullname" .) -}}
+{{- end -}}
+
+{{/*
+  Name of the chart-owned Secret holding the two LWQL passwords
+  (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD) when the chart
+  generates them (autogen, no existingSecret). It is a pre-install,pre-upgrade,pre-rollback
+  hook (templates/lwql-passwords-secret.yaml) so the passwords exist before the
+  render Job on a first upgrade, when the app Secret has not yet been healed with
+  the keys. sharedEnv resolves the LWQL passwords to this Secret on the autogen
+  path, and every consumer (app, workers, render Job) reads them from here.
+*/}}
+{{- define "langwatch.lwql.passwordSecretName" -}}
+  {{- printf "%s-lwql-passwords" (include "langwatch.fullname" .) -}}
 {{- end -}}
 
 {{/* ClickHouse: Password secret key */}}

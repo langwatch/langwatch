@@ -10,25 +10,67 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   CreateTeamInput,
   PaginatedResult,
+  TeamProjectListing,
   TeamRepository,
   UpdateTeamInput,
 } from "./team.repository";
 
 export class PrismaTeamRepository implements TeamRepository {
+  private readonly accessListing: GrantsAccessListingRepository;
+
   constructor(
     private readonly prisma: PrismaClient,
     // Team memberships are grants, and the ledger is their only writer since
     // ADR-092 delivery-plan PR 2. Injectable so a test can watch the commands
     // rather than the tables they end up in.
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+  ) {
+    this.accessListing = new GrantsAccessListingRepository(prisma);
+  }
 
   async findById(id: string): Promise<Team | null> {
     return this.prisma.team.findUnique({ where: { id } });
+  }
+
+  async findProjectsInTeam({
+    teamId,
+  }: {
+    teamId: string;
+  }): Promise<TeamProjectListing[]> {
+    return this.prisma.project.findMany({
+      where: {
+        teamId,
+        archivedAt: null,
+        kind: { not: "internal_governance" },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async listMembers({
+    organizationId,
+    teamId,
+  }: {
+    organizationId: string;
+    teamId: string;
+  }) {
+    const bindingsByTeam = await this.accessListing.findTeamMemberBindings({
+      organizationId,
+      teamIds: [teamId],
+    });
+    return bindingsByTeam.get(teamId) ?? [];
   }
 
   async findAllByOrganization({

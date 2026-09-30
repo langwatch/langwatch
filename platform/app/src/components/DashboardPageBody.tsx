@@ -8,12 +8,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { KeyRound } from "lucide-react";
 import numeral from "numeral";
 import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
+import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
+import { TeamAccessWaiting } from "../features/auth/components/team-access-waiting";
+import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
+import { useOrganizationMfaGate } from "../features/mfa/hooks/useOrganizationMfaGate";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import {
   useOrganizationTeamProject,
@@ -28,6 +31,8 @@ import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
+import { JoinYourTeamTakeover } from "./JoinYourTeamTakeover";
+import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { SavedViewsBar } from "./SavedViewsBar";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -55,11 +60,17 @@ export const DashboardPageBody = ({
 }: DashboardPageBodyProps) => {
   const router = useRouter();
   const { data: session } = useRequiredSession({ required: !publicPage });
-  const { organization, team, project, organizationRole, hasPermission } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const {
+    organization,
+    team,
+    project,
+    organizationRole,
+    hasPermission,
+    isLoading: isOrganizationContextLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const publicEnv = usePublicEnv();
   const { url: planManagementUrl } = usePlanManagementUrl();
   const usage = api.limits.getUsage.useQuery(
@@ -133,6 +144,15 @@ export const DashboardPageBody = ({
   // leaves DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
   // `project?.slug` would otherwise read as a match on any route that hasn't
   // resolved a project yet.
+  // The organization's membership condition (D06), asked on the way into ITS
+  // data and nowhere else. A personal-scope route is never held: the
+  // requirement belongs to the organization that set it, and nobody's own
+  // workspace is stranded by their employer's decision.
+  const mfaGate = useOrganizationMfaGate({
+    organizationId: organization?.id,
+    isPersonalScope: isPersonalScopeRoute,
+  });
+
   const isDemoProject =
     !!publicEnv.data?.DEMO_PROJECT_SLUG &&
     publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
@@ -159,170 +179,197 @@ export const DashboardPageBody = ({
 
   return (
     <VStack width="full" gap={0} {...props}>
-      {/* Alert banners */}
-      {publicEnv.data &&
-        (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
-          !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
-          <Alert.Root
-            status="warning"
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor="yellow.300"
-            borderTopLeftRadius="2xl"
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                Please check your environment variables, the following variables
-                are not set which are required for evaluations and workflows:
-              </Text>
-              {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
-                <Text>LANGWATCH_NLP_SERVICE</Text>
-              )}
-              {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
-                <Text>LANGEVALS_ENDPOINT</Text>
-              )}
-            </Alert.Content>
-          </Alert.Root>
-        )}
-      {usage.data?.messageLimitInfo &&
-        usage.data.messageLimitInfo.status !== "ok" && (
-          <Alert.Root
-            status={
-              usage.data.messageLimitInfo.status === "exceeded"
-                ? "error"
-                : "warning"
-            }
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor={
-              usage.data.messageLimitInfo.status === "exceeded"
-                ? "red.300"
-                : "yellow.300"
-            }
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                {usage.data.messageLimitInfo.message}{" "}
-                <Link
-                  href={planManagementUrl}
-                  textDecoration="underline"
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook:
-                        usage.data?.messageLimitInfo.status === "exceeded"
-                          ? "messages_limit_reached"
-                          : "messages_limit_warning",
-                    });
-                  }}
-                >
-                  Click here
-                </Link>{" "}
-                to upgrade your plan.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
-      {usage.data &&
-        usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-          <Alert.Root
-            status="warning"
-            width="full"
-            borderBottom="1px solid"
-            borderBottomColor="yellow.300"
-          >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                You reached the limit of{" "}
-                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage
-                cost for this month, evaluations and guardrails will not be
-                processed.{" "}
-                <Link
-                  href="/settings/usage"
-                  textDecoration="underline"
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook: "usage_cost_limit_reached",
-                    });
-                  }}
-                >
-                  Go to settings
-                </Link>{" "}
-                to check your usage spending limit or upgrade your plan.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
+      {/* Alert banners.
 
-      <AnnouncementBanner />
-
-      {adminViewingAs && (
-        <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
-      )}
-
-      {ssoStatus?.pendingSsoSetup && (
-        <Alert.Root
-          status="error"
-          width="full"
-          border="1px solid"
-          borderColor="colorPalette.muted"
-          marginX={4}
-          marginTop={3}
-          borderRadius="lg"
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <VStack align="start" gap={0} flex={1}>
-                <Alert.Title fontWeight="bold">
-                  Action Required: Link your SSO account
-                </Alert.Title>
-                <Text fontSize="sm">
-                  Your organization requires SSO login. Please link your account
-                  by logging in via the email input box on the sign-in page.
+          A positioned layer on purpose. Pages are free to paint outside their
+          own box (the home hero's light-mode bloom bleeds upward by almost
+          half its height) and to stack their own containers with a
+          `zIndex`. A static banner loses to both: the bloom washed the
+          "You reached the limit" alert out to a smear a customer could not
+          read. Banners are chrome, so they stack above whatever the page
+          does — `docked` is the lowest token above page-level layering and
+          still under every portaled overlay. */}
+      <VStack
+        width="full"
+        gap={0}
+        position="relative"
+        zIndex="docked"
+        data-part="page-banners"
+      >
+        {publicEnv.data &&
+          (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
+            !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
+            <Alert.Root
+              status="warning"
+              width="full"
+              borderBottom="1px solid"
+              borderBottomColor="yellow.300"
+              borderTopLeftRadius="2xl"
+            >
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  Please check your environment variables, the following
+                  variables are not set which are required for evaluations and
+                  workflows:
                 </Text>
-              </VStack>
-              <Button
-                size="sm"
-                colorPalette="red"
-                flexShrink={0}
-                color="white"
-                asChild
-              >
-                <Link href="/settings/authentication">
-                  <KeyRound size={14} />
-                  Link SSO Account
-                </Link>
-              </Button>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
-      )}
+                {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
+                  <Text>LANGWATCH_NLP_SERVICE</Text>
+                )}
+                {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
+                  <Text>LANGEVALS_ENDPOINT</Text>
+                )}
+              </Alert.Content>
+            </Alert.Root>
+          )}
+        {usage.data?.messageLimitInfo &&
+          usage.data.messageLimitInfo.status !== "ok" && (
+            <Alert.Root
+              status={
+                usage.data.messageLimitInfo.status === "exceeded"
+                  ? "error"
+                  : "warning"
+              }
+              width="full"
+              borderBottom="1px solid"
+              borderBottomColor={
+                usage.data.messageLimitInfo.status === "exceeded"
+                  ? "red.300"
+                  : "yellow.300"
+              }
+            >
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  {usage.data.messageLimitInfo.message}{" "}
+                  <Link
+                    href={planManagementUrl}
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook:
+                          usage.data?.messageLimitInfo.status === "exceeded"
+                            ? "messages_limit_reached"
+                            : "messages_limit_warning",
+                      });
+                    }}
+                  >
+                    Click here
+                  </Link>{" "}
+                  to upgrade your plan.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+          )}
+        {usage.data &&
+          usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
+            <Alert.Root
+              status="warning"
+              width="full"
+              borderBottom="1px solid"
+              borderBottomColor="yellow.300"
+            >
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  You reached the limit of{" "}
+                  {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")}{" "}
+                  usage cost for this month, evaluations and guardrails will not
+                  be processed.{" "}
+                  <Link
+                    href="/settings/usage"
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "usage_cost_limit_reached",
+                      });
+                    }}
+                  >
+                    Go to settings
+                  </Link>{" "}
+                  to check your usage spending limit or upgrade your plan.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+          )}
 
-      {publicEnv.data?.DEMO_PROJECT_SLUG &&
-        publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
-          <HStack width="full" backgroundColor="orange.400" padding={1}>
-            <Spacer />
-            <Text fontSize="sm">
-              Viewing Demo Project - Go back to yours{" "}
-              <Link href="/" textDecoration="underline">
-                here
-              </Link>
-            </Text>
-            <Spacer />
-          </HStack>
+        <AnnouncementBanner />
+
+        <JoinYourTeamTakeover
+          // Three meanings, kept apart: `undefined` while the organization
+          // read is still out (the takeover decides nothing), `null` once it
+          // has answered with no organization, and the id otherwise.
+          currentOrganizationId={
+            isOrganizationContextLoading
+              ? undefined
+              : (organization?.id ?? null)
+          }
+          fallback={publicPage ? null : <SecureAccountNudge />}
+        />
+
+        {adminViewingAs && (
+          <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
         )}
+
+        {ssoStatus?.pendingSsoSetup && (
+          <Alert.Root
+            status="error"
+            width="full"
+            border="1px solid"
+            borderColor="colorPalette.muted"
+            marginX={4}
+            marginTop={3}
+            borderRadius="lg"
+            maxWidth="calc(100% - 22px)"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <HStack width="full" gap={4}>
+                <VStack align="start" gap={0} flex={1}>
+                  <Alert.Title fontWeight="bold">
+                    Sign in with your organization's single sign-on
+                  </Alert.Title>
+                  <Text fontSize="sm">
+                    Your organization requires single sign-on. Sign out, then
+                    sign in again by entering your work email address.
+                  </Text>
+                </VStack>
+                <Button
+                  size="sm"
+                  colorPalette="red"
+                  flexShrink={0}
+                  color="white"
+                  onClick={() => void signOut()}
+                >
+                  Sign out
+                </Button>
+              </HStack>
+            </Alert.Content>
+          </Alert.Root>
+        )}
+
+        {publicEnv.data?.DEMO_PROJECT_SLUG &&
+          publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
+            <HStack width="full" backgroundColor="orange.400" padding={1}>
+              <Spacer />
+              <Text fontSize="sm">
+                Viewing Demo Project - Go back to yours{" "}
+                <Link href="/" textDecoration="underline">
+                  here
+                </Link>
+              </Text>
+              <Spacer />
+            </HStack>
+          )}
+      </VStack>
 
       <CurrentDrawer />
       {/* v2 trace drawer is mounted globally so cross-page opens
@@ -331,7 +378,23 @@ export const DashboardPageBody = ({
         /[project]/traces where TracesPage already mounts it. */}
       <GlobalTraceV2DrawerMount />
 
-      {userIsPartOfTeam ? (
+      {mfaGate.outcome.held ? (
+        // The enrollment gate (D06). Here rather than in each shell because
+        // this is the one interior every shell renders, so the gate cannot be
+        // reachable through a nav mode somebody forgot to wire. It swaps the
+        // BODY and leaves the chrome: the organization switcher above it is
+        // how somebody reaches everything they are not held out of, and
+        // nothing about their session has changed.
+        <OrganizationMfaGate
+          organizationName={mfaGate.outcome.organizationName}
+          offerPasskey={mfaGate.outcome.offerPasskey}
+          onEnrolled={mfaGate.refresh}
+        />
+      ) : userIsPartOfTeam || isOrganizationContextLoading ? (
+        // A refusal is only ever drawn from an answered read: membership
+        // comes from `team` and `organizationRole`, which do not exist until
+        // the organization read lands. This gate has no loading screen of
+        // its own, so the body renders meanwhile.
         // Page body absorbs leftover vertical space inside the
         // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
         // pages that use `height="full"` interpret it as "100%
@@ -368,30 +431,10 @@ export const DashboardPageBody = ({
           </ErrorBoundary>
         </Box>
       ) : (
-        <Alert.Root
-          status="warning"
-          width="full"
-          border="1px solid"
-          borderColor="colorPalette.muted"
-          marginX={4}
-          marginTop={3}
-          borderRadius="lg"
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <Text flex={1}>
-                You are not part of any team in this organization. Ask your
-                administrator to add you, or{" "}
-                <Link href="/" textDecoration="underline">
-                  go back to your home page
-                </Link>
-                .
-              </Text>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
+        <TeamAccessWaiting
+          organizationName={organization?.name ?? "your organization"}
+          onCheckAccess={() => router.reload()}
+        />
       )}
       <GlobalUpgradeModal />
     </VStack>

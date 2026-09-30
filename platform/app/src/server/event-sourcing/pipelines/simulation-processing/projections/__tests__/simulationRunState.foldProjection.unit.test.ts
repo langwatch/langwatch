@@ -333,6 +333,53 @@ describe("simulationRunStateFoldProjection", () => {
     });
   });
 
+  describe("when a finish is re-driven after a second started event", () => {
+    /** @scenario "A re-driven finish keeps the first attempt's metadata" */
+    it("keeps the first started event's metadata and reaches finished with the snapshot's messages", () => {
+      const state = foldEvents([
+        createRunStartedEvent(
+          {
+            metadata: { source: "browser", langwatch: { targetType: "voice" } },
+          },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createRunStartedEvent(
+          {
+            metadata: {
+              source: "provider",
+              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+            },
+          },
+          { id: "event-started-2", occurredAt: 1500 },
+        ),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            reasoning: "done",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      // The first started event's metadata wins: the re-drive does not
+      // overwrite it with the second attempt's fields (#7973).
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.source).toBe("browser");
+      expect(metadata.langwatch).toEqual({ targetType: "voice" });
+      expect(metadata).not.toHaveProperty("audioUrl");
+
+      expect(state.Status).toBe("SUCCESS");
+      expect(state.FinishedAt).toBe(3000);
+      expect(state.Messages).toHaveLength(1);
+      expect(state.Messages[0]?.Role).toBe("user");
+      expect(state.Messages[0]?.Content).toBe("hello");
+    });
+  });
+
   describe("when an event carries secret parameters on its metadata", () => {
     // The queued command puts the encrypted values beside the metadata, not
     // inside it. The started event is the one a caller can shape: the SDK
@@ -615,6 +662,42 @@ describe("simulationRunStateFoldProjection", () => {
       ]);
 
       expect(state.DurationMs).toBeNull();
+    });
+
+    /** @scenario "A finished event may name inconclusive criteria" */
+    it("keeps the criteria the judge could not decide apart, and still unmet", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: ["stays polite"],
+            unmetCriteria: ["names the refund window", "opens a ticket"],
+            inconclusiveCriteria: ["opens a ticket"],
+          },
+        }),
+      ]);
+
+      expect(state.UnmetCriteria).toEqual([
+        "names the refund window",
+        "opens a ticket",
+      ]);
+      expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
+    });
+
+    it("stores no inconclusive criteria when the event names none", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "success",
+            metCriteria: ["a"],
+            unmetCriteria: [],
+          },
+        }),
+      ]);
+
+      expect(state.InconclusiveCriteria).toEqual([]);
     });
 
     it("sets FAILURE status for failure verdict", () => {

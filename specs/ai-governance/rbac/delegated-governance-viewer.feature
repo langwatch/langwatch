@@ -39,16 +39,17 @@ Feature: Delegated governance viewer reaches the Governance pages
     Given sam opens each page the Governance section navigation lists
     Then no page answers with "Access Restricted"
 
+  # The overview used to carry every activity-monitor panel, so it was where a
+  # delegated viewer met the most refusals: one panel named
+  # `activityMonitor:view` and the rest of the page carried on around it. The
+  # panels now live on the pages that own them, so the overview holds nothing
+  # to refuse — which is a stronger answer than naming the grant well.
   @integration @rbac
-  Scenario: The overview names the grant a refused panel needs
+  Scenario: The overview holds nothing a delegated viewer is refused
     Given sam opens the governance overview
-    Then the spend and activity panel names `activityMonitor:view`
-    And the rest of the page still renders
-
-  @integration @rbac
-  Scenario: A panel query is not sent when the viewer cannot read it
-    Given sam opens the governance overview
-    Then no request is made for the activity monitor
+    Then the page renders its heading and its hero
+    And no panel names a missing grant
+    And no request is made for the activity monitor, nor for any other panel
 
   @integration @rbac
   Scenario: Departments offers no controls a viewer cannot use
@@ -67,24 +68,32 @@ Feature: Delegated governance viewer reaches the Governance pages
   @integration @rbac
   Scenario: The sources tab offers no controls a viewer cannot use
     Given sam holds `ingestionSources:view` and not `ingestionSources:manage`
-    When sam opens the inventory page (whose default tab for sam is
-      Sources — sam holds no `aiTools:manage`)
+    When sam opens the inventory page at its Sources tab
     Then there is no control to add a source
     And no source row offers an edit, rotate, or archive control
 
   @integration @rbac
   Scenario: The inventory Catalog pane names its own grant
     Given sam opens the inventory page at its Catalog tab
-    Then the pane names `aiTools:manage`
-    And no tiles editor is rendered
+    Then the pane names `ingestionSources:view`
+    And it does not claim the organization has registered no tools
+    # The pane's grant changed with the pane. It used to be the tile editor
+    # and named `aiTools:manage`; it is now the registered-tools catalog,
+    # built from the source list, so the grant it needs is the source list's.
+    # Naming it matters more than it did for the tiles: an ungated pane would
+    # fall through to its empty state and tell sam the organization runs no
+    # AI at all, which is a confident wrong answer where the honest one is
+    # that sam cannot see.
 
   @regression @rbac
-  Scenario: An org admin still sees every panel on the overview
-    # The panels were re-grouped so a delegated viewer gets the part they
-    # hold. The admin path must be unchanged by that.
+  Scenario: An org admin meets the same overview a delegated viewer does
+    # The panels were re-grouped so a delegated viewer got the part they
+    # hold, and then moved off the overview entirely. This is what says the
+    # admin lost nothing they could still reach elsewhere: the two paths now
+    # meet the same page, and neither reads anything.
     Given alice opens the governance overview
-    Then every panel renders
-    And every panel's read is issued
+    Then the hero and both sections render
+    And no panel is drawn and no read is issued
     And no panel names a missing grant
 
   @regression @rbac

@@ -150,7 +150,7 @@ const runtimeImpl: RuntimeApi = {
 			// URL with no agent behind it turns every send into a hang, and the
 			// forced rollout flag would render the panel. The .env keeps its lines
 			// (they are the user's knobs); only the running processes lose them.
-			delete childEnv.OPENCODE_AGENT_URL;
+			delete childEnv.LANGY_AGENT_URL;
 			const forced = (childEnv.FEATURE_FLAG_FORCE_ENABLE ?? "")
 				.split(",")
 				.map((f) => f.trim())

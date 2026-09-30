@@ -1,0 +1,72 @@
+---
+title: "Data and telemetry: what a self-hosted install sends to LangWatch"
+description: "The two channels a self-hosted install can open to LangWatch, what each one carries, where to read your own copy of the report, and the three switches that stop parts of it or all of it"
+sidebarTitle: Data and telemetry
+keywords: telemetry, usage report, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup
+---
+
+A self-hosted install sends LangWatch one usage report a day, and a licensed install with hosted services also syncs its license once a day. Both carry counts and metadata. Neither carries a trace, a prompt, a dataset row, an evaluation input or output, a project name, a user name, an email address, an IP address or a key.
+
+You can read the exact report your install sends on **Settings, Checkup**, copy it, and switch parts of it off from the same page. This page says what the two channels are, what each carries, and which switch stops what.
+
+<Info>
+**Also check:** [Usage report dictionary](/self-hosting/usage-report-dictionary), [Connect](/self-hosting/connect), [Environment variables](/self-hosting/configuration/environment-variables).
+</Info>
+
+## The two channels
+
+| Channel | Who sends it | Where it goes | What it carries | How to stop it |
+|---|---|---|---|---|
+| Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
+| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | The license token, the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
+
+The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that. Keeping them apart is what lets both sentences stay true.
+
+Both go out over HTTPS on port 443. Behind a forward proxy, set `HTTPS_PROXY` on the app and the workers and the install sends both through it.
+
+## What the usage report is for
+
+The report tells LangWatch that your install exists, which release it runs, how far it got in setting up, and how much it is used. That is what decides which installation path gets attention, which release an upgrade notice reaches, and who to contact when a version you run has a problem.
+
+The company running the install is reported as email domains with counts, for example `acme.com: 14`. Never an address, never a name. The domain is the one field that says who you are, and it is the first one to switch off if you would rather it did not.
+
+## Read your own copy
+
+Open **Settings, Checkup** and scroll to **What this install sends to LangWatch**. The section shows the report your install would send right now, pretty printed, with a copy button and the host it goes to. What you read there is what leaves the install, not a description of it.
+
+From a terminal, `langwatch doctor` prints the same report after the checkup rows:
+
+```bash
+langwatch doctor
+langwatch doctor --format json
+```
+
+The CLI needs a project API key of the install, either from `langwatch login` or in `LANGWATCH_API_KEY`, with `LANGWATCH_ENDPOINT` pointing at your install.
+
+## The three switches
+
+| Switch | Where | What it stops |
+|---|---|---|
+| `DISABLE_USAGE_STATS=true` | Environment, or `app.telemetry.usage.enabled: false` in the chart | The usage report as a whole. No report leaves the install |
+| Usage counts and onboarding dates | **Settings, Checkup** | The optional category: usage counts, onboarding dates, email domains, model provider names. The report keeps the release, the counts of organizations and projects, and the sign-in method |
+| Hostname | **Settings, Checkup** | The `hostname` field alone. It names your own network, so it has a switch of its own |
+
+`LANGWATCH_CONNECT_DISABLED=true` is a fourth switch, for an audit that has to prove absence rather than derive it from the license. With it set the install builds no client and opens no connection to LangWatch for any reason: no hosted service, no license sync, no usage report.
+
+The switches on the Checkup page are stored in the install's own database, so they hold across restarts, upgrades and every browser. Organization management rights are needed to change them; every member can read the report.
+
+## When the report starts
+
+The first report goes out at the next 12:00 UTC after boot, and one a day after that.
+
+## What is never collected
+
+The dictionary page keeps the exact list. In short: no trace or span content, no prompts, no dataset contents, no evaluation inputs or outputs, no project names, no user names, no email addresses, no IP addresses, no keys of any kind.
+
+## Where it lands
+
+The report lands in a database at LangWatch, one row per install and one per report, where the LangWatch team reads it. LangWatch also sends the report to PostHog for analysis and updates the account's traits in Customer.io, both under a data processing agreement. No other party receives it.
+
+## Existing installs
+
+An install on an offline license, upgraded to a release with this page, behaves as before: the same seat cap, the same screens, the same license check with no network on the path, and the usage report going where it always went. The report gains fields with the release, and the switches above are how to trim it.

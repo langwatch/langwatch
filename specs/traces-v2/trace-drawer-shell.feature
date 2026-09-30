@@ -946,6 +946,47 @@ Rule: Deep linking
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DEEP LINKS AND THE PARTITION HINT
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Deep links carry the partition hint
+  A row click writes `drawer.t` with the trace's start time, and every
+  per-trace read prunes ClickHouse partitions by it. A link from an API
+  response, a Slack message or an email used to carry the id alone, so the
+  drawer opened with every read scanning by id across every partition,
+  cold storage included, and sat on a skeleton for seconds.
+
+  @unit
+  Scenario: A trace link built by the platform carries the trace timestamp
+    Given a trace that started at 1714476000000
+    When the platform builds its link
+    Then the link ends in "/traces/<trace id>?t=1714476000000"
+    And a trace with no known start time links to the bare path
+
+  @unit
+  Scenario: The REST trace endpoints link with the timestamp
+    When a trace is read or searched through the REST API
+    Then its platformUrl carries the trace's start time as t
+
+  @unit
+  Scenario: Notification links carry the timestamp
+    When a trigger posts to Slack or a report lists a trace
+    Then the trace link carries the trace's start time as t
+
+  @integration
+  Scenario: The short link forwards the timestamp to the drawer
+    When the user opens "/<project>/traces/<trace id>?t=1714476000000"
+    Then the redirect opens the drawer with `drawer.t=1714476000000`
+    And a t that is not a positive whole number is dropped
+
+  @unit
+  Scenario: Sibling reads wait for the partition hint on a deep link
+    Given the drawer opened from a link with no t
+    Then the header read runs without the hint and backfills it from its result
+    And the span tree, events, signals, full spans and span detail reads wait for the hint
+    And they run once the hint is known
+
+# ─────────────────────────────────────────────────────────────────────────────
 # RESPONSIVE BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 

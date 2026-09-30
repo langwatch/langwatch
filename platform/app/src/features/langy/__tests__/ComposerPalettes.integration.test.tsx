@@ -16,6 +16,22 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Boundary mocks for the palette's flag gate: the skills palette now reads
+// the project/org context and the playground flag to decide which skills to
+// show. Both hooks reach tRPC, which this tree mounts no provider for; the
+// palette's rendering (not the flag's resolution) is what these tests pin, so
+// the gate resolves to its off/default shape — the pre-playground skill set.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "p_demo" },
+    organization: { id: "o_demo" },
+  }),
+}));
+
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false }),
+}));
+
 vi.mock("~/components/ModelSelector", () => ({
   ModelSelector: ({ model }: { model: string }) => (
     <div data-testid="model-selector">{model}</div>

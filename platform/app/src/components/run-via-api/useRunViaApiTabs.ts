@@ -2,7 +2,7 @@
  * Shared state + tab assembly for the Run via API dialog.
  *
  * Owns the selected data source and turns a snippet builder into the ordered
- * language tabs the dialog renders (Python first, then TypeScript, then Shell).
+ * language tabs the dialog renders (Python first, then TypeScript, Go, Shell).
  * Returns state and callbacks only, never JSX, so both the workflow and the
  * experiment buttons can reuse it.
  */
@@ -18,10 +18,11 @@ interface LangTabSpec {
   language: PrismLanguage;
 }
 
-/** Tab order is fixed: Python default, then TypeScript, then Shell. */
+/** Tab order is fixed: Python default, then TypeScript, then Go, then Shell. */
 const LANG_TABS: LangTabSpec[] = [
   { value: "python", label: "Python", language: "python" },
   { value: "typescript", label: "TypeScript", language: "typescript" },
+  { value: "go", label: "Go", language: "go" },
   { value: "shell", label: "Shell", language: "bash" },
 ];
 

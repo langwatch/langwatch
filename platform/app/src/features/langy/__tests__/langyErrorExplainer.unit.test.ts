@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   explainLangyError,
+  isLangyConversationPending,
   isStaleLangyHistoryRead,
   KNOWN_LANGY_ERROR_KINDS,
+  LANGY_CONVERSATION_PENDING_GRACE_MS,
   type LangyDomainError,
   readLangyStreamError,
   resolveLiveTurnError,
@@ -144,7 +146,40 @@ describe("explainLangyError", () => {
 
         expect(presentation.kind).toBe("llm_upstream_error");
         expect(presentation.description).toBe(
-          "The model provider is rate-limiting these calls. Wait a moment and try again.",
+          "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+
+      /** @scenario A rate limit filed under the provider's own code reads the same way */
+      it("reads the proxy's own upstream code with the provider's rate limit discriminant beneath it", () => {
+        // The chain the proxy records for a provider-native 429 body: its own
+        // code with the provider's discriminant as the one reason, and no
+        // upstream status reason at all.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: {
+                  http_status: 429,
+                  provider: "azure",
+                  body_kind: "json",
+                },
+                reasons: [{ kind: "rate_limit_exceeded" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.description).toBe(
+          "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.",
         );
         expect(presentation.action).toEqual({
           label: "Try again",
@@ -741,5 +776,70 @@ describe("resolveLiveTurnError", () => {
         expect(domain.meta).toEqual({});
       });
     });
+  });
+});
+
+describe("given the platform could not read the conversation back", () => {
+  /** @scenario "A platform failure to read the conversation is never told as Langy being slow" */
+  it("says the read failed in the shared words, with a retry, and never blames Langy", () => {
+    const presentation = explainLangyError(
+      domain({ code: "clickhouse_unavailable", httpStatus: 500 }),
+    );
+
+    expect(presentation.title).toBe("This could not be loaded right now");
+    expect(presentation.description).toContain("Try again in a moment");
+    expect(presentation.render).toBe("card");
+    expect(presentation.action).toEqual({ label: "Try again", kind: "retry" });
+    expect(`${presentation.title} ${presentation.description}`).not.toContain(
+      "Langy",
+    );
+  });
+});
+
+describe("isLangyConversationPending", () => {
+  /** @scenario "A conversation that was never created stops reading as one on its way" */
+  it("counts a fresh not-found as the record lagging, until the grace runs out", () => {
+    expect(
+      isLangyConversationPending({
+        code: "langy_conversation_not_found",
+        unconfirmed: true,
+        graceIsOver: false,
+      }),
+    ).toBe(true);
+    expect(
+      isLangyConversationPending({
+        code: "langy_conversation_not_found",
+        unconfirmed: true,
+        graceIsOver: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("never reads a confirmed conversation, or another failure, as lagging", () => {
+    expect(
+      isLangyConversationPending({
+        code: "langy_conversation_not_found",
+        unconfirmed: false,
+        graceIsOver: false,
+      }),
+    ).toBe(false);
+    expect(
+      isLangyConversationPending({
+        code: "langy_conversation_not_owned",
+        unconfirmed: true,
+        graceIsOver: false,
+      }),
+    ).toBe(false);
+    expect(
+      isLangyConversationPending({
+        code: undefined,
+        unconfirmed: true,
+        graceIsOver: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("waits twenty seconds before a missing conversation stops reading as lagging", () => {
+    expect(LANGY_CONVERSATION_PENDING_GRACE_MS).toBe(20_000);
   });
 });

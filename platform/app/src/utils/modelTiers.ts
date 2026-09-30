@@ -1,11 +1,24 @@
 /**
  * Model id tier grammar and version ranking, shared by the server-side
  * latest-alias resolver (`server/modelProviders/latestAliases.ts`) and
- * the client-side provider-drawer picker (`utils/pickFlagshipModel.ts`)
- * so the model the drawer pre-fills is the model the org seed writes.
+ * every surface that pre-fills a "recommended" chat model, so the model a
+ * picker shows is the model the org seed writes.
  *
- * Kept free of any catalog import: the client bundle must not pull in
- * `llmModels.json`.
+ * Kept free of any catalog import: this module only knows how to read an
+ * id, the catalog walk lives with the resolver.
+ *
+ * Each provider gets two allow-listed tiers, read from the id alone:
+ *
+ *   - "main": the newest general-purpose model of the line the provider
+ *     positions for everyday serious work. Not the top tier (the premium
+ *     priced one: GPT-6 Astra, GPT-5.6 Sol, Claude Fable, Gemini Pro) and
+ *     not the small one.
+ *   - "fast": the cost-efficient tier below it (GPT-5.6 Luna, Claude
+ *     Sonnet, Gemini Flash Lite, DeepSeek Flash).
+ *
+ * Everything outside the two lists never ranks: the top tier, `-pro`
+ * serving modes, nano and haiku, codex, chat, image, audio and vision
+ * spin-offs, dated snapshots, experimental builds and `:batch` lanes.
  */
 
 /** Newest-first sort key. `rank` breaks ties inside one generation. */
@@ -22,61 +35,131 @@ export function compareModelSortKeys(a: ModelSortKey, b: ModelSortKey): number {
   );
 }
 
-export type OpenAIVariant = "flagship" | "mini";
+export type ModelVariant = "main" | "fast";
+
+/** The generation and tier read from one model id. */
+interface ParsedModelId {
+  major: number;
+  minor: number;
+  tier: string;
+}
 
 /**
- * OpenAI's flagship tiers, newest naming last.
- *
- * Through GPT-5.5 a generation's flagship was its unsuffixed id
- * (`gpt-5.5`). GPT-5.6 replaced that with named tiers and ships no
- * unsuffixed id at all, so matching on "no suffix" alone finds nothing
- * in the newer generation and the alias silently keeps serving GPT-5.5.
- *
- * The number is a tiebreak used only when one generation offers both
- * spellings; the named tier wins.
+ * One provider's id grammar. `parse` reads the generation and the tier
+ * word; the two maps say which tier words belong to which variant and
+ * how they rank against each other inside one generation (higher wins).
  */
-export const OPENAI_FLAGSHIP_TIERS: Record<string, number> = {
-  "": 0,
-  sol: 1,
+interface ProviderTierGrammar {
+  parse: (id: string) => ParsedModelId | null;
+  main: Record<string, number>;
+  fast: Record<string, number>;
+}
+
+const version = (major: string, minor: string | undefined): ParsedModelId => ({
+  major: Number(major),
+  minor: minor === undefined ? 0 : Number(minor),
+  tier: "",
+});
+
+/**
+ * OpenAI: `gpt-<major>[.<minor>][-<tier>]`.
+ *
+ * Through GPT-5.5 a generation's general-purpose model was its unsuffixed
+ * id (`gpt-5.5`) and the fast tier carried `-mini`. GPT-5.6 ships named
+ * tiers and no unsuffixed id at all: Sol on top, Terra in the middle,
+ * Luna as the fast tier. GPT-6 so far ships only Astra, priced as a top
+ * tier, so it ranks nowhere and the main tier stays on GPT-5.6 Terra
+ * until GPT-6 ships its middle tier. The number is a tiebreak used only
+ * when one generation offers both spellings; the named tier wins.
+ */
+const OPENAI: ProviderTierGrammar = {
+  parse: (id) => {
+    const m = /^openai\/gpt-(\d+)(?:\.(\d+))?(?:-([a-z0-9-]+))?$/.exec(id);
+    if (!m) return null;
+    return { ...version(m[1]!, m[2]), tier: m[3] ?? "" };
+  },
+  main: { "": 0, terra: 1 },
+  fast: { mini: 0, luna: 1 },
 };
 
 /**
- * OpenAI's fast tiers, the counterpart for `latest-mini`. GPT-5.6 calls
- * this tier Luna; earlier generations called it `-mini`.
+ * Anthropic: `claude-<tier>-<major>[-<minor>]`. Opus is the main tier,
+ * Sonnet the fast one; Fable sits above Opus and Haiku below Sonnet, so
+ * neither is an alias target. A generation without a minor (`claude-opus-5`)
+ * is that generation's first release and outranks every `-4-x`.
  */
-export const OPENAI_FAST_TIERS: Record<string, number> = {
-  mini: 0,
-  luna: 1,
+const ANTHROPIC: ProviderTierGrammar = {
+  parse: (id) => {
+    const m = /^anthropic\/claude-([a-z]+)-(\d+)(?:-(\d+))?$/.exec(id);
+    if (!m) return null;
+    return { ...version(m[2]!, m[3]), tier: m[1]! };
+  },
+  main: { opus: 0 },
+  fast: { sonnet: 0 },
 };
 
-const OPENAI_CHAT_ID = /^openai\/gpt-(\d+)\.(\d+)(-[a-z0-9-]+)?$/;
+/**
+ * Gemini: `gemini-<major>[.<minor>]-<tier>`. Flash is the main tier and
+ * Flash Lite the fast one; Pro is the top tier. A preview ranks below the
+ * release of the same generation. Image, audio and custom-tools variants
+ * carry another tier word and never rank.
+ */
+const GEMINI: ProviderTierGrammar = {
+  parse: (id) => {
+    const m = /^gemini\/gemini-(\d+)(?:\.(\d+))?-([a-z-]+)$/.exec(id);
+    if (!m) return null;
+    return { ...version(m[1]!, m[2]), tier: m[3]! };
+  },
+  main: { "flash-preview": 0, flash: 1 },
+  fast: { "flash-lite-preview": 0, "flash-lite": 1 },
+};
 
 /**
- * Ranks an OpenAI chat model id for the requested variant, or returns
- * null when the id is not a member of that variant's tier.
- *
- * Both tier maps are allow-lists, which is what keeps everything that
- * is not a general-purpose chat tier out of role defaults: `-pro`
- * serving modes (the same model at higher reasoning effort, priced for
- * hard one-off problems rather than every assistive call), `nano`,
- * `codex`, `chat` and the image spin-offs. `terra` is deliberately
- * absent too: a balanced middle tier answers neither "most capable"
- * nor "fastest", so it stays explicitly selectable without ever being
- * picked automatically.
+ * DeepSeek: `deepseek-v<major>[.<minor>][-<tier>]`. V4 names its tiers
+ * Pro (main) and Flash (fast); V3 shipped one unsuffixed model per
+ * release. Dated snapshots (`-pro-0813`), experimental builds (`-exp`),
+ * vision variants and the older `deepseek-chat` / `deepseek-r1` ids do not
+ * fit the grammar and never rank.
  */
-export function rankOpenAIChatModel({
+const DEEPSEEK: ProviderTierGrammar = {
+  parse: (id) => {
+    const m = /^deepseek\/deepseek-v(\d+)(?:\.(\d+))?(?:-([a-z]+))?$/.exec(id);
+    if (!m) return null;
+    return { ...version(m[1]!, m[2]), tier: m[3] ?? "" };
+  },
+  main: { "": 0, pro: 1 },
+  fast: { flash: 0 },
+};
+
+const GRAMMARS: Record<string, ProviderTierGrammar> = {
+  openai: OPENAI,
+  anthropic: ANTHROPIC,
+  gemini: GEMINI,
+  deepseek: DEEPSEEK,
+};
+
+/** The providers whose ids the ranking knows how to read. */
+export const TIERED_PROVIDERS = Object.keys(GRAMMARS);
+
+/**
+ * Ranks a chat model id for the requested variant of its provider, or
+ * returns null when the id is not a member of that variant's tier, or the
+ * provider has no grammar.
+ */
+export function rankChatModel({
   id,
+  provider,
   variant,
 }: {
   id: string;
-  variant: OpenAIVariant;
+  provider: string;
+  variant: ModelVariant;
 }): ModelSortKey | null {
-  const match = OPENAI_CHAT_ID.exec(id);
-  if (!match) return null;
-  const tier = match[3]?.slice(1) ?? "";
-  const tiers =
-    variant === "flagship" ? OPENAI_FLAGSHIP_TIERS : OPENAI_FAST_TIERS;
-  const rank = tiers[tier];
+  const grammar = GRAMMARS[provider];
+  if (!grammar) return null;
+  const parsed = grammar.parse(id);
+  if (!parsed) return null;
+  const rank = grammar[variant][parsed.tier];
   if (rank === undefined) return null;
-  return { major: Number(match[1]), minor: Number(match[2]), rank };
+  return { major: parsed.major, minor: parsed.minor, rank };
 }

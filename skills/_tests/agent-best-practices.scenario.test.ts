@@ -1,4 +1,4 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -8,8 +8,6 @@ import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
@@ -65,7 +63,6 @@ describe("Agent Best Practices Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "agent-best-practices");
           },
           scenario.judge(),

@@ -1,5 +1,6 @@
 import type { TagToken } from "liqe";
 import { FilterParseError } from "../errors";
+import type { ResolvedInstantEvalRun } from "./instant-eval-field";
 
 export const MAX_VALUE_LENGTH = 500;
 export const MAX_ATTRIBUTE_KEY_LENGTH = 256;
@@ -39,6 +40,11 @@ export interface TranslationContext {
   params: Record<string, unknown>;
   tenantId: string;
   timeRange: { from: number; to: number };
+  /**
+   * The Instant Eval runs the caller registered for its `eval` chips, already
+   * checked against the project. Absent when the query carries no such chip.
+   */
+  evalRuns?: readonly ResolvedInstantEvalRun[];
 }
 
 export type FieldHandler = (

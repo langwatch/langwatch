@@ -8,8 +8,14 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { Protections } from "../../../../traces/protections";
+import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
+import { lwqlAllowedTables, lwqlGatedColumns } from "../../catalog/types";
 import { type LangWatchQLValidation, validateLangWatchQL } from "../validate";
-import type { LangWatchQLViolationCode } from "../violations";
+import {
+  type LangWatchQLViolationCode,
+  LWQL_VIOLATION_CODES,
+} from "../violations";
 
 /** A catalog with one restricted field, which is the interesting configuration. */
 const POLICY = {
@@ -28,6 +34,7 @@ function validate(
     gatedColumns: readonly string[];
     defaultDatabase?: string;
     limits?: { maxSubqueryDepth: number; maxNodeDepth: number };
+    viewColumns?: Readonly<Record<string, readonly string[]>>;
   } = POLICY,
 ): LangWatchQLValidation {
   return validateLangWatchQL({ sql, ...policy });
@@ -72,7 +79,7 @@ describe("validateLangWatchQL", () => {
       ],
       [
         "a UNION ALL",
-        "SELECT TraceId FROM traces UNION ALL SELECT TraceId FROM spans",
+        "SELECT TraceId FROM traces LIMIT 10 UNION ALL SELECT TraceId FROM spans LIMIT 10",
       ],
       [
         "a join on an equality key",
@@ -432,6 +439,219 @@ describe("validateLangWatchQL", () => {
     });
   });
 
+  /**
+   * A column set does not become resolvable by being wrapped in a function or
+   * buried in a clause, so the gate refuses it wherever it appears — not only as
+   * a direct projection element. The one exemption is a bare `count(*)`, where
+   * the star names a row count and reveals no column.
+   */
+  describe("given a column set outside the projection", () => {
+    const regexPositions: ReadonlyArray<[string, (matcher: string) => string]> =
+      [
+        [
+          "a function argument",
+          (m) => `SELECT toString(${m}) FROM traces AS t`,
+        ],
+        ["WHERE", (m) => `SELECT t.TraceId FROM traces AS t WHERE ${m} = 1`],
+        ["GROUP BY", (m) => `SELECT count() FROM traces AS t GROUP BY ${m}`],
+        [
+          "HAVING",
+          (m) =>
+            `SELECT t.TraceId, count() AS n FROM traces AS t GROUP BY t.TraceId HAVING ${m} > 0`,
+        ],
+        ["ORDER BY", (m) => `SELECT t.TraceId FROM traces AS t ORDER BY ${m}`],
+        [
+          "LIMIT BY",
+          (m) =>
+            `SELECT t.TraceId FROM traces AS t ORDER BY t.TraceId LIMIT 1 BY ${m}`,
+        ],
+        [
+          "JOIN ON",
+          (m) =>
+            `SELECT t.TraceId FROM traces AS t JOIN spans AS s ON ${m} = s.TraceId`,
+        ],
+        [
+          "a window PARTITION BY",
+          (m) => `SELECT count() OVER (PARTITION BY ${m}) FROM traces AS t`,
+        ],
+        [
+          "a lambda body",
+          (m) => `SELECT arrayMap(x -> toString(${m}), [1]) FROM traces AS t`,
+        ],
+        [
+          "a CTE body",
+          (m) =>
+            `WITH c AS (SELECT ${m} FROM traces AS t) SELECT TraceId FROM c`,
+        ],
+        [
+          "a subquery",
+          (m) =>
+            `SELECT TraceId FROM traces WHERE TraceId IN (SELECT ${m} FROM spans AS t)`,
+        ],
+        [
+          "a UNION ALL branch",
+          (m) =>
+            `SELECT TraceId FROM traces LIMIT 10 UNION ALL SELECT ${m} FROM spans AS t LIMIT 10`,
+        ],
+      ];
+    const regexMatchers = ["COLUMNS('^Trace')", "t.COLUMNS('^Trace')"];
+    const regexCases: Array<[string, string]> = regexPositions.flatMap(
+      ([where, build]) =>
+        regexMatchers.map((matcher): [string, string] => [
+          `${matcher} in ${where}`,
+          build(matcher),
+        ]),
+    );
+
+    /** @scenario "A regular-expression column set is refused wherever it appears" */
+    it.each(regexCases)("refuses %s", (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
+    });
+
+    const wildcardCases: Array<[string, string]> = [
+      ["tuple(*)", "SELECT tuple(*) FROM traces"],
+      [
+        "tupleElement(tuple(*), 1)",
+        "SELECT tupleElement(tuple(*), 1) FROM traces",
+      ],
+      ["tuple(t.*)", "SELECT tuple(t.*) FROM traces AS t"],
+      [
+        "tuple(* EXCEPT (TraceId))",
+        "SELECT tuple(* EXCEPT (TraceId)) FROM traces",
+      ],
+      [
+        "tuple(* REPLACE (1 AS TraceId))",
+        "SELECT tuple(* REPLACE (1 AS TraceId)) FROM traces",
+      ],
+      ["toString(*)", "SELECT toString(*) FROM traces"],
+      [
+        "concat('', COLUMNS('^Trace'))",
+        "SELECT concat('', COLUMNS('^Trace')) FROM traces",
+      ],
+      ["GROUP BY *", "SELECT count() FROM traces GROUP BY *"],
+      ["ORDER BY t.*", "SELECT t.TraceId FROM traces AS t ORDER BY t.*"],
+      ["* APPLY (toString)", "SELECT * APPLY (toString) FROM traces"],
+      [
+        "COLUMNS('^Trace') APPLY (toString)",
+        "SELECT COLUMNS('^Trace') APPLY (toString) FROM traces",
+      ],
+      [
+        "a named WINDOW partitioned by a matcher",
+        "SELECT count(*) OVER w FROM traces WINDOW w AS (PARTITION BY COLUMNS('^bo'))",
+      ],
+      [
+        "COLUMNS('body', 'TraceId') with string-literal members",
+        "SELECT COLUMNS('body', 'TraceId') FROM traces",
+      ],
+      [
+        "t.COLUMNS('body', 'TraceId') with string-literal members",
+        "SELECT t.COLUMNS('body', 'TraceId') FROM traces AS t",
+      ],
+      [
+        "COLUMNS(TraceId, 'body') with a mixed member list",
+        "SELECT COLUMNS(TraceId, 'body') FROM traces",
+      ],
+    ];
+
+    /** @scenario "A wildcard is refused inside functions and in non-projection clauses" */
+    it.each(wildcardCases)("refuses %s", (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
+    });
+
+    /** @scenario "Only a bare star as the sole argument of count stays exempt" */
+    it.each([
+      ["count(*)", "SELECT count(*) FROM traces"],
+      ["count()", "SELECT count() FROM traces"],
+      ["count(*) OVER ()", "SELECT count(*) OVER () FROM traces"],
+    ])("accepts %s as a row count", (_case, sql) => {
+      expect(codesOf(validate(sql))).toEqual([]);
+    });
+
+    /** @scenario "Only a bare star as the sole argument of count stays exempt" */
+    it.each([
+      ["count(t.*)", "SELECT count(t.*) FROM traces AS t"],
+      ["count(DISTINCT *)", "SELECT count(DISTINCT *) FROM traces"],
+      [
+        "count(* EXCEPT (TraceId))",
+        "SELECT count(* EXCEPT (TraceId)) FROM traces",
+      ],
+      ["count(*, TraceId)", "SELECT count(*, TraceId) FROM traces"],
+      ["sum(*)", "SELECT sum(*) FROM traces"],
+      ["count(tuple(*))", "SELECT count(tuple(*)) FROM traces"],
+      [
+        "count(*) OVER (PARTITION BY COLUMNS('^bo'))",
+        "SELECT count(*) OVER (PARTITION BY COLUMNS('^bo')) FROM traces",
+      ],
+      [
+        "count(*) OVER (PARTITION BY *)",
+        "SELECT count(*) OVER (PARTITION BY *) FROM traces",
+      ],
+    ])("refuses %s", (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
+    });
+
+    /** @scenario "A caller with nothing withheld keeps every column-set shape" */
+    it.each([
+      ...regexCases,
+      ...wildcardCases,
+    ])("accepts %s when the caller has no restricted fields", (_case, sql) => {
+      expect(codesOf(validate(sql, UNGATED_POLICY))).toEqual([]);
+    });
+
+    /** @scenario "A qualified path through a gated column is refused" */
+    it.each([
+      [
+        "a subfield of the gated column",
+        "SELECT TraceId, body.null FROM traces",
+      ],
+      [
+        "a table-qualified path through it",
+        "SELECT traces.body.null FROM traces",
+      ],
+    ])("refuses %s", (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("GATED_COLUMN");
+    });
+
+    /** @scenario "A qualified path through a gated column is refused" */
+    it.each([
+      [
+        "a subfield of the gated column",
+        "SELECT TraceId, body.null FROM traces",
+      ],
+      [
+        "a table-qualified path through it",
+        "SELECT traces.body.null FROM traces",
+      ],
+      [
+        "an alias-qualified path through it",
+        "SELECT t.body.null FROM traces AS t",
+      ],
+    ])("still names the view and its usable columns for %s", (_case, sql) => {
+      const result = validate(sql, {
+        ...POLICY,
+        viewColumns: { "analytics.traces": ["TraceId", "Cost", "body"] },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.view).toBe("analytics.traces");
+      expect(violation?.availableColumns).toEqual(["Cost", "TraceId"]);
+    });
+
+    /** @scenario "A COLUMNS() list that names every member is gated member by member" */
+    it("accepts COLUMNS(TraceId) and refuses COLUMNS(body) by the named field", () => {
+      expect(codesOf(validate("SELECT COLUMNS(TraceId) FROM traces"))).toEqual(
+        [],
+      );
+      expect(codesOf(validate("SELECT COLUMNS(body) FROM traces"))).toEqual([
+        "GATED_COLUMN",
+      ]);
+    });
+  });
+
   describe("given nesting past the configured depth", () => {
     const limitedTo = (maxSubqueryDepth: number) => ({
       ...UNGATED_POLICY,
@@ -491,6 +711,233 @@ describe("validateLangWatchQL", () => {
     });
   });
 
+  describe("given a violation whose refusal should name what exists", () => {
+    /** @scenario "A TABLE_NOT_ALLOWED violation names the views that exist" */
+    it("lists the caller's allowed views on an unknown view", () => {
+      const result = validate("SELECT id FROM billing.invoices");
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "TABLE_NOT_ALLOWED",
+      );
+      expect(violation?.availableViews).toEqual([
+        "analytics.spans",
+        "analytics.traces",
+      ]);
+    });
+
+    /** @scenario "A TABLE_NOT_ALLOWED violation names the views that exist" */
+    it("sorts and deduplicates availableViews regardless of the policy's own order", () => {
+      const result = validate("SELECT id FROM billing.invoices", {
+        allowedTables: [
+          "analytics.traces",
+          "analytics.spans",
+          "analytics.traces",
+        ],
+        gatedColumns: [],
+        defaultDatabase: "analytics",
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "TABLE_NOT_ALLOWED",
+      );
+      expect(violation?.availableViews).toEqual([
+        "analytics.spans",
+        "analytics.traces",
+      ]);
+    });
+
+    /**
+     * The bound-parameter TABLE_NOT_ALLOWED names no view to correct — it
+     * still gets a hint, but never a stale/irrelevant view list.
+     */
+    it("omits availableViews when no view name was written", () => {
+      const result = validate("SELECT id FROM {which:Identifier}");
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "TABLE_NOT_ALLOWED",
+      );
+      expect(violation?.availableViews).toBeUndefined();
+      expect(violation?.hint).toBeTruthy();
+    });
+
+    /** @scenario "A GATED_COLUMN violation names the view's columns" */
+    it("names the view and its columns on a gated field read through an alias", () => {
+      const result = validate("SELECT t.body FROM traces AS t", {
+        ...POLICY,
+        viewColumns: {
+          "analytics.traces": ["TraceId", "Cost", "body"],
+        },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.view).toBe("analytics.traces");
+      // The gated field is not offered back as a suggestion.
+      expect(violation?.availableColumns).toEqual(["Cost", "TraceId"]);
+    });
+
+    /** @scenario "A GATED_COLUMN violation names the view's columns" */
+    it("resolves the view from the sole table in scope when the reference is unqualified", () => {
+      const result = validate("SELECT body FROM traces", {
+        ...POLICY,
+        viewColumns: { "analytics.traces": ["TraceId", "body"] },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.view).toBe("analytics.traces");
+    });
+
+    it("does not guess a view for an unqualified gated field with two tables in scope", () => {
+      const result = validate(
+        "SELECT body FROM traces JOIN spans ON traces.TraceId = spans.TraceId",
+        { ...POLICY, viewColumns: { "analytics.traces": ["body"] } },
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.view).toBeUndefined();
+      expect(violation?.availableColumns).toBeUndefined();
+      // Still not left with nothing to act on.
+      expect(violation?.hint).toBeTruthy();
+    });
+
+    it("omits availableColumns when the policy carries no column data for the view", () => {
+      const result = validate("SELECT body FROM traces");
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "GATED_COLUMN",
+      );
+      expect(violation?.view).toBe("analytics.traces");
+      expect(violation?.availableColumns).toBeUndefined();
+    });
+
+    /**
+     * One SQL text per violation code, driven through the real validator —
+     * the exhaustiveness this asserts is that every code a real query can
+     * trigger comes back with a hint, not that the internal lookup table
+     * happens to have every key (which the compiler already guarantees: it
+     * types that table as `Record<LangWatchQLViolationCode, string>`).
+     */
+    /** @scenario "Every violation carries a corrective hint" */
+    it.each([
+      ["EMPTY_QUERY", ""],
+      ["PARSE_FAILED", "SELECT FROM WHERE (("],
+      [
+        "MULTIPLE_STATEMENTS",
+        "SELECT TraceId FROM traces; SELECT TraceId FROM spans",
+      ],
+      ["STATEMENT_NOT_ALLOWED", "INSERT INTO traces VALUES (1)"],
+      [
+        "SETTINGS_CLAUSE",
+        "SELECT TraceId FROM traces SETTINGS max_threads = 1",
+      ],
+      ["OUTPUT_CLAUSE", "SELECT TraceId FROM traces FORMAT JSON"],
+      ["SCHEMA_NOT_ALLOWED", "SELECT * FROM system.tables"],
+      ["TABLE_NOT_ALLOWED", "SELECT id FROM billing.invoices"],
+      ["TABLE_FUNCTION", "SELECT * FROM url('http://x', CSV)"],
+      ["FUNCTION_NOT_ALLOWED", "SELECT unsupportedFn(TraceId) FROM traces"],
+      ["GATED_COLUMN", "SELECT body FROM traces"],
+      ["WILDCARD_NOT_ALLOWED", "SELECT * FROM traces"],
+      ["LIMIT_TOO_HIGH", "SELECT TraceId FROM traces LIMIT 10001"],
+      ["NESTING_TOO_DEEP", "SELECT ((((((TraceId)))))) FROM traces"],
+      ["UNSUPPORTED_SYNTAX", "SELECT TraceId FROM traces PASTE JOIN spans"],
+      [
+        "APP_FUNCTION_POSITION",
+        "SELECT TraceId FROM traces WHERE thread_traces(ConversationId) = 'x'",
+      ],
+      [
+        "APP_FUNCTION_NAME_CASE",
+        "SELECT THREAD_TRACES(ConversationId) AS ids FROM traces",
+      ],
+      [
+        "APP_FUNCTION_ALIAS_REQUIRED",
+        "SELECT thread_traces(ConversationId) FROM traces",
+      ],
+      ["APP_FUNCTION_ARGUMENT", "SELECT thread_traces() AS ids FROM traces"],
+      [
+        "APP_FUNCTION_GATED",
+        "SELECT conversation(ConversationId) AS transcript FROM traces",
+      ],
+    ] as [
+      LangWatchQLViolationCode,
+      string,
+    ][])("names a hint for %s", (code, sql) => {
+      const policy =
+        code === "NESTING_TOO_DEEP"
+          ? {
+              ...UNGATED_POLICY,
+              limits: { maxSubqueryDepth: 8, maxNodeDepth: 4 },
+            }
+          : POLICY;
+      const result = validate(sql, policy);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find((entry) => entry.code === code);
+      expect(violation, code).toBeDefined();
+      expect(violation?.hint, code).toBeTruthy();
+    });
+
+    /** Belt-and-suspenders: every code named by the type is covered above. */
+    it("covers every violation code with a hint case", () => {
+      const covered = new Set<LangWatchQLViolationCode>([
+        "EMPTY_QUERY",
+        "PARSE_FAILED",
+        "MULTIPLE_STATEMENTS",
+        "STATEMENT_NOT_ALLOWED",
+        "SETTINGS_CLAUSE",
+        "OUTPUT_CLAUSE",
+        "SCHEMA_NOT_ALLOWED",
+        "TABLE_NOT_ALLOWED",
+        "TABLE_FUNCTION",
+        "FUNCTION_NOT_ALLOWED",
+        "GATED_COLUMN",
+        "WILDCARD_NOT_ALLOWED",
+        "LIMIT_TOO_HIGH",
+        "LIMIT_REQUIRED_PER_BRANCH",
+        "NESTING_TOO_DEEP",
+        "UNSUPPORTED_SYNTAX",
+        "APP_FUNCTION_POSITION",
+        "APP_FUNCTION_NAME_CASE",
+        "APP_FUNCTION_ALIAS_REQUIRED",
+        "APP_FUNCTION_ARGUMENT",
+        "APP_FUNCTION_GATED",
+      ]);
+      expect([...covered].sort()).toEqual([...LWQL_VIOLATION_CODES].sort());
+    });
+
+    /** @scenario "Every violation carries a corrective hint" */
+    it("carries a hint alongside FUNCTION_NOT_ALLOWED's allowedFunctions, not instead of it", () => {
+      const result = validate("SELECT unsupportedFn(TraceId) FROM traces");
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const violation = result.violations.find(
+        (entry) => entry.code === "FUNCTION_NOT_ALLOWED",
+      );
+      expect(violation?.hint).toBeTruthy();
+      expect(violation?.allowedFunctions).toBeDefined();
+    });
+  });
+
   describe("given a query that breaks several rules at once", () => {
     it("reports each of them, so one round trip is enough to fix it", () => {
       const result = validate(
@@ -519,7 +966,7 @@ describe("validateLangWatchQL", () => {
       return result.blocks;
     };
 
-    it("records the datasets a block reads, with the aliases it gave them", () => {
+    it("records the views a block reads, with the aliases it gave them", () => {
       expect(
         blocksOf(
           "SELECT t.TraceId FROM traces AS t JOIN analytics.spans AS s ON t.TraceId = s.TraceId",
@@ -560,7 +1007,7 @@ describe("validateLangWatchQL", () => {
     /**
      * An equality that only holds on one arm of an `OR` is not a key the join
      * matched on, and neither is one over a computed value. Recording either
-     * would tell a fanout rule two datasets line up when they may not.
+     * would tell a fanout rule two views line up when they may not.
      */
     it.each([
       [
@@ -649,10 +1096,167 @@ describe("validateLangWatchQL", () => {
 
     it("gives each branch of a UNION its own block", () => {
       const blocks = blocksOf(
-        "SELECT TraceId FROM traces UNION ALL SELECT count() FROM spans",
+        "SELECT TraceId FROM traces LIMIT 10 UNION ALL SELECT count() FROM spans LIMIT 10",
       );
 
       expect(blocks.map((block) => block.isAggregated)).toEqual([false, true]);
+    });
+  });
+
+  describe("given the row cap on what one request returns", () => {
+    /** @scenario "A statement with no LIMIT is capped at the row ceiling" */
+    it("flags a statement that names no LIMIT for the default cap to be appended", () => {
+      const result = validate("SELECT TraceId FROM traces WHERE Cost > 1");
+      expect(result.ok && result.appendRowLimit).toBe(true);
+    });
+
+    it("leaves a statement that already names a LIMIT alone", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 20");
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("leaves a statement that pages with OFFSET alone", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces ORDER BY TraceId LIMIT 20 OFFSET 40",
+      );
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("accepts a LIMIT at exactly the cap without flagging an append", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 10000");
+      expect(codesOf(result)).toEqual([]);
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    /** @scenario "A LIMIT above the ceiling is refused before the query runs" */
+    it("refuses a LIMIT above the cap, naming the cap and how to page", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 10001");
+      expect(codesOf(result)).toEqual(["LIMIT_TOO_HIGH"]);
+      const violation = !result.ok
+        ? result.violations.find((v) => v.code === "LIMIT_TOO_HIGH")
+        : undefined;
+      expect(violation?.maxRows).toBe(10000);
+      expect(violation?.clause).toBe("limit");
+      expect(violation?.hint).toMatch(/LIMIT\/OFFSET/);
+    });
+
+    it("does not refuse a LIMIT whose value is a bound parameter", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT {n:UInt32}");
+      expect(codesOf(result)).toEqual([]);
+      // A dynamic LIMIT is treated as present, so the default cap is not appended.
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("refuses a UNION branch whose own LIMIT is over the cap", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT 5 " +
+          "UNION ALL SELECT TraceId FROM spans LIMIT 99999",
+      );
+      expect(codesOf(result)).toEqual(["LIMIT_TOO_HIGH"]);
+    });
+
+    /** @scenario "An OFFSET with no LIMIT is still unbounded" */
+    it("flags a statement that names only OFFSET for the default cap to be appended", () => {
+      const result = validate("SELECT TraceId FROM traces OFFSET 40");
+      expect(codesOf(result)).toEqual([]);
+      expect(result.ok && result.appendRowLimit).toBe(true);
+      expect(result.ok && result.appendRowLimitBeforeOffset).toBeDefined();
+    });
+
+    it("accepts the offset,count form of LIMIT as an explicit LIMIT", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 5, 10");
+      expect(codesOf(result)).toEqual([]);
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("refuses the offset,count form when the count is over the cap", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 5, 99999");
+      expect(codesOf(result)).toEqual(["LIMIT_TOO_HIGH"]);
+    });
+
+    it("flags a statement that names only LIMIT BY for the default cap to be appended", () => {
+      const result = validate("SELECT TraceId FROM traces LIMIT 1 BY TraceId");
+      expect(codesOf(result)).toEqual([]);
+      // LIMIT BY caps rows per group, not the response, so it does not count
+      // as an explicit LIMIT — the statement is still unbounded overall.
+      expect(result.ok && result.appendRowLimit).toBe(true);
+    });
+
+    /** @scenario "A UNION cannot rely on the default cap" */
+    it("refuses a UNION where one branch names no LIMIT at all", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT 1 " +
+          "UNION ALL SELECT TraceId FROM spans",
+      );
+      expect(codesOf(result)).toEqual(["LIMIT_REQUIRED_PER_BRANCH"]);
+    });
+
+    it("accepts a UNION where every branch names its own bounded LIMIT", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT 5 " +
+          "UNION ALL SELECT TraceId FROM spans LIMIT 5",
+      );
+      expect(codesOf(result)).toEqual([]);
+      expect(result.ok && result.appendRowLimit).toBe(false);
+    });
+
+    it("does not refuse a UNION branch whose LIMIT is a bound parameter", () => {
+      const result = validate(
+        "SELECT TraceId FROM traces LIMIT {n:UInt32} " +
+          "UNION ALL SELECT TraceId FROM spans LIMIT 5",
+      );
+      expect(codesOf(result)).toEqual([]);
+    });
+  });
+
+  /**
+   * Gated means refused, not dropped: the shipped catalog's `annotations`
+   * view carries `Comment` (`Annotation.comment`, gated `output` by the
+   * derivation) rather than omitting it, so a caller without content access
+   * learns the column exists and why it was refused instead of the query
+   * silently returning fewer columns than it asked for.
+   */
+  describe("given the shipped catalog's content gates", () => {
+    const database = "analytics";
+
+    function policyFor(protections: Protections) {
+      return {
+        allowedTables: lwqlAllowedTables({
+          database,
+          views: LWQL_VIEW_CATALOG,
+        }),
+        gatedColumns: lwqlGatedColumns({
+          protections,
+          views: LWQL_VIEW_CATALOG,
+        }),
+        defaultDatabase: database,
+      };
+    }
+
+    /** @scenario "A content column is gated, not dropped" */
+    it("refuses Comment on annotations without content access, and allows it with", () => {
+      const withoutContentAccess: Protections = {
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        canSeeCosts: true,
+      };
+      const withContentAccess: Protections = {
+        canSeeCapturedInput: true,
+        canSeeCapturedOutput: true,
+        canSeeCosts: true,
+      };
+
+      const refused = validateLangWatchQL({
+        sql: `SELECT Comment FROM ${database}.annotations`,
+        ...policyFor(withoutContentAccess),
+      });
+      expect(codesOf(refused)).toContain("GATED_COLUMN");
+
+      const permitted = validateLangWatchQL({
+        sql: `SELECT Comment FROM ${database}.annotations`,
+        ...policyFor(withContentAccess),
+      });
+      expect(codesOf(permitted)).toEqual([]);
     });
   });
 });

@@ -130,6 +130,21 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
       expect(updateClause).not.toContain('"revokedAt"');
       expect(updateClause).not.toContain('"revokedReason"');
     });
+
+    it("guards a stamped USER attach by the active membership lifetime", async () => {
+      const { repository, executeRaw } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow(),
+        membershipStamp: "membership_1",
+      } as GrantProjectionWrite);
+
+      const sql = JSON.stringify(executeRaw.mock.calls[0]);
+      expect(sql).toContain("OrganizationUser");
+      expect(sql).toContain("membershipStamp");
+      expect(sql).toContain("FOR UPDATE");
+    });
   });
 
   describe("given a write that states one field", () => {
@@ -159,7 +174,10 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
      * so an ADMIN import reassigned to a new custom role would keep answering
      * ADMIN.
      *
-     * @scenario "A reassigned role does not keep the role it was imported with"
+     * No feature scenario names this behavior yet — the annotation here used
+     * to claim "A reassigned role does not keep the role it was imported
+     * with", which exists in no .feature file. Removed rather than bound to
+     * the wrong title.
      */
     it("clears the imported legacy role rather than carrying it", async () => {
       const { repository, prisma } = build();

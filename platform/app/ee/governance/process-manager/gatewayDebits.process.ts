@@ -121,6 +121,9 @@ export const writeGatewayDebitsSchema = z.object({
       output_audio_tokens: z.number().int().min(0).default(0),
       input_chars: z.number().int().min(0).default(0),
       audio_ms: z.number().int().min(0).default(0),
+      input_image_tokens: z.number().int().min(0).default(0),
+      output_image_tokens: z.number().int().min(0).default(0),
+      image_count: z.number().int().min(0).default(0),
     })
     .nullable(),
   /** The price the outcome event carried, in integer nano-USD. */
@@ -214,6 +217,9 @@ function buildDebitRows(
     output_audio_tokens: 0,
     input_chars: 0,
     audio_ms: 0,
+    input_image_tokens: 0,
+    output_image_tokens: 0,
+    image_count: 0,
   };
   // The outcome was priced once, as an integer. It stays one all the way to
   // the ledger: dividing by 1e9 to six decimals here rounded every debit to
@@ -413,7 +419,10 @@ function movedNothing(outcome: SpendOutcome): boolean {
     usage.input_audio_tokens === 0 &&
     usage.output_audio_tokens === 0 &&
     usage.input_chars === 0 &&
-    usage.audio_ms === 0
+    usage.audio_ms === 0 &&
+    usage.input_image_tokens === 0 &&
+    usage.output_image_tokens === 0 &&
+    usage.image_count === 0
   );
 }
 

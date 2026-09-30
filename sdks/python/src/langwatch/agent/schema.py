@@ -70,6 +70,29 @@ class AgentParameterInvalid(Exception):
         self.message = message
 
 
+ACCEPTED_REPLY_SHAPES = (
+    "a string, a message dict with a role and content, "
+    "a list of such messages, or AgentReply(output, session=...)"
+)
+
+
+class AgentReplyInvalid(TypeError):
+    """The function returned a value the platform cannot read as an answer.
+
+    The platform reads a result's output as text, one message or a list of
+    messages, and a message must carry a role. Anything else, a plain dict of
+    fields for example, would be dropped by the platform without an answer,
+    so the value is refused here and answered as the `agent_call_failed`
+    error code with the accepted shapes in the message.
+    """
+
+    code = "agent_call_failed"
+
+    def __init__(self, *, reason: str) -> None:
+        super().__init__(f"returned {reason}; return {ACCEPTED_REPLY_SHAPES}")
+        self.reason = reason
+
+
 @dataclass(frozen=True)
 class Param:
     """Metadata for one run parameter, used through `Annotated`.

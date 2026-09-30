@@ -9,7 +9,6 @@ import sys
 import threading
 import time
 import traceback
-import httpx
 from opentelemetry import trace, context as otel_context
 from opentelemetry.trace import Span
 from pydantic import BaseModel, Field
@@ -44,6 +43,7 @@ import langwatch
 from langwatch.attributes import AttributeKey
 from langwatch.domain import Money, TypedValueJson
 from langwatch.experiment._results_df import build_results_df
+from langwatch.http_client import create_client
 from langwatch.experiment.platform_run import (
     EvaluatorStats,
     ExperimentRunResult,
@@ -365,7 +365,7 @@ class Experiment:
             )
         langwatch.ensure_setup()
 
-        with httpx.Client(timeout=60) as client:
+        with create_client(timeout=60) as client:
             response = client.post(
                 f"{langwatch.get_endpoint()}/api/experiment/init",
                 headers=build_auth_headers(langwatch.get_api_key() or ""),
@@ -433,7 +433,7 @@ class Experiment:
 
         for attempt in range(retries):
             try:
-                with httpx.Client(timeout=30) as client:
+                with create_client(timeout=30) as client:
                     response = client.get(url, headers=build_auth_headers(api_key))
 
                 if response.status_code == 404:
@@ -794,7 +794,7 @@ class Experiment:
                 f"concurrency must be >= 1, got {concurrency!r}"
             )
         if not self.initialized:
-            # init() does a blocking httpx.post — run it off-loop.
+            # init() does a blocking HTTP call, run it off-loop.
             await asyncio.to_thread(self.init)
 
         progress_bar: Optional[tqdm] = None
@@ -1131,15 +1131,15 @@ class Experiment:
         reraise=True,
     )
     def _log_results(cls, api_key: str, body: Dict[str, Any]):
-        response = httpx.post(
-            f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
-            headers={
-                **build_auth_headers(api_key),
-                "Content-Type": "application/json",
-            },
-            data=json.dumps(body, cls=SerializableWithStringFallback),  # type: ignore
-            timeout=60,
-        )
+        with create_client(timeout=60) as client:
+            response = client.post(
+                f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
+                headers={
+                    **build_auth_headers(api_key),
+                    "Content-Type": "application/json",
+                },
+                content=json.dumps(body, cls=SerializableWithStringFallback),
+            )
         better_raise_for_status(response)
 
     def _wait_for_completion(self):

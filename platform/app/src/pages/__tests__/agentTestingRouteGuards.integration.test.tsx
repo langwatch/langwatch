@@ -99,6 +99,11 @@ vi.mock("~/utils/api", () => ({
       runAll: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    // The run dialog resolves the evaluators a suite or plan attaches; with
+    // none saved the dialog shows no evaluator line.
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
     modelProvider: {
       listAllForProjectForFrontend: {

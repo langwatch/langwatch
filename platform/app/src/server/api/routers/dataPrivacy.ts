@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { dataPrivacyConfigSchema } from "~/server/data-privacy/dataPrivacy.types";
 import {
   assertCanWriteDataPrivacyScope,
@@ -12,7 +12,6 @@ import {
   InvalidDataPrivacyConfigError,
   ScopeTargetNotFoundError,
 } from "~/server/data-privacy/dataPrivacyPolicy.service";
-import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInput = z.object({

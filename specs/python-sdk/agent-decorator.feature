@@ -124,6 +124,13 @@ Feature: Python SDK connect_agent decorator
     When the scenario library calls .call(input) with messages, new_messages and thread_id
     Then the function runs with those turn fields and the reply is returned
 
+  @unit
+  Scenario: The decorated function is accepted as the agent under test
+    Given a decorated function passed to scenario.run as the agent under test
+    When the scenario executor picks the agent for the agent role
+    Then it finds the decorated function under that role
+    And the role is resolved without importing the scenario package at module load
+
   # --- Run parameters from the signature ---
 
   @unit
@@ -209,6 +216,17 @@ Feature: Python SDK connect_agent decorator
   Scenario: AgentReply carries output and session
     When the function returns AgentReply(output, session=...)
     Then the result frame carries output and session
+
+  @unit
+  Scenario: A dict without a role is refused as a reply
+    When the function returns a dict of fields, such as {"output": "...", "thread_id": "..."}
+    Then coercion raises AgentReplyInvalid
+    And the error names the accepted shapes: a string, a message dict with a role, a list of such messages, or AgentReply
+
+  @unit
+  Scenario: A list with an item that is not a message is refused as a reply
+    When the function returns a list holding a string or a dict without a role
+    Then coercion raises AgentReplyInvalid
 
   @unit
   Scenario: The session is echoed on the next turn of the same thread
@@ -303,6 +321,14 @@ Feature: Python SDK connect_agent decorator
     And the connection stays open
 
   @unit
+  Scenario: A reply the platform cannot read answers agent_call_failed instead of silence
+    Given a function that returns a dict without a role
+    When a call frame arrives
+    Then a result frame with error code agent_call_failed is sent
+    And its message names the agent and the accepted return shapes
+    And the connection stays open and the next call is answered
+
+  @unit
   Scenario: The deadline of a call is read as epoch milliseconds
     Given a call frame whose deadlineAt is an epoch in milliseconds
     When the SDK computes the seconds left
@@ -319,6 +345,12 @@ Feature: Python SDK connect_agent decorator
     Given a call in flight
     When a cancel frame with its call id arrives
     Then the function is cancelled and no result is sent for it
+
+  @unit
+  Scenario: A connected agent takes ten calls at once unless told otherwise
+    Given a decorated function with no concurrency argument
+    Then it registers with ten calls at once, in every environment
+    And a concurrency argument replaces that number
 
   @unit
   Scenario: A call past the concurrency limit answers agent_busy

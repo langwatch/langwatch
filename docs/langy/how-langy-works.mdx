@@ -1,14 +1,14 @@
 ---
 title: How Langy works
-description: "Each Langy conversation is one opencode worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
+description: "Each Langy conversation is one agent worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
 sidebarTitle: How Langy works
 keywords:
   - how langy works
   - ai agent architecture
-  - opencode harness
+  - langy agent worker
 ---
 
-Langy runs on [opencode](https://github.com/anomalyco/opencode) as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one opencode process per conversation and reaps it when the conversation goes idle.
+Langy runs as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one agent worker process per conversation and reaps it when the conversation goes idle.
 
 The worker does the actual reading, testing, and code editing. Every tool call it makes streams back into the chat as a typed activity, and every turn is a traced run in your project.
 
@@ -23,7 +23,7 @@ graph LR
   browser["Browser<br/>(event-sourced chat UI)"]
   control["LangWatch control plane<br/>(turn processor, event log)"]
   manager["langyagent pod<br/>(Go manager)"]
-  worker["opencode worker<br/>(one per conversation, gVisor-sandboxed)"]
+  worker["Agent worker<br/>(one per conversation, gVisor-sandboxed)"]
   cli["langwatch CLI<br/>&rarr; LangWatch API"]
   gateway["LangWatch AI Gateway<br/>(model calls)"]
   github["GitHub App<br/>(bot-authored PRs)"]
@@ -41,8 +41,8 @@ graph LR
 |---|---|
 | Browser | The chat panel. Event-sourced: a refresh resumes the conversation, an in-flight turn keeps streaming. |
 | Control plane | The turn processor in the LangWatch app. Admits each turn, dispatches it to the agent, logs every tool call as a typed event. |
-| `langyagent` | The agent service. Spawns one opencode worker per conversation. Single replica; scale vertically. |
-| opencode worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
+| `langyagent` | The agent service. Spawns one worker per conversation. Single replica; scale vertically. |
+| Agent worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
 
 The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/self-hosting/langy/overview).
 

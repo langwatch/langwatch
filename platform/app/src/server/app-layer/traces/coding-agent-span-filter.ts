@@ -1,7 +1,8 @@
 /**
  * Coding-assistant span noise filter.
  *
- * codex (instrumentation scope `codex_cli_rs`) and opencode (scope `opencode`)
+ * codex (instrumentation scopes `codex_cli_rs`, `codex_exec`,
+ * `codex-app-server`) and opencode (scope `opencode`)
  * export their ENTIRE internal call graph over OTLP: DB queries, file IO,
  * config reads, auth, websockets, session init, plugin enumeration. For a
  * single "hello" that is hundreds of spans fragmented across dozens of trace
@@ -24,21 +25,41 @@ export const CODEX_SCOPE = "codex_cli_rs";
  * enumeration, 500+ spans for one exec turn), same filter.
  */
 export const CODEX_EXEC_SCOPE = "codex_exec";
+/**
+ * Newer codex releases run the TUI on top of their app-server and report
+ * every span under the app-server's scope instead. Same span names, same
+ * attributes, same noise as `codex_cli_rs`, so it takes the TUI's rules.
+ */
+export const CODEX_APP_SERVER_SCOPE = "codex-app-server";
 export const OPENCODE_SCOPE = "opencode";
 
 /** The per-turn rollup span codex emits (model + tokens + cost + reasoning). */
 const CODEX_TURN_SPAN = "session_task.turn";
 
+/**
+ * The app-server request span that starts a codex helper thread's turn, kept
+ * only once ingestion has stamped the helper's thread id on it (see
+ * `codex-auxiliary-thread.ts`). The stamp is the admission: the same span for
+ * a user-driven turn carries no stamp and stays noise.
+ */
+const CODEX_TURN_REQUEST_SPAN = "turn/start";
+const CODEX_HELPER_THREAD_STAMP = "langwatch.thread.id";
+
 const CODEX_SCOPES: ReadonlySet<string> = new Set([
   CODEX_SCOPE,
   CODEX_EXEC_SCOPE,
+  CODEX_APP_SERVER_SCOPE,
 ]);
 
 const CODING_AGENT_SCOPES: ReadonlySet<string> = new Set([
-  CODEX_SCOPE,
-  CODEX_EXEC_SCOPE,
+  ...CODEX_SCOPES,
   OPENCODE_SCOPE,
 ]);
+
+/** Whether this scope is one of codex's (the TUI's, `codex exec`'s, the app-server's). */
+export function isCodexScope(scopeName: string | null | undefined): boolean {
+  return typeof scopeName === "string" && CODEX_SCOPES.has(scopeName);
+}
 
 /** Whether spans under this scope are subject to the coding-agent filter. */
 export function isCodingAgentNoiseScope(
@@ -73,7 +94,12 @@ function isAiSemanticCodingAgentSpan({
     // codex tool run also emits a `codex.tool_result` log carrying the tool
     // name, arguments, output, duration and success, and the terminal
     // transcript renders tool calls from those.
-    return spanName === CODEX_TURN_SPAN || hasGenAi;
+    return (
+      spanName === CODEX_TURN_SPAN ||
+      hasGenAi ||
+      (spanName === CODEX_TURN_REQUEST_SPAN &&
+        attributeKeys.includes(CODEX_HELPER_THREAD_STAMP))
+    );
   }
   if (scopeName === OPENCODE_SCOPE) {
     // opencode wraps the Vercel AI SDK, whose operation spans are all named

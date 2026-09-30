@@ -1,0 +1,104 @@
+---
+title: ElevenLabs API paths
+description: ElevenLabs' own synthesis, transcription and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
+sidebarTitle: ElevenLabs
+---
+
+## Endpoints
+
+```
+POST /v1/text-to-speech/{voice_id}
+POST /v1/speech-to-text
+POST /v1/convai/webhook/{model_provider_id}
+xi-api-key: vk-lw-<ULID>
+```
+
+The two audio paths mirror ElevenLabs' own, with ElevenLabs' own request bodies. Point the ElevenLabs SDK at the gateway with `base_url="https://gateway.langwatch.ai"` and the virtual key in place of the ElevenLabs key. The key goes in the `xi-api-key` header the SDK already sends.
+
+The ElevenLabs key itself stays on the organization's ElevenLabs model provider. An SDK that still sends it gets `401 invalid_api_key`, because the gateway reads that header as a virtual key.
+
+Both audio paths are served only by an ElevenLabs credential. A key that cannot reach ElevenLabs answers `400 model_provider_not_bound` and no provider is called. There is no fallback to another provider.
+
+## Text to speech
+
+```bash
+curl "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL?output_format=mp3_44100_128" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from the gateway.", "model_id": "eleven_flash_v2_5"}' \
+  --output hello.mp3
+```
+
+The response is ElevenLabs' audio bytes and headers, unchanged.
+
+| Parameter | What the gateway does |
+|---|---|
+| `text` | Required. Missing: `400 bad_request`. Metered as Unicode characters. |
+| `model_id` | Resolved through the key's aliases and allowlist, then rewritten to the bare model id ElevenLabs knows. Absent: billed and gated as `eleven_multilingual_v2`, the vendor's own default. Outside the allowlist: `400 model_not_allowed`. |
+| Query string (`output_format`, `enable_logging`, latency settings) | Forwarded as written. |
+| Every other body field (voice settings, and the rest) | Forwarded as written. |
+
+The body is capped at 1 MB; over the cap: `413 payload_too_large`.
+
+## Speech to text
+
+```bash
+curl https://gateway.langwatch.ai/v1/speech-to-text \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -F "model_id=scribe_v1" \
+  -F "file=@call-recording.wav"
+```
+
+The response is ElevenLabs' transcript JSON, unchanged. Transcription is metered by the audio duration ElevenLabs reports on it.
+
+| Form part | What the gateway does |
+|---|---|
+| `model_id` | Required, as a form part. Missing: `400 missing_model`. Resolved through the key's aliases and allowlist. |
+| `file` or `cloud_storage_url` | One of the two is required; missing both: `400 bad_request`. An upload is capped at 26 MB; over the cap: `413 payload_too_large`. For a larger file send `cloud_storage_url`, which ElevenLabs fetches itself. |
+| `webhook` | Refused when truthy with `400 bad_request`, before any call is made. In that mode ElevenLabs answers before it has transcribed, so the call would carry no duration to bill. Send the request without it and read the transcript from the response. |
+| Every other part (diarization, timestamps, and the rest) | Forwarded as written. |
+
+## Request and response headers
+
+The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
+
+Both audio paths return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers), plus ElevenLabs' own response headers. A forwarded ElevenLabs error carries `X-LangWatch-Provider: elevenlabs` and the vendor's `Retry-After` when it sent one.
+
+## Streaming
+
+Neither audio path streams. The audio bytes and the transcript are returned complete.
+
+## Post-call webhook
+
+```
+POST /v1/convai/webhook/{model_provider_id}
+ElevenLabs-Signature: t=<timestamp>,v0=<hmac>
+```
+
+This is the URL to paste into the ElevenLabs workspace webhook settings, for [Conversational AI](/ai-gateway/api/realtime#elevenlabs-conversational-ai) sessions brokered by the gateway. `{model_provider_id}` is the id of the ElevenLabs model provider row in Settings, Model Providers. Store the webhook secret from ElevenLabs on that same provider row, under `ELEVENLABS_WEBHOOK_SECRET`.
+
+The route takes no virtual key. Each delivery authenticates itself: the gateway relays the raw bytes and the `ElevenLabs-Signature` header to LangWatch, which computes the HMAC with the provider's stored secret and accepts a signature timestamp at most 30 minutes old.
+
+What happens with a delivery:
+
+| Event | What LangWatch does |
+|---|---|
+| `post_call_transcription` | Matches the conversation to its session and closes the session's spend record with the reported cost and duration. |
+| `post_call_audio`, `call_initiation_failure` | Acknowledged and not applied. They carry no duration. |
+
+Responses:
+
+| Status | Meaning |
+|---|---|
+| `200` `{"received":true}` | Accepted, or acknowledged as an event LangWatch does not act on. |
+| `400` | The payload did not parse as a post-call event. |
+| `401` | The signature did not verify. |
+| `404` | No ElevenLabs provider with that id has a webhook secret stored. |
+| `413` | The delivery is too large to relay. |
+| `502` | The gateway could not reach LangWatch to relay the delivery. |
+
+The webhook is the fast path. Two minutes after a mint, LangWatch also reads the conversation back from ElevenLabs by its own id, so a session bills even when no delivery arrives.
+
+## Errors
+
+The full table is on [Errors](/ai-gateway/api/errors).

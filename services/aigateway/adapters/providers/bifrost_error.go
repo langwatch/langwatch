@@ -194,7 +194,7 @@ func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) err
 	if provider := string(berr.ExtraFields.Provider); provider != "" {
 		meta["provider"] = provider
 	}
-	if model := berr.ExtraFields.ModelRequested; model != "" {
+	if model := berr.ExtraFields.OriginalModelRequested; model != "" {
 		meta["model"] = bfClampMetaValue(model)
 	}
 
@@ -365,7 +365,7 @@ func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
 		// away for the very provider this was written for.
 		return "The credentials configured for this model provider were not accepted, so the request never reached the provider and will fail the same way on every retry. Check the provider's credentials in your model provider settings."
 	case domain.ErrProviderConfigInvalid:
-		if model := berr.ExtraFields.ModelRequested; model != "" {
+		if model := berr.ExtraFields.OriginalModelRequested; model != "" {
 			return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", model)
 		}
 		return "This model provider is not configured to serve the requested model. Check the models and deployments configured for it in your model provider settings."

@@ -5,11 +5,23 @@ import type { StateProjectionStore } from "~/server/event-sourcing/projections/s
 import {
   ConfigureIngestionPullCommand,
   DisableIngestionPullCommand,
+  RecordIngestionPullAgentsListedCommand,
+  RecordIngestionPullAgentsListingRefusedCommand,
+  RecordIngestionPullPeopleListedCommand,
+  RecordIngestionPullPeopleListingRefusedCommand,
   RecordIngestionPullRunCompletedCommand,
   RecordIngestionPullRunFailedCommand,
+  RequestIngestionPullAgentsListingCommand,
+  RequestIngestionPullPeopleListingCommand,
 } from "./commands";
 import {
   buildProcessEventView,
+  handleAgentsListed,
+  handleAgentsListingRefused,
+  handleAgentsListingRequested,
+  handlePeopleListed,
+  handlePeopleListingRefused,
+  handlePeopleListingRequested,
   handlePullConfigured,
   handlePullDisabled,
   handlePullRunCompleted,
@@ -18,7 +30,9 @@ import {
   ingestionPullWake,
 } from "./process-manager/ingestionPull.process";
 import {
+  createAgentListingHandler,
   createIngestionPullRunHandler,
+  createPeopleListingHandler,
   INGESTION_PULL_CONCURRENCY,
   INGESTION_PULL_LEASE_DURATION_MS,
   INGESTION_PULL_MAX_ATTEMPTS,
@@ -27,13 +41,17 @@ import {
 import {
   INGESTION_PULL_PROCESS_INTENT_TYPES,
   INGESTION_PULL_PROCESS_NAME,
+  ingestionPullListingIntentSchema,
   ingestionPullRunIntentSchema,
 } from "./process-manager/ingestionPullProcess.types";
 import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusFoldProjection,
 } from "./projections/ingestionPullRunStatus.foldProjection";
-import { INGESTION_PULL_EVENT_TYPES } from "./schemas/constants";
+import {
+  INGESTION_PULL_EVENT_TYPES,
+  INGESTION_PULL_PROCESSING_PIPELINE_NAME,
+} from "./schemas/constants";
 import type { IngestionPullProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
@@ -62,10 +80,38 @@ export function ingestionPullPM(
         ingestionPullRunIntentSchema,
         createIngestionPullRunHandler(dispatch),
       )
+      .intent(
+        INGESTION_PULL_PROCESS_INTENT_TYPES.LIST_AGENTS,
+        ingestionPullListingIntentSchema,
+        createAgentListingHandler(dispatch),
+      )
+      .intent(
+        INGESTION_PULL_PROCESS_INTENT_TYPES.LIST_PEOPLE,
+        ingestionPullListingIntentSchema,
+        createPeopleListingHandler(dispatch),
+      )
       .on(INGESTION_PULL_EVENT_TYPES.CONFIGURED, handlePullConfigured)
       .on(INGESTION_PULL_EVENT_TYPES.DISABLED, handlePullDisabled)
       .on(INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED, handlePullRunCompleted)
       .on(INGESTION_PULL_EVENT_TYPES.RUN_FAILED, handlePullRunFailed)
+      .on(
+        INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
+        handleAgentsListingRequested,
+      )
+      .on(INGESTION_PULL_EVENT_TYPES.AGENTS_LISTED, handleAgentsListed)
+      .on(
+        INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REFUSED,
+        handleAgentsListingRefused,
+      )
+      .on(
+        INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED,
+        handlePeopleListingRequested,
+      )
+      .on(INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED, handlePeopleListed)
+      .on(
+        INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REFUSED,
+        handlePeopleListingRefused,
+      )
       .onWake(ingestionPullWake)
       .toPayload(buildProcessEventView)
       .outbox({
@@ -86,12 +132,19 @@ export function ingestionPullPM(
  * cron wake, the pull run lifecycle, and the durable cursor. It deliberately
  * declares no `.schedule()`: the cadence is each source's own cron
  * expression, so every handler returns its explicit `nextWakeAt`.
+ *
+ * It also owns on-demand listings, which have no cadence at all: a caller
+ * emits `requestAgentsListing` or `requestPeopleListing`, and the matching
+ * intent runs once under this process manager's leases and retries. Those
+ * handlers settle through the same `nextWakeAt` the pull handlers do, so
+ * asking a source what it knows never moves the schedule it is already
+ * keeping.
  */
 export function createIngestionPullProcessingPipeline(
   deps: IngestionPullProcessingPipelineDeps,
 ) {
   return definePipeline<IngestionPullProcessingEvent>()
-    .withName("ingestion_pull_processing")
+    .withName(INGESTION_PULL_PROCESSING_PIPELINE_NAME)
     .withAggregateType("ingestion_pull")
     .withProjection(
       "ingestionPullRunStatus",
@@ -101,6 +154,24 @@ export function createIngestionPullProcessingPipeline(
     .withCommand("disable", DisableIngestionPullCommand)
     .withCommand("recordRunCompleted", RecordIngestionPullRunCompletedCommand)
     .withCommand("recordRunFailed", RecordIngestionPullRunFailedCommand)
+    .withCommand(
+      "requestAgentsListing",
+      RequestIngestionPullAgentsListingCommand,
+    )
+    .withCommand("recordAgentsListed", RecordIngestionPullAgentsListedCommand)
+    .withCommand(
+      "recordAgentsListingRefused",
+      RecordIngestionPullAgentsListingRefusedCommand,
+    )
+    .withCommand(
+      "requestPeopleListing",
+      RequestIngestionPullPeopleListingCommand,
+    )
+    .withCommand("recordPeopleListed", RecordIngestionPullPeopleListedCommand)
+    .withCommand(
+      "recordPeopleListingRefused",
+      RecordIngestionPullPeopleListingRefusedCommand,
+    )
     .withProcessManager(
       INGESTION_PULL_PROCESS_NAME,
       ingestionPullPM(deps.dispatch),

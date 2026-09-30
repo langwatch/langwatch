@@ -15,18 +15,25 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 
+import { Button, VStack } from "@chakra-ui/react";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useState } from "react";
+import { TalkToItPanel } from "~/components/agents/voice/TalkToItPanel";
+import { useVoiceAgentsEnabled } from "~/components/agents/voice/useVoiceAgentsEnabled";
 import { Dialog } from "~/components/ui/dialog";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { OpenListContext } from "../shared/OpenListContext";
 import { RunDialogFields } from "./RunDialogFields";
 import { RunDialogFooter } from "./RunDialogFooter";
 import { isNoteTooLong } from "./RunNoteField";
 import type { RunDialogProps, RunDialogSubject } from "./run-dialog-types";
+import { RUN_MISSING_MAPPINGS_TOOLTIP } from "./run-evaluators";
 import { type RunDialogForm, useRunDialogForm } from "./useRunDialogForm";
 import {
   type RunDialogController,
   useRunDialogSubmit,
 } from "./useRunDialogSubmit";
+import { voiceCallTargetOf } from "./voice-call-target";
 
 export type {
   RunDialogProps,
@@ -128,7 +135,20 @@ function RunDialogHeader({ subject }: { subject: RunDialogSubject }) {
   );
 }
 
-export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
+/**
+ * All the dialog's hook state: the two open-list flags, the form, and the
+ * submit controller. Kept as one hook so `RunDialog` itself stays a thin
+ * wrapper around "compute state, then render".
+ */
+function useRunDialogState({
+  subject,
+  onClose,
+  onRunStarted,
+}: {
+  subject: RunDialogSubject | null;
+  onClose: () => void;
+  onRunStarted: RunDialogProps["onRunStarted"];
+}) {
   // Escape belongs to the run name list while that list is open. The dialog's
   // own Escape handling listens on the document in the capture phase, so it
   // runs before the field can stop the key and has to be turned off instead.
@@ -156,6 +176,7 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
     runParameters: form.runParameters,
     storableRunParameters: form.storableRunParameters,
     storableSecretNames: form.storableSecretNames,
+    evaluators: form.extras,
     onRunStarted,
     onClose,
     setInlineError: form.setInlineError,
@@ -163,7 +184,83 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
     setMissingProvider: form.setMissingProvider,
   });
 
-  if (!subject) return null;
+  // An evaluator whose required input reads nothing holds the run: Run opens
+  // its editor instead, so the fix is one click away and nothing is queued
+  // that the server would refuse.
+  const offender = form.offender;
+  const onRun = offender ? form.openOffender : () => void controller.run();
+
+  return {
+    isNameListOpen,
+    setIsNameListOpen,
+    openLists,
+    reportOpenList,
+    form,
+    controller,
+    offender,
+    onRun,
+  };
+}
+
+/**
+ * The "Call it myself" body, shown in place of the fields. Owns the project
+ * lookup the panel needs, so the dialog shell stays free of it.
+ */
+function RunDialogCallBody({
+  voiceCall,
+  onBack,
+}: {
+  voiceCall: NonNullable<ReturnType<typeof voiceCallTargetOf>>;
+  onBack: () => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  return (
+    <Dialog.Body paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
+      <VStack align="stretch" gap={3} data-testid="run-dialog-call">
+        <Button
+          variant="ghost"
+          size="sm"
+          alignSelf="flex-start"
+          onClick={onBack}
+          data-testid="run-dialog-call-back"
+        >
+          <ArrowLeft size={16} /> Back
+        </Button>
+        <TalkToItPanel
+          projectId={project?.id ?? ""}
+          projectSlug={project?.slug ?? ""}
+          transport={voiceCall.transport}
+          agentId={voiceCall.agentId}
+          agentRowId={voiceCall.agentRowId}
+          scenarioId={voiceCall.scenarioId}
+        />
+      </VStack>
+    </Dialog.Body>
+  );
+}
+
+function RunDialogContent({
+  subject,
+  onClose,
+  isNameListOpen,
+  setIsNameListOpen,
+  openLists,
+  reportOpenList,
+  form,
+  controller,
+  offender,
+  onRun,
+}: {
+  subject: RunDialogSubject;
+  onClose: () => void;
+} & ReturnType<typeof useRunDialogState>) {
+  // The panel opens in place of the fields when the person calls the agent
+  // themselves; leaving the call returns to the dialog it was opened from.
+  const [isCalling, setIsCalling] = useState(false);
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+  const voiceCall = voiceAgentsEnabled
+    ? voiceCallTargetOf({ form, subject })
+    : null;
 
   return (
     <Dialog.Root
@@ -173,6 +270,9 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
       }}
       placement="center"
       closeOnEscape={!isNameListOpen && openLists.size === 0}
+      // The evaluator list and the evaluator editor open as drawers over the
+      // dialog; a click inside them must not read as a click outside it.
+      closeOnInteractOutside={!form.isEvaluatorFlowOpen}
     >
       <Dialog.Content
         bg="bg.panel"
@@ -181,29 +281,51 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
         data-testid={subject.kind === "case" ? "run-case-dialog" : "run-dialog"}
       >
         <RunDialogHeader subject={subject} />
-        <Dialog.Body
-          paddingX={5}
-          paddingY={4}
-          maxHeight="58vh"
-          overflowY="auto"
-        >
-          <OpenListContext.Provider value={reportOpenList}>
-            <RunDialogFields
-              form={form}
-              isBusy={controller.isBusy}
-              onNameListOpenChange={setIsNameListOpen}
+        {isCalling && voiceCall ? (
+          <RunDialogCallBody
+            voiceCall={voiceCall}
+            onBack={() => setIsCalling(false)}
+          />
+        ) : (
+          <>
+            <Dialog.Body
+              paddingX={5}
+              paddingY={4}
+              maxHeight="58vh"
+              overflowY="auto"
+            >
+              <OpenListContext.Provider value={reportOpenList}>
+                <RunDialogFields
+                  form={form}
+                  isBusy={controller.isBusy}
+                  onNameListOpenChange={setIsNameListOpen}
+                />
+              </OpenListContext.Provider>
+            </Dialog.Body>
+            <RunDialogFooter
+              controller={controller}
+              isRunBlocked={isRunBlocked({ form, controller })}
+              blockedReason={runBlockedReason({ subject, form, controller })}
+              warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
+              onRun={onRun}
+              {...(voiceCall
+                ? { onCallItMyself: () => setIsCalling(true) }
+                : {})}
+              caseCount={form.caseCount}
+              targetCount={form.runTargets.length}
+              onClose={onClose}
             />
-          </OpenListContext.Provider>
-        </Dialog.Body>
-        <RunDialogFooter
-          controller={controller}
-          isRunBlocked={isRunBlocked({ form, controller })}
-          blockedReason={runBlockedReason({ subject, form, controller })}
-          caseCount={form.caseCount}
-          targetCount={form.runTargets.length}
-          onClose={onClose}
-        />
+          </>
+        )}
       </Dialog.Content>
     </Dialog.Root>
   );
+}
+
+export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
+  const state = useRunDialogState({ subject, onClose, onRunStarted });
+
+  if (!subject) return null;
+
+  return <RunDialogContent subject={subject} onClose={onClose} {...state} />;
 }

@@ -1,0 +1,430 @@
+/**
+ * Running commands in a shared folder, with real child processes in a real
+ * temporary directory: the cap, the timeout, the process group and the
+ * background process that outlives the session.
+ */
+
+import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { BASH_OUTPUT_CAP_BYTES } from "../../../../agent/local-control-protocol";
+import { LocalCallFailure } from "../errors";
+import {
+  BASH_MAX_TIMEOUT_SECONDS,
+  collapseProgressRedraws,
+  commandEnvironment,
+  excludeLogDirFromGit,
+  inheritsVariable,
+  killGroup,
+  logPathFor,
+  startCommand,
+  timeoutMsFor,
+  timeoutSecondsFor,
+} from "../executor";
+
+const alive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const settle = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** Waits for a condition rather than for a fixed time, so a busy machine is fine. */
+const waitUntil = async (
+  ready: () => boolean,
+  { timeoutMs = 10_000, what = "the condition" } = {},
+): Promise<void> => {
+  const deadline = Date.now() + timeoutMs;
+  while (!ready()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    await settle(25);
+  }
+};
+
+describe("given a shared folder", () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "langy-exec-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  describe("when a command runs to its end", () => {
+    it("returns its exit code, its output and how long it took", async () => {
+      const command = startCommand({
+        command: "echo hello && echo oops >&2",
+        root,
+        callId: "call-1",
+      });
+      const output = await command.result;
+      expect(output.exitCode).toBe(0);
+      expect(output.stdout).toContain("hello");
+      expect(output.stderr).toContain("oops");
+      expect(output.truncated).toBe(false);
+      expect(output.durationMs).toBeGreaterThanOrEqual(0);
+      expect(fs.readFileSync(output.logPath!, "utf8")).toContain("hello");
+    });
+
+    it("runs in the shared folder", async () => {
+      const command = startCommand({ command: "pwd", root, callId: "call-2" });
+      const output = await command.result;
+      expect(output.stdout.trim()).toBe(fs.realpathSync(root));
+    });
+
+    it("reports a failing command by its exit code, not as an error", async () => {
+      const command = startCommand({
+        command: "exit 3",
+        root,
+        callId: "call-3",
+      });
+      const output = await command.result;
+      expect(output.exitCode).toBe(3);
+    });
+  });
+
+  describe("when the developer's login profile has a broken line", () => {
+    it("keeps that text off the command's stderr, and leaves real stderr alone", async () => {
+      const home = fs.mkdtempSync(path.join(os.tmpdir(), "langy-home-"));
+      const noise = "profile: line 3: /nowhere/env: No such file or directory";
+      for (const file of [".profile", ".bash_profile", ".bashrc"]) {
+        fs.writeFileSync(path.join(home, file), `echo "${noise}" >&2\n`);
+      }
+      const realHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        const clean = await startCommand({
+          command: "echo hello",
+          root,
+          callId: "call_profile",
+        }).result;
+        expect(clean.stderr).toBe("");
+        expect(clean.stdout).toBe("hello\n");
+
+        const loud = await startCommand({
+          command: "echo mine >&2",
+          root,
+          callId: "call_profile_stderr",
+        }).result;
+        expect(loud.stderr).toBe("mine\n");
+      } finally {
+        if (realHome === undefined) delete process.env.HOME;
+        else process.env.HOME = realHome;
+        fs.rmSync(home, { recursive: true, force: true });
+      }
+    });
+
+    it("gives the command the PATH the CLI itself was started with", async () => {
+      const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "langy-bin-"));
+      const tool = path.join(binDir, "langy-only-here");
+      fs.writeFileSync(tool, "#!/bin/sh\necho found\n");
+      fs.chmodSync(tool, 0o755);
+      const realPath = process.env.PATH;
+      process.env.PATH = `${binDir}:${realPath ?? ""}`;
+      try {
+        const output = await startCommand({
+          command: "langy-only-here",
+          root,
+          callId: "call_path",
+        }).result;
+        expect(output.stdout).toBe("found\n");
+        expect(output.exitCode).toBe(0);
+      } finally {
+        process.env.PATH = realPath;
+        fs.rmSync(binDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("when a command writes more than the cap", () => {
+    it("cuts the text, says so, and keeps the whole log in the folder", async () => {
+      const command = startCommand({
+        command: `head -c ${BASH_OUTPUT_CAP_BYTES * 2} /dev/zero | tr '\\0' 'x'`,
+        root,
+        callId: "call-4",
+      });
+      const output = await command.result;
+      expect(output.truncated).toBe(true);
+      expect(output.stdout).toContain("The whole log is at");
+      expect(output.stdout.length).toBeLessThan(BASH_OUTPUT_CAP_BYTES * 1.1);
+      const log = fs.statSync(output.logPath!);
+      expect(log.size).toBeGreaterThan(BASH_OUTPUT_CAP_BYTES);
+    });
+  });
+
+  describe("when a command passes its timeout", () => {
+    /** @scenario "A command stopped at its time limit says the limit and how to raise it" */
+    it("stops it and says the limit it hit and the longest limit it may ask for", async () => {
+      const command = startCommand({
+        command: "sleep 30",
+        root,
+        callId: "call-5",
+        timeout: 1,
+      });
+      await expect(command.result).rejects.toBeInstanceOf(LocalCallFailure);
+      await command.result.catch((error: LocalCallFailure) => {
+        expect(error.code).toBe("timeout");
+        expect(error.message).toBe(
+          `The command was stopped at its 1 second limit. To give it more time, ask for it again with a larger timeout parameter, which is in seconds and may go up to ${BASH_MAX_TIMEOUT_SECONDS}. The output so far is at ${command.logPath}.`,
+        );
+      });
+    });
+
+    it("keeps the timeout inside the platform's window", () => {
+      expect(timeoutMsFor(undefined)).toBe(5 * 60 * 1000);
+      expect(timeoutMsFor(30)).toBe(30_000);
+      expect(timeoutMsFor(3_600)).toBe(15 * 60 * 1000);
+      expect(timeoutMsFor(0)).toBe(5 * 60 * 1000);
+    });
+
+    it("reports the clamped limit in whole seconds", () => {
+      expect(timeoutSecondsFor(undefined)).toBe(300);
+      expect(timeoutSecondsFor(30)).toBe(30);
+      expect(timeoutSecondsFor(0.4)).toBe(1);
+      expect(timeoutSecondsFor(3_600)).toBe(BASH_MAX_TIMEOUT_SECONDS);
+      expect(BASH_MAX_TIMEOUT_SECONDS).toBe(900);
+    });
+  });
+
+  describe("when a command is cancelled", () => {
+    it("kills the process and everything it started", async () => {
+      const command = startCommand({
+        command: "sleep 30 & echo $! > child.pid; wait",
+        root,
+        callId: "call-6",
+      });
+      const pidFile = path.join(root, "child.pid");
+      await waitUntil(
+        () => fs.existsSync(pidFile) && fs.readFileSync(pidFile, "utf8").trim() !== "",
+        { what: "the child to write its pid" },
+      );
+      const childPid = Number(fs.readFileSync(pidFile, "utf8").trim());
+      expect(alive(childPid)).toBe(true);
+      command.cancel();
+      await expect(command.result).rejects.toBeInstanceOf(LocalCallFailure);
+      await waitUntil(() => !alive(childPid), { what: "the child to end" });
+    });
+  });
+
+  describe("when Langy starts a command in the background", () => {
+    /** @scenario "A background process Langy started outlives the command" */
+    it("returns the process id and the log path at once and leaves it running", async () => {
+      const command = startCommand({
+        command: "for i in 1 2 3; do echo tick; sleep 0.2; done",
+        root,
+        callId: "call-7",
+        background: true,
+      });
+      const output = await command.result;
+      expect(output.pid).toBeGreaterThan(0);
+      expect(output.exitCode).toBeNull();
+      expect(output.logPath).toBe(logPathFor({ root, callId: "call-7" }));
+      expect(alive(output.pid!)).toBe(true);
+
+      await waitUntil(
+        () => fs.readFileSync(output.logPath!, "utf8").includes("tick"),
+        { what: "the background process to write its log" },
+      );
+      killGroup(output.pid);
+    });
+  });
+
+  describe("when the folder is a git repository", () => {
+    /** @scenario "The log directory is kept out of git" */
+    it("excludes the log directory through the repository's own exclude file", async () => {
+      execFileSync("git", ["init", "-q"], { cwd: root });
+      const command = startCommand({ command: "echo hi", root, callId: "call-8" });
+      await command.result;
+      const exclude = fs.readFileSync(
+        path.join(root, ".git", "info", "exclude"),
+        "utf8",
+      );
+      expect(exclude).toContain(".langwatch/");
+      expect(
+        execFileSync("git", ["status", "--porcelain"], {
+          cwd: root,
+          encoding: "utf8",
+        }),
+      ).not.toContain(".langwatch");
+    });
+
+    it("writes the entry once, however often the session runs", () => {
+      execFileSync("git", ["init", "-q"], { cwd: root });
+      excludeLogDirFromGit(root);
+      excludeLogDirFromGit(root);
+      excludeLogDirFromGit(root);
+      const lines = fs
+        .readFileSync(path.join(root, ".git", "info", "exclude"), "utf8")
+        .split("\n")
+        .filter((line) => line.trim() === ".langwatch/");
+      expect(lines).toHaveLength(1);
+    });
+  });
+
+  describe("when the folder is not a git repository", () => {
+    it("runs the command anyway", async () => {
+      const command = startCommand({ command: "echo hi", root, callId: "call-9" });
+      const output = await command.result;
+      expect(output.exitCode).toBe(0);
+    });
+  });
+});
+
+describe("collapseProgressRedraws", () => {
+  describe("when a line was redrawn many times", () => {
+    /** @scenario "A progress display is read as its last line, not every redraw" */
+    it("keeps the last state of the line, the way the terminal shows it", () => {
+      const spinner = "\rframe 1\rframe 2\rframe 3 done";
+
+      expect(collapseProgressRedraws(`start\n${spinner}\nend`)).toBe(
+        "start\nframe 3 done\nend",
+      );
+    });
+  });
+
+  describe("when the last redraw is blank", () => {
+    it("keeps the last one that wrote something", () => {
+      expect(collapseProgressRedraws("working\rdone\r")).toBe("done");
+    });
+  });
+
+  describe("when nothing was redrawn", () => {
+    it("returns the text untouched", () => {
+      expect(collapseProgressRedraws("2 passed\n1 warning\n")).toBe(
+        "2 passed\n1 warning\n",
+      );
+    });
+  });
+});
+
+describe("given the environment a command runs with", () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "langy-env-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  /**
+   * The rule, as a table: a name on the list, a name in a family named by its
+   * prefix or by its suffix, and the veto that reads last and wins.
+   */
+  const variables: Array<[string, boolean]> = [
+    ["PATH", true],
+    ["HOME", true],
+    ["SHELL", true],
+    ["TERM", true],
+    ["COLORTERM", true],
+    ["TERM_PROGRAM", true],
+    ["USER", true],
+    ["LOGNAME", true],
+    ["TMPDIR", true],
+    ["TZ", true],
+    ["LANG", true],
+    ["LANGUAGE", true],
+    ["LC_ALL", true],
+    ["LC_CTYPE", true],
+    ["XDG_CACHE_HOME", true],
+    ["XDG_CONFIG_HOME", true],
+    ["SSH_AUTH_SOCK", true],
+    ["HOMEBREW_PREFIX", true],
+    ["HOMEBREW_CELLAR", true],
+    ["HOMEBREW_REPOSITORY", true],
+    ["JAVA_HOME", true],
+    ["PNPM_HOME", true],
+    ["CARGO_HOME", true],
+    ["RUSTUP_HOME", true],
+    ["GRADLE_USER_HOME", true],
+    ["M2_HOME", true],
+    ["VOLTA_HOME", true],
+    ["GOPATH", true],
+    ["GOROOT", true],
+    ["GOFLAGS", true],
+    ["GOPROXY", true],
+    ["PYENV_ROOT", true],
+    ["NVM_DIR", true],
+    ["NVM_BIN", true],
+    ["ASDF_DIR", true],
+    ["RBENV_ROOT", true],
+    ["SDKMAN_DIR", true],
+    ["VIRTUAL_ENV", true],
+    ["CONDA_PREFIX", true],
+    ["UV_CACHE_DIR", true],
+    ["UV_PYTHON", true],
+    ["HTTP_PROXY", true],
+    ["HTTPS_PROXY", true],
+    ["NO_PROXY", true],
+    ["ALL_PROXY", true],
+    ["http_proxy", true],
+    ["https_proxy", true],
+    ["no_proxy", true],
+    ["all_proxy", true],
+    ["SSL_CERT_FILE", true],
+    ["SSL_CERT_DIR", true],
+    ["NODE_EXTRA_CA_CERTS", true],
+    ["REQUESTS_CA_BUNDLE", true],
+    ["CURL_CA_BUNDLE", true],
+    // The veto reads last, so a family with a secret in it loses that one.
+    ["HOMEBREW_GITHUB_API_TOKEN", false],
+    ["XDG_SESSION_TOKEN", false],
+    ["SOMETHING_HOME_KEY", false],
+    ["LANGWATCH_API_KEY", false],
+    ["OPENAI_API_KEY", false],
+    ["AWS_SECRET_ACCESS_KEY", false],
+    ["GITHUB_TOKEN", false],
+    ["DATABASE_PASSWORD", false],
+    // And a name that is on no list at all never travels.
+    ["AWS_ACCESS_KEY_ID", false],
+    ["NODE_ENV", false],
+    ["DATABASE_URL", false],
+    ["SHLVL", false],
+  ];
+
+  /** @scenario "A command runs with the machine's own variables and no more" */
+  it("keeps the machine and the toolchain, and never a name that reads as a secret", () => {
+    for (const [name, inherited] of variables) {
+      expect(inheritsVariable(name), name).toBe(inherited);
+    }
+    const source = Object.fromEntries(
+      variables.map(([name]) => [name, `value-of-${name}`]),
+    );
+    expect(Object.keys(commandEnvironment(source)).sort()).toEqual(
+      variables
+        .filter(([, inherited]) => inherited)
+        .map(([name]) => name)
+        .sort(),
+    );
+  });
+
+  /** @scenario "A command runs with the machine's own variables and no more" */
+  it("gives a real command no key this process holds", async () => {
+    process.env.LANGY_TEST_SECRET = "sk-lw-do-not-leak";
+    try {
+      const command = startCommand({
+        command: "echo \"key=[${LANGY_TEST_SECRET:-none}]\"",
+        root,
+        callId: "call_env",
+      });
+      const output = await command.result;
+
+      expect(output.stdout).toContain("key=[none]");
+      expect(output.stdout).not.toContain("sk-lw-do-not-leak");
+    } finally {
+      delete process.env.LANGY_TEST_SECRET;
+    }
+  });
+});

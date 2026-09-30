@@ -36,9 +36,10 @@ import {
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
   grantRowToFact,
+  isBindingGrant,
 } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type {
   GrantProjectionWrite,
   GrantProjectionWriteStore,
@@ -294,8 +295,8 @@ export class PrismaAuthzGrantsWriteRepository
     // exactly the visible change the migration promises not to make.
     const migrationSourced = isMigrationOwned(grant.source);
 
-    const binding = grantFactToCompatBinding({ grant, organizationId });
-    if (binding) {
+    if (isBindingGrant(grant)) {
+      const binding = grantFactToCompatBinding({ grant, organizationId });
       const { id, ...rest } = binding;
       if (migrationSourced) {
         await this.prisma.roleBinding.updateMany({
@@ -344,11 +345,12 @@ export class PrismaAuthzGrantsWriteRepository
       select: GRANT_FACT_COLUMNS,
     });
     if (!row) return;
+    const grant = grantRowToFact(row);
+    if (!isBindingGrant(grant)) return;
     const binding = grantFactToCompatBinding({
-      grant: grantRowToFact(row),
+      grant,
       organizationId: row.organizationId,
     });
-    if (!binding) return;
     await this.prisma.roleBinding.updateMany({
       where: { organizationId: row.organizationId, id: grantId },
       data: { role: binding.role, customRoleId: binding.customRoleId },
@@ -391,7 +393,11 @@ export class PrismaAuthzGrantsWriteRepository
   ): Prisma.PrismaPromise<unknown> {
     switch (write.kind) {
       case "grant.upsert":
-        return this.upsertGrant(write.row);
+        return this.upsertGrant(
+          write.row,
+          write.membershipStamp,
+          write.membershipBootstrap,
+        );
 
       case "grant.setRole":
         return this.prisma.grant.updateMany({
@@ -456,14 +462,47 @@ export class PrismaAuthzGrantsWriteRepository
    * attach must not un-revoke a grant, and the row's own revocation is not
    * this event's to state.
    */
-  private upsertGrant(row: GrantRow): Prisma.PrismaPromise<number> {
+  private upsertGrant(
+    row: GrantRow,
+    membershipStamp: string | undefined,
+    membershipBootstrap: boolean | undefined,
+  ): Prisma.PrismaPromise<number> {
+    const membershipGuard =
+      membershipStamp !== undefined && row.principalType === "USER"
+        ? Prisma.sql`
+            (
+              EXISTS (
+                SELECT 1
+                FROM "OrganizationUser"
+                WHERE "organizationId" = ${row.organizationId}
+                  AND "userId" = ${row.principalId}
+                  AND "membershipStamp" = ${membershipStamp}
+                FOR UPDATE
+              )
+              OR (
+                ${membershipBootstrap ?? false}
+                AND ${row.roleKey === "admin"}
+                AND ${
+                  row.scopeType === "TEAM" ||
+                  (row.scopeType === "ORGANIZATION" &&
+                    row.scopeId === row.organizationId)
+                }
+                AND NOT EXISTS (
+                  SELECT 1 FROM "Organization"
+                  WHERE "id" = ${row.organizationId}
+                )
+              )
+            )
+          `
+        : Prisma.sql`TRUE`;
+
     return this.prisma.$executeRaw`
       INSERT INTO "Grant" (
         "id", "organizationId", "principalType", "principalId", "roleKey",
         "legacyRole", "source", "scopeType", "scopeId", "token", "permission",
         "resourceKind", "projectId", "createdByUserId", "expiresAt",
         "maxViews", "occurredAt", "updatedAt"
-      ) VALUES (
+      ) SELECT
         ${row.id}, ${row.organizationId},
         ${row.principalType}::"GrantPrincipalType", ${row.principalId},
         ${row.roleKey}, ${row.legacyRole}, ${row.source},
@@ -471,7 +510,7 @@ export class PrismaAuthzGrantsWriteRepository
         ${row.permission}, ${row.resourceKind}, ${row.projectId},
         ${row.createdByUserId}, ${row.expiresAt}, ${row.maxViews},
         ${row.occurredAt}, NOW()
-      )
+      WHERE ${membershipGuard}
       ON CONFLICT ("id") DO UPDATE SET
         "organizationId"  = EXCLUDED."organizationId",
         "principalType"   = EXCLUDED."principalType",

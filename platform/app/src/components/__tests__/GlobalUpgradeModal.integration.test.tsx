@@ -43,8 +43,12 @@ describe("GlobalUpgradeModal", () => {
         useUpgradeModalStore.getState().openLiteMemberRestriction({});
       });
 
+      // The default 1s findBy timeout is too tight for this one: resolving
+      // the chunk pulls in the dialog UI and its dependencies, which takes
+      // just over a second in the vm-fork pool and fails right at the
+      // boundary. The test is about the chunk resolving and mounting at all.
       expect(
-        await screen.findByText("Feature Not Available"),
+        await screen.findByText("Feature Not Available", {}, { timeout: 5000 }),
       ).toBeInTheDocument();
     });
   });

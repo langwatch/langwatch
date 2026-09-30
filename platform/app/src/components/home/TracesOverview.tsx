@@ -11,6 +11,7 @@ import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "~/server/analytics/registry";
+import { LANGY_TRACE_ORIGIN } from "~/server/app-layer/traces/derive-trace-origin";
 import { CustomGraph, type CustomGraphInput } from "../analytics/CustomGraph";
 import { usePeriodSelector } from "../PeriodSelector";
 import { Link } from "../ui/link";
@@ -173,6 +174,10 @@ export function TracesOverview({
   const tracesOverviewGraph: CustomGraphInput = {
     graphId: "tracesOverview",
     graphType: "summary",
+    // Langy's own turns trace into the project (ADR-061) but the customer
+    // never sent them: a fresh project with one kickoff behind it still
+    // reads Traces 0, Users 0.
+    excludeOrigins: [LANGY_TRACE_ORIGIN],
     series: [
       {
         name: "Traces",

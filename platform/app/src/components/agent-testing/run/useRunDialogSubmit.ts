@@ -7,6 +7,7 @@ import {
 } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
+import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
 import type { SuiteTarget } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import type { toLineRunParameters } from "./parameter-line";
@@ -102,6 +103,8 @@ export type RunDialogSubmitInput = {
   storableRunParameters: RunParameters;
   /** The keys of the secret rows, which is all the suite may remember of them. */
   storableSecretNames: string[] | undefined;
+  /** The plan's own evaluators, beside the ones the suites in scope attach. */
+  evaluators: EvaluatorAttachment[];
   onRunStarted: (info: RunStartedInfo) => void;
   onClose: () => void;
   setInlineError: (error: unknown) => void;

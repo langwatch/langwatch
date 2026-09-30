@@ -81,6 +81,8 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       annotation: {
         getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
+        getQueues: { invalidate: mocks.invalidateQueues },
+        getQueueWalkStep: { invalidate: vi.fn() },
         getPendingItemsCount: { invalidate: mocks.invalidatePending },
         getAssignedItemsCount: { invalidate: mocks.invalidateAssigned },
         getQueueItemsCounts: { invalidate: mocks.invalidateQueueCounts },

@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { previewCostRuleMatchingSpans } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import { prisma } from "~/server/db";
 import { assertCanManageScope } from "~/server/modelProviders/modelProvider.authz";
@@ -11,7 +12,6 @@ import { SCOPE_TIERS, type ScopeTier } from "~/server/scopes/scope.types";
 import { isSafeRegex } from "~/utils/safeRegex";
 import { getModelLimits } from "../../../utils/modelLimits";
 import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
-import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**

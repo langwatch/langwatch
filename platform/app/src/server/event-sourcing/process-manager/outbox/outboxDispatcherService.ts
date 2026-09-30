@@ -35,6 +35,14 @@ export interface DispatchableMessage {
   sourceEventId: string | null;
   /** 1-based delivery attempt. */
   attempt: number;
+  /**
+   * When this delivery's lease lapses, in the dispatcher's logical clock.
+   *
+   * A handler doing paid work bounds itself by it: past this instant another
+   * dispatcher may lease the same message and run the effect a second time,
+   * so work still under way then is work that will be paid for twice.
+   */
+  leaseExpiresAt: number;
 }
 
 /**
@@ -530,6 +538,10 @@ export class OutboxDispatcherService {
               payload: message.payload,
               sourceEventId: message.sourceEventId,
               attempt,
+              // The store anchored the lease at the drain's `now`, so this is
+              // the same instant the store will hand the message to someone
+              // else at.
+              leaseExpiresAt: now + this.leaseDurationMs,
             },
           });
           const { applied } = await this.store.markDispatched({

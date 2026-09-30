@@ -14,6 +14,9 @@ import { useDrawerProjectId } from "./useDrawerProjectId";
  *   - `project` (resolved org/team/project),
  *   - `traceId` from the drawer store,
  *   - `occurredAtMs` URL hint for ClickHouse partition pruning,
+ *   - `hintReady`, true once that hint is known: the header read runs
+ *     without it and backfills it, every other per-trace read waits for it,
+ *     so a deep link costs one unpruned read rather than one per hook,
  *   - `isLive` rolling-window flag for live refetch cadence,
  *   - `queryArgs` ready to spread into a `useQuery({ ... })` input.
  *
@@ -40,6 +43,7 @@ export function useTraceQueryArgs() {
   };
 
   const isReady = !!projectId && !!traceId && !isPreviewTraceId(traceId ?? "");
+  const hintReady = occurredAtMs !== null;
 
   return {
     project,
@@ -48,6 +52,7 @@ export function useTraceQueryArgs() {
     occurredAtMs,
     isLive,
     isReady,
+    hintReady,
     queryArgs,
   };
 }

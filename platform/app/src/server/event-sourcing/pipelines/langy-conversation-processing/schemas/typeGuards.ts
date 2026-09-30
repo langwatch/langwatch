@@ -10,11 +10,17 @@ import type {
   LangyConversationProcessingEvent,
   LangyConversationStartedEvent,
   LangyConversationTitleGeneratedEvent,
+  LangyLocalControlRequestedEvent,
+  LangyLocalPolicyChangedEvent,
+  LangyLocalWorkspaceConnectedEvent,
+  LangyLocalWorkspaceDisconnectedEvent,
   LangyMessageRecordedEvent,
   LangyPlanUpdatedEvent,
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
+  LangyUserWaitEndedEvent,
+  LangyUserWaitStartedEvent,
 } from "./events";
 
 export function isLangyConversationStartedEvent(
@@ -103,4 +109,44 @@ export function isLangyConversationTitleGeneratedEvent(
   event: LangyConversationProcessingEvent,
 ): event is LangyConversationTitleGeneratedEvent {
   return event.type === LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED;
+}
+
+export function isLangyLocalControlRequestedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyLocalControlRequestedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED;
+}
+
+export function isLangyLocalWorkspaceConnectedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyLocalWorkspaceConnectedEvent {
+  return (
+    event.type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED
+  );
+}
+
+export function isLangyLocalWorkspaceDisconnectedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyLocalWorkspaceDisconnectedEvent {
+  return (
+    event.type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED
+  );
+}
+
+export function isLangyLocalPolicyChangedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyLocalPolicyChangedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_POLICY_CHANGED;
+}
+
+export function isLangyUserWaitStartedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyUserWaitStartedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED;
+}
+
+export function isLangyUserWaitEndedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyUserWaitEndedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED;
 }

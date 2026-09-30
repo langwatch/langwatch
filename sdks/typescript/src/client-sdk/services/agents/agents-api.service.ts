@@ -46,6 +46,14 @@ export interface AgentResponse {
   owner?: { userId: string; name: string } | null;
   /** The machine a host-scoped development agent belongs to. */
   hostLabel?: string | null;
+  /**
+   * Whether this key can run the agent. A personal development agent of
+   * another person is listed all the same, so two agents of one name can be
+   * told apart, but it cannot be run with this key.
+   */
+  selectable?: boolean;
+  /** Why the agent cannot be run with this key; null when it can. */
+  notSelectableReason?: "owned_by_another_person" | null;
   parameters?: AgentParameterSpec[];
 }
 

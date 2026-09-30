@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  EXACT_CREDENTIAL_FIELDS,
   PUBLIC_CREDENTIAL_FIELDS,
   SECRET_CREDENTIAL_MARKERS,
 } from "../../../utils/constants";
@@ -135,6 +136,35 @@ describe("credential field classification", () => {
           isSecretCredentialField(field),
           `${field} should stay visible`,
         ).toBe(false);
+      }
+    });
+  });
+
+  describe("given the exact-bytes credential list", () => {
+    it("holds no name that no provider stores", () => {
+      // A stale entry is a field that was renamed or removed. Left behind, it
+      // stops matching the name the registry now uses, and the credential it
+      // was protecting goes back to being trimmed on every read — silently,
+      // because a signing key that no longer matches the vendor's copy fails
+      // as an authentication error rather than as a bad value.
+      const registryFields = new Set(
+        everyRegistryCredentialField().map(({ field }) => field),
+      );
+
+      for (const field of EXACT_CREDENTIAL_FIELDS) {
+        expect(
+          registryFields.has(field),
+          `${field} is not in the registry`,
+        ).toBe(true);
+      }
+    });
+
+    it("holds only fields the classifier already treats as secret", () => {
+      for (const field of EXACT_CREDENTIAL_FIELDS) {
+        expect(
+          isSecretCredentialField(field),
+          `${field} is exempt from trimming but not classified as a secret`,
+        ).toBe(true);
       }
     });
   });

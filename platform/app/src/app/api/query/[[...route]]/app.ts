@@ -1,10 +1,13 @@
 /**
  * The query domain's app.
  *
- * `createProjectApp`, because a project API key reaches exactly its own
- * project and that is the single-project slice this family ships first. The
- * cross-project fan-out (issue #7565) would mount on `createOrgApp` instead,
- * and would choose its own gate there.
+ * `createProjectApp` for the canonical envelope and the app-context/logger
+ * plumbing, but NOT for its project-auth chain: the routes declare
+ * `handlerManagedAuth` and prepend their own key-auth middleware
+ * ({@link createUnifiedKeyAuthMiddleware}), which authenticates ANY API key
+ * without demanding a project so the door can fan the key out across every
+ * project it can read (#8085). The app's variables are widened with
+ * {@link KeyAuthVariables} so the handlers read `keyPrincipal` off context.
  *
  * No `onError` of its own: the canonical envelope `createProjectApp` installs
  * is the whole error contract, the same one every other REST family answers
@@ -17,6 +20,7 @@
  */
 
 import { createProjectApp } from "~/server/api/security";
+import type { KeyAuthVariables } from "~/server/api-key/auth-middleware";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { registerQueryRoutes } from "./app.v1";
 
@@ -41,7 +45,7 @@ const BASE_PATH = "/api/v1/query";
  * no such shape to preserve and the canonical one is what the rest of the
  * platform is converging on.
  */
-const secured = createProjectApp({
+const secured = createProjectApp<KeyAuthVariables>({
   basePath: BASE_PATH,
   errorEnvelope: "canonical",
 });

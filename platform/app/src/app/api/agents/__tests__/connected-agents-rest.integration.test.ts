@@ -76,6 +76,67 @@ describe("Feature: connected agents on the REST agents API", () => {
     });
   }
 
+  describe("when one name and one environment hold a personal row and a host-scoped row", () => {
+    /** @scenario "A listed connected agent carries its owner and whether the caller can choose it" */
+    it("lists both rows, and marks the personal one as not selectable", async () => {
+      const owner = await prisma.user.create({
+        data: { name: "Ana", email: `owner-${nanoid(8)}@example.com` },
+      });
+      const name = `two-owners-${nanoid(6)}`;
+      const personal = await prisma.agent.create({
+        data: {
+          id: `agent_${nanoid()}`,
+          projectId: project.id,
+          name,
+          type: "connected",
+          config: connectedConfig,
+          environment: "development",
+          ownerUserId: owner.id,
+          identityKey: `${name}@development/user:${owner.id}`,
+          lastSeenAt: new Date(),
+        },
+      });
+      const hosted = await prisma.agent.create({
+        data: {
+          id: `agent_${nanoid()}`,
+          projectId: project.id,
+          name,
+          type: "connected",
+          config: connectedConfig,
+          environment: "development",
+          hostLabel: "acme-laptop",
+          identityKey: `${name}@development/host:acme-laptop`,
+          lastSeenAt: new Date(),
+        },
+      });
+
+      const response = await app.request("/api/v1/agents?limit=100", {
+        headers: headers(),
+      });
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        data: {
+          id: string;
+          owner: { name: string | null } | null;
+          selectable: boolean;
+          notSelectableReason: string | null;
+        }[];
+      };
+      const personalWire = body.data.find((row) => row.id === personal.id);
+      const hostedWire = body.data.find((row) => row.id === hosted.id);
+
+      expect(personalWire?.owner?.name).toBe("Ana");
+      expect(personalWire?.selectable).toBe(false);
+      expect(personalWire?.notSelectableReason).toBe("owned_by_another_person");
+      expect(hostedWire?.owner).toBeNull();
+      expect(hostedWire?.selectable).toBe(true);
+      expect(hostedWire?.notSelectableReason).toBeNull();
+
+      await prisma.user.delete({ where: { id: owner.id } }).catch(() => {});
+    });
+  });
+
   describe("when a caller creates a connected agent by hand", () => {
     /** @scenario "A connected agent cannot be created by hand" */
     it("refuses with agent_register_only", async () => {

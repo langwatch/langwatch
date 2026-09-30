@@ -63,6 +63,11 @@ const occurredAtMs = z
  * `input_tokens` and `output_tokens`: the gateway takes them out of the
  * provider's totals before emitting, because audio tokens price several times
  * higher and charging both would double the audio portion.
+ * `input_image_tokens` and `output_image_tokens` are DISJOINT the same way:
+ * the token-billed image models price output image tokens at six to eight
+ * times text input, and an image call carries most of its cost there.
+ * `image_count` is how many images the response carried, reported for
+ * display and never priced.
  * `reasoning_tokens` is the exception and stays a subset of `output_tokens`,
  * reported for display and never priced.
  *
@@ -82,6 +87,10 @@ export const spendUsageSchema = z.object({
   input_chars: z.number().int().min(0).default(0),
   /** Audio duration in whole milliseconds. */
   audio_ms: z.number().int().min(0).default(0),
+  input_image_tokens: z.number().int().min(0).default(0),
+  output_image_tokens: z.number().int().min(0).default(0),
+  /** Images the response carried. Observability only, never priced. */
+  image_count: z.number().int().min(0).default(0),
 });
 export type SpendUsage = z.infer<typeof spendUsageSchema>;
 
@@ -97,6 +106,9 @@ export const EMPTY_SPEND_USAGE: SpendUsage = {
   output_audio_tokens: 0,
   input_chars: 0,
   audio_ms: 0,
+  input_image_tokens: 0,
+  output_image_tokens: 0,
+  image_count: 0,
 };
 
 /**
