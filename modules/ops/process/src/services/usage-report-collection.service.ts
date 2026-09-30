@@ -4,6 +4,7 @@ import type { AutomationApi } from "@langwatch/automation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { ConnectDeploymentView } from "@langwatch/enterprise-licensing-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
@@ -91,6 +92,11 @@ export interface UsageReportCollectInput {
   readonly firstSeenAt: Instant | undefined;
   /** Whether any license on this install names a hosted service. */
   readonly connected: boolean;
+  /** The key licenses verify against, and the license it verified. */
+  readonly license: Pick<
+    ConnectDeploymentView,
+    "licenseKeySource" | "licenseKeyFingerprint" | "licenseId" | "licenseVerified"
+  >;
   readonly switches?: UsageReportSwitches;
   readonly now: Instant;
 }
@@ -126,6 +132,7 @@ export class UsageReportCollectionService {
     instanceId,
     firstSeenAt,
     connected,
+    license,
     switches = USAGE_REPORT_SWITCHES_ON,
     now,
   }: UsageReportCollectInput): Promise<Record<string, unknown>> {
@@ -149,6 +156,10 @@ export class UsageReportCollectionService {
       first_seen_at: firstSeenAt ? iso(firstSeenAt.epochMilliseconds) : null,
       timestamp: iso(now.epochMilliseconds),
       ...operational,
+      license_key_source: license.licenseKeySource,
+      license_key_fingerprint: license.licenseKeyFingerprint,
+      license_id: license.licenseId,
+      license_verified: license.licenseVerified,
       ...optional,
     };
   }

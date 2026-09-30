@@ -1,14 +1,11 @@
-import { DEFAULT_LICENSE_PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
+import { generateKeyPairSync } from "node:crypto";
+
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { describe, expect, it } from "vitest";
 
-import {
-  isSignedFor,
-  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
-  resolveSeedLicense,
-  TEST_SUITE_ENTERPRISE_LICENSE_KEY as TEST_SUITE_LICENSE_KEY,
-} from "../seed-license.ts";
+import { chooseSeedLicense, TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "../seed-license.ts";
 
-/** The public half of the licensing test suite's key pair, which signs TEST_SUITE_LICENSE_KEY. */
+/** The public half of the licensing test suite's key pair, which signs the test-suite fixture. */
 const TEST_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApmJ61eRR1wxrapjipSmN
 IqYMJPmbonA1d6XV51kdnVs/MdNrrdoWIal6TDt2lHvbAbrEalqR7h+vQzBBZ4St
@@ -19,112 +16,111 @@ m0gqlJm89dYcRBaDVGFTnb98BM7SrAIg117yjuuw5o/RmSlKq9/Klkz0QsXYF9Zj
 iQIDAQAB
 -----END PUBLIC KEY-----`;
 
-const SEED_CANDIDATES = [LOCAL_DEV_ENTERPRISE_LICENSE_KEY, TEST_SUITE_LICENSE_KEY] as const;
+const ORGANIZATION = {
+  id: "local-dev-organization",
+  name: "Local Dev Organization",
+  email: "admin@example.test",
+};
 
-describe("LOCAL_DEV_ENTERPRISE_LICENSE_KEY", () => {
-  describe("given the app boots with the default key", () => {
-    describe("when the local-dev license is verified", () => {
-      it("verifies", () => {
-        expect(
-          isSignedFor({
-            licenseKey: LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
-            publicKey: DEFAULT_LICENSE_PUBLIC_KEY,
-          }),
-        ).toBe(true);
+function keyPair(): { publicKey: string; privateKey: string } {
+  return generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  });
+}
+
+const dev = keyPair();
+const stranger = keyPair();
+
+describe("chooseSeedLicense", () => {
+  describe("given the private key pairs with the boot public key", () => {
+    describe("when the organization holds no valid licence", () => {
+      /** @scenario "The seed signs an enterprise licence from the private key in secrets" */
+      it("signs a fresh enterprise licence bound to the organization", () => {
+        const choice = chooseSeedLicense({
+          stored: "not-a-licence",
+          publicKey: dev.publicKey,
+          privateKey: dev.privateKey,
+          organization: ORGANIZATION,
+        });
+
+        expect(choice.licenseKey).not.toBeNull();
+        expect(choice).toMatchObject({ source: "signed" });
+        const validation = NodeLicenseCryptographyService.create({
+          publicKey: dev.publicKey,
+        }).validateLicense({ licenseKey: choice.licenseKey ?? "" });
+        expect(validation).toMatchObject({
+          valid: true,
+          licenseData: { organizationId: ORGANIZATION.id, plan: { type: "ENTERPRISE" } },
+        });
       });
     });
 
-    // Documents why the seed used to show an invalid license: the ee fixture
-    // is signed with the test-suite private key, not the default one.
-    describe("when the ee test fixture license is verified", () => {
-      it("rejects it", () => {
-        expect(
-          isSignedFor({
-            licenseKey: TEST_SUITE_LICENSE_KEY,
-            publicKey: DEFAULT_LICENSE_PUBLIC_KEY,
-          }),
-        ).toBe(false);
+    describe("when the organization already holds a valid licence", () => {
+      /** @scenario "The seed keeps a stored licence that verifies" */
+      it("keeps it rather than signing another", () => {
+        const first = chooseSeedLicense({
+          stored: null,
+          publicKey: dev.publicKey,
+          privateKey: dev.privateKey,
+          organization: ORGANIZATION,
+        });
+
+        const second = chooseSeedLicense({
+          stored: first.licenseKey,
+          publicKey: dev.publicKey,
+          privateKey: dev.privateKey,
+          organization: ORGANIZATION,
+        });
+
+        expect(second).toEqual({ licenseKey: first.licenseKey, source: "stored" });
       });
     });
   });
-});
 
-describe("resolveSeedLicense", () => {
-  describe("given the app boots with the default key", () => {
-    describe("when the organization has no license yet", () => {
-      it("returns the local-dev enterprise license", () => {
+  describe("given no private key", () => {
+    describe("when no committed licence is valid under the boot public key", () => {
+      /** @scenario "Without a private key the seed stores no licence and says why" */
+      it("stores no licence and names the missing key", () => {
         expect(
-          resolveSeedLicense({
+          chooseSeedLicense({
             stored: null,
-            publicKey: DEFAULT_LICENSE_PUBLIC_KEY,
-            candidates: SEED_CANDIDATES,
+            publicKey: dev.publicKey,
+            privateKey: undefined,
+            organization: ORGANIZATION,
           }),
-        ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
+        ).toEqual({ licenseKey: null, reason: "no-private-key" });
       });
     });
 
-    describe("when the stored license does not verify", () => {
-      it("replaces an unreadable value", () => {
+    describe("when the stack boots with the test suite's public key, as CI does", () => {
+      /** @scenario "CI keeps seeding the test-suite licence under the test key" */
+      it("stores the test-suite enterprise licence", () => {
         expect(
-          resolveSeedLicense({
-            stored: "not-a-license",
-            publicKey: DEFAULT_LICENSE_PUBLIC_KEY,
-            candidates: SEED_CANDIDATES,
-          }),
-        ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
-      });
-
-      it("replaces a fixture left behind by an older seed", () => {
-        expect(
-          resolveSeedLicense({
-            stored: TEST_SUITE_LICENSE_KEY,
-            publicKey: DEFAULT_LICENSE_PUBLIC_KEY,
-            candidates: SEED_CANDIDATES,
-          }),
-        ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
-      });
-    });
-
-    describe("when the stored license already verifies", () => {
-      it("keeps it, so a re-seed never clobbers a license someone activated", () => {
-        const activated = LOCAL_DEV_ENTERPRISE_LICENSE_KEY;
-        // Candidates deliberately exclude the stored key, so a resolver that
-        // skipped the stored branch could not pass by coincidence.
-        expect(
-          resolveSeedLicense({
-            stored: activated,
-            publicKey: DEFAULT_LICENSE_PUBLIC_KEY,
-            candidates: [TEST_SUITE_LICENSE_KEY],
-          }),
-        ).toBe(activated);
-      });
-    });
-  });
-
-  describe("given the app boots with the test-suite key, as CI seeds do", () => {
-    describe("when the organization has no license yet", () => {
-      it("returns the ee test fixture, the candidate that verifies there", () => {
-        expect(
-          resolveSeedLicense({
+          chooseSeedLicense({
             stored: null,
             publicKey: TEST_PUBLIC_KEY,
-            candidates: SEED_CANDIDATES,
+            privateKey: undefined,
+            organization: ORGANIZATION,
           }),
-        ).toBe(TEST_SUITE_LICENSE_KEY);
+        ).toEqual({ licenseKey: TEST_SUITE_ENTERPRISE_LICENSE_KEY, source: "test-suite" });
       });
     });
   });
 
-  describe("given no candidate verifies against the boot key", () => {
-    describe("when the organization has no license yet", () => {
-      it("falls back to the first candidate so the org still has a readable license", () => {
+  describe("given a private key that does not pair with the boot public key", () => {
+    describe("when the seed runs", () => {
+      /** @scenario "A private key that does not pair with the boot public key is refused" */
+      it("stores no licence", () => {
         expect(
-          resolveSeedLicense({
+          chooseSeedLicense({
             stored: null,
-            publicKey: "-----BEGIN PUBLIC KEY-----\nnot-a-key\n-----END PUBLIC KEY-----",
-            candidates: SEED_CANDIDATES,
+            publicKey: dev.publicKey,
+            privateKey: stranger.privateKey,
+            organization: ORGANIZATION,
           }),
-        ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
+        ).toEqual({ licenseKey: null, reason: "unpaired-private-key" });
       });
     });
   });

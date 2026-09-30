@@ -1,4 +1,9 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyService,
+  type LicenseCryptography,
+} from "@langwatch/enterprise-license-signing";
 /**
  * The licensing feature's application: what both of its doors call. It holds every service and
  * port the feature's api files reach, and it is the one typed thing a transport is given.
@@ -102,21 +107,18 @@ import { ContractBudgetService } from "../services/contract-budget.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
 import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
-import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { LicenseRefreshService } from "../services/license-refresh.service.ts";
 import { LicenseRegistryService } from "../services/license-registry.service.ts";
 import { LicenseSyncService } from "../services/license-sync.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
 import { LicensingInfrastructureService } from "../services/licensing-infrastructure.service.ts";
-import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
 import type {
   ConnectInstallInfrastructure,
   LicenseCustomers,
   HostedServicesInfrastructure,
-  LicenseCryptography,
   SelfHostedInstancesInfrastructure,
   LicenseLogger,
   LicenseRegistryInfrastructure,

@@ -1,4 +1,3 @@
-export { NodeLicenseCryptographyService } from "./services/node-license-cryptography.service.ts";
 export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.app.ts";
 export { licensingServer } from "./licensing.server.ts";
 export { LicensingInfrastructureService } from "./services/licensing-infrastructure.service.ts";
@@ -13,7 +12,6 @@ export {
 export { MemoryOrganizationLicenseRepository } from "./repositories/memory/memory.organization-license.repository.ts";
 export { PrismaOrganizationLicenseRepository } from "./repositories/prisma/prisma.organization-license.repository.ts";
 export type {
-  LicenseCryptography,
   LicenseLogger,
   LicenseRetention,
   LicenseRetentionRule,

@@ -1,11 +1,7 @@
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  type LicenseRetention,
-  type LicenseStorage,
-  NodeLicenseCryptographyService,
-  type StoredLicense,
-} from "../index.ts";
+import { type LicenseRetention, type LicenseStorage, type StoredLicense } from "../index.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import { EXPIRED_LICENSE_KEY, TEST_PUBLIC_KEY, VALID_LICENSE_KEY } from "./testing.ts";
 

@@ -1,3 +1,4 @@
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import type { OrganizationLicense } from "@langwatch/enterprise-licensing-process";
 import { describe, expect, it } from "vitest";
 
@@ -8,7 +9,6 @@ import {
   TEST_PUBLIC_KEY,
 } from "../../__tests__/testing.ts";
 import { LicensingEntitlementSourceService } from "../licensing-entitlement-source.service.ts";
-import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 /**
  * Spec: specs/licensing/management-apis-enterprise-gate.feature. The four

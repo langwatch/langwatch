@@ -1,3 +1,4 @@
+import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
   LICENSE_ERRORS,
   LicensingService as LicensingServiceContract,
@@ -16,7 +17,6 @@ import { licenseResourceCounts } from "@langwatch/plans";
 import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
 
 import type {
-  LicenseCryptography,
   LicenseLogger,
   LicenseRetention,
   LicenseUsage,

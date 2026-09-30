@@ -12,6 +12,13 @@ Feature: Enterprise licensing lifecycle
     When the licensing service validates it for activation
     Then validation fails and no license state is written
 
+  # lic-d6f0f20c-f1f9-4489-bc0a-77b156986b0c was signed by the production key and committed.
+  @unit
+  Scenario: A revoked license never verifies, whatever key signed it
+    Given a license whose id is on the revocation list carries a signature the verifier's key accepts
+    When the verifier checks its signature or validates it
+    Then it is refused as an invalid signature
+
   @unit
   Scenario: Preserve a lapsed self-hosted purchase
     Given a genuine signed license has reached its end date

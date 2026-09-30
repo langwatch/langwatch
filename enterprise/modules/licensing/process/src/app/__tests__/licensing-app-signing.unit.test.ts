@@ -3,6 +3,7 @@
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/kernel";
@@ -17,7 +18,6 @@ import {
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
-import { NodeLicenseCryptographyService } from "../../services/node-license-cryptography.service.ts";
 import { LicensingApp } from "../licensing.app.ts";
 
 const PURCHASE = {

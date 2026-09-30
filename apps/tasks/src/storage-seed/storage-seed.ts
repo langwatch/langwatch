@@ -7,12 +7,18 @@
 import { createHash, createHmac } from "node:crypto";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
-import { DEFAULT_LICENSE_PUBLIC_KEY as PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
+import { parseProcessConfig } from "@langwatch/config";
+import {
+  DEFAULT_LICENSE_PUBLIC_KEY,
+  licensingConfig,
+  licensingSecrets,
+} from "@langwatch/enterprise-licensing-contract";
 import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { aesEncryption, type Encryption } from "@langwatch/process-stores";
 import { ROLE_KIND } from "@langwatch/role-contract";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { hash as hashPassword } from "bcrypt";
 
 import type { TaskInput } from "../config.ts";
@@ -30,11 +36,7 @@ import {
   resolveSeedEmailDomain,
   seedEmailAddress,
 } from "./seed-identity.ts";
-import {
-  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
-  resolveSeedLicense,
-  TEST_SUITE_ENTERPRISE_LICENSE_KEY,
-} from "./seed-license.ts";
+import { chooseSeedLicense, type SeedLicenseChoice } from "./seed-license.ts";
 
 const logger = createLogger("langwatch:tasks:storage-seed");
 
@@ -120,20 +122,32 @@ export async function storageSeed({ connections, environment }: TaskInput): Prom
     ? firstMessageOverride === "1" || firstMessageOverride === "true"
     : environment.HAVEN_SEED_PRESET === "demo";
 
-  // The license must verify against the key this app boots with, otherwise
-  // every settings page reports it as invalid. `resolveSeedLicense` keeps a
-  // license that already verifies (someone activated a real one) and only
-  // replaces what does not. The local-dev key verifies under the default key;
-  // the test-suite fixture is there for CI, which seeds under the test key.
+  // The licence must be valid under the key this stack boots with. No licence is committed:
+  // the seed signs one with the private key from secrets (seed-license.ts has the order).
   const existingOrganization = await prisma.organization.findUnique({
     where: { id: ORG_ID },
     select: { license: true },
   });
-  const license = resolveSeedLicense({
-    stored: existingOrganization?.license ?? null,
-    publicKey: PUBLIC_KEY,
-    candidates: [LOCAL_DEV_ENTERPRISE_LICENSE_KEY, TEST_SUITE_ENTERPRISE_LICENSE_KEY],
+  const { licensing } = parseProcessConfig({
+    owners: [{ name: "licensing", config: licensingConfig }],
+    environment,
   });
+  const secrets = SecretsResolver.over(
+    SecretsChain.start({ environment })
+      .withEnv()
+      .withFile()
+      .withOnePassword(environment.LANGWATCH_OP_ACCOUNT),
+  ).scopeTo("storage-seed", [licensingSecrets.licensePrivateKey]);
+  const licenseChoice = await secrets.into(licensingSecrets.licensePrivateKey, (privateKey) =>
+    chooseSeedLicense({
+      stored: existingOrganization?.license ?? null,
+      publicKey: licensing.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY,
+      privateKey,
+      organization: { id: ORG_ID, name: ORG_NAME, email: adminEmail },
+    }),
+  );
+  logSeedLicenseChoice(licenseChoice);
+  const license = licenseChoice.licenseKey;
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
     create: {
@@ -500,6 +514,23 @@ async function seedAccessTokens({
 // ID (idempotent). HAVEN_SEED_MODEL_PROVIDERS=0 disables the whole block.
 
 const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
+
+/** One line per outcome; the two that store nothing name the secret that fixes them. */
+function logSeedLicenseChoice(choice: SeedLicenseChoice): void {
+  if ("source" in choice) {
+    logger.info({ source: choice.source }, "seeding the local organization's licence");
+    return;
+  }
+  if (choice.reason === "unpaired-private-key") {
+    logger.warn(
+      "LANGWATCH_LICENSE_PRIVATE_KEY does not pair with this stack's licence public key (LANGWATCH_LICENSE_PUBLIC_KEY), so no licence is seeded",
+    );
+    return;
+  }
+  logger.warn(
+    "no licence seeded: set LANGWATCH_LICENSE_PRIVATE_KEY (root .env or 1Password) to sign an enterprise licence for the local organization",
+  );
+}
 
 /** The api-key module's at-rest hash: HMAC-SHA256 of the secret under the pepper, in hex. */
 function hashApiKeySecret({ secret, pepper }: { secret: string; pepper: string }): string {

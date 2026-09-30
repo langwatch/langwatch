@@ -3,7 +3,13 @@
  * left switched on, and what never leaves an install that reaches nothing.
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
-import { ConnectBudgetExhaustedError } from "@langwatch/enterprise-licensing-contract";
+import { createHash, createPublicKey } from "node:crypto";
+
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
+import {
+  ConnectBudgetExhaustedError,
+  DEFAULT_LICENSE_PUBLIC_KEY,
+} from "@langwatch/enterprise-licensing-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -17,7 +23,6 @@ import { MemoryConnectOrganizationRepository } from "../../repositories/memory/m
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
-import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const ORGANIZATION = "org-acme";
@@ -69,12 +74,15 @@ function install({
   permitted = true,
   gateway = MemoryConnectGatewayChannel.create(),
   upstream = new RecordingUpstreamSlot(),
+  override = true,
 }: {
   license: string | null;
   servicesDisabled?: string[];
   permitted?: boolean;
   gateway?: MemoryConnectGatewayChannel;
   upstream?: RecordingUpstreamSlot;
+  /** Whether LANGWATCH_LICENSE_PUBLIC_KEY names the test key. */
+  override?: boolean;
 }) {
   const organizations = MemoryConnectOrganizationRepository.create([
     {
@@ -99,7 +107,7 @@ function install({
     },
     ...(permitted ? { gateway } : {}),
     instanceLicenseKey: () => void 0,
-    publicKey: TEST_PUBLIC_KEY,
+    ...(override ? { publicKey: TEST_PUBLIC_KEY } : {}),
     upstream,
   });
   return { service, organizations, gateway, upstream };
@@ -252,7 +260,7 @@ describe("whether the install as a whole is connected", () => {
   it("is connected once any license on it names a hosted service", async () => {
     const { service } = install({ license: licenseNaming(["instant_evals"]) });
 
-    expect(await service.getDeployment()).toEqual({
+    expect(await service.getDeployment()).toMatchObject({
       permitted: true,
       connected: true,
       licenseEndpoint: "https://connect.langwatch.ai",
@@ -326,5 +334,77 @@ describe("the hosted provider slot of the install's own gateway", () => {
 
       expect(setup.upstream.current).toBeNull();
     }
+  });
+});
+
+/** The first 16 hex characters of the SHA-256 of a PEM public key's DER form. */
+function fingerprintOf(pem: string): string {
+  const der = createPublicKey(pem).export({ type: "spki", format: "der" });
+  return createHash("sha256").update(der).digest("hex").slice(0, 16);
+}
+
+/** A genuine license's signature over data it was not signed for. */
+function forgedLicense(): string {
+  const genuine = cryptography.parseLicenseKey(licenseNaming([]));
+  if (!genuine) throw new Error("the fixture license did not parse");
+  return cryptography.encodeLicenseKey({
+    data: { ...genuine.data, licenseId: "lic-forged" },
+    signature: genuine.signature,
+  });
+}
+
+describe("the license key the usage report names", () => {
+  /** @scenario "The report says whether licenses verify against the embedded key or an override" */
+  it("reports an override where the deployment names a public key", async () => {
+    const { service } = install({ license: null });
+
+    expect((await service.getDeployment()).licenseKeySource).toBe("override");
+  });
+
+  /** @scenario "The report says whether licenses verify against the embedded key or an override" */
+  it("reports the embedded key where the deployment names none", async () => {
+    const { service } = install({ license: null, override: false });
+
+    expect((await service.getDeployment()).licenseKeySource).toBe("embedded");
+  });
+
+  /** @scenario "The report fingerprints the verifying key and never carries it" */
+  it("fingerprints the key licenses verify against, and never carries it", async () => {
+    const override = await install({ license: null }).service.getDeployment();
+    const embedded = await install({ license: null, override: false }).service.getDeployment();
+
+    expect(override.licenseKeyFingerprint).toBe(fingerprintOf(TEST_PUBLIC_KEY));
+    expect(embedded.licenseKeyFingerprint).toBe(fingerprintOf(DEFAULT_LICENSE_PUBLIC_KEY));
+    expect(JSON.stringify(override)).not.toContain("BEGIN PUBLIC KEY");
+  });
+
+  /** @scenario "The report names the active license and whether it verified" */
+  it("names the license held and reports it verified", async () => {
+    const { service } = install({ license: licenseNaming([]) });
+
+    expect(await service.getDeployment()).toMatchObject({
+      licenseId: "lic-connect",
+      licenseVerified: true,
+    });
+  });
+
+  /** @scenario "The report names the active license and whether it verified" */
+  it("names a license whose signature does not verify, and says so", async () => {
+    const { service } = install({ license: forgedLicense() });
+
+    expect(await service.getDeployment()).toMatchObject({
+      licenseId: "lic-forged",
+      licenseVerified: false,
+    });
+  });
+
+  /** @scenario "The report names the active license and whether it verified" */
+  it("reports neither where the install holds no license", async () => {
+    const { service } = install({ license: null });
+
+    expect(await service.getDeployment()).toMatchObject({
+      licenseId: null,
+      licenseVerified: null,
+    });
   });
 });

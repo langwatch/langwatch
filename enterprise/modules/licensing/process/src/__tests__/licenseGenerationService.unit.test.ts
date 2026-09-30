@@ -1,10 +1,12 @@
+import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyService,
+} from "@langwatch/enterprise-license-signing";
 import { DEFAULT_LIMIT } from "@langwatch/enterprise-licensing-contract";
 import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE } from "@langwatch/plans";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { NodeLicenseCryptographyService } from "../index.ts";
-import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./testing.ts";
 
 const baseParams = {

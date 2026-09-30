@@ -11,12 +11,13 @@
  */
 import crypto from "crypto";
 
+import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyService,
+} from "@langwatch/enterprise-license-signing";
 import { buildMintedPlan } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-
-import { NodeLicenseCryptographyService } from "../index.ts";
-import { LicenseGenerationService } from "../services/license-generation.service.ts";
 
 /**
  * The plan schema as it shipped BEFORE the fields below became optional, kept

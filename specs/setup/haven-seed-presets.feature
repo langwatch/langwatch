@@ -88,3 +88,42 @@ Feature: Seed presets — a database that is ready to look at
     Then that provider is seeded as an enabled org-scoped credential
     And re-running updates the same credential instead of duplicating it
     And the bare preset seeds no providers
+
+  # The seeded organization's licence. No licence is committed: the root .env
+  # holds a dev key pair, LANGWATCH_LICENSE_PUBLIC_KEY for the stack and
+  # LANGWATCH_LICENSE_PRIVATE_KEY, which the seed reads through secrets.
+  # Bound by apps/tasks/src/storage-seed/__tests__/seed-license.unit.test.ts.
+  @unit
+  Scenario: The seed signs an enterprise licence from the private key in secrets
+    Given LANGWATCH_LICENSE_PRIVATE_KEY pairs with the public key the stack boots with
+    And the seeded organization holds no valid licence
+    When the storage seed runs
+    Then the organization holds a fresh enterprise licence bound to it that verifies
+
+  @unit
+  Scenario: The seed keeps a stored licence that verifies
+    Given the seeded organization holds a licence that verifies against the boot public key
+    When the storage seed runs
+    Then the stored licence is kept, even when a private key is set
+
+  @unit
+  Scenario: Without a private key the seed stores no licence and says why
+    Given LANGWATCH_LICENSE_PRIVATE_KEY is not set
+    And no committed licence verifies against the boot public key
+    When the storage seed runs
+    Then the organization holds no licence
+    And the seed logs one line naming LANGWATCH_LICENSE_PRIVATE_KEY
+
+  @unit
+  Scenario: A private key that does not pair with the boot public key is refused
+    Given LANGWATCH_LICENSE_PRIVATE_KEY does not pair with the boot public key
+    When the storage seed runs
+    Then the organization holds no licence
+    And the seed logs one line saying the private key does not pair with the public key
+
+  @unit
+  Scenario: CI keeps seeding the test-suite licence under the test key
+    Given the stack boots with the licensing test suite's public key
+    And LANGWATCH_LICENSE_PRIVATE_KEY is not set
+    When the storage seed runs
+    Then the organization holds the test-suite enterprise licence

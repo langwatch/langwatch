@@ -4,6 +4,7 @@
  * @see specs/self-hosting/connected-services/license-sync.feature
  */
 
+import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
   type LicenseError,
   type LicenseRefreshOutcome,
@@ -15,7 +16,6 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 
-import type { LicenseCryptography } from "../app/licensing.members.ts";
 import type { ConnectLicenseChannel } from "../channels/connect-license.channel.ts";
 import type { ConnectOrganizationRepository } from "../repositories/connect-organization.repository.ts";
 import type { ConnectInstallService } from "./connect-install.service.ts";

@@ -36,6 +36,9 @@
       "path": "../../modules/data-privacy/process/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/packages/license-signing/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
@@ -58,6 +61,9 @@
     },
     {
       "path": "../../modules/ops/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/plans/tsconfig.build.json"
     },
     {
       "path": "../../packages/prisma-client/tsconfig.build.json"

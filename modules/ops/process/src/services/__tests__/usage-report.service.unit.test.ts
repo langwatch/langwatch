@@ -28,6 +28,10 @@ class InstallStandIn implements UsageReportInstall {
     connected: false,
     licenseEndpoint: "https://connect.langwatch.ai",
     gatewayEndpoint: "https://gateway.langwatch.ai",
+    licenseKeySource: "override",
+    licenseKeyFingerprint: "0123456789abcdef",
+    licenseId: "lic-dev",
+    licenseVerified: true,
   };
   readonly outcomes: (string | undefined)[] = [];
   minted = 0;
@@ -189,6 +193,40 @@ describe("given an install that reports", () => {
         first_seen_at: "2026-08-01T00:00:00.000Z",
       });
       expect(install.outcomes).toEqual([undefined]);
+    });
+  });
+
+  describe("when the install verifies licenses against an override key", () => {
+    /** @scenario "The report says whether licenses verify against the embedded key or an override" */
+    it("says the key is an override", async () => {
+      await service().send();
+
+      expect(channel.posts[0]?.body).toMatchObject({ license_key_source: "override" });
+    });
+
+    /** @scenario "The report fingerprints the verifying key and never carries it" */
+    it("carries the key's fingerprint", async () => {
+      await service().send();
+
+      expect(channel.posts[0]?.body).toMatchObject({
+        license_key_fingerprint: "0123456789abcdef",
+      });
+    });
+
+    /** @scenario "The report names the active license and whether it verified" */
+    it("names the active license", async () => {
+      await service().send();
+
+      expect(channel.posts[0]?.body).toMatchObject({ license_id: "lic-dev" });
+    });
+
+    /** @scenario "The report names the active license and whether it verified" */
+    it("says whether the license verified", async () => {
+      install.connect = { ...install.connect, licenseVerified: false };
+
+      await service().send();
+
+      expect(channel.posts[0]?.body).toMatchObject({ license_verified: false });
     });
   });
 

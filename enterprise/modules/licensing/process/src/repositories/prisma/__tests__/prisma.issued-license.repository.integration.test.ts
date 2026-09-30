@@ -1,3 +1,7 @@
+import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyService,
+} from "@langwatch/enterprise-license-signing";
 /**
  * @vitest-environment node
  * @see specs/self-hosting/connected-services/license-credential.feature
@@ -13,9 +17,7 @@ import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
 } from "../../../__tests__/fixtures/license-keys.fixture.ts";
-import { LicenseGenerationService } from "../../../services/license-generation.service.ts";
 import { LicenseRegistryService } from "../../../services/license-registry.service.ts";
-import { NodeLicenseCryptographyService } from "../../../services/node-license-cryptography.service.ts";
 import { PrismaIssuedLicenseRepository } from "../prisma.issued-license.repository.ts";
 import {
   createLicensingTestConnection,

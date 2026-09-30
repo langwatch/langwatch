@@ -1,8 +1,8 @@
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { LicensePlanLimitsSchema } from "@langwatch/enterprise-licensing-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { NodeLicenseCryptographyService } from "../index.ts";
 import {
   TEST_PUBLIC_KEY,
   WRONG_PUBLIC_KEY,

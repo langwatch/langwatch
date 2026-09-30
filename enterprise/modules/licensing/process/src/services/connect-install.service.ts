@@ -4,6 +4,7 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
+import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
   type ConnectClassifyAnswer,
   type ConnectCredential,
@@ -14,10 +15,11 @@ import {
   ConnectDisabledError,
   ConnectLicenseRequiredError,
   ConnectServiceNotEntitledError,
+  DEFAULT_LICENSE_PUBLIC_KEY,
 } from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { ConnectUpstreamSlot, LicenseCryptography } from "../app/licensing.members.ts";
+import type { ConnectUpstreamSlot } from "../app/licensing.members.ts";
 import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
 import type {
   ConnectOrganizationRecord,
@@ -28,6 +30,7 @@ import {
   connectServicesNamedBy,
   enabledConnectServices,
 } from "../rules/connect-entitlement.rules.ts";
+import { licenseKeyFingerprint } from "../rules/license-key.rules.ts";
 import type { InstanceIdentityService } from "./instance-identity.service.ts";
 
 /** What a deployment decided about Connect, before any license has its say. */
@@ -117,13 +120,31 @@ export class ConnectInstallService {
    * hosted service: the usage report goes to the connect host only then.
    */
   async getDeployment(): Promise<ConnectDeploymentView> {
-    const { deployment } = this.deps;
+    const { deployment, publicKey, cryptography } = this.deps;
+    const [licenseKey] = await this.findActiveLicenseKey();
+    const signed = licenseKey ? cryptography.parseLicenseKey(licenseKey) : null;
     return {
       permitted: deployment.permitted,
       connected: await this.isInstallConnected(),
       licenseEndpoint: deployment.licenseEndpoint,
       gatewayEndpoint: deployment.gatewayEndpoint,
+      licenseKeySource: publicKey ? "override" : "embedded",
+      licenseKeyFingerprint: licenseKeyFingerprint(publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY),
+      licenseId: signed?.data.licenseId ?? null,
+      licenseVerified: licenseKey
+        ? signed !== null && cryptography.verifySignature(signed, publicKey)
+        : null,
     };
+  }
+
+  /** The instance-wide license, else the first organization's; empty where none is held. */
+  private async findActiveLicenseKey(): Promise<string[]> {
+    const instanceKey = this.deps.instanceLicenseKey();
+    if (instanceKey) return [instanceKey];
+    const [organizationId] = await this.deps.organizations.findLicensedOrganizationIds();
+    if (organizationId === undefined) return [];
+    const license = (await this.deps.organizations.findById(organizationId))?.license;
+    return license ? [license] : [];
   }
 
   /** Every organization holding a license, which the daily sync passes over. */

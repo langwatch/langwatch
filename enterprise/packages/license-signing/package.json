@@ -1,0 +1,36 @@
+{
+  "name": "@langwatch/enterprise-license-signing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Signs and verifies LangWatch Enterprise licences: the licensing module and the local-dev seed share it.",
+  "license": "SEE LICENSE IN ../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/time": "workspace:*"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

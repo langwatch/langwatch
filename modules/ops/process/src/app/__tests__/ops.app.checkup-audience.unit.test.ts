@@ -28,6 +28,10 @@ const INSTALL_WIDE_KEYS = [
   "hostname",
   "auth_method",
   "connected",
+  "license_key_source",
+  "license_key_fingerprint",
+  "license_id",
+  "license_verified",
 ];
 
 let world: UsageReportWorld;
@@ -67,6 +71,10 @@ function checkupService(): OpsCheckupService {
           connected: false,
           licenseEndpoint: "https://connect.langwatch.ai",
           gatewayEndpoint: "https://gateway.langwatch.ai",
+          licenseKeySource: "embedded",
+          licenseKeyFingerprint: "0123456789abcdef",
+          licenseId: null,
+          licenseVerified: null,
         }),
       }),
       providerTests: createApiFixture<ModelProviderApi>(),

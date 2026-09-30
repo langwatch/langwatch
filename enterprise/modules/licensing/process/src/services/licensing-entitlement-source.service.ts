@@ -1,3 +1,4 @@
+import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
   floorAtOssBaseline,
   type EntitlementGrant,
@@ -7,7 +8,7 @@ import {
   type ResolvePlanInput,
 } from "@langwatch/enterprise-licensing-contract";
 
-import type { LicenseCryptography, OrganizationLicense } from "../app/licensing.members.ts";
+import type { OrganizationLicense } from "../app/licensing.members.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 export type LicensingEntitlementSourceMode = "cloud" | "self-hosted";

@@ -44,7 +44,7 @@ export interface UsageField {
 }
 
 /** The version of this dictionary. */
-export const USAGE_REPORT_SCHEMA_VERSION = 4;
+export const USAGE_REPORT_SCHEMA_VERSION = 5;
 
 /** Every field, in the order the docs page lists them. */
 export const USAGE_FIELDS: readonly UsageField[] = [
@@ -154,6 +154,34 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     category: "operational",
     window: "point_in_time",
     why: "Whether this install's license names a hosted service, which decides what it may call and which host answers it.",
+    source: "the signed license",
+  },
+  {
+    key: "license_key_source",
+    category: "operational",
+    window: "point_in_time",
+    why: "Whether licenses are verified against the key LangWatch builds into the release or one the operator named instead, so an install trusting its own signer is not mistaken for a licensed one.",
+    source: "LANGWATCH_LICENSE_PUBLIC_KEY, set or not",
+  },
+  {
+    key: "license_key_fingerprint",
+    category: "operational",
+    window: "point_in_time",
+    why: "The first 16 hex characters of the SHA-256 of the verifying public key, which tells a development key from a self-made one. Never the key.",
+    source: "the verifying public key",
+  },
+  {
+    key: "license_id",
+    category: "operational",
+    window: "point_in_time",
+    why: "The license this install runs on, so a report can be matched to the license it claims. Null on an install holding none.",
+    source: "LANGWATCH_LICENSE_KEY, else the first organization's license",
+  },
+  {
+    key: "license_verified",
+    category: "operational",
+    window: "point_in_time",
+    why: "Whether that license's signature verified against the key, so a license that does not verify is told apart from one that does. Null on an install holding none.",
     source: "the signed license",
   },
 
@@ -604,6 +632,10 @@ export const usageReportBodySchema = z.object({
   auth_method: z.string().max(50).optional(),
   sso_provider: z.string().max(50).nullable().optional(),
   connected: z.boolean().optional(),
+  license_key_source: z.enum(["embedded", "override"]).optional(),
+  license_key_fingerprint: z.string().max(64).optional(),
+  license_id: z.string().max(200).nullable().optional(),
+  license_verified: z.boolean().nullable().optional(),
 
   // Who runs it. Domains with counts, never an address.
   user_email_domains: z.record(z.string().max(255), z.number()).optional(),

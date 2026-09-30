@@ -1539,6 +1539,9 @@ importers:
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:../../modules/data-privacy/process
+      '@langwatch/enterprise-license-signing':
+        specifier: workspace:*
+        version: link:../../enterprise/packages/license-signing
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../enterprise/modules/licensing/contract
@@ -1566,6 +1569,9 @@ importers:
       '@langwatch/ops-process':
         specifier: workspace:*
         version: link:../../modules/ops/process
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../packages/plans
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../packages/prisma-client
@@ -3396,6 +3402,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
+      '@langwatch/enterprise-license-signing':
+        specifier: workspace:*
+        version: link:../../../packages/license-signing
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4119,6 +4128,37 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  enterprise/packages/license-signing:
+    dependencies:
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../modules/licensing/contract
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../../modules/gateway/contract
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+    devDependencies:
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0

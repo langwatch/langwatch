@@ -4,6 +4,7 @@
  * validating a license inside an install. A refusal names a code and no more.
  */
 
+import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
   entitledConnectServices,
   type ConnectCredentialRefusalCode,
@@ -12,7 +13,7 @@ import {
 import { isLicenseTokenShape, registryHashForToken } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
-import type { ConnectManagedKeys, LicenseCryptography } from "../app/licensing.members.ts";
+import type { ConnectManagedKeys } from "../app/licensing.members.ts";
 import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,

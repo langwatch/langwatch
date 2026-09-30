@@ -92,6 +92,7 @@ export class UsageReportService {
         instanceId,
         firstSeenAt: identity ? Temporal.Instant.from(identity.createdAt) : undefined,
         connected: connect.connected,
+        license: connect,
         switches: switchesOf(identity),
         now: this.deps.now(),
       });
@@ -138,6 +139,7 @@ export class UsageReportService {
             instanceId: identity?.instanceId ?? INSTANCE_ID_NOT_MINTED,
             firstSeenAt: identity ? Temporal.Instant.from(identity.createdAt) : undefined,
             connected: connect.connected,
+            license: connect,
             switches,
             now,
           });

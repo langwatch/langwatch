@@ -17,7 +17,7 @@ import { LICENSE_TOKEN_PREFIX } from "@langwatch/gateway-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
-import { type LicenseCryptography } from "../app/licensing.members.ts";
+import type { LicenseCryptography } from "./license-cryptography.ts";
 
 /**
  * PEM normalization for license signing keys. OpenSSL is unforgiving about
@@ -36,6 +36,14 @@ const PEM_PRIVATE_KEY_BLOCK =
 
 /** RFC 1421 headers (`Proc-Type:`, `DEK-Info:`) precede the body of legacy encrypted keys. */
 const PEM_HEADER_LINE = /^[A-Za-z][A-Za-z0-9-]*:\s/m;
+
+/**
+ * Licences that never verify, whatever signed them: production-signed keys that leaked into the
+ * public repository (dev/docs/runbooks/license-generator.md).
+ */
+const REVOKED_LICENSE_IDS: ReadonlySet<string> = new Set([
+  "lic-d6f0f20c-f1f9-4489-bc0a-77b156986b0c",
+]);
 
 /** RFC 7468 wraps the base64 body at 64 characters. */
 const PEM_BODY_LINE = /.{1,64}/g;
@@ -112,6 +120,7 @@ export class NodeLicenseCryptographyService implements LicenseCryptography {
     if (!signedLicense.signature || signedLicense.signature.trim() === "") {
       return false;
     }
+    if (REVOKED_LICENSE_IDS.has(signedLicense.data.licenseId)) return false;
 
     try {
       const verify = crypto.createVerify("SHA256");

@@ -1,3 +1,4 @@
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { registryHashForToken } from "@langwatch/gateway-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -8,7 +9,6 @@ import type { IssuedLicenseRecord } from "../../repositories/issued-license.repo
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { ConnectCredentialService } from "../connect-credential.service.ts";
 import { LicenseSyncService } from "../license-sync.service.ts";
-import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const TOKEN = `lwl_${"a".repeat(64)}`;

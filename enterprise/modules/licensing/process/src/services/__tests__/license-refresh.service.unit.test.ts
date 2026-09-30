@@ -1,3 +1,4 @@
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 /**
  * The install end of the license sync: what leaves the install, and what a
  * delivered replacement does when it lands.
@@ -17,7 +18,6 @@ import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memo
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
 import { LicenseRefreshService } from "../license-refresh.service.ts";
-import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const ORGANIZATION = "org-acme";

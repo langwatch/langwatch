@@ -17,6 +17,12 @@ const NOW = Temporal.Instant.from("2026-09-21T12:00:00.000Z");
 const INSTANCE_ID = "3f1c2b40-9a7e-4f2a-8f4c-6b1f0c2d9e77";
 const at = (iso: string) => Temporal.Instant.from(iso);
 const day = (iso: string) => Date.parse(iso);
+const LICENSE: UsageReportCollectInput["license"] = {
+  licenseKeySource: "embedded",
+  licenseKeyFingerprint: "0123456789abcdef",
+  licenseId: "lic-1",
+  licenseVerified: true,
+};
 
 let state: UsageReportWorld;
 
@@ -39,6 +45,7 @@ function report(overrides: Partial<UsageReportCollectInput> = {}) {
     instanceId: INSTANCE_ID,
     firstSeenAt: undefined,
     connected: false,
+    license: LICENSE,
     now: NOW,
     ...overrides,
   });
@@ -316,6 +323,7 @@ describe("given a process that composes ops health", () => {
       instanceId: INSTANCE_ID,
       firstSeenAt: undefined,
       connected: false,
+      license: LICENSE,
       now: NOW,
       switches,
     });

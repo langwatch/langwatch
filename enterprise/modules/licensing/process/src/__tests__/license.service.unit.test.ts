@@ -1,3 +1,7 @@
+import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyService,
+} from "@langwatch/enterprise-license-signing";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -7,10 +11,8 @@ import {
   type LicenseStorage,
   type LicenseRetention,
   type LicenseUsage,
-  NodeLicenseCryptographyService,
   type StoredLicense,
 } from "../index.ts";
-import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import {
   EXPIRED_LICENSE_KEY,

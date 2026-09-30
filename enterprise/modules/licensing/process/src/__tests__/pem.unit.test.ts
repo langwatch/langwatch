@@ -1,8 +1,8 @@
 import crypto from "crypto";
 
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { describe, expect, it } from "vitest";
 
-import { NodeLicenseCryptographyService } from "../index.ts";
 import { canonicalPemKey, mangledPemPastes, TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./testing.ts";
 
 // Wrapped rather than destructured bare: a bare static-method reference trips

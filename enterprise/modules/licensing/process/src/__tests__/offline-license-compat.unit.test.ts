@@ -8,6 +8,10 @@
 import { readFileSync } from "node:fs";
 
 import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyService,
+} from "@langwatch/enterprise-license-signing";
+import {
   DEFAULT_LICENSE_PUBLIC_KEY,
   mapToPlanInfo,
 } from "@langwatch/enterprise-licensing-contract";
@@ -15,9 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LicenseStorage, StoredLicense } from "../app/licensing.members.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
-import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { LicenseService } from "../services/license.service.ts";
-import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import { OFFLINE_LICENSE_FROM_MAIN as fixture } from "./support/offline-license-from-main.fixture.ts";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./testing.ts";
 
@@ -177,7 +179,7 @@ const INSTALL_SIDE_MODULES = [
   "../services/license.service.ts",
   "../services/license-plan-source.service.ts",
   "../services/licensing-entitlement-source.service.ts",
-  "../services/node-license-cryptography.service.ts",
+  "../../../../../packages/license-signing/src/node-license-cryptography.ts",
   "../rules/connect-entitlement.rules.ts",
 ];
 

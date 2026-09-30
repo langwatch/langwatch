@@ -4,6 +4,10 @@
  * row, and the signing key comes from a server secret rather than a caller.
  */
 
+import type {
+  LicenseCryptography,
+  LicenseGenerationService,
+} from "@langwatch/enterprise-license-signing";
 import {
   entitledConnectServices,
   type ConnectedSeats,
@@ -33,7 +37,6 @@ import { Temporal, toDate, type Instant } from "@langwatch/time";
 import type {
   ConnectManagedKeys,
   ContractBudgets,
-  LicenseCryptography,
   LicenseCustomers,
   LicenseDeliveryCipher,
 } from "../app/licensing.members.ts";
@@ -48,7 +51,6 @@ import {
   statusOfIssuedLicense,
   violationNames,
 } from "../rules/issued-license.rules.ts";
-import type { LicenseGenerationService } from "./license-generation.service.ts";
 
 export interface LicenseRegistryOptions {
   repository: IssuedLicenseRepository;

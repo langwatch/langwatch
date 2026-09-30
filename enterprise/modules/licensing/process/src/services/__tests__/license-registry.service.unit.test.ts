@@ -1,4 +1,8 @@
 import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyService,
+} from "@langwatch/enterprise-license-signing";
+import {
   IssuedLicenseNotActiveError,
   IssuedLicenseNotFoundError,
   LicenseAlreadyRegisteredError,
@@ -15,9 +19,7 @@ import {
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import type { ConnectManagedKeys } from "../../app/licensing.members.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
-import { LicenseGenerationService } from "../license-generation.service.ts";
 import { LicenseRegistryService } from "../license-registry.service.ts";
-import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const TERM_END: Instant = Temporal.Instant.from("2027-01-01T00:00:00.000Z");

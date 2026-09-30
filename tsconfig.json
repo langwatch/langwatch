@@ -235,6 +235,9 @@
       "path": "enterprise/modules/governance/process/tsconfig.json"
     },
     {
+      "path": "enterprise/packages/license-signing/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/licensing/browser/tsconfig.json"
     },
     {
@@ -349,6 +352,9 @@
       "path": "modules/feature-flag/process/tsconfig.json"
     },
     {
+      "path": "tools/fuzz/runner/tsconfig.json"
+    },
+    {
       "path": "modules/gateway/browser/tsconfig.json"
     },
     {
@@ -404,6 +410,9 @@
     },
     {
       "path": "modules/instant-eval/process/tsconfig.json"
+    },
+    {
+      "path": "tools/interactionsimulator/tsconfig.json"
     },
     {
       "path": "packages/internal-slack/tsconfig.json"
@@ -716,12 +725,6 @@
     },
     {
       "path": "tools/visualdiff/runner/tsconfig.json"
-    },
-    {
-      "path": "tools/fuzz/runner/tsconfig.json"
-    },
-    {
-      "path": "tools/interactionsimulator/tsconfig.json"
     },
     {
       "path": "packages/vitest-config/tsconfig.json"

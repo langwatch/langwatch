@@ -266,4 +266,12 @@ export interface ConnectDeploymentView {
   readonly connected: boolean;
   readonly licenseEndpoint: string;
   readonly gatewayEndpoint: string;
+  /** `override` where LANGWATCH_LICENSE_PUBLIC_KEY replaces the key compiled in. */
+  readonly licenseKeySource: "embedded" | "override";
+  /** The first 16 hex characters of the SHA-256 of the verifying key; never the key. */
+  readonly licenseKeyFingerprint: string;
+  /** The instance license, else the first organization's; null where the install holds none. */
+  readonly licenseId: string | null;
+  /** Whether that license's signature verified; null where the install holds none. */
+  readonly licenseVerified: boolean | null;
 }

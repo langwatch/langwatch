@@ -1,3 +1,4 @@
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import {
   OrganizationNotFoundError,
   UNLIMITED_PLAN,
@@ -7,7 +8,6 @@ import { describe, expect, it } from "vitest";
 import type { OrganizationLicense } from "../app/licensing.members.ts";
 import { LicensePlanSourceService } from "../services/license-plan-source.service.ts";
 import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
-import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import {
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_ENTERPRISE_LICENSE_KEY,

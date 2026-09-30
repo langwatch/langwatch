@@ -53,8 +53,8 @@ describe("given the dictionary", () => {
     it("declares exactly the fields the schema version stands for", () => {
       // A field added or removed is a schema version bump, and this is the
       // number that makes somebody notice they owe one.
-      expect(USAGE_FIELDS).toHaveLength(103);
-      expect(USAGE_REPORT_SCHEMA_VERSION).toBe(4);
+      expect(USAGE_FIELDS).toHaveLength(107);
+      expect(USAGE_REPORT_SCHEMA_VERSION).toBe(5);
     });
   });
 

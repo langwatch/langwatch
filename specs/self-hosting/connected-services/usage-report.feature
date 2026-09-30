@@ -98,6 +98,31 @@ Feature: The usage report a self-hosted install sends
     And no organization id appears anywhere in it
 
   # ============================================================================
+  # The license key the install trusts
+  # ============================================================================
+
+  @unit
+  Scenario: The report says whether licenses verify against the embedded key or an override
+    Given a deployment that sets LANGWATCH_LICENSE_PUBLIC_KEY
+    When the report is taken
+    Then it carries license_key_source "override"
+    But an install that sets no public key reports license_key_source "embedded"
+
+  @unit
+  Scenario: The report fingerprints the verifying key and never carries it
+    When the report is taken
+    Then it carries the first 16 hex characters of the SHA-256 of the verifying public key
+    And the key itself appears nowhere in it
+
+  @unit
+  Scenario: The report names the active license and whether it verified
+    Given an install whose license was signed by a key other than the verifying one
+    When the report is taken
+    Then it carries that license's id
+    And it reports the license as not verified
+    But an install holding no license reports neither
+
+  # ============================================================================
   # Windows
   # ============================================================================
 
