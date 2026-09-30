@@ -99,6 +99,9 @@ func CheckURL(raw string, opts Options) error {
 		return ErrBlocked
 	}
 	host := strings.ToLower(u.Hostname())
+	if host == "" {
+		return ErrBlocked
+	}
 	allow, deny := hostPolicy(host, opts)
 	if deny {
 		return ErrBlocked
@@ -127,9 +130,8 @@ func CheckURL(raw string, opts Options) error {
 // otherwise resolve the host a second time inside the standard library
 // and could connect to a different IP than what CheckURL validated.
 //
-// Allow-listed hosts skip the private-address check (the customer's
-// escape hatch, as in CheckURL), but cloud metadata is refused for every
-// host whatever the configuration.
+// allow-listed hosts skip the IP check entirely and are dialed via the
+// hostname (the customer-controlled escape hatch, as in CheckURL).
 func SafeDialer(opts Options) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	base := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -137,7 +139,15 @@ func SafeDialer(opts Options) func(ctx context.Context, network, addr string) (n
 		if err != nil {
 			return nil, err
 		}
-		ip, err := dialIP(strings.ToLower(host), opts)
+		host = strings.ToLower(host)
+		allow, deny := hostPolicy(host, opts)
+		if deny {
+			return nil, ErrBlocked
+		}
+		if allow {
+			return base.DialContext(ctx, network, addr)
+		}
+		ip, err := dialIP(host, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -147,12 +157,9 @@ func SafeDialer(opts Options) func(ctx context.Context, network, addr string) (n
 	}
 }
 
-// dialIP returns the address SafeDialer may dial for host, or ErrBlocked.
+// dialIP returns the checked address SafeDialer may dial for a host that is
+// neither allow- nor deny-listed, or ErrBlocked.
 func dialIP(host string, opts Options) (net.IP, error) {
-	allow, deny := hostPolicy(host, opts)
-	if deny {
-		return nil, ErrBlocked
-	}
 	ips, err := lookupIPs(host, opts)
 	if err != nil {
 		return nil, err
@@ -161,7 +168,7 @@ func dialIP(host string, opts Options) (net.IP, error) {
 		return nil, ErrBlocked
 	}
 	for _, ip := range ips {
-		if isMetadata(ip) || (!allow && ipBlocked(ip, opts, host)) {
+		if ipBlocked(ip, opts, host) {
 			return nil, ErrBlocked
 		}
 	}
@@ -174,12 +181,6 @@ func lookupIPs(host string, opts Options) ([]net.IP, error) {
 		return []net.IP{ip}, nil
 	}
 	return resolveHost(host, opts)
-}
-
-// isMetadata reports a cloud metadata address, refused even for allow-listed hosts.
-func isMetadata(ip net.IP) bool {
-	addr, ok := netip.AddrFromSlice(ip)
-	return !ok || Classify(addr.Unmap()) == CategoryMetadata
 }
 
 // ErrBlocked is returned when SSRF policy rejects a destination.
