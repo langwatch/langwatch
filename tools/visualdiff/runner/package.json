@@ -4,6 +4,13 @@
   "private": true,
   "description": "Playwright capture half of visualdiff: drives the same routes and flows on two running stacks and reports every screenshot, console error, failed request and pixel diff as JSON lines.",
   "type": "module",
+  "exports": {
+    "./capture": "./src/capture.ts",
+    "./protocol": "./src/protocol.ts",
+    "./sign-in": "./src/sign-in.ts",
+    "./module-load": "./src/module-load.ts",
+    "./settle": "./src/settle.ts"
+  },
   "scripts": {
     "capture": "node --experimental-transform-types src/main.ts",
     "preflight": "node --experimental-transform-types src/preflight.ts",

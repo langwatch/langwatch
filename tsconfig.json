@@ -712,6 +712,9 @@
       "path": "tools/visualdiff/runner/tsconfig.json"
     },
     {
+      "path": "tools/fuzz/runner/tsconfig.json"
+    },
+    {
       "path": "packages/vitest-config/tsconfig.json"
     },
     {

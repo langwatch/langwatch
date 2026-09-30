@@ -1,0 +1,23 @@
+{
+  "name": "@langwatch/fuzz-runner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright half of the fuzzer: a seeded monkey over every route the UI registers, many pages at once, with oracles and a replayable action trail per finding.",
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-transform-types src/main.ts",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/visual-diff-runner": "workspace:*",
+    "playwright": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
