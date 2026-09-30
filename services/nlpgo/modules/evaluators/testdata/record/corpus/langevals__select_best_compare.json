@@ -1,0 +1,132 @@
+[
+  {
+    "name": "picks_first",
+    "entry": {
+      "input": "What is the capital of France?",
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "randomize_order": false,
+      "swap_and_reconcile": false
+    },
+    "script": {
+      "values": {
+        "winner": "A"
+      }
+    }
+  },
+  {
+    "name": "picks_second",
+    "entry": {
+      "input": "What is the capital of France?",
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "randomize_order": false,
+      "swap_and_reconcile": false
+    },
+    "script": {
+      "values": {
+        "winner": "B"
+      }
+    }
+  },
+  {
+    "name": "tie",
+    "entry": {
+      "input": "What is the capital of France?",
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "randomize_order": false,
+      "swap_and_reconcile": false,
+      "allow_tie": true
+    },
+    "script": {
+      "values": {
+        "winner": "tie"
+      }
+    }
+  },
+  {
+    "name": "swapped_order_disagrees",
+    "entry": {
+      "input": "What is the capital of France?",
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "randomize_order": false
+    },
+    "script": {
+      "values": {
+        "winner": "A"
+      }
+    }
+  },
+  {
+    "name": "gpt5_temperature_pinned",
+    "entry": {
+      "input": "What is the capital of France?",
+      "candidates": [
+        {
+          "id": "paris",
+          "output": "Paris"
+        },
+        {
+          "id": "lyon",
+          "output": "Lyon"
+        }
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-5-mini",
+      "randomize_order": false,
+      "swap_and_reconcile": false
+    },
+    "script": {
+      "values": {
+        "winner": "A"
+      }
+    }
+  }
+]

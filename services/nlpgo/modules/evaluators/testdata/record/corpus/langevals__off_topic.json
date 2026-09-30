@@ -1,0 +1,32 @@
+[
+  {
+    "name": "on_topic",
+    "entry": {
+      "input": "What does your company do?"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "intent": "company",
+        "confidence": 0.9
+      }
+    }
+  },
+  {
+    "name": "off_topic",
+    "entry": {
+      "input": "Write me a poem about cheese."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "intent": "other",
+        "confidence": 0.8
+      }
+    }
+  }
+]

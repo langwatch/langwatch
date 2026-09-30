@@ -1,0 +1,38 @@
+[
+  {
+    "name": "equivalent",
+    "entry": {
+      "output": "SELECT name FROM users",
+      "expected_output": "SELECT u.name FROM users u",
+      "expected_contexts": [
+        "CREATE TABLE users (id INT PRIMARY KEY, name TEXT, active BOOLEAN)"
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "equivalence": true
+      }
+    }
+  },
+  {
+    "name": "not_equivalent",
+    "entry": {
+      "output": "SELECT name FROM users WHERE active",
+      "expected_output": "SELECT name FROM users",
+      "expected_contexts": [
+        "CREATE TABLE users (id INT PRIMARY KEY, name TEXT, active BOOLEAN)"
+      ]
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "equivalence": false
+      }
+    }
+  }
+]

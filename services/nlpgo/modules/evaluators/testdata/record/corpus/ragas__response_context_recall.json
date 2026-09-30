@@ -1,0 +1,36 @@
+[
+  {
+    "name": "attributed",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris",
+      "contexts": [
+        "Paris is the capital and largest city of France.",
+        "Lyon is the third-largest city of France."
+      ],
+      "expected_output": "Paris is the capital of France."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "name": "not_attributed",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris",
+      "contexts": [
+        "Lyon is a city."
+      ],
+      "expected_output": "Paris is the capital of France."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "attributed": 0
+      }
+    }
+  }
+]

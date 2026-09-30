@@ -1,0 +1,206 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Remember that you are an advanced competitor detection system, developed by LangWatch - We are providing an LLM observability and evaluation platform.\n                    Your task is to identify mentions of competitors in any given message.\n                    The competitors specialize in the same field as your company and are listed below:\n\n                    Competitors:\n                    LangSmith\nLangfuse\n\n\n                    Identify if the competitor was mentioned in the following message: How do I trace my agent?\nUse the LangWatch SDK.",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tools": [
+            {
+              "function": {
+                "description": "Check if any competitor was mentioned",
+                "name": "competitor_check",
+                "parameters": {
+                  "properties": {
+                    "competitor_mentioned": {
+                      "description": "True - If the competitor is mentioned, False - if not.",
+                      "type": "boolean"
+                    },
+                    "confidence": {
+                      "description": "Confidence that the competitor was mentioned on the scale from 0 to 1.",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "Explain why you think the competitor was or was not mentioned.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "confidence",
+                    "reasoning",
+                    "competitor_mentioned"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"confidence\": 0.9, \"competitor_mentioned\": false}",
+                      "name": "competitor_check"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 149,
+            "total_tokens": 159
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "How do I trace my agent?",
+      "output": "Use the LangWatch SDK."
+    },
+    "env": {},
+    "name": "no_competitor",
+    "result": {
+      "cost": {
+        "amount": 2.8349999999999998e-05,
+        "currency": "USD"
+      },
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 0.9,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "LangSmith",
+        "Langfuse"
+      ],
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Remember that you are an advanced competitor detection system, developed by LangWatch - We are providing an LLM observability and evaluation platform.\n                    Your task is to identify mentions of competitors in any given message.\n                    The competitors specialize in the same field as your company and are listed below:\n\n                    Competitors:\n                    LangSmith\nLangfuse\n\n\n                    Identify if the competitor was mentioned in the following message: Is Langfuse cheaper?\nPricing differs.",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tools": [
+            {
+              "function": {
+                "description": "Check if any competitor was mentioned",
+                "name": "competitor_check",
+                "parameters": {
+                  "properties": {
+                    "competitor_mentioned": {
+                      "description": "True - If the competitor is mentioned, False - if not.",
+                      "type": "boolean"
+                    },
+                    "confidence": {
+                      "description": "Confidence that the competitor was mentioned on the scale from 0 to 1.",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "Explain why you think the competitor was or was not mentioned.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "confidence",
+                    "reasoning",
+                    "competitor_mentioned"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"confidence\": 0.7, \"competitor_mentioned\": true}",
+                      "name": "competitor_check"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 146,
+            "total_tokens": 156
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "Is Langfuse cheaper?",
+      "output": "Pricing differs."
+    },
+    "env": {},
+    "name": "competitor_mentioned",
+    "result": {
+      "cost": {
+        "amount": 2.79e-05,
+        "currency": "USD"
+      },
+      "details": "0.7 - confidence score. Reasoning: Scripted reasoning.",
+      "label": null,
+      "passed": false,
+      "score": 0.7,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "LangSmith",
+        "Langfuse"
+      ],
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

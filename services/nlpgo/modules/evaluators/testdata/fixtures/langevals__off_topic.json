@@ -1,0 +1,216 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an intent classification system. Your goal is to identify the intent of the message. Consider these intents and their following descriptions: Intent: simple_chat - Description: Smalltalk with the user\n #Intent: company - Description: Questions about the company, what we do, etc",
+              "role": "system"
+            },
+            {
+              "content": "What does your company do?",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "identify_intent"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Identify the intent of the message",
+                "name": "identify_intent",
+                "parameters": {
+                  "properties": {
+                    "confidence": {
+                      "description": "Confidence in the identified intent on the scale from 0.0 to 1.0",
+                      "type": "number"
+                    },
+                    "intent": {
+                      "description": "The intent of the user message, what is the message about",
+                      "enum": [
+                        "company",
+                        "simple_chat",
+                        "other"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "intent",
+                    "confidence"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"intent\": \"company\", \"confidence\": 0.9}",
+                      "name": "identify_intent"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 95,
+            "total_tokens": 105
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What does your company do?"
+    },
+    "env": {},
+    "name": "on_topic",
+    "result": {
+      "cost": {
+        "amount": 2.0249999999999998e-05,
+        "currency": "USD"
+      },
+      "details": "Detected intent: company",
+      "label": "company",
+      "passed": true,
+      "score": 0.9,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an intent classification system. Your goal is to identify the intent of the message. Consider these intents and their following descriptions: Intent: simple_chat - Description: Smalltalk with the user\n #Intent: company - Description: Questions about the company, what we do, etc",
+              "role": "system"
+            },
+            {
+              "content": "Write me a poem about cheese.",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "identify_intent"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Identify the intent of the message",
+                "name": "identify_intent",
+                "parameters": {
+                  "properties": {
+                    "confidence": {
+                      "description": "Confidence in the identified intent on the scale from 0.0 to 1.0",
+                      "type": "number"
+                    },
+                    "intent": {
+                      "description": "The intent of the user message, what is the message about",
+                      "enum": [
+                        "company",
+                        "simple_chat",
+                        "other"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "intent",
+                    "confidence"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"intent\": \"other\", \"confidence\": 0.8}",
+                      "name": "identify_intent"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 96,
+            "total_tokens": 106
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "Write me a poem about cheese."
+    },
+    "env": {},
+    "name": "off_topic",
+    "result": {
+      "cost": {
+        "amount": 2.04e-05,
+        "currency": "USD"
+      },
+      "details": "Detected intent: other",
+      "label": "other",
+      "passed": false,
+      "score": 0.8,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

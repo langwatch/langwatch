@@ -1,0 +1,264 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Based on the given text and keyphrases, generate closed-ended questions that can be answered with '1' if the question can be answered using the text, or '0' if it cannot. The questions should ALWAYS result in a '1' based on the given text.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"questions\": {\"items\": {\"type\": \"string\"}, \"title\": \"Questions\", \"type\": \"array\"}}, \"required\": [\"questions\"], \"title\": \"QuestionsGenerated\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"text\": \"Apple Inc. is a technology company based in Cupertino, California. Founded by Steve Jobs in 1976, it reached a market capitalization of $3 trillion in 2023.\",\n    \"keyphrases\": [\n        \"Apple Inc.\",\n        \"Cupertino, California\",\n        \"Steve Jobs\",\n        \"1976\",\n        \"$3 trillion\",\n        \"2023\"\n    ]\n}\nOutput: {\n    \"questions\": [\n        \"Is Apple Inc. a technology company?\",\n        \"Is Apple Inc. based in Cupertino, California?\",\n        \"Was Apple Inc. founded by Steve Jobs?\",\n        \"Was Apple Inc. founded in 1976?\",\n        \"Did Apple Inc. reach a market capitalization of $3 trillion?\",\n        \"Did Apple Inc. reach a market capitalization of $3 trillion in 2023?\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"text\": \"Paris is the capital and largest city of France. It lies on the Seine.\",\n    \"keyphrases\": [\n        \"Scripted keyphrases.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"questions\": [\"Scripted questions.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 440,
+            "total_tokens": 450
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Based on the list of close-ended '1' or '0' questions, generate a JSON with key 'answers', which is a list of strings that determines whether the provided summary contains sufficient information to answer EACH question. Answers should STRICTLY be either '1' or '0'. Answer '0' if the provided summary does not contain enough information to answer the question and answer '1' if the provided summary can answer the question.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"answers\": {\"items\": {\"type\": \"string\"}, \"title\": \"Answers\", \"type\": \"array\"}}, \"required\": [\"answers\"], \"title\": \"AnswersGenerated\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"summary\": \"Apple Inc. is a technology company based in Cupertino, California. Founded by Steve Jobs in 1976, it reached a market capitalization of $3 trillion in 2023.\",\n    \"questions\": [\n        \"Is Apple Inc. a technology company?\",\n        \"Is Apple Inc. based in Cupertino, California?\",\n        \"Was Apple Inc. founded by Steve Jobs?\",\n        \"Was Apple Inc. founded in 1976?\",\n        \"Did Apple Inc. reach a market capitalization of $3 trillion?\",\n        \"Did Apple Inc. reach a market capitalization of $3 trillion in 2023?\",\n        \"Is Apple Inc. a major software company?\",\n        \"Is Apple Inc. known for the iPhone?\",\n        \"Was Steve Jobs the co-founder of Apple Inc.?\"\n    ]\n}\nOutput: {\n    \"answers\": [\n        \"1\",\n        \"1\",\n        \"1\",\n        \"1\",\n        \"1\",\n        \"1\",\n        \"0\",\n        \"0\",\n        \"1\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"summary\": \"Paris is France's capital, on the Seine.\",\n    \"questions\": [\n        \"Scripted questions.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"answers\": [\"1\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 516,
+            "total_tokens": 526
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Extract keyphrases of type: Person, Organization, Location, Date/Time, Monetary Values, and Percentages.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"keyphrases\": {\"items\": {\"type\": \"string\"}, \"title\": \"Keyphrases\", \"type\": \"array\"}}, \"required\": [\"keyphrases\"], \"title\": \"ExtractedKeyphrases\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"text\": \"Apple Inc. is a technology company based in Cupertino, California. Founded by Steve Jobs in 1976, it reached a market capitalization of $3 trillion in 2023.\"\n}\nOutput: {\n    \"keyphrases\": [\n        \"Apple Inc.\",\n        \"Cupertino, California\",\n        \"Steve Jobs\",\n        \"1976\",\n        \"$3 trillion\",\n        \"2023\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"text\": \"Paris is the capital and largest city of France. It lies on the Seine.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"keyphrases\": [\"Scripted keyphrases.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 292,
+            "total_tokens": 302
+          }
+        }
+      }
+    ],
+    "entry": {
+      "contexts": [
+        "Paris is the capital and largest city of France. It lies on the Seine."
+      ],
+      "output": "Paris is France's capital, on the Seine."
+    },
+    "env": {},
+    "name": "answers_yes",
+    "result": {
+      "cost": {
+        "amount": 0.0002052,
+        "currency": "USD"
+      },
+      "details": "QA Score: 1.00\nConciseness Score: 0.43",
+      "label": null,
+      "passed": null,
+      "score": 0.7142857142861225,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Based on the given text and keyphrases, generate closed-ended questions that can be answered with '1' if the question can be answered using the text, or '0' if it cannot. The questions should ALWAYS result in a '1' based on the given text.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"questions\": {\"items\": {\"type\": \"string\"}, \"title\": \"Questions\", \"type\": \"array\"}}, \"required\": [\"questions\"], \"title\": \"QuestionsGenerated\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"text\": \"Apple Inc. is a technology company based in Cupertino, California. Founded by Steve Jobs in 1976, it reached a market capitalization of $3 trillion in 2023.\",\n    \"keyphrases\": [\n        \"Apple Inc.\",\n        \"Cupertino, California\",\n        \"Steve Jobs\",\n        \"1976\",\n        \"$3 trillion\",\n        \"2023\"\n    ]\n}\nOutput: {\n    \"questions\": [\n        \"Is Apple Inc. a technology company?\",\n        \"Is Apple Inc. based in Cupertino, California?\",\n        \"Was Apple Inc. founded by Steve Jobs?\",\n        \"Was Apple Inc. founded in 1976?\",\n        \"Did Apple Inc. reach a market capitalization of $3 trillion?\",\n        \"Did Apple Inc. reach a market capitalization of $3 trillion in 2023?\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"text\": \"Paris is the capital and largest city of France. It lies on the Seine.\",\n    \"keyphrases\": [\n        \"Scripted keyphrases.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"questions\": [\"Scripted questions.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 440,
+            "total_tokens": 450
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Based on the list of close-ended '1' or '0' questions, generate a JSON with key 'answers', which is a list of strings that determines whether the provided summary contains sufficient information to answer EACH question. Answers should STRICTLY be either '1' or '0'. Answer '0' if the provided summary does not contain enough information to answer the question and answer '1' if the provided summary can answer the question.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"answers\": {\"items\": {\"type\": \"string\"}, \"title\": \"Answers\", \"type\": \"array\"}}, \"required\": [\"answers\"], \"title\": \"AnswersGenerated\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"summary\": \"Apple Inc. is a technology company based in Cupertino, California. Founded by Steve Jobs in 1976, it reached a market capitalization of $3 trillion in 2023.\",\n    \"questions\": [\n        \"Is Apple Inc. a technology company?\",\n        \"Is Apple Inc. based in Cupertino, California?\",\n        \"Was Apple Inc. founded by Steve Jobs?\",\n        \"Was Apple Inc. founded in 1976?\",\n        \"Did Apple Inc. reach a market capitalization of $3 trillion?\",\n        \"Did Apple Inc. reach a market capitalization of $3 trillion in 2023?\",\n        \"Is Apple Inc. a major software company?\",\n        \"Is Apple Inc. known for the iPhone?\",\n        \"Was Steve Jobs the co-founder of Apple Inc.?\"\n    ]\n}\nOutput: {\n    \"answers\": [\n        \"1\",\n        \"1\",\n        \"1\",\n        \"1\",\n        \"1\",\n        \"1\",\n        \"0\",\n        \"0\",\n        \"1\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"summary\": \"Lyon is nice.\",\n    \"questions\": [\n        \"Scripted questions.\"\n    ]\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"answers\": [\"0\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 509,
+            "total_tokens": 519
+          }
+        }
+      },
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Extract keyphrases of type: Person, Organization, Location, Date/Time, Monetary Values, and Percentages.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"keyphrases\": {\"items\": {\"type\": \"string\"}, \"title\": \"Keyphrases\", \"type\": \"array\"}}, \"required\": [\"keyphrases\"], \"title\": \"ExtractedKeyphrases\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n--------EXAMPLES-----------\nExample 1\nInput: {\n    \"text\": \"Apple Inc. is a technology company based in Cupertino, California. Founded by Steve Jobs in 1976, it reached a market capitalization of $3 trillion in 2023.\"\n}\nOutput: {\n    \"keyphrases\": [\n        \"Apple Inc.\",\n        \"Cupertino, California\",\n        \"Steve Jobs\",\n        \"1976\",\n        \"$3 trillion\",\n        \"2023\"\n    ]\n}\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"text\": \"Paris is the capital and largest city of France. It lies on the Seine.\"\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"keyphrases\": [\"Scripted keyphrases.\"]}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 292,
+            "total_tokens": 302
+          }
+        }
+      }
+    ],
+    "entry": {
+      "contexts": [
+        "Paris is the capital and largest city of France. It lies on the Seine."
+      ],
+      "output": "Lyon is nice."
+    },
+    "env": {},
+    "name": "answers_no",
+    "result": {
+      "cost": {
+        "amount": 0.00020415,
+        "currency": "USD"
+      },
+      "details": "QA Score: 0.00\nConciseness Score: 0.81",
+      "label": null,
+      "passed": null,
+      "score": 0.4071428571429898,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

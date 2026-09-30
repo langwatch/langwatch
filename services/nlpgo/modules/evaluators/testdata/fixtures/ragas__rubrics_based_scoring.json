@@ -1,0 +1,180 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to assign an appropriate score and provide feedback to the inputs based solely on the scoring criteria passed in the input.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"feedback\": {\"description\": \"The feedback for the response\", \"title\": \"Feedback\", \"type\": \"string\"}, \"score\": {\"description\": \"The score given to the response\", \"title\": \"Score\", \"type\": \"integer\"}}, \"required\": [\"feedback\", \"score\"], \"title\": \"ScoreFeedback\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"user_input\": \"What is the capital of France?\",\n    \"response\": \"Paris is the capital of France.\",\n    \"rubrics\": {\n        \"score1_description\": \"The response is incorrect, irrelevant.\",\n        \"score2_description\": \"The response partially answers the question but includes significant errors, omissions, or irrelevant information.\",\n        \"score3_description\": \"The response partially answers the question but includes minor errors, omissions, or irrelevant information.\",\n        \"score4_description\": \"The response fully answers the question and includes minor errors, omissions, or irrelevant information.\",\n        \"score5_description\": \"The response fully answers the question and includes no errors, omissions, or irrelevant information.\"\n    }\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"feedback\": \"Scripted feedback.\", \"score\": 5}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 404,
+            "total_tokens": 414
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "default_rubrics_high",
+    "result": {
+      "cost": {
+        "amount": 6.659999999999999e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted feedback.",
+      "label": null,
+      "passed": null,
+      "score": 5.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to assign an appropriate score and provide feedback to the inputs based solely on the scoring criteria passed in the input.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"feedback\": {\"description\": \"The feedback for the response\", \"title\": \"Feedback\", \"type\": \"string\"}, \"score\": {\"description\": \"The score given to the response\", \"title\": \"Score\", \"type\": \"integer\"}}, \"required\": [\"feedback\", \"score\"], \"title\": \"ScoreFeedback\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"user_input\": \"What is the capital of France?\",\n    \"response\": \"Lyon.\",\n    \"rubrics\": {\n        \"score1_description\": \"The response is incorrect, irrelevant.\",\n        \"score2_description\": \"The response partially answers the question but includes significant errors, omissions, or irrelevant information.\",\n        \"score3_description\": \"The response partially answers the question but includes minor errors, omissions, or irrelevant information.\",\n        \"score4_description\": \"The response fully answers the question and includes minor errors, omissions, or irrelevant information.\",\n        \"score5_description\": \"The response fully answers the question and includes no errors, omissions, or irrelevant information.\"\n    }\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"feedback\": \"Scripted feedback.\", \"score\": 1}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 398,
+            "total_tokens": 408
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Lyon."
+    },
+    "env": {},
+    "name": "default_rubrics_low",
+    "result": {
+      "cost": {
+        "amount": 6.57e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted feedback.",
+      "label": null,
+      "passed": null,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "Your task is to assign an appropriate score and provide feedback to the inputs based solely on the scoring criteria passed in the input.\nPlease return the output in a JSON format that complies with the following schema as specified in JSON Schema:\n{\"properties\": {\"feedback\": {\"description\": \"The feedback for the response\", \"title\": \"Feedback\", \"type\": \"string\"}, \"score\": {\"description\": \"The score given to the response\", \"title\": \"Score\", \"type\": \"integer\"}}, \"required\": [\"feedback\", \"score\"], \"title\": \"ScoreFeedback\", \"type\": \"object\"}Do not use single quotes in your response but double quotes,properly escaped with a backslash.\n\n-----------------------------\n\nNow perform the same with the following input\ninput: {\n    \"user_input\": \"What is the capital of France?\",\n    \"response\": \"Paris is the capital of France.\",\n    \"reference\": \"Paris.\",\n    \"rubrics\": {\n        \"score1_description\": \"The response is incorrect, irrelevant.\",\n        \"score2_description\": \"The response partially answers the question but includes significant errors, omissions, or irrelevant information.\",\n        \"score3_description\": \"The response partially answers the question but includes minor errors, omissions, or irrelevant information.\",\n        \"score4_description\": \"The response fully answers the question and includes minor errors, omissions, or irrelevant information.\",\n        \"score5_description\": \"The response fully answers the question and includes no errors, omissions, or irrelevant information.\"\n    }\n}\nOutput: ",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "n": 1,
+          "temperature": 0.01
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\"feedback\": \"Scripted feedback.\", \"score\": 4}",
+                "role": "assistant"
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 412,
+            "total_tokens": 422
+          }
+        }
+      }
+    ],
+    "entry": {
+      "expected_output": "Paris.",
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "with_reference",
+    "result": {
+      "cost": {
+        "amount": 6.78e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted feedback.",
+      "label": null,
+      "passed": null,
+      "score": 4.0,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

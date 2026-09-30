@@ -1,0 +1,39 @@
+[
+  {
+    "name": "correct",
+    "entry": {
+      "output": "Paris is the capital of France.",
+      "expected_output": "The capital of France is Paris."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "name": "incorrect",
+    "entry": {
+      "output": "Lyon is the capital of France.",
+      "expected_output": "The capital of France is Paris."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "verdict": 0
+      }
+    }
+  },
+  {
+    "name": "recall_mode_high_atomicity",
+    "entry": {
+      "output": "Paris is the capital of France.",
+      "expected_output": "The capital of France is Paris."
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini",
+      "mode": "recall",
+      "atomicity": "high"
+    }
+  }
+]

@@ -63,3 +63,10 @@ Feature: Evaluators ported to the Go runtime answer as langevals answered
     Given the request carries embeddings credentials that differ from its chat credentials
     When the tenant runs the similarity or sentiment evaluator
     Then every embeddings call uses the embeddings credentials
+
+  @unit
+  Scenario: Similarity and sentiment replay langevals' recorded embedding calls
+    Given langevals' recorded similarity and sentiment answers with every embedding call they made
+    When the Go runtime evaluates the same entries through the gateway channel, answered only from the recording
+    Then every status, score, passed, label and details matches within 1e-9
+    And a text with no recorded embedding, or a recorded text never embedded, fails the replay

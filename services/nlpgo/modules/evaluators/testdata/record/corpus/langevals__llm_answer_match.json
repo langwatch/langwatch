@@ -1,0 +1,50 @@
+[
+  {
+    "name": "match",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris",
+      "expected_output": "Paris"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "is_correct": "True"
+      }
+    }
+  },
+  {
+    "name": "mismatch",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Lyon",
+      "expected_output": "Paris"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    },
+    "script": {
+      "values": {
+        "is_correct": "False"
+      }
+    }
+  },
+  {
+    "name": "gpt5_temperature_pinned",
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris",
+      "expected_output": "Paris"
+    },
+    "settings": {
+      "model": "openai/gpt-5-mini"
+    },
+    "script": {
+      "values": {
+        "is_correct": "True"
+      }
+    }
+  }
+]
