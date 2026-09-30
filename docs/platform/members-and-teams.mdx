@@ -31,15 +31,15 @@ Personal workspaces contain one personal team and project, listed under **My Wor
 
 **Settings > Directory > People** lists every member with their organization role and their access. Opening the page needs `organization:manage`.
 
-Each row shows the name, the email, a **Lite Member** badge when the member is on a Lite seat, a **Disabled** badge when access is switched off, and the **Access** column: one badge per role binding, as `role on scope`, with `via <group>` when the binding comes from a group.
+Each row shows the name, the email, a **Lite Member** or **Developer** badge when the member is on one of those seats, a **Disabled** badge when access is switched off, and the **Access** column: one badge per role binding, as `role on scope`, with `via <group>` when the binding comes from a group.
 
 Click a row to open the member dialog:
 
-- **Organization role**: Admin, Member or Lite Member. You cannot change your own role.
-- **Access**: the team and project bindings. Add a row with a role, a scope type (organization, team or project) and the team or project. Remove a row to revoke it.
+- **Organization role**: Admin, Member, Lite Member or Developer. You cannot change your own role.
+- **Access**: the team and project bindings. Add a row with a role, a scope type (organization, team or project) and the team or project. Remove a row to revoke it. A Developer has no rows to add: the seat works in its own project only.
 - **Group access**: the bindings inherited from groups, read only.
 
-The seat panel above the table shows **Team Members** and **Lite Members** in use against the plan limits.
+The seat panel above the table shows **Team Members** and **Lite Members** in use against the plan limits, and **Developers** as a plain count, because Developer seats have no limit.
 
 Each member manages their own sign-in methods at **Settings > Security**:
 passkeys, linked accounts and their password. An administrator cannot change
@@ -47,7 +47,7 @@ another member's sign-in methods there.
 
 ## Invite people
 
-Click **Invite people**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
+Click **Invite people**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats, or **Developer** to invite them on Developer seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. A Developer joins no team, so the section disappears when that seat is ticked. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
 
 Click **Send invites**. When the deployment has no email provider, the button reads **Create invites** and you copy the invite link from the row menu instead. An invite link has the form `https://app.langwatch.ai/invite/accept?inviteCode=...` and works for 14 days. **Resend invitation** issues a new 14-day link, and **Revoke** cancels it.
 
@@ -63,7 +63,9 @@ provider:
 |--------|----------|
 | **Invite only** | Only people with an invitation can join |
 | **Approval required** | Someone with a verified company address can ask to join. You approve or reject the request in **Settings > Directory > People** |
-| **Automatic joining** | Someone on a domain you verified joins without approval and receives the default role |
+| **Automatic joining** | Someone on a domain you verified joins without approval and receives the seat chosen below |
+
+Under the door setting, **Seat for people who join** decides what a person admitted without an invitation lands on: **Member** (the default, a full seat that sees the shared projects) or **Developer** (a project of their own and nothing shared). The same choice applies to people your identity provider admits. Invitations always name their own seat and ignore this setting.
 
 The **Account lockout** and **Session limits** cards in the same section apply
 to password sign-in for the organization. They remain available when you stop
@@ -72,6 +74,14 @@ using single sign-on. Changing a policy requires `organization:manage`.
 ## Lite Members
 
 A Lite Member is a read-only seat, counted apart from full seats. On a team or a project a Lite Member can read traces, analytics, evaluations, datasets, prompts, workflows, experiments and scenarios, and can create and update annotations. A Lite Member cannot see costs, the LangWatch AI Gateway pages or the audit log, cannot change anything else, and has the same limits over the API and MCP. In the settings pages a Lite Member can only hold the Viewer role.
+
+## Developers
+
+A Developer is a seat for somebody who needs their own place to work and nothing shared: a developer sending traces from Claude Code or another coding agent, for example. A Developer gets a personal project and everything a member can do inside it: send traces from the CLI, run queries and evaluations, manage its keys. A Developer cannot open, be invited to, or be added to any shared team or project, and cannot be given access through a group either. Developers are counted on the seat panel and never limited by the plan.
+
+Moving a member to a Developer seat removes their access to every shared team, shared project and the organization, and records each removal in the audit log. Their personal project, its traces and their API keys stay. A key that pointed at a shared project stops working on its own, because a key can never do more than its owner can. Moving a Developer to a Member seat gives them nothing on its own; add teams afterwards.
+
+The CLI honours the seat too: `langwatch login` offers a Developer their personal project only and refuses a shared one.
 
 ## Teams
 
