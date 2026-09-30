@@ -3783,6 +3783,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../packages/eventing
+      '@langwatch/experiment-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/experiment/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
@@ -11121,6 +11124,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract
