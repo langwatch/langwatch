@@ -232,6 +232,7 @@
   endpoint: POST /api/v1/instant-evals/estimate
   setup:
     - {"request": "POST /api/collector", "auth": "project-b", "body": {"trace_id": "vdqb{uid}", "spans": [{"type": "llm", "span_id": "vdqbs{uid}", "trace_id": "vdqb{uid}", "name": "vd-{uid}", "input": {"type": "text", "value": "vd secret {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": "{nowMs-60000}", "finished_at": "{nowMs-59000}"}}]}, "expect": {"status": 200}}
+    - {"request": "POST /api/v1/query", "auth": "project-b", "body": {"sql": "SELECT TraceId FROM traces WHERE TraceId = 'vdqb{uid}' LIMIT 10"}, "eventually": "60s", "expect": {"status": 200, "contains": "vdqb{uid}"}}
   request: {"path": "/api/v1/instant-evals/estimate", "body": {"sql": "SELECT TraceId, eval(llm_readable_trace(TraceId, 1000), 'Is the answer polite?') AS q1 FROM traces WHERE TenantId = '{projectIdB}' LIMIT 10", "limit": 10}}
   expect: {"status": 200, "body": {"rows": 0}, "notContains": "vdqb{uid}"}
 

@@ -372,7 +372,6 @@ flows:
           text: vd-proj-renamed-{uid}
           equals: "0"
 
-  # branch-only: the permission step (authz-permission-*); main's role dialog composes permissions with different controls.
   - id: role-create-with-permission-and-delete
     title: Create a custom role with a permission, see it in the API, delete it and see it gone
     isolated: true
@@ -387,9 +386,14 @@ flows:
         with:
           selector: 'input[name="name"]'
           value: 'vd-role-{uid}'
+      - action: fill
+        with:
+          label: Search permissions
+          value: Traces
       - action: click
         with:
-          testIdPrefix: authz-permission-
+          selector: '[data-testid="access-level-traces"] label'
+          hasText: /^\s*Read\s*$/
       - action: click
         with:
           text: /^\s*Create role\s*$/i
@@ -406,7 +410,7 @@ flows:
           contains: vd-role-{uid}
       - action: click
         with:
-          selector: 'button[aria-label="Delete this role"], button[aria-label="Delete vd-role-{uid}"]'
+          selector: '[data-testid^="custom-role-"]:has-text("vd-role-{uid}") button[aria-label="Delete this role"]'
       - action: click
         with:
           text: /^\s*Delete\s*$/
@@ -418,7 +422,6 @@ flows:
           text: vd-role-{uid}
           equals: "0"
 
-  # branch-only: the permission step (authz-permission-*); main's role dialog composes permissions with different controls.
   - id: role-assign-custom-role-to-member
     title: Give a member a custom role on a team and see the assignment listed on the Roles page
     isolated: true
@@ -433,9 +436,14 @@ flows:
         with:
           selector: 'input[name="name"]'
           value: 'vd-role-{uid}'
+      - action: fill
+        with:
+          label: Search permissions
+          value: Traces
       - action: click
         with:
-          testIdPrefix: authz-permission-
+          selector: '[data-testid="access-level-traces"] label'
+          hasText: /^\s*Read\s*$/
       - action: click
         with:
           text: /^\s*Create role\s*$/i

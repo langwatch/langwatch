@@ -1,0 +1,256 @@
+# Model providers and defaults (lane green-model-providers). Handles are the ones main already carries
+# (row scoping with tr:has-text, role-row-*, feature-row-*, config-row-*, scope-filter, filter-*) plus
+# button words. A saved key reads back masked (HAS_KEY...), never as the value typed.
+flows:
+  - id: model-provider-key-masked-and-replaced
+    title: Add a provider key, see it masked when the drawer reopens, replace it and see it still masked after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Cerebras\s*$/
+      - action: fill
+        with:
+          selector: 'input[type="password"]'
+          value: 'csk-vd-{uid}'
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("Cerebras")'
+          min: '1'
+      - action: click
+        with:
+          selector: 'tr:has-text("Cerebras") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Edit Provider
+      - action: expect
+        with:
+          count: 'input[type="password"][value^="HAS_KEY"]'
+          min: '1'
+      - action: expect
+        with:
+          count: 'input[value*="csk-vd-{uid}"]'
+          equals: '0'
+      - action: fill
+        with:
+          selector: 'input[type="password"]'
+          value: 'csk-vd-new-{uid}'
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          selector: 'tr:has-text("Cerebras") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Edit Provider
+      - action: expect
+        with:
+          count: 'input[type="password"][value^="HAS_KEY"]'
+          min: '1'
+      - action: expect
+        with:
+          count: 'input[value*="csk-vd-"]'
+          equals: '0'
+
+  - id: model-provider-enabled-then-disabled-by-delete
+    title: A provider added shows as enabled in the list API, and deleting it removes its row after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*DeepSeek\s*$/
+      - action: fill
+        with:
+          selector: 'input[type="password"]'
+          value: 'dsk-vd-{uid}'
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("DeepSeek")'
+          min: '1'
+      - action: expect
+        with:
+          api: /api/model-providers
+          field: deepseek.enabled
+          equals: 'true'
+      - action: click
+        with:
+          selector: 'tr:has-text("DeepSeek") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Delete Provider
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("DeepSeek")'
+          equals: '0'
+
+  - id: model-provider-scope-fixed-and-filterable
+    title: A provider added at the default scope shows under the project filter and its drawer says the scope is fixed
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*xAI\s*$/
+      - action: expect
+        with:
+          text: Scope
+      - action: fill
+        with:
+          selector: 'input[type="password"]'
+          value: 'xai-vd-{uid}'
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("xAI")'
+          min: '1'
+      - action: click
+        with:
+          testId: scope-filter
+      - action: click
+        with:
+          testId: filter-this-project
+      - action: expect
+        with:
+          count: 'tr:has-text("xAI")'
+          min: '1'
+      - action: click
+        with:
+          selector: 'tr:has-text("xAI") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Edit Provider
+      - action: expect
+        with:
+          text: Scope is fixed after create
+
+  - id: model-defaults-embeddings-and-topic-clustering
+    title: Set the default, embeddings and topic clustering models for a config and see each after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Gemini\s*$/
+      - action: fill
+        with:
+          selector: 'input[type="password"]'
+          value: 'gem-vd-{uid}'
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          selector: '[data-testid="add-config-button"], [data-testid="empty-state-add-config"]'
+      - action: expect
+        with:
+          testId: default-model-override-drawer
+      - action: select
+        with:
+          selector: '[data-testid="role-row-default"] [role="combobox"]'
+          option: gemini
+      - action: select
+        with:
+          selector: '[data-testid="role-row-embeddings"] [role="combobox"]'
+          option: embedding
+      - action: click
+        with:
+          testId: role-row-fast-expand
+      - action: select
+        with:
+          selector: '[data-testid="feature-row-analytics.topic_clustering_llm"] [role="combobox"]'
+          option: gemini
+      - action: click
+        with:
+          testId: config-save
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          testIdPrefix: config-row-
+          hasText: /embedding/i
+          min: '1'
+      - action: click
+        with:
+          selector: '[data-testid^="config-row-"][data-testid$="-actions"]'
+      - action: click
+        with:
+          selector: '[data-testid^="config-row-"][data-testid$="-edit"]'
+      - action: expect
+        with:
+          testId: default-model-override-drawer
+      - action: expect
+        with:
+          testId: role-row-default
+          hasText: /gemini/i
+      - action: expect
+        with:
+          testId: role-row-embeddings
+          hasText: /embedding/i
+      - action: click
+        with:
+          testId: role-row-fast-expand
+      - action: expect
+        with:
+          testId: feature-row-analytics.topic_clustering_llm
+          hasText: /gemini/i

@@ -3,7 +3,8 @@
 # object available, GET /api/files/{projectId}/{objectId} reads it back. Main has no upload routes
 # (it answers 404), so these are branch-only like the stored-objects scenarios in uncovered-routes.yaml;
 # the read half (/api/files) is main's. Each scenario runs in its own project shard so
-# the objects it makes are its own.
+# the objects it makes are its own. A body that differs from the signed content-length is a
+# 403 SignatureDoesNotMatch from S3 (direct upload) and a 4xx from the product (through-process).
 
 - id: stored-objects-roundtrip-uploads-and-reads-back
   endpoint: POST /api/stored-objects/uploads/{storedObjectId}/confirmation
@@ -99,7 +100,7 @@
     bodyRaw: "hi"
     contentType: text/plain
   expect:
-    status: [400, 409, 413, 422]
+    status: [400, 403, 409, 413, 422]
   verify:
     - request: POST /api/stored-objects/uploads/{objectId}/confirmation
       body: { projectId: "{projectId}" }
@@ -125,7 +126,7 @@
     bodyRaw: "hello, and a good deal more than five bytes"
     contentType: text/plain
   expect:
-    status: [400, 409, 413, 422]
+    status: [400, 403, 409, 413, 422]
   verify:
     - request: POST /api/stored-objects/uploads/{objectId}/confirmation
       body: { projectId: "{projectId}" }
@@ -151,7 +152,7 @@
     bodyRaw: ""
     contentType: text/plain
   expect:
-    status: [400, 409, 413, 422]
+    status: [400, 403, 409, 413, 422]
   verify:
     - request: GET /api/files/{projectId}/{objectId}
       expect: { status: [404, 409, 422] }

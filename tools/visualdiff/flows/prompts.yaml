@@ -375,3 +375,52 @@ flows:
           count: 'textarea[placeholder^="Type your message here"]'
           min: "2"
           timeout: "20000"
+
+  - id: prompt-variable-mapping-persists
+    title: Map a prompt variable to a dataset column in the workbench and read the mapping back after a reload
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-pmap-{uid}
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          min: "1"
+      - action: click
+        with:
+          testId: target-header-button
+      - action: expect
+        with:
+          testId: mapping-input-input
+      - action: click
+        with:
+          testId: clear-mapping-button
+          optional: "true"
+      - action: click
+        with:
+          testId: mapping-input-input
+      - action: click
+        with:
+          testId: field-option-input
+      - action: expect
+        with:
+          testId: source-mapping-tag
+      - action: wait
+        with:
+          millis: "3000"
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: click
+        with:
+          testId: target-header-button
+      - action: expect
+        with:
+          testId: source-mapping-tag
+          hasText: input
