@@ -191,6 +191,7 @@ describe("OnboardingChecksService", () => {
   });
 
   /** @scenario "The checklist carries the organization's guided onboarding" */
+  /** @scenario "the onboarding checks expose the guided state of the organization" */
   it("carries the organization's guided onboarding", async () => {
     const { service } = checklist({
       guided: {
@@ -210,5 +211,14 @@ describe("OnboardingChecksService", () => {
       currentPath: "coding",
       donePaths: ["llmops"],
     });
+  });
+
+  /** @scenario "the onboarding checks expose the empty guided state for an organization that recorded none" */
+  it("carries no variant, paths or done paths for an organization that recorded none", async () => {
+    const { service } = checklist();
+
+    const status = await service.getCheckStatus({ projectId: PROJECT_ID });
+
+    expect(status.guidedOnboarding).toMatchObject({ variant: null, paths: [], donePaths: [] });
   });
 });
