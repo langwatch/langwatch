@@ -3170,6 +3170,13 @@ const presentations = {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
   },
+  developer_seat_restricted: {
+    // A Developer seat reaches its own project only (ADR-143). No admin can
+    // grant a role here, so the copy names the seat rather than a permission.
+    title: "This is outside your Developer seat",
+    describe: () =>
+      "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
+  },
   dataset_column_type_change_unsupported: {
     // Customer fault in the ADR-045 sense: they asked for something the format
     // can't do, and there is a way to get where they were going.

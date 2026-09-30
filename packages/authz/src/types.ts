@@ -129,6 +129,8 @@ export type AuthzDenialReason =
   | "membership-disabled"
   | "no-binding"
   | "lite-member-restricted"
+  /** A Developer seat (ADR-143) asked for something outside its personal team. */
+  | "developer-restricted"
   | "owner-ceiling";
 
 export type AuthzGrantVia =

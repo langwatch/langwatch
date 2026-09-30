@@ -18,6 +18,7 @@ import {
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
   ProjectPermissionDeniedError,
@@ -84,6 +85,15 @@ export const checkProjectPermission =
           ),
         });
       }
+      if (organizationRole === OrganizationUserRole.DEVELOPER) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "This is outside your Developer seat",
+          cause: new DeveloperSeatRestrictedError(
+            permission.split(":")[0] ?? "unknown",
+          ),
+        });
+      }
       // The boundary maps the handled cause to its HTTP status and customer code.
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -117,6 +127,15 @@ export const checkTeamPermission =
           code: "UNAUTHORIZED",
           message: "This feature is not available for your account",
           cause: new LiteMemberRestrictedError(
+            permission.split(":")[0] ?? "unknown",
+          ),
+        });
+      }
+      if (organizationRole === OrganizationUserRole.DEVELOPER) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "This is outside your Developer seat",
+          cause: new DeveloperSeatRestrictedError(
             permission.split(":")[0] ?? "unknown",
           ),
         });
