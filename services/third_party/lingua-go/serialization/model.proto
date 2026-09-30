@@ -1,0 +1,123 @@
+/*
+ * Copyright © 2021-present Peter M. Stahl pemistahl@gmail.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+package lingua;
+option go_package = "./serialization";
+
+// SerializableLanguageModel represents a statistical language model
+// that is serialized as a protocol buffer and stored on disk as a binary file.
+// Even though this struct is public, it is not meant to be used directly.
+// It is used only internally for serialization and deserialization.
+message SerializableLanguageModel {
+  SerializableLanguage language = 1;
+  uint32 ngram_length = 2;
+  uint32 total_ngrams = 3;
+  repeated SerializableNgramSet ngram_sets = 4;
+}
+
+// SerializableNgramSet represents a collection of ngrams sharing the same
+// probability within a specific language model that is serialized as a protocol
+// buffer and stored on disk as a binary file. Even though this struct is public,
+// it is not meant to be used directly. It is used only internally for
+// serialization and deserialization.
+message SerializableNgramSet {
+  double probability = 1;
+  repeated string ngrams = 2;
+}
+
+// SerializableLanguage represents a language that is serialized as a protocol
+// buffer and stored on disk as a binary file. Even though this type is public,
+// it is not meant to be used directly. It is used only internally for
+// serialization and deserialization.
+enum SerializableLanguage {
+  AFRIKAANS = 0;
+  ALBANIAN = 1;
+  ARABIC = 2;
+  ARMENIAN = 3;
+  AZERBAIJANI = 4;
+  BASQUE = 5;
+  BELARUSIAN = 6;
+  BENGALI = 7;
+  BOKMAL = 8;
+  BOSNIAN = 9;
+  BULGARIAN = 10;
+  CATALAN = 11;
+  CHINESE = 12;
+  CROATIAN = 13;
+  CZECH = 14;
+  DANISH = 15;
+  DUTCH = 16;
+  ENGLISH = 17;
+  ESPERANTO = 18;
+  ESTONIAN = 19;
+  FINNISH = 20;
+  FRENCH = 21;
+  GANDA = 22;
+  GEORGIAN = 23;
+  GERMAN = 24;
+  GREEK = 25;
+  GUJARATI = 26;
+  HEBREW = 27;
+  HINDI = 28;
+  HUNGARIAN = 29;
+  ICELANDIC = 30;
+  INDONESIAN = 31;
+  IRISH = 32;
+  ITALIAN = 33;
+  JAPANESE = 34;
+  KAZAKH = 35;
+  KOREAN = 36;
+  LATIN = 37;
+  LATVIAN = 38;
+  LITHUANIAN = 39;
+  MACEDONIAN = 40;
+  MALAY = 41;
+  MAORI = 42;
+  MARATHI = 43;
+  MONGOLIAN = 44;
+  NYNORSK = 45;
+  PERSIAN = 46;
+  POLISH = 47;
+  PORTUGUESE = 48;
+  PUNJABI = 49;
+  ROMANIAN = 50;
+  RUSSIAN = 51;
+  SERBIAN = 52;
+  SHONA = 53;
+  SLOVAK = 54;
+  SLOVENE = 55;
+  SOMALI = 56;
+  SOTHO = 57;
+  SPANISH = 58;
+  SWAHILI = 59;
+  SWEDISH = 60;
+  TAGALOG = 61;
+  TAMIL = 62;
+  TELUGU = 63;
+  THAI = 64;
+  TSONGA = 65;
+  TSWANA = 66;
+  TURKISH = 67;
+  UKRAINIAN = 68;
+  URDU = 69;
+  VIETNAMESE = 70;
+  WELSH = 71;
+  XHOSA = 72;
+  YORUBA = 73;
+  ZULU = 74;
+}
