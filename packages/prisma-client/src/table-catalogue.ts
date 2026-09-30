@@ -54,6 +54,7 @@ export const prismaTableCatalogue = {
   "BatchEvaluation": "BatchEvaluation",
   "Trigger": "Trigger",
   "SlackIntegration": "SlackIntegration",
+  "SlackConnectionClaim": "slack_connection_claim",
   "WebhookEndpoint": "WebhookEndpoint",
   "WebhookEndpointDelivery": "WebhookEndpointDelivery",
   "Experiment": "Experiment",
@@ -1096,6 +1097,17 @@ export const prismaModelFieldCatalogue = {
     "slackTeamName",
     "createdById",
     "updatedById",
+    "createdAt",
+    "updatedAt",
+    "claims"
+  ],
+  "SlackConnectionClaim": [
+    "connectionId",
+    "connection",
+    "claimantId",
+    "claimantLabel",
+    "organizationId",
+    "projectId",
     "createdAt",
     "updatedAt"
   ],
@@ -2946,7 +2958,12 @@ export const prismaRelationCatalogue = {
     "latestEvaluation": "TriggerLatestEvaluation",
     "customGraph": "CustomGraph"
   },
-  "SlackIntegration": {},
+  "SlackIntegration": {
+    "claims": "SlackConnectionClaim"
+  },
+  "SlackConnectionClaim": {
+    "connection": "SlackIntegration"
+  },
   "WebhookEndpoint": {
     "organization": "Organization",
     "deliveries": "WebhookEndpointDelivery"

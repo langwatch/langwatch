@@ -2348,9 +2348,28 @@ model SlackIntegration {
   updatedById         String
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @default(now()) @updatedAt
+  claims              SlackConnectionClaim[]
 
   @@unique([organizationId, scopeType, scopeId, secretFingerprint])
   @@index([scopeType, scopeId])
+}
+
+/// An automation holding a Slack connection in use (ARCHITECTURE.md §3, the
+/// claims ruling): a claimed connection is never deleted. `projectId` is the
+/// claimant's project; `organizationId` is the connection's tenancy anchor.
+model SlackConnectionClaim {
+  connectionId   String
+  connection     SlackIntegration @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  claimantId     String
+  claimantLabel  String
+  organizationId String
+  projectId      String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now()) @updatedAt
+
+  @@id([connectionId, claimantId])
+  @@index([organizationId])
+  @@map("slack_connection_claim")
 }
 
 enum WebhookDeliveryOutcome {

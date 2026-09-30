@@ -19,10 +19,18 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@langwatch/slack-contract": "workspace:*"
+    "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/slack-contract": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
     "@langwatch/vitest-config": "workspace:*",
+    "@types/react": "catalog:",
+    "react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

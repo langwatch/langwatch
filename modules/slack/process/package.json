@@ -20,11 +20,24 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
-    "@langwatch/slack-contract": "workspace:*"
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/slack-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
+    "@trpc/server": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

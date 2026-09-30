@@ -8968,6 +8968,112 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        },
+        {
+          "name": "claims",
+          "columnName": "claims",
+          "type": "SlackConnectionClaim",
+          "kind": "relation",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "",
+          "relation": {
+            "fields": [],
+            "references": [],
+            "to": "SlackConnectionClaim"
+          }
+        }
+      ]
+    },
+    {
+      "name": "SlackConnectionClaim",
+      "tableName": "slack_connection_claim",
+      "documentation": "An automation holding a Slack connection in use (ARCHITECTURE.md §3, the\nclaims ruling): a claimed connection is never deleted. `projectId` is the\nclaimant's project; `organizationId` is the connection's tenancy anchor.",
+      "primaryKey": [
+        "connectionId",
+        "claimantId"
+      ],
+      "fields": [
+        {
+          "name": "connectionId",
+          "columnName": "connectionId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "connection",
+          "columnName": "connection",
+          "type": "SlackIntegration",
+          "kind": "relation",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "",
+          "relation": {
+            "fields": [
+              "connectionId"
+            ],
+            "references": [
+              "id"
+            ],
+            "to": "SlackIntegration"
+          }
+        },
+        {
+          "name": "claimantId",
+          "columnName": "claimantId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "claimantLabel",
+          "columnName": "claimantLabel",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         }
       ]
     },

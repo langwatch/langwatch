@@ -1,5 +1,13 @@
-/** What a browser installs for slack; the slackConnection drawer lands with its packet. */
+/** What a browser installs for slack: the `slackConnection` drawer settings and automation open. */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
-export const slackWeb = defineWebModule("slack");
+export const slackWeb = defineWebModule("slack")
+  /** The name is the wire (§10): settings and automation's Slack step open it by address. */
+  .withDrawers({
+    slackConnection: {
+      load: async () => ({
+        default: (await import("./ui/sections/slack-connection-drawer.tsx")).SlackConnectionDrawer,
+      }),
+    },
+  });
