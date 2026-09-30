@@ -35,10 +35,10 @@ export function buildSecurityHeaders({
     // it the voice panel fails in production with "Failed to load the
     // rawAudioProcessor worklet module" while working in dev, where no CSP is
     // enforced (#7947).
-    `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
-    `style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com https://unpkg.com${cdn}`,
-    `img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
-    `font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev https://fonts.gstatic.com${cdn}`,
+    `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://*.google-analytics.com https://www.google.com${cdn}`,
+    `style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://fonts.googleapis.com https://unpkg.com${cdn}`,
+    `img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com${cdn}`,
+    `font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://fonts.gstatic.com${cdn}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -49,8 +49,8 @@ export function buildSecurityHeaders({
     // ConvAI websocket the platform mints (#7947).
     `connect-src 'self' ${buildStorageConnectSrc(environment).join(
       " ",
-    )} https://api.elevenlabs.io wss://api.elevenlabs.io https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
-    "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev",
+    )} https://api.elevenlabs.io wss://api.elevenlabs.io https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com${cdn}`,
+    "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com",
   ].join("; ");
 
   return {
