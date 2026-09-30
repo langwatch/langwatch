@@ -1,1 +1,0 @@
-ALTER TABLE "Trigger" ADD COLUMN "lwql" TEXT;

@@ -2270,9 +2270,6 @@ model Trigger {
   // Evaluated in-memory against fold state at dispatch (never per-trace CH),
   // fail-closed on any unevaluable field.
   filterQuery          String?
-  // LWQL: a WHERE expression over traces (AUTOMATION, REPORT) or a metric
-  // statement (ALERT without customGraphId). NULL = not authored in LWQL.
-  lwql                 String?
   lastRunAt            Float                     @default(0)
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @default(now()) @updatedAt
