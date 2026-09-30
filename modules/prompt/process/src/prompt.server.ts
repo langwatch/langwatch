@@ -11,7 +11,7 @@ import { promptLifecycleEventing } from "./eventing/prompt-lifecycle.pipeline.ts
 import { promptRepositories } from "./repositories/prompt-repositories.registry.ts";
 import { promptExecuteRest } from "./transport/prompt-execute.rest.ts";
 import { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
-import { promptRest, promptRestCredential, promptRestFacts } from "./transport/prompt.rest.ts";
+import { promptRest, promptRestFacts } from "./transport/prompt.rest.ts";
 import { promptTrpcTransport } from "./transport/prompt.trpc.ts";
 
 /** Prompt library server — tRPC, REST, and the browser-only playground stream. */
@@ -31,18 +31,6 @@ export const promptServer = defineServerModule("prompt")
         organizationId: project.organizationId,
         promptsUrl: app.promptsPlatformUrl({ projectSlug: project.slug }),
       };
-    }),
-    bindRestMiddleware(promptRestCredential, (context) => {
-      const credential = projectCredentialOfRequest(context.req.raw);
-
-      return credential.type === "legacyProjectKey"
-        ? { type: "legacyProjectKey" as const, projectId: credential.project.id }
-        : {
-            type: "apiKey" as const,
-            apiKeyId: credential.apiKeyId,
-            userId: credential.userId,
-            organizationId: credential.organizationId,
-          };
     }),
   ]);
 

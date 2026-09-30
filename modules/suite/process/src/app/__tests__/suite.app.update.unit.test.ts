@@ -99,8 +99,6 @@ const promptApi = createApiFixture<PromptApi>({
   listCopies: mockMethod(),
   getCopySource: mockMethod(),
   createTagForProject: mockMethod(),
-  projectsSharingTagCatalog: mockMethod(),
-  assertMayManageTagCatalog: mockMethod(),
   renameTagForProject: mockMethod(),
   deleteTagForProject: mockMethod(),
 });

@@ -19,7 +19,7 @@ import { PromptApp } from "#app/prompt.app";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
-import { promptRest, promptRestCredential, promptRestFacts } from "../prompt.rest.ts";
+import { promptRest, promptRestFacts } from "../prompt.rest.ts";
 
 export const PROMPT_TEST_PROJECT = "project_authorized";
 export const PROMPT_TEST_ORGANIZATION = "org_1";
@@ -92,10 +92,6 @@ export function mountPromptRest(options: {
       bindRestMiddleware(promptRestFacts, () => ({
         organizationId,
         promptsUrl: "https://app.test/authorized/prompts",
-      })),
-      bindRestMiddleware(promptRestCredential, () => ({
-        type: "legacyProjectKey" as const,
-        projectId,
       })),
     ],
   });

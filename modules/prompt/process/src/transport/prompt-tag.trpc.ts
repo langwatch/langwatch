@@ -1,25 +1,9 @@
 /**
- * The server half of `promptTags.*`. A tag definition is one organization
- * row whose assignments cascade across it, so the named project is only the
- * first scope reached; which projects, and the refusal, belong to the app.
+ * The server half of `promptTags.*`. Each write needs `prompts:manage` on the
+ * caller's project only, as on main.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { PromptApi, promptTagTrpc } from "@langwatch/prompt-contract";
-
-/**
- * The organization-wide guard. Its refusal is `PermissionDeniedError`, a
- * handled 403 the runtime renders as FORBIDDEN with the domain error as the
- * cause, so nothing here re-wraps it.
- */
-function assertMayManageEveryProject(
-  app: PromptApi,
-  input: { projectId: string; userId: string },
-): Promise<void> {
-  return app.assertMayManageTagCatalog({
-    projectId: input.projectId,
-    by: { type: "user", userId: input.userId },
-  });
-}
 
 export const promptTagTrpcTransport = defineTrpcRouter(PromptApi, promptTagTrpc)
   .procedure("getAll")
@@ -34,26 +18,17 @@ export const promptTagTrpcTransport = defineTrpcRouter(PromptApi, promptTagTrpc)
 
   .procedure("rename")
   .withPermission("prompts:manage")
-  .handle(async ({ app, input, actor }) => {
-    await assertMayManageEveryProject(app, {
-      projectId: input.projectId,
-      userId: actor.id,
-    });
-
-    return app.renameTagForProject({
+  .handle(({ app, input }) =>
+    app.renameTagForProject({
       projectId: input.projectId,
       oldName: input.oldName,
       newName: input.newName,
-    });
-  })
+    }),
+  )
 
   .procedure("delete")
   .withPermission("prompts:manage")
-  .handle(async ({ app, input, actor }) => {
-    await assertMayManageEveryProject(app, {
-      projectId: input.projectId,
-      userId: actor.id,
-    });
+  .handle(async ({ app, input }) => {
     await app.deleteTagForProject({ projectId: input.projectId, name: input.name });
 
     return { success: true };

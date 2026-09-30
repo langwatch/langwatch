@@ -70,16 +70,16 @@ Feature: Permissions are resolved at the scope of the resource acted on
   # ────────────────────────────────────────────────────────────────────────────
 
   @unit
-  Scenario: Renaming a prompt tag demands the permission across the organization
-    Given a credential that may manage prompts in one project only
-    When it renames a prompt tag that every project in the organization resolves
-    Then the request is refused and no tag is renamed
+  Scenario: Renaming a prompt tag needs the permission on the caller's project only
+    Given a credential that may manage prompts in one project of the organization only
+    When it renames a prompt tag
+    Then the tag is renamed and no sibling project is checked
 
   @unit
-  Scenario: Deleting a prompt tag demands the permission across the organization
-    Given a credential that may manage prompts in one project only
-    When it deletes a prompt tag whose assignments span the organization
-    Then the request is refused and no assignment is removed
+  Scenario: Deleting a prompt tag needs the permission on the caller's project only
+    Given a credential that may manage prompts in one project of the organization only
+    When it deletes a prompt tag
+    Then the tag is deleted and no sibling project is checked
 
   # ────────────────────────────────────────────────────────────────────────────
   # H9 — workflow optimization chat

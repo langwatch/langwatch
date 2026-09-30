@@ -54,21 +54,6 @@ import { PromptTagService } from "../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
 
-/**
- * The credential a tag write arrived on. A tag definition is one organization
- * row whose assignments cascade across it, so the caller must be allowed on
- * every project reached; a legacy project key only answers for its own project.
- */
-export type PromptTagCatalogPrincipal =
-  | Readonly<{ type: "user"; userId: string }>
-  | Readonly<{
-      type: "apiKey";
-      apiKeyId: string;
-      userId: string | null;
-      organizationId: string;
-    }>
-  | Readonly<{ type: "legacyProjectKey"; projectId: string }>;
-
 /** Who a write is attributed to. */
 export interface PromptCaller {
   readonly id: string;
@@ -658,69 +643,6 @@ export class PromptApp implements PromptApi {
   }
 
   /**
-   * Every project a tag operation reaches: the definition is one organization
-   * row and its assignments cascade across the whole organization, so this is
-   * the set a caller has to be allowed to act on, not just the one they named.
-   */
-  async projectsSharingTagCatalog(input: { projectId: string }): Promise<string[]> {
-    const organizationId = await this.#organizationOf(input.projectId);
-    return this.#dependencies.projects.listIdsByOrganization({ organizationId });
-  }
-
-  /**
-   * Refuses unless the caller may manage prompts in EVERY project the tag
-   * catalog reaches - authorizing only the named project would let its grant
-   * rename or delete what every sibling resolves. Names the first project it cannot manage.
-   */
-  async assertMayManageTagCatalog(input: {
-    projectId: string;
-    by: PromptTagCatalogPrincipal;
-  }): Promise<void> {
-    const projectIds = await this.projectsSharingTagCatalog({ projectId: input.projectId });
-    for (const projectId of projectIds) {
-      if (await this.#mayManagePromptsIn({ by: input.by, projectId })) continue;
-
-      throw new PermissionDeniedError({
-        permission: "prompts:manage",
-        scope: { type: "project", id: projectId },
-        denialReason: "no-binding",
-      });
-    }
-  }
-
-  /**
-   * Whether the CREDENTIAL on this request - not the person who minted it - may
-   * manage prompts in one project. A legacy project key answers only for the
-   * project it is pinned to.
-   */
-  async #mayManagePromptsIn(input: {
-    by: PromptTagCatalogPrincipal;
-    projectId: string;
-  }): Promise<boolean> {
-    const { by, projectId } = input;
-
-    if (by.type === "legacyProjectKey") return by.projectId === projectId;
-
-    if (by.type === "user") {
-      return this.#permissions().hasPermission({
-        userId: by.userId,
-        permission: "prompts:manage",
-        projectId,
-      });
-    }
-
-    const decision = await this.#permissions().getApiKeyProjectDecision({
-      apiKeyId: by.apiKeyId,
-      userId: by.userId,
-      organizationId: by.organizationId,
-      projectId,
-      permission: "prompts:manage",
-    });
-
-    return decision.outcome === "allowed";
-  }
-
-  /**
    * Whether one person holds a permission in a SECOND project this request
    * names. The door's declared check covers the project the input named; copy,
    * push and sync each reach another, and this is the probe for it.
@@ -988,27 +910,16 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.tagCatalogue.createTagDefinition(input);
   }
 
-  async renameTagDefinition(input: {
-    projectId: string;
+  renameTagDefinition(input: {
     organizationId: string;
     oldName: string;
     newName: string;
-    by: PromptTagCatalogPrincipal;
   }): Promise<PromptTag> {
-    const { projectId, by, ...rename } = input;
-    await this.assertMayManageTagCatalog({ projectId, by });
-    return this.#dependencies.tagCatalogue.renameTagDefinition(rename);
+    return this.#dependencies.tagCatalogue.renameTagDefinition(input);
   }
 
-  async deleteTagDefinition(input: {
-    projectId: string;
-    organizationId: string;
-    name: string;
-    by: PromptTagCatalogPrincipal;
-  }): Promise<void> {
-    const { projectId, by, ...deletion } = input;
-    await this.assertMayManageTagCatalog({ projectId, by });
-    return this.#dependencies.tagCatalogue.deleteTagDefinition(deletion);
+  deleteTagDefinition(input: { organizationId: string; name: string }): Promise<void> {
+    return this.#dependencies.tagCatalogue.deleteTagDefinition(input);
   }
 
   async #organizationOf(projectId: string): Promise<string> {

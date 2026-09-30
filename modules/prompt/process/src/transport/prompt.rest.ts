@@ -57,24 +57,6 @@ export const promptRestFacts = defineRestMiddleware(
   }),
 );
 
-/**
- * The credential this request arrived on, as the tag catalogue's cascade reads
- * it. A legacy project key names no key row, so it can only ever answer for the
- * one project it is pinned to.
- */
-export const promptRestCredential = defineRestMiddleware(
-  "promptRestCredential",
-  z.discriminatedUnion("type", [
-    z.object({
-      type: z.literal("apiKey"),
-      apiKeyId: z.string(),
-      userId: z.string().nullable(),
-      organizationId: z.string(),
-    }),
-    z.object({ type: z.literal("legacyProjectKey"), projectId: z.string() }),
-  ]),
-);
-
 // ── OpenAPI + refusal helpers ────────────────────────────────────────────────
 
 // ── the family ───────────────────────────────────────────────────────────────
@@ -203,7 +185,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .withInput(renameTagInputSchema)
   .withPermission("prompts:manage")
   .withOutput(tagDefinitionSchema)
-  .withMiddleware(promptRestFacts, promptRestCredential)
+  .withMiddleware(promptRestFacts)
   .withDocs({
     description: "Rename a prompt tag definition",
     responses: {
@@ -211,13 +193,11 @@ export const promptRest = defineRestRouter(PromptApi)
       200: { ...buildStandardSuccessResponse(tagDefinitionSchema), description: "Tag renamed" },
     },
   })
-  .handle(async ({ app, input, scope }, project, credential) => {
+  .handle(async ({ app, input }, project) => {
     const tag = await app.renameTagDefinition({
-      projectId: scope.id,
       organizationId: project.organizationId,
       oldName: input.tag,
       newName: input.name,
-      by: credential,
     });
 
     return { id: tag.id, name: tag.name, createdAt: tag.createdAt };
@@ -227,18 +207,13 @@ export const promptRest = defineRestRouter(PromptApi)
   .withParams(tagParamsSchema)
   .withPermission("prompts:manage")
   .withOutput(z.void())
-  .withMiddleware(promptRestFacts, promptRestCredential)
+  .withMiddleware(promptRestFacts)
   .withDocs({
     description: "Delete a prompt tag definition and cascade to assignments",
     responses: { ...baseResponses, 204: { description: "Tag deleted", content: {} } },
   })
-  .handle(async ({ app, input, scope }, project, credential) => {
-    await app.deleteTagDefinition({
-      projectId: scope.id,
-      organizationId: project.organizationId,
-      name: input.tag,
-      by: credential,
-    });
+  .handle(async ({ app, input }, project) => {
+    await app.deleteTagDefinition({ organizationId: project.organizationId, name: input.tag });
   })
 
   .get("/api/prompts/:id{.+?}/versions", "getApiPromptsByIdVersions")

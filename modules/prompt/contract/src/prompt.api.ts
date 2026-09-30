@@ -26,21 +26,6 @@ import type {
 
 export type PromptApiCaller = Readonly<{ id: string }>;
 
-/**
- * The credential a tag-catalogue write arrived on: a signed-in person at the
- * browser door, the API key itself at the REST one, or a legacy project key
- * that names no key row and so answers only for its own project.
- */
-export type PromptTagCatalogPrincipal =
-  | Readonly<{ type: "user"; userId: string }>
-  | Readonly<{
-      type: "apiKey";
-      apiKeyId: string;
-      userId: string | null;
-      organizationId: string;
-    }>
-  | Readonly<{ type: "legacyProjectKey"; projectId: string }>;
-
 export type PromptRestSyncInput = {
   idOrHandle: string;
   localConfigData: z.infer<typeof syncInputSchema>["configData"];
@@ -192,11 +177,6 @@ export interface PromptApi {
     input: { projectId: string; name: string },
     by: PromptApiCaller,
   ): Promise<PromptTag>;
-  projectsSharingTagCatalog(input: { projectId: string }): Promise<string[]>;
-  assertMayManageTagCatalog(input: {
-    projectId: string;
-    by: PromptTagCatalogPrincipal;
-  }): Promise<void>;
   /** A project gained a prompt: the nurturing trail the door leaves. */
   announceCreated(input: { projectId: string; promptId: string; userId?: string | null }): void;
   listCopyTargets(
@@ -255,18 +235,11 @@ export interface PromptApi {
   }): Promise<PromptTagAssignment>;
   createTagDefinition(input: { organizationId: string; name: string }): Promise<PromptTag>;
   renameTagDefinition(input: {
-    projectId: string;
     organizationId: string;
     oldName: string;
     newName: string;
-    by: PromptTagCatalogPrincipal;
   }): Promise<PromptTag>;
-  deleteTagDefinition(input: {
-    projectId: string;
-    organizationId: string;
-    name: string;
-    by: PromptTagCatalogPrincipal;
-  }): Promise<void>;
+  deleteTagDefinition(input: { organizationId: string; name: string }): Promise<void>;
 }
 
 export const PromptApi = moduleApi<PromptApi>()("prompt");
