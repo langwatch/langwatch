@@ -136,6 +136,12 @@ export class LangyConversationService {
     return this.reads.getLocalRecord(input);
   }
 
+  getLatestLocalControlRequest(
+    input: Parameters<LangyConversationReadService["getLatestLocalControlRequest"]>[0],
+  ): ReturnType<LangyConversationReadService["getLatestLocalControlRequest"]> {
+    return this.reads.getLatestLocalControlRequest(input);
+  }
+
   findByIdVisible(
     input: Parameters<LangyConversationReadService["findByIdVisible"]>[0],
   ): ReturnType<LangyConversationReadService["findByIdVisible"]> {

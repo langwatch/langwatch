@@ -9,6 +9,7 @@ import {
   responseFormatSchema,
   versionSchema,
   nodeDatasetSchema,
+  nulFreeStringSchema,
 } from "./prompt.field-schemas.ts";
 import { sortKeysDeep } from "./prompt.sort-keys.ts";
 
@@ -36,15 +37,15 @@ const configSchemaV1_0 = z.object({
   projectId: z.string().min(1, "Project ID cannot be empty"),
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),
-  commitMessage: z.string(),
+  commitMessage: nulFreeStringSchema,
   version: versionSchema,
   createdAt: z.date(),
   configData: z.object({
-    prompt: z.string(),
+    prompt: nulFreeStringSchema,
     messages: z.array(messageSchema).default([]),
     inputs: z.array(inputsSchema).default([]),
     outputs: z.array(outputsSchema).min(1, "At least one output is required"),
-    model: z.string().min(1, "Model identifier cannot be empty"),
+    model: nulFreeStringSchema.min(1, "Model identifier cannot be empty"),
     temperature: z.number().optional(),
     max_tokens: z.number().optional(),
     // Traditional sampling parameters

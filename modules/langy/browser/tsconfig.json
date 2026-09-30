@@ -74,6 +74,9 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../onboarding/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../onboarding/contract/tsconfig.build.json"
     },
     {

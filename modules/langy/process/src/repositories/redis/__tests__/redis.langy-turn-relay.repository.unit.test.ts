@@ -218,6 +218,26 @@ describe("LangyTurnRelayAdapter", () => {
       expect(conversations.ingestAgentTurnResult).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Streamed tokens are not events" */
+    /** @scenario "Status and progress are ephemeral, never durable" */
+    it("writes nothing durable for 500 tokens, status, progress and reasoning", async () => {
+      const { relay, buffer, conversations } = makeRelay();
+      const frames = [
+        { type: "status", status: "Searching traces" },
+        { type: "progress", message: "Reading", current: 1, total: 3 },
+        { type: "reasoning", text: "thinking" },
+        ...Array.from({ length: 500 }, (_, i) => ({ type: "delta", text: `t${i} ` })),
+      ];
+
+      await handleAll({ relay, frames: frames.map((payload) => frame(payload)) });
+
+      expect(buffer.appendChunk).toHaveBeenCalledTimes(500);
+      expect(buffer.appendStatus).toHaveBeenCalledTimes(1);
+      expect(buffer.appendProgress).toHaveBeenCalledTimes(1);
+      const writes = Object.entries(conversations).filter(([name]) => name !== "findRunToken");
+      for (const [name, write] of writes) expect(write, name).not.toHaveBeenCalled();
+    });
+
     it("routes a heartbeat to liveness with no content", async () => {
       const { relay, buffer } = makeRelay();
       await relay.handle(frame({ type: "heartbeat" }));

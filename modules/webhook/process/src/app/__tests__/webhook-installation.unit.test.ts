@@ -47,7 +47,13 @@ function stores() {
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(webhookServer)])
-    .withConfig({ webhook: { allowInsecureLocalUrls: false, allowAmbientAwsCredentials: false } })
+    .withConfig({
+      webhook: {
+        allowInsecureLocalUrls: false,
+        allowAmbientAwsCredentials: false,
+        outboundProxy: {},
+      },
+    })
     .withStores(stores())
     .withMember("isSaas", false)
     .provide({

@@ -7,6 +7,7 @@ import type { RoutingDecision } from "@langwatch/identity-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const {
   requestVerificationMock,
@@ -18,6 +19,7 @@ const {
   signInMock,
   addPasskeyMock,
   navigateMock,
+  hardRedirectMock,
   searchParamsRef,
   publicEnvRef,
 } = vi.hoisted(() => ({
@@ -30,6 +32,7 @@ const {
   signInMock: vi.fn(),
   addPasskeyMock: vi.fn(),
   navigateMock: vi.fn(),
+  hardRedirectMock: vi.fn(),
   searchParamsRef: { current: new URLSearchParams("") },
   publicEnvRef: { current: { IS_SAAS: true } as Record<string, unknown> },
 }));
@@ -65,7 +68,8 @@ vi.mock("../../../behavior/auth-api.ts", async () => {
       },
       [mutateAsync],
     );
-    return { mutate, mutateAsync, isPending, error };
+    const reset = useCallback(() => setError(null), []);
+    return { mutate, mutateAsync, reset, isPending, error };
   };
 
   return {
@@ -74,9 +78,6 @@ vi.mock("../../../behavior/auth-api.ts", async () => {
         route: { useMutation: useFakeMutation(routeMock) },
         requestSignUpVerification: {
           useMutation: useFakeMutation(requestVerificationMock),
-        },
-        completeSignUpVerification: {
-          useMutation: useFakeMutation(completeVerificationMock),
         },
         signUpEnrollment: { useMutation: useFakeMutation(enrollmentMock) },
         sendMyAddressConfirmation: {
@@ -87,6 +88,15 @@ vi.mock("../../../behavior/auth-api.ts", async () => {
     },
   };
 });
+
+vi.mock("../../../behavior/confirm-sign-up-address.ts", () => ({
+  confirmSignUpAddress: completeVerificationMock,
+}));
+
+vi.mock("../../../behavior/hard-redirect.ts", () => ({
+  hardRedirect: hardRedirectMock,
+  isNavigatingAway: () => false,
+}));
 
 vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
@@ -111,7 +121,10 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 }));
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
+import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
 import { VerificationFirstSignUp } from "../verification-first-sign-up.tsx";
+
+const CEREMONY = z.object({ context: z.string() });
 
 const localPicker: RoutingDecision = {
   outcome: "method_picker",
@@ -159,7 +172,10 @@ describe("given the sign-up screen", () => {
     });
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    _resetTwoStepChallengeForTests();
+  });
 
   describe("when sign-up starts with a work address", () => {
     /** @scenario Sign-up proves the address before asking for a credential */
@@ -300,22 +316,71 @@ describe("given the sign-up screen", () => {
   });
 
   describe("when a confirmation link comes back for an account that exists", () => {
+    it("goes straight into the app on the session the link opened", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token&callbackUrl=%2Fprojects");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: true,
+        addressProof: null,
+        signedIn: true,
+      });
+
+      renderScreen();
+
+      expect(await screen.findByTestId("signed-in-handoff")).toHaveTextContent(
+        "sam@acme.com is confirmed. Taking you to LangWatch.",
+      );
+      expect(hardRedirectMock).toHaveBeenCalledWith("/projects");
+      expect(screen.queryByTestId("method-picker")).toBeNull();
+      expect(routeMock).not.toHaveBeenCalled();
+    });
+
     /** @scenario Sign-up creates the account and confirms the address afterwards */
-    it("says the address is confirmed and asks for nothing more", async () => {
+    it("offers the way in when the link was reopened and opened no session", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token");
       completeVerificationMock.mockResolvedValue({
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: true,
         addressProof: null,
+        signedIn: false,
       });
 
       renderScreen();
 
-      // Nothing to choose: sign-up already made the account, and this link is
-      // the address catching up with it.
+      // One link is one way in: the routed picker, since the account may hold a passkey.
       expect(await screen.findByTestId("account-ready")).toHaveTextContent(/sam@acme\.com/);
-      expect(screen.queryByTestId("method-picker")).toBeNull();
+      expect(await screen.findByTestId("method-picker")).toBeTruthy();
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+      expect(hardRedirectMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a reopened link returns no usable proof", () => {
+    it("offers a fresh link and confirms nothing", async () => {
+      searchParamsRef.current = new URLSearchParams("verify=spent-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: null,
+        signedIn: false,
+      });
+
+      const { container } = renderScreen();
+
+      expect(await screen.findByText("That confirmation link no longer works")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /send a new link/i })).toBeTruthy();
+      expect(screen.queryByTestId("verified-address")).toBeNull();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(enrollmentMock).not.toHaveBeenCalled();
+
+      await userEvent.type(screen.getByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: /send a new link/i }));
+
+      expect(await screen.findByTestId("verification-sent")).toBeTruthy();
+      expect(requestVerificationMock).toHaveBeenCalledWith({ email: "sam@acme.com" });
     });
   });
 
@@ -388,9 +453,16 @@ describe("given the sign-up screen", () => {
       });
       const { container } = renderScreen();
 
-      expect(await screen.findByTestId("welcome-back")).toBeTruthy();
+      expect(await screen.findByTestId("routed-to-connection")).toBeTruthy();
+      expect(screen.queryByTestId("welcome-back")).toBeNull();
       expect(container.querySelector('input[type="password"]')).toBeNull();
       expect(screen.queryByTestId("verified-address")).toBeNull();
+      await waitFor(() => {
+        expect(signInMock).toHaveBeenCalledWith(
+          "okta",
+          expect.objectContaining({ loginHint: "sam@acme.com" }),
+        );
+      });
     });
   });
 
@@ -446,6 +518,63 @@ describe("given the sign-up screen", () => {
       expect(container.textContent).not.toMatch(/already (have|has)/i);
       expect(container.textContent).not.toMatch(/registered|exists/i);
       expect(container.querySelector('[role="alert"]')).toBeNull();
+    });
+
+    /** @scenario A correct password with a second factor asks for the code on the same card */
+    it("asks for the second factor on the same card when the password was right", async () => {
+      requestVerificationMock.mockRejectedValue({
+        data: { error: { code: "email_already_registered", httpStatus: 409, fault: "customer" } },
+      });
+      signInMock.mockResolvedValue({ ok: false, twoStepRequired: true });
+
+      const { container } = renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+      await screen.findByTestId("method-picker");
+
+      await userEvent.type(
+        container.querySelector('input[type="password"]') as HTMLInputElement,
+        "the-right-password",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+
+      expect(await screen.findByText("Enter your verification code")).toBeTruthy();
+      expect(screen.getByTestId("two-step-code")).toBeTruthy();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+    });
+  });
+
+  describe("when the address's domain routes through an identity provider", () => {
+    /** @scenario Sign-up hands a single-sign-on domain to its provider */
+    it("hands it to the provider instead of sending a link or asking for a credential", async () => {
+      const okta = { id: "okta", kind: "federated" as const, connectionId: "conn_acme" };
+      routeMock.mockResolvedValue({
+        outcome: "redirect_to_connection",
+        connectionId: "conn_acme",
+        methodSet: [okta],
+        reasonCode: "domain_routed",
+      });
+
+      const { container } = renderScreen();
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      await screen.findByTestId("routed-to-connection");
+      expect(screen.queryByTestId("signup-identifier")).toBeNull();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(requestVerificationMock).not.toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when somebody meant to log in instead", () => {
+    it("offers the log-in door under the address step, carrying the callback", async () => {
+      searchParamsRef.current = new URLSearchParams("callbackUrl=/settings");
+      renderScreen();
+
+      const link = await screen.findByTestId("go-to-sign-in");
+      expect(link).toHaveTextContent("Or log in instead");
+      expect(link.getAttribute("href")).toBe("/auth/signin?callbackUrl=%2Fsettings");
     });
   });
 
@@ -566,11 +695,13 @@ describe("given the sign-up screen", () => {
       await userEvent.click(screen.getByTestId("passkey-sign-up"));
 
       await waitFor(() => {
-        expect(addPasskeyMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            context: JSON.stringify({ email: "sam@acme.com", addressProof: "proof-1" }),
-          }),
-        );
+        expect(addPasskeyMock).toHaveBeenCalled();
+      });
+      const [ceremony] = addPasskeyMock.mock.calls[0] ?? [];
+      expect(JSON.parse(CEREMONY.parse(ceremony).context)).toEqual({
+        email: "sam@acme.com",
+        addressProof: "proof-1",
+        claim: expect.any(String),
       });
     });
 

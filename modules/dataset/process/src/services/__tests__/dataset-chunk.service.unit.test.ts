@@ -1,4 +1,4 @@
-import type { DatasetColumns } from "@langwatch/dataset-contract";
+import { DatasetStaleColumnsError, type DatasetColumns } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment node
  * The s3_jsonl chunk mutations: each case asserts the counter write lands on
@@ -345,6 +345,29 @@ describe("DatasetChunkService", () => {
         { id: "r1", entry: { score: 10 } },
         { id: "r2", entry: { score: 20 } },
       ]);
+    });
+
+    /** @scenario "A stale-columns conflict keeps its own code through the middleware" */
+    it("refuses an editor that opened before another edit changed the columns", async () => {
+      const dataset = readyDataset({ ...oneChunk, columnTypes: scoreAsNumber });
+      const { chunks, updates } = fakeRepository(dataset);
+      const { storage } = fakeStorage([[{ id: "r1", entry: { score: 10 } }]]);
+
+      const refusal = await chunks
+        .migrateColumns({
+          dataset,
+          projectId,
+          oldColumnTypes: scoreAsText,
+          newColumnTypes: scoreAsNumber,
+          name: "Scores",
+          slug: "scores",
+          storage,
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(DatasetStaleColumnsError);
+      expect(refusal).toMatchObject({ code: "dataset_stale_columns", httpStatus: 409 });
+      expect(updates).toEqual([]);
     });
 
     /** @scenario "Retyping a text column to an image URL keeps the value" */

@@ -3,13 +3,14 @@ import { credentialSignInFailure } from "../model/credential-sign-in.ts";
 import { signIn } from "./auth-client.tsx";
 
 /**
- * Password attempt with three outcomes (signed in, signing up, refused).
- * Refused credential (wrong password vs no account) auto-converts to sign-up;
- * asks for confirmation link, not password.
+ * Password attempt with four outcomes. A refused credential for an address
+ * the router says nobody holds becomes a sign-up; nothing is mailed here.
+ * A correct password that owes a second factor is a challenge, not a session.
  */
 export type CredentialAttempt =
   | { outcome: "signed_in" }
   | { outcome: "signing_up" }
+  | { outcome: "two_step_required" }
   | {
       outcome: "refused";
       message: string;
@@ -21,15 +22,13 @@ export async function attemptCredentialSignIn({
   email,
   password,
   callbackUrl,
-  convertToSignUp,
+  addressHasNoAccount,
 }: {
   email: string;
   password: string;
   callbackUrl?: string;
-  /**
-   * Sign-up fallback for unknown address; refuses known accounts to distinguish from wrong password
-   */
-  convertToSignUp?: (input: { email: string }) => Promise<unknown>;
+  /** Asks the router whether anybody holds the address; sends nothing to anybody. */
+  addressHasNoAccount?: (input: { email: string }) => Promise<boolean>;
 }): Promise<CredentialAttempt> {
   let response: Awaited<ReturnType<typeof signIn>>;
   try {
@@ -44,6 +43,8 @@ export async function attemptCredentialSignIn({
     };
   }
 
+  if (response?.twoStepRequired) return { outcome: "two_step_required" };
+
   const failure = credentialSignInFailure({ response });
   if (!failure) return { outcome: "signed_in" };
 
@@ -57,16 +58,13 @@ export async function attemptCredentialSignIn({
     code: response?.code,
     message: response?.error,
   });
-  if (!looksLikeWrongCredentials || !convertToSignUp) return refused;
+  if (!looksLikeWrongCredentials || !addressHasNoAccount) return refused;
 
   try {
-    await convertToSignUp({ email });
+    if (!(await addressHasNoAccount({ email }))) return refused;
     return { outcome: "signing_up" };
   } catch {
-    // The address already has an account (so this really was a wrong
-    // password), or the request was rate-limited or could not be made. All
-    // three leave the honest refusal standing, which is the safe way to be
-    // wrong: it never claims a link is coming when none is.
+    // A router that could not answer leaves the honest refusal standing.
     return refused;
   }
 }

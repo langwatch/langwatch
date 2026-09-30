@@ -10,6 +10,8 @@ export type EmailAttachment = {
 };
 
 export type EmailContent = {
+  /** Stable delivery identity. Gateways without deduplication remain at-least-once. */
+  idempotencyKey?: string;
   to: string | string[];
   subject: string;
   html: string;

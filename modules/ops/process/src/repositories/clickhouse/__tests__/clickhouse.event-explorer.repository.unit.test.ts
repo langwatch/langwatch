@@ -1,5 +1,6 @@
 /** Spec: modules/ops/specs/projection-replay-console.feature */
 import type { QueryRequest } from "@langwatch/clickhouse-client";
+import { OpsSearchQueryRequiredError } from "@langwatch/ops-contract";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -68,11 +69,13 @@ describe("EventExplorerClickHouseRepository.findAggregates", () => {
 describe("EventExplorerClickHouseRepository.searchAggregates", () => {
   describe("given neither tenantIds nor a non-empty query string is supplied", () => {
     describe("when searchAggregates is called", () => {
+      /** @scenario "An event-log search that reaches the explorer with no query and no tenant is a handled client error" */
       it("rejects the call rather than scanning the whole event_log table", async () => {
-        const { repo } = repoCapturingQuery();
-        await expect(repo.searchAggregates({ query: "", tenantIds: [] })).rejects.toThrow(
-          /search query or pick at least one tenant/,
-        );
+        const { repo, statements } = repoCapturingQuery();
+        const refusal = await repo.searchAggregates({ query: "", tenantIds: [] }).catch((e) => e);
+        expect(refusal).toBeInstanceOf(OpsSearchQueryRequiredError);
+        expect(refusal).toMatchObject({ code: "ops_search_query_required", httpStatus: 400 });
+        expect(statements).toEqual([]);
       });
 
       it("rejects when tenantIds is omitted entirely and query is whitespace", async () => {

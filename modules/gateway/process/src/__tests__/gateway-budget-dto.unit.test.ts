@@ -135,3 +135,26 @@ describe("toBudgetDto", () => {
     });
   });
 });
+
+describe("toBudgetDto on an anchored budget", () => {
+  const anchor = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
+  const anchored = budget({
+    cycleAnchorAt: anchor,
+    currentPeriodStartedAt: anchor,
+    resetsAt: Temporal.Instant.from("2026-07-17T09:00:00.000Z"),
+  });
+
+  /** @scenario Creating an anchored budget reports its true cycle on the wire */
+  it("echoes the anchor and reports the anchored period rather than the calendar one", () => {
+    const dto = budgetDtos.toBudgetDto({
+      budget: anchored,
+      readAt: Temporal.Instant.from("2026-07-01T12:00:00.000Z"),
+    });
+
+    expect(dto).toMatchObject({
+      cycle_anchor_at: "2026-06-17T09:00:00.000Z",
+      current_period_started_at: "2026-06-17T09:00:00.000Z",
+      resets_at: "2026-07-17T09:00:00.000Z",
+    });
+  });
+});

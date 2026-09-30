@@ -25,86 +25,108 @@ export const opsWeb = defineWebModule("ops")
       load: () => import("./features/checkup/ui/sections/checkup.screen.tsx"),
     },
     "pages/ops/index": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-dashboard.screen.tsx"),
     },
     "pages/ops/dejaview": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-deja-view.screen.tsx"),
     },
     "pages/ops/event-sourcing/index": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-event-sourcing.screen.tsx"),
     },
     "pages/ops/event-sourcing/dead-letters": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-dead-letters.screen.tsx"),
     },
     "pages/ops/event-sourcing/processes": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-processes.screen.tsx"),
     },
     "pages/ops/event-sourcing/projections": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-projections.screen.tsx"),
     },
     "pages/ops/event-sourcing/subscribers": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-subscribers.screen.tsx"),
     },
     "pages/ops/event-sourcing/schedules": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-schedules.screen.tsx"),
     },
     "pages/ops/blobs": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-payload-store.screen.tsx"),
     },
     "pages/ops/feature-flags": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-feature-flags.screen.tsx"),
     },
     "pages/ops/foundry": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-foundry.screen.tsx"),
     },
     "pages/ops/migrations": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-migrations.screen.tsx"),
     },
     "pages/ops/projections/[runId]": {
+      requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-replay-progress.screen.tsx"),
     },
     "pages/ops/users": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx")).UsersScreen,
       }),
     },
     "pages/ops/organizations": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx")).OrganizationsScreen,
       }),
     },
     "pages/ops/projects": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx")).ProjectsScreen,
       }),
     },
     "pages/ops/sso-connections": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx")).SsoConnectionsScreen,
       }),
     },
     "pages/ops/identity-lookup": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx")).IdentityLookupScreen,
       }),
     },
     "pages/ops/cloud/subscriptions": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudSubscriptionsScreen,
       }),
     },
     "pages/ops/cloud/licenses": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudLicensesScreen,
       }),
     },
     "pages/ops/cloud/self-hosted-instances": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx"))
           .CloudSelfHostedInstancesScreen,
       }),
     },
     "pages/ops/cloud/bug-reports": {
+      requires: "ops:manage",
       load: async () => ({
         default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudBugReportsScreen,
       }),

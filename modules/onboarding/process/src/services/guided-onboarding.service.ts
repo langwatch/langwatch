@@ -7,8 +7,11 @@ import { createLogger } from "@langwatch/observability";
  */
 import {
   GuidedOnboardingPathUnknownError,
+  guidedOnboardingRecordedEventNameSchema,
+  guidedOnboardingRecordedStateSchema,
   isGuidedPath,
   type GuidedOnboardingRecord,
+  type GuidedOnboardingRecordedEventData,
   type GuidedOnboardingState,
   type GuidedPath,
 } from "@langwatch/onboarding-contract";
@@ -20,8 +23,14 @@ import {
   guidedOnboardingTrackedEvent,
   type GuidedOnboardingEvent,
 } from "../rules/guided-onboarding-analytics.rules.ts";
+import { definedGuidedPayload } from "../rules/guided-onboarding-record.rules.ts";
 
 const logger = createLogger("langwatch:onboarding:guided");
+
+/** Tells the lifecycle pipeline about a write a peer hears of. */
+export type GuidedOnboardingAnnouncer = (
+  input: Omit<GuidedOnboardingRecordedEventData, "tenantId" | "occurredAt">,
+) => Promise<void>;
 
 export type TourStatus = "completed" | "skipped" | "replayed";
 
@@ -49,17 +58,20 @@ export class GuidedOnboardingService {
   private constructor(
     private readonly organizations: OrganizationApi,
     private readonly events: PostHogEventsChannel,
+    private readonly announce: GuidedOnboardingAnnouncer,
     private readonly now: () => string,
   ) {}
 
   static create(options: {
     organizations: OrganizationApi;
     events: PostHogEventsChannel;
+    announce: GuidedOnboardingAnnouncer;
     now?: () => string;
   }): GuidedOnboardingService {
     return new GuidedOnboardingService(
       options.organizations,
       options.events,
+      options.announce,
       options.now ?? (() => nowInstant().toString()),
     );
   }
@@ -260,33 +272,60 @@ export class GuidedOnboardingService {
       organizationId,
       record: { state: next, variant: previous.variant },
     });
-    await this.track({ organizationId, userId, event, payload, state: next });
+    await this.publish({
+      organizationId,
+      userId,
+      event,
+      payload,
+      state: next,
+      previousPaths: previous.state.paths,
+    });
     return next;
   }
 
   /**
    * Never fails the write. A write through a project credential has no user, so the
    * organization's admin stands in, the same person the other onboarding milestones
-   * are tracked against; an organization without one tracks nothing.
+   * are tracked against; an organization without one tracks and announces nothing.
    */
-  private async track({
+  private async publish({
     organizationId,
     userId,
     event,
     payload,
     state,
+    previousPaths,
   }: {
     organizationId: string;
     userId: string | undefined;
     event: GuidedOnboardingEvent;
     payload: Record<string, string | string[] | number | undefined>;
     state: GuidedOnboardingState;
+    previousPaths: GuidedPath[];
   }): Promise<void> {
     const tracked = guidedOnboardingTrackedEvent({ event, payload, state, organizationId });
-    if (!tracked.tracked) return;
-    const distinctId = userId ?? (await this.findAdminUserIds(organizationId))[0];
-    if (!distinctId) return;
-    this.events.track({ userId: distinctId, event: tracked.name, properties: tracked.properties });
+    const signalled = guidedOnboardingRecordedEventNameSchema.safeParse(event);
+    if (!tracked.tracked && !signalled.success) return;
+    const attributed = userId ?? (await this.findAdminUserIds(organizationId))[0];
+    if (!attributed) return;
+    if (tracked.tracked) {
+      this.events.track({
+        userId: attributed,
+        event: tracked.name,
+        properties: tracked.properties,
+      });
+    }
+    if (!signalled.success) return;
+    await this.announce({
+      organizationId,
+      userId: attributed,
+      event: signalled.data,
+      payload: definedGuidedPayload(payload),
+      previousPaths,
+      state: guidedOnboardingRecordedStateSchema.parse(state),
+    }).catch((error: unknown) =>
+      logger.error({ error, organizationId, event }, "guided onboarding signal not announced"),
+    );
   }
 
   private async findAdminUserIds(organizationId: string): Promise<string[]> {

@@ -33,6 +33,7 @@
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

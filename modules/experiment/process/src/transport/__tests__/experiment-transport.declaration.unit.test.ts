@@ -131,6 +131,7 @@ describe("given the experiment REST families", () => {
       ]).toEqual(["post /api/experiment/init", "post /api/dspy/log_steps"]);
     });
 
+    /** @scenario "Each workbench endpoint declares the grain it needs" */
     it("keeps every project-keyed workbench route on the permission it answered before", () => {
       expect(
         experimentV3Rest

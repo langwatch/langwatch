@@ -2,17 +2,12 @@
  * What became of a conversation's latest control request (ADR-129): open, approved, expired,
  * declined, ended or none, read from Redis and the conversation's event log together.
  */
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  type LangyControlRequestState,
+} from "@langwatch/langy-contract";
 
-export const CONTROL_REQUEST_STATES = [
-  "open",
-  "approved",
-  "expired",
-  "declined",
-  "ended",
-  "none",
-] as const;
-export type ControlRequestState = (typeof CONTROL_REQUEST_STATES)[number];
+export type ControlRequestState = LangyControlRequestState;
 
 /** The part of a conversation event this reading needs. */
 export interface ControlRequestHistoryEvent {

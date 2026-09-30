@@ -1,13 +1,23 @@
-/** The Directory's tabs: who is here, the containers they sit in, and the groups. */
+/** The Directory's tabs every reader has: who is here, the containers they sit in, the groups. */
 export const DIRECTORY_TABS = ["people", "teams", "groups"] as const;
-export type DirectoryTab = (typeof DIRECTORY_TABS)[number];
+/** Departments join only where the organization has any and the reader may view governance. */
+export type DirectoryTab = (typeof DIRECTORY_TABS)[number] | "departments";
 
 /** The open tab lives in the address, so an old address lands on the tab it became. */
 export const DIRECTORY_TAB_PARAM = "tab";
 
 /** A tab the page does not have falls back to the people, however the address arrived. */
-export function parseDirectoryTab(value: string | undefined): DirectoryTab {
-  return DIRECTORY_TABS.find((tab) => tab === value) ?? "people";
+export function parseDirectoryTab({
+  value,
+  departmentsShown,
+}: {
+  value: string | undefined;
+  departmentsShown: boolean;
+}): DirectoryTab {
+  const available: readonly DirectoryTab[] = departmentsShown
+    ? [...DIRECTORY_TABS, "departments"]
+    : DIRECTORY_TABS;
+  return available.find((tab) => tab === value) ?? "people";
 }
 
 /**

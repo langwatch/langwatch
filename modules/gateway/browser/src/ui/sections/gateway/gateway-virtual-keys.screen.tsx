@@ -41,6 +41,7 @@ import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { GuidedOnboardingOffer } from "../../../behavior/lent-guided-onboarding-offer.tsx";
 import { resolveTracesHrefForKey } from "../../../features/virtual-keys/model/traces-href-for-key.ts";
 import { isExpired } from "../../../features/virtual-keys/model/virtual-key-expiration.ts";
 import {
@@ -226,6 +227,11 @@ function VirtualKeysPage() {
             </PageLayout.HeaderButton>
           )}
         </PageLayout.Header>
+        {/* A failed read is unknown, never an empty list: the cache keeps the last one. */}
+        <GuidedOnboardingOffer
+          space="gateway"
+          spaceInUse={listQuery.isError || !listQuery.data ? null : listQuery.data.length > 0}
+        />
 
         <PageLayout.Container>
           {listView === "loading" && <Spinner />}

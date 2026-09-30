@@ -1,5 +1,5 @@
 import { AwsClientConfiguration } from "@langwatch/aws-client";
-import { getProcessOutboundProxyConfig, resolveProxyForHost } from "@langwatch/egress";
+import { parseOutboundProxyConfig } from "@langwatch/egress";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
@@ -23,7 +23,10 @@ import {
 
 import { HttpWebhookDispatchChannel } from "../channels/http/http.webhook-dispatch.channel.ts";
 import { MemorySqsWebhookDestinationChannel } from "../channels/memory/memory.sqs-webhook-destination.channel.ts";
-import { SqsWebhookDestinationChannel } from "../channels/sqs/sqs.webhook-destination.channel.ts";
+import {
+  SqsWebhookDestinationChannel,
+  sqsProxyResolver,
+} from "../channels/sqs/sqs.webhook-destination.channel.ts";
 import {
   buildWebhookDeliveryPipeline,
   type WebhookDeliveryDefinition,
@@ -164,11 +167,8 @@ export class WebhookApp implements WebhookApiContract {
       redis: input.members.redis,
       rejectUnauthorized: input.members.isSaas,
     });
-    // Read per host at client build, so a proxy configured after boot still applies.
     const aws = AwsClientConfiguration.create({
-      outboundProxy: {
-        tryResolveForHost: (host) => resolveProxyForHost(getProcessOutboundProxyConfig(), host),
-      },
+      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.config.outboundProxy)),
     });
     const deliver = WebhookDeliveryService.dispatchThrough({
       destinations: WebhookDestinationDispatchService.create({

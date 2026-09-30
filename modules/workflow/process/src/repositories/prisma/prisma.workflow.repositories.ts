@@ -21,7 +21,9 @@ export type WorkflowPrismaDatabase = WorkflowDatabase &
 export class PostgresWorkflowRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(members: Readonly<{ prisma: WorkflowPrismaDatabase }>): WorkflowRepositories {
+  static create(
+    members: Readonly<{ prisma: WorkflowPrismaDatabase }>,
+  ): Omit<WorkflowRepositories, "nlpLambdaArns" | "payloadStaging"> {
     const database = members.prisma;
 
     return {

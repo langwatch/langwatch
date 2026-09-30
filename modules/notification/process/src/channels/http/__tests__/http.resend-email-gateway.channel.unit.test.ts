@@ -135,3 +135,67 @@ describe("given the vendor rejects a send", () => {
     });
   });
 });
+
+describe("given a Resend deployment and a message with the full surface", () => {
+  describe("when it is sent", () => {
+    /** @scenario "The full message surface survives every gateway" */
+    it("carries attachments, reply-to and headers, and the blind copy as bcc", async () => {
+      const gateway = ResendEmailGatewayChannel.create({
+        configuration: { apiKey: "re_test" },
+        outboundProxy: {},
+      });
+      await gateway.send({
+        content: {
+          to: "public@acme.example",
+          bcc: "hidden@acme.example",
+          replyTo: "help@acme.example",
+          subject: "Report",
+          html: "<p>Report</p>",
+          headers: { "X-Report": "weekly" },
+          attachments: [{ filename: "report.csv", content: "a,b", contentType: "text/csv" }],
+        },
+        defaultFrom: "noreply@acme.example",
+      });
+      const payload = JSON.parse(fetch.mock.calls[0]?.[1]?.body as string) as Record<
+        string,
+        unknown
+      >;
+
+      expect(payload).toMatchObject({
+        to: ["public@acme.example"],
+        bcc: ["hidden@acme.example"],
+        reply_to: "help@acme.example",
+        headers: { "X-Report": "weekly" },
+        attachments: [{ filename: "report.csv", content: Buffer.from("a,b").toString("base64") }],
+      });
+    });
+  });
+});
+
+describe("given a Resend delivery that is attempted again", () => {
+  describe("when the same delivery identity is sent twice, and another once", () => {
+    /** @scenario "Resend retries reuse the same provider idempotency key" */
+    it("sends the same opaque key and payload for the retry, another key for another delivery", async () => {
+      const gateway = ResendEmailGatewayChannel.create({
+        configuration: { apiKey: "re_test" },
+        outboundProxy: {},
+      });
+      const base = { to: "public@acme.example", subject: "Alert", html: "<p>Alert</p>" };
+      for (const idempotencyKey of ["org:join:a", "org:join:a", "org:join:b"]) {
+        await gateway.send({
+          content: { ...base, idempotencyKey },
+          defaultFrom: "noreply@acme.example",
+        });
+      }
+      const [first, retry, other] = fetch.mock.calls.map(
+        (call) => call[1] as { headers: Record<string, string>; body: string },
+      );
+
+      expect(first?.headers["Idempotency-Key"]).toMatch(/^[a-f0-9]{64}$/);
+      expect(retry?.headers["Idempotency-Key"]).toBe(first?.headers["Idempotency-Key"]);
+      expect(other?.headers["Idempotency-Key"]).not.toBe(first?.headers["Idempotency-Key"]);
+      expect(retry?.body).toBe(first?.body);
+      expect(first?.body).not.toContain("idempotencyKey");
+    });
+  });
+});

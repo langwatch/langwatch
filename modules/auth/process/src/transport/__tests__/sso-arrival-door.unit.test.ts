@@ -163,6 +163,7 @@ describe("a returning sign-in, which creates no account row", () => {
     const admit = vi.fn().mockResolvedValue(undefined);
 
     await afterAccountUpdate({
+      findGoverningConnections: async () => [],
       repo: repoFor({ pendingSsoSetup: false }),
       account: OKTA_ACCOUNT,
       collaborators: collaboratorsFor(admit),
@@ -179,6 +180,7 @@ describe("a returning sign-in, which creates no account row", () => {
     const admit = vi.fn().mockResolvedValue(undefined);
 
     await afterAccountUpdate({
+      findGoverningConnections: async () => [],
       repo: repoFor(null),
       account: OKTA_ACCOUNT,
       collaborators: collaboratorsFor(admit),
@@ -210,6 +212,7 @@ describe("a sign-in that arrives while its organization is cutting over", () => 
     const admit = vi.fn().mockResolvedValue(undefined);
 
     await afterAccountUpdate({
+      findGoverningConnections: async () => [],
       repo: repoFor(),
       account: OKTA_ACCOUNT,
       collaborators: collaboratorsDeciding({

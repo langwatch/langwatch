@@ -2,8 +2,12 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
-import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
+import type {
+  JoinRequestAdmin,
+  JoinRequestAudienceRepository,
+} from "../repositories/join-request-audience.repository.ts";
 import type { JoinRequestNotificationContextRepository } from "../repositories/join-request-notification-context.repository.ts";
+import { joinNotificationDeliveryKey } from "../rules/join-request-id.rules.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");
@@ -90,19 +94,25 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     const [organizationName, requesterName, admins, approvedFromDomainCount] = await Promise.all([
       this.organizationName({ organizationId }),
       this.displayName({ userId: requesterUserId }),
-      this.adminEmails({ organizationId }),
+      this.admins({ organizationId }),
       this.approvedFromDomainCount({ organizationId, domain }),
     ]);
     await this.fanOut({
       joinRequestId,
       what: "requestArrived",
-      sends: admins.map((adminEmail) =>
+      sends: admins.map((admin) =>
         this.mail.sendRequestArrived({
-          adminEmail,
+          adminEmail: admin.email,
           organizationName,
           requesterName,
           domain,
           approvedFromDomainCount,
+          idempotencyKey: joinNotificationDeliveryKey({
+            organizationId,
+            joinRequestId,
+            kind: "requestArrived",
+            recipientUserId: admin.userId,
+          }),
         }),
       ),
     });
@@ -126,13 +136,23 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     const [organizationName, requesterName, admins] = await Promise.all([
       this.organizationName({ organizationId }),
       this.displayName({ userId: requesterUserId }),
-      this.adminEmails({ organizationId }),
+      this.admins({ organizationId }),
     ]);
     await this.fanOut({
       joinRequestId,
       what: "requestStillWaiting",
-      sends: admins.map((adminEmail) =>
-        this.mail.sendRequestStillWaiting({ adminEmail, organizationName, requesterName }),
+      sends: admins.map((admin) =>
+        this.mail.sendRequestStillWaiting({
+          adminEmail: admin.email,
+          organizationName,
+          requesterName,
+          idempotencyKey: joinNotificationDeliveryKey({
+            organizationId,
+            joinRequestId,
+            kind: "requestStillWaiting",
+            recipientUserId: admin.userId,
+          }),
+        }),
       ),
     });
   }
@@ -155,7 +175,19 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     await this.fanOut({
       joinRequestId,
       what: "requestApproved",
-      sends: [this.mail.sendRequestApproved({ requesterEmail, organizationName, ...intent })],
+      sends: [
+        this.mail.sendRequestApproved({
+          requesterEmail,
+          organizationName,
+          ...intent,
+          idempotencyKey: joinNotificationDeliveryKey({
+            organizationId,
+            joinRequestId,
+            kind: "requestApproved",
+            recipientUserId: requesterUserId,
+          }),
+        }),
+      ],
     });
   }
 
@@ -176,7 +208,18 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     await this.fanOut({
       joinRequestId,
       what: "requestRejected",
-      sends: [this.mail.sendRequestRejected({ requesterEmail, organizationName })],
+      sends: [
+        this.mail.sendRequestRejected({
+          requesterEmail,
+          organizationName,
+          idempotencyKey: joinNotificationDeliveryKey({
+            organizationId,
+            joinRequestId,
+            kind: "requestRejected",
+            recipientUserId: requesterUserId,
+          }),
+        }),
+      ],
     });
   }
 
@@ -203,6 +246,12 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
           requesterEmail,
           organizationName,
           ...(personalProjectUrl ? { personalProjectUrl } : {}),
+          idempotencyKey: joinNotificationDeliveryKey({
+            organizationId,
+            joinRequestId,
+            kind: "requestExpired",
+            recipientUserId: requesterUserId,
+          }),
         }),
       ],
     });
@@ -222,19 +271,25 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     const [organizationName, memberName, admins, seats] = await Promise.all([
       this.organizationName({ organizationId }),
       this.displayName({ userId: requesterUserId }),
-      this.adminEmails({ organizationId }),
+      this.admins({ organizationId }),
       this.trySeats({ organizationId }),
     ]);
     await this.fanOut({
       joinRequestId,
       what: "joinedAutomatically",
-      sends: admins.map((adminEmail) =>
+      sends: admins.map((admin) =>
         this.mail.sendJoinedAutomatically({
-          adminEmail,
+          adminEmail: admin.email,
           organizationName,
           memberName,
           domain,
           ...(seats ? { seats } : {}),
+          idempotencyKey: joinNotificationDeliveryKey({
+            organizationId,
+            joinRequestId,
+            kind: "joinedAutomatically",
+            recipientUserId: admin.userId,
+          }),
         }),
       ),
     });
@@ -290,8 +345,12 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     return organization?.primaryIntent ? { intent: organization.primaryIntent } : {};
   }
 
-  private async adminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
-    return this.audience.findAdminEmails({ organizationId });
+  private async admins({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<JoinRequestAdmin[]> {
+    return this.audience.findAdmins({ organizationId });
   }
 
   private async displayName({ userId }: { userId: string }): Promise<string> {

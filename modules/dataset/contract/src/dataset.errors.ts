@@ -80,24 +80,12 @@ export class ColumnTypeChangeNotSupportedError extends HandledError {
   }
 }
 
-/**
- * Which conflict a `DatasetConflictError` is. Both are 409s from PostgreSQL's point of view,
- * but they are different failures to a person: one is fixed by choosing another name, the other
- * by reloading the editor.
- */
-export type DatasetConflictReason = "name_taken" | "stale_columns";
-
 export class DatasetConflictError extends HandledError {
   declare readonly code: "dataset_conflict";
-  readonly reason: DatasetConflictReason;
 
-  constructor(
-    message = "A dataset with this name already exists",
-    options: { reason?: DatasetConflictReason } = {},
-  ) {
+  constructor(message = "A dataset with this name already exists") {
     super("dataset_conflict", message, { httpStatus: 409, fault: "customer" });
     this.name = "DatasetConflictError";
-    this.reason = options.reason ?? "name_taken";
   }
 }
 

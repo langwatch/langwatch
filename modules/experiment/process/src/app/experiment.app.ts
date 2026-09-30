@@ -91,6 +91,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { SuiteApi } from "@langwatch/suite-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   WorkflowApi,
   type StudioWorkflow,
@@ -102,6 +103,10 @@ import {
 import type { ExperimentWorkbenchObserver } from "#app/experiment-workbench.members";
 
 import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
+import {
+  buildExperimentLifecyclePipeline,
+  type ExperimentLifecyclePipeline,
+} from "../eventing/experiment-lifecycle.pipeline.ts";
 import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
@@ -230,6 +235,11 @@ export interface ExperimentAppDependencies {
   workbenchObserver: ExperimentWorkbenchObserver;
   /** Starts a workflow's evaluation here and runs it where the pipeline is drained. */
   workflowEvaluations: WorkflowEvaluationService;
+  /** `experiment_lifecycle`, which peers react to; absent where a suite builds none. */
+  lifecycle?: Readonly<{
+    pipeline: ExperimentLifecyclePipeline;
+    senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> };
+  }>;
   /** `experiment_run_processing`, its senders and run lookup; absent where a suite builds none. */
   runProcessing?: Readonly<{
     pipeline: ExperimentRunProcessingPipeline;
@@ -302,6 +312,11 @@ export class ExperimentApp implements ExperimentApi {
   static create(setup: ExperimentSetup): ExperimentApp {
     const { members, dependencies, config } = setup;
     const commands = ExperimentRunCommandDispatcherService.create();
+    const senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> } = {};
+    const lifecycle = {
+      pipeline: buildExperimentLifecyclePipeline(),
+      senders,
+    };
     const attachmentEgress = {
       blockLocal: config.blockLocalHttpCalls,
       allowedHosts: config.allowedProxyHosts,
@@ -318,10 +333,24 @@ export class ExperimentApp implements ExperimentApi {
       runConcurrency: config.runConcurrency,
       attachmentEgress,
       dependencies,
+      announceRan: async (ran) => {
+        if (!senders.commands) {
+          throw new Error("experiment_lifecycle pipeline senders are not connected yet");
+        }
+        await senders.commands.recordExperimentRan.send({
+          tenantId: ran.projectId,
+          occurredAt: nowInstant().epochMilliseconds,
+          userId: ran.userId,
+          projectId: ran.projectId,
+          experimentId: ran.experimentId ?? null,
+          fullRun: ran.isFullRun,
+        });
+      },
     });
     const { runCells, ...app } = built;
     return new ExperimentApp({
       ...app,
+      lifecycle,
       runLookup: ExperimentFindOrCreateService.create(built.experiments),
       runProcessing: {
         pipeline: buildExperimentRunProcessing({
@@ -631,6 +660,23 @@ export class ExperimentApp implements ExperimentApi {
   /** Refuses what it can, then sends the evaluation for the worker to run. */
   triggerWorkflowEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
     return this.#dependencies.workflowEvaluations.request(input);
+  }
+
+  /** The pipeline `experiment_lifecycle` registers, built once by {@link create}. */
+  lifecyclePipeline(): ExperimentLifecyclePipeline {
+    if (!this.#dependencies.lifecycle) {
+      throw new Error("Experiment was asked for its lifecycle pipeline, but none was built");
+    }
+
+    return this.#dependencies.lifecycle.pipeline;
+  }
+
+  /** Binds the lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: EventingCommands<ExperimentLifecyclePipeline>): void {
+    if (!this.#dependencies.lifecycle) {
+      throw new Error("Experiment was asked to connect its lifecycle pipeline, but none was built");
+    }
+    this.#dependencies.lifecycle.senders.commands = commands;
   }
 
   /** Binds the registered pipeline's own senders; every run write goes through them. */

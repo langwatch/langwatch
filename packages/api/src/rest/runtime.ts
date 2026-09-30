@@ -539,7 +539,6 @@ function routeStack<Api>({
   facts,
   version,
   status,
-  suffix,
   paramSource = "route",
   documented = true,
 }: {
@@ -550,7 +549,6 @@ function routeStack<Api>({
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
   version: string;
   status: VersionStatus;
-  suffix?: string | undefined;
   paramSource?: "route" | "context";
   documented?: boolean;
 }): MiddlewareHandler[] {
@@ -588,7 +586,6 @@ function routeStack<Api>({
       ? [
           documentRoute({
             route,
-            suffix,
             credential: declaration.credential,
             ...(deprecated ? { deprecated } : {}),
           }),

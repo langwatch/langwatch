@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SqsDestinationConfig } from "../../webhook-destination.channel.ts";
 import {
   SqsWebhookDestinationChannel,
+  sqsProxyResolver,
   type SqsClientFactory,
 } from "../sqs.webhook-destination.channel.ts";
 
@@ -134,5 +135,19 @@ describe("SqsWebhookDestinationChannel", () => {
     await subject.send({ config: first, body: "recreated", attributes: {} });
     expect(clients).toHaveLength(3);
     subject.close();
+  });
+
+  describe("when an outbound proxy is configured", () => {
+    const proxy = { httpsProxy: "http://proxy.corp:8080", noProxy: ".internal.corp" };
+
+    /** @scenario "Queue deliveries follow the configured outbound proxy" */
+    it("routes the queue host through the proxy and contacts excluded hosts directly", () => {
+      const resolver = sqsProxyResolver(proxy);
+
+      expect(resolver.tryResolveForHost("sqs.eu-central-1.amazonaws.com")).toBe(
+        "http://proxy.corp:8080",
+      );
+      expect(resolver.tryResolveForHost("sqs.internal.corp")).toBeUndefined();
+    });
   });
 });

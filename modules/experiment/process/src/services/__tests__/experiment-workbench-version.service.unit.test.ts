@@ -43,6 +43,7 @@ describe("ExperimentWorkbenchVersionService.restoreBySlug", () => {
     ]);
   });
 
+  /** @scenario "A restore of a version that does not exist reads as not found" */
   it("refuses a path segment that parsed as no version as a version never had", async () => {
     const service = ExperimentWorkbenchVersionService.create({
       experiments: createApiFixture<ExperimentService>({

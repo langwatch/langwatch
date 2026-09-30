@@ -1,4 +1,4 @@
-import type { GuidedKickoff, GuidedKickoffTourStatus } from "@langwatch/onboarding-browser-kit";
+import type { GuidedKickoffTourStatus } from "@langwatch/onboarding-browser-kit";
 /**
  * Mounted once above every guided landing: docks the panel, runs or skips
  * the current path's tour, records the outcome and queues the kickoff.
@@ -21,25 +21,10 @@ import {
 import { TOUR_END_ACTIONS } from "../model/tour-steps.ts";
 import { TourLayer } from "../ui/tour/tour-layer.tsx";
 import { useGuidedTourStore } from "./guided-tour-store.ts";
+import { queueKickoffOnceScoped } from "./queue-kickoff.ts";
 import { useRegisterTourActions } from "./tour-registry.ts";
 import { useGuidedOnboarding } from "./use-guided-onboarding.ts";
 import { useOnboardingExperimentRegistration } from "./use-onboarding-experiment-registration.ts";
-
-/**
- * Queues the kickoff once Langy announces it is scoped to `organizationId`.
- * Returns the release, for a kickoff still pending when the host unmounts.
- */
-function queueKickoffOnceScoped({
-  host,
-  organizationId,
-  kickoff,
-}: {
-  host: OnboardingHostApi;
-  organizationId: string;
-  kickoff: GuidedKickoff;
-}): () => void {
-  return host.langy().onScopeAnnounced(organizationId, () => host.langy().queueKickoff(kickoff));
-}
 
 /** A release to run when the component unmounts, set by whoever waits. */
 function useReleaseOnUnmount(): MutableRefObject<() => void> {
@@ -90,6 +75,8 @@ export function GuidedOnboardingHost() {
     },
   });
 
+  const attachConversation = onboardingApi.onboarding.attachConversation.useMutation();
+
   useHostTourActions(host);
   useOnboardingExperimentRegistration();
 
@@ -109,6 +96,7 @@ export function GuidedOnboardingHost() {
       releasePending.current = queueKickoffOnceScoped({
         host,
         organizationId,
+        attachConversation: attachConversation.mutate,
         kickoff: buildKickoff({
           path,
           state,

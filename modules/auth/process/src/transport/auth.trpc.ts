@@ -53,11 +53,6 @@ const OWN_SIGN_UP = publicRoute({
     "starts a signed-out visitor's own sign-up; no tenant scope exists before an account does",
 });
 
-const OWN_EMAILED_TOKEN = publicRoute({
-  reason:
-    "spends a signed-out visitor's own emailed confirmation token; the token is the authorization",
-});
-
 const INVITE_CODE_IS_THE_AUTHORIZATION = publicRoute({
   reason:
     "reads the invitation the caller holds the code for; the code is the authorization, and the answer names no person and no address",
@@ -132,26 +127,6 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
     });
 
     return app.requestNewAccountVerification({ email: input.email });
-  })
-
-  /**
-   * Spends a confirmation link and answers the address it confirmed. A link
-   * carrying a pending credential also creates the account. Expired, spent
-   * and never issued are one refusal: the way on is the same for all three.
-   */
-  .procedure("completeSignUpVerification")
-  .withFacts(callerAddressFact)
-  .withAccess(OWN_EMAILED_TOKEN)
-  .handle(async ({ app, input }, address) => {
-    await spend({
-      app,
-      address,
-      procedure: "completeSignUpVerification",
-      max: 60,
-      refusal: "Too many attempts. Please try again later.",
-    });
-
-    return app.completeSignUpVerification({ token: input.token });
   })
 
   /**

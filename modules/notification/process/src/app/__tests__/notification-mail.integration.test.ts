@@ -62,6 +62,14 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
         provider: smtp.provider,
         ses: { enabled: undefined, region: undefined, endpoint: undefined },
         smtp: { host: smtp.host, port: smtp.port, user: "u", secure: "false" },
+        outboundProxy: {
+          HTTPS_PROXY: undefined,
+          https_proxy: undefined,
+          HTTP_PROXY: undefined,
+          http_proxy: undefined,
+          NO_PROXY: undefined,
+          no_proxy: undefined,
+        },
       },
     });
 }

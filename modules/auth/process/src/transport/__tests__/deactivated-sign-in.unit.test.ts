@@ -100,6 +100,7 @@ describe("the before-session-create hook", () => {
   describe("given a password sign-up still awaiting its emailed proof", () => {
     describe("when its correct password is about to mint a session", () => {
       /** @scenario "Pending password sign-in cannot mint a session" */
+      /** @scenario "Client session flags cannot bypass address confirmation" */
       it("refuses the session, and lets it through once the latch is cleared", async () => {
         const pending = repoAnswering(null, true);
         const confirmed = repoAnswering(null, false);

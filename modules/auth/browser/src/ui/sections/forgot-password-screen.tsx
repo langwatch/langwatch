@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { authClient } from "../../behavior/auth-client.tsx";
-import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.ts";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
@@ -26,7 +25,6 @@ export default function ForgotPassword() {
 
 function ForgotPasswordScreen() {
   const publicEnv = usePublicEnv();
-  const frontDoor = useIdentityFrontDoor();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
 
   if (!publicEnv.data) {
@@ -34,9 +32,7 @@ function ForgotPasswordScreen() {
   }
 
   // Reset follows account (has password?), not deployment provider.
-  const deploymentHoldsNoPasswords = frontDoor.enabled
-    ? Boolean(publicEnv.data.IS_SAAS) && isAuthProvider !== "email"
-    : Boolean(isAuthProvider) && isAuthProvider !== "email";
+  const deploymentHoldsNoPasswords = Boolean(publicEnv.data.IS_SAAS) && isAuthProvider !== "email";
 
   if (deploymentHoldsNoPasswords) {
     return (

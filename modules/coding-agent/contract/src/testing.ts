@@ -24,6 +24,7 @@ export function codingAgentSessionFixture(
     entrypoint: "",
     parentSessionId: "",
     isFork: false,
+    auxiliary: false,
     repositoryHost: "github.com",
     repositoryOwner: "langwatch",
     repositoryName: "langwatch",

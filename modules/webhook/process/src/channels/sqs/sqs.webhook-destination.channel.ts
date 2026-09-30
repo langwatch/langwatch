@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
-import type { AwsClientConfig } from "@langwatch/aws-client";
+import type { AwsClientConfig, OutboundProxyResolver } from "@langwatch/aws-client";
+import { resolveProxyForHost, type OutboundProxyConfig } from "@langwatch/egress";
 
 import { parseSqsQueueUrl, sqsHostFor } from "../../rules/sqs-queue-url.rules.ts";
 import type {
@@ -17,6 +18,11 @@ interface SqsClient {
 }
 
 export type SqsClientFactory = (config: AwsClientConfig) => SqsClient;
+
+/** Proxy routing for the process's AWS clients, decided per queue host at client build. */
+export const sqsProxyResolver = (outboundProxy: OutboundProxyConfig): OutboundProxyResolver => ({
+  tryResolveForHost: (host) => resolveProxyForHost(outboundProxy, host),
+});
 
 const createSqsClient: SqsClientFactory = (config) => new SQSClient(config);
 

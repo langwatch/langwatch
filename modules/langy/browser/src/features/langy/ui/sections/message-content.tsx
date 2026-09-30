@@ -12,6 +12,11 @@ import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
 } from "@langwatch/langy-contract";
+import {
+  type GuidedPullRequest,
+  guidedKickoffPartOf,
+  guidedPathCompletedIn,
+} from "@langwatch/onboarding-browser-kit";
 import type { UIMessage } from "ai";
 import { memo, useMemo } from "react";
 
@@ -22,7 +27,10 @@ import {
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
 } from "../../../../model/langy-answer-segments.ts";
-import { codeAccessCallId } from "../../../../model/langy-code-access-tool.ts";
+import {
+  codeAccessCallId,
+  codeAccessOffersDescribe,
+} from "../../../../model/langy-code-access-tool.ts";
 import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
@@ -58,6 +66,8 @@ import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy
 import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
 import { LangySecretSnippetCard } from "../../../../ui/sections/derived-cards/langy-secret-snippet-card.tsx";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
+import { LangyGuidedPrCard } from "../elements/github/langy-guided-pr-card.tsx";
+import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
 import { LangyFeedback } from "./langy-feedback.tsx";
 import { LangyPlanCard } from "./langy-plan-card.tsx";
@@ -133,6 +143,14 @@ type MessageContentProps = {
    * closed. Absent = this message is read on its own, so its card is live.
    */
   liveCodeAccessCallId?: string | null;
+  /**
+   * Leave the PR-flow progress card out. A guided conversation tells the pull request as a
+   * sentence with a link and, at the end of the path, as one PR card; the step-by-step receipt
+   * would say the same thing a third time.
+   */
+  hideGithubProgress?: boolean;
+  /** The pull request a guided path opened (or the branch alone), drawn after the closing line. */
+  guidedPullRequest?: GuidedPullRequest | null;
 };
 
 function MessageContentImpl(props: MessageContentProps) {
@@ -140,7 +158,7 @@ function MessageContentImpl(props: MessageContentProps) {
   // A message from the developer, or a notice the platform wrote into the
   // transcript (ADR-129): plain text, so none of the assistant reading applies.
   if (message.role === "user" || message.role === "system")
-    return <PlainMessage message={message} />;
+    return <PlainMessage message={message} organizationId={props.organizationId ?? null} />;
   return <AssistantMessage {...props} />;
 }
 
@@ -157,7 +175,17 @@ function messageText(message: UIMessage): string {
  * The developer's own words, as a bubble on the right; or a notice — something that HAPPENED to
  * the conversation — as a quiet centred line: no bubble, which would claim the reader sent it.
  */
-function PlainMessage({ message }: { message: UIMessage }) {
+function PlainMessage({
+  message,
+  organizationId,
+}: {
+  message: UIMessage;
+  organizationId: string | null;
+}) {
+  // The guided onboarding kickoff is a user message on the wire and the tour card on screen:
+  // the brief it carries is for the model, never a bubble.
+  const kickoff = message.role === "user" ? guidedKickoffPartOf(message.parts) : null;
+  if (kickoff) return <GuidedTourCard kickoff={kickoff} organizationId={organizationId} />;
   const text = messageText(message);
   if (!text && extractProposals(message).length === 0) return null;
   if (message.role === "system") {
@@ -221,6 +249,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
     [parts],
   );
   const codeAccessCall = useMemo(() => codeAccessCallId(parts), [parts]);
+  const codeAccessDescribe = useMemo(() => codeAccessOffersDescribe(parts), [parts]);
   const secretSnippets = useMemo(() => secretSnippetCalls(parts), [parts]);
   const pullRequestLinks = useMemo(() => pullRequestLinksFromToolParts(parts), [parts]);
   // The live turn prefers the manager's typed plan snapshot; settled ones do not subscribe.
@@ -238,6 +267,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
     runs,
     questionCards,
     codeAccessCall,
+    codeAccessDescribe,
     secretSnippets,
     pullRequestLinks,
     plan,
@@ -408,7 +438,7 @@ function AnswerCards({
   const organizationId = props.organizationId ?? null;
   return (
     <>
-      {reading.progressEvents.length > 0 ? (
+      {reading.progressEvents.length > 0 && !props.hideGithubProgress ? (
         <LangyCardBoundary scope="the progress card">
           <LangyGitHubProgressCard
             events={reading.progressEvents}
@@ -424,6 +454,11 @@ function AnswerCards({
           <LangyGitHubPrCard {...pr} />
         </LangyCardBoundary>
       ))}
+      {props.guidedPullRequest && guidedPathCompletedIn(props.message.parts) ? (
+        <LangyCardBoundary scope="the pull request card">
+          <LangyGuidedPrCard {...props.guidedPullRequest} />
+        </LangyCardBoundary>
+      ) : null}
       {reading.proposals.map(({ id, proposal }) => (
         <LangyCardBoundary key={id} scope="this proposal">
           <ProposalCard
@@ -446,7 +481,12 @@ function AnswerCards({
           />
         </LangyCardBoundary>
       ))}
-      <CodeAccessCardSlot props={props} callId={reading.codeAccessCall} projectId={projectId} />
+      <CodeAccessCardSlot
+        props={props}
+        callId={reading.codeAccessCall}
+        offerDescribe={reading.codeAccessDescribe}
+        projectId={projectId}
+      />
       {reading.secretSnippets.map((call) => (
         <LangyCardBoundary key={call.callId} scope="the secret snippet card">
           <LangySecretSnippetCard organizationId={organizationId} call={call} />
@@ -477,10 +517,12 @@ function questionLockState({
 function CodeAccessCardSlot({
   props,
   callId,
+  offerDescribe,
   projectId,
 }: {
   props: MessageContentProps;
   callId: string | null;
+  offerDescribe: boolean;
   projectId: string | undefined;
 }) {
   const { conversationId, liveCodeAccessCallId, onChoiceSelect, onAskCodeAccessAgain } = props;
@@ -493,6 +535,7 @@ function CodeAccessCardSlot({
         callId={callId}
         organizationId={props.organizationId ?? null}
         superseded={liveCodeAccessCallId != null && liveCodeAccessCallId !== callId}
+        offerDescribe={offerDescribe}
         {...(onChoiceSelect ? { onChoiceSelect } : {})}
         {...(onAskCodeAccessAgain ? { onAskAgain: onAskCodeAccessAgain } : {})}
       />

@@ -3,6 +3,7 @@ import { PermissionDeniedError, type AuthzApi } from "@langwatch/authz-contract"
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 /**
  * The app authorizes the caller's exact organizationId before every
  * guided-onboarding read and write. Binds the `@integration` scenarios over
@@ -27,6 +28,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { RecordGuidedOnboardingCommandData } from "../../eventing/guided-onboarding-lifecycle.events.ts";
 import { OnboardingApp } from "../onboarding.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
@@ -69,6 +71,9 @@ function buildApp(
         writeGuidedOnboardingState,
         initializeOrganization,
         recordIntegrationMethod,
+        findAdministrators: async () => [
+          { userId: "user_admin", name: "Ada", email: "ada@acme.test" },
+        ],
       }),
       ops: createApiFixture<OpsApi>({ findProductAnalyticsTargets: () => [] }),
       gateway: createApiFixture<GatewayApi>({
@@ -256,5 +261,92 @@ describe("OnboardingApp", () => {
         app.getGuidedStateByProject({ projectId: "project_gone" }),
       ).rejects.toMatchObject({ code: "project_not_found" });
     });
+  });
+});
+
+/** Records what the app sends on the lifecycle pipeline, as the queue would receive it. */
+function connectLifecycle(app: OnboardingApp): RecordGuidedOnboardingCommandData[] {
+  const sent: RecordGuidedOnboardingCommandData[] = [];
+  const sender: EventingCommandSender<RecordGuidedOnboardingCommandData> = {
+    send: async (payload) => {
+      sent.push(payload);
+    },
+    sendBatch: async (payloads) => {
+      sent.push(...payloads);
+    },
+    close: async () => {},
+    waitUntilReady: async () => {},
+  };
+  app.connectLifecycleCommands({ recordGuidedOnboarding: sender });
+  return sent;
+}
+
+describe("OnboardingApp records its guided writes for peers", () => {
+  /** @scenario "a guided state write through the procedure reaches Customer.io" */
+  it("records the picked paths, in order, for the person who picked them", async () => {
+    const { app } = buildApp();
+    const sent = connectLifecycle(app);
+
+    await app.recordPaths({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      paths: ["gateway", "llmops"],
+    });
+
+    expect(sent).toEqual([
+      expect.objectContaining({
+        tenantId: ORGANIZATION_ID,
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        event: "paths_selected",
+        previousPaths: [],
+        state: expect.objectContaining({ paths: ["gateway", "llmops"] }),
+      }),
+    ]);
+  });
+
+  /** @scenario "a write through a project credential is attributed to the organization admin" */
+  it("attributes a write with no user to the organization's admin", async () => {
+    const { app } = buildApp();
+    const sent = connectLifecycle(app);
+
+    await app.completePath({ organizationId: ORGANIZATION_ID, userId: null, path: "gateway" });
+
+    expect(sent).toEqual([
+      expect.objectContaining({ userId: "user_admin", event: "path_completed" }),
+    ]);
+  });
+
+  it("records only the tour skip when the provider is skipped, not the provider skip", async () => {
+    const { app } = buildApp();
+    const sent = connectLifecycle(app);
+
+    await app.recordProviderSkipped({ organizationId: ORGANIZATION_ID, userId: USER_ID });
+
+    expect(sent.map((data) => data.event)).toEqual(["tour_skipped"]);
+  });
+
+  it("leaves the conversation and the key reveal off what it records", async () => {
+    const { app } = buildApp({
+      record: {
+        state: {
+          paths: [],
+          donePaths: [],
+          conversationId: "conv_1",
+          virtualKeyRevealId: "reveal_1",
+        },
+        variant: "guided",
+      },
+    });
+    const sent = connectLifecycle(app);
+
+    await app.recordProvider({
+      organizationId: ORGANIZATION_ID,
+      userId: USER_ID,
+      provider: "openai",
+      model: "gpt-5",
+    });
+
+    expect(sent[0]?.state).toEqual({ paths: [], donePaths: [], provider: "openai" });
   });
 });

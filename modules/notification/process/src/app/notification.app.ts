@@ -1,3 +1,5 @@
+import { AwsClientConfiguration } from "@langwatch/aws-client";
+import { parseOutboundProxyConfig } from "@langwatch/egress";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
   NotificationService as NotificationApi,
@@ -19,7 +21,7 @@ import {
   resolveDefaultFrom,
 } from "../channels/email-delivery.channel.ts";
 import { emailGatewayOpener } from "../channels/email-gateway-channels.registry.ts";
-import { directSesClientConfiguration } from "../channels/ses/ses.email-gateway.channel.ts";
+import { emailProxyResolver } from "../channels/ses/ses.email-gateway.channel.ts";
 import type { NotificationRepositories } from "../repositories/notification.repositories.ts";
 import { EmailDeliveryService } from "../services/email-delivery.service.ts";
 import { MailDeliveryService } from "../services/mail-delivery.service.ts";
@@ -72,12 +74,15 @@ export class NotificationApp implements NotificationApiContract {
         baseHost: members.publicBaseUrl ?? "",
       }),
     };
+    const outboundProxy = parseOutboundProxyConfig(config.outboundProxy);
+    const aws = AwsClientConfiguration.create({ outboundProxy: emailProxyResolver(outboundProxy) });
+    resources.own("Notification AWS clients", () => aws.close());
     const delivery = EmailDeliveryService.create({
       configuration,
       openGateway: emailGatewayOpener({
         configuration,
-        aws: directSesClientConfiguration,
-        outboundProxy: {},
+        aws,
+        outboundProxy,
       }),
     });
     resources.own("Notification mail gateway", () => delivery.close());

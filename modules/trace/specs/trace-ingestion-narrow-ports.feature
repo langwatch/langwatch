@@ -18,7 +18,8 @@ Feature: Reading other features from the trace ingestion path
     When the project metadata subscriber is composed
     Then it runs without a full project service
 
-  @unit
+  @unit @unimplemented
+  # A compile-time property, checked by typecheck of the runtime pipeline passing the project peer.
   Scenario: The published project service still satisfies the narrowed port
     Given the published project service
     When it is passed where the narrow port is expected

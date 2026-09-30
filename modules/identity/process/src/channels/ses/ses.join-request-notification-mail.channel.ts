@@ -58,10 +58,12 @@ export class SesJoinRequestNotificationMailChannel extends JoinRequestNotificati
   sendRequestApproved({
     requesterEmail,
     organizationName,
+    idempotencyKey,
   }: Input<"sendRequestApproved">): Promise<void> {
     return sendJoinRequestApprovedEmail({
       requesterEmail,
       organizationName,
+      idempotencyKey,
       organizationUrl: this.baseUrl,
       mailer: this.mailer,
     });

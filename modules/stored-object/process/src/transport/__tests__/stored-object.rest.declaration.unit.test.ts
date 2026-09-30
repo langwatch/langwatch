@@ -40,6 +40,14 @@ describe("the stored-objects REST family", () => {
       ]);
     });
 
+    it("asks every project permission at the project the request names, not the key's own", () => {
+      const scoped = declaration.routes.filter((route) => route.permission !== undefined);
+
+      expect(scoped.map((route) => [route.operation, route.permissionTarget])).toEqual(
+        scoped.map((route) => [route.operation, { at: "route", param: "projectId" }]),
+      );
+    });
+
     it("declares an input and an answer for every route", () => {
       for (const route of declaration.routes) {
         expect([

@@ -1,6 +1,7 @@
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { EmptyState, SIDEBAR_PANEL_WIDTH, useReducedMotion } from "@langwatch/langy-browser-kit";
+import type { GuidedKickoffInput } from "@langwatch/onboarding-browser-kit";
 import type { UIMessage } from "ai";
 import { ArrowDown, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -10,6 +11,7 @@ import { LangyModelProviderSetup } from "../../../../../ui/sections/model-provid
 import type { LangyErrorPresentation } from "../../../behavior/logic/langy-error-explainer.ts";
 import type { useLangyStickToBottom } from "../../../behavior/use-langy-stick-to-bottom.ts";
 import { ConversationSkeleton, skeletonMessageCount } from "../conversation-skeleton.tsx";
+import { GuidedTourCard } from "../derived-cards/guided-tour-card.tsx";
 import { LangyCardGallery } from "../langy-card-gallery.tsx";
 import { LangyError } from "../langy-error.tsx";
 import { MessageContent } from "../message-content.tsx";
@@ -255,6 +257,11 @@ export interface LangyColumnState {
   onHistoryErrorAction: (kind: ErrorAction) => void;
   /** Restoring a conversation whose messages have not arrived: its shape, not an invitation. */
   restoring: { messageCount: number | null } | null;
+  /**
+   * The guided tour card, before the kickoff message exists: in progress while the tour runs,
+   * settled once it ended and the kickoff only waits to send. Never the invitation instead.
+   */
+  tourCard: { kickoff: GuidedKickoffInput | null; organizationId: string | null } | null;
   /** A queued question counts as content, so the empty state never shows over it. */
   empty: {
     panelWidth: number;
@@ -292,6 +299,14 @@ export function LangyConversationBody({
           count={skeletonMessageCount(state.restoring.messageCount)}
           dense={!floating}
         />
+      </VStack>
+    );
+  }
+  if (state.tourCard) {
+    const gutter = panelGutter(floating);
+    return (
+      <VStack align="stretch" paddingX={gutter} paddingTop={gutter}>
+        <GuidedTourCard {...state.tourCard} />
       </VStack>
     );
   }

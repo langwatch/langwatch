@@ -111,6 +111,14 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			}
 		}
 	}
+	// The product-analytics stand-in, opt-in (see domain.AnalyticsProviderEnv).
+	if opts.Selection.Analytics {
+		for _, svc := range st.Services {
+			if svc.Name == domain.AnalyticsService && svc.Port != 0 {
+				base = append(base, domain.AnalyticsProviderEnv(resolvedDevEnv(repoDir), svc.URL)...)
+			}
+		}
+	}
 	// The LLM provider stand-in, opt-in (see domain.LLMProviderEnv).
 	if opts.Selection.LLM {
 		for _, svc := range st.Services {
@@ -246,6 +254,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	}
 	if opts.Selection.LLM {
 		out = append(out, o.llmChild(st, opts.RepoRoot, base))
+	}
+	if opts.Selection.Analytics {
+		out = append(out, o.analyticsChild(st, opts.RepoRoot, base))
 	}
 	// The two developer tools. Neither is a Node LANE — nothing in the product
 	// degrades without them — so they are planned like the Go services: only

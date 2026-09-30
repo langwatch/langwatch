@@ -11,6 +11,7 @@ import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
+import type { LangyKickoffBrief } from "@langwatch/langy-contract";
 import type {
   MediaAudioElement,
   MediaPartProps,
@@ -98,6 +99,9 @@ export type UiInlineCommandPaletteProps = { placeholder: string };
 
 /** Project's lent switcher needs nothing handed in: it reads the scope and the graph itself. */
 export type UiProjectSwitcherProps = Record<string, never>;
+
+/** Organization's lent card of people waiting to join needs nothing handed in: it reads the scope itself. */
+export type UiPendingJoinRequestsProps = Record<string, never>;
 
 /** What project's settings form hands organization's lent department row. */
 export type UiProjectDepartmentFieldProps = {
@@ -281,6 +285,8 @@ export type UiEditModelProviderFormProps = {
   onSaved?: (saved: { chatModel?: string }) => void;
   /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
   guided?: boolean;
+  /** Why the connection did not happen: a refused credential, or a sign-in that failed or timed out. */
+  onFailed?: (failure: { provider: string; code: string }) => void;
 };
 
 /**
@@ -580,6 +586,39 @@ export type UiResourceLimitRowProps = { current: number; max?: number } & (
   | { limitType: "members" | "membersLite"; label?: never }
 );
 
+/** The product space a guided onboarding offer sits in. */
+export type UiGuidedSpace = "project" | "me" | "gateway" | "governance";
+
+/**
+ * What a screen hands onboarding's guided offer: the space it sits in, and its own answer to
+ * whether that space is already in use (null while unknown, which keeps the offer hidden).
+ */
+export type UiGuidedOnboardingOfferProps = {
+  space: UiGuidedSpace;
+  spaceInUse?: boolean | null;
+};
+
+/** The guided kickoff a caller hands Langy's panel to send. */
+export type UiLangyKickoff = LangyKickoffBrief;
+
+/** What Langy lends onboarding: dock the panel and hand it the guided kickoff. */
+export type UiLangyGuidedOnboarding = {
+  dock(): void;
+  queueKickoff(kickoff: UiLangyKickoff): void;
+  /** Calls back once, with the scope the panel announced; returns the release. */
+  onScopeAnnounced(announced: (scope: { organizationId: string | null }) => void): () => void;
+};
+
+/**
+ * What onboarding lends Langy's tour card: whether a tour is on screen, and a replay of one.
+ * Both are hooks, read during render.
+ */
+export type UiGuidedTour = {
+  useRunning(): boolean;
+  /** The replay: runs `path`'s tour again and records it on the organization, when named. */
+  useReplay(): (input: { path: string; organizationId?: string | null }) => void;
+};
+
 /**
  * Each capability a peer reads by name, and the shape a declaration must have
  * to fill it: the CORE side of the contract, as `UiSlotProps` is for slots.
@@ -611,6 +650,9 @@ export type UiDeclaredCapabilities = {
   datasetPickerList: UiDeclaredComponent<UiDatasetPickerListProps>;
   datasetRecordSync: UiDeclaredComponent<UiDatasetRecordSyncProps>;
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
+  guidedOnboarding: UiLangyGuidedOnboarding;
+  guidedOnboardingOffer: UiDeclaredComponent<UiGuidedOnboardingOfferProps>;
+  guidedTour: UiGuidedTour;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
@@ -630,6 +672,7 @@ export type UiDeclaredCapabilities = {
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
   outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
   parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
+  pendingJoinRequests: UiDeclaredComponent<UiPendingJoinRequestsProps>;
   projectDepartmentField: UiDeclaredComponent<UiProjectDepartmentFieldProps>;
   projectSwitcher: UiDeclaredComponent<UiProjectSwitcherProps>;
   passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;

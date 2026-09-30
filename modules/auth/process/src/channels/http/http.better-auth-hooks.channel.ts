@@ -5,6 +5,7 @@ import {
   TeamUserRole,
   type AuthzGrantsService,
 } from "@langwatch/authz-contract";
+import { isNativeSocialProvider } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { HandledError } from "@langwatch/handled-error";
 import {
   deriveSessionAmr,
@@ -252,8 +253,42 @@ export const afterUserCreate = async ({
   }
 };
 
-/** A first sign-up through a provider the SSO-enforced organization does not use is refused. */
-async function assertNotFirstSignupThroughWrongProvider({
+/** The organization connections that govern an address (D04), asked of the sign-in router. */
+export type FindGoverningConnections = (input: { email: string }) => Promise<readonly string[]>;
+
+/**
+ * A native social button pressed by somebody whose organization's connection governs their
+ * address is sent to that connection: better-auth carries the message into `error_description`,
+ * and the error route dials it (specs/identity/native-social-at-a-claimed-domain.feature).
+ */
+async function bounceNativeProviderToConnection({
+  email,
+  account,
+  findGoverningConnections,
+}: {
+  email: string;
+  account: { userId: string; providerId: string };
+  findGoverningConnections: FindGoverningConnections;
+}): Promise<void> {
+  if (!isNativeSocialProvider(account.providerId)) return;
+  const [connectionId] = await findGoverningConnections({ email });
+  if (connectionId === undefined) return;
+
+  logger.info(
+    { userId: account.userId, attemptedProvider: account.providerId, connectionId },
+    "Sent a native social sign-in to the organization's own connection",
+  );
+  throw APIError.from("FORBIDDEN", {
+    code: "SSO_REQUIRED_BY_ORGANIZATION",
+    message: connectionId,
+  });
+}
+
+/**
+ * A native social provider the SSO-enforced organization does not use is refused whoever presses
+ * it; any other provider only on a first sign-up, since a broker mid-migration is soft-flagged.
+ */
+async function refuseWrongProvider({
   repo,
   userId,
   attemptedProvider,
@@ -264,11 +299,15 @@ async function assertNotFirstSignupThroughWrongProvider({
   attemptedProvider: string;
   orgSsoProvider: string;
 }): Promise<void> {
-  const existingAccountCount = await repo.countAccountsForUser({ userId });
-  if (existingAccountCount !== 0) return;
+  if (
+    !isNativeSocialProvider(attemptedProvider) &&
+    (await repo.countAccountsForUser({ userId })) !== 0
+  ) {
+    return;
+  }
   logger.warn(
     { userId, attemptedProvider, orgSsoProvider },
-    "Blocked new signup: provider does not match SSO-enforced org",
+    "Refused sign-in: provider does not match SSO-enforced org",
   );
   // Throw APIError so BetterAuth surfaces the specific code in the
   // callback redirect (?error=SSO_PROVIDER_NOT_ALLOWED), which the
@@ -286,9 +325,11 @@ async function assertNotFirstSignupThroughWrongProvider({
 export function createBeforeAccountCreateHook({
   repo,
   federation,
+  findGoverningConnections,
 }: {
   repo: BetterAuthHooksRepository;
   federation: BetterAuthFederation;
+  findGoverningConnections: FindGoverningConnections;
 }): NonNullable<
   NonNullable<
     NonNullable<NonNullable<BetterAuthOptions["databaseHooks"]>["account"]>["create"]
@@ -323,6 +364,13 @@ export function createBeforeAccountCreateHook({
       return;
     }
 
+    // The organization's own connection first; the legacy columns below answer the rest.
+    await bounceNativeProviderToConnection({
+      email: user.email,
+      account,
+      findGoverningConnections,
+    });
+
     const domain = extractEmailDomain(user.email);
     if (!domain) return;
 
@@ -344,11 +392,10 @@ export function createBeforeAccountCreateHook({
       return;
     }
 
-    // Wrong provider for this SSO org. Determine whether this is a first-time
-    // signup (hard block) or an existing user trying a different provider
-    // (soft block via pendingSsoSetup banner).
+    // Wrong provider for this SSO org: a native one or a first sign-up is refused,
+    // an existing member on the broker is soft-blocked via the pendingSsoSetup banner.
     if (account.providerId !== "credential" && org.ssoProvider) {
-      await assertNotFirstSignupThroughWrongProvider({
+      await refuseWrongProvider({
         repo,
         userId: user.id,
         attemptedProvider: account.providerId,
@@ -493,11 +540,21 @@ export const afterAccountUpdate = async ({
   repo,
   account,
   collaborators,
+  findGoverningConnections,
 }: {
   repo: BetterAuthHooksRepository;
   account: { userId: string; providerId: string; accountId: string };
   collaborators: BetterAuthHookCollaborators;
+  findGoverningConnections: FindGoverningConnections;
 }): Promise<void> => {
+  // Outside the try below: a refusal its catch swallowed would admit the sign-in it stops.
+  await refuseNativeProviderOnSignIn({
+    repo,
+    account,
+    federation: collaborators.federation,
+    findGoverningConnections,
+  });
+
   try {
     const user = await repo
       .getUserForHooks({ userId: account.userId })
@@ -543,6 +600,50 @@ export const afterAccountUpdate = async ({
     );
   }
 };
+
+/**
+ * better-auth creates an account row ONCE and only updates it on every sign-in after, so a
+ * create-path guard alone would let every already-linked native holder keep signing in. Both
+ * refusals, in the create path's order: the organization's connection, then the legacy columns.
+ */
+async function refuseNativeProviderOnSignIn({
+  repo,
+  account,
+  federation,
+  findGoverningConnections,
+}: {
+  repo: BetterAuthHooksRepository;
+  account: { userId: string; providerId: string; accountId: string };
+  federation: BetterAuthFederation;
+  findGoverningConnections: FindGoverningConnections;
+}): Promise<void> {
+  if (!isNativeSocialProvider(account.providerId)) return;
+  if (!(await federation.platformSsoAllowed())) return;
+
+  const user = await repo
+    .getUserForHooks({ userId: account.userId })
+    .catch(skipOn("user_not_found"));
+  if (!user?.email) return;
+  const domain = extractEmailDomain(user.email);
+  if (!domain) return;
+
+  await bounceNativeProviderToConnection({ email: user.email, account, findGoverningConnections });
+
+  const org = await repo
+    .getOrganizationBySsoDomain({ domain })
+    .catch(skipOn("organization_not_found"));
+  // A provider the organization pinned is its own front door, whatever kind it is.
+  if (!org?.ssoProvider || isSsoProviderMatch(org, account)) return;
+
+  logger.warn(
+    { userId: account.userId, attemptedProvider: account.providerId, path: "account_update" },
+    "Refused sign-in: provider does not match SSO-enforced org",
+  );
+  throw APIError.from("FORBIDDEN", {
+    code: "SSO_PROVIDER_NOT_ALLOWED",
+    message: "SSO_PROVIDER_NOT_ALLOWED",
+  });
+}
 
 /**
  * Blocks deactivated users at this last layer, and refuses a way in the

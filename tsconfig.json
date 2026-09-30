@@ -742,6 +742,9 @@
       "path": "apps/voicesim-web/tsconfig.json"
     },
     {
+      "path": "apps/analyticssim-web/tsconfig.json"
+    },
+    {
       "path": "modules/webhook/contract/tsconfig.json"
     },
     {

@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { Check, Copy, ExternalLink, LogOut, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 import {
   type CodexSignInPhase,
@@ -21,6 +21,7 @@ export function CodexSignIn({
   scopes,
   setAsCodingDefaults,
   onConnected,
+  onFailed,
 }: {
   /** Onboarding's wording: the account is named ChatGPT, as the plan it runs on. */
   guided?: boolean;
@@ -31,6 +32,8 @@ export function CodexSignIn({
    *  assists at the codex model. Settings passes false. */
   setAsCodingDefaults: boolean;
   onConnected?: (account: { email: string; plan: string }) => void;
+  /** Told once when a sign-in ends in an error: which kind, timed out or failed. */
+  onFailed?: (code: "codex_sign_in_timed_out" | "codex_sign_in_failed") => void;
 }) {
   const signIn = useCodexDeviceSignIn({
     projectId,
@@ -39,6 +42,16 @@ export function CodexSignIn({
     onConnected,
   });
   const { phase, connected } = signIn;
+  const failedCode =
+    phase.name === "error"
+      ? phase.timedOut
+        ? "codex_sign_in_timed_out"
+        : "codex_sign_in_failed"
+      : null;
+  const reportFailure = useEffectEvent((code: NonNullable<typeof failedCode>) => onFailed?.(code));
+  useEffect(() => {
+    if (failedCode) reportFailure(failedCode);
+  }, [failedCode]);
 
   if (connected && phase.name !== "pending" && phase.name !== "starting") {
     return (
@@ -117,7 +130,7 @@ function PendingApprovalPanel({
   onCancel: () => void;
 }) {
   return (
-    <VStack align="stretch" gap={3}>
+    <VStack align="stretch" gap={3} data-testid="codex-pending">
       <Text fontSize="sm">Enter this code on OpenAI's device page to approve the sign-in:</Text>
       <HStack justify="space-between" gap={3} flexWrap="wrap">
         <Text
@@ -147,7 +160,7 @@ function PendingApprovalPanel({
           </Link>
         </Button>
       </HStack>
-      <HStack gap={2} color="fg.muted">
+      <HStack gap={2} color="fg.muted" data-testid="codex-waiting">
         <Spinner size="xs" />
         <Text fontSize="xs">
           {guided ? "Waiting for ChatGPT…" : "Waiting for you to approve in the browser…"}

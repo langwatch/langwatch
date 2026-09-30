@@ -36,6 +36,7 @@ export function toCodingAgentSessionRow({
     entrypoint: state.entrypoint ?? "",
     parentSessionId: state.parentSessionId ?? "",
     isFork: state.isFork,
+    auxiliary: state.auxiliary,
     ...gitContextColumns(state),
 
     modelCalls: state.modelCalls,

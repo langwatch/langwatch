@@ -8,6 +8,7 @@ vi.mock("../langwatch-api-evaluators.ts", async (importOriginal) => {
     getEvaluator: vi.fn(),
     createEvaluator: vi.fn(),
     updateEvaluator: vi.fn(),
+    deleteEvaluator: vi.fn(),
   };
 });
 
@@ -16,8 +17,10 @@ import {
   getEvaluator,
   createEvaluator,
   updateEvaluator,
+  deleteEvaluator,
 } from "../langwatch-api-evaluators.ts";
 import { handleCreateEvaluator } from "../tools/create-evaluator.ts";
+import { handleDeleteEvaluator } from "../tools/delete-evaluator.ts";
 import { handleGetEvaluator } from "../tools/get-evaluator.ts";
 import { handleListEvaluators } from "../tools/list-evaluators.ts";
 import { handleUpdateEvaluator } from "../tools/update-evaluator.ts";
@@ -26,6 +29,7 @@ const mockListEvaluators = vi.mocked(listEvaluators);
 const mockGetEvaluator = vi.mocked(getEvaluator);
 const mockCreateEvaluator = vi.mocked(createEvaluator);
 const mockUpdateEvaluator = vi.mocked(updateEvaluator);
+const mockDeleteEvaluator = vi.mocked(deleteEvaluator);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -256,6 +260,21 @@ describe("handleUpdateEvaluator()", () => {
 
     it("includes the updated name", () => {
       expect(result).toContain("Updated Name");
+    });
+  });
+});
+
+describe("handleDeleteEvaluator()", () => {
+  describe("when the API answers success without an id", () => {
+    let result: string;
+
+    beforeEach(async () => {
+      mockDeleteEvaluator.mockResolvedValue({ success: true });
+      result = await handleDeleteEvaluator({ idOrSlug: "toxicity-check" });
+    });
+
+    it("names the id the tool was given", () => {
+      expect(result).toBe("Evaluator toxicity-check has been archived (soft-deleted).");
     });
   });
 });

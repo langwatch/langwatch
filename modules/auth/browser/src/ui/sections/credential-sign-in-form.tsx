@@ -7,15 +7,16 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in.ts";
+import { authApi as api } from "../../behavior/auth-api.ts";
 
 import "../elements/auth-front-door.css";
-import { authApi as api } from "../../behavior/auth-api.ts";
 import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
 import { useRetryCountdown } from "../../behavior/use-retry-countdown.ts";
 import { forgotPasswordHref } from "../../model/carried-email.ts";
 import { describeRemainingWait } from "../../model/credential-sign-in.ts";
 import { SHAPE } from "../../model/front-door-theme.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
+import { startTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { EmailPill } from "../elements/email-pill.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field.tsx";
 import { PasswordInput } from "../elements/password-input.tsx";
@@ -91,10 +92,9 @@ export function CredentialSignInForm({
       if (parsed.success) form.clearErrors("password");
     },
   });
-  // The same request the sign-up door makes, because from here on it IS the
-  // sign-up door: no password travels with it, and the one that was typed
-  // above is not kept.
-  const requestSignUpVerification = api.auth.requestSignUpVerification.useMutation();
+  // Does anybody hold this address? Asked of the ROUTER, which sends nothing:
+  // asking by requesting a link mailed a stranger on every mistyped address.
+  const route = api.auth.route.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const passwordField = useFocusWhenSettled();
@@ -111,12 +111,21 @@ export function CredentialSignInForm({
       email: address,
       password: values.password,
       callbackUrl,
-      convertToSignUp: onSignUpStarted ? requestSignUpVerification.mutateAsync : undefined,
+      addressHasNoAccount: onSignUpStarted
+        ? async ({ email: address }) =>
+            (await route.mutateAsync({ identifier: address })).outcome === "route_to_signup"
+        : undefined,
     });
     setIsSubmitting(false);
 
     if (attempt.outcome === "signed_in") {
       rememberLastUsedMethod({ id: "password" });
+      return;
+    }
+    if (attempt.outcome === "two_step_required") {
+      // The card above becomes the code screen; a code box under a live
+      // password field would invite a second attempt on top of this one.
+      startTwoStepChallenge({ callbackUrl });
       return;
     }
     if (attempt.outcome === "signing_up") {

@@ -156,3 +156,81 @@ describe("Coding Agent ClickHouse query contract", () => {
     expect(page.nextCursor).toEqual({ timeUnixMs: 123, recordId: "record-1" });
   });
 });
+
+describe("Coding Agent session list and helper threads", () => {
+  type Runtime = Awaited<ReturnType<typeof runtime>>;
+  const window = { fromMs: TEST_NOW_MS - 3_600_000, toMs: TEST_NOW_MS };
+
+  /** The record the session projection writes for a row, as the list read would return it. */
+  async function storedRecord(harness: Runtime, row: Parameters<typeof session>[0]) {
+    const written = harness.endpoint.requests.length;
+    await harness.projections.storeSession({
+      row: session(row),
+      retentionDays: 14,
+      appliedEventIds: [],
+    });
+    const request = harness.endpoint.requests[written];
+    if (request === undefined) throw new Error("session projection did not write");
+    return z.record(z.string(), z.unknown()).parse(JSON.parse(request.body));
+  }
+
+  async function list(harness: Runtime, records: Record<string, unknown>[], limit = 50) {
+    const before = harness.endpoint.requests.length;
+    harness.endpoint.queryRows.push(records);
+    const rows = await harness.service.listRecent({ projectId: "project-1", ...window, limit });
+    const request = harness.endpoint.requests[before];
+    return { rows, sql: request?.body ?? "" };
+  }
+
+  /** @scenario "An auxiliary session is not listed" */
+  it("leaves a helper thread's session out of the list and keeps the user's own", async () => {
+    const harness = await runtime();
+    const codex = await storedRecord(harness, { sessionId: "codex-1", agent: "codex" });
+    const helper = await storedRecord(harness, {
+      sessionId: "helper-1",
+      agent: "codex",
+      auxiliary: true,
+    });
+
+    const { rows } = await list(harness, [helper, codex]);
+
+    expect(rows.map((row) => row.sessionId)).toEqual(["codex-1"]);
+  });
+
+  /** @scenario "A second session started seconds later is listed on its own" */
+  it("lists two unmarked sessions started seconds apart", async () => {
+    const harness = await runtime();
+    const first = await storedRecord(harness, {
+      sessionId: "codex-1",
+      agent: "codex",
+      startedAtMs: TEST_NOW_MS - 20_000,
+    });
+    const second = await storedRecord(harness, {
+      sessionId: "codex-2",
+      agent: "codex",
+      startedAtMs: TEST_NOW_MS - 10_000,
+    });
+
+    const { rows } = await list(harness, [second, first]);
+
+    expect(rows.map((row) => row.sessionId).toSorted()).toEqual(["codex-1", "codex-2"]);
+  });
+
+  describe("when the list is read", () => {
+    /**
+     * @scenario "A run of helper threads does not shorten the list"
+     * @scenario "A session marked auxiliary after it was first stored drops out of the list"
+     */
+    it("drops a marked session inside the dedup group, so it costs no page slot", async () => {
+      const harness = await runtime();
+
+      const { sql } = await list(harness, []);
+
+      const dedup = sql.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
+      expect(dedup).toContain("HAVING max(toUInt8(Auxiliary)) = 0");
+      expect(dedup.indexOf("GROUP BY TenantId, SessionId")).toBeLessThan(
+        dedup.indexOf("HAVING max(toUInt8(Auxiliary)) = 0"),
+      );
+    });
+  });
+});

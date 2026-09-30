@@ -95,6 +95,7 @@ interface ClickHouseWriteRecord {
   Entrypoint: string;
   ParentSessionId: string;
   IsFork: boolean;
+  Auxiliary: boolean;
   RepositoryHost: string;
   RepositoryOwner: string;
   RepositoryName: string;
@@ -258,6 +259,7 @@ function toRecord({
     Entrypoint: row.entrypoint,
     ParentSessionId: row.parentSessionId,
     IsFork: row.isFork,
+    Auxiliary: row.auxiliary,
     RepositoryHost: row.repositoryHost,
     RepositoryOwner: row.repositoryOwner,
     RepositoryName: row.repositoryName,
@@ -591,6 +593,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
               GROUP BY TenantId, SessionId
+              HAVING max(toUInt8(Auxiliary)) = 0
             )
           ORDER BY StartedAt DESC
           LIMIT {limit:UInt32}
@@ -618,8 +621,10 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     // scan's own floor from anything that scales with page size.
     observe(rows.length > 0 ? "hit" : "empty");
 
+    // Marked sessions left with the dedup group above; this repeats the rule on the settled version.
     return dedupToLatestPerSession(rows)
       .map(fromRecord)
+      .filter((row) => !row.auxiliary)
       .toSorted((a, b) => b.startedAtMs - a.startedAtMs)
       .slice(0, limit);
   }
@@ -1045,6 +1050,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     entrypoint: asString(record.Entrypoint),
     parentSessionId: asString(record.ParentSessionId),
     isFork: Boolean(record.IsFork),
+    auxiliary: Boolean(record.Auxiliary),
     repositoryHost: asString(record.RepositoryHost),
     repositoryOwner: asString(record.RepositoryOwner),
     repositoryName: asString(record.RepositoryName),

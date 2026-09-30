@@ -3,7 +3,7 @@
  * The reviewer's queue walk: the bar, the sitting's session count, the end of
  * the queue, and an item whose trace is gone. The conversation and Edit trace
  * are trace's, lent through its declaration, so they stand in here.
- * @see specs/annotations/annotation-queue-workflow.feature
+ * @see modules/annotation/specs/annotation-queue-workflow.feature
  */
 
 import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
@@ -82,8 +82,8 @@ vi.mock("../../../behavior/lent-trace.tsx", () => ({
     traceId: string;
     conversationId: string | null;
   }) => <div data-testid="conversation" data-trace={traceId} data-thread={conversationId ?? ""} />,
-  TraceEditButton: ({ disabled }: { disabled?: boolean }) => (
-    <button type="button" disabled={disabled}>
+  TraceEditButton: ({ disabled, traceId }: { disabled?: boolean; traceId: string }) => (
+    <button type="button" disabled={disabled} data-trace={traceId}>
       Edit trace
     </button>
   ),
@@ -154,16 +154,52 @@ afterEach(() => {
 
 describe("given a reviewer walking their annotation queue", () => {
   describe("when the queue item page renders", () => {
-    /** @scenario "The queue bar labels its navigation and actions in words" */
+    /** @scenario "The queue bar has one labelled forward action" */
     it("names every action on the bar in words", () => {
       renderWalker();
 
       expect(screen.getByRole("button", { name: /previous/i })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Edit trace" })).toBeTruthy();
       expect(screen.getByRole("button", { name: /next/i })).toBeTruthy();
+      expect(screen.getAllByRole("button", { name: /next|done|skip/i })).toHaveLength(1);
     });
 
-    /** @scenario "The queue bar shows my position in the queue" */
+    /** @scenario "Edit trace uses the trace drawer in annotation mode" */
+    it("offers Edit trace for the queued trace, for trace to open in annotation mode", () => {
+      renderWalker();
+
+      expect(screen.getByRole("button", { name: "Edit trace" }).dataset.trace).toBe("trace-item-2");
+    });
+
+    /** @scenario "Annotation suggestions use the conversation correction editor" */
+    it("supplies no suggestion editor of its own beside the conversation", () => {
+      renderWalker();
+
+      expect(screen.getByTestId("conversation")).toBeTruthy();
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.queryByText(/suggest/i)).toBeNull();
+    });
+
+    /** @scenario "A single or unavailable conversation still shows the queued trace" */
+    it("hands trace the queued trace alone when it belongs to no thread", () => {
+      mocks.state.step = stepAt(2, {
+        item: {
+          ...queueItem("item-2"),
+          trace: {
+            trace_id: "trace-item-2",
+            metadata: {},
+            timestamps: { started_at: 1_700_000_000_000 },
+          },
+        },
+      });
+      renderWalker();
+
+      const conversation = screen.getByTestId("conversation");
+      expect(conversation.dataset.trace).toBe("trace-item-2");
+      expect(conversation.dataset.thread).toBe("");
+    });
+
+    /** @scenario "The final action is explicit" */
     it("shows the position in the queue", () => {
       renderWalker();
 
@@ -181,7 +217,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer has stepped on and the new item is still being read", () => {
-    /** @scenario "Nothing acts on the item I have just stepped off" */
+    /** @scenario "Navigation does not leave work after the page" */
     it("holds every action and the conversation, announced as busy", () => {
       mocks.state.step = stepAt(2, { stepIsStale: true });
       renderWalker();
@@ -197,7 +233,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer chooses Next with items left after this one", () => {
-    /** @scenario "Next finishes the item and moves on" */
+    /** @scenario "The queue bar has one labelled forward action" */
     it("records the item as done and moves on to the next one", async () => {
       markDoneSucceeds();
       const { host } = renderWalker();
@@ -216,7 +252,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer leaves while the move is still settling", () => {
-    /** @scenario "Leaving mid-navigation leaves nothing pending behind" */
+    /** @scenario "Navigation does not leave work after the page" */
     it("leaves no settle timer running against the page it left", async () => {
       vi.useFakeTimers();
       markDoneSucceeds();
@@ -234,13 +270,14 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("given the last item of the queue is open", () => {
-    /** @scenario "The last item's primary action reads Done" */
+    /** @scenario "The final action is explicit" */
     it("reads Done instead of Next", () => {
       mocks.state.step = stepAt(3);
       renderWalker();
 
       expect(screen.getByRole("button", { name: /done/i })).toBeTruthy();
       expect(screen.queryByRole("button", { name: /next/i })).toBeNull();
+      expect(screen.getByText("3 of 3")).toBeTruthy();
     });
   });
 
@@ -255,23 +292,25 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when turns are counted into the session", () => {
-    /** @scenario "The turn under review is counted from the start" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts the open item's own trace before anything is annotated", () => {
       renderWalker();
 
       expect(useAnnotationQueueSessionStore.getState().marks).toEqual({ "trace-item-2": "auto" });
     });
 
-    /** @scenario "The dataset toggle carries the live count in traces" */
+    /** @scenario "The dataset toggle reports usable selections" */
     it("carries the live count in traces on the toggle", () => {
       renderWalker();
 
       expect(screen.getByText("Add to dataset at the end (1 trace)")).toBeTruthy();
       act(() => useAnnotationQueueSessionStore.getState().toggle("trace-other"));
       expect(screen.getByText("Add to dataset at the end (2 traces)")).toBeTruthy();
+      act(() => useAnnotationQueueSessionStore.getState().toggle("trace-third"));
+      expect(screen.getByText("Add to dataset at the end (3 traces)")).toBeTruthy();
     });
 
-    /** @scenario "An empty session disables the dataset toggle" */
+    /** @scenario "The dataset toggle reports usable selections" */
     it("disables the dataset toggle once nothing is counted any more", () => {
       renderWalker();
 
@@ -281,7 +320,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(screen.getByRole("checkbox").hasAttribute("disabled")).toBe(true);
     });
 
-    /** @scenario "Session marks belong to the sitting" */
+    /** @scenario "Leaving clears the session selection" */
     it("drops the sitting's count on the way out of the queue", () => {
       const { unmount } = renderWalker();
 
@@ -297,7 +336,7 @@ describe("given a reviewer walking their annotation queue", () => {
       mocks.state.step = stepAt(3);
     });
 
-    /** @scenario "Finishing the last item opens the hand-off over the conversation" */
+    /** @scenario "A selected hand-off remains over the conversation until it resolves" */
     it("opens the hand-off over the conversation, and does not celebrate yet", async () => {
       const { host } = renderWalker();
 
@@ -309,9 +348,10 @@ describe("given a reviewer walking their annotation queue", () => {
       ]);
       expect(mocks.markDone).not.toHaveBeenCalled();
       expect(screen.queryByText("All tasks complete")).toBeNull();
+      expect(screen.getByTestId("conversation")).toBeTruthy();
     });
 
-    /** @scenario "Traces counted earlier in the walk are part of the hand-off" */
+    /** @scenario "A selected hand-off remains over the conversation until it resolves" */
     it("includes a trace counted earlier in the walk", async () => {
       useAnnotationQueueSessionStore.setState({ marks: { "trace-item-1": "auto" } });
       const { host } = renderWalker();
@@ -324,7 +364,7 @@ describe("given a reviewer walking their annotation queue", () => {
       });
     });
 
-    /** @scenario "Finishing with the dataset toggle off celebrates directly" */
+    /** @scenario "Completing or confirming without a dataset ends the session" */
     it("records the item as done and celebrates when the toggle is off", async () => {
       markDoneSucceeds();
       renderWalker();
@@ -346,7 +386,7 @@ describe("given a reviewer walking their annotation queue", () => {
       return view;
     }
 
-    /** @scenario "The celebration shows once the records are added" */
+    /** @scenario "Completing or confirming without a dataset ends the session" */
     it("records the item as done, celebrates and clears the sitting's set", async () => {
       markDoneSucceeds();
       await openHandoff();
@@ -358,7 +398,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(useAnnotationQueueSessionStore.getState().marks).toEqual({});
     });
 
-    /** @scenario "Closing the hand-off without adding asks before ending the session" */
+    /** @scenario "Completing or confirming without a dataset ends the session" */
     it("asks before ending the session, and confirming records it done and celebrates", async () => {
       markDoneSucceeds();
       const { host, rerender } = await openHandoff();
@@ -372,7 +412,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(await screen.findByText("All tasks complete")).toBeTruthy();
     });
 
-    /** @scenario "Cancelling the question lands back on the conversation, nothing finished" */
+    /** @scenario "Cancelling a hand-off leaves the final item and selections intact" */
     it("lands back on the conversation with nothing finished", async () => {
       const { host, rerender } = await openHandoff();
 
@@ -383,6 +423,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(mocks.markDone).not.toHaveBeenCalled();
       expect(screen.getByTestId("conversation")).toBeTruthy();
       expect(useAnnotationQueueSessionStore.getState().handoff).toBe("idle");
+      expect(useAnnotationQueueSessionStore.getState().marks).toEqual({ "trace-item-3": "auto" });
     });
   });
 
@@ -391,7 +432,7 @@ describe("given a reviewer walking their annotation queue", () => {
       mocks.state.step = stepAt(2, { item: queueItem("item-2", false) });
     });
 
-    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("says the trace is gone and offers removal and skipping", () => {
       renderWalker();
 
@@ -399,9 +440,11 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(screen.getByRole("button", { name: "Remove from queue" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Skip" })).toBeTruthy();
       expect(screen.queryByTestId("conversation")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Edit trace" })).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
     });
 
-    /** @scenario "Removing an item whose trace is gone takes it out of the queue" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("removes the item and moves on", async () => {
       mocks.deleteItems.mockImplementation(
         (_input, handlers: { onSuccess: () => Promise<void> }) => {
@@ -419,7 +462,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(host.navigations).toContain("/test-project/annotations/my-queue?queue-item=item-3");
     });
 
-    /** @scenario "Skipping an item whose trace is gone leaves it in the queue" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("moves on without removing the item", async () => {
       const { host } = renderWalker();
 

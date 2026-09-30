@@ -16,6 +16,7 @@ function createService(): GuidedOnboardingService {
   return GuidedOnboardingService.create({
     organizations: createApiFixture<OrganizationApi>({}),
     events: MemoryPostHogEventsChannel.create(),
+    announce: async () => {},
   });
 }
 
@@ -77,6 +78,7 @@ describe("GuidedOnboardingService path guards", () => {
     const service = GuidedOnboardingService.create({
       organizations: api,
       events: MemoryPostHogEventsChannel.create(),
+      announce: async () => {},
     });
 
     const failure = await service
@@ -99,6 +101,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const service = GuidedOnboardingService.create({
       organizations: api,
       events: MemoryPostHogEventsChannel.create(),
+      announce: async () => {},
     });
 
     const state = await service.recordProvider(
@@ -118,6 +121,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const service = GuidedOnboardingService.create({
       organizations: api,
       events: MemoryPostHogEventsChannel.create(),
+      announce: async () => {},
     });
 
     const state = await service.recordProviderSkipped({
@@ -136,6 +140,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const service = GuidedOnboardingService.create({
       organizations: api,
       events: MemoryPostHogEventsChannel.create(),
+      announce: async () => {},
     });
     const actor = { organizationId: "org_1", userId: "user_1" };
 
@@ -158,6 +163,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const service = GuidedOnboardingService.create({
       organizations: api,
       events: MemoryPostHogEventsChannel.create(),
+      announce: async () => {},
     });
 
     const state = await service.beginPath(
@@ -177,6 +183,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const service = GuidedOnboardingService.create({
       organizations: api,
       events: MemoryPostHogEventsChannel.create(),
+      announce: async () => {},
     });
 
     const state = await service.beginPath(
@@ -199,6 +206,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const service = GuidedOnboardingService.create({
       organizations: api,
       events: MemoryPostHogEventsChannel.create(),
+      announce: async () => {},
     });
     const actor = { organizationId: "org_1", userId: "user_1" };
 
@@ -217,6 +225,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     const service = GuidedOnboardingService.create({
       organizations: api,
       events: MemoryPostHogEventsChannel.create(),
+      announce: async () => {},
     });
 
     const state = await service.attachConversation(
@@ -233,7 +242,11 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
       org_1: { state: { paths: [], donePaths: [] }, variant: "guided" },
     });
     const events = MemoryPostHogEventsChannel.create();
-    const service = GuidedOnboardingService.create({ organizations: api, events });
+    const service = GuidedOnboardingService.create({
+      organizations: api,
+      events,
+      announce: async () => {},
+    });
 
     await service.recordPaths(
       { organizationId: "org_1", userId: "user_1" },
@@ -266,7 +279,11 @@ describe("GuidedOnboardingService attribution of a write with no user", () => {
       findAdministrators,
     });
     const events = MemoryPostHogEventsChannel.create();
-    const service = GuidedOnboardingService.create({ organizations, events });
+    const service = GuidedOnboardingService.create({
+      organizations,
+      events,
+      announce: async () => {},
+    });
     return { service, events, records };
   }
 

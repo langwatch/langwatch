@@ -420,3 +420,33 @@ describe("given the queue editor", () => {
     });
   });
 });
+
+describe("given the four annotations addresses", () => {
+  describe("when the reader opens each of them", () => {
+    /** @scenario "Each annotations address opens its own list" */
+    it("opens the inbox, the own queue, all annotations and a named queue as four views of the list", () => {
+      mocks.queue = { id: "q1", name: "Support reviews", members: [] };
+      const route = { params: { slug: "support-reviews" }, query: {} };
+      const opened: Record<string, Record<string, unknown>> = {};
+
+      for (const view of ["inbox", "mine", "all", "queue"] as const) {
+        const { unmount } = renderWithAnnotationHost(<AnnotationsScreen view={view} />, { route });
+        opened[view] = { ...mocks.listProps };
+        unmount();
+      }
+
+      expect(Object.values(opened).map((props) => props.view)).toEqual([
+        "inbox",
+        "mine",
+        "all",
+        "queue",
+      ]);
+      expect(opened.all?.rows).toBeDefined();
+      expect(opened.queue?.queueId).toBe("q1");
+      expect(opened.mine?.pageQueue).toMatchObject({
+        annotatorId: expect.stringMatching(/^user-/),
+      });
+      expect(opened.inbox?.pageQueue).toBeUndefined();
+    });
+  });
+});

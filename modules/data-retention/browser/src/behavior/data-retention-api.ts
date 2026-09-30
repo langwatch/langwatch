@@ -8,8 +8,8 @@ import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { dataRetentionTrpc } from "@langwatch/data-retention-contract";
 
 /**
- * Procedures another feature owns. The organization graph is what the scope
- * FILTER offers, narrowed to the three fields it renders.
+ * Procedures another feature owns: the organization graph the scope FILTER offers,
+ * the plan type that opens the enterprise menu, and the operator check for "No retention".
  */
 type BorrowedProcedures = {
   organization: {
@@ -27,6 +27,14 @@ type BorrowedProcedures = {
         }[];
       };
     };
+  };
+  limits: {
+    getUsage: {
+      query: { input: { organizationId: string }; output: { activePlan: { type: string } } };
+    };
+  };
+  user: {
+    isAdmin: { query: { input: Record<string, never>; output: { isAdmin: boolean } } };
   };
 };
 

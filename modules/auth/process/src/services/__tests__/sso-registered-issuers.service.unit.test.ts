@@ -73,6 +73,29 @@ describe("given a sign-in naming an email address", () => {
   });
 });
 
+describe("given an unnamed sign-in that brings another tenant's origin with it", () => {
+  /** @scenario "Unnamed SSO requests cannot trust another tenant's origin" */
+  it("trusts only the issuer its own verified domain resolves to", async () => {
+    const OTHER_ISSUER = "https://idp.other.test";
+    const issuersByDomain: Record<string, string[]> = {
+      "acme.test": [ACME_ISSUER],
+      "other.test": [OTHER_ISSUER],
+    };
+    const service = serviceOver({
+      findIssuersForDomain: async ({ domain }) => issuersByDomain[domain] ?? [],
+    });
+    const carrying = (email: string) =>
+      new Request("https://app.langwatch.test/api/auth/sign-in/sso", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: OTHER_ISSUER },
+        body: JSON.stringify({ email, callbackURL: `${OTHER_ISSUER}/steal` }),
+      });
+
+    expect(await service.issuersForRequest(carrying("person@acme.test"))).toEqual([ACME_ISSUER]);
+    expect(await service.issuersForRequest(carrying("person@unclaimed.test"))).toEqual([]);
+  });
+});
+
 describe("given a callback naming a connection in its path", () => {
   it("answers that connection's issuer, whatever the body says", async () => {
     const service = serviceOver({

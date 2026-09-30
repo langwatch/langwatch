@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { MONO_FONT } from "../../model/front-door-theme.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
+import { rankMethodsForBrowser } from "../../model/method-ranking.ts";
 
 import "../elements/auth-front-door.css";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
@@ -26,6 +27,9 @@ export function SignInMethodPicker({
   renderLocalMethod,
   callbackUrl,
   onPasskeyError,
+  autoStartPasskey,
+  onPasskeyAutoStarted,
+  onPasskeyDeclined,
 }: {
   methodSet: readonly SignInMethod[];
   reasonCode: string;
@@ -37,8 +41,17 @@ export function SignInMethodPicker({
   callbackUrl?: string;
   /** A refused ceremony, sent to the card's one alert at the top. */
   onPasskeyError: (error: unknown) => void;
+  /** Start the ceremony on arrival; see `shouldStartPasskeyOnArrival`. */
+  autoStartPasskey?: boolean;
+  /** Told to the screen, which outlives a remount of the button. */
+  onPasskeyAutoStarted?: () => void;
+  /** The ceremony ended without a session. */
+  onPasskeyDeclined?: () => void;
 }) {
   const guidance = signInRoutingReasonCopy(reasonCode);
+  // The server's ranking with this browser's last-used method promoted: one
+  // promotion, never a re-sort.
+  const ordered = rankMethodsForBrowser({ methodSet, lastUsedMethodId });
   // A WebAuthn ceremony hands the screen to the browser and the operating
   // system: while one is in flight, a second click on another method would
   // open a competing prompt on top of it. Scoped to this picker rather than a
@@ -62,13 +75,13 @@ export function SignInMethodPicker({
         </Alert.Root>
       ) : null}
 
-      {methodSet.length === 0 ? (
+      {ordered.length === 0 ? (
         <Text>
           There is no way to sign in to this installation yet. Ask whoever runs it to set one up.
         </Text>
       ) : null}
 
-      {methodSet.map((method) => (
+      {ordered.map((method) => (
         <MethodEntry
           key={`${method.kind}:${method.id}:${method.connectionId ?? ""}`}
           method={method}
@@ -79,6 +92,9 @@ export function SignInMethodPicker({
           onPasskeyError={onPasskeyError}
           passkeyIsBusy={passkeyIsBusy}
           onPasskeyBusyChange={setPasskeyIsBusy}
+          autoStartPasskey={autoStartPasskey}
+          onPasskeyAutoStarted={onPasskeyAutoStarted}
+          onPasskeyDeclined={onPasskeyDeclined}
         />
       ))}
     </VStack>
@@ -244,6 +260,9 @@ function MethodEntry({
   onPasskeyError,
   passkeyIsBusy,
   onPasskeyBusyChange,
+  autoStartPasskey,
+  onPasskeyAutoStarted,
+  onPasskeyDeclined,
 }: {
   method: SignInMethod;
   isLastUsed: boolean;
@@ -255,6 +274,9 @@ function MethodEntry({
   passkeyIsBusy: boolean;
   /** Told by the passkey seat itself, whenever its own ceremony starts or ends. */
   onPasskeyBusyChange: (isBusy: boolean) => void;
+  autoStartPasskey?: boolean;
+  onPasskeyAutoStarted?: () => void;
+  onPasskeyDeclined?: () => void;
 }) {
   if (method.kind === "federated") {
     return (
@@ -279,6 +301,9 @@ function MethodEntry({
         badge={isLastUsed ? <LastUsedBadge /> : null}
         onError={onPasskeyError}
         onBusyChange={onPasskeyBusyChange}
+        autoStart={autoStartPasskey}
+        onAutoStarted={onPasskeyAutoStarted}
+        onDeclined={onPasskeyDeclined}
       />
     );
   }

@@ -1146,6 +1146,10 @@ Messages:
 - `handlerBindingCall`
   - what: This source calls `createTrpcHandlerBinding`.
   - fix: Delete the call and export the `defineTrpcRouter` declaration; the process binds handlers when it mounts the router.
+- `handlerChecksInput`
+  - what: The handler throws when its input fails `{{test}}`.
+  - fix: Delete the check and require the field in the route's `.withInput(...)` schema (no `.optional()`, and `.min(1)` for a string or array); the framework refuses the request before the handler runs.
+  - why: The schema is the route's published contract, so a check outside it is invisible to callers and to the OpenAPI document.
 - `handlerConstructs`
   - what: The handler constructs `{{name}}`.
   - fix: Call the operation on the handler's `app`; the module constructs its services once, when the process boots.
@@ -1164,6 +1168,9 @@ Messages:
 - `legacyRegisterRoute`
   - what: This route registers its handler through `registerRoute`.
   - fix: Declare it with `defineRestRouter`'s chain so the verb, input, output, permission and inline handler form one declaration.
+- `mediaTypeCheck`
+  - what: This source decides on the request's media type through `{{text}}`.
+  - fix: Delete the check and declare the body on the route, `.withInput(schema)` for JSON or `.withRawBody(form, { mediaType })` otherwise; the framework refuses a request that does not match its declaration.
 - `multipleOperationCalls`
   - what: The handler makes {{count}} calls on `app`.
   - fix: Call exactly one API operation and move the orchestration into the module; a pure mapping of its result may stay.
@@ -1200,6 +1207,9 @@ Messages:
 - `rbacImport`
   - what: This transport imports the legacy RBAC module `{{specifier}}`.
   - fix: Declare access with `.withPermission(...)` on the route or procedure; AuthZ decides it.
+- `requestBodyRead`
+  - what: This source reads the request body through `{{text}}`.
+  - fix: Declare the body on the route with `.withInput(schema)`, or `.withRawBody(form)` when the handler needs the exact bytes; a middleware binding carries credentials and never reads the body.
 - `responseMethod`
   - what: The handler calls the response method `{{name}}()`.
   - fix: Return the plain value `.withOutput()` declares, or nothing for an empty response, and throw a `HandledError` to refuse; the framework serialises both.

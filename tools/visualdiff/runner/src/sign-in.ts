@@ -48,21 +48,23 @@ const signInAs = async ({
 };
 
 /**
- * captureOffer photographs the passkey offer a password sign-in must be shown. Its absence is
- * an error naming the precondition; answering it is the caller's choice, because an answer
- * lasts 30 days on the account.
+ * captureOffer photographs the passkey offer a password sign-in shows. Its absence is an error
+ * naming the precondition only when `required`: the probe account is never answered, but a
+ * fallback account may have declined it already (an answer lasts 30 days).
  */
 const captureOffer = async ({
   plan,
   side,
   email,
   failure,
+  required,
   collect,
 }: {
   plan: Plan;
   side: Side;
   email: string;
   failure: string;
+  required: boolean;
   collect: Collect;
 }): Promise<boolean> => {
   const startedAt = Date.now();
@@ -80,7 +82,7 @@ const captureOffer = async ({
       label: "signIn: passkey offer",
       side,
       screenshot: file,
-      error: shown ? "" : offerAbsent({ email, failure }),
+      error: shown || !required ? "" : offerAbsent({ email, failure }),
       durationMs: Date.now() - startedAt,
       notFound: false,
       blank: await side.blank(),
@@ -111,6 +113,7 @@ const capturePasskeyOffer = async ({
       side,
       email: plan.credential.email,
       failure: "",
+      required: true,
       collect,
     });
     if (shown) await declinePasskeyOffer({ page: side.page, probeMillis: 0 });
@@ -126,6 +129,7 @@ const capturePasskeyOffer = async ({
       side: probe,
       email: email ?? probeEmail,
       failure: email === undefined ? failures.join("; ") : "",
+      required: email === undefined || email === probeEmail,
       collect,
     });
     probe.drain();

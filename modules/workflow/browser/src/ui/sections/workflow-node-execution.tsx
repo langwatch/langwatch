@@ -111,6 +111,8 @@ export function ComponentExecutionButton({
           maxHeight="24px"
           marginRight="-4px"
           marginLeft="-4px"
+          data-testid="workflow-node-execution-status"
+          data-status={executionStatus ?? "idle"}
           role={shouldOpenExecutionResults ? "button" : void 0}
           cursor={node.data.execution_state ? "pointer" : void 0}
           onClick={() => {
@@ -170,6 +172,7 @@ export function ComponentExecutionButton({
               variant="ghost"
               size="xs"
               paddingX={2}
+              data-testid="workflow-node-run-menu"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
               {...props}
@@ -182,7 +185,11 @@ export function ComponentExecutionButton({
               <Play size={14} />
               Run with manual input
             </Menu.Item>
-            <Menu.Item value="run-workflow" onClick={() => node && openRunUntilHereDialog(node.id)}>
+            <Menu.Item
+              value="run-workflow"
+              data-testid="workflow-node-run-until-here"
+              onClick={() => node && openRunUntilHereDialog(node.id)}
+            >
               <Play size={14} />
               Run workflow until here
             </Menu.Item>

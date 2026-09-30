@@ -116,4 +116,54 @@ describe("given an SMTP deployment", () => {
       ).rejects.toThrow(/closed/);
     });
   });
+
+  describe("when a message carries the full surface", () => {
+    /** @scenario "The full message surface survives every gateway" */
+    it("hands the transport attachments, reply-to and headers, blind copies in the envelope only", async () => {
+      const gateway = SmtpEmailGatewayChannel.create({ url: "smtp://localhost:1025" });
+      await gateway.send({
+        content: {
+          to: ["public@acme.example"],
+          bcc: ["hidden@acme.example"],
+          replyTo: "help@acme.example",
+          subject: "Report",
+          html: "<p>Report</p>",
+          headers: { "X-Report": "weekly" },
+          attachments: [{ filename: "report.csv", content: "a,b", contentType: "text/csv" }],
+        },
+        defaultFrom: "noreply@acme.example",
+      });
+      const message = sendMail.mock.calls[0]?.[0] as Record<string, unknown>;
+
+      expect(message).toMatchObject({
+        replyTo: "help@acme.example",
+        headers: { "X-Report": "weekly" },
+        attachments: [{ filename: "report.csv", content: "a,b", contentType: "text/csv" }],
+        envelope: { to: ["public@acme.example", "hidden@acme.example"] },
+      });
+      expect(message).not.toHaveProperty("bcc");
+    });
+  });
+
+  describe("when the same delivery is attempted again", () => {
+    /** @scenario "SMTP retries preserve the notification message identity" */
+    it("keeps the MIME message identifier, and gives another delivery another one", async () => {
+      const gateway = SmtpEmailGatewayChannel.create({ url: "smtp://localhost:1025" });
+      const base = { to: "public@acme.example", subject: "Alert", html: "<p>Alert</p>" };
+      for (const idempotencyKey of ["org:join:a", "org:join:a", "org:join:b"]) {
+        await gateway.send({
+          content: { ...base, idempotencyKey },
+          defaultFrom: "noreply@acme.example",
+        });
+      }
+      const [first, retry, other] = sendMail.mock.calls.map(
+        (call) => call[0] as { messageId: string },
+      );
+
+      expect(first?.messageId).toMatch(/^<[a-f0-9]{64}@notifications\.langwatch\.ai>$/);
+      expect(retry?.messageId).toBe(first?.messageId);
+      expect(other?.messageId).not.toBe(first?.messageId);
+      expect(first).not.toHaveProperty("idempotencyKey");
+    });
+  });
 });

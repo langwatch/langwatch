@@ -138,6 +138,7 @@ export type {
   EventSubscriberContext,
   EventSubscriberDefinition,
   EventSubscriberOptions,
+  PeerSubscriberDefinition,
 } from "./subscribers/eventSubscriber.types.ts";
 export type { SubscriberDispatchDefinition } from "./subscribers/subscriber.types.ts";
 export { throttledPerWindow, throttledWindow } from "./subscribers/throttleWindow.ts";

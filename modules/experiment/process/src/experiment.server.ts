@@ -8,6 +8,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.app";
 
+import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
@@ -63,4 +64,5 @@ export const experimentServer = defineServerModule("experiment")
       };
     }),
   ])
-  .withEventing(experimentRunProcessingEventing);
+  .withEventing(experimentRunProcessingEventing)
+  .withEventing(experimentLifecycleEventing);

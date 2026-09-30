@@ -26,6 +26,17 @@ const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
 const IS_CI = !!process.env.CI;
 
+/* Lean headless Chromium: no GPU, no anti-aliasing, no /dev/shm, capped V8 heap.
+ * Leaves out --single-process/--no-zygote: they crash Chromium once a test opens a second context. */
+const CHROMIUM_ARGS = [
+  "--disable-gpu",
+  "--disable-canvas-aa",
+  "--disable-2d-canvas-clip-aa",
+  "--disable-gl-drawing-for-tests",
+  "--disable-dev-shm-usage",
+  "--js-flags=--max-old-space-size=256",
+];
+
 export default defineConfig({
   testDir: "./tests",
 
@@ -67,6 +78,9 @@ export default defineConfig({
      * avoid a separate ffmpeg install. Trace already captures DOM, network,
      * and console for debugging. */
     video: process.env.E2E_RECORD_VIDEO ? "retain-on-failure" : "off",
+
+    reducedMotion: "reduce",
+    launchOptions: { args: CHROMIUM_ARGS },
 
     /* Reasonable timeouts */
     actionTimeout: 15000,

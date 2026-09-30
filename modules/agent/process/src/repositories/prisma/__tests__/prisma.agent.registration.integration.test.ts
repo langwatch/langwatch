@@ -187,6 +187,7 @@ describe.skipIf(!databaseUrl)("Prisma Agent registration", () => {
     expect(await repository.getById({ id: before.id, projectId })).toEqual(before);
   });
 
+  /** @scenario "A connected agent unseen for thirty days is not listed" */
   it("omits stale connected agents from list and pagination", async () => {
     const input = registration(`${namespace}-stale`);
     const stale = await repository.registerConnected({

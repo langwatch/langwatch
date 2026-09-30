@@ -11,6 +11,7 @@ import {
   distinctFieldNamesResultSchema,
   evaluationSchema,
   facetValuesResultSchema,
+  type namedTopicCountsSchema,
   TraceAiQueryUnavailableError,
   TraceApi,
   traceListPageSchema,
@@ -20,6 +21,7 @@ import {
   tracesTrpc,
   sessionGroupsResultSchema,
 } from "@langwatch/trace-contract";
+import type { z } from "zod";
 
 import {
   traceDerivedAttrPrefixes,
@@ -128,7 +130,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       );
 
       const mapBuckets = (buckets: { key: string; count: number }[], includeParent = false) => {
-        return buckets.reduce(
+        return buckets.reduce<z.infer<typeof namedTopicCountsSchema>["subtopicCounts"]>(
           (acc, bucket) => {
             const topic = topicsMap[bucket.key];
             if (!topic) return acc;
@@ -143,7 +145,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
               },
             ];
           },
-          [] as { id: string; name: string; count: number; parentId?: string | null }[],
+          [],
         );
       };
 

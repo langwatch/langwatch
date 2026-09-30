@@ -4,6 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type {
+  JoinRequestAdmin,
   JoinRequestAudienceRepository,
   JoinRequestAudienceProfile,
 } from "../join-request-audience.repository.ts";
@@ -45,14 +46,14 @@ export class PrismaJoinRequestAudienceRepository implements JoinRequestAudienceR
     return organization.name;
   }
 
-  async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
+  async findAdmins({ organizationId }: { organizationId: string }): Promise<JoinRequestAdmin[]> {
     const admins = await this.database.organizationUser.findMany({
       where: { organizationId, role: "ADMIN", disabledAt: null },
-      select: { user: { select: { email: true } } },
+      select: { user: { select: { id: true, email: true } } },
     });
-    return admins
-      .map((admin) => admin.user.email)
-      .filter((email): email is string => Boolean(email));
+    return admins.flatMap(({ user }) =>
+      user.email ? [{ userId: user.id, email: user.email }] : [],
+    );
   }
 
   async getUserProfile({ userId }: { userId: string }): Promise<JoinRequestAudienceProfile> {

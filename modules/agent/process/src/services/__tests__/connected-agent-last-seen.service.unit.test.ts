@@ -5,6 +5,7 @@ import type { AgentService } from "../agent.service.ts";
 import { ConnectedAgentLastSeenService } from "../connected-agent-last-seen.service.ts";
 
 describe("ConnectedAgentLastSeenService", () => {
+  /** @scenario "The last seen time is written at most once a minute" */
   it("writes at most once per minute for each project and agent", async () => {
     const write = vi.fn(async () => void 0);
     const service = ConnectedAgentLastSeenService.create(
@@ -34,6 +35,7 @@ describe("ConnectedAgentLastSeenService", () => {
     expect(write).toHaveBeenCalledTimes(2);
   });
 
+  /** @scenario "Application instances do not share presence write throttle state" */
   it("does not share throttle state between application instances", async () => {
     const write = vi.fn(async () => void 0);
     const agents = createApiFixture<AgentService>({ touchLastSeenAt: write });

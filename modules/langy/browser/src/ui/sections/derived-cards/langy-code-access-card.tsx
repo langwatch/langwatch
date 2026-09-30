@@ -1,12 +1,16 @@
 import { Box, Button, chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
+import type {
+  LangyChoiceSelection,
+  LangyControlRequestState,
+  LangyDerivedChoicesCard,
+} from "@langwatch/langy-contract";
 import { SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
 /**
  * The code access card (ADR-129): four states, all read from `langy.getLocalWorkspace` rather
  * than the tool call, which is only where the card hangs, never what it says.
  */
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { Check, FolderCode, GitPullRequest } from "lucide-react";
+import { Check, FolderCode, FolderOpen, GitPullRequest } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { describeError } from "../../../behavior/errors.tsx";
@@ -27,19 +31,25 @@ import { LangyCopyButton } from "../../elements/langy-copy-button.tsx";
 export const LANGY_CODE_ACCESS_OPTIONS = {
   LOCAL: "local",
   GITHUB: "github",
+  DESCRIBE: "describe",
 } as const;
 
-const LOCAL_LABEL = "Share my local folder";
+const LOCAL_LABEL = "Share local folder";
 const LOCAL_SUBTITLE = "Fastest: I run the toolchain you already have";
-const GITHUB_LABEL = "Use GitHub";
+const GITHUB_LABEL = "Connect to GitHub";
 const GITHUB_SUBTITLE = "I open a pull request through the LangWatch GitHub App";
+/** The quiet third way out, offered only when the tool asked for it. */
+export const LANGY_CODE_ACCESS_DESCRIBE_LABEL = "I'd rather describe it";
 
 /**
  * The choices card the GitHub selection binds to. The panel answers it through
  * the same `onChoiceSelect` a question card uses, so the reader's pick becomes
  * their own message with no second send path.
  */
-export function langyCodeAccessChoicesCard(callId: string): LangyDerivedChoicesCard {
+export function langyCodeAccessChoicesCard(
+  callId: string,
+  { offerDescribe = false }: { offerDescribe?: boolean } = {},
+): LangyDerivedChoicesCard {
   return {
     blockId: `code-access:${callId}`,
     kind: "choices",
@@ -55,23 +65,34 @@ export function langyCodeAccessChoicesCard(callId: string): LangyDerivedChoicesC
         label: GITHUB_LABEL,
         description: GITHUB_SUBTITLE,
       },
+      ...(offerDescribe
+        ? [
+            {
+              id: LANGY_CODE_ACCESS_OPTIONS.DESCRIBE,
+              label: LANGY_CODE_ACCESS_DESCRIBE_LABEL,
+              quiet: true,
+            },
+          ]
+        : []),
     ],
   };
 }
 
-/** The GitHub pick, as the choices path carries it. */
-function githubSelection(callId: string): {
+/** One pick, as the choices path carries it. */
+function codeAccessSelection({
+  callId,
+  optionId,
+  offerDescribe,
+}: {
+  callId: string;
+  optionId: string;
+  offerDescribe: boolean;
+}): {
   selection: LangyChoiceSelection;
   card: LangyDerivedChoicesCard;
 } {
-  const card = langyCodeAccessChoicesCard(callId);
-  return {
-    selection: {
-      blockId: card.blockId,
-      optionIds: [LANGY_CODE_ACCESS_OPTIONS.GITHUB],
-    },
-    card,
-  };
+  const card = langyCodeAccessChoicesCard(callId, { offerDescribe });
+  return { selection: { blockId: card.blockId, optionIds: [optionId] }, card };
 }
 
 /** What Langy is asked when the reader wants the question put again. */
@@ -90,6 +111,8 @@ export interface LangyCodeAccessCardProps {
   onAskAgain?: () => void;
   /** A newer `code_access` call exists, so this is the older ask: reads closed, answers nothing. */
   superseded?: boolean;
+  /** The tool asked for the quiet third way out, "I'd rather describe it". */
+  offerDescribe?: boolean;
   /** Test seam: the clock the countdown reads. */
   now?: () => number;
 }
@@ -113,6 +136,36 @@ export function langyCodeAccessState({
   if (pickedLocal) return "waiting";
   return "asking";
 }
+
+/** Why a picked card has nothing to wait for. */
+export type LangyCodeAccessClosedReason = "expired" | "declined" | "ended" | "over";
+
+/**
+ * Whether the waiting card still has something to wait for. The platform's reading decides;
+ * the clock only closes an open request whose time ran out between two reads.
+ */
+export function langyCodeAccessClosedReason({
+  requestState,
+  expiresAt,
+  now,
+}: {
+  requestState: LangyControlRequestState;
+  expiresAt: number | null;
+  now: number;
+}): LangyCodeAccessClosedReason | null {
+  if (requestState === "open" || requestState === "approved") {
+    return expiresAt !== null && expiresAt <= now ? "expired" : null;
+  }
+  if (requestState === "none") return "over";
+  return requestState;
+}
+
+const CLOSED_COPY: Record<LangyCodeAccessClosedReason, { line: string; action: string }> = {
+  expired: { line: "This request expired.", action: "Try again" },
+  declined: { line: "This request was declined in the terminal.", action: "Try again" },
+  ended: { line: "Sharing stopped.", action: "Share again" },
+  over: { line: "This request is closed.", action: "Try again" },
+};
 
 export function LangyCodeAccessCard(props: LangyCodeAccessCardProps) {
   const { projectId, conversationId } = props;
@@ -155,10 +208,27 @@ function CodeAccessBody({
   const [pickedLocal, setPickedLocal] = useState(() =>
     readLocalFolderPick({ conversationId, callId }),
   );
+  const [renewFailure, setRenewFailure] = useState<string | null>(null);
+  const renew = api.langy.renewLocalControlRequest.useMutation();
+  const openFreshRequest = () => {
+    setRenewFailure(null);
+    renew.mutate(
+      { projectId, conversationId },
+      {
+        onSuccess: () => onRefetch(),
+        onError: (error) =>
+          setRenewFailure(describeError({ error, fallbackTitle: "Could not open a new request" })),
+      },
+    );
+  };
   const pickLocal = () => {
     writeLocalFolderPick({ conversationId, callId });
     setPickedLocal(true);
+    // The request Langy recorded when it asked may be over by the time the reader picks.
+    if (folder.requestState !== "open") openFreshRequest();
   };
+  // A card with no way to answer is a past conversation being read.
+  const readOnly = !props.onChoiceSelect && !onAskAgain;
   const request = folder.pendingRequest;
   const state = langyCodeAccessState({
     connected: folder.connected && !!folder.workspace,
@@ -176,9 +246,13 @@ function CodeAccessBody({
     return (
       <CardShell>
         <WaitingState
+          requestState={folder.requestState}
           expiresAt={request ? toEpochMs(request.expiresAt) : null}
           now={now ?? (() => nowInstant().epochMilliseconds)}
-          onAskAgain={onAskAgain}
+          onExpired={onRefetch}
+          onTryAgain={readOnly ? undefined : openFreshRequest}
+          tryingAgain={renew.isPending}
+          failure={renewFailure}
         />
       </CardShell>
     );
@@ -330,6 +404,7 @@ function AskingState({
   organizationId,
   onChoiceSelect,
   onPickLocal,
+  offerDescribe = false,
 }: LangyCodeAccessCardProps & { onPickLocal: () => void }) {
   const github = api.github.getConnectionStatus.useQuery(
     { organizationId: organizationId ?? "" },
@@ -343,7 +418,18 @@ function AskingState({
   const installations = github.data?.installations ?? [];
   const installed = installations.length > 0;
 
-  const answerWithGithub = () => onChoiceSelect?.(githubSelection(callId));
+  const answerWithGithub = () =>
+    onChoiceSelect?.(
+      codeAccessSelection({ callId, optionId: LANGY_CODE_ACCESS_OPTIONS.GITHUB, offerDescribe }),
+    );
+  const answerWithDescribe = () =>
+    onChoiceSelect?.(
+      codeAccessSelection({
+        callId,
+        optionId: LANGY_CODE_ACCESS_OPTIONS.DESCRIBE,
+        offerDescribe: true,
+      }),
+    );
 
   const rememberThen = (next: () => void) => {
     if (!remember) {
@@ -415,6 +501,26 @@ function AskingState({
             }}
           />
         ) : null}
+        {offerDescribe ? (
+          <chakra.button
+            type="button"
+            data-testid="langy-code-access-describe"
+            disabled={!onChoiceSelect}
+            onClick={answerWithDescribe}
+            alignSelf="flex-start"
+            paddingX={1}
+            paddingTop={0.5}
+            textStyle="xs"
+            textDecoration="underline"
+            textUnderlineOffset="2px"
+            background="transparent"
+            color="fg.muted"
+            cursor={onChoiceSelect ? "pointer" : "default"}
+            _hover={onChoiceSelect ? { color: "fg" } : undefined}
+          >
+            {LANGY_CODE_ACCESS_DESCRIBE_LABEL}
+          </chakra.button>
+        ) : null}
         <RememberBox checked={remember} disabled={!onChoiceSelect} onChange={setRemember} />
         {failure ? <FailureLine text={failure} /> : null}
       </VStack>
@@ -454,13 +560,23 @@ function RememberBox({
 
 /** The waiting state: the one command, the countdown, and what comes next. */
 function WaitingState({
+  requestState,
   expiresAt,
   now,
-  onAskAgain,
+  onExpired,
+  onTryAgain,
+  tryingAgain,
+  failure,
 }: {
+  requestState: LangyControlRequestState;
   expiresAt: number | null;
   now: () => number;
-  onAskAgain: (() => void) | undefined;
+  /** The countdown reached zero: the platform is asked what it reads now. */
+  onExpired: () => void;
+  /** Open a fresh request. Absent = read-only. */
+  onTryAgain: (() => void) | undefined;
+  tryingAgain: boolean;
+  failure: string | null;
 }) {
   const [remainingMs, setRemainingMs] = useState(() =>
     expiresAt === null ? null : expiresAt - now(),
@@ -476,7 +592,24 @@ function WaitingState({
     return () => clearInterval(timer);
   }, [expiresAt, now]);
 
-  const expired = remainingMs !== null && remainingMs <= 0;
+  const closed = langyCodeAccessClosedReason({ requestState, expiresAt, now: now() });
+
+  // An open request that ran out on screen: the platform's reading replaces the clock's, once.
+  const ranOutOnScreen = closed === "expired" && requestState === "open";
+  useEffect(() => {
+    if (ranOutOnScreen) onExpired();
+  }, [ranOutOnScreen, onExpired]);
+
+  if (closed) {
+    return (
+      <ClosedRequestState
+        reason={closed}
+        onTryAgain={onTryAgain}
+        tryingAgain={tryingAgain}
+        failure={failure}
+      />
+    );
+  }
 
   return (
     <VStack align="stretch" gap={2}>
@@ -503,26 +636,51 @@ function WaitingState({
         </Text>
         <LangyCopyButton size="xs" value={SHARE_CONTROL_COMMAND} label="The command" />
       </HStack>
-      {expired ? (
-        <HStack gap={2} justifyContent="space-between">
-          <Text textStyle="2xs" color="fg.muted">
-            Request expired, ask again
+      <HStack gap={2}>
+        <Spinner size="xs" />
+        <Text textStyle="2xs" color="fg.muted">
+          Waiting for you to approve in the terminal
+          {remainingMs === null ? "" : `. ${expiresIn(remainingMs)}`}
+        </Text>
+      </HStack>
+    </VStack>
+  );
+}
+
+/**
+ * The picked card once no terminal can approve anything: why, and the way to a fresh request.
+ * The command is left out on purpose, because running it now finds nothing to approve.
+ */
+function ClosedRequestState({
+  reason,
+  onTryAgain,
+  tryingAgain,
+  failure,
+}: {
+  reason: LangyCodeAccessClosedReason;
+  onTryAgain: (() => void) | undefined;
+  tryingAgain: boolean;
+  failure: string | null;
+}) {
+  const copy = CLOSED_COPY[reason];
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack gap={2} justifyContent="space-between">
+        <HStack gap={2} minWidth={0}>
+          <Box color="fg.muted" display="flex">
+            <FolderOpen size={14} />
+          </Box>
+          <Text textStyle="xs" color="fg">
+            {copy.line}
           </Text>
-          {onAskAgain ? (
-            <Button size="xs" variant="outline" onClick={onAskAgain}>
-              Ask again
-            </Button>
-          ) : null}
         </HStack>
-      ) : (
-        <HStack gap={2}>
-          <Spinner size="xs" />
-          <Text textStyle="2xs" color="fg.muted">
-            Waiting for you to approve in the terminal
-            {remainingMs === null ? "" : `. ${expiresIn(remainingMs)}`}
-          </Text>
-        </HStack>
-      )}
+        {onTryAgain ? (
+          <Button size="xs" variant="outline" loading={tryingAgain} onClick={onTryAgain}>
+            {copy.action}
+          </Button>
+        ) : null}
+      </HStack>
+      {failure ? <FailureLine text={failure} /> : null}
     </VStack>
   );
 }

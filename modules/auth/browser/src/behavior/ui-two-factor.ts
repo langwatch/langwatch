@@ -96,3 +96,37 @@ export async function regenerateUiBackupCodes(
   if (!answer.ok) return answer;
   return { ok: true, value: { backupCodes: answerOf(answer.value).backupCodes } };
 }
+
+/**
+ * Answer a sign-in's second-factor challenge. Both factors are one call so the
+ * refusal never says which check failed (both are `identity_mfa_code_invalid`).
+ * The refusal is the flat handled body, so the registry words it.
+ */
+export async function verifyUiTwoStepChallenge({
+  code,
+  isBackupCode,
+}: {
+  code: string;
+  isBackupCode: boolean;
+}): Promise<UiTwoStepAnswer<{ verified: true }>> {
+  const endpoint = isBackupCode ? "verify-backup-code" : "verify-totp";
+  const response = await fetch(`${TWO_FACTOR_PATH}/${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ code }),
+  });
+  if (response.ok) return { ok: true, value: { verified: true } };
+  const answered: unknown = await response.json().catch(() => void 0);
+  const handled = typeof answered === "object" && answered !== null && "error" in answered;
+  return {
+    ok: false,
+    error: handled
+      ? answered
+      : signInRefusalOf({
+          status: response.status,
+          statusText: response.statusText,
+          body: answered,
+        }),
+  };
+}

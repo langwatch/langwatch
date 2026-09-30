@@ -50,6 +50,8 @@ const FUNCTIONS = new Set(["ArrowFunctionExpression", "FunctionDeclaration", "Fu
 const SERVICE_OR_REPOSITORY = /(?:App|Service|Repository)$/;
 const SERVICE_OR_REPOSITORY_FACTORY = /^create[A-Z].*(?:App|Service|Repository)$/;
 const HANDLER_STATEMENT_LIMIT = 6;
+const PRESENCE_OPERATORS = new Set(["===", "=="]);
+const EMPTY_LITERALS = new Set([null, "", 0]);
 
 const NOTHING_PRODUCED = new Set();
 
@@ -267,6 +269,94 @@ function operationCallTest(handler) {
   };
 }
 
+function inputRoots(handler) {
+  const [context, positional] = handler.params.map(parameterPattern);
+  const roots = new Set(positional?.type === "Identifier" ? [positional.name] : []);
+  const fields = new Set();
+  for (const element of context?.type === "ObjectPattern" ? context.properties : []) {
+    const binding = bindingElement(element);
+    if (binding.key !== "input" || binding.rest) continue;
+    if (binding.local) roots.add(binding.local);
+    for (const field of binding.target?.type === "ObjectPattern" ? binding.target.properties : []) {
+      const local = bindingElement(field).local;
+      if (local) fields.add(local);
+    }
+  }
+
+  return { contextNames: contextParameterNames(handler), fields, roots };
+}
+
+function inputPathDepth(path, input) {
+  if (!path) return 0;
+  if (input.roots.has(path[0])) return path.length;
+
+  return input.contextNames.has(path[0]) && path[1] === "input" ? path.length - 1 : 0;
+}
+
+/** `const { projectId, ...body } = input` and `const projectId = input.projectId`. */
+function bindInputAliases(body, input) {
+  walk(body, (node) => {
+    if (node.type !== "VariableDeclarator") return;
+    const depth = inputPathDepth(propertyPath(node.init), input);
+    if (depth === 0) return;
+    if (node.id.type === "Identifier") (depth === 1 ? input.roots : input.fields).add(node.id.name);
+    if (node.id.type === "ObjectPattern") bindPatternAliases(node.id, input);
+  });
+}
+
+function bindPatternAliases(pattern, input) {
+  for (const element of pattern.properties) {
+    const binding = bindingElement(element);
+    if (binding.local) (binding.rest ? input.roots : input.fields).add(binding.local);
+  }
+}
+
+function isInputField(node, input) {
+  const value = node.type === "ChainExpression" ? node.expression : node;
+  if (value.type === "Identifier") return input.fields.has(value.name);
+  const trimmed = value.type === "CallExpression" && propertyName(value.callee) === "trim";
+  if (trimmed) return isInputField(value.callee.object, input);
+
+  return inputPathDepth(propertyPath(value), input) >= 2;
+}
+
+function isEmptyValue(node) {
+  if (node.type === "Identifier") return node.name === "undefined";
+  if (node.type === "UnaryExpression") return node.operator === "void";
+
+  return node.type === "Literal" && EMPTY_LITERALS.has(node.value);
+}
+
+function isPresenceCheck(test, input) {
+  if (test.type === "UnaryExpression")
+    return test.operator === "!" && isInputField(test.argument, input);
+  if (test.type === "LogicalExpression") {
+    return isPresenceCheck(test.left, input) && isPresenceCheck(test.right, input);
+  }
+  if (test.type !== "BinaryExpression" || !PRESENCE_OPERATORS.has(test.operator)) return false;
+  const leftField = isInputField(test.left, input) && isEmptyValue(test.right);
+
+  return leftField || (isInputField(test.right, input) && isEmptyValue(test.left));
+}
+
+function onlyThrows(statement) {
+  const body = statement.type === "BlockStatement" ? statement.body : [statement];
+
+  return body.length === 1 && body[0].type === "ThrowStatement";
+}
+
+/** `if (!input.projectId) throw …`: the handler refuses what the route's schema should. */
+function inputCheckTest(handler) {
+  const input = inputRoots(handler);
+  bindInputAliases(handler.body, input);
+
+  return (node) =>
+    node.type === "IfStatement" &&
+    !node.alternate &&
+    onlyThrows(node.consequent) &&
+    isPresenceCheck(node.test, input);
+}
+
 /** One operation on `app`, no branching, a short body: a handler declares, it does not decide. */
 export function inspectHandlerShape(handler, tools) {
   const state = {
@@ -281,7 +371,12 @@ export function inspectHandlerShape(handler, tools) {
     tools.report(state.calls[1], "multipleOperationCalls", { count: state.calls.length });
   }
   if (state.nested.length > 0) tools.report(state.nested[0], "nestedOperationCall");
-  if (state.flow.length > 0) tools.report(state.flow[0], "handlerControlFlow");
+  const isInputCheck = inputCheckTest(handler);
+  for (const check of state.flow.filter(isInputCheck)) {
+    tools.report(check, "handlerChecksInput", { test: tools.text(check.test) });
+  }
+  const decision = state.flow.find((node) => !isInputCheck(node));
+  if (decision) tools.report(decision, "handlerControlFlow");
   const statements = handler.body.type === "BlockStatement" ? handler.body.body.length : 0;
   if (statements > HANDLER_STATEMENT_LIMIT) {
     tools.report(handler.body, "handlerTooLong", {

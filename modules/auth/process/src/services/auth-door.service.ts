@@ -77,6 +77,7 @@ export class AuthDoorService {
     if (
       !isAllowedAuthOrigin({
         method: request.method,
+        pathname: new URL(request.url).pathname,
         origin: origin ?? undefined,
         referer: referer ?? undefined,
         baseUrl,

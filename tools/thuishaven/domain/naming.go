@@ -66,6 +66,11 @@ const VoiceService = "voice"
 // call the stack makes with seeded Markov text, so nothing costs money.
 const LLMService = "llm"
 
+// AnalyticsService is the product-analytics stand-in (services/analyticssim)
+// that catches PostHog and Customer.io calls, routed at
+// analytics.<slug>.langwatch.localhost. Opt-in like voice and llm.
+const AnalyticsService = "analytics"
+
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the
 // same-origin app.<slug>.../api path (Vite's own proxy to Stack.APIPort)

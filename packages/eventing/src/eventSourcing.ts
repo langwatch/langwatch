@@ -175,6 +175,7 @@ export class EventSourcing {
 
     this.projectionRegistry = new ProjectionRegistry<Event>({
       parseEvent: (value) => this.parseRegisteredEvent(value),
+      start: () => this.startGlobalRegistry(),
     });
     options.configureGlobalProjections?.(this.projectionRegistry);
   }
@@ -232,8 +233,9 @@ export class EventSourcing {
     this._consumersHeld = true;
   }
 
-  /** Starts the global queue's consumer and the process runtime a hold kept idle. */
+  /** Starts the global registry, then the consumer and process runtime a hold kept idle. */
   startConsumers(): void {
+    this.startGlobalRegistry();
     if (!this._consumersHeld) return;
     this._consumersHeld = false;
     this._globalQueue?.start?.();
@@ -368,7 +370,20 @@ export class EventSourcing {
     ].join(" ");
   }
 
-  /** A pipeline's cross-pipeline projections, before the global registry starts routing. */
+  /**
+   * Starts routing every global lane once: when consumers start, or at the first dispatch in a
+   * runtime that holds none. Every module registers first, so several may declare global
+   * projections and peer subscribers, in any order (§9).
+   */
+  private startGlobalRegistry(): void {
+    const registry = this.projectionRegistry;
+    if (!registry.hasProjections || registry.isInitialized) return;
+    const queue = this.globalQueue;
+    if (!queue) return;
+    registry.initialize(queue, this._globalJobRegistry, this._executionTarget);
+  }
+
+  /** A pipeline's cross-pipeline lanes, before the global registry starts routing. */
   private registerGlobalProjections(
     definition: Pick<StaticPipelineDefinition, "globalProjections" | "metadata">,
   ): void {
@@ -376,7 +391,7 @@ export class EventSourcing {
       if (this.projectionRegistry.isInitialized) {
         throw new ConfigurationError(
           "EventSourcing",
-          `Pipeline "${definition.metadata.name}" declares the global projection "${projection.name}" after the global registry started routing. Register it before any pipeline that starts the registry.`,
+          `Pipeline "${definition.metadata.name}" declares the global lane "${projection.name}" after the global registry started routing. Register every pipeline before consumers start or the first event is dispatched.`,
           { pipeline: definition.metadata.name, projection: projection.name },
         );
       }
@@ -474,19 +489,6 @@ export class EventSourcing {
     }
 
     this.registerGlobalProjections(definition);
-
-    // Initialize the projection registry if it has projections and hasn't been initialized yet
-    if (
-      this.projectionRegistry.hasProjections &&
-      !this.projectionRegistry.isInitialized &&
-      this._globalQueue
-    ) {
-      this.projectionRegistry.initialize(
-        this._globalQueue,
-        this._globalJobRegistry,
-        this._executionTarget,
-      );
-    }
 
     // Create the pipeline
     const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({

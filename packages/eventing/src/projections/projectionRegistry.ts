@@ -9,6 +9,7 @@ import { ConfigurationError } from "../services/errorHandling.ts";
 import type { FailedHandoff, HandoffLaneKind } from "../services/handoff/failedHandoff.ts";
 import { type JobRegistryEntry, QueueManager } from "../services/queues/queueManager.ts";
 import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import type { MapProjectionDefinition } from "./mapProjection.types.ts";
@@ -21,9 +22,8 @@ import {
 } from "./sealedProjection.ts";
 
 /**
- * Global projection registry for projections that subscribe to events from
- * multiple pipelines: no event store, purely incremental, processes live
- * events only.
+ * Global projection registry for projections and peer subscribers that take events from
+ * other pipelines: no event store, purely incremental, processes live events only.
  */
 export class ProjectionRegistry<EventType extends Event = Event> {
   private readonly logger: Logger;
@@ -37,21 +37,44 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     string,
     { mapName: string; definition: SubscriberDispatchDefinition<EventType> }
   >();
+  private readonly eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
+  private closed = false;
 
   private readonly parseEvent: (value: unknown) => EventType;
+  private readonly start?: () => void;
 
   constructor({
     parseEvent,
+    start,
     logger = createLogger("langwatch:event-sourcing:projection-registry"),
   }: {
     /** Parses a queued event with the schema its own pipeline declared for its type (§9). */
     parseEvent: (value: unknown) => EventType;
+    /** Initializes the registry on its first dispatch, once every lane has registered. */
+    start?: () => void;
     logger?: Logger;
   }) {
     this.parseEvent = parseEvent;
+    this.start = start;
     this.logger = logger;
+  }
+
+  /** A peer subscriber (§9): a live consumer of another pipeline's events, on its own lane. */
+  registerEventSubscriber(subscriber: EventSubscriberDefinition<EventType>): void {
+    if (
+      this.eventSubscribers.has(subscriber.name) ||
+      this.subscribers.has(subscriber.name) ||
+      this.mapSubscriberEntries.has(subscriber.name)
+    ) {
+      throw new ConfigurationError(
+        "ProjectionRegistry",
+        `Subscriber "${subscriber.name}" already registered`,
+        { subscriberName: subscriber.name },
+      );
+    }
+    this.eventSubscribers.set(subscriber.name, subscriber);
   }
 
   registerFoldProjection<State>(projection: FoldProjectionDefinition<State, EventType>): void {
@@ -186,6 +209,10 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       this.router.registerMapSubscriber(mapName, definition);
     }
 
+    for (const subscriber of this.eventSubscribers.values()) {
+      this.router.registerEventSubscriber(subscriber);
+    }
+
     if (this.foldProjections.size > 0) {
       this.router.initializeFoldQueues();
     }
@@ -197,6 +224,9 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     if (this.subscribers.size > 0 || this.mapSubscriberEntries.size > 0) {
       this.router.initializeProjectionSubscriberQueues();
     }
+
+    this.router.initializeSubscriberQueues();
+    this.closed = false;
   }
 
   get isInitialized(): boolean {
@@ -208,7 +238,8 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       this.foldProjections.size > 0 ||
       this.mapProjections.size > 0 ||
       this.subscribers.size > 0 ||
-      this.mapSubscriberEntries.size > 0
+      this.mapSubscriberEntries.size > 0 ||
+      this.eventSubscribers.size > 0
     );
   }
 
@@ -223,6 +254,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     if (!this.hasProjections) {
       return [];
     }
+    this.startOnFirstUse();
     if (!this.router) {
       // Absent before initialize() or after close(), in prod overwhelmingly
       // the latter (SIGTERM mid-dispatch). Every lane is answered as failed so
@@ -242,6 +274,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     lane: string;
     event: EventType;
   }): Promise<void> {
+    this.startOnFirstUse();
     if (!this.router) {
       throw new DispatchError({
         message: "ProjectionRegistry has no router (not initialized, or already closed)",
@@ -249,6 +282,11 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       });
     }
     await this.router.redeliver(params);
+  }
+
+  /** Never after close(): a dispatch racing shutdown is answered for re-drive instead. */
+  private startOnFirstUse(): void {
+    if (!this.router && !this.closed) this.start?.();
   }
 
   /** The registry's own lanes, each with the events it takes, as failed hand-offs. */
@@ -266,6 +304,11 @@ export class ProjectionRegistry<EventType extends Event = Event> {
         kind: "map" as const,
         lane,
         eventTypes: definition.eventTypes,
+      })),
+      ...[...this.eventSubscribers].map(([lane, { eventTypes }]) => ({
+        kind: "subscriber" as const,
+        lane,
+        eventTypes,
       })),
     ];
     return lanes.flatMap(({ kind, lane, eventTypes }) => {
@@ -285,6 +328,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     await this.queueManager?.close();
     this.queueManager = undefined;
     this.router = undefined;
+    this.closed = true;
   }
 
   async waitUntilReady(): Promise<void> {

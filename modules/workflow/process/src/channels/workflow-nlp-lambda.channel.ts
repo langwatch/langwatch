@@ -69,7 +69,7 @@ export class NlpInvokeTransportAdapter {
     target: string;
     config: NlpInvokeStagingConfig;
     lambda?: NlpLambdaInvoke | undefined;
-    staging: NlpPayloadStaging;
+    staging?: NlpPayloadStaging | undefined;
     /** Injected so a test drives the wire without a listener. */
     fetch?: typeof fetch;
   }): NlpInvokeTransportAdapter {
@@ -81,7 +81,7 @@ export class NlpInvokeTransportAdapter {
       target: string;
       config: NlpInvokeStagingConfig;
       lambda?: NlpLambdaInvoke | undefined;
-      staging: NlpPayloadStaging;
+      staging?: NlpPayloadStaging | undefined;
       fetch?: typeof fetch;
     },
   ) {}
@@ -179,12 +179,20 @@ export class NlpInvokeTransportAdapter {
     serialized: string;
   }): Promise<StagedNlpPayload | undefined> {
     const { projectId, body, path } = input.request;
-    const staging = this.options.staging;
     if (projectId === undefined || body === undefined) return undefined;
 
     const threshold =
       this.options.config.stagingThresholdBytes ?? INVOKE_STAGING_THRESHOLD_BYTES_DEFAULT;
-    if (Buffer.byteLength(input.serialized, "utf-8") <= threshold) return undefined;
+    const bytes = Buffer.byteLength(input.serialized, "utf-8");
+    if (bytes <= threshold) return undefined;
+
+    const staging = this.options.staging;
+    if (!staging) {
+      throw new Error(
+        `The nlpgo invoke for ${path} is ${bytes} bytes, over the ${threshold}-byte ` +
+          "direct invoke limit, and this deployment composed no object storage to park it in.",
+      );
+    }
 
     const staged = await staging.stage({
       projectId,

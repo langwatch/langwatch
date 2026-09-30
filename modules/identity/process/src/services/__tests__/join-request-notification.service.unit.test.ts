@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestMail } from "../../app/identity.members.ts";
 import type {
+  JoinRequestAdmin,
   JoinRequestAudienceRepository,
   JoinRequestAudienceProfile,
 } from "../../repositories/join-request-audience.repository.ts";
@@ -40,8 +41,11 @@ class Audience implements JoinRequestAudienceRepository {
     return this.answers.organizationName;
   }
 
-  async findAdminEmails(): Promise<string[]> {
-    return this.answers.admins ?? ["admin@acme.example"];
+  async findAdmins(): Promise<JoinRequestAdmin[]> {
+    return (this.answers.admins ?? ["admin@acme.example"]).map((email) => ({
+      userId: `user_${email}`,
+      email,
+    }));
   }
 
   async getUserProfile(): Promise<JoinRequestAudienceProfile> {
@@ -163,7 +167,7 @@ describe("given a reminder wake for a request the fold has not written", () => {
     it("asks nobody for an address and sends nothing", async () => {
       const mail = new RecordingMail();
       const audience = new Audience({ requesterId: null });
-      const admins = vi.spyOn(audience, "findAdminEmails");
+      const admins = vi.spyOn(audience, "findAdmins");
       const service = JoinRequestNotificationService.create({ audience, mail });
 
       await service.requestStillWaiting({ joinRequestId: REQUEST, organizationId: ORGANIZATION });

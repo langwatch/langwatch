@@ -17,6 +17,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository.ts";
+import { ProjectCreatedNoticeService } from "../services/project-created-notice.service.ts";
 import type { ProjectCredentials } from "../services/project-credentials.service.ts";
 import { ProjectService } from "../services/project.service.ts";
 
@@ -52,6 +53,7 @@ describe.skipIf(!DB_URL)(
       },
     });
     const projects = ProjectService.create({
+      created: ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } }),
       repository: PrismaProjectRepository.create({ prisma }),
       credentials,
       organizations,

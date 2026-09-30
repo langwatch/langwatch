@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Trace's Edit trace, lent to the queue walker: it opens the trace drawer on
  * the queued trace, already editing, and never on the conversation tab.
- * @see specs/annotations/annotation-queue-workflow.feature
+ * @see modules/annotation/specs/annotation-queue-workflow.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe("when the reviewer chooses Edit trace", () => {
-  /** @scenario "Edit trace opens the trace drawer already in annotation mode" */
+  /** @scenario "Edit trace uses the trace drawer in annotation mode" */
   it("opens the trace drawer on that trace, already editing", async () => {
     renderButton();
 
@@ -47,7 +47,7 @@ describe("when the reviewer chooses Edit trace", () => {
   });
 
   describe("given the drawer last showed the conversation tab", () => {
-    /** @scenario "Edit trace falls back from the conversation tab to the summary tab" */
+    /** @scenario "Edit trace uses the trace drawer in annotation mode" */
     it("opens the drawer on the summary tab instead", async () => {
       useDrawerStore.setState({ viewMode: "conversation" });
       renderButton();

@@ -179,6 +179,7 @@ describe.each(["thread", "bubbles"] as const)("given a turn read in %s layout", 
       }
     });
 
+    /** @scenario "Annotation suggestions use the conversation correction editor" */
     /** @scenario "Either side of a turn takes a comment and a correction" */
     it("offers a comment and a correction on either side", () => {
       renderTurn({ layout });
@@ -246,6 +247,7 @@ describe.each(["thread", "bubbles"] as const)("given a turn read in %s layout", 
   });
 
   describe("when the reviewer suggests what the reply should have said", () => {
+    /** @scenario "Annotation suggestions use the conversation correction editor" */
     /** @scenario "Either side of a turn takes a comment and a correction" */
     it("opens on the turn's output, pre-filled with what it said", async () => {
       renderTurn({ layout });

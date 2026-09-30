@@ -9,7 +9,7 @@ import { useJoinRequests } from "../../../../behavior/use-join-requests.ts";
 import { useTwoStepRequirement } from "../../../../behavior/use-two-step-requirement.ts";
 import type { OrganizationHostApi } from "../../../../model/organization-host.ts";
 import { useSignInSecurity } from "../../behavior/use-sign-in-security.ts";
-import { DomainJoinCard } from "../blocks/domain-join-card.tsx";
+import { JoinPolicyCard } from "../blocks/join-policy-card.tsx";
 import { SessionLimitCard, SignInLockoutCard } from "../blocks/sign-in-security-cards.tsx";
 import { TwoStepRequirementCard } from "../blocks/two-step-requirement-card.tsx";
 
@@ -37,11 +37,14 @@ export function OrganizationPolicyCard({
       alignItems="start"
       data-testid="organization-policy"
     >
-      <DomainJoinCard
+      <JoinPolicyCard
         key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
         domainJoin={joinRequests.joining.domainJoin}
         joinDomains={joinRequests.joining.joinDomains}
         saving={joinRequests.savingJoining}
+        planLocked={twoStep.planLocked}
+        planLink={twoStep.planLink}
+        ssoLive={twoStep.connection.connected}
         onSave={joinRequests.setJoining}
       />
       {twoStep.show && (

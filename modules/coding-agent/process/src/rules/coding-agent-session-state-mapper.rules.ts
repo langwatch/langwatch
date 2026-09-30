@@ -47,6 +47,7 @@ export function codingAgentSessionStateFromRow(
     userId: normalizeEmptyToNull(row.userId),
     parentSessionId: normalizeEmptyToNull(row.parentSessionId),
     isFork: row.isFork,
+    auxiliary: row.auxiliary,
     repositoryHost: normalizeEmptyToNull(row.repositoryHost),
     repositoryOwner: normalizeEmptyToNull(row.repositoryOwner),
     repositoryName: normalizeEmptyToNull(row.repositoryName),

@@ -639,6 +639,7 @@ export {
   type RoutingInput,
   routeSignIn,
   routesToOrganizationConnection,
+  organizationConnectionsOf,
   routingDecisionSchema,
   routingIdentifierOf,
   SIGNIN_METHOD_KINDS,

@@ -9,6 +9,8 @@ import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+  AUXILIARY_SESSION_FACT,
+  codingAgentSessionSchema,
   type LogFactsContributedEvent,
   type MetricFactsContributedEvent,
   type SpanFactsContributedEvent,
@@ -2314,6 +2316,112 @@ describe("usage by declared context", () => {
       expect(codingAgentSessionStateFromRow({ ...row, usageByContext: [] }).usageByContext).toEqual(
         {},
       );
+    });
+  });
+});
+
+describe("a codex helper thread's session", () => {
+  const HELPER_THREAD_ID = "0195a0b1-1111-7222-8333-444455556666";
+
+  function helperRequest(projection = makeProjection()) {
+    return projection.handleCodingAgentSessionSpanFactsContributed(
+      spanFactsEvent({
+        name: "turn/start",
+        spanId: "helper-request",
+        agent: "codex",
+        facts: { [AUXILIARY_SESSION_FACT]: true, "langwatch.thread.id": HELPER_THREAD_ID },
+      }),
+      projection.init(),
+    );
+  }
+
+  describe("when its request span contributes the auxiliary fact", () => {
+    /** @scenario "a codex helper thread's request span marks its session as auxiliary" */
+    it("marks the session, counts no model call, and keeps the mark through the turn span", () => {
+      const projection = makeProjection();
+      const marked = helperRequest(projection);
+
+      const afterTurn = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "helper-turn",
+          agent: "codex",
+          facts: { "gen_ai.usage.input_tokens": "10", "gen_ai.usage.output_tokens": "2" },
+        }),
+        marked,
+      );
+      const afterLog = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ agent: "codex", facts: { "event.name": "codex.user_prompt" } }),
+        afterTurn,
+      );
+
+      expect(marked.auxiliary).toBe(true);
+      expect(marked.modelCalls).toBe(0);
+      expect(afterTurn.auxiliary).toBe(true);
+      expect(afterLog.auxiliary).toBe(true);
+    });
+
+    /** @scenario "a codex helper thread's request span marks its session as auxiliary" */
+    it("keeps the mark when the turn span arrives first", () => {
+      const projection = makeProjection();
+      const afterTurn = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "helper-turn",
+          agent: "codex",
+          facts: { "gen_ai.usage.input_tokens": "10" },
+        }),
+        projection.init(),
+      );
+
+      const marked = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "turn/start",
+          spanId: "helper-request",
+          agent: "codex",
+          facts: { [AUXILIARY_SESSION_FACT]: true },
+        }),
+        afterTurn,
+      );
+
+      expect(afterTurn.auxiliary).toBe(false);
+      expect(marked.auxiliary).toBe(true);
+    });
+  });
+
+  describe("when a codex turn arrives without the fact", () => {
+    /** @scenario "a codex turn without the fact keeps its session unmarked" */
+    it("leaves the session unmarked", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "user-turn",
+          agent: "codex",
+          facts: { "gen_ai.usage.input_tokens": "10" },
+        }),
+        projection.init(),
+      );
+
+      expect(state.auxiliary).toBe(false);
+    });
+  });
+
+  describe("when the session is stored and read back", () => {
+    /** @scenario "an auxiliary session round-trips through its stored row" */
+    it("stays marked, and a row from before the mark reads back unmarked", () => {
+      const row = toCodingAgentSessionRow({
+        state: helperRequest(),
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+      const { auxiliary: _mark, ...beforeTheMark } = row;
+
+      expect(row.auxiliary).toBe(true);
+      expect(codingAgentSessionStateFromRow(row).auxiliary).toBe(true);
+      expect(codingAgentSessionSchema.parse(beforeTheMark).auxiliary).toBe(false);
     });
   });
 });

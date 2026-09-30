@@ -8,7 +8,10 @@ import { createLogger } from "@langwatch/observability";
 
 import type { SsoDomainProofMail } from "../app/identity.members.ts";
 import type { SsoDomainProofNotifications } from "../eventing/sso-domain-proof-notification.process.ts";
-import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
+import type {
+  JoinRequestAdmin,
+  JoinRequestAudienceRepository,
+} from "../repositories/join-request-audience.repository.ts";
 
 const logger = createLogger("langwatch:identity:sso-domain-proof-notification");
 
@@ -22,7 +25,7 @@ const UNNAMED_ORGANIZATION = "your organization";
  */
 export type SsoDomainProofAudience = Pick<
   JoinRequestAudienceRepository,
-  "findAdminEmails" | "getOrganizationName"
+  "findAdmins" | "getOrganizationName"
 >;
 
 /**
@@ -45,11 +48,13 @@ export class SsoDomainProofNotificationService implements SsoDomainProofNotifica
 
   /** The record is gone and the clock has started. One mail, per absence. */
   async proofWavering({
+    notificationKey,
     connectionId,
     organizationId,
     domain,
     graceEndsAtMs,
   }: {
+    notificationKey: string;
     connectionId: string;
     organizationId: string;
     domain: string;
@@ -59,13 +64,14 @@ export class SsoDomainProofNotificationService implements SsoDomainProofNotifica
     await this.fanOut({
       connectionId,
       what: "proofWavering",
-      sends: admins.map((adminEmail) =>
+      sends: admins.map((admin) =>
         this.mail.sendProofWavering({
-          adminEmail,
+          adminEmail: admin.email,
           organizationName,
           domain,
           record: proofRecord({ domain }),
           graceEndsAtMs,
+          idempotencyKey: `${notificationKey}:${admin.userId}`,
         }),
       ),
     });
@@ -73,10 +79,12 @@ export class SsoDomainProofNotificationService implements SsoDomainProofNotifica
 
   /** The grace ran out. Says what stopped, and as loudly what did not. */
   async proofLapsed({
+    notificationKey,
     connectionId,
     organizationId,
     domain,
   }: {
+    notificationKey: string;
     connectionId: string;
     organizationId: string;
     domain: string;
@@ -85,12 +93,13 @@ export class SsoDomainProofNotificationService implements SsoDomainProofNotifica
     await this.fanOut({
       connectionId,
       what: "proofLapsed",
-      sends: admins.map((adminEmail) =>
+      sends: admins.map((admin) =>
         this.mail.sendProofLapsed({
-          adminEmail,
+          adminEmail: admin.email,
           organizationName,
           domain,
           record: proofRecord({ domain }),
+          idempotencyKey: `${notificationKey}:${admin.userId}`,
         }),
       ),
     });
@@ -98,7 +107,7 @@ export class SsoDomainProofNotificationService implements SsoDomainProofNotifica
 
   private async readAudience({ organizationId }: { organizationId: string }): Promise<{
     organizationName: string;
-    admins: readonly string[];
+    admins: readonly JoinRequestAdmin[];
   }> {
     const [organizationName, admins] = await Promise.all([
       this.audience.getOrganizationName({ organizationId }).catch((error: unknown) => {
@@ -106,7 +115,7 @@ export class SsoDomainProofNotificationService implements SsoDomainProofNotifica
           return UNNAMED_ORGANIZATION;
         throw error;
       }),
-      this.audience.findAdminEmails({ organizationId }),
+      this.audience.findAdmins({ organizationId }),
     ]);
     return { organizationName, admins };
   }
@@ -151,7 +160,12 @@ function proofRecord({ domain }: { domain: string }): {
 }
 
 /** The domain whose proof moved, and the organization nobody heard from. */
-type UnsentNotice = { connectionId: string; organizationId: string; domain: string };
+type UnsentNotice = {
+  notificationKey: string;
+  connectionId: string;
+  organizationId: string;
+  domain: string;
+};
 
 /**
  * The notices, unsent: this process composed no mail gateway. A warn rather

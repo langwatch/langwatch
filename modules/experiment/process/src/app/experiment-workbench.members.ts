@@ -19,3 +19,8 @@ export type ExperimentWorkbenchObserver = Readonly<{
   /** Where an unnamed failure is reported. */
   reportError(error: unknown, context: Readonly<Record<string, unknown>>): void;
 }>;
+
+/** Announces one run that ended to the lifecycle pipeline; a failure is the caller's to log. */
+export type ExperimentRanAnnouncer = (
+  input: Parameters<ExperimentWorkbenchObserver["recordExperimentRan"]>[0],
+) => Promise<void>;

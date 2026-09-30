@@ -438,6 +438,13 @@ Feature: Enterprise SCIM package boundary
       And every collection's totalResults, startIndex and itemsPerPage are integers
 
     @unit
+    Scenario: Provisioning answers are published as application/scim+json, discovery as JSON
+      When the SCIM API reference is generated
+      Then every Users and Groups answer, refusals included, is application/scim+json
+      And the creates publish 201 and no 200
+      And the resource types and schemas answers are application/json
+
+    @unit
     Scenario: Every SCIM document publishes its schemas as a list of URNs
       When the SCIM API reference is generated
       Then every resource and collection declares schemas as an array of strings

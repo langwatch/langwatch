@@ -16,6 +16,7 @@ const USER_ID = "user-1";
 const ACCEPTED = { conversationId: "conv-1", turnId: "turn-1" };
 
 function buildApi(options: {
+  dark?: boolean;
   settle?: (input: LangyTurnSettlementWaitInput) => Promise<LangyTurnSettlementWait>;
 }) {
   const started: LangyStartConversationTurnInput[] = [];
@@ -25,7 +26,8 @@ function buildApi(options: {
     permission: input.permission,
   });
   const app = createApiFixture<LangyApi>({
-    getRestCaller: async () => ({ dark: false, projectId: PROJECT_ID, userId: USER_ID }),
+    getRestCaller: async () =>
+      options.dark ? { dark: true } : { dark: false, projectId: PROJECT_ID, userId: USER_ID },
     getRestActor: async ({ userId }) => ({ user: { id: userId } }),
     startConversationTurn: async (input) => {
       started.push(input);
@@ -46,7 +48,10 @@ function buildApi(options: {
       headers: { "content-type": "application/json", ...headers },
     });
 
-  return { post, started };
+  const postUnmounted = () =>
+    hono.request("http://api.test/api/langy/not-a-real-route", { method: "POST" });
+
+  return { post, postUnmounted, started };
 }
 
 const TURN = {
@@ -132,6 +137,26 @@ describe("given a project key starting a Langy turn", () => {
         [{ role: "user", parts: [{ type: "text", text: "plain" }] }],
         [{ role: "user", parts: [{ type: "text", text: "kept" }] }],
       ]);
+    });
+  });
+});
+
+describe("given the key-authed surface is switched off for the project", () => {
+  describe("when a valid key starts a turn", () => {
+    /** @scenario "A switched-off surface answers exactly as a route that does not exist" */
+    it("answers exactly what an unrouted path answers, with no envelope", async () => {
+      const api = buildApi({ dark: true });
+
+      const dark = await api.post(TURN);
+      const unrouted = await api.postUnmounted();
+
+      expect(dark.status).toBe(404);
+      expect(dark.status).toBe(unrouted.status);
+      expect(dark.headers.get("content-type")).toBe(unrouted.headers.get("content-type"));
+      const body = await dark.text();
+      expect(body).toBe(await unrouted.text());
+      expect(body).not.toContain("trace_id");
+      expect(api.started).toEqual([]);
     });
   });
 });

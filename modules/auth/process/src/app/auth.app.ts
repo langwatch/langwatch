@@ -28,7 +28,6 @@ import {
   type SaveSignInSecurityResult,
   SIGN_IN_SECURITY_ENTERPRISE_REFUSAL,
   type SignInSecuritySettings,
-  type SignUpVerificationResult,
   type VerifiedBrowserSession,
   type AuthUsageCount,
   type AddressConfirmation,
@@ -1029,12 +1028,6 @@ export class AuthApp implements AuthApiContract {
     code: string;
   }): Promise<void> {
     return this.#twoStep.disable(input);
-  }
-
-  async completeSignUpVerification(
-    input: Readonly<{ token: string }>,
-  ): Promise<SignUpVerificationResult> {
-    return this.requireSignUp().completeVerification(input);
   }
 
   async claimSignUpAddressProof(

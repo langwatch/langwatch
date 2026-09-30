@@ -1,0 +1,393 @@
+# The MCP server (mcp/typescript), second half: agents, triggers, run plans, test suites,
+# simulation runs, experiments, query, secrets, API keys and projects. Every request is the
+# client's own (/api/v1/<x>, /api/projects, X-Auth-Token), with the body the tool builds in
+# langwatch-api-*.ts, and each assertion names a field the tool's formatter reads. Written unrun.
+# There is no MCP tool for instant-evals; query-analytics.yaml covers that route.
+
+# ── agents: platform_create_agent, list, get, update, delete ─────────────────
+
+- id: "mcp-agents-create-list-get-update-delete"
+  endpoint: "POST /api/v1/agents"
+  request:
+    path: "/api/v1/agents"
+    headers: {"X-Project-Id": "{projectId}"}
+    body:
+      name: "vd-{uid}"
+      type: "http"
+      config: {"url": "http://127.0.0.1:1/echo", "method": "POST"}
+  capture: {"agentId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "name": "vd-{uid}", "type": "http", "config": "<any>"}
+  verify:
+    - request: "GET /api/v1/agents?limit=100"
+      expect:
+        status: 200
+        body: {"pagination": {"page": 1, "limit": 100, "total": "<any>", "totalPages": "<any>"}}
+        contains: ["vd-{uid}", "updatedAt"]
+    - request: "GET /api/v1/agents/{agentId}"
+      expect:
+        status: 200
+        body: {"id": "{agentId}", "name": "vd-{uid}", "type": "http", "createdAt": "<any>", "updatedAt": "<any>"}
+    - request: "PATCH /api/v1/agents/{agentId}"
+      body: {"name": "vd2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{agentId}", "name": "vd2-{uid}", "type": "http"}}
+    - request: "DELETE /api/v1/agents/{agentId}"
+      expect: {"status": 200, "body": {"id": "{agentId}", "name": "vd2-{uid}"}}
+    - request: "GET /api/v1/agents/{agentId}"
+      expect: {"status": 404}
+
+- id: "mcp-agents-get-unknown-refusal-carries-code"
+  endpoint: "GET /api/v1/agents/{id}"
+  request: {"path": "/api/v1/agents/nope-{uid}"}
+  expect: {"status": 404, "contains": "agent_not_found"}
+
+- id: "mcp-agents-create-connected-type-is-register-only"
+  endpoint: "POST /api/v1/agents"
+  request:
+    path: "/api/v1/agents"
+    body: {"name": "vd-{uid}", "type": "connected", "config": {}}
+  expect: {"status": 422, "contains": "agent_register_only"}
+
+# ── triggers: platform_create_trigger, list, update, delete ──────────────────
+
+- id: "mcp-triggers-create-list-update-delete"
+  endpoint: "POST /api/v1/triggers"
+  request:
+    path: "/api/v1/triggers"
+    body:
+      name: "vd-{uid}"
+      action: "ADD_TO_DATASET"
+      filters: {"metadata.labels": ["vd-{uid}"]}
+      message: "apidiff"
+      alertType: "WARNING"
+  capture: {"triggerId": "id"}
+  expect:
+    status: 201
+    body:
+      id: "<any>"
+      name: "vd-{uid}"
+      action: "ADD_TO_DATASET"
+      active: true
+      message: "apidiff"
+      alertType: "WARNING"
+      actionParams: "<any>"
+      filters: "<any>"
+      createdAt: "<any>"
+      updatedAt: "<any>"
+  verify:
+    - request: "GET /api/v1/triggers"
+      expect: {"status": 200, "contains": ["vd-{uid}", "ADD_TO_DATASET", "WARNING"]}
+    - request: "GET /api/v1/triggers/{triggerId}"
+      expect: {"status": 200, "body": {"id": "{triggerId}", "name": "vd-{uid}", "active": true}}
+    - request: "PATCH /api/v1/triggers/{triggerId}"
+      body: {"name": "vd2-{uid}", "active": false}
+      expect: {"status": 200, "body": {"id": "{triggerId}", "name": "vd2-{uid}", "active": false}}
+    - request: "DELETE /api/v1/triggers/{triggerId}"
+      expect: {"status": 200, "body": {"id": "{triggerId}", "deleted": true}}
+    - request: "GET /api/v1/triggers/{triggerId}"
+      expect: {"status": 404}
+
+- id: "mcp-triggers-create-with-no-filters-is-refused"
+  endpoint: "POST /api/v1/triggers"
+  request:
+    path: "/api/v1/triggers"
+    body: {"name": "vd-{uid}", "action": "SEND_EMAIL", "filters": {}}
+  expect: {"status": [400, 422]}
+
+# ── run plans: platform_run_plan, list, get, rerun, archive ──────────────────
+
+- id: "mcp-run-plans-run-by-name-then-list-get-rerun-archive"
+  endpoint: "POST /api/v1/run-plans/run"
+  setup:
+    - request: "POST /api/v1/scenarios"
+      body: {"name": "vd-{uid}", "situation": "A customer asks for a refund", "criteria": ["Agent apologises"], "labels": ["vd"]}
+      capture: {"scenarioId": "id"}
+      expect: {"status": [200, 201]}
+    - request: "POST /api/v1/agents"
+      body: {"name": "vd-{uid}", "type": "http", "config": {"url": "http://127.0.0.1:1/echo", "method": "POST"}}
+      capture: {"agentId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/run-plans/run"
+    body:
+      name: "vd-plan-{uid}"
+      config:
+        scope: {"mode": "scenarios"}
+        scenarioIds: ["{scenarioId}"]
+        targets: [{"type": "http", "referenceId": "{agentId}"}]
+        repeatCount: 1
+      note: "apidiff"
+  capture: {"planId": "runPlanId"}
+  expect:
+    status: [200, 201]
+    body:
+      scheduled: true
+      created: true
+      planName: "vd-plan-{uid}"
+      runPlanId: "<any>"
+      batchRunId: "<any>"
+      setId: "<any>"
+      jobCount: "<any>"
+      skippedArchived: "<any>"
+      platformUrl: "<any>"
+  verify:
+    - request: "GET /api/v1/run-plans"
+      expect: {"status": 200, "contains": ["vd-plan-{uid}", "{planId}", "repeatCount"]}
+    - request: "GET /api/v1/run-plans?includeArchived=true"
+      expect: {"status": 200, "contains": "{planId}"}
+    - request: "GET /api/v1/run-plans/{planId}"
+      expect:
+        status: 200
+        body:
+          id: "{planId}"
+          name: "vd-plan-{uid}"
+          slug: "<any>"
+          scenarioIds: "<any>"
+          targets: "<any>"
+          repeatCount: 1
+          labels: "<any>"
+          platformUrl: "<any>"
+          createdAt: "<any>"
+          updatedAt: "<any>"
+    - request: "POST /api/v1/run-plans/{planId}/run"
+      body: {}
+      expect:
+        status: [200, 201]
+        body: {"scheduled": true, "created": false, "runPlanId": "{planId}", "planName": "vd-plan-{uid}", "batchRunId": "<any>", "jobCount": "<any>", "platformUrl": "<any>"}
+    - request: "DELETE /api/v1/run-plans/{planId}"
+      expect: {"status": 200, "body": {"id": "{planId}", "archived": true}}
+    - request: "GET /api/v1/run-plans/{planId}"
+      expect: {"status": 404}
+
+- id: "mcp-run-plans-run-without-config-is-refused"
+  endpoint: "POST /api/v1/run-plans/run"
+  request: {"path": "/api/v1/run-plans/run", "body": {"name": "vd-{uid}"}}
+  expect: {"status": [400, 422]}
+
+# ── test suites: platform_create_test_suite, list, get, update, rename, archive ──
+
+- id: "mcp-test-suites-create-list-get-update-rename-archive"
+  endpoint: "POST /api/v1/test-suites"
+  request: {"path": "/api/v1/test-suites", "body": {"name": "vd-{uid}"}}
+  capture: {"suiteId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "name": "vd-{uid}", "slug": "<any>", "platformUrl": "<any>"}
+  verify:
+    - request: "GET /api/v1/test-suites"
+      expect: {"status": 200, "contains": ["vd-{uid}", "scenarioCount", "archivedAt"]}
+    - request: "GET /api/v1/test-suites/{suiteId}"
+      expect:
+        status: 200
+        body: {"id": "{suiteId}", "name": "vd-{uid}", "slug": "<any>", "scenarioCount": 0, "scenarios": "<any>", "createdAt": "<any>", "updatedAt": "<any>", "platformUrl": "<any>"}
+    - request: "PATCH /api/v1/test-suites/{suiteId}"
+      body: {"name": "vd2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{suiteId}", "name": "vd2-{uid}", "slug": "<any>", "scenarioCount": 0}}
+    - request: "DELETE /api/v1/test-suites/{suiteId}"
+      expect: {"status": 200, "body": {"id": "{suiteId}", "archived": true}}
+
+- id: "mcp-test-suites-get-unknown-is-404"
+  endpoint: "GET /api/v1/test-suites/{id}"
+  request: {"path": "/api/v1/test-suites/nope-{uid}"}
+  expect: {"status": 404}
+
+# ── simulation runs: platform_list_simulation_runs, platform_get_simulation_run ──
+
+- id: "mcp-simulation-runs-list-and-get-read-verdict-fields"
+  endpoint: "GET /api/v1/simulation-runs"
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_FINISHED", "timestamp": "{nowMs+1000}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "status": "SUCCESS", "results": {"verdict": "success", "reasoning": "ok-{uid}", "metCriteria": ["c-{uid}"], "unmetCriteria": []}}, "expect": {"status": 201}}
+    - {"request": "GET /api/v1/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200, "contains": "ok-{uid}"}}
+  request:
+    path: "/api/v1/simulation-runs"
+    query: {"scenarioSetId": "set-{uid}", "batchRunId": "batch-{uid}", "limit": "10"}
+  expect:
+    status: 200
+    path: "runs"
+    length: 1
+    contains: ["run-{uid}", "scen-{uid}", "batch-{uid}", "vd-{uid}", "SUCCESS", "durationInMs", "timestamp"]
+  verify:
+    - request: "GET /api/v1/simulation-runs/run-{uid}"
+      expect:
+        status: 200
+        body:
+          scenarioRunId: "run-{uid}"
+          scenarioId: "scen-{uid}"
+          batchRunId: "batch-{uid}"
+          name: "vd-{uid}"
+          status: "SUCCESS"
+          durationInMs: "<any>"
+          timestamp: "<any>"
+          results: {"verdict": "success", "reasoning": "ok-{uid}", "metCriteria": ["c-{uid}"]}
+
+- id: "mcp-simulation-runs-get-unknown-is-404"
+  endpoint: "GET /api/v1/simulation-runs/{id}"
+  request: {"path": "/api/v1/simulation-runs/nope-{uid}"}
+  expect: {"status": 404}
+
+# ── experiments: platform_experiment_list, list_runs, status, results, run ────
+
+- id: "mcp-experiments-list-and-list-runs-read-fields"
+  endpoint: "GET /api/v1/experiments"
+  shard: "project"
+  setup:
+    - {"request": "POST /api/experiment/init", "body": {"experiment_name": "vd-{uid}", "experiment_slug": "vd-{uid}", "experiment_type": "BATCH_EVALUATION_V2"}, "expect": {"status": 200}}
+    - {"request": "POST /api/evaluations/batch/log_results", "body": {"experiment_slug": "vd-{uid}", "name": "vd-{uid}", "run_id": "run-{uid}", "dataset": [{"index": 0, "entry": {"input": "q-{uid}"}, "duration": 12, "cost": 0.001, "trace_id": "vdt{uid}", "predicted": {"output": "q-{uid}"}}], "evaluations": [{"name": "exact", "evaluator": "langevals/exact_match", "trace_id": "vdt{uid}", "status": "processed", "index": 0, "score": 1, "passed": true, "label": "match", "details": "d", "inputs": {"output": "q-{uid}"}}], "progress": 1, "total": 1, "timestamps": {"created_at": "{nowMs}", "finished_at": "{nowMs+1000}"}}, "expect": {"status": 200}}
+    - {"request": "GET /api/v1/experiments/runs?experimentSlug=vd-{uid}&pageSize=25", "eventually": "60s", "expect": {"status": 200, "contains": "run-{uid}"}}
+  request:
+    path: "/api/v1/experiments"
+    query: {"pageSize": "25"}
+  expect:
+    status: 200
+    body: {"experiments": "<any>", "pagination": {"page": "<any>", "pageSize": "<any>", "totalHits": "<any>", "hasMore": false}}
+    contains: ["vd-{uid}", "slug", "runsCount", "lastRunAt"]
+  verify:
+    - request: "GET /api/v1/experiments/runs?experimentSlug=vd-{uid}&pageSize=25"
+      expect:
+        status: 200
+        body: {"experimentSlug": "vd-{uid}", "runs": "<any>", "pagination": {"totalHits": 1, "hasMore": false}}
+        contains: ["run-{uid}", "timestamps", "createdAt", "finishedAt"]
+
+- id: "mcp-experiments-results-read-dataset-evaluations-and-timestamps"
+  endpoint: "GET /api/v1/experiments/runs/{runId}/results"
+  setup:
+    - {"request": "POST /api/experiment/init", "body": {"experiment_name": "vd-{uid}", "experiment_slug": "vd-{uid}", "experiment_type": "BATCH_EVALUATION_V2"}, "expect": {"status": 200}}
+    - {"request": "POST /api/evaluations/batch/log_results", "body": {"experiment_slug": "vd-{uid}", "name": "vd-{uid}", "run_id": "run-{uid}", "dataset": [{"index": 0, "entry": {"input": "q-{uid}"}, "duration": 12, "cost": 0.001, "trace_id": "vdt{uid}", "predicted": {"output": "q-{uid}"}}], "evaluations": [{"name": "exact", "evaluator": "langevals/exact_match", "trace_id": "vdt{uid}", "status": "processed", "index": 0, "score": 1, "passed": true, "label": "match", "details": "d", "inputs": {"output": "q-{uid}"}}], "progress": 1, "total": 1, "timestamps": {"created_at": "{nowMs}", "finished_at": "{nowMs+1000}"}}, "expect": {"status": 200}}
+    - {"request": "GET /api/v1/experiments/runs?experimentSlug=vd-{uid}&pageSize=25", "eventually": "60s", "expect": {"status": 200, "contains": "run-{uid}"}}
+    - {"request": "GET /api/v1/experiments/runs/run-{uid}/results?experimentSlug=vd-{uid}", "eventually": "60s", "expect": {"status": 200, "contains": "q-{uid}"}}
+  request:
+    path: "/api/v1/experiments/runs/run-{uid}/results"
+    query: {"experimentSlug": "vd-{uid}"}
+  expect:
+    status: 200
+    body: {"runId": "run-{uid}", "experimentId": "<any>", "dataset": "<any>", "evaluations": "<any>", "timestamps": {"createdAt": "<any>", "updatedAt": "<any>"}}
+    contains: ["q-{uid}", "langevals/exact_match", "processed"]
+
+# The tool reads a 404 as "no such run" and falls back or explains; anything else it raises.
+- id: "mcp-experiments-list-runs-unknown-slug-is-404"
+  endpoint: "GET /api/v1/experiments/runs"
+  request:
+    path: "/api/v1/experiments/runs"
+    query: {"experimentSlug": "nope-{uid}", "pageSize": "25"}
+  expect: {"status": 404}
+
+- id: "mcp-experiments-status-unknown-run-is-404"
+  endpoint: "GET /api/v1/experiments/runs/{runId}"
+  request: {"path": "/api/v1/experiments/runs/run-none-{uid}"}
+  expect: {"status": 404}
+
+- id: "mcp-experiments-results-unknown-run-is-404"
+  endpoint: "GET /api/v1/experiments/runs/{runId}/results"
+  request:
+    path: "/api/v1/experiments/runs/run-none-{uid}/results"
+    query: {"experimentSlug": "nope-{uid}"}
+  expect: {"status": 404}
+
+- id: "mcp-experiments-run-unknown-slug-without-body-is-404"
+  endpoint: "POST /api/v1/experiments/{slug}/run"
+  request: {"path": "/api/v1/experiments/nope-{uid}/run"}
+  expect: {"status": 404}
+
+# ── query: platform_run_query, platform_query_reference ──────────────────────
+
+- id: "mcp-query-run-without-parameters-reads-columns"
+  endpoint: "POST /api/v1/query"
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces LIMIT 5"}}
+  expect:
+    status: 200
+    body: {"columns": "<any>", "rows": "<any>", "statistics": {"elapsedMs": "<any>", "rowsReturned": "<any>"}, "truncated": false, "diagnostics": "<any>"}
+
+- id: "mcp-query-reference-carries-both-languages"
+  endpoint: "GET /api/v1/query/reference"
+  request: {"path": "/api/v1/query/reference"}
+  expect:
+    status: 200
+    body:
+      version: "<any>"
+      lwql: {"enabled": "<any>", "schema": "<any>", "limits": "<any>", "endpoints": "<any>"}
+      traceFilter: {"syntax": "<any>", "fields": "<any>", "dynamicPrefixes": "<any>"}
+      examples: "<any>"
+      decisionTable: "<any>"
+
+# ── secrets: platform_create_secret, list, update, delete ─────────────────────
+
+- id: "mcp-secrets-create-list-update-delete-with-project-id"
+  endpoint: "POST /api/v1/secrets"
+  request:
+    path: "/api/v1/secrets"
+    body: {"projectId": "{projectId}", "name": "VD_MCP_{UID}", "value": "sekret-{uid}"}
+  capture: {"secretId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "projectId": "{projectId}", "name": "VD_MCP_{UID}", "createdAt": "<any>", "updatedAt": "<any>"}
+    notContains: "sekret-{uid}"
+  verify:
+    - request: "GET /api/v1/secrets?projectId={projectId}"
+      expect: {"status": 200, "contains": ["VD_MCP_{UID}", "{secretId}", "updatedAt"], "notContains": "sekret-{uid}"}
+    - request: "GET /api/v1/secrets/{secretId}?projectId={projectId}"
+      expect: {"status": 200, "body": {"id": "{secretId}", "name": "VD_MCP_{UID}"}}
+    - request: "PUT /api/v1/secrets/{secretId}"
+      body: {"projectId": "{projectId}", "value": "sekret2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{secretId}", "name": "VD_MCP_{UID}"}, "notContains": "sekret2-{uid}"}
+    - request: "DELETE /api/v1/secrets/{secretId}"
+      body: {"projectId": "{projectId}"}
+      expect: {"status": 200, "body": {"id": "{secretId}", "deleted": true}}
+    - request: "GET /api/v1/secrets/{secretId}?projectId={projectId}"
+      expect: {"status": 404}
+
+# ── API keys: platform_create_api_key, list, revoke (the org key, as the tool needs) ──
+
+- id: "mcp-api-keys-create-list-revoke"
+  endpoint: "POST /api/v1/api-keys"
+  auth: "org"
+  request:
+    path: "/api/v1/api-keys"
+    body: {"keyType": "service", "name": "vd-{uid}", "description": "apidiff", "projectIds": ["{projectId}"]}
+  capture: {"keyId": "apiKey.id"}
+  expect:
+    status: [200, 201]
+    body: {"token": "<any>", "apiKey": {"id": "<any>", "name": "vd-{uid}", "createdAt": "<any>"}}
+  verify:
+    - request: "GET /api/v1/api-keys"
+      auth: "org"
+      expect: {"status": 200, "path": "data", "contains": ["vd-{uid}", "{keyId}", "roleBindings", "revokedAt"]}
+    - request: "DELETE /api/v1/api-keys/{keyId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"success": true}}
+    - request: "GET /api/v1/api-keys"
+      auth: "org"
+      expect: {"status": 200, "contains": "revokedAt"}
+
+# ── projects: platform_create_project, list, get, update, archive (/api/projects, no /v1) ──
+
+- id: "mcp-projects-create-list-get-update-archive"
+  endpoint: "POST /api/projects"
+  auth: "org"
+  request:
+    path: "/api/projects"
+    body: {"name": "vd-{uid}", "language": "python", "framework": "openai", "newTeamName": "vd-team-{uid}"}
+  capture: {"newProjectId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "name": "vd-{uid}", "slug": "<any>", "language": "python", "framework": "openai", "serviceApiKey": "<any>", "serviceApiKeyId": "<any>"}
+  verify:
+    - request: "GET /api/projects?limit=100"
+      auth: "org"
+      expect:
+        status: 200
+        body: {"pagination": {"page": 1, "limit": 100, "total": "<any>", "totalPages": "<any>"}}
+        contains: ["vd-{uid}", "slug", "framework", "updatedAt"]
+    - request: "GET /api/projects/{newProjectId}"
+      auth: "org"
+      expect:
+        status: 200
+        body: {"id": "{newProjectId}", "name": "vd-{uid}", "slug": "<any>", "teamId": "<any>", "piiRedactionLevel": "<any>", "createdAt": "<any>", "updatedAt": "<any>"}
+    - request: "PATCH /api/projects/{newProjectId}"
+      auth: "org"
+      body: {"name": "vd2-{uid}", "piiRedactionLevel": "STRICT"}
+      expect: {"status": 200, "body": {"id": "{newProjectId}", "name": "vd2-{uid}", "piiRedactionLevel": "STRICT", "language": "python", "framework": "openai"}}
+    - request: "DELETE /api/projects/{newProjectId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"id": "{newProjectId}", "name": "vd2-{uid}", "archivedAt": "<any>"}}

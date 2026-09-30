@@ -5,7 +5,7 @@
  * @see specs/settings/model-provider-skip-permissions.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -136,6 +136,71 @@ describe("the modelProvider tRPC namespace", () => {
         const providers = await caller.getAllForProject({ projectId: PROJECT_A });
 
         expect(providers.openai?.id).toBe("mp_openai");
+      });
+    });
+  });
+
+  describe("given a caller whose rights sit on a project or organization other than the one named", () => {
+    describe("when they list a project's providers", () => {
+      /** @scenario Access to a sibling project does not grant access to this project's providers */
+      it("refuses an admin of the sibling project", async () => {
+        const getForProject = vi.fn(async () => ({}));
+        const { caller } = mount({
+          modelProviders: { getForProject: getForProject as never },
+          permits: (_permission, scope) => scope.tier === "project" && scope.id === "project_b",
+        });
+
+        await expect(caller.getAllForProject({ projectId: PROJECT_A })).rejects.toMatchObject({
+          code: "FORBIDDEN",
+        });
+        expect(getForProject).not.toHaveBeenCalled();
+      });
+
+      /** @scenario Admin rights in another organization grant nothing across the tenancy boundary */
+      it("refuses an admin of another organization", async () => {
+        const getForProject = vi.fn(async () => ({}));
+        const { caller } = mount({
+          modelProviders: { getForProject: getForProject as never },
+          permits: (_permission, scope) =>
+            scope.tier === "organization" && scope.id === "org_other",
+        });
+
+        await expect(caller.getAllForProject({ projectId: PROJECT_A })).rejects.toMatchObject({
+          code: "FORBIDDEN",
+        });
+        expect(getForProject).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the resolver refuses because no model is configured", () => {
+    describe("when a procedure calls it", () => {
+      /** @scenario A tRPC procedure forwards ModelNotConfiguredError as a typed TRPCError */
+      it("answers BAD_REQUEST carrying the cause, the feature and the role", async () => {
+        const refusal = new ModelNotConfiguredError({
+          featureKey: "traces.ai_search",
+          role: "FAST",
+          featureDisplayName: "AI search",
+          projectId: PROJECT_A,
+        });
+        const { caller } = mount({
+          modelProviders: {
+            getForProject: (async () => {
+              throw refusal;
+            }) as never,
+          },
+        });
+
+        await expect(caller.getAllForProject({ projectId: PROJECT_A })).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          cause: {
+            cause: "MODEL_NOT_CONFIGURED",
+            featureKey: "traces.ai_search",
+            role: "FAST",
+            featureDisplayName: "AI search",
+            projectId: PROJECT_A,
+          },
+        });
       });
     });
   });

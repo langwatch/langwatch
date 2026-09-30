@@ -43,11 +43,13 @@ describe("auth server configuration", () => {
 
   describe("given the browser config the served page carries", () => {
     /** @scenario "The served page names the identifier-first screens as the sign-in front door" */
-    it("names the identifier-first screens as the front door with no switch set", () => {
-      expect(authBrowserConfig.project(read({})).identityFrontDoor).toBe(true);
-      expect(authBrowserConfig.project(read({ PASSKEYS_ENABLED: "on" })).identityFrontDoor).toBe(
-        true,
-      );
+    it("names the identifier-first screens as the front door with no switch set", async () => {
+      await expect(authBrowserConfig.project(read({}), undefined)).resolves.toMatchObject({
+        identityFrontDoor: true,
+      });
+      await expect(
+        authBrowserConfig.project(read({ PASSKEYS_ENABLED: "on" }), undefined),
+      ).resolves.toMatchObject({ identityFrontDoor: true });
     });
   });
 

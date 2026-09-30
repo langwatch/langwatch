@@ -1,8 +1,8 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import { ProjectApp } from "./app/project.app.ts";
+import { projectLifecycleEventing } from "./eventing/project-lifecycle.pipeline.ts";
 import type { CodingAgentActivityRepository } from "./repositories/coding-agent-activity.repository.ts";
 import {
   PrismaCodingAgentActivityRepository,
@@ -17,17 +17,9 @@ import {
   GovernanceInternalProjectService,
   type ProjectOldestTeam,
 } from "./services/governance-internal-project.service.ts";
-import {
-  type ProjectCredentials,
-  ProjectCredentialsService,
-} from "./services/project-credentials.service.ts";
+import { ProjectCredentialsService } from "./services/project-credentials.service.ts";
 import { ProjectMetadataService } from "./services/project-metadata.service.ts";
-import {
-  ProjectService,
-  type ProjectDiagnostics,
-  type ProjectKeyMap,
-  type ProjectStoredObjects,
-} from "./services/project.service.ts";
+import type { ProjectDiagnostics } from "./services/project.service.ts";
 import { projectRest, projectRestCredential } from "./transport/project.rest.ts";
 import { projectTrpcTransport } from "./transport/project.trpc.ts";
 
@@ -41,7 +33,8 @@ export const projectServer = defineServerModule("project")
 
       return { apiKeyId: credential.apiKeyId, userId: credential.userId };
     }),
-  ]);
+  ])
+  .withEventing(projectLifecycleEventing);
 
 /**
  * Composition seams for a process wiring this feature: thin factories over
@@ -52,25 +45,6 @@ export function createProjectCodingAgentActivityRepository(
   options: Readonly<{ prisma: PrismaCodingAgentActivityDatabase }>,
 ): CodingAgentActivityRepository {
   return PrismaCodingAgentActivityRepository.create(options);
-}
-
-/** The full read/write project directory, over the process's own Prisma client. */
-export function createProjectService(options: {
-  database: PrismaProjectDatabase;
-  credentials: ProjectCredentials;
-  organizations: OrganizationApi;
-  keyMap?: ProjectKeyMap;
-  storedObjects?: ProjectStoredObjects;
-  diagnostics?: ProjectDiagnostics;
-}): ProjectService {
-  return ProjectService.create({
-    repository: PrismaProjectRepository.create({ prisma: options.database }),
-    credentials: options.credentials,
-    organizations: options.organizations,
-    keyMap: options.keyMap,
-    storedObjects: options.storedObjects,
-    diagnostics: options.diagnostics,
-  });
 }
 
 /** The read-mostly project metadata surface, for a caller with no credentials or org service. */

@@ -233,6 +233,25 @@ describe("Feature: the published SCIM reference", () => {
     }
   });
 
+  /** @scenario "Provisioning answers are published as application/scim+json, discovery as JSON" */
+  it("publishes the media type each route answers with", async () => {
+    const { paths } = await mount().document();
+    const mediaTypes = (operation: PublishedOperation | undefined, status: string) =>
+      Object.keys(operation?.responses[status]?.content ?? {});
+
+    for (const path of listed) {
+      expect(mediaTypes(paths[path]?.get, "200")).toEqual(["application/scim+json"]);
+      expect(mediaTypes(paths[path]?.get, "401")).toEqual(["application/scim+json"]);
+    }
+    for (const path of ["/api/scim/v2/ResourceTypes", "/api/scim/v2/Schemas"]) {
+      expect(mediaTypes(paths[path]?.get, "200")).toEqual(["application/json"]);
+    }
+    for (const path of listed) {
+      expect(mediaTypes(paths[path]?.post, "201")).toEqual(["application/scim+json"]);
+      expect(Object.keys(paths[path]?.post?.responses ?? {})).not.toContain("200");
+    }
+  });
+
   /** @scenario "Every SCIM document publishes its schemas as a list of URNs" */
   it("publishes schemas as an array of strings on every document", async () => {
     const { paths } = await mount().document();
@@ -247,7 +266,7 @@ describe("Feature: the published SCIM reference", () => {
           path,
           schemas: "string",
         });
-        for (const resource of collections.includes(path)
+        for (const resource of collections.includes(path) && operation === operations.get
           ? [published.properties.Resources?.items]
           : []) {
           expect(resource?.properties?.schemas?.items?.type).toBe("string");

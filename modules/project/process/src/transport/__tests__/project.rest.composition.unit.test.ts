@@ -16,9 +16,10 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectApp } from "../../app/project.app.ts";
+import type { RecordProjectCreatedCommandData } from "../../eventing/project-lifecycle.events.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import { mountProjectRestApplication, ORGANIZATION_ID, USER_ID } from "./project.rest.harness.ts";
@@ -215,6 +216,52 @@ describe("the projects REST family over the application the composition builds",
       const { send } = mountProjectRestApplication(application().app);
 
       expect((await send("/api/projects/project_other")).status).toBe(404);
+    });
+  });
+
+  describe("when a project is created", () => {
+    const recorded = vi.fn(async (_data: RecordProjectCreatedCommandData) => undefined);
+    let app: ReturnType<typeof application>["app"];
+
+    beforeEach(() => {
+      recorded.mockClear();
+      app = application().app;
+      app.connectLifecycle({ recordProjectCreated: { send: recorded } });
+    });
+
+    /** @scenario "A project created through the REST API is recorded as created" */
+    it("records the new project on project's own pipeline", async () => {
+      const { send } = mountProjectRestApplication(app);
+
+      const response = await send("/api/projects", {
+        method: "POST",
+        body: { name: "Fresh Project", teamId: "team-1", language: "python", framework: "other" },
+      });
+
+      expect(response.status).toBe(201);
+      const { id } = (await response.json()) as { id: string };
+      expect(recorded).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: id, projectId: id, organizationId: ORGANIZATION_ID }),
+      );
+    });
+
+    /** @scenario "A project created from the projects screen is recorded as created" */
+    /** @scenario "The first project created during onboarding is recorded as created" */
+    it("records one made through ProjectApi.create, as the screen and onboarding do", async () => {
+      const created = await app.create(
+        {
+          organizationId: ORGANIZATION_ID,
+          teamId: "team-1",
+          name: "First Project",
+          language: "python",
+          framework: "other",
+        },
+        { id: USER_ID },
+      );
+
+      expect(recorded).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: created.id, organizationId: ORGANIZATION_ID }),
+      );
     });
   });
 

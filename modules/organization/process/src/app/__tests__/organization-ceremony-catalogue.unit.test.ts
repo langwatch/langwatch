@@ -2,6 +2,7 @@
  * @vitest-environment node
  *
  * The sign-up ceremony seeds the standard AI-tool catalogue through governance,
+ notifications: createApiFixture<Pick<NotificationService, "sendEmail" | "getMailDelivery">>(),
  * as main's onboarding did.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
@@ -9,6 +10,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";

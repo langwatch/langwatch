@@ -4,6 +4,7 @@
  */
 
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import type { departmentsTrpc } from "@langwatch/enterprise-governance-contract";
 import type {
   scimOversightTrpc,
   scimReconciliationTrpc,
@@ -60,3 +61,6 @@ export type DirectoryMembershipApiMap = ContractApiMap<typeof groupTrpc> &
   ContractApiMap<typeof organizationTrpc>;
 
 export const directoryMembershipApi = createModuleApi<DirectoryMembershipApiMap>();
+
+/** The departments the card names, read through governance's contract, never its package. */
+export const departmentsApi = createModuleApi<ContractApiMap<typeof departmentsTrpc>>();

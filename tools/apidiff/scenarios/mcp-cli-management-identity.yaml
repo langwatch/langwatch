@@ -1,0 +1,229 @@
+# The `langwatch` CLI (sdks/typescript) identity families: roles, role-bindings, groups, teams.
+# Every request is the client's own: an organization key as a Bearer token, the paths in
+# client-sdk/services/<family>/*-api.service.ts (roles and role-bindings go through
+# managementPath, so they carry `/latest`; teams and groups do not), and the bodies the CLI
+# commands build. Assertions name the fields the service types and the commands read.
+# Written unrun. The `/latest` paths are the CLI's own; other scenarios cover `/api/<x>`.
+
+# ── roles ────────────────────────────────────────────────────────────────────
+
+- id: "cli-roles-create-get-list-update-delete"
+  endpoint: "POST /api/v1/roles/latest"
+  auth: "org"
+  request:
+    path: "/api/v1/roles/latest"
+    body: {"name": "vd-{uid}", "description": "vd role", "permissions": ["project:view"]}
+  capture: {"roleId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "name": "vd-{uid}", "description": "vd role", "permissions": ["project:view"], "createdAt": "<any>", "updatedAt": "<any>"}
+  verify:
+    - request: "GET /api/v1/roles/latest/{roleId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"id": "{roleId}", "name": "vd-{uid}", "permissions": ["project:view"]}}
+    - request: "GET /api/v1/roles/latest"
+      auth: "org"
+      expect: {"status": 200, "path": "roles", "contains": ["vd-{uid}", "{roleId}"]}
+    - request: "PATCH /api/v1/roles/latest/{roleId}"
+      auth: "org"
+      body: {"name": "vd2-{uid}", "description": null, "permissions": ["project:view", "project:update"]}
+      expect: {"status": 200, "body": {"id": "{roleId}", "name": "vd2-{uid}", "description": null}}
+    - request: "DELETE /api/v1/roles/latest/{roleId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"success": true}}
+    - request: "GET /api/v1/roles/latest/{roleId}"
+      auth: "org"
+      expect: {"status": 404}
+
+- id: "cli-roles-permission-catalog-carries-resources-and-actions"
+  endpoint: "GET /api/v1/roles/latest/permissions"
+  auth: "org"
+  request: {"path": "/api/v1/roles/latest/permissions"}
+  expect: {"status": 200, "body": {"resources": "<any>", "actions": "<any>"}, "contains": ["organizationExclusive", "permissions"]}
+
+- id: "cli-roles-get-unknown-is-404"
+  endpoint: "GET /api/v1/roles/latest/{id}"
+  auth: "org"
+  request: {"path": "/api/v1/roles/latest/nope-{uid}"}
+  expect: {"status": 404}
+
+# ── role bindings ─────────────────────────────────────────────────────────────
+
+- id: "cli-role-bindings-create-list-update-delete"
+  endpoint: "POST /api/v1/role-bindings/latest"
+  auth: "org"
+  setup:
+    - request: "POST /api/v1/groups"
+      auth: "org"
+      body: {"name": "vd-{uid}"}
+      capture: {"groupId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/role-bindings/latest"
+    body: {"groupId": "{groupId}", "role": "VIEWER", "scopeType": "PROJECT", "scopeId": "{projectId}"}
+  capture: {"bindingId": "id"}
+  expect:
+    status: 201
+    body:
+      id: "<any>"
+      principal: {"type": "group", "id": "{groupId}"}
+      role: "VIEWER"
+      scopeType: "PROJECT"
+      scopeId: "{projectId}"
+      customRoleId: null
+      createdAt: "<any>"
+  verify:
+    - request: "GET /api/v1/role-bindings/latest?groupId={groupId}&limit=50"
+      auth: "org"
+      expect: {"status": 200, "body": {"bindings": "<any>", "totalCount": 1}, "contains": ["{bindingId}", "scopeName", "customRoleName"]}
+    - request: "PATCH /api/v1/role-bindings/latest/{bindingId}"
+      auth: "org"
+      body: {"role": "MEMBER"}
+      expect: {"status": 200, "body": {"id": "{bindingId}", "role": "MEMBER"}}
+    - request: "DELETE /api/v1/role-bindings/latest/{bindingId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"success": true}}
+    - request: "GET /api/v1/role-bindings/latest?groupId={groupId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"totalCount": 0}}
+
+- id: "cli-role-bindings-custom-role-is-named-on-read-back"
+  endpoint: "POST /api/v1/role-bindings/latest"
+  auth: "org"
+  setup:
+    - request: "POST /api/v1/groups"
+      auth: "org"
+      body: {"name": "vd-{uid}"}
+      capture: {"groupId": "id"}
+      expect: {"status": 201}
+    - request: "POST /api/v1/roles/latest"
+      auth: "org"
+      body: {"name": "vd-{uid}", "permissions": ["project:view"]}
+      capture: {"roleId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/role-bindings/latest"
+    body: {"groupId": "{groupId}", "role": "CUSTOM", "customRoleId": "{roleId}", "scopeType": "PROJECT", "scopeId": "{projectId}"}
+  expect: {"status": 201, "body": {"role": "CUSTOM", "customRoleId": "{roleId}"}}
+  verify:
+    - request: "GET /api/v1/role-bindings/latest?groupId={groupId}"
+      auth: "org"
+      eventually: "30s"
+      expect: {"status": 200, "body": {"totalCount": 1}, "contains": ["{roleId}", "vd-{uid}"]}
+
+# ── groups ────────────────────────────────────────────────────────────────────
+
+- id: "cli-groups-create-get-list-rename-delete"
+  endpoint: "POST /api/v1/groups"
+  auth: "org"
+  request: {"path": "/api/v1/groups", "body": {"name": "vd-{uid}"}}
+  capture: {"groupId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "name": "vd-{uid}", "slug": "<any>", "organizationId": "{orgId}", "createdAt": "<any>"}
+  verify:
+    - request: "GET /api/v1/groups/{groupId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"id": "{groupId}", "name": "vd-{uid}", "slug": "<any>", "members": "<any>", "bindings": "<any>"}}
+    - request: "GET /api/v1/groups?limit=100"
+      auth: "org"
+      expect:
+        status: 200
+        body: {"pagination": {"page": 1, "limit": 100, "total": "<any>"}}
+        contains: ["vd-{uid}", "memberCount", "bindings", "externalId", "scimSource"]
+    - request: "PATCH /api/v1/groups/{groupId}"
+      auth: "org"
+      body: {"name": "vd2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{groupId}", "name": "vd2-{uid}"}}
+    - request: "DELETE /api/v1/groups/{groupId}"
+      auth: "org"
+      expect: {"status": 200}
+    - request: "GET /api/v1/groups/{groupId}"
+      auth: "org"
+      expect: {"status": 404}
+
+- id: "cli-groups-members-and-bindings-add-list-remove"
+  endpoint: "POST /api/v1/groups/{groupId}/members"
+  auth: "org"
+  setup:
+    - request: "POST /api/v1/groups"
+      auth: "org"
+      body: {"name": "vd-{uid}"}
+      capture: {"groupId": "id"}
+      expect: {"status": 201}
+    - request: "GET /api/organization/members"
+      auth: "org"
+      capture: {"memberUserId": "members.0.userId"}
+      expect: {"status": 200}
+  request:
+    path: "/api/v1/groups/{groupId}/members"
+    body: {"userId": "{memberUserId}"}
+  expect: {"status": [200, 201]}
+  verify:
+    - request: "GET /api/v1/groups/{groupId}/members"
+      auth: "org"
+      expect: {"status": 200, "contains": ["{memberUserId}", "email"]}
+    - request: "POST /api/v1/groups/{groupId}/bindings"
+      auth: "org"
+      body: {"role": "VIEWER", "scopeType": "PROJECT", "scopeId": "{projectId}"}
+      capture: {"groupBindingId": "id"}
+      expect: {"status": 201, "body": {"id": "<any>", "role": "VIEWER", "scopeType": "PROJECT", "scopeId": "{projectId}"}}
+    - request: "GET /api/v1/groups/{groupId}/bindings"
+      auth: "org"
+      expect: {"status": 200, "contains": ["{groupBindingId}", "customRoleName"]}
+    - request: "DELETE /api/v1/groups/{groupId}/bindings/{groupBindingId}"
+      auth: "org"
+      expect: {"status": 200}
+    - request: "DELETE /api/v1/groups/{groupId}/members/{memberUserId}"
+      auth: "org"
+      expect: {"status": 200}
+
+# ── teams ─────────────────────────────────────────────────────────────────────
+
+- id: "cli-teams-create-get-list-rename-archive"
+  endpoint: "POST /api/v1/teams"
+  auth: "org"
+  request: {"path": "/api/v1/teams", "body": {"name": "vd-{uid}"}}
+  capture: {"teamId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "name": "vd-{uid}", "slug": "<any>", "organizationId": "{orgId}", "createdAt": "<any>", "updatedAt": "<any>"}
+  verify:
+    - request: "GET /api/v1/teams/{teamId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"id": "{teamId}", "name": "vd-{uid}", "slug": "<any>"}}
+    - request: "GET /api/v1/teams?page=1&limit=100"
+      auth: "org"
+      expect: {"status": 200, "body": {"pagination": {"page": 1, "limit": 100, "total": "<any>"}}, "contains": ["vd-{uid}", "{teamId}"]}
+    - request: "PATCH /api/v1/teams/{teamId}"
+      auth: "org"
+      body: {"name": "vd2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{teamId}", "name": "vd2-{uid}"}}
+    - request: "DELETE /api/v1/teams/{teamId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"id": "{teamId}", "name": "vd2-{uid}", "archivedAt": "<any>"}}
+
+- id: "cli-teams-members-add-list-remove"
+  endpoint: "POST /api/v1/teams/{teamId}/members"
+  auth: "org"
+  setup:
+    - request: "POST /api/v1/teams"
+      auth: "org"
+      body: {"name": "vd-{uid}"}
+      capture: {"teamId": "id"}
+      expect: {"status": 201}
+    - request: "GET /api/organization/members"
+      auth: "org"
+      capture: {"memberUserId": "members.0.userId"}
+      expect: {"status": 200}
+  request:
+    path: "/api/v1/teams/{teamId}/members"
+    body: {"userId": "{memberUserId}", "role": "VIEWER"}
+  expect: {"status": [200, 201], "body": {"success": true}}
+  verify:
+    - request: "GET /api/v1/teams/{teamId}/members"
+      auth: "org"
+      expect: {"status": 200, "body": {"data": [{"userId": "{memberUserId}", "role": "VIEWER"}]}, "contains": ["name", "email"]}
+    - request: "DELETE /api/v1/teams/{teamId}/members/{memberUserId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"success": true}}

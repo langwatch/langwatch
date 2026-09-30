@@ -11,10 +11,15 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { NlpPayloadStaging } from "../../channels/nlp-lambda.channel.ts";
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { WorkflowApp, type WorkflowInfrastructure } from "../workflow.app.ts";
+import {
+  WorkflowApp,
+  type NlpLambdaArnCache,
+  type WorkflowInfrastructure,
+} from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 class NoopTestEncryption {
@@ -27,10 +32,10 @@ class NoopTestEncryption {
   }
 }
 
-function appWith(
+async function appWith(
   overrides: Partial<WorkflowInfrastructure>,
   authz: AuthzApi = createApiFixture<AuthzApi>({}, "AuthzApi"),
-): WorkflowApp {
+): Promise<WorkflowApp> {
   const members = createWorkflowTestInfrastructure(overrides);
 
   return WorkflowApp.create({
@@ -51,7 +56,11 @@ function appWith(
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       nurturing: createApiFixture<NurturingApi>({}, "NurturingApi"),
     },
-    config: { stagingThresholdBytes: void 0, stagingTtlSeconds: 600 },
+    config: {
+      stagingThresholdBytes: void 0,
+      stagingTtlSeconds: 600,
+      codeBlockTimeoutSeconds: void 0,
+    },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories: {
@@ -62,6 +71,8 @@ function appWith(
         "WorkflowProjectEnvironmentRepository",
       ),
       lineage: createApiFixture<WorkflowLineageRepository>({}, "WorkflowLineageRepository"),
+      nlpLambdaArns: createApiFixture<NlpLambdaArnCache>({}, "NlpLambdaArnCache"),
+      payloadStaging: createApiFixture<NlpPayloadStaging>({}, "NlpPayloadStaging"),
     },
   });
 }
@@ -71,7 +82,7 @@ describe("WorkflowApp caller refusals", () => {
     /** @scenario A workflows-only key cannot start a run it could not read */
     it("refuses before the trigger is reached", async () => {
       const trigger = vi.fn<WorkflowInfrastructure["evaluations"]["trigger"]>();
-      const app = appWith({ evaluations: { trigger } });
+      const app = await appWith({ evaluations: { trigger } });
 
       await expect(
         app.triggerEvaluation({
@@ -92,7 +103,7 @@ describe("WorkflowApp caller refusals", () => {
     it("refuses it as unauthorized before checking any permission", async () => {
       const has = vi.fn<WorkflowInfrastructure["permissions"]["has"]>();
       const hasMany = vi.fn<WorkflowInfrastructure["permissions"]["hasMany"]>();
-      const app = appWith({ permissions: { has, hasMany } });
+      const app = await appWith({ permissions: { has, hasMany } });
 
       await expect(
         app.completeCode({ projectId: "project_1", userId: undefined, body: {} }),
@@ -116,24 +127,27 @@ describe("WorkflowApp caller refusals", () => {
 
     it("refuses a body that is not a Studio event as a validation error", async () => {
       await expect(
-        appWith({}).streamStudioEvent({ body: "not json", userId: "user_1" }),
+        (await appWith({})).streamStudioEvent({ body: "not json", userId: "user_1" }),
       ).rejects.toMatchObject({ code: "validation_error", httpStatus: 400 });
     });
 
     it("refuses a caller who is not signed in", async () => {
       await expect(
-        appWith({}).streamStudioEvent({ body: isAlive, userId: undefined }),
+        (await appWith({})).streamStudioEvent({ body: isAlive, userId: undefined }),
       ).rejects.toMatchObject({ code: "unauthorized", httpStatus: 401 });
     });
 
     it("refuses a caller who may not manage the project's workflows", async () => {
       await expect(
-        appWith({}, authzAnswering(false)).streamStudioEvent({ body: isAlive, userId: "user_1" }),
+        (await appWith({}, authzAnswering(false))).streamStudioEvent({
+          body: isAlive,
+          userId: "user_1",
+        }),
       ).rejects.toMatchObject({ code: "project_permission_denied", httpStatus: 403 });
     });
 
     it("answers a run the engine cannot start with one last error frame, then ends", async () => {
-      const app = appWith({}, authzAnswering(true));
+      const app = await appWith({}, authzAnswering(true));
 
       const events = await app.streamStudioEvent({ body: isAlive, userId: "user_1" });
 

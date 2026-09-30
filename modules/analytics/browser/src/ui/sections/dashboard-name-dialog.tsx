@@ -5,6 +5,7 @@
  */
 
 import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
+import { dashboardNameSchema } from "@langwatch/dashboard-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect, useState } from "react";
 
@@ -61,7 +62,7 @@ export function DashboardNameDialog({
     <Dialog.Root open={open} size="sm" onOpenChange={({ open: isOpen }) => onOpenChange(isOpen)}>
       <Dialog.Content>
         <Dialog.Header>
-          <Dialog.Title>Create dashboard</Dialog.Title>
+          <Dialog.Title>Create Dashboard</Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>
         <Dialog.Body>
@@ -73,6 +74,7 @@ export function DashboardNameDialog({
               aria-label="Dashboard name"
               data-testid="analytics-dashboard-name-input"
               placeholder="Dashboard name"
+              maxLength={dashboardNameSchema.maxLength ?? undefined}
               value={dashboardName}
               onChange={(event) => setDashboardName(event.target.value)}
               onKeyDown={(event) => {
@@ -91,7 +93,7 @@ export function DashboardNameDialog({
               disabled={!dashboardName.trim()}
               loading={createDashboard.isPending}
             >
-              Create dashboard
+              Create Dashboard
             </Button>
           </HStack>
         </Dialog.Footer>

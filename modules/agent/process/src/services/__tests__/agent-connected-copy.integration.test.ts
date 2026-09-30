@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 
 describe("copying a connected agent", () => {
+  /** @scenario "A connected agent cannot be copied" */
   it("refuses the copy and persists no row", async () => {
     const { app, repositories } = createAgentAppFixture();
     const registered = await app.registerConnected({

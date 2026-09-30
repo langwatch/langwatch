@@ -50,6 +50,7 @@ import {
   createBeforeSessionCreateHook,
   beforeUserCreate,
   type BetterAuthHookCollaborators,
+  type FindGoverningConnections,
 } from "./http.better-auth-hooks.channel.ts";
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
 import {
@@ -62,6 +63,10 @@ import {
   runSignInRouterShadow,
   type SignInRouterShadow,
 } from "./http.sign-in-router-shadow.channel.ts";
+import {
+  signUpConfirmationPlugin,
+  type SignUpAddressConfirmation,
+} from "./http.sign-up-confirmation.channel.ts";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -352,7 +357,7 @@ export const createAuthOptions = ({
   ssoIssuers,
   credentialGuard,
   signInLockout,
-  addressRoutesToConnection,
+  findGoverningConnections,
   passwordResetSession,
 }: {
   repo: BetterAuthHooksRepository;
@@ -365,7 +370,7 @@ export const createAuthOptions = ({
   ssoIssuers: BetterAuthSsoIssuers;
   credentialGuard: CredentialSessionGuard;
   signInLockout: SignInAttemptCounter;
-  addressRoutesToConnection: AddressRoutesToConnection;
+  findGoverningConnections: FindGoverningConnections;
   /** Opens the session a completed password reset earned. */
   passwordResetSession?: PasswordResetSessionChannel;
 }): BetterAuthOptions & {
@@ -570,7 +575,10 @@ export const createAuthOptions = ({
     account: {
       create: {
         before: async (account, context) => {
-          await createBeforeAccountCreateHook({ repo, federation })(account, context);
+          await createBeforeAccountCreateHook({ repo, federation, findGoverningConnections })(
+            account,
+            context,
+          );
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
@@ -605,6 +613,7 @@ export const createAuthOptions = ({
               accountId: account.accountId as string,
             },
             collaborators: hooks,
+            findGoverningConnections,
           });
         },
       },
@@ -669,7 +678,8 @@ export const createAuthOptions = ({
       federation,
       shadow,
       signInLockout,
-      addressRoutesToConnection,
+      addressRoutesToConnection: async ({ email }) =>
+        (await findGoverningConnections({ email })).length > 0,
     }),
     /** `createAuthMiddleware` is load-bearing, not ceremony: the after-hook
      *  runner reads `.headers` off whatever the hook returns, unguarded, so a
@@ -810,15 +820,15 @@ export type BetterAuthTransportOptions = Readonly<{
   secondaryStorage: NonNullable<BetterAuthOptions["secondaryStorage"]>;
   /** Presence decides whether Better Auth's rate limiter uses secondary storage. */
   redis: RedisConnection | null;
-  signUpVerification: SignUpVerification;
+  signUpVerification: SignUpVerification & SignUpAddressConfirmation;
   users: UserApi;
   /** Whether an already proved password may open this deployment's local door
    *  for the organization its address routes to. */
   credentialGuard: CredentialSessionGuard;
   /** The consecutive-failure counter behind account lock-out (GAC-09). */
   signInLockout: SignInAttemptCounter;
-  /** Whether an organization's own connection governs an address (D04). */
-  addressRoutesToConnection: AddressRoutesToConnection;
+  /** The organization connections that govern an address (D04). */
+  findGoverningConnections: FindGoverningConnections;
 }>;
 
 /** The options the deployment's ONE Better Auth instance is built from. */
@@ -842,7 +852,7 @@ const transportOptions = ({
   ssoAssertions,
   ssoIssuers,
   signInLockout,
-  addressRoutesToConnection,
+  findGoverningConnections,
   ssoMigration,
   storage,
   users,
@@ -858,7 +868,7 @@ const transportOptions = ({
     ssoIssuers,
     credentialGuard,
     signInLockout,
-    addressRoutesToConnection,
+    findGoverningConnections,
     passwordResetSession,
     hooks: {
       federation,
@@ -888,6 +898,7 @@ const transportOptions = ({
           ]
         : []),
       ssoPlugin(ssoAssertions),
+      signUpConfirmationPlugin({ verification: signUpVerification, users }),
     ],
     secondaryStorage,
     rateLimit: {

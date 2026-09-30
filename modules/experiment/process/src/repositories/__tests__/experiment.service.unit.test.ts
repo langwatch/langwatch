@@ -435,6 +435,7 @@ describe("ExperimentService", () => {
     expect(repository.values).toEqual([]);
   });
 
+  /** @scenario "A stale save is refused with the version to read again" */
   it("enforces expectedVersion as a compare-and-set", async () => {
     const { service } = build();
     const created = await service.createEvaluationsV3({
@@ -462,6 +463,29 @@ describe("ExperimentService", () => {
       code: "experiment_stale_workbench_state",
       meta: { currentVersion: 2 },
     });
+  });
+
+  /** @scenario "A setup that cannot be read is refused with its code" */
+  it("refuses a save whose setup does not match the schema, leaving the row as it was", async () => {
+    const { service } = build();
+    const created = await service.createEvaluationsV3({
+      projectId: "project_1",
+      state: workbenchState(),
+      actor: { label: "user" },
+    });
+
+    await expect(
+      service.saveWorkbenchState({
+        projectId: "project_1",
+        id: created.experimentId,
+        state: { name: "Broken" },
+        actor: { label: "user" },
+      }),
+    ).rejects.toMatchObject({ code: "experiment_invalid_workbench_state" });
+    expect(
+      (await service.getWorkbenchState({ projectId: "project_1", id: created.experimentId }))
+        .version,
+    ).toBe(created.version);
   });
 
   it("keeps run results out of the version history", async () => {
@@ -621,6 +645,7 @@ describe("ExperimentService", () => {
   describe("given a project that holds no such experiment", () => {
     describe("when a required read asks for it", () => {
       /** @scenario "Required reads throw on absence" */
+      /** @scenario "An unknown experiment reads as not found" */
       it("throws the Experiment's own not-found error instead of returning null", async () => {
         const { service } = build();
 

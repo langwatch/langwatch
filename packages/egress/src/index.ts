@@ -74,8 +74,6 @@ export { WebhookSignatureVectorsTask } from "./tasks/webhook-signature-vectors.t
  * how). Every HTTPS caller resolves it the same way, so no bypass via a second `no_proxy` copy.
  */
 export {
-  configureProcessOutboundProxy,
-  getProcessOutboundProxyConfig,
   hostnameOf,
   isProxyBypassed,
   parseOutboundProxyConfig,

@@ -40,7 +40,10 @@ import {
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import { ConfigurationError, ValidationError } from "../services/errorHandling.ts";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
+import type {
+  EventSubscriberDefinition,
+  PeerSubscriberDefinition,
+} from "../subscribers/eventSubscriber.types.ts";
 import type {
   SubscriberDispatchDefinition,
   SubscriberDispatchOptions,
@@ -155,6 +158,31 @@ export class PipelineBuilder<
           registry.registerMapSubscriber(projection.name, subscriber);
         }
       },
+    });
+    return this;
+  }
+
+  /**
+   * This module's subscriber on a peer pipeline's event (§9), on the global registry, so it is
+   * staged whichever pipeline appends the event and wherever either registers. Its lane is named
+   * `<this pipeline>.<name>`, and the handler gets the data parsed with the contract's schema.
+   */
+  withPeerSubscriber<Data extends z.ZodType>(
+    name: string,
+    subscriber: PeerSubscriberDefinition<Data>,
+  ): this {
+    const lane = `${this.name}.${name}`;
+    if (this.globalProjections.some((declared) => declared.name === lane)) {
+      this.throwDuplicateProjectionName(lane);
+    }
+    this.globalProjections.push({
+      name: lane,
+      register: (registry) =>
+        registry.registerEventSubscriber({
+          name: lane,
+          eventTypes: [subscriber.eventType],
+          handle: (event, context) => subscriber.handle(subscriber.data.parse(event.data), context),
+        }),
     });
     return this;
   }

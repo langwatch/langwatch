@@ -57,6 +57,7 @@ describe("given a spend rollup grouping", () => {
   });
 
   describe("when the window can still change", () => {
+    /** @scenario Grouping on a movable key is refused while the window is still settling */
     it("refuses a movable grouping", () => {
       const refusal = refusalFrom(() =>
         spendGrouping.assertGroupingIsWalkable({
@@ -71,6 +72,7 @@ describe("given a spend rollup grouping", () => {
       expect(refusal.code).toBe("gateway_spend_group_by_unstable");
     });
 
+    /** @scenario Grouping on a key that cannot move is never refused */
     it("serves a grouping whose key cannot move", () => {
       expect(() =>
         spendGrouping.assertGroupingIsWalkable({
@@ -84,6 +86,7 @@ describe("given a spend rollup grouping", () => {
       ).not.toThrow();
     });
 
+    /** @scenario A caller who accepts the risk can ask for it anyway */
     it("serves a movable grouping when the caller accepts an inexact read", () => {
       expect(() =>
         spendGrouping.assertGroupingIsWalkable({
@@ -117,6 +120,7 @@ describe("given a spend rollup grouping", () => {
   });
 
   describe("when the window has settled", () => {
+    /** @scenario The same grouping is served once the window has settled */
     it("serves the movable grouping it would have refused", () => {
       expect(
         spendGrouping.windowHasSettled({

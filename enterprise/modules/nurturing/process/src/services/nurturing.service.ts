@@ -15,6 +15,7 @@ type NurturingServiceOptions = {
   config: {
     customerIoApiKey?: string;
     customerIoRegion?: string;
+    customerIoBaseUrl?: string;
   };
   fetchFn?: typeof fetch;
   errorReporter?: CustomerIoChannelOptions["errorReporter"];

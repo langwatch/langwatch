@@ -24,12 +24,12 @@ const MAX_ACTION_BODY_BYTES = 256 * 1024;
 /** Hono's own 404, byte-for-byte what an unmounted path returns. */
 const HONO_NOT_FOUND = {
   status: 404,
-  mediaType: "text/plain;charset=UTF-8",
+  mediaType: "text/plain; charset=UTF-8",
   body: "404 Not Found",
 } as const;
 
 /** The CLI's wire: the action outcome as JSON, or the dark surface's bare 404. */
-const UI_ACTIONS_PRODUCES = ["application/json", "text/plain;charset=UTF-8"] as const;
+const UI_ACTIONS_PRODUCES = ["application/json", "text/plain; charset=UTF-8"] as const;
 const UI_ACTIONS_ANSWER = {
   produces: UI_ACTIONS_PRODUCES,
   because: "The CLI reads a bare 404 as the rollout being dark for the project.",

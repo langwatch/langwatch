@@ -42,6 +42,9 @@ export const STABLE_AUTH_ERRORS = [
   "OAuthAccountNotLinked",
   "DIFFERENT_EMAIL_NOT_ALLOWED",
   "SSO_PROVIDER_NOT_ALLOWED",
+  // Stable only as a fallback: the bounce leaves before any timer, and reaches the card only
+  // when the refusal named no connection the page will dial.
+  "SSO_REQUIRED_BY_ORGANIZATION",
   ...CUTOVER_SIGN_IN_ERROR_CODES,
   // The assertion gate's refusals: the provider still holds a live session, so a retry loops.
   "sso_sign_in_refused",

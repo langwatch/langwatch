@@ -100,3 +100,19 @@ export class PersonalProjectOwnerMismatchError extends Error {
     this.name = "PersonalProjectOwnerMismatchError";
   }
 }
+
+/** A newly created personal workspace, which project records as a created project (§9). */
+export const PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE =
+  "lw.organization.personal_workspace_provisioned" as const;
+
+/** Ids only: the tenant is the organization, and a peer reads the project through `ProjectApi`. */
+export const personalWorkspaceProvisionedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  projectId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type PersonalWorkspaceProvisionedEventData = z.infer<
+  typeof personalWorkspaceProvisionedEventDataSchema
+>;

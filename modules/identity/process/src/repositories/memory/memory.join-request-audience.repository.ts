@@ -3,6 +3,7 @@ import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
 import type {
+  JoinRequestAdmin,
   JoinRequestAudienceProfile,
   JoinRequestAudienceRepository,
 } from "../join-request-audience.repository.ts";
@@ -30,8 +31,8 @@ export class MemoryJoinRequestAudienceRepository implements JoinRequestAudienceR
     return name;
   }
 
-  async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
-    return [...(this.store.organizationAdminEmails.get(organizationId) ?? [])];
+  async findAdmins({ organizationId }: { organizationId: string }): Promise<JoinRequestAdmin[]> {
+    return [...(this.store.organizationAdmins.get(organizationId) ?? [])];
   }
 
   async getUserProfile({ userId }: { userId: string }): Promise<JoinRequestAudienceProfile> {

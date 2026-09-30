@@ -290,6 +290,7 @@ export function createDataRetentionTestApp(
     },
     config: {
       platformDefaultDays: input.platformDefaultRetentionDays?.toString(),
+      isSaas: true,
     },
     resources: new ResourceScope(),
     // No handle is ever resolved through it in these tests.

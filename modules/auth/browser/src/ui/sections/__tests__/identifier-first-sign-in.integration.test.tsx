@@ -12,19 +12,23 @@ const {
   routeMock,
   routeErrorRef,
   requestSignUpVerificationMock,
+  registerMock,
   signInMock,
   replaceMock,
   sessionRef,
   searchParamsRef,
+  publicEnvRef,
   priorSessionRef,
 } = vi.hoisted(() => ({
   routeMock: vi.fn(),
   routeErrorRef: { current: null as unknown },
   requestSignUpVerificationMock: vi.fn(),
+  registerMock: vi.fn(),
   signInMock: vi.fn(),
   replaceMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
   searchParamsRef: { current: new URLSearchParams("") },
+  publicEnvRef: { current: { IS_SAAS: true } as Record<string, unknown> },
   priorSessionRef: ((): { current: unknown } => ({ current: undefined }))(),
 }));
 
@@ -49,11 +53,16 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
         useQuery: () => ({ data: priorSessionRef.current }),
       },
     },
+    user: {
+      register: {
+        useMutation: () => ({ mutateAsync: registerMock, isPending: false, error: null }),
+      },
+    },
   },
 }));
 
 vi.mock("../../../behavior/use-public-env.ts", () => ({
-  usePublicEnv: () => ({ data: { IS_SAAS: true } }),
+  usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
@@ -76,7 +85,11 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 }));
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
-import { LAST_USED_METHOD_STORAGE_KEY } from "../../../model/last-used-method.ts";
+import {
+  LAST_USED_METHOD_STORAGE_KEY,
+  promotePendingMethod,
+} from "../../../model/last-used-method.ts";
+import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
 import { IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
 
 const passwordMethod: SignInMethod = {
@@ -95,6 +108,14 @@ const localPicker: RoutingDecision = {
   outcome: "method_picker",
   methodSet: [passwordMethod],
   reasonCode: "no_domain_match",
+};
+
+/** Nobody holds the address: the router's answer, asked by the address step
+ *  or by the password form. */
+const unknownIdentifier: RoutingDecision = {
+  outcome: "route_to_signup",
+  methodSet: [],
+  reasonCode: "identifier_unknown",
 };
 
 const renderScreen = () =>
@@ -129,22 +150,122 @@ describe("given the identifier-first sign-in screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // The address has an account unless a test says otherwise, which is what
-    // makes a rejected password a WRONG password by default. Set explicitly,
-    // because an unset mock resolves — and a resolved sign-up request means
-    // "no account here, a link is on its way", which is the opposite.
+    // makes a rejected password a WRONG password by default. The router is
+    // what answers that now: a picker means somebody holds the address, and
+    // only `route_to_signup` says nobody does.
     requestSignUpVerificationMock.mockRejectedValue(new Error("email_already_registered"));
+    registerMock.mockResolvedValue({ ok: true });
     routeErrorRef.current = null;
     sessionRef.current = { data: null };
     searchParamsRef.current = new URLSearchParams("");
+    publicEnvRef.current = { IS_SAAS: true };
     priorSessionRef.current = undefined;
     window.localStorage.clear();
+    _resetTwoStepChallengeForTests();
   });
 
   afterEach(() => cleanup());
 
+  describe("when an expired session of this browser's explains the arrival", () => {
+    /** @scenario "An expired session is recognised and the address carried forward" */
+    it("carries the address to the method step without anybody typing it", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      // Two answers: the instance question the screen always asks on mount,
+      // then the one the recovered address asks.
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      renderScreen();
+
+      // The address step is skipped entirely — the person lands where they
+      // would have landed had they typed what we already knew.
+      await waitFor(() => {
+        expect(routeMock).toHaveBeenCalledWith(
+          expect.objectContaining({ identifier: "sam@acme.com" }),
+        );
+      });
+      expect(await screen.findByText(/welcome back/i)).toBeInTheDocument();
+    });
+
+    /** @scenario "The expired notice replaces the greeting, not the error copy" */
+    it("says the session ran out, and does not greet a stranger or report a fault", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByText(/welcome back/i)).toBeInTheDocument();
+      expect(screen.getByText(/session expired/i)).toBeInTheDocument();
+      // Not the first-time greeting, and not an error: nothing went wrong, and
+      // an error tone sends somebody looking for a fault that does not exist.
+      expect(screen.queryByText(/log in to langwatch/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/went wrong/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Recognition is not authentication" */
+    it("still demands a credential, and signs nobody in on its own", async () => {
+      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+
+      renderScreen();
+      await screen.findByText(/welcome back/i);
+
+      // Knowing who somebody is is not proof that they are. The password form
+      // the picker renders is the proof, and nothing has been signed in.
+      // Exact label: /password/i also catches the "Forgot password?" link.
+      expect(await screen.findByLabelText("Password")).toBeInTheDocument();
+      expect(signInMock).not.toHaveBeenCalled();
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+
+    /**
+     * THE SECURITY ONE. A revoked session answers `unknown`, like a forgery,
+     * so the screen must look exactly like the cold one: naming the account
+     * after somebody ended every session would undo that.
+     */
+    /** @scenario "A revoked session is given the cold screen and no address" */
+    it("gives a revoked session the cold screen, naming nobody", async () => {
+      priorSessionRef.current = { kind: "unknown" };
+      routeMock.mockResolvedValue(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByText(/log in to langwatch/i)).toBeInTheDocument();
+      expect(screen.queryByText(/welcome back/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/acme\.com/i)).not.toBeInTheDocument();
+      // And no address was handed to the router on anybody's behalf.
+      expect(routeMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ identifier: expect.stringContaining("@") }),
+      );
+    });
+  });
+
+  /** @scenario "A sole SSO provider waits for a sign-in gesture" */
+  it("waits for an explicit click before using the sole provider", async () => {
+    routeMock.mockResolvedValue({
+      outcome: "redirect_to_connection",
+      connectionId: "org:acme",
+      methodSet: [oktaMethod],
+      reasonCode: "sole_connection",
+    });
+    renderScreen();
+    const continueButton = await screen.findByRole("button", {
+      name: /continue with okta/i,
+    });
+    expect(signInMock).not.toHaveBeenCalled();
+    await userEvent.click(continueButton);
+    expect(signInMock).toHaveBeenCalledTimes(1);
+    expect(signInMock).toHaveBeenCalledWith(
+      "okta",
+      expect.objectContaining({ callbackUrl: undefined }),
+    );
+  });
+
   describe("when an address routes to an identity provider", () => {
     /** @scenario The email step renders the routed outcome */
-    it("sends the person to the provider the decision named", async () => {
+    /** @scenario "The address typed on our screen rides along to the identity provider" */
+    it("sends the person to the provider the decision named, address in hand", async () => {
       routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
         outcome: "redirect_to_connection",
         connectionId: "org:acme",
@@ -156,11 +277,34 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("sam@acme.com");
 
       await waitFor(() => {
+        // The typed address rides along as the OIDC login hint, so the
+        // provider's screen arrives prefilled with it.
         expect(signInMock).toHaveBeenCalledWith("okta", {
           callbackUrl: undefined,
+          loginHint: "sam@acme.com",
         });
       });
       expect(await screen.findByTestId("routed-to-connection")).toHaveTextContent(/okta/i);
+    });
+
+    /** @scenario "A provider my address was routed to is badged once it lets me in" */
+    it("parks the provider it dials, so the landing can badge it", async () => {
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+      await waitFor(() => expect(signInMock).toHaveBeenCalled());
+
+      // Nothing is badged by the dial itself: the provider may still refuse.
+      expect(window.localStorage.getItem(LAST_USED_METHOD_STORAGE_KEY)).toBeNull();
+      // The landing is what promotes it, exactly as the session fetch does.
+      promotePendingMethod();
+      expect(window.localStorage.getItem(LAST_USED_METHOD_STORAGE_KEY)).toBe(oktaMethod.id);
     });
 
     /** @scenario Wrong-method guidance points at the method my account holds */
@@ -226,8 +370,7 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
-  describe("when two visitors enter a registered and an unregistered address", () => {
-    /** @scenario The picker looks the same whether or not my account exists */
+  describe("when two visitors receive the same routed decision", () => {
     it("renders the same picker, from the same one request, for both", async () => {
       routeMock.mockResolvedValue(localPicker);
 
@@ -302,15 +445,26 @@ describe("given the identifier-first sign-in screen", () => {
   });
 
   describe("when the address typed in has no account at all", () => {
-    /** @scenario A password typed at the log-in door never becomes an account's password */
-    it("asks for a link and never banks the password that was typed", async () => {
-      routeMock.mockResolvedValue(localPicker);
+    /**
+     * The router is asked three times: on mount, for the typed address, and
+     * by the password form to tell a wrong password from a sign-up. Only the
+     * last says nobody holds the address.
+     */
+    const refusedForAnUnheldAddress = () => {
+      routeMock
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValue(unknownIdentifier);
       signInMock.mockResolvedValue({
         error: "INVALID_EMAIL_OR_PASSWORD",
         code: "INVALID_EMAIL_OR_PASSWORD",
         status: 401,
       });
-      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
+    };
+
+    /** @scenario A password typed at the log-in door never becomes an account's password */
+    it("asks for verification and never banks the password that was typed", async () => {
+      refusedForAnUnheldAddress();
 
       const { container } = renderScreen();
       await enterEmail("nobody@example.com");
@@ -319,54 +473,82 @@ describe("given the identifier-first sign-in screen", () => {
       await userEvent.type(container.querySelector('input[type="password"]')!, "a-new-password");
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
-      expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
-        /nobody@example\.com/,
+      expect(await screen.findByTestId("unknown-identifier")).toHaveTextContent(
+        "nobody@example.com",
       );
-      // The address, and ONLY the address. A password typed into a field
-      // spelled `current-password` must never become an account's password:
-      // it was never confirmed and never held to a length.
-      expect(requestSignUpVerificationMock).toHaveBeenCalledWith({
-        email: "nobody@example.com",
-      });
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(screen.getByRole("button", { name: /send confirmation link/i })).toBeTruthy();
       // No refusal is shown on the way: nothing dead-ends here.
       expect(container.textContent).not.toMatch(/invalid email or password/i);
     });
 
+    /** @scenario Converting at the log-in door still asks for the password properly */
+    it("sends verification before asking for a new password", async () => {
+      refusedForAnUnheldAddress();
+
+      const { container } = renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("method-picker");
+      await userEvent.type(
+        container.querySelector('input[type="password"]')!,
+        "typed-at-the-log-in-door",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+      await screen.findByTestId("unknown-identifier");
+
+      await userEvent.click(screen.getByRole("button", { name: /send confirmation link/i }));
+      expect(requestSignUpVerificationMock).toHaveBeenCalledWith({
+        email: "nobody@example.com",
+      });
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario No credential is collected until the confirmation link is opened */
+    it("creates no account while the confirmation is being sent", async () => {
+      refusedForAnUnheldAddress();
+
+      const { container } = renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("method-picker");
+      await userEvent.type(container.querySelector('input[type="password"]')!, "a-new-password");
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+      await screen.findByTestId("unknown-identifier");
+
+      await userEvent.click(screen.getByRole("button", { name: /send confirmation link/i }));
+      expect(requestSignUpVerificationMock).toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+
     /** @scenario Going back from a sent link returns to the address step */
     it("goes back to the address step when the address was wrong", async () => {
-      routeMock.mockResolvedValue(localPicker);
-      signInMock.mockResolvedValue({
-        error: "INVALID_EMAIL_OR_PASSWORD",
-        code: "INVALID_EMAIL_OR_PASSWORD",
-        status: 401,
-      });
-      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
+      refusedForAnUnheldAddress();
 
       const { container } = renderScreen();
       await enterEmail("typo@example.com");
       await screen.findByTestId("method-picker");
       await userEvent.type(container.querySelector('input[type="password"]')!, "a-new-password");
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
-      await screen.findByTestId("verification-sent");
+      await screen.findByTestId("unknown-identifier");
 
-      await userEvent.click(screen.getByTestId("check-email-back"));
+      await userEvent.click(screen.getByRole("button", { name: /use a different email/i }));
 
       // All the way back to the address, not back to the password step for
       // the address they came here to change.
       expect(await screen.findByLabelText(/email/i)).toBeTruthy();
-      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
       expect(screen.queryByTestId("method-picker")).toBeNull();
     });
 
     /** @scenario Signing in without an account creates it through verification */
     it("keeps the honest failure when the address does have an account", async () => {
+      // The router says somebody holds it, both times it is asked, so the
+      // refusal really was a wrong password.
       routeMock.mockResolvedValue(localPicker);
       signInMock.mockResolvedValue({
         error: "INVALID_EMAIL_OR_PASSWORD",
         code: "INVALID_EMAIL_OR_PASSWORD",
         status: 401,
       });
-      requestSignUpVerificationMock.mockRejectedValue(new Error("email_already_registered"));
 
       const { container } = renderScreen();
       await enterEmail("sam@example.com");
@@ -376,7 +558,8 @@ describe("given the identifier-first sign-in screen", () => {
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
       expect(await screen.findByText(/invalid email or password/i)).toBeTruthy();
-      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
     });
   });
 
@@ -426,13 +609,18 @@ describe("given the identifier-first sign-in screen", () => {
   });
 
   describe("when this browser has signed in before", () => {
-    /** @scenario The method last used on this device is badged, never reordered */
-    it("badges the method it remembers, in the order the decision named", async () => {
+    /**
+     * The ordering assertion is REVERSED on purpose: ADR-117's 2026-08-25
+     * revision makes the list the ACCOUNT's, so promoting the method it last
+     * used is the screen agreeing with itself. The badge still says which one.
+     */
+    /** @scenario The method last used on this device leads, and is badged */
+    it("promotes the method it remembers and badges it", async () => {
       window.localStorage.setItem(LAST_USED_METHOD_STORAGE_KEY, oktaMethod.id);
       routeMock.mockResolvedValue({
         outcome: "method_picker",
         methodSet: [passwordMethod, oktaMethod],
-        reasonCode: "no_domain_match",
+        reasonCode: "account_methods",
       } satisfies RoutingDecision);
 
       renderScreen();
@@ -445,12 +633,33 @@ describe("given the identifier-first sign-in screen", () => {
         /last used/i,
       );
 
-      // The badge is a label, never an ordering: the password method the
-      // decision named first is still first.
+      // Okta was named second and is drawn first, because this browser last
+      // got in that way. Everything below it keeps the server's order.
       const picker = screen.getByTestId("method-picker");
       const passwordFieldIndex = picker.innerHTML.indexOf('type="password"');
       const oktaIndex = picker.innerHTML.indexOf("Continue with Okta");
       expect(passwordFieldIndex).toBeGreaterThan(-1);
+      expect(oktaIndex).toBeLessThan(passwordFieldIndex);
+    });
+
+    /** @scenario A local hint never overrules the deployment's own ranking */
+    it("keeps the server's order when this browser remembers a method the account no longer holds", async () => {
+      window.localStorage.setItem(LAST_USED_METHOD_STORAGE_KEY, "gitlab");
+      routeMock.mockResolvedValue({
+        outcome: "method_picker",
+        methodSet: [passwordMethod, oktaMethod],
+        reasonCode: "account_methods",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@example.com");
+      const picker = await screen.findByTestId("method-picker");
+
+      // A hint naming something that is not on offer is a stale note, not an
+      // instruction: nothing is promoted and nothing is badged.
+      expect(screen.queryByTestId("last-used-method")).toBeNull();
+      const passwordFieldIndex = picker.innerHTML.indexOf('type="password"');
+      const oktaIndex = picker.innerHTML.indexOf("Continue with Okta");
       expect(passwordFieldIndex).toBeLessThan(oktaIndex);
     });
 
@@ -531,63 +740,113 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
-  describe("when an expired session of this browser's explains the arrival", () => {
-    /** @scenario "An expired session is recognised and the address carried forward" */
-    it("carries the address to the method step without anybody typing it", async () => {
-      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
-      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
-
-      renderScreen();
-
-      await waitFor(() => {
-        expect(routeMock).toHaveBeenCalledWith(
-          expect.objectContaining({ identifier: "sam@acme.com" }),
-        );
-      });
-      expect(await screen.findByText(/welcome back/i)).toBeInTheDocument();
-    });
-
-    /** @scenario "The expired notice replaces the greeting, not the error copy" */
-    it("says the session ran out, and does not greet a stranger or report a fault", async () => {
-      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
-      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
-
-      renderScreen();
-
-      expect(await screen.findByText(/welcome back/i)).toBeInTheDocument();
-      expect(screen.getByText(/session expired/i)).toBeInTheDocument();
-      expect(screen.queryByText(/log in to langwatch/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/went wrong/i)).not.toBeInTheDocument();
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    });
-
-    /** @scenario "Recognition is not authentication" */
-    it("still demands a credential, and signs nobody in on its own", async () => {
-      priorSessionRef.current = { kind: "expired", email: "sam@acme.com" };
-      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce(localPicker);
+  describe("when the router says no account holds the address", () => {
+    /** @scenario An address with no account carries on as a sign-up */
+    it("says so and asks to verify, the way the sign-up door does", async () => {
+      routeMock.mockResolvedValue(unknownIdentifier);
 
       const { container } = renderScreen();
-      await screen.findByTestId("method-picker");
+      await enterEmail("nobody@example.com");
 
-      expect(container.querySelector('input[type="password"]')).not.toBeNull();
-      expect(signInMock).not.toHaveBeenCalled();
-      expect(replaceMock).not.toHaveBeenCalled();
+      expect(await screen.findByText(/no account for that email address yet/i)).toBeTruthy();
+      expect(screen.queryByTestId("method-picker")).toBeNull();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(screen.getByRole("button", { name: /send confirmation link/i })).toBeTruthy();
     });
 
-    /** @scenario "A revoked session is given the cold screen and no address" */
-    it("gives a revoked session the cold screen, naming nobody", async () => {
-      priorSessionRef.current = { kind: "unknown" };
-      routeMock.mockResolvedValue(localPicker);
+    /** @scenario An address with no account carries on as a sign-up */
+    it("carries the address, so nothing is typed twice", async () => {
+      routeMock.mockResolvedValue(unknownIdentifier);
 
       renderScreen();
+      await enterEmail("nobody@example.com");
 
-      expect(await screen.findByText(/log in to langwatch/i)).toBeInTheDocument();
-      expect(screen.queryByText(/welcome back/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/acme\.com/i)).not.toBeInTheDocument();
-      expect(routeMock).not.toHaveBeenCalledWith(
-        expect.objectContaining({ identifier: expect.stringContaining("@") }),
+      expect(await screen.findByTestId("unknown-identifier")).toHaveTextContent(
+        "nobody@example.com",
       );
+      expect(screen.queryByLabelText(/email/i)).toBeNull();
+    });
+
+    /** @scenario No credential is collected until the confirmation link is opened */
+    it("mails the proof before collecting any credential", async () => {
+      routeMock.mockResolvedValue(unknownIdentifier);
+      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
+
+      renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("unknown-identifier");
+
+      expect(registerMock).not.toHaveBeenCalled();
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
+
+      await userEvent.click(screen.getByRole("button", { name: /send confirmation link/i }));
+
+      await waitFor(() =>
+        expect(requestSignUpVerificationMock).toHaveBeenCalledWith({
+          email: "nobody@example.com",
+        }),
+      );
+      expect(registerMock).not.toHaveBeenCalled();
+      expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
+        "nobody@example.com",
+      );
+    });
+
+    /**
+     * The router reads the projection and `user.register` the account, so an
+     * account the projection lags is invisible to one and plain to the other.
+     * "Already registered" used to be a dead end here.
+     */
+    /** @scenario Sign-up with an address that already has an account becomes a log-in */
+    it("becomes the log-in picker when the address turns out to be held", async () => {
+      // Mount, then the address (nobody holds it), then the re-ask after
+      // `user.register` says otherwise.
+      routeMock
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValueOnce(unknownIdentifier)
+        .mockResolvedValue(localPicker);
+      requestSignUpVerificationMock.mockRejectedValue({
+        data: {
+          error: {
+            code: "email_already_registered",
+            httpStatus: 409,
+            fault: "customer",
+          },
+        },
+      });
+
+      renderScreen();
+      await enterEmail("sam@example.com");
+      await screen.findByTestId("unknown-identifier");
+      await userEvent.click(screen.getByRole("button", { name: /send confirmation link/i }));
+
+      expect(await screen.findByTestId("method-picker")).toBeTruthy();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
+    });
+
+    /** @scenario The sign-up door never offers to use a passkey that already exists */
+    it("offers no passkey until the emailed proof returns", async () => {
+      publicEnvRef.current = { IS_SAAS: true };
+      routeMock.mockResolvedValue(unknownIdentifier);
+
+      renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("unknown-identifier");
+
+      expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
+      expect(screen.queryByTestId("passkey-sign-in")).toBeNull();
+    });
+
+    /** @scenario An address with no account carries on as a sign-up */
+    it("goes back to the address step for a mistyped address", async () => {
+      routeMock.mockResolvedValue(unknownIdentifier);
+
+      renderScreen();
+      await enterEmail("nobody@example.com");
+      await userEvent.click(await screen.findByRole("button", { name: /use a different email/i }));
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
     });
   });
 });

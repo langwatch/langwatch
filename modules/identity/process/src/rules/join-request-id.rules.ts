@@ -1,5 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 
+import { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "../eventing/join-request-lifecycle.process.ts";
+
 /**
  * Join-request identity (D12): every id/command-id form lives here, never
  * duplicated. A persisted contract — changing a form makes every prior
@@ -46,4 +48,23 @@ export function approveJoinCommandId({
   resolvedById: string;
 }): string {
   return `join-approve:${joinRequestId}:${resolvedByType}:${resolvedById}`;
+}
+
+/**
+ * One recipient's delivery of one notice, as main keys it
+ * (`process:tenant:message:recipient`): a retried send is the same mail, and the
+ * recipient is named by user id.
+ */
+export function joinNotificationDeliveryKey({
+  organizationId,
+  joinRequestId,
+  kind,
+  recipientUserId,
+}: {
+  organizationId: string;
+  joinRequestId: string;
+  kind: string;
+  recipientUserId: string;
+}): string {
+  return `${JOIN_REQUEST_LIFECYCLE_PROCESS_NAME}:${organizationId}:join:${joinRequestId}:${kind}:${recipientUserId}`;
 }

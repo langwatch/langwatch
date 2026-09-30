@@ -22,6 +22,7 @@ import type {
   ConversationListItem,
   ConversationListPage,
 } from "../rules/langy-conversation-shape.rules.ts";
+import type { LatestControlRequest } from "../rules/langy-local-control-request-state.rules.ts";
 import {
   type LangyConversationService,
   ADOPTABLE_CONVERSATION_ID,
@@ -169,6 +170,14 @@ export class LangyService {
     userId: string;
   }): Promise<LangyLocalRecord> {
     return this.conversations.getLocalRecord(input);
+  }
+
+  /** The latest request to share a folder, and whether a folder connected through it. */
+  getLatestLocalControlRequest(input: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LatestControlRequest | null> {
+    return this.conversations.getLatestLocalControlRequest(input);
   }
 
   findByIdVisible(input: {

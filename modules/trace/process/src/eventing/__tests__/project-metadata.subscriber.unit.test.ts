@@ -195,7 +195,30 @@ describe("createProjectMetadataHandler()", () => {
       });
     });
 
-    /** @scenario First trace tracks the PostHog integration milestone against the org admin */
+    /** @scenario The project metadata subscriber names three capabilities, not a service */
+    it("runs over a project read, a metadata write and an org-admin lookup alone", async () => {
+      const subscriber = createProjectMetadataHandler({
+        projects: {
+          findById: (id) => mockProjects.findById(id),
+          updateMetadata: (input) => mockProjects.updateMetadata(input),
+          resolveOrgAdmin: (id) => mockProjects.resolveOrgAdmin(id),
+        },
+        nurturing: { recordSignal: mockRecordSignal },
+      });
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ firstMessage: true }),
+      });
+    });
+
+    /**
+     * @scenario First trace tracks the PostHog integration milestone against the org admin
+     * @scenario The milestone is attributed to the person the browser knows
+     * @scenario The first-trace milestone is recorded through a sink, not a function
+     */
     it("tracks first_trace_integrated against the org admin", async () => {
       const subscriber = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
@@ -218,6 +241,21 @@ describe("createProjectMetadataHandler()", () => {
         projectId: tenantId,
         sdkLanguage: "python",
         sdkFramework: "openai",
+      });
+    });
+
+    /** @scenario Recording never fails the trace that caused it */
+    it("still writes the project when the nurturing signal is refused", async () => {
+      mockRecordSignal.mockRejectedValueOnce(new Error("nurturing unavailable"));
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await expect(
+        subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
+      ).resolves.toBeUndefined();
+
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ integrated: true }),
       });
     });
 
@@ -688,6 +726,22 @@ describe("createProjectMetadataHandler()", () => {
         });
 
         expect(isRealFirstIngest(state)).toBe(false);
+      });
+
+      /** @scenario Langy's own turn is not the project's first trace */
+      it("leaves the project unmarked and tells nurturing nothing", async () => {
+        mockProjects.findById.mockResolvedValue({
+          id: tenantId,
+          firstMessage: false,
+          integrated: false,
+        });
+        const subscriber = createProjectMetadataHandler(deps);
+        const state = createFoldState({ attributes: { "langwatch.origin": "langy" } });
+
+        await subscriber(createEvent(tenantId), createContext(tenantId, state));
+
+        expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
+        expect(mockRecordSignal).not.toHaveBeenCalled();
       });
     });
   });

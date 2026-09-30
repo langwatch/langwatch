@@ -9,6 +9,7 @@ export type CustomerIoChannelOptions = {
   config: {
     customerIoApiKey?: string;
     customerIoRegion?: string;
+    customerIoBaseUrl?: string;
   };
   fetchFn?: typeof fetch;
   errorReporter?: { capture(error: Error, context?: Record<string, unknown>): void };

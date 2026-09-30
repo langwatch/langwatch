@@ -15,7 +15,6 @@ export const TEST_PUBLIC_ENVIRONMENT: AuthPublicEnvironment = {
   BASE_HOST: "http://localhost:5560",
   DEMO_PROJECT_SLUG: undefined,
   NODE_ENV: "test",
-  IDENTITY_FRONT_DOOR: false,
   PASSKEYS_ENABLED: false,
   HAS_EMAIL_PROVIDER_KEY: true,
   IS_SAAS: false,

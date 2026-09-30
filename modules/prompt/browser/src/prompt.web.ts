@@ -16,6 +16,7 @@ export const promptWeb = defineWebModule("prompt")
       path: "/:project/prompts",
       within: "project",
       label: "Prompts",
+      requires: "prompts:view",
       load: () => import("./ui/sections/prompt-studio/prompt-studio-screen.tsx"),
     },
   })

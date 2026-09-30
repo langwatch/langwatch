@@ -48,6 +48,7 @@
     "hono": "catalog:",
     "hono-openapi": "catalog:",
     "nanoid": "catalog:",
+    "slugify": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

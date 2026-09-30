@@ -13,6 +13,7 @@ const { state } = vi.hoisted(() => ({
     groups: [] as Record<string, unknown>[],
     provenance: {} as Record<string, { source: string }>,
     membershipQueried: [] as string[],
+    departments: [] as Record<string, unknown>[],
   },
 }));
 
@@ -25,6 +26,9 @@ vi.mock("../../../behavior/scim-api.ts", () => {
           useQuery: () => read(() => ({ connections: state.connections, recentChanges: [] })),
         },
       },
+    },
+    departmentsApi: {
+      departments: { list: { useQuery: () => read(() => state.departments) } },
     },
     directoryMembershipApi: {
       group: {
@@ -51,7 +55,7 @@ vi.mock("../../../behavior/scim-api.ts", () => {
   };
 });
 
-import { renderWithScimHost } from "../../../testing.tsx";
+import { FakeScimHost, renderWithScimHost } from "../../../testing.tsx";
 import { DirectoryOverviewCard } from "../directory-overview-card.tsx";
 
 afterEach(cleanup);
@@ -77,6 +81,7 @@ beforeEach(() => {
     ivy: { source: "invited" },
   };
   state.membershipQueried = [];
+  state.departments = [];
 });
 
 describe("given a directory that manages three of four members", () => {
@@ -117,5 +122,25 @@ describe("given a connection whose provider has not pushed yet", () => {
       "href",
       "/settings/authentication/connectors",
     );
+  });
+});
+
+describe("given governance is on and the organization has departments", () => {
+  it("names them under the groups, and says nothing when governance is off", () => {
+    state.departments = [
+      { id: "d-1", name: "Support" },
+      { id: "d-2", name: "Finance" },
+    ];
+    const on = renderWithScimHost(
+      <DirectoryOverviewCard organizationId="org-1" canReadMembership />,
+      new FakeScimHost({ flags: ["release_ui_ai_governance_enabled"] }),
+    );
+    expect(
+      screen.getAllByTestId("directory-card-department-chip").map((chip) => chip.textContent),
+    ).toEqual(["Support", "Finance"]);
+    on.unmount();
+
+    renderWithScimHost(<DirectoryOverviewCard organizationId="org-1" canReadMembership />);
+    expect(screen.queryByTestId("directory-card-department-chip")).toBeNull();
   });
 });

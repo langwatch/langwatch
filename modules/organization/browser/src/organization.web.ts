@@ -90,6 +90,12 @@ export const organizationWeb = defineWebModule("organization")
     },
     /** Shown in place of the dashboard body to a member on none of its teams. */
     teamAccessWaiting: { load: () => import("./ui/sections/team-access-waiting.tsx") },
+    /** People waiting at the door, lent to project's home for those who can answer (§3.4 r7). */
+    pendingJoinRequests: {
+      load: async () => ({
+        default: (await import("./ui/sections/pending-join-requests.tsx")).PendingJoinRequests,
+      }),
+    },
     /** A project's department row, lent to project's settings form (§3.4 rule 7). */
     projectDepartmentField: {
       load: async () => ({

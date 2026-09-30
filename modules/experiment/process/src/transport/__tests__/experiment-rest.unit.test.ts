@@ -5,6 +5,7 @@
  * @vitest-environment node
  */
 import type { Experiment } from "@langwatch/experiment-contract";
+import { NotFoundError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -40,6 +41,7 @@ const listing = {
 
 describe("given the project's experiments over REST", () => {
   describe("when the listing is read", () => {
+    /** @scenario "Authenticated request lists experiments scoped to the project" */
     it("answers each entry with its identifiers, its type and its run aggregates", async () => {
       const { send } = mountExperimentRest({ app: { ...listing } });
 
@@ -59,6 +61,7 @@ describe("given the project's experiments over REST", () => {
       });
     });
 
+    /** @scenario "Authenticated request lists experiments scoped to the project" */
     it("reads the project off the credential, never off the request", async () => {
       const getPage = vi.fn(async () => ({ experiments: [], totalHits: 0 }));
       const { send } = mountExperimentRest({
@@ -92,6 +95,7 @@ describe("given the project's experiments over REST", () => {
       expect(getPage).toHaveBeenCalledWith({ projectId: PROJECT_ID, page: 1, pageSize: 200 });
     });
 
+    /** @scenario "Pagination returns the requested page" */
     it("reports more pages while the window has not reached the total", async () => {
       const { send } = mountExperimentRest({
         app: {
@@ -109,6 +113,7 @@ describe("given the project's experiments over REST", () => {
   });
 
   describe("when one experiment is read", () => {
+    /** @scenario "Reading one experiment answers with the same shape the list uses" */
     it("answers the same row shape the list puts in its array", async () => {
       const { send } = mountExperimentRest({
         app: {
@@ -129,6 +134,26 @@ describe("given the project's experiments over REST", () => {
       });
     });
 
+    /** @scenario "A slug that names no experiment is refused by name" */
+    it("refuses a slug that names no experiment by its code", async () => {
+      const { send } = mountExperimentRest({
+        app: {
+          getBySlugOrId: async () => {
+            throw new NotFoundError("experiment_not_found", {
+              resource: "Experiment",
+              id: "does-not-exist",
+            });
+          },
+        },
+      });
+
+      const response = await send("/api/experiments/does-not-exist");
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error: "experiment_not_found" });
+    });
+
+    /** @scenario "An experiment in another project is not readable" */
     it("looks the slug up only inside the credential's project", async () => {
       const getBySlugOrId = vi.fn(async () => experiment);
       const { send } = mountExperimentRest({
@@ -143,6 +168,7 @@ describe("given the project's experiments over REST", () => {
       });
     });
 
+    /** @scenario "Either identifier the list returns can be read back" */
     it("accepts the id as well, because the same list row carries both", async () => {
       const getBySlugOrId = vi.fn(async () => experiment);
       const { send } = mountExperimentRest({
@@ -245,6 +271,7 @@ describe("given the project's experiments over REST", () => {
   });
 
   describe("when the caller presents no usable credential", () => {
+    /** @scenario "Unauthenticated request returns 401" */
     it("is refused before any handler runs", async () => {
       const getPage = vi.fn();
       const { send } = mountExperimentRest({ app: { getPage } });
@@ -253,6 +280,19 @@ describe("given the project's experiments over REST", () => {
 
       expect(response.status).toBe(401);
       expect(getPage).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Reading one experiment needs the project key" */
+    it("refuses reading one experiment before any handler runs", async () => {
+      const getBySlugOrId = vi.fn();
+      const { send } = mountExperimentRest({ app: { getBySlugOrId } });
+
+      const response = await send("/api/experiments/support-email-classifier", {
+        as: "nobody-issued-this",
+      });
+
+      expect(response.status).toBe(401);
+      expect(getBySlugOrId).not.toHaveBeenCalled();
     });
 
     it("authenticates before it authorizes", async () => {

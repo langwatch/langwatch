@@ -20,8 +20,19 @@ vi.mock("../../../behavior/use-guided-provider-connect.ts", () => ({
 }));
 
 vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
-  LentEditModelProviderForm: ({ providerKey }: { providerKey: string }) => (
-    <div data-testid="stub-form">{providerKey}</div>
+  LentEditModelProviderForm: ({
+    providerKey,
+    onSaved,
+  }: {
+    providerKey: string;
+    onSaved: (saved: { chatModel?: string }) => Promise<void>;
+  }) => (
+    <div data-testid="stub-form">
+      {providerKey}
+      <button type="button" onClick={() => void onSaved({ chatModel: "m" })}>
+        stub-save
+      </button>
+    </div>
   ),
 }));
 
@@ -61,6 +72,26 @@ describe("ProviderScreen", () => {
     );
     expect(emitMock).toHaveBeenCalledWith("viewed", "provider");
   }, 10000);
+
+  it("offers the marks as one radio group with the first provider checked", () => {
+    renderScreen();
+    const group = screen.getByRole("radiogroup", { name: "AI provider" });
+    const marks = within(group).getAllByRole("radio");
+    expect(marks[0]).toHaveAttribute("aria-checked", "true");
+    expect(marks[1]).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("reports a failed save as a failed provider event", async () => {
+    onSavedMock.mockRejectedValueOnce(new Error("nope"));
+    renderScreen();
+    screen.getByText("stub-save").click();
+    await waitFor(() =>
+      expect(emitMock).toHaveBeenCalledWith("failed", "provider", {
+        provider: "openai_codex",
+        code: "save_failed",
+      }),
+    );
+  });
 
   it("switches the credential panel to the picked provider", async () => {
     renderScreen();

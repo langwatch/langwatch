@@ -93,7 +93,9 @@ const deployment: BetterAuthDeploymentConfiguration = {
 
 function buildOptions(
   federation: StubFederation,
-  addressRoutesToConnection: (input: { email: string }) => Promise<boolean> = async () => false,
+  findGoverningConnections: (input: {
+    email: string;
+  }) => Promise<readonly string[]> = async () => [],
 ) {
   return createAuthOptions({
     repo: {} as never,
@@ -106,7 +108,7 @@ function buildOptions(
     ssoIssuers: { issuersForRequest: async () => [] },
     /** No organization has set a threshold, so nothing is ever locked out. */
     signInLockout: signInSecurityFixture({ now: nowInstant }).lockout,
-    addressRoutesToConnection,
+    findGoverningConnections,
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: null,
@@ -119,9 +121,11 @@ function buildOptions(
 
 function buildHook(
   federation: StubFederation,
-  addressRoutesToConnection: (input: { email: string }) => Promise<boolean> = async () => false,
+  findGoverningConnections: (input: {
+    email: string;
+  }) => Promise<readonly string[]> = async () => [],
 ) {
-  const authOptions = buildOptions(federation, addressRoutesToConnection);
+  const authOptions = buildOptions(federation, findGoverningConnections);
   const before = authOptions.hooks?.before;
   if (!before) throw new Error("createAuthOptions did not wire a `before` hook");
   return (path: string, body: unknown = {}) =>
@@ -189,6 +193,7 @@ describe("the SSO license-gate request hook", () => {
 
   describe("given a request to better-auth's own raw sign-up route", () => {
     /** @scenario "Raw password sign-up is closed on every deployment, licensed or not" */
+    /** @scenario "Raw password sign-up cannot bypass confirmed registration" */
     it("refuses with 404 before any license or gate state is read, even in plain email mode", async () => {
       const federation = new StubFederation();
       federation.federationCapableValue = false;
@@ -289,27 +294,32 @@ describe("a deployment that issues its own passwords beside its provider (D09)",
   });
 
   describe("given an address its organization routes through its own identity provider", () => {
-    const governed = async ({ email }: { email: string }) => email.endsWith("@acme.com");
+    const governed = async ({ email }: { email: string }) =>
+      email.endsWith("@acme.com") ? ["ssoc_acme"] : [];
 
     /** @scenario "An organization's own connection still refuses a local password" */
-    it("refuses a password reset for that address and lets an ordinary one through", async () => {
-      const federation = new StubFederation();
-      federation.federationCapableValue = false;
-      const run = buildHook(federation, governed);
+    /** @scenario "A recovery grant cannot start a password reset for an SSO governed address" */
+    it.each([false, true])(
+      "refuses a password reset for that address and lets an ordinary one through (federation %s)",
+      async (federationCapable) => {
+        const federation = new StubFederation();
+        federation.federationCapableValue = federationCapable;
+        const run = buildHook(federation, governed);
 
-      await expect(
-        run("/api/auth/request-password-reset", { email: "jo@acme.com" }),
-      ).rejects.toMatchObject({ body: { code: "EMAIL_PASSWORD_DISABLED" } });
-      await expect(
-        run("/api/auth/request-password-reset", { email: "sam@home.net" }),
-      ).resolves.toBeUndefined();
-    });
+        await expect(
+          run("/api/auth/request-password-reset", { email: "jo@acme.com" }),
+        ).rejects.toMatchObject({ body: { code: "EMAIL_PASSWORD_DISABLED" } });
+        await expect(
+          run("/api/auth/request-password-reset", { email: "sam@home.net" }),
+        ).resolves.toBeUndefined();
+      },
+    );
 
     /** @scenario "An organization's own connection still refuses a local password" */
     it("allows an address-less reset, which carries a token and no email", async () => {
       const federation = new StubFederation();
       federation.federationCapableValue = false;
-      const lookup = vi.fn(async () => true);
+      const lookup = vi.fn(async () => ["ssoc_acme"]);
 
       await expect(
         buildHook(federation, lookup)("/api/auth/reset-password", { token: "t", newPassword: "x" }),

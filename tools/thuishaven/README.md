@@ -233,6 +233,18 @@ environment already names one; it never sets `OPENAI_BASE_URL`, because every
 OpenAI model call in the stack falls back to it. Its console, at the lane's
 own URL, lists recent calls with their turns and protocol events.
 
+analytics — the product-analytics stand-in (`services/analyticssim`) — is
+opt-in: `haven up +analytics` once runs the `analytics` lane, routed at
+`analytics.<slug>.langwatch.localhost`. It accepts PostHog's capture calls
+(posthog-node's `/batch/`, posthog-js's `/e/`, flags answered empty) and
+Customer.io's CDP (`/v1/identify|track|group|batch`) and Track APIs, and keeps
+each call as one record (provider, kind, id, name, properties, raw). The overlay
+sets `POSTHOG_HOST` and `CUSTOMER_IO_BASE_URL` to its route, plus
+`POSTHOG_KEY=phc_analyticssim` and `CUSTOMER_IO_API_KEY=analyticssim` where no
+key is set, leaving any provider whose host `.env` names alone. Its console and
+`/_sim/api/records?provider=&kind=&id=&name=` list what was sent; apidiff's
+`analytics` verify step reads the same list.
+
 Mail, IdP, storage and voice are bundled into the installed Haven binary. Each stack runs its
 own supervised simulator processes with its own ports. Under Haven's home
 (`~/.langwatch/portless`, or `LANGWATCH_PORTLESS_HOME`), mail persists in `mail/<slug>/` and

@@ -90,6 +90,12 @@ Feature: Annotation service boundary
       Then the invalid member is rejected before any queue lookup or write
 
     @unit
+    Scenario: A queue's slug is its slugified name, as the legacy product wrote it
+      Given a queue configuration is named "Café & Réview_Team"
+      When the queue service configures the queue
+      Then the queue's slug is "cafe-and-review-team"
+
+    @unit
     Scenario: Completing an item derives the organisation from its project
       Given a reviewer names a queue item in a project
       When the queue service marks the item done

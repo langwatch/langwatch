@@ -1,5 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { AggregateSearchResult } from "@langwatch/ops-contract";
+import { type AggregateSearchResult, OpsSearchQueryRequiredError } from "@langwatch/ops-contract";
 
 import type {
   AggregateDiscoveryRow,
@@ -93,7 +93,7 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       // Rationale lives in the comment above (cross-tenant unbounded scan
       // over the whole event_log) but the message reaches the ops UI - the
       // user-facing text should tell them what to do, not name the method.
-      throw new Error("Enter a search query or pick at least one tenant before searching.");
+      throw new OpsSearchQueryRequiredError();
     }
 
     // No silent time clamp in repo; caller supplies sinceMs explicitly.

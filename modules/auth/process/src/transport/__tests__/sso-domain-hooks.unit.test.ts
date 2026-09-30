@@ -19,8 +19,10 @@ import type {
   BetterAuthFederation,
 } from "../../channels/better-auth.channel.ts";
 import {
+  afterAccountUpdate,
   afterUserCreate,
   createBeforeAccountCreateHook,
+  type BetterAuthHookCollaborators,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type {
   BetterAuthHookOrganization,
@@ -285,13 +287,15 @@ describe("signing in through a domain-matched organization's identity provider",
 
   describe("given an existing user signs in through the organization's own provider", () => {
     /** @scenario Existing user with correct SSO provider auto-links */
+    /** @scenario "An organization pinned to Google still signs in with Google" */
     it("lets the account row be created and leaves the pending flag alone", async () => {
       const { double: repo, mocks } = accountRepo({ organization: ACME, accountCount: 1 });
 
-      await createBeforeAccountCreateHook({ repo, federation: new LicensedFederation() })(
-        googleAccountFor("user_1"),
-        null,
-      );
+      await createBeforeAccountCreateHook({
+        repo,
+        federation: new LicensedFederation(),
+        findGoverningConnections: async () => [],
+      })(googleAccountFor("user_1"), null);
 
       expect(mocks.flagPendingSsoSetup).not.toHaveBeenCalled();
     });
@@ -301,16 +305,55 @@ describe("signing in through a domain-matched organization's identity provider",
     /** @scenario "Existing user with wrong brokered SSO provider gets pending flag" */
     it("lets them in, and flags the account for setup", async () => {
       const { double: repo, mocks } = accountRepo({
-        organization: { ...ACME, ssoProvider: "okta" },
+        organization: { ...ACME, ssoProvider: "waad|acme-conn" },
         accountCount: 1,
       });
 
-      await createBeforeAccountCreateHook({ repo, federation: new LicensedFederation() })(
-        googleAccountFor("user_1"),
+      await createBeforeAccountCreateHook({
+        repo,
+        federation: new LicensedFederation(),
+        findGoverningConnections: async () => [],
+      })(
+        { ...googleAccountFor("user_1"), providerId: "auth0", accountId: "waad|other-conn|dana" },
         null,
       );
 
       expect(mocks.flagPendingSsoSetup).toHaveBeenCalledWith({ userId: "user_1" });
+    });
+  });
+
+  describe("given an existing user presses Google at an organization pinned to another provider", () => {
+    const BROKERED = { ...ACME, ssoProvider: "waad|acme-conn" };
+
+    /** @scenario "A native social sign-in at an SSO-enforced domain is refused" */
+    /** @scenario "SSO-domain guard still blocks the wrong provider" */
+    it("refuses the first link and leaves the pending flag alone", async () => {
+      const { double: repo, mocks } = accountRepo({ organization: BROKERED, accountCount: 0 });
+
+      await expect(
+        createBeforeAccountCreateHook({
+          repo,
+          federation: new LicensedFederation(),
+          findGoverningConnections: async () => [],
+        })(googleAccountFor("user_1"), null),
+      ).rejects.toMatchObject({ body: { code: "SSO_PROVIDER_NOT_ALLOWED" } });
+      expect(mocks.flagPendingSsoSetup).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A native social sign-in on an already-linked account is refused too" */
+    it("refuses the sign-in that refreshes an already-linked Google account", async () => {
+      const { double: repo } = accountRepo({ organization: BROKERED, accountCount: 1 });
+
+      await expect(
+        afterAccountUpdate({
+          repo,
+          account: { userId: "user_1", providerId: "google", accountId: "google|123" },
+          collaborators: createApiFixture<BetterAuthHookCollaborators>({
+            federation: new LicensedFederation(),
+          }),
+          findGoverningConnections: async () => [],
+        }),
+      ).rejects.toMatchObject({ body: { code: "SSO_PROVIDER_NOT_ALLOWED" } });
     });
   });
 });

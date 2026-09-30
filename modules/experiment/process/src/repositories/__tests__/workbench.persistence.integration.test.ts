@@ -368,6 +368,7 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
 
   describe("given a run that wrote its results to the board", () => {
     /** @scenario "A redelivered completion writes the run's cells to the board once" */
+    /** @scenario "A version a run wrote names that run" */
     it("finds the run in the version history, even after the person saved on top", async () => {
       const experiments = service();
       const created = await experiments.createEvaluationsV3({

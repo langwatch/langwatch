@@ -35,4 +35,6 @@ export abstract class EvaluationRunRepository {
     input: TraceEvaluationsQuery,
   ): Promise<Record<string, TraceEvaluationData[]>>;
   abstract findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
+  /** How many distinct evaluations the tenant holds. */
+  abstract countRuns(input: { tenantId: string }): Promise<number>;
 }

@@ -19,6 +19,7 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthApp } from "../auth.app.ts";
@@ -172,6 +173,37 @@ describe("given a deployment that named one", () => {
   });
 });
 
+describe("when Better Auth deletes a user", () => {
+  const USER = {
+    id: "user_1",
+    email: "person@example.test",
+    name: "Person",
+    emailVerified: true,
+    image: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  };
+
+  /** @scenario "Deleting a user erases their identity identifiers" */
+  it("asks identity to erase the user before the row goes", async () => {
+    const erased: { id: string }[] = [];
+    const app = await appFor(true, {
+      identity: createApiFixture<IdentityApi>({
+        ceremonies: () => ({
+          beforeUserDelete: async (user) => void erased.push(user),
+          createAccountIdentifier: async () => ({ pinned: false }),
+          beforeAccountDelete: async () => undefined,
+        }),
+      }),
+    });
+    const { options } = await app.betterAuth();
+
+    await options.databaseHooks?.user?.delete?.before?.(USER, null);
+
+    expect(erased).toEqual([{ id: "user_1" }]);
+  });
+});
+
 describe("when the born-finalized entrance is reached", () => {
   it("refuses by name rather than signing somebody up outside the birth context", async () => {
     const app = await appFor(true);
@@ -182,17 +214,23 @@ describe("when the born-finalized entrance is reached", () => {
   });
 });
 
+const genericOAuthOptionsSchema = z.object({
+  config: z.array(z.object({ providerId: z.string() })),
+});
+
 /** Mounted means initialised too: plugin init (OIDC discovery) settles inside the test. */
 async function mountedProviderIds(app: AuthApp): Promise<string[]> {
   const auth = await app.betterAuth();
   await auth.$context;
   const { options } = auth;
   const genericOAuth = options.plugins?.find((plugin) => plugin.id === "generic-oauth");
-  const configs = (genericOAuth?.options as { config?: { providerId: string }[] } | undefined)
-    ?.config;
+  const configs =
+    genericOAuth !== undefined && "options" in genericOAuth
+      ? genericOAuthOptionsSchema.parse(genericOAuth.options).config
+      : [];
   return [
     ...Object.keys(options.socialProviders ?? {}),
-    ...(configs ?? []).map((config) => config.providerId),
+    ...configs.map((config) => config.providerId),
   ];
 }
 

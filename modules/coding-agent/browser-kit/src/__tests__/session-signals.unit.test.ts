@@ -26,6 +26,7 @@ function session(
     entrypoint: "cli",
     parentSessionId: "",
     isFork: false,
+    auxiliary: false,
     repositoryHost: "",
     repositoryOwner: "",
     repositoryName: "",

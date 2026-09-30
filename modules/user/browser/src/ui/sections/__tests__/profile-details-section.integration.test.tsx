@@ -68,7 +68,7 @@ describe("given a signed-in admin with an organization", () => {
 
       expect(nameInput().value).toBe("Ana");
       expect(screen.getByTestId("profile-email").textContent).toBe("ana@acme.example");
-      expect(screen.getByTestId("profile-standing-chip").textContent).toBe("Admin");
+      expect(screen.getByTestId("profile-standing-chip").textContent).toBe("Admin of ACME");
       expect(screen.getByLabelText("Add profile photo")).toBeTruthy();
     });
 

@@ -75,6 +75,8 @@ export function useLangyComposerModel({ projectId }: { projectId: string | undef
     reachableModels,
     langyDefaultModel,
     langyNeedsModel,
+    /** Both model reads have answered, so "no model" is a fact rather than a wait. */
+    modelQueriesSettled: settled,
     resolvedDefault: resolvedDefaultQuery.data ?? null,
     refetchResolvedDefault: resolvedDefaultQuery.refetch,
     /** The model a panel-open warm boots the worker on, once both model reads settled. */

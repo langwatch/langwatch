@@ -303,7 +303,7 @@ function RecentDirectoryChanges({ changes }: { changes: DirectoryChangeRow[] }) 
       <Heading size="sm">Access changes assigned by your identity provider</Heading>
       <VStack align="stretch" gap={2}>
         {shown.map((change) => (
-          <HStack key={change.grantId} gap={3}>
+          <HStack key={`${change.grantId}-${change.kind}`} gap={3}>
             <Badge colorPalette={change.kind === "removed" ? "red" : "green"}>
               {change.kind === "removed" ? "Removed" : "Added"}
             </Badge>

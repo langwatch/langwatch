@@ -4,11 +4,11 @@ import { Link } from "@langwatch/browser-host/link";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import { useEffect } from "react";
 
-import { isSameOrigin, useSession } from "../../behavior/auth-client.tsx";
+import { isSameOrigin, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
-import { cutoverSignInRefusal } from "../../model/sign-in-error-code.ts";
+import { bounceConnectionFrom, cutoverSignInRefusal } from "../../model/sign-in-error-code.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
@@ -53,6 +53,7 @@ const errorTitle = (error: string): string => {
     case "DIFFERENT_EMAIL_NOT_ALLOWED":
       return "Can't link this account";
     case "SSO_PROVIDER_NOT_ALLOWED":
+    case "SSO_REQUIRED_BY_ORGANIZATION":
       return "Use your organization's sign-in";
     default:
       return (
@@ -71,13 +72,22 @@ export default function Error() {
   );
 }
 
-function SignInErrorScreen() {
+export function SignInErrorScreen() {
   const { data: session } = useSession();
   const query = useSearchParams();
   const error = normalizeSignInErrorCode(query?.get("error"));
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
+  const bounceTo = bounceConnectionFrom({ error, target: query?.get("error_description") });
+
+  // The bounce goes ahead of the five-second timer: this is somebody being taken to the door
+  // their organization chose (specs/identity/native-social-at-a-claimed-domain.feature).
+  useEffect(() => {
+    if (!bounceTo) return;
+    void signIn(bounceTo, { callbackUrl: "/" });
+  }, [bounceTo]);
+
   useEffect(() => {
     if (!publicEnv.data) {
       return;
@@ -107,6 +117,17 @@ function SignInErrorScreen() {
 
     return () => clearTimeout(redirectTimeout);
   }, [publicEnv.data, isAuth0, isAzureAD, session, error]);
+
+  if (bounceTo) {
+    return (
+      <AuthCard title="Taking you to your organization's sign-in">
+        <HStack gap={3}>
+          <Spinner size="sm" color="frontDoor.detail" />
+          <Text color="fg.muted">One moment.</Text>
+        </HStack>
+      </AuthCard>
+    );
+  }
 
   if (error) {
     return <SignInError error={error} />;
@@ -185,7 +206,7 @@ function SignInErrorDescription({
     );
   }
 
-  if (error === "SSO_PROVIDER_NOT_ALLOWED") {
+  if (error === "SSO_PROVIDER_NOT_ALLOWED" || error === "SSO_REQUIRED_BY_ORGANIZATION") {
     return (
       <Alert.Description>
         <VStack gap={1} align="start">

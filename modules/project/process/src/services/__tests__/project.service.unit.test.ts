@@ -25,6 +25,7 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProjectRepository } from "../../repositories/project.repository.ts";
+import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import { ProjectCredentials } from "../project-credentials.service.ts";
 import { ProjectService } from "../project.service.ts";
 
@@ -360,8 +361,10 @@ class FixedCredentials extends ProjectCredentials {
 const createService = (
   repository: StubRepository,
   organizations = new StubOrganizationService(),
+  created = ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } }),
 ): ProjectService =>
   ProjectService.create({
+    created,
     repository,
     credentials: new FixedCredentials(),
     organizations: createApiFixture<OrganizationApi>({
@@ -572,6 +575,52 @@ describe("ProjectService", () => {
         name: "Application",
       }),
     );
+  });
+
+  describe("when a project is created", () => {
+    const input = {
+      organizationId: "org",
+      teamId: "team_1",
+      name: "Application",
+      language: "typescript",
+      framework: "langchain",
+    };
+
+    /** @scenario "A new project is recorded on project's own pipeline" */
+    it("records it on project_lifecycle with its ids", async () => {
+      const send = vi.fn(() => Promise.resolve());
+      const created = ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } });
+      created.connect({ recordProjectCreated: { send } });
+
+      await createService(new StubRepository(), new StubOrganizationService(), created).create(
+        input,
+      );
+
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: applicationProject.id,
+          projectId: applicationProject.id,
+          organizationId: "org",
+        }),
+      );
+    });
+
+    /** @scenario "A failure to record the new project does not block its creation" */
+    it("still creates the project and logs the failure", async () => {
+      const error = vi.fn();
+      const created = ProjectCreatedNoticeService.create({ logger: { error } });
+      created.connect({
+        recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
+      });
+
+      await expect(
+        createService(new StubRepository(), new StubOrganizationService(), created).create(input),
+      ).resolves.toBe(applicationProject);
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: applicationProject.id }),
+        expect.any(String),
+      );
+    });
   });
 
   it("asks Organization to create and grant a new team", async () => {

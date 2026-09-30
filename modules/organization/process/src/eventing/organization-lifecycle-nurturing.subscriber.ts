@@ -1,5 +1,6 @@
 import type { NurturingApi, NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type { SubscriberSpec } from "@langwatch/eventing";
+import { PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE } from "@langwatch/organization-contract";
 
 import {
   INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
@@ -7,11 +8,15 @@ import {
   MEMBERS_INVITED_EVENT_TYPE,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   type OrganizationLifecycleEvent,
+  type PersonalWorkspaceProvisionedEvent,
 } from "./organization-lifecycle.events.ts";
 
 export type OrganizationLifecycleNurturingDeps = Pick<NurturingApi, "recordSignal">;
 
-function signalOf(event: OrganizationLifecycleEvent): NurturingSignal {
+/** A provisioned personal workspace is project's to record, not a nurturing signal. */
+type NurturedEvent = Exclude<OrganizationLifecycleEvent, PersonalWorkspaceProvisionedEvent>;
+
+function signalOf(event: NurturedEvent): NurturingSignal {
   const source = {
     sourceEventId: event.id,
     tenantId: String(event.tenantId),
@@ -49,6 +54,9 @@ export function createOrganizationLifecycleNurturingSubscriber(
       INVITE_ACCEPTED_EVENT_TYPE,
       INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
     ],
-    handler: (event: OrganizationLifecycleEvent) => nurturing.recordSignal(signalOf(event)),
+    handler: async (event: OrganizationLifecycleEvent) => {
+      if (event.type === PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE) return;
+      await nurturing.recordSignal(signalOf(event));
+    },
   };
 }

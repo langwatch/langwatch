@@ -4,11 +4,12 @@
  * it — the plugin list, the account-linking guard, the password verifier.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import type {
-  SsoArrivalApi,
-  SsoAssertionApi,
-  SsoAuthenticationActivityApi,
-  SsoMigrationCallbackApi,
+import {
+  IdentityVerificationExpiredError,
+  type SsoArrivalApi,
+  type SsoAssertionApi,
+  type SsoAuthenticationActivityApi,
+  type SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -94,7 +95,7 @@ export function betterAuthTransportFor(
      *  credential sign-in; a test that needs one supplies its own guard. */
     /** No organization has set a threshold, so nothing is ever locked out. */
     signInLockout: signInSecurityFixture({ now: nowInstant }).lockout,
-    addressRoutesToConnection: async () => false,
+    findGoverningConnections: async () => [],
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: null,
@@ -106,6 +107,9 @@ export function betterAuthTransportFor(
     redis: null,
     secondaryStorage: createSecondaryStorage(null),
     signUpVerification: {
+      completeVerification: async () => {
+        throw new IdentityVerificationExpiredError();
+      },
       validateAddressProof: async () => false,
       claimAddressProof: async () => false,
     },

@@ -128,6 +128,7 @@ describe("the connected-agent call boundary", () => {
     expect(response.headers.get("Retry-After")).toBe("2");
   });
 
+  /** @scenario "The relay route needs scenarios create" */
   it("refuses a key without scenarios:create before invoking the app", async () => {
     const { hono, call } = buildApi({ authorizeRefuses: true });
     const response = await hono.request("/api/v1/agents/agent_1/call", {
@@ -140,6 +141,7 @@ describe("the connected-agent call boundary", () => {
     expect(call).not.toHaveBeenCalled();
   });
 
+  /** @scenario "The relay route refuses an agent of another project" */
   it("keeps project isolation failures handled and forwards the authorized project", async () => {
     const { hono, call } = buildApi({
       call: async (input) => {
@@ -160,6 +162,7 @@ describe("the connected-agent call boundary", () => {
     });
   });
 
+  /** @scenario "The relay route refuses a personal agent of another person" */
   it("passes the actual key holder separately from untrusted input and preserves owner refusals", async () => {
     const { hono, call } = buildApi({
       apiKeyUserId: "u_2",
@@ -184,6 +187,7 @@ describe("the connected-agent call boundary", () => {
     expect(call.mock.calls[0]?.[1]).toMatchObject({ viewerUserId: "u_2" });
   });
 
+  /** @scenario "The relay route lets the project key call a personal agent" */
   it("preserves a machine caller and passes only the parsed trace header", async () => {
     const { hono, call } = buildApi();
     const response = await hono.request("/api/v1/agents/agent_1/call", {

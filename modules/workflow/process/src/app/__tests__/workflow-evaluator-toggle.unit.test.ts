@@ -10,10 +10,11 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 
+import type { NlpPayloadStaging } from "../../channels/nlp-lambda.channel.ts";
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { WorkflowApp } from "../workflow.app.ts";
+import { WorkflowApp, type NlpLambdaArnCache } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 class NoopTestEncryption {
@@ -40,13 +41,13 @@ const existingEvaluator: Evaluator = {
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
 };
 
-function appWith({
+async function appWith({
   lineage,
   evaluators,
 }: {
   lineage: Partial<WorkflowLineageRepository>;
   evaluators: EvaluatorApi;
-}): WorkflowApp {
+}): Promise<WorkflowApp> {
   const members = createWorkflowTestInfrastructure({ evaluators });
 
   return WorkflowApp.create({
@@ -70,6 +71,7 @@ function appWith({
     config: {
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
+      codeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -81,6 +83,8 @@ function appWith({
         "WorkflowProjectEnvironmentRepository",
       ),
       lineage: createApiFixture<WorkflowLineageRepository>(lineage, "WorkflowLineageRepository"),
+      nlpLambdaArns: createApiFixture<NlpLambdaArnCache>({}, "NlpLambdaArnCache"),
+      payloadStaging: createApiFixture<NlpPayloadStaging>({}, "NlpPayloadStaging"),
     },
   });
 }
@@ -98,7 +102,7 @@ describe("workflow evaluator publication", () => {
     const setFlags = vi.fn<WorkflowLineageRepository["setFlags"]>(async () => undefined);
     const listByWorkflow = vi.fn<EvaluatorApi["listByWorkflow"]>(async () => [existingEvaluator]);
     const update = vi.fn<EvaluatorApi["update"]>(async () => existingEvaluator);
-    const app = appWith({
+    const app = await appWith({
       lineage: { findFlags, setFlags },
       evaluators: createApiFixture<EvaluatorApi>({ listByWorkflow, update }, "EvaluatorApi"),
     });
@@ -125,7 +129,7 @@ describe("workflow evaluator publication", () => {
   /** @scenario "Saving a missing workflow as an evaluator refuses before publication changes" */
   it("refuses before publication flags or evaluator rows change", async () => {
     const setFlags = vi.fn<WorkflowLineageRepository["setFlags"]>(async () => undefined);
-    const app = appWith({
+    const app = await appWith({
       lineage: { findFlags: async () => null, setFlags },
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
     });

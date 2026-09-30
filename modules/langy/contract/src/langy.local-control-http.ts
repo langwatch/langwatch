@@ -152,6 +152,17 @@ export const langyLocalRecordSchema = z.object({
   workspaceConnected: z.boolean(),
 });
 
+/** What became of a conversation's latest request to share a folder. */
+export const langyControlRequestStateSchema = z.enum([
+  "open",
+  "approved",
+  "expired",
+  "declined",
+  "ended",
+  "none",
+]);
+export type LangyControlRequestState = z.infer<typeof langyControlRequestStateSchema>;
+
 /** What the panel chip and the code access card read. */
 export const langyLocalWorkspaceStatusSchema = z.object({
   connected: z.boolean(),
@@ -159,6 +170,7 @@ export const langyLocalWorkspaceStatusSchema = z.object({
   skipAllowed: z.boolean(),
   skipPermissions: z.boolean(),
   pendingRequest: z.looseObject({}).nullable(),
+  requestState: langyControlRequestStateSchema,
   codeAccessPreference: z.literal("github").nullable(),
 });
 

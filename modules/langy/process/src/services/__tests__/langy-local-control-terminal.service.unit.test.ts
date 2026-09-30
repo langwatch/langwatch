@@ -29,6 +29,7 @@ describe("listing the terminal's open requests", () => {
   });
 
   describe("given a key no person owns", () => {
+    /** @scenario "A project key holds no requests" */
     it("refuses as an invalid request without reading any", async () => {
       const { listOpen, service } = terminal();
 
@@ -42,6 +43,7 @@ describe("listing the terminal's open requests", () => {
 
 describe("approving a request", () => {
   describe("given a key no person owns", () => {
+    /** @scenario "A project key holds no requests" */
     it("refuses before any request is addressed", async () => {
       const { service } = terminal();
 

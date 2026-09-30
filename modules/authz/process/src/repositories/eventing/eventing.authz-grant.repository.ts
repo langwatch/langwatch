@@ -357,43 +357,35 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     // Two reads because they are two orderings: a grant written last year and
     // taken back this morning is the most recent REMOVAL and one of the
     // oldest attachments, and one `orderBy` cannot say both.
+    const select = { id: true, principalId: true, createdAt: true, revokedAt: true } as const;
     const [attached, removed] = await Promise.all([
       this.options.database.grant.findMany({
         where: directory,
-        select: { id: true, principalId: true, createdAt: true },
+        select,
         orderBy: { createdAt: "desc" },
         take: limit,
       }),
       this.options.database.grant.findMany({
         where: { ...directory, revokedAt: { not: null } },
-        select: { id: true, principalId: true, revokedAt: true },
+        select,
         orderBy: { revokedAt: "desc" },
         take: limit,
       }),
     ]);
 
-    const changes: DirectoryCausedGrantChange[] = [
-      ...attached.map((row) => ({
+    // One row per grant, as on main: a revoked grant reads as removed, at the later time.
+    const rows = [...new Map([...attached, ...removed].map((row) => [row.id, row])).values()];
+    return rows
+      .map((row) => ({
         grantId: row.id,
         userId: row.principalId,
-        kind: "attached" as const,
-        occurredAtMs: row.createdAt.getTime(),
-      })),
-      ...removed.flatMap((row) =>
-        row.revokedAt
-          ? [
-              {
-                grantId: row.id,
-                userId: row.principalId,
-                kind: "removed" as const,
-                occurredAtMs: row.revokedAt.getTime(),
-              },
-            ]
-          : [],
-      ),
-    ];
-    return changes
-      .toSorted((left, right) => right.occurredAtMs - left.occurredAtMs)
+        kind: row.revokedAt ? ("removed" as const) : ("attached" as const),
+        occurredAtMs: Math.max(row.createdAt.getTime(), row.revokedAt?.getTime() ?? 0),
+      }))
+      .toSorted(
+        (left, right) =>
+          right.occurredAtMs - left.occurredAtMs || left.grantId.localeCompare(right.grantId),
+      )
       .slice(0, limit);
   }
 

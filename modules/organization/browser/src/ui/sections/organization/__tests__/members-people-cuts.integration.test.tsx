@@ -82,7 +82,8 @@ vi.mock("../../../../behavior/use-required-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user_ana" } } }),
 }));
 
-// Seat usage and the department picker are covered where they live; here they only must not get in the way.
+// Seat usage and the department picker are covered where they live; here they only stay out of
+// the way.
 vi.mock("../../member-seat-usage.tsx", () => ({
   MemberSeatUsage: () => <div data-testid="seat-usage">Seats</div>,
 }));
@@ -187,6 +188,25 @@ describe("given the directory's people tab", () => {
       expect(rows).toHaveLength(2);
       expect(within(rows[0]!).getByText("Ana Diaz")).toBeInTheDocument();
       expect(within(rows[0]!).getByText("ana@acme.com")).toBeInTheDocument();
+    });
+
+    /** @scenario One identity row carries a person wherever they appear */
+    it("marks a switched-off member and a deactivated one, and nobody else", () => {
+      state.members = [
+        sam,
+        { ...ana, disabledAt: new Date("2026-09-01T09:00:00.000Z") },
+        {
+          ...person("user_rex", "Rex Ito", "MEMBER"),
+          user: { ...person("user_rex", "Rex Ito", "MEMBER").user, deactivatedAt: new Date() },
+        },
+      ];
+      renderPeople();
+
+      expect(screen.getByTestId("member-disabled").title).toBe(
+        "Their access in this organization is switched off.",
+      );
+      expect(screen.getAllByTestId("member-disabled")).toHaveLength(1);
+      expect(screen.getAllByTestId("member-deactivated")).toHaveLength(1);
     });
 
     /** @scenario Opening a person puts them in the address bar */

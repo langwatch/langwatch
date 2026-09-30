@@ -16,6 +16,7 @@ export const datasetWeb = defineWebModule("dataset")
       path: "/:project/datasets",
       within: "project",
       label: "Datasets",
+      requires: "datasets:view",
       load: () => import("./ui/sections/datasets.screen.tsx"),
     },
     "pages/[project]/datasets/[id]": {

@@ -122,3 +122,39 @@ describe("given a project attached to a team and organization", () => {
     });
   });
 });
+
+describe("given the setup checklist asks whether a provider is configured", () => {
+  describe("when the repository counts the enabled providers in the project's scopes", () => {
+    /** @scenario All database access goes through the repository */
+    it("counts one issued by the repository, an organization one included, and reads no credential", async () => {
+      const issued: unknown[] = [];
+      const database = prismaDouble({
+        modelProvider: {
+          count: (args) => {
+            issued.push(args);
+            const wanted = findManyArgsSchema.parse(args).where.scopes.some.OR;
+            return Promise.resolve(
+              STORED.filter((provider) =>
+                provider.scopes.some((scope) =>
+                  wanted.some(
+                    (candidate) =>
+                      candidate.scopeType === scope.scopeType &&
+                      candidate.scopeId === scope.scopeId,
+                  ),
+                ),
+              ).length,
+            );
+          },
+        },
+      });
+      const repository = PrismaModelProviderRepository.create(database, new PlainTextCredentials());
+
+      const count = await repository.countEnabledInScopes({ scopes: PROJECT_SCOPES });
+
+      expect(count).toBe(3);
+      expect(issued).toHaveLength(1);
+      expect(issued[0]).not.toHaveProperty("select");
+      expect(issued[0]).toMatchObject({ where: { enabled: true, disabledAt: null } });
+    });
+  });
+});

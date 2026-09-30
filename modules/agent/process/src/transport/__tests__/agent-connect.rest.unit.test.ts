@@ -84,6 +84,7 @@ const registerBody = {
 };
 
 describe("registerConnectedAgentInstance", () => {
+  /** @scenario "A register refusal answers at the HTTP status of its reason" */
   it.each([
     ["api_key_invalid", 401],
     ["project_required", 400],
@@ -146,6 +147,7 @@ describe("registerConnectedAgentInstance", () => {
     expect(await response.json()).toEqual(answer);
   });
 
+  /** @scenario "A connected protocol forwards only its declared credential facts" */
   it("passes only parsed protocol input and declared credential facts", async () => {
     const connectFrames = vi.fn(async () => ({ accepted: 1 }));
     const { hono } = buildApi({ application: createApiFixture<AgentApi>({ connectFrames }) });

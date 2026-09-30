@@ -1,15 +1,21 @@
 /** OTLP receiver imports spans: rejection tally carefully counts validation
  * failures, and one bad span doesn't spoil the batch. */
 
+import {
+  createRecordingMeterProvider,
+  type RecordingMeterProvider,
+} from "@langwatch/observability/metrics/testing";
 import type { OtlpSpan, PIIRedactionLevel, RecordSpanCommandData } from "@langwatch/trace-contract";
 import { SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type SpanDedupClaim,
   TraceSpanDedupRepository,
 } from "../../repositories/trace-span-dedup.repository.ts";
+import { TraceEdgeMediaPayloadService } from "../trace-edge-media-payload.service.ts";
+import { TraceEdgeMediaTelemetryService } from "../trace-edge-media-telemetry.service.ts";
 import { TraceIngressCommand, TraceIngestionService } from "../trace-ingestion.service.ts";
 import { TestCodingAgentService } from "./support/coding-agent.service.fake.ts";
 
@@ -446,6 +452,110 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
         resource: null,
         instrumentationScope: null,
       });
+    });
+  });
+});
+
+describe("TraceIngestionService.handleOtlpTraceRequest span outcome series", () => {
+  let metrics: RecordingMeterProvider;
+
+  beforeEach(() => {
+    metrics = createRecordingMeterProvider();
+    metrics.install();
+  });
+
+  afterEach(() => {
+    metrics.uninstall();
+  });
+
+  describe("given a request with a collected, a deduped, a failed and an invalid span", () => {
+    /** @scenario OTLP partial rejection exposes its cause independently of HTTP status */
+    it("counts each outcome under its own label and rejects only failed and invalid spans", async () => {
+      const { commands, dedup, service } = fixture();
+      dedup.acquire.mockResolvedValueOnce({ outcome: "held" });
+      commands.record.mockRejectedValueOnce(new Error("queue is down"));
+
+      const result = await handle(service, [
+        { traceId: "trace-1" },
+        span({ spanId: "span-deduped" }),
+        span({ spanId: "span-failed" }),
+        span({ spanId: "span-collected" }),
+      ]);
+
+      const outcome = (name: string) =>
+        metrics.valueOf("trace_ingestion_spans_total", {
+          operation: "otlp_traces",
+          outcome: name,
+        });
+      expect({
+        collected: outcome("collected"),
+        dropped: outcome("dropped"),
+        deduped: outcome("deduped"),
+        failed: outcome("failed"),
+        filtered: outcome("filtered"),
+      }).toEqual({ collected: 1, dropped: 1, deduped: 1, failed: 1, filtered: 0 });
+      expect(result.rejectedSpans).toBe(2);
+      expect(result.ingestionFailures).toBe(1);
+    });
+  });
+});
+
+describe("TraceIngestionService.handleOtlpTraceRequest edge media fail-open series", () => {
+  let metrics: RecordingMeterProvider;
+
+  beforeEach(() => {
+    metrics = createRecordingMeterProvider();
+    metrics.install();
+  });
+
+  afterEach(() => {
+    metrics.uninstall();
+  });
+
+  describe("given a project whose feature-flag store cannot be read", () => {
+    /** @scenario The receiver publishes the edge media fail-open series */
+    it("ingests the span unmodified and counts the fail-open under the flag_store stage", async () => {
+      const commands = new TestTraceIngressCommand();
+      const original = JSON.stringify([
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgo=" } },
+          ],
+        },
+      ]);
+      const service = TraceIngestionService.create({
+        codingAgents: new TestCodingAgentService(),
+        codingAgentSpanFilterEnabled: false,
+        dedup: new TestTraceSpanDedup(),
+        commands,
+        payloads: TraceEdgeMediaPayloadService.create({
+          deps: {
+            featureFlags: {
+              isEnabled: async () => {
+                throw new Error("flag store unreachable");
+              },
+            } as never,
+            hasContentDropRules: async () => false,
+            telemetry: TraceEdgeMediaTelemetryService.create(),
+          },
+          logger: { info: vi.fn(), warn: vi.fn() },
+        }),
+      });
+
+      const result = await handle(service, [
+        span({ attributes: [{ key: "langwatch.input", value: { stringValue: original } }] }),
+      ]);
+
+      expect(result.rejectedSpans).toBe(0);
+      expect(commands.record).toHaveBeenCalledOnce();
+      expect(commands.record.mock.calls[0]?.[0].span.attributes).toContainEqual({
+        key: "langwatch.input",
+        value: { stringValue: original },
+      });
+      expect(
+        metrics.valueOf("langwatch_edge_media_extract_fail_open_total", { reason: "flag_store" }),
+      ).toBe(1);
     });
   });
 });

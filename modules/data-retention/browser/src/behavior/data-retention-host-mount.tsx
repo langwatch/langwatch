@@ -22,15 +22,13 @@ import {
   type RetentionRouteReading,
   type RetentionSuccessNotice,
 } from "../model/data-retention-host.ts";
+import { dataRetentionApi } from "./data-retention-api.ts";
 
-/**
- * No capability carries the reader's writable-scope list or the plan tier
- * yet, so the filter offers nothing and the enterprise gate reads closed.
- */
-const NO_AVAILABLE_SCOPES: RetentionAvailableScopes = {
-  organization: null,
-  teams: [],
-  projects: [],
+/** What the mount reads through borrowed procedures, as main's settings page read it. */
+type RetentionHostReadings = {
+  availableScopes: RetentionAvailableScopes;
+  isPlatformAdmin: boolean;
+  isEnterprise: boolean;
 };
 
 class CapabilityDataRetentionHost extends DataRetentionHostApi {
@@ -40,6 +38,7 @@ class CapabilityDataRetentionHost extends DataRetentionHostApi {
       session: UiSession;
       route: UiRoute;
       feedback: UiFeedback;
+      readings: RetentionHostReadings;
     },
   ) {
     super();
@@ -54,15 +53,15 @@ class CapabilityDataRetentionHost extends DataRetentionHostApi {
   }
 
   availableScopes(): RetentionAvailableScopes {
-    return NO_AVAILABLE_SCOPES;
+    return this.deps.readings.availableScopes;
   }
 
   isPlatformAdmin(): boolean {
-    return false;
+    return this.deps.readings.isPlatformAdmin;
   }
 
   isEnterprise(): boolean {
-    return false;
+    return this.deps.readings.isEnterprise;
   }
 
   route(): RetentionRouteReading {
@@ -96,6 +95,30 @@ export default function DataRetentionHostMount({ children }: { children?: ReactN
   const uiScope = useUiScope();
   const { organizationId, projectId } = uiScope.activeScope();
   const teamId = uiScope.scopeHost()?.team()?.id;
+  // The shell's own workspace and plan reads, under the same cache keys: no second request.
+  const organizations = dataRetentionApi.organization.getAll.useQuery({ isDemo: false });
+  const usage = dataRetentionApi.limits.getUsage.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
+  );
+  const admin = dataRetentionApi.user.isAdmin.useQuery({});
+  const planType = usage.data?.activePlan.type;
+  const isPlatformAdmin = admin.data?.isAdmin ?? false;
+  const readings = useMemo((): RetentionHostReadings => {
+    const organization = organizations.data?.find((candidate) => candidate.id === organizationId);
+    const teams = organization?.teams ?? [];
+    return {
+      availableScopes: {
+        organization: organization ? { id: organization.id, name: organization.name } : null,
+        teams: teams.map((team) => ({ id: team.id, name: team.name })),
+        projects: teams.flatMap((team) =>
+          team.projects.map((project) => ({ id: project.id, name: project.name, teamId: team.id })),
+        ),
+      },
+      isPlatformAdmin,
+      isEnterprise: planType === "ENTERPRISE",
+    };
+  }, [organizations.data, organizationId, isPlatformAdmin, planType]);
 
   const host = useMemo(
     () =>
@@ -108,8 +131,9 @@ export default function DataRetentionHostMount({ children }: { children?: ReactN
         session,
         route,
         feedback,
+        readings,
       }),
-    [organizationId, teamId, projectId, session, route, feedback],
+    [organizationId, teamId, projectId, session, route, feedback, readings],
   );
   return <DataRetentionHostProvider value={host}>{children}</DataRetentionHostProvider>;
 }

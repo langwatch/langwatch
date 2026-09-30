@@ -63,8 +63,8 @@ export function SignInMethodsSummary() {
           <Text fontWeight={600}>Sign-in methods</Text>
         </HStack>
         <Button asChild size="xs" variant="outline" data-testid="sign-in-methods-manage">
-          <Link unstyled href="/settings/authentication">
-            Manage on Security
+          <Link unstyled href="/settings/security">
+            Manage
           </Link>
         </Button>
       </HStack>

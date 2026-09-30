@@ -183,7 +183,7 @@ func TestStackHomeCarriesFactsSurfacesErrorsAndCredentials(t *testing.T) {
 		want := map[string]string{
 			"app": statusLive, "api": statusLive, "worker": statusStarting, "gateway": statusStarting,
 			"nlp": statusStarting, "langyagent": statusNotSelected, "idp": statusLive, "mail": statusStarting,
-			"design-system": statusNotSelected, "mail-room": statusNotSelected, "langevals": statusNotSelected, "storage": statusNotSelected, "voice": statusNotSelected, "llm": statusNotSelected, "observability": statusDown,
+			"design-system": statusNotSelected, "mail-room": statusNotSelected, "langevals": statusNotSelected, "storage": statusNotSelected, "voice": statusNotSelected, "llm": statusNotSelected, "analytics": statusNotSelected, "observability": statusDown,
 		}
 		got := map[string]string{}
 		var order []string

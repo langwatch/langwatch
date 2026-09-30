@@ -20,7 +20,8 @@ export function DejaViewContent() {
       tenantId: state.submittedTenant || void 0,
     },
     {
-      enabled: state.hasSearched,
+      enabled:
+        state.hasSearched && (state.submittedQuery.trim() !== "" || state.submittedTenant !== ""),
     },
   );
 

@@ -110,7 +110,7 @@ export default function GroupsScreen() {
         {!groups.isLoading && (
           <Card.Root width="full" overflow="hidden">
             <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-              <Table.Root variant="line" size="md" width="full">
+              <Table.Root variant="line" size="md" width="full" data-testid="groups-list">
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader>Group</Table.ColumnHeader>
@@ -126,6 +126,7 @@ export default function GroupsScreen() {
                   {(groups.data ?? []).map((g) => (
                     <Table.Row
                       key={g.id}
+                      data-testid="group-row"
                       cursor="pointer"
                       onClick={() => setSelectedGroup(g)}
                       _hover={{ bg: "bg.muted" }}

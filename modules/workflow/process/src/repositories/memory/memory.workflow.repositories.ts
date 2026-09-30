@@ -1,4 +1,8 @@
+import { memoryObjectStorage } from "@langwatch/process-stores";
+
+import { ObjectStorageNlpPayloadStagingRepository } from "../object-storage/object-storage.nlp-payload-staging.repository.ts";
 import type { WorkflowRepositories } from "../workflow-repositories.registry.ts";
+import { MemoryNlpLambdaArnRepository } from "./memory.nlp-lambda-arn.repository.ts";
 import { WorkflowLineageMemoryRepository } from "./memory.workflow-lineage.repository.ts";
 import { WorkflowProjectEnvironmentMemoryRepository } from "./memory.workflow-project-environment.repository.ts";
 import { WorkflowRowMemoryRepository } from "./memory.workflow-row.repository.ts";
@@ -20,6 +24,10 @@ export class MemoryWorkflowRepositories {
       workflowRows: WorkflowRowMemoryRepository.create(store),
       projectEnvironment: WorkflowProjectEnvironmentMemoryRepository.create(store),
       lineage: WorkflowLineageMemoryRepository.create(store),
+      nlpLambdaArns: MemoryNlpLambdaArnRepository.create(),
+      payloadStaging: ObjectStorageNlpPayloadStagingRepository.create({
+        objectStorage: memoryObjectStorage(),
+      }),
     };
   }
 }

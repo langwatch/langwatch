@@ -44,7 +44,11 @@ export function roleBadgeColor(role: string) {
 
 export function SourceBadge({ scimSource }: { scimSource: string | null }) {
   if (!scimSource) return <Badge colorPalette="gray">Manual</Badge>;
-  return <Badge colorPalette="blue">{scimSource.toUpperCase()}</Badge>;
+  return (
+    <Badge colorPalette="blue" data-testid="group-directory-chip">
+      {scimSource.toUpperCase()}
+    </Badge>
+  );
 }
 
 // ── Types + constants ─────────────────────────────────────────────────────────

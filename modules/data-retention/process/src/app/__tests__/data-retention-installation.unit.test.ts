@@ -34,7 +34,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(dataRetentionServer)])
     .withConfig({
-      "data-retention": { platformDefaultDays: undefined },
+      "data-retention": { platformDefaultDays: undefined, isSaas: true },
     })
     .withMember("nodeEnvironment", undefined)
     .withAnalytical(analyticalWithoutStore())

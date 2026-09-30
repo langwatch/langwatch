@@ -3,7 +3,7 @@
  * key is separate to avoid spreading credentials across unrelated surfaces.
  */
 
-import type { UiJoinOfferProps } from "@langwatch/browser-host/declarations";
+import type { UiJoinOfferProps, UiLangyKickoff } from "@langwatch/browser-host/declarations";
 import { createContext, useContext, type ComponentType } from "react";
 
 /** One project, as narrowly as these screens read one. */
@@ -68,14 +68,8 @@ export type OnboardingSuccessNotice = {
   readonly description?: string;
 };
 
-/**
- * A landing's kickoff brief, exactly as the tour builds it
- * (`features/guided-onboarding/model/kickoff.ts`). Typed here so the host
- * capability's signature is checked, without the host importing the panel.
- */
-export type OnboardingLangyKickoff = Readonly<Record<string, unknown>> & {
-  readonly path: string;
-};
+/** A landing's kickoff: the brief, the typed parts beside it and who hears the conversation. */
+export type OnboardingLangyKickoff = UiLangyKickoff;
 
 /**
  * Langy panel operations, so no screen imports `modules/langy/browser`

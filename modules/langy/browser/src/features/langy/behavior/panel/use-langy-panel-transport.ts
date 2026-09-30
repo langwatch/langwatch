@@ -242,6 +242,8 @@ export interface LangyPanelTurnRefs {
   dispatchedTurnIdRef: RefObject<string | null>;
   /** The adopted turn this tab already reattached to. */
   resumedTurnIdRef: RefObject<string | null>;
+  /** Told once which conversation a queued kickoff's send created, then cleared. */
+  kickoffNamedRef: RefObject<((conversationId: string) => void) | null>;
 }
 
 /**
@@ -267,6 +269,7 @@ export function useLangyPanelTransport({
   const uiActionSeenRef = useRef<Set<string>>(new Set());
   const dispatchedTurnIdRef = useRef<string | null>(null);
   const resumedTurnIdRef = useRef<string | null>(null);
+  const kickoffNamedRef = useRef<((conversationId: string) => void) | null>(null);
 
   // The rollback lever for agent-driven page control: with the flag off this page
   // ignores `ui` stream entries, so switching it off during a live turn stops the page
@@ -297,6 +300,9 @@ export function useLangyPanelTransport({
           lastSentTextRef.current = null;
           navigatedInstructionsRef.current = new Set();
           uiActionSeenRef.current = new Set();
+          const named = kickoffNamedRef.current;
+          kickoffNamedRef.current = null;
+          named?.(conversationId);
         },
         getResumeTarget: () => currentResumeTarget(turnContextRef.current?.projectId),
         onNavigate: (entry) =>
@@ -330,6 +336,7 @@ export function useLangyPanelTransport({
     lastSentTextRef,
     dispatchedTurnIdRef,
     resumedTurnIdRef,
+    kickoffNamedRef,
   };
   return { transport, refs };
 }

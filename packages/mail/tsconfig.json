@@ -19,9 +19,6 @@
       "path": "tsconfig.declarations.json"
     },
     {
-      "path": "../egress/tsconfig.build.json"
-    },
-    {
       "path": "../observability/tsconfig.build.json"
     },
     {

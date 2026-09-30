@@ -82,6 +82,21 @@ export function latestCodeAccessCallId(
   return found;
 }
 
+/**
+ * Whether the LAST `code_access` call in a message asked for the quiet third way out,
+ * "I'd rather describe it". Off unless the tool's input says so.
+ */
+export function codeAccessOffersDescribe(parts: readonly unknown[]): boolean {
+  let offers = false;
+  for (const part of parts) {
+    if (!isCodeAccessToolPart(part)) continue;
+    const p = part as CodeAccessPartLike;
+    if (!COMPLETE_INPUT_STATES.has(p.state ?? "")) continue;
+    offers = (p.input as { offer_describe?: unknown } | undefined)?.offer_describe === true;
+  }
+  return offers;
+}
+
 /** The one line Langy gave for the change it wants to make, when it gave one. */
 export function codeAccessReason(parts: readonly unknown[]): string | null {
   for (const part of parts) {

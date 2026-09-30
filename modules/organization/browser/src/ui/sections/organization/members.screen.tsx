@@ -3,17 +3,7 @@
  * D12): three cuts of one list (specs/identity/directory-administration.feature).
  */
 
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Input,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
@@ -267,7 +257,7 @@ function DepartmentChip({ name }: { name: string | undefined }) {
   return (
     <IdentityChip
       label={name}
-      title={`In the ${name} department. Departments are org structure for accounting and reporting — never an access gate.`}
+      title={`In the ${name} department. Departments are org structure for accounting and reporting, never an access gate.`}
       data-testid="member-department-chip"
     />
   );
@@ -368,6 +358,31 @@ function InlineInviteBox({ onStartTyping }: { onStartTyping: (email: string) => 
   );
 }
 
+/** Why a member cannot sign in here, when they cannot. */
+function MemberStatusChip({ member }: { member: Member }) {
+  if (member.user.deactivatedAt) {
+    return (
+      <IdentityChip
+        label="Deactivated"
+        tone="warning"
+        title="This account has been deactivated here. Your identity provider may still list them."
+        data-testid="member-deactivated"
+      />
+    );
+  }
+  if (member.disabledAt) {
+    return (
+      <IdentityChip
+        label="Disabled"
+        tone="warning"
+        title="Their access in this organization is switched off."
+        data-testid="member-disabled"
+      />
+    );
+  }
+  return null;
+}
+
 /** One member, as the People list draws them. */
 function MemberListRow({
   member,
@@ -411,16 +426,7 @@ function MemberListRow({
               Lite Member
             </Badge>
           )}
-          {member.user.deactivatedAt && (
-            <Badge colorPalette="red" size="sm">
-              Deactivated
-            </Badge>
-          )}
-          {member.disabledAt && (
-            <Badge colorPalette="orange" size="sm">
-              Disabled
-            </Badge>
-          )}
+          <MemberStatusChip member={member} />
         </>
       }
       chips={
@@ -550,8 +556,8 @@ function InviteLinkDialog({
     <Dialog.Root open={open} onOpenChange={({ open }) => (open ? undefined : onClose())}>
       <Dialog.Content bg="bg">
         <Dialog.Header>
-          <Dialog.Title>
-            <Heading>Invite Link</Heading>
+          <Dialog.Title textStyle="xl" fontWeight="semibold">
+            Invite Link
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />

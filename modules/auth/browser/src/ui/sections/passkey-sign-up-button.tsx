@@ -4,6 +4,7 @@ import { useState } from "react";
 import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { isCeremonyAbandoned, passkeyFailure } from "../../model/passkey-failure.ts";
+import { passkeySignUpContext } from "../../model/passkey-sign-up-claim.ts";
 import { MethodButton } from "../elements/method-button.tsx";
 import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
 
@@ -42,8 +43,8 @@ type Refusal =
   | { kind: "report"; error: { error: string } };
 
 /**
- * Runs the ceremony and says what came of it. The address and its mailbox proof
- * travel as the registration `context`, baked into the stored challenge, so the
+ * Runs the ceremony and says what came of it. The address, its mailbox proof and the tab's
+ * claim travel as the registration `context`, baked into the stored challenge, so the
  * created account is for the address the proof confirmed — not swappable mid-flow.
  */
 async function createAccountWithPasskey({
@@ -55,7 +56,7 @@ async function createAccountWithPasskey({
 }): Promise<Refusal | "created"> {
   try {
     const result = await authClient.passkey.addPasskey({
-      context: JSON.stringify({ email, addressProof }),
+      context: passkeySignUpContext({ email, addressProof }),
       name: email,
       // The session is minted by the same transaction that writes the
       // credential, so this button ends with somebody signed in rather than

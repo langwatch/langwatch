@@ -23,7 +23,7 @@ export function EmailAndLinkedAccountsSection() {
       <VStack align="start" gap={1}>
         <HStack gap={2}>
           <AtSign size={18} />
-          <Text fontWeight={600}>Linked accounts</Text>
+          <Text fontWeight={600}>Linked Accounts</Text>
         </HStack>
         <Text color="fg.muted" fontSize="sm">
           The addresses this account is known by, and the identity providers that vouch for it.

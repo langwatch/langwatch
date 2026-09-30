@@ -1016,103 +1016,97 @@ function SeriesFieldItem({
       borderColor="border"
       marginBottom={4}
     >
-      <Accordion.ItemTrigger
-        cursor="pointer"
-        background="bg.subtle"
-        fontWeight="bold"
-        paddingLeft={1}
-        paddingRight={3}
-      >
-        <HStack width="full" gap={4}>
-          <HStack width="full" gap={1}>
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button variant="plain" padding={0} onClick={(e) => e.stopPropagation()}>
-                  <Center>
-                    <Box
-                      width="32px"
-                      height="32px"
-                      borderRadius="100%"
-                      background={`conic-gradient(from -${
-                        360 / coneColors.length
-                      }deg, ${coneColors.join(", ")})`}
-                    />
-                  </Center>
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content>
-                {Object.entries(rotatingColors).map(([key, colorSet]) => (
-                  <Menu.Item
-                    key={key}
-                    value={key}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      form.setValue(`series.${index}.colorSet`, key as RotatingColorSet, {
-                        shouldTouch: true,
-                      });
-                    }}
-                  >
-                    <VStack align="start" gap={2}>
-                      <Text>{camelCaseToTitleCase(key)}</Text>
-                      <HStack gap={0} paddingLeft="12px">
-                        {colorSet.map((color, i) => (
-                          <Box
-                            key={i}
-                            width="32px"
-                            height="32px"
-                            borderRadius="100%"
-                            backgroundColor={color.color}
-                            marginLeft="-12px"
-                          />
-                        ))}
-                      </HStack>
-                    </VStack>
-                  </Menu.Item>
-                ))}
-              </Menu.Content>
-            </Menu.Root>
-            <Input
-              {...form.control.register(`series.${index}.name`)}
-              border="none"
-              paddingX={2}
+      <HStack width="full" gap={4} background="bg.subtle" paddingLeft={1} paddingRight={3}>
+        <HStack width="full" gap={1}>
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="plain" padding={0} onClick={(e) => e.stopPropagation()}>
+                <Center>
+                  <Box
+                    width="32px"
+                    height="32px"
+                    borderRadius="100%"
+                    background={`conic-gradient(from -${
+                      360 / coneColors.length
+                    }deg, ${coneColors.join(", ")})`}
+                  />
+                </Center>
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              {Object.entries(rotatingColors).map(([key, colorSet]) => (
+                <Menu.Item
+                  key={key}
+                  value={key}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    form.setValue(`series.${index}.colorSet`, key as RotatingColorSet, {
+                      shouldTouch: true,
+                    });
+                  }}
+                >
+                  <VStack align="start" gap={2}>
+                    <Text>{camelCaseToTitleCase(key)}</Text>
+                    <HStack gap={0} paddingLeft="12px">
+                      {colorSet.map((color, i) => (
+                        <Box
+                          key={i}
+                          width="32px"
+                          height="32px"
+                          borderRadius="100%"
+                          backgroundColor={color.color}
+                          marginLeft="-12px"
+                        />
+                      ))}
+                    </HStack>
+                  </VStack>
+                </Menu.Item>
+              ))}
+            </Menu.Content>
+          </Menu.Root>
+          <Input
+            {...form.control.register(`series.${index}.name`)}
+            border="none"
+            paddingX={2}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            fontSize="14px"
+            fontWeight="normal"
+            onDoubleClick={() => {
+              setExpandedSeries((prev) => {
+                if (Array.isArray(prev)) {
+                  const key = index.toString();
+                  const isExpanded = prev.includes(key);
+
+                  return isExpanded ? prev.filter((i) => i.toString() !== key) : [...prev, key];
+                }
+                return prev;
+              });
+            }}
+            background="none"
+          />
+        </HStack>
+        <HStack gap={0}>
+          {seriesFields.fields.length > 1 && (
+            <Button
+              variant="plain"
+              padding={0}
               onClick={(e) => {
                 e.stopPropagation();
+                seriesFields.remove(index);
               }}
-              fontSize="14px"
-              fontWeight="normal"
-              onDoubleClick={() => {
-                setExpandedSeries((prev) => {
-                  if (Array.isArray(prev)) {
-                    const key = index.toString();
-                    const isExpanded = prev.includes(key);
-
-                    return isExpanded ? prev.filter((i) => i.toString() !== key) : [...prev, key];
-                  }
-                  return prev;
-                });
-              }}
-              background="none"
-            />
-          </HStack>
-          <HStack gap={0}>
-            {seriesFields.fields.length > 1 && (
-              <Button
-                variant="plain"
-                padding={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  seriesFields.remove(index);
-                }}
-              >
-                <Trash width={16} />
-              </Button>
-            )}
+            >
+              <Trash width={16} />
+            </Button>
+          )}
+          <Accordion.ItemTrigger width="auto" padding={2} cursor="pointer">
             <Accordion.ItemIndicator>
               <ChevronDown />
             </Accordion.ItemIndicator>
-          </HStack>
+          </Accordion.ItemTrigger>
         </HStack>
-      </Accordion.ItemTrigger>
+      </HStack>
       <Accordion.ItemContent>
         <Box padding={3}>
           <SeriesField form={form} index={index} customId={customId} />

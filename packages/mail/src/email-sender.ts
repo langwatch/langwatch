@@ -6,6 +6,8 @@ export type EmailAttachment = {
 
 /** One rendered message, as a template hands it to NotificationApi's sender. */
 export type EmailContent = {
+  /** Stable identity of one recipient's delivery, so a retry is not a second mail. */
+  idempotencyKey?: string;
   to: string | string[];
   subject: string;
   html: string;

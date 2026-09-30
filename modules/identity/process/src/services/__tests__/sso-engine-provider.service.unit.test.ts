@@ -177,6 +177,27 @@ describe("given a connection nothing may dial", () => {
   });
 });
 
+describe("given a connection whose claim an operator turned down", () => {
+  /** @scenario "A connection whose claim an operator turned down carries nobody" */
+  it("projects no row, so the identity provider is never dialled", async () => {
+    const store = MemoryIdentityStore.create();
+    store.ssoEngineProviders.set("connection_1", {
+      id: "connection_1",
+      providerId: "connection_1",
+      organizationId: "org_1",
+      issuer: "https://idp.acme.test",
+      domain: "acme.test",
+      oidcConfig: "{}",
+      samlConfig: null,
+    });
+    const service = await serviceOver(store);
+
+    await service.project({ connection: connectionOf({ state: "REJECTED" }) });
+
+    expect(store.ssoEngineProviders.has("connection_1")).toBe(false);
+  });
+});
+
 describe("given a SAML connection whose document the vault holds", () => {
   it("names this deployment as the service provider", async () => {
     const store = MemoryIdentityStore.create();

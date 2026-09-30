@@ -77,6 +77,9 @@ export const INDEFINITE_DEFAULT_RETENTION_TABLES = [
   "governance_cost_rollup_1d",
   "governance_cost_rollup_charges",
   "governance_cost_rollup_restatement_index",
+  // Instant Eval judgements carry no customer content, and a run's row explains them.
+  "instant_eval_judgments",
+  "instant_eval_runs",
 ] as const;
 
 export type IndefiniteDefaultRetentionTable = (typeof INDEFINITE_DEFAULT_RETENTION_TABLES)[number];

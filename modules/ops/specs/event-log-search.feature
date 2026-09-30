@@ -11,6 +11,12 @@ Feature: Searching the event log from the operator console
     And the answer is a client error, not a 500
 
   @unit
+  Scenario: An event-log search that reaches the explorer with no query and no tenant is a handled client error
+    Given a caller that bypassed the input schema
+    When the explorer is asked to search with a blank query and no tenant
+    Then it refuses with the ops search query required error, a 400, and reads nothing
+
+  @unit
   Scenario: An event-log search bounded by a query or a tenant is accepted
     Given an operator on the event explorer
     When they search with a query, or with a tenant picked and no query

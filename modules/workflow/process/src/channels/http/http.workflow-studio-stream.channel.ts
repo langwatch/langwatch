@@ -44,17 +44,17 @@ export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
  * `fetch` at `undefined/go/...` reporting an opaque URL parse failure.
  */
 export class UnconfiguredWorkflowStudioStreamAdapter implements WorkflowStudioStream {
-  static create(): UnconfiguredWorkflowStudioStreamAdapter {
-    return new UnconfiguredWorkflowStudioStreamAdapter();
+  /** `reason` names why, where the deployment named an engine it cannot use. */
+  static create(input: { reason?: string } = {}): UnconfiguredWorkflowStudioStreamAdapter {
+    return new UnconfiguredWorkflowStudioStreamAdapter(
+      input.reason ??
+        "This process was composed without an NLP engine address, so it cannot run the optimization studio.",
+    );
   }
 
-  private constructor() {}
+  private constructor(private readonly reason: string) {}
 
   open(): Promise<ReadableStreamDefaultReader<Uint8Array>> {
-    return Promise.reject(
-      new Error(
-        "This process was composed without an NLP engine address, so it cannot run the optimization studio.",
-      ),
-    );
+    return Promise.reject(new Error(this.reason));
   }
 }

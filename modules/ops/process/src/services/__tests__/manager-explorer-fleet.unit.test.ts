@@ -110,6 +110,7 @@ describe("ManagerExplorerService fleet summary", () => {
   });
 
   describe("given rows the pipeline registry does not know", () => {
+    /** @scenario "The operator fleet is read from the process-manager tables" */
     it("still shows them, naming the registry gap", async () => {
       const service = serviceWithCounts([counts("retired.process", { deadMessages: 2 })]);
       const rows = await service.getFleetSummary();

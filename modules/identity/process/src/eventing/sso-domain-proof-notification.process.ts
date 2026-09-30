@@ -39,6 +39,8 @@ export type SsoDomainProofNotificationIntents = {
  */
 export interface SsoDomainProofNotifications {
   proofWavering(args: {
+    /** The intent's own key: one per ceremony, the root of each admin's delivery key. */
+    notificationKey: string;
     connectionId: string;
     organizationId: string;
     domain: string;
@@ -46,6 +48,7 @@ export interface SsoDomainProofNotifications {
   }): Promise<void>;
 
   proofLapsed(args: {
+    notificationKey: string;
     connectionId: string;
     organizationId: string;
     domain: string;

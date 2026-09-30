@@ -176,6 +176,7 @@ describe("GatewayApp.listSpendEventsPage", () => {
 
   describe("given rows naming a virtual key", () => {
     /** @scenario Ledger rows resolve virtual key display names */
+    /** @scenario Virtual key rows are read only through the gateway feature */
     it("resolves virtual-key display names alongside the rows", async () => {
       const app = await gatewayAppStub();
       const result = await app.listSpendEventsPage(BASE_INPUT);
@@ -189,6 +190,18 @@ describe("GatewayApp.listSpendEventsPage", () => {
           where: expect.objectContaining({ organizationId: "org_1", id: { in: ["vk_1"] } }),
         }),
       );
+    });
+  });
+
+  describe("given a page naming no keys", () => {
+    it("asks the virtual-key table nothing", async () => {
+      clickHouseQuery.mockResolvedValue({ rows: [{ ...SPEND_EVENT_ROW, VirtualKeyId: "" }] });
+      const app = await gatewayAppStub();
+
+      const result = await app.listSpendEventsPage(BASE_INPUT);
+
+      expect(result?.virtualKeyNames).toEqual({});
+      expect(virtualKeyFindMany).not.toHaveBeenCalled();
     });
   });
 

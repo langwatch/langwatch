@@ -3,12 +3,14 @@
  * switch stays available for turning it off after an Enterprise plan lapses.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { Alert, Badge, Box, HStack, Text } from "@chakra-ui/react";
+import { Alert, Box, HStack, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Lock } from "lucide-react";
+
+import { EnterprisePlanBadge } from "../../../../ui/elements/enterprise-plan-badge.tsx";
 
 const OFF_EXPLANATION =
   "Requiring two-step verification of every member is part of the Enterprise plan. Members can still set it up on their own accounts.";
@@ -44,11 +46,7 @@ export function TwoStepRequirementCard({
       hint="A code, a passkey, or one their identity provider confirms. Turning it on signs nobody out."
       badge={
         <HStack gap={2}>
-          {planLocked && (
-            <Badge colorPalette="purple" data-testid="two-step-requirement-plan-badge">
-              Enterprise
-            </Badge>
-          )}
+          {planLocked && <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" />}
           {/* The tooltip hangs off a wrapper: a disabled switch takes no pointer events. */}
           <Tooltip content={explanation} disabled={!planLocked || mfaRequired}>
             <Box>

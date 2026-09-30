@@ -24,7 +24,10 @@ import type { CodexDeviceCode, CodexPollResult } from "../../services/codex-acco
 export type ModelProviderTrpcTestContext = { actor: { id: string } };
 
 /** Whether the caller holds one permission on the scope the input named. */
-export type ModelProviderTestDecision = (permission: AuthzPermission) => boolean;
+export type ModelProviderTestDecision = (
+  permission: AuthzPermission,
+  scope: Parameters<AuthzApi["getDecision"]>[0]["scope"],
+) => boolean;
 
 export function modelProviderTrpcTestMembers(
   permits: ModelProviderTestDecision = () => true,
@@ -33,12 +36,14 @@ export function modelProviderTrpcTestMembers(
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
-        getDecision: async ({ permission }) => ({
-          permitted: permits(permission),
+        getDecision: async ({ permission, scope }) => ({
+          permitted: permits(permission, scope),
           organizationRole: null,
         }),
-        getProjectAnyDecision: async ({ permissions }) => ({
-          permitted: permissions.some((permission) => permits(permission)),
+        getProjectAnyDecision: async ({ permissions, projectId }) => ({
+          permitted: permissions.some((permission) =>
+            permits(permission, { tier: "project", id: projectId }),
+          ),
           organizationRole: null,
         }),
         checkScopeLineage: async () => ({ kind: "consistent" }),
@@ -138,8 +143,8 @@ export function mountableModelProviderApp(options: {
     repositories,
     dependencies: {
       permissions: createApiFixture<AuthzApi>({
-        getDecision: async ({ permission }: { permission: AuthzPermission }) => ({
-          permitted: permits(permission),
+        getDecision: async ({ permission, scope }) => ({
+          permitted: permits(permission, scope),
           organizationRole: null,
         }),
       }),

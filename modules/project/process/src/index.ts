@@ -12,13 +12,8 @@ export {
   createGovernanceInternalProjectService,
   createProjectCodingAgentActivityRepository,
   createProjectMetadataService,
-  createProjectService,
 } from "./project.server.ts";
-export {
-  ProjectDiagnostics,
-  ProjectKeyMap,
-  ProjectStoredObjects,
-} from "./services/project.service.ts";
+export { ProjectDiagnostics, ProjectStoredObjects } from "./services/project.service.ts";
 export {
   type ProjectManagementApi,
   projectRest,

@@ -84,6 +84,8 @@ export const sendEmailCommandSchema = z
       .strict()
       .optional(),
     attachments: z.array(emailAttachmentSchema).optional(),
+    /** Stable identity of one recipient's delivery; a retry carries the same one. */
+    idempotencyKey: z.string().min(1).optional(),
   })
   .strict();
 

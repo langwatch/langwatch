@@ -62,6 +62,7 @@ import {
   ssoDomainProofFileChannels,
 } from "../channels/sso-domain-proof-channels.registry.ts";
 import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
+import { ssoDomainProofMailChannels } from "../channels/sso-domain-proof-mail-channels.registry.ts";
 import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
 import {
   composeJoinRequestPipeline,
@@ -78,6 +79,7 @@ import {
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
 import { breakGlassHolderEligibility } from "../rules/break-glass-eligibility.rules.ts";
+import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type {
   JoinMembership,
   JoinOfferDismissals,
@@ -89,6 +91,7 @@ import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.
 import { newSsoBreakGlassBindingId } from "../rules/sso-connection-id.rules.ts";
 import { ssoMethodDialWith } from "../rules/sso-method-dial.rules.ts";
 import { AccountIdentifiersService } from "../services/account-identifiers.service.ts";
+import { IdentityCeremoniesService } from "../services/better-auth-identity-ceremonies.service.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
@@ -190,6 +193,7 @@ type IdentitySetup = FeatureSetup<
 
 type IdentityAppParts = {
   emails: IdentityEmailService;
+  ceremonies: IdentityCeremoniesService;
   identityGuards: IdentityGuardsService;
   mfaGuards: MfaGuardsService;
   reservations: IdentityRepositories["reservations"];
@@ -471,6 +475,13 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       identity,
       deps: { isLatched },
     });
+    const ceremonies = IdentityCeremoniesService.create({
+      heads: setup.repositories.heads,
+      users: setup.repositories.users,
+      identity,
+      isLatched,
+      clock: { now: () => Date.now(), newCommandId: newIdentityCommandId },
+    });
     const newbornSweep = IdentityNewbornReconciliationService.create({
       newborns: setup.repositories.newborn,
       identity,
@@ -505,6 +516,10 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         scim: setup.dependencies.scim,
       }),
       engineProvider: engineProviders,
+      mail: ssoDomainProofMailChannels.ses.create({
+        mailer,
+        baseUrl: setup.members.publicBaseUrl ?? "",
+      }),
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
@@ -692,6 +707,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
 
     return new IdentityApp({
       emails,
+      ceremonies,
       identityGuards,
       mfaGuards,
       reservations,
@@ -961,6 +977,10 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
 
   identity(): IdentityService {
     return this.#parts.identity;
+  }
+
+  ceremonies(): IdentityCeremoniesService {
+    return this.#parts.ceremonies;
   }
 
   newbornSweep(): IdentityNewbornReconciliationService {

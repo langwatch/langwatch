@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-ses": "catalog:",
+    "@langwatch/aws-client": "workspace:*",
+    "@langwatch/egress": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",

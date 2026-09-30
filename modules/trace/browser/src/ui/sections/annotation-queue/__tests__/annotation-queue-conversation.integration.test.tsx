@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * The conversation trace lends annotation's queue walker: the item's thread,
  * or its own trace as the only turn when there is no thread to read.
- * @see specs/annotations/annotation-queue-workflow.feature
+ * @see modules/annotation/specs/annotation-queue-workflow.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -128,7 +128,7 @@ describe("given the queued trace belongs to a thread", () => {
   });
 
   describe("given the thread is older than the window the conversation reads", () => {
-    /** @scenario "A trace whose thread is older than the conversation window is read on its own" */
+    /** @scenario "A single or unavailable conversation still shows the queued trace" */
     it("hands the trace over as the only turn once the thread answers empty", () => {
       mocks.state.turns = { items: [] };
       renderConversation("thread-1");
@@ -148,7 +148,7 @@ describe("given the queued trace belongs to a thread", () => {
 });
 
 describe("given the queued trace belongs to no thread", () => {
-  /** @scenario "A trace with no thread is still read as a conversation" */
+  /** @scenario "A single or unavailable conversation still shows the queued trace" */
   it("hands the trace over as the conversation's only turn", () => {
     renderConversation(null);
 

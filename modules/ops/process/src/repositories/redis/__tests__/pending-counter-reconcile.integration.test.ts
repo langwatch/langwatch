@@ -232,8 +232,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.reconcileTotalPending", () => {
 
   describe("given a pass that ran past its single-flight window", () => {
     describe("when reconcile completes", () => {
-      /** @scenario An overrunning reconcile releases the marker instead of
-       * holding it past the window */
+      /** @scenario "An overrunning reconcile releases the marker instead of holding it past the window" */
       it("releases the marker so the next cycle can start immediately", async () => {
         const counterKey = `${queueName}:gq:stats:total-pending`;
 
@@ -310,8 +309,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.reconcileTotalPending", () => {
 
   describe("given a group the pending index has not learned about yet", () => {
     describe("when reconcile runs", () => {
-      /** @scenario "A group known only to the lifecycle indexes is adopted
-       * into the pending index" */
+      /** @scenario "A group known only to the lifecycle indexes is adopted into the pending index" */
       it("counts it and adopts it, so later passes read it from the index", async () => {
         const indexKey = `${queueName}:gq:pending-groups`;
 

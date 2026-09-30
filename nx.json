@@ -272,6 +272,15 @@
       },
       {
         "filter": {
+          "projects": ["@langwatch/analyticssim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/analyticssim/web/dist"]
+      },
+      {
+        "filter": {
           "plugin": "./dev/nx/go-plugin.mjs"
         },
         "cache": true,

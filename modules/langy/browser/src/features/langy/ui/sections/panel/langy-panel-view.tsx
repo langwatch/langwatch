@@ -1,5 +1,6 @@
 import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
+import type { GuidedPullRequest } from "@langwatch/onboarding-browser-kit";
 import type { UIMessage } from "ai";
 import { type ProfilerOnRenderCallback, type RefObject, useEffect, useMemo } from "react";
 
@@ -104,6 +105,7 @@ export function langyColumnState({
   onHistoryErrorAction,
   restoringMessageCount,
   hasPendingPrompt,
+  tourCard,
   empty,
 }: {
   showCardGallery: boolean;
@@ -114,6 +116,8 @@ export function langyColumnState({
   onHistoryErrorAction: () => void;
   restoringMessageCount: number | null;
   hasPendingPrompt: boolean;
+  /** Set while a guided tour runs or its kickoff waits to send; only shown in an empty column. */
+  tourCard: LangyColumnState["tourCard"];
   empty: NonNullable<LangyColumnState["empty"]>;
 }): LangyColumnState {
   const { reconnectCodex } = failure;
@@ -137,7 +141,8 @@ export function langyColumnState({
       if (kind === "retry") onHistoryErrorAction();
     },
     restoring: flags.isRestoring ? { messageCount: restoringMessageCount } : null,
-    empty: flags.isEmpty && !hasPendingPrompt ? empty : null,
+    tourCard: flags.isEmpty ? tourCard : null,
+    empty: flags.isEmpty && !hasPendingPrompt && !tourCard ? empty : null,
   };
 }
 
@@ -162,6 +167,7 @@ export function langyMessageContext({
   onAskCodeAccessAgain,
   interruptedConversationId,
   pinnedFeedbackMessageId,
+  guided,
 }: {
   live: boolean;
   isBusy: boolean;
@@ -179,6 +185,8 @@ export function langyMessageContext({
   onAskCodeAccessAgain: () => void;
   interruptedConversationId: string | null;
   pinnedFeedbackMessageId: string | null;
+  /** What the transcript says about a guided onboarding path; all quiet in an ordinary chat. */
+  guided: { conversation: boolean; inProgress: boolean; pullRequest: GuidedPullRequest | null };
 }): LangyMessageContext {
   const settled = !isBusy && !turnActive && !failure.turnError && !failure.recovery.isRecovering;
   return {
@@ -192,7 +200,10 @@ export function langyMessageContext({
     displayBusy: view.displayBusy,
     interruptedHere:
       interruptedConversationId != null && interruptedConversationId === activeConversationId,
-    feedbackAllowed: live && settled,
+    // Never during a guided path: the ask waits until a reply has closed it.
+    feedbackAllowed: live && settled && !guided.inProgress,
+    hideGithubProgress: guided.conversation,
+    guidedPullRequest: guided.pullRequest,
     pinnedFeedbackMessageId,
     shouldAskFeedback,
     choicesTimeline: reads.choicesTimeline,

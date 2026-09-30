@@ -25,6 +25,7 @@
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",

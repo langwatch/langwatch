@@ -1,7 +1,8 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 /**
- * The access-model reconvergence watch as a scheduled process with no events of its own.
- * `global`, because one ClickHouse access model serves every tenant (ADR-159).
+ * Analytics' LangWatchQL pipeline, with no events of its own: the access-model reconvergence
+ * watch, `global` because one ClickHouse access model serves every tenant (ADR-159), and the
+ * key-map row it writes when project records a created project (§9).
  */
 import {
   defineAggregate,
@@ -10,6 +11,10 @@ import {
   type EventingSetup,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  PROJECT_CREATED_EVENT_TYPE,
+  projectCreatedEventDataSchema,
+} from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
@@ -27,10 +32,11 @@ import {
 
 export const LWQL_RECONVERGENCE_PIPELINE_NAME = "lwql_reconvergence";
 
-/** The two operations the watch calls; absent LangWatchQL or rendered mode, both are no-ops. */
+/** The operations this pipeline calls; absent LangWatchQL or rendered mode, all are no-ops. */
 export interface LwqlReconvergenceApp {
   probeLwqlAccessModelOwner(): Promise<LwqlAccessModelOwner>;
   convergeLwqlAccessModel(): Promise<void>;
+  syncLwqlKeyMapRow(input: { projectId: string }): Promise<void>;
 }
 
 export function buildLwqlReconvergence({
@@ -45,6 +51,11 @@ export function buildLwqlReconvergence({
     aggregate: defineAggregate({ type: "global" }),
   })
     .withEvents([])
+    .withPeerSubscriber("syncLwqlKeyMapRow", {
+      eventType: PROJECT_CREATED_EVENT_TYPE,
+      data: projectCreatedEventDataSchema,
+      handle: ({ projectId }) => app.syncLwqlKeyMapRow({ projectId }),
+    })
     .withProcessManager(LWQL_RECONVERGENCE_PROCESS_NAME, (pm) =>
       pm
         .state(lwqlReconvergenceStateSchema, LWQL_RECONVERGENCE_INITIAL_STATE)
@@ -69,7 +80,8 @@ function isReconvergenceApp(app: unknown): app is LwqlReconvergenceApp {
     typeof app === "object" &&
     app !== null &&
     "probeLwqlAccessModelOwner" in app &&
-    "convergeLwqlAccessModel" in app
+    "convergeLwqlAccessModel" in app &&
+    "syncLwqlKeyMapRow" in app
   );
 }
 

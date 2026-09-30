@@ -87,6 +87,7 @@ describe("the per-project NLP Lambda runtime", () => {
       expect(resolve).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario "A resolved function is shared across every pod through Redis" */
     /** @scenario "A successful resolution is shared for ten minutes" */
     it("warms every other pod, so a fresh runtime resolves nothing", async () => {
       const cache = new SharedCache();

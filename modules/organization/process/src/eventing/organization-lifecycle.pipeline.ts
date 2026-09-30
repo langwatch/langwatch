@@ -15,6 +15,7 @@ import {
   RecordIntegrationMethodChosenCommand,
   RecordInviteAcceptedCommand,
   RecordMembersInvitedCommand,
+  RecordPersonalWorkspaceProvisionedCommand,
   RecordSignedUpCommand,
 } from "./organization-lifecycle.commands.ts";
 import {
@@ -24,6 +25,7 @@ import {
   ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
   organizationSignedUpEventSchema,
+  personalWorkspaceProvisionedEventSchema,
 } from "./organization-lifecycle.events.ts";
 
 function lifecycleCommands() {
@@ -36,11 +38,13 @@ function lifecycleCommands() {
       membersInvitedEventSchema,
       inviteAcceptedEventSchema,
       integrationMethodChosenEventSchema,
+      personalWorkspaceProvisionedEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
     .withCommand("recordMembersInvited", RecordMembersInvitedCommand)
     .withCommand("recordInviteAccepted", RecordInviteAcceptedCommand)
-    .withCommand("recordIntegrationMethodChosen", RecordIntegrationMethodChosenCommand);
+    .withCommand("recordIntegrationMethodChosen", RecordIntegrationMethodChosenCommand)
+    .withCommand("recordPersonalWorkspaceProvisioned", RecordPersonalWorkspaceProvisionedCommand);
 }
 
 export type OrganizationLifecycleDefinition = ReturnType<

@@ -23,6 +23,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/error-views": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

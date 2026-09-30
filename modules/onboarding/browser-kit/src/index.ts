@@ -21,3 +21,4 @@ export * from "./model/shared/accent-surface.ts";
 export * from "./behavior/use-project-by-slug-or-latest.ts";
 export * from "./model/code-prompts.ts";
 export * from "./ui/sections/observability/codegen/snippets.ts";
+export * from "./features/guided-onboarding/model/guided-conversation.ts";

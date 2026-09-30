@@ -22,10 +22,11 @@ Feature: Prompt Studio page
     And I am told which grant the page needs
 
   @integration
-  Scenario: Replicating a prompt offers only projects the reader may create in
+  Scenario: Replicating a prompt cannot target a project the reader may not create in
     Given I belong to one team as an administrator and to another as a viewer
     When I open the Replicate dialog on a prompt
-    Then only the projects of the team I administer are offered
+    Then the viewer team's project is marked "no permission" and cannot be chosen
+    And the project of the team I administer can be chosen and replicated into
 
   @integration
   Scenario: Opening a trace from a playground turn addresses the trace drawer

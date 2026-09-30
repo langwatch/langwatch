@@ -24,7 +24,6 @@ function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
     BASE_HOST: config.process.appBaseUrl ?? window.location.origin,
     DEMO_PROJECT_SLUG: config.authz.demoProjectSlug,
     NODE_ENV: config.process.mode,
-    IDENTITY_FRONT_DOOR: config.auth.identityFrontDoor,
     PASSKEYS_ENABLED: config.auth.passkeys,
     HAS_EMAIL_PROVIDER_KEY: config.notification.email,
     IS_SAAS: config.process.deployment === "saas",

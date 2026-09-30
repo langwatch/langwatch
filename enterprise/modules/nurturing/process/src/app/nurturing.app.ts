@@ -50,7 +50,11 @@ export class NurturingApp implements NurturingApi {
     const customerIo = await secrets.into(nurturingSecrets.customerIoApiKey, (key) =>
       key
         ? NurturingService.create({
-            config: { customerIoApiKey: key, customerIoRegion: config.customerIoRegion },
+            config: {
+              customerIoApiKey: key,
+              customerIoRegion: config.customerIoRegion,
+              customerIoBaseUrl: config.customerIoBaseUrl,
+            },
           })
         : void 0,
     );

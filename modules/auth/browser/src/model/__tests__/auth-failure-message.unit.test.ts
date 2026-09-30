@@ -63,11 +63,47 @@ describe("authFailureMessage", () => {
     });
   });
 
-  describe("when nothing recognizable comes back", () => {
-    it("falls back rather than putting an identifier on screen", () => {
-      expect(authFailureMessage({ code: "SOME_NEW_CODE", status: 400 })).toBe(
-        "Sign in did not go through. Please try again.",
+  describe("when the installation has stopped accepting attempts", () => {
+    /** @scenario Too many attempts says to wait */
+    it("tells the person to wait, whether the refusal came as a status or a code", () => {
+      const byStatus = authFailureMessage({ message: "Too many requests", status: 429 });
+      const byCode = authFailureMessage({ code: "TOO_MANY_ATTEMPTS" });
+
+      expect(byStatus).toMatch(/wait/i);
+      expect(byCode).toBe(byStatus);
+      expect(byStatus).not.toContain("429");
+      expect(byStatus).not.toContain("TOO_MANY");
+    });
+  });
+
+  describe("when the installation is set up for another address", () => {
+    /** @scenario An address mismatch says which thing to check */
+    it("names the address as the thing to check, and never the code", () => {
+      const message = authFailureMessage({
+        code: "INVALID_ORIGIN",
+        message: "Invalid origin",
+        status: 403,
+      });
+
+      expect(message).toBe(
+        "LangWatch is set up for a different web address than the one you are using. Check the address and try again.",
       );
+      expect(message).not.toContain("INVALID_ORIGIN");
+      expect(message).not.toMatch(/origin/i);
+    });
+  });
+
+  describe("when nothing recognizable comes back", () => {
+    /** @scenario An unexpected failure still says something honest */
+    it("falls back rather than putting an identifier on screen", () => {
+      const message = authFailureMessage({
+        code: "SOME_NEW_CODE",
+        message: "SOME_NEW_CODE",
+        status: 400,
+      });
+
+      expect(message).toBe("Sign in did not go through. Please try again.");
+      expect(message).not.toContain("SOME_NEW_CODE");
     });
   });
 });

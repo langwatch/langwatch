@@ -46,6 +46,9 @@ dist/
 !/services/llmsim/web/dist/
 /services/llmsim/web/dist/*
 !/services/llmsim/web/dist/.gitkeep
+!/services/analyticssim/web/dist/
+/services/analyticssim/web/dist/*
+!/services/analyticssim/web/dist/.gitkeep
 /dev/.cache/
 
 langwatch_server/

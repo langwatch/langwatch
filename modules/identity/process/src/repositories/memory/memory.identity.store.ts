@@ -78,7 +78,7 @@ export class MemoryIdentityStore {
   readonly organizationNames = new Map<string, string>();
   /** Each organization's member user ids, the legacy stranding check's membership read. */
   readonly organizationMembers = new Map<string, string[]>();
-  readonly organizationAdminEmails = new Map<string, string[]>();
+  readonly organizationAdmins = new Map<string, { userId: string; email: string }[]>();
   readonly finalizedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */
   readonly legacySignInAccounts = new Map<string, LegacySignInAccount>();

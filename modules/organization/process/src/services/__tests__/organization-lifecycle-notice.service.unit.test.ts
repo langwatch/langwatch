@@ -12,6 +12,7 @@ const idle = { send: async () => undefined };
 function notices(
   recordSignedUp: { send: (data: RecordSignedUpCommandData) => Promise<void> },
   recordIntegrationMethodChosen: { send: (data: unknown) => Promise<void> } = idle,
+  recordPersonalWorkspaceProvisioned: { send: (data: unknown) => Promise<void> } = idle,
 ) {
   const reportError = vi.fn();
   const service = OrganizationLifecycleNoticeService.create({ reportError });
@@ -20,6 +21,7 @@ function notices(
     recordMembersInvited: idle,
     recordInviteAccepted: idle,
     recordIntegrationMethodChosen,
+    recordPersonalWorkspaceProvisioned,
   });
   return { service, reportError };
 }

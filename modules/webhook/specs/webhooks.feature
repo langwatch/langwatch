@@ -53,3 +53,10 @@ Feature: Enterprise webhook endpoints
     And a queue that refuses the send is classified terminal or retryable from the SDK error, never thrown
     And a batch over the message limit is refused terminally
     And an HTTPS endpoint still sends through the egress
+
+  @unit
+  Scenario: Queue deliveries follow the configured outbound proxy
+    Given an outbound HTTP proxy is configured for the environment
+    When a batch is delivered to an endpoint whose destination is an Amazon SQS queue
+    Then the send to the queue host is routed through the proxy
+    And a queue host listed as a proxy exception is contacted directly

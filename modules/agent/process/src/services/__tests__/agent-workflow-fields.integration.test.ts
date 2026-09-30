@@ -32,6 +32,7 @@ async function setup() {
 }
 
 describe("AgentApp workflow field enrichment", () => {
+  /** @scenario "A workflow agent reports the end node's results as its output fields" */
   it("returns all declared outputs and preserves their object type", async () => {
     const { app, agent, listFields } = await setup();
     const read = await app.getById(agent);
@@ -46,6 +47,7 @@ describe("AgentApp workflow field enrichment", () => {
     });
   });
 
+  /** @scenario "A workflow agent reports the entry node's fields as its input fields" */
   it("returns entry inputs from the Workflow API", async () => {
     const { app, agent } = await setup();
 
@@ -64,6 +66,7 @@ describe("AgentApp workflow field enrichment", () => {
   });
 
   /** @scenario "Workflow fields describe the current graph" */
+  /** @scenario "Editing the workflow changes the agent's fields without touching the agent" */
   it("refreshes fields without modifying the persisted Agent", async () => {
     const { app, agent, fields, repositories } = await setup();
     const before = await repositories.agents.getById(agent);
@@ -84,6 +87,7 @@ describe("AgentApp workflow field enrichment", () => {
     expect(await repositories.agents.getById(agent)).toEqual(before);
   });
 
+  /** @scenario "A workflow agent whose workflow declares no results reports none" */
   it("preserves a resolved workflow with no outputs", async () => {
     const { app, agent, fields } = await setup();
     fields.workflow_1 = { inputFields: agent.inputFields, outputFields: [], fieldsResolved: true };
@@ -92,6 +96,7 @@ describe("AgentApp workflow field enrichment", () => {
   });
 
   /** @scenario "Workflow fields describe the current graph" */
+  /** @scenario "A workflow agent whose workflow was deleted reports no fields" */
   it("returns unresolved fields when the Workflow API excludes an archived graph", async () => {
     const { app, agent, fields } = await setup();
     delete fields.workflow_1;
@@ -105,6 +110,7 @@ describe("AgentApp workflow field enrichment", () => {
   });
 
   /** @scenario "Workflow fields describe the current graph" */
+  /** @scenario "A workflow agent pointing at no workflow at all reports no fields" */
   it("keeps an agent whose workflow cannot be resolved in the project", async () => {
     const { app } = createAgentAppFixture({
       workflows: createApiFixture<WorkflowApi>({ listFields: async () => ({}) }),

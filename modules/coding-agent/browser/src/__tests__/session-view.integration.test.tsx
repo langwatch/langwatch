@@ -28,6 +28,7 @@ const REAL_SESSION: CodingAgentSessionDisplay & Record<string, unknown> = {
   entrypoint: "cli",
   parentSessionId: "",
   isFork: false,
+  auxiliary: false,
   repositoryHost: "github.com",
   repositoryOwner: "acme",
   repositoryName: "widgets",

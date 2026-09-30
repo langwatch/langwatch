@@ -8,7 +8,11 @@ import {
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
 } from "../../app/workflow.app.ts";
-import { type NlpLambdaInvoke, type NlpPayloadStaging } from "../nlp-lambda.channel.ts";
+import {
+  type NlpLambdaFunctionReader,
+  type NlpLambdaInvoke,
+  type NlpPayloadStaging,
+} from "../nlp-lambda.channel.ts";
 import {
   NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,
@@ -64,11 +68,21 @@ export type NlpDispatchRequest = Readonly<{
   path: string;
   body: unknown;
   origin: NlpOrigin;
-  /** Scopes S3 staging on the ARN path; absent means never stage. */
-  projectId?: string;
+  /** Picks the project's engine on the ARN path, and scopes what it stages. */
+  projectId: string;
   causalityDepth?: number;
   parentTrace?: { traceId: string; parentSpanId: string };
 }>;
+
+/** How the adapter is composed, whichever engine it reaches. */
+type NlpRuntimeOptions = {
+  /** Where one project's engine answers: the shared address, or its own function's ARN. */
+  targetFor: (projectId: string) => Promise<string>;
+  fetch?: typeof fetch;
+  lambda?: NlpLambdaInvoke | undefined;
+  staging?: NlpPayloadStaging | undefined;
+  stagingConfig?: Partial<NlpInvokeStagingConfig> | undefined;
+};
 
 /**
  * Dispatches Studio events to the NLP engine at a single configured address. The engine serves
@@ -99,45 +113,41 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
     fetch?: typeof fetch;
     /** Composed only where the engine is reached by ARN; see the transport. */
     lambda?: NlpLambdaInvoke | undefined;
-    /**
-     * Where an oversized invoke body is parked. REQUIRED: a deployment with no
-     * object storage composes the refusing adapter, so an over-threshold
-     * payload is named rather than posted into the Lambda body cap.
-     */
-    staging: NlpPayloadStaging;
-    stagingConfig?: NlpInvokeStagingConfig | undefined;
+    /** Where an oversized ARN invoke is parked; absent, such an invoke refuses by name. */
+    staging?: NlpPayloadStaging | undefined;
+    stagingConfig?: Partial<NlpInvokeStagingConfig> | undefined;
   }): HttpWorkflowNlpRuntimeAdapter {
-    return new HttpWorkflowNlpRuntimeAdapter(options);
-  }
+    const { serviceUrl, ...rest } = options;
 
-  private readonly transport: NlpInvokeTransportAdapter;
-
-  private constructor(
-    private readonly options: {
-      serviceUrl: string;
-      fetch?: typeof fetch;
-      lambda?: NlpLambdaInvoke | undefined;
-      staging: NlpPayloadStaging;
-      stagingConfig?: NlpInvokeStagingConfig | undefined;
-    },
-  ) {
-    this.transport = NlpInvokeTransportAdapter.create({
-      target: options.serviceUrl,
-      // A deployment that named no staging policy still gets the built-in
-      // threshold, so an ARN target cannot silently re-expose the 6 MiB cap.
-      config: options.stagingConfig ?? DEFAULT_INVOKE_STAGING_CONFIG,
-      ...(options.lambda ? { lambda: options.lambda } : {}),
-      staging: options.staging,
-      ...(options.fetch ? { fetch: options.fetch } : {}),
+    return new HttpWorkflowNlpRuntimeAdapter({
+      ...rest,
+      targetFor: () => Promise.resolve(serviceUrl),
     });
   }
+
+  /** Each project's engine on its own function, as main's `nlpgoFetch` reaches it. */
+  static onProjectFunctions(options: {
+    functions: NlpLambdaFunctionReader;
+    lambda: NlpLambdaInvoke;
+    staging?: NlpPayloadStaging | undefined;
+    stagingConfig?: Partial<NlpInvokeStagingConfig> | undefined;
+  }): HttpWorkflowNlpRuntimeAdapter {
+    const { functions, ...rest } = options;
+
+    return new HttpWorkflowNlpRuntimeAdapter({
+      ...rest,
+      targetFor: (projectId) => functions.arnFor({ projectId }),
+    });
+  }
+
+  private constructor(private readonly options: NlpRuntimeOptions) {}
 
   dispatch(input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse> {
     return this.send({
       path: "/studio/execute_sync",
       body: input.body,
       origin: input.origin as NlpOrigin,
-      ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
+      projectId: input.projectId,
       ...(input.causalityDepth === undefined ? {} : { causalityDepth: input.causalityDepth }),
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
     });
@@ -153,8 +163,8 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
       path: "/studio/execute_sync",
       body: { type: "is_alive", payload: {} } satisfies { type: string; payload: object },
       origin: "workflow",
+      projectId: input.projectId,
     });
-    void input;
   }
 
   private async send(request: NlpDispatchRequest): Promise<WorkflowNlpDispatchResponse> {
@@ -177,12 +187,22 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
       headers.traceparent = formatTraceparent(request.parentTrace);
     }
 
-    const response = await this.transport.send({
+    const { fetch: call, lambda, staging, stagingConfig } = this.options;
+    const transport = NlpInvokeTransportAdapter.create({
+      target: await this.options.targetFor(request.projectId),
+      // A deployment that named no staging policy still gets the built-in
+      // threshold, so an ARN target cannot silently re-expose the 6 MiB cap.
+      config: { ...DEFAULT_INVOKE_STAGING_CONFIG, ...stagingConfig },
+      ...(lambda ? { lambda } : {}),
+      ...(staging ? { staging } : {}),
+      ...(call ? { fetch: call } : {}),
+    });
+    const response = await transport.send({
       path: `/go${request.path}`,
       method: "POST",
       headers,
       body: JSON.stringify(request.body),
-      ...(request.projectId === undefined ? {} : { projectId: request.projectId }),
+      projectId: request.projectId,
     });
 
     return {
@@ -198,18 +218,18 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
  * The engine this deployment did not configure.
  */
 export class UnconfiguredWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
-  static create(): UnconfiguredWorkflowNlpRuntimeAdapter {
-    return new UnconfiguredWorkflowNlpRuntimeAdapter();
+  /** `reason` names why, where the deployment named an engine it cannot use. */
+  static create(input: { reason?: string } = {}): UnconfiguredWorkflowNlpRuntimeAdapter {
+    return new UnconfiguredWorkflowNlpRuntimeAdapter(
+      input.reason ??
+        "This process was composed without an NLP engine address, so it cannot execute a workflow or a code evaluator.",
+    );
   }
 
-  private constructor() {}
+  private constructor(private readonly reason: string) {}
 
   dispatch(_input: WorkflowNlpDispatchInput): Promise<WorkflowNlpDispatchResponse> {
-    return Promise.reject(
-      new Error(
-        "This process was composed without an NLP engine address, so it cannot execute a workflow or a code evaluator.",
-      ),
-    );
+    return Promise.reject(new Error(this.reason));
   }
 }
 

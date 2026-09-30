@@ -43,6 +43,7 @@ export function BackofficeTable({
           value={searchValue}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={searchPlaceholder ?? "Search"}
+          maxLength={200}
           width="full"
           maxWidth="480px"
         />

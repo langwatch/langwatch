@@ -6,6 +6,7 @@ import {
   inputsSchema,
   messageSchema,
   modelNameSchema,
+  nulFreeStringSchema,
   outputsSchema,
   runtimeParametersSchema,
   schemaVersionSchema,
@@ -22,13 +23,13 @@ export const createPromptInputSchema = z
     temperature: z.number().optional(),
     maxTokens: z.number().optional(),
     commitMessage: commitMessageSchema.optional(),
-    authorId: z.string().optional(),
-    prompt: z.string().optional(),
+    authorId: nulFreeStringSchema.optional(),
+    prompt: nulFreeStringSchema.optional(),
     messages: z.array(messageSchema).optional(),
     inputs: z.array(inputsSchema).optional(),
     outputs: z.array(outputsSchema).optional(),
     schemaVersion: schemaVersionSchema.optional(),
-    tags: z.array(z.string().min(1)).optional(),
+    tags: z.array(nulFreeStringSchema.min(1)).optional(),
     parameters: runtimeParametersSchema.optional(),
   })
   // `prompt` and `messages` are each optional but the handler needs one of
@@ -111,14 +112,14 @@ export const assignTagResponseSchema = z.object({
   tag: z.string(),
   updatedAt: z.date(),
 });
-export const assignTagInputSchema = z.object({ versionId: z.string() });
+export const assignTagInputSchema = z.object({ versionId: nulFreeStringSchema });
 export const tagDefinitionSchema = z.object({
   id: z.string(),
   name: z.string(),
   createdAt: z.coerce.date(),
 });
-export const createTagInputSchema = z.object({ name: z.string() });
-export const renameTagInputSchema = z.object({ name: z.string() });
+export const createTagInputSchema = z.object({ name: nulFreeStringSchema });
+export const renameTagInputSchema = z.object({ name: nulFreeStringSchema });
 export const syncInputSchema = z.object({
   configData: getLatestConfigVersionSchema().shape.configData,
   parameters: z.record(z.string(), z.unknown()).optional(),
@@ -138,14 +139,20 @@ export const documentedSyncResultSchema = z.object({
     })
     .optional(),
 });
-export const idParamsSchema = z.object({ id: z.string() });
-export const idTagParamsSchema = z.object({ id: z.string(), tag: z.string() });
-export const tagParamsSchema = z.object({ tag: z.string() });
-export const idVersionParamsSchema = z.object({ id: z.string(), versionId: z.string() });
+export const idParamsSchema = z.object({ id: nulFreeStringSchema });
+export const idTagParamsSchema = z.object({
+  id: nulFreeStringSchema,
+  tag: nulFreeStringSchema,
+});
+export const tagParamsSchema = z.object({ tag: nulFreeStringSchema });
+export const idVersionParamsSchema = z.object({
+  id: nulFreeStringSchema,
+  versionId: nulFreeStringSchema,
+});
 
 /** A restore takes no body: the prompt and version travel in the path. */
 export const restorePromptVersionBodySchema = z.object({});
 export const promptWindowQuerySchema = z.object({
   version: z.coerce.number().int().nonnegative().optional(),
-  tag: z.string().optional(),
+  tag: nulFreeStringSchema.optional(),
 });

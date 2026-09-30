@@ -36,6 +36,10 @@ import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
+import {
+  ProjectCreatedNoticeService,
+  type ProjectLifecycleSenders,
+} from "../services/project-created-notice.service.ts";
 import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
 import { ProjectRequestService } from "../services/project-request.service.ts";
@@ -127,6 +131,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
+  readonly #lifecycle: ProjectCreatedNoticeService;
   readonly #apiKeys: ApiKeyApi;
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
@@ -142,6 +147,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   private constructor({
     projectService,
     operations,
+    lifecycle,
     apiKeys,
     authorization,
     trace,
@@ -151,6 +157,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   }: {
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
+    lifecycle: ProjectCreatedNoticeService;
     apiKeys: ApiKeyApi;
     authorization: AuthzApi;
     trace: TraceApi;
@@ -160,6 +167,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
+    this.#lifecycle = lifecycle;
     this.#apiKeys = apiKeys;
     this.#authorization = authorization;
     this.#trace = trace;
@@ -169,10 +177,12 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   }
 
   static create({ members, dependencies, repositories }: ProjectSetup): ProjectApp {
+    const lifecycle = ProjectCreatedNoticeService.create({ logger: members.logger });
     const projects = ProjectApplicationService.create({
       repository: repositories.projects,
       credentials: ProjectCredentialsService.create(),
       organizations: dependencies.organizations,
+      created: lifecycle,
     });
     const operations = ProjectOperationsService.create({
       projects,
@@ -186,6 +196,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return new ProjectApp({
       projectService: projects,
       operations,
+      lifecycle,
       apiKeys: dependencies.apiKeys,
       authorization: dependencies.authorization,
       trace: dependencies.trace,
@@ -202,6 +213,18 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
    */
   projects(): ProjectApiContract {
     return this;
+  }
+
+  /** project_lifecycle's senders, once the pipeline registers in this process. */
+  connectLifecycle(senders: ProjectLifecycleSenders): void {
+    this.#lifecycle.connect(senders);
+  }
+
+  /** Records a project organization created (a personal one, §9); throws so the queue retries. */
+  recordProjectCreated(
+    input: Readonly<{ projectId: string; organizationId: string }>,
+  ): Promise<void> {
+    return this.#lifecycle.record(input);
   }
 
   /** The deployment's cipher, for the stored-object credentials on the form. */

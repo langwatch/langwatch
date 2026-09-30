@@ -31,7 +31,7 @@ import {
   type UploadExistingDatasetInput,
   type UpsertDatasetInput,
   upsertDatasetInputSchema,
-  DatasetConflictError,
+  DatasetNameTakenError,
   DatasetNotFoundError,
   DatasetNotReadyError,
 } from "@langwatch/dataset-contract";
@@ -110,7 +110,7 @@ export class DatasetService {
         excludeId: existing.id,
       });
       if (conflict) {
-        throw new DatasetConflictError();
+        throw new DatasetNameTakenError();
       }
 
       const update: DatasetUpdateInput = {
@@ -142,7 +142,7 @@ export class DatasetService {
       slug,
     });
     if (conflict) {
-      throw new DatasetConflictError();
+      throw new DatasetNameTakenError();
     }
 
     if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {

@@ -1,8 +1,10 @@
 /**
  * Same-origin gate for /api/auth/*. GET/OPTIONS/HEAD allowed; state-changing
- * methods require Origin or Referer matching baseUrl.
+ * methods require Origin or Referer matching baseUrl, except the exact SAML ACS
+ * POST an identity provider submits cross-site (Better Auth validates it).
  */
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
+const SAML_ASSERTION_CONSUMER = /^\/api\/auth\/sso\/saml2\/sp\/acs\/[^/?#]+$/;
 
 function parseOrigin(value: string | undefined): string | null {
   if (!value) return null;
@@ -15,11 +17,13 @@ function parseOrigin(value: string | undefined): string | null {
 
 export function isAllowedAuthOrigin(opts: {
   method: string | undefined;
+  pathname?: string;
   origin: string | undefined;
   referer: string | undefined;
   baseUrl: string;
 }): boolean {
-  const { method, origin, referer, baseUrl } = opts;
+  const { method, pathname = "", origin, referer, baseUrl } = opts;
+  if (method === "POST" && SAML_ASSERTION_CONSUMER.test(pathname)) return true;
   if (!method || !STATE_CHANGING_METHODS.has(method)) return true;
 
   const expected = parseOrigin(baseUrl);

@@ -201,7 +201,7 @@ var table = append(baseTable, tabSpecs()...)
 var baseTable = []commandSpec{
 	{
 		name:    "simulator",
-		args:    "<mail|idp|storage|voice|llm>",
+		args:    "<mail|idp|storage|voice|llm|analytics>",
 		maxArgs: 1,
 		hidden:  true,
 		run:     runBundledSimulator,

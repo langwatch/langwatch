@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({ info: vi.fn(), warn, error: vi.fn() }),
+}));
+
 import type {
   EmailContent,
   EmailGatewayOpener,
@@ -97,10 +103,20 @@ describe("given a mailer configuration naming a provider whose credentials are a
 describe("given a mailer configuration with no provider settings at all", () => {
   describe("when the delivery capability is composed", () => {
     /** @scenario "A deployment with no provider composes and skips each send" */
+    /** @scenario "No email configuration at all is reported clearly" */
     it("composes, and skips the send rather than failing it", async () => {
       const delivery = compose(configuration());
       expect(delivery.defaultFrom()).toBe("LangWatch <contact@langwatch.ai>");
       await expect(delivery.send(message())).resolves.toBeUndefined();
+    });
+
+    /** @scenario "No email configuration at all is reported clearly" */
+    it("warns once, naming the subject it did not send", async () => {
+      warn.mockClear();
+      await compose(configuration()).send(message());
+
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]?.[1]).toContain('"Alert" was not sent');
     });
   });
 });

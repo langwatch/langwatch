@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 
-import type { ProcessHandlerContext } from "@langwatch/eventing";
+import type { IntentContext, ProcessHandlerContext } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
@@ -142,27 +142,44 @@ describe("the domain-proof notification process", () => {
         proofLapsed: vi.fn<SsoDomainProofNotifications["proofLapsed"]>(async () => {}),
       };
 
-      await runNotifyProofWavering({ notifications })({
-        connectionId: CONNECTION,
-        organizationId: ORG,
-        domain: DOMAIN,
-        firstAbsentAtMs: T0,
-        graceEndsAtMs: T0 + GRACE_MS,
-      });
-      await runNotifyProofLapsed({ notifications })({
-        connectionId: CONNECTION,
-        organizationId: ORG,
-        domain: DOMAIN,
-        firstAbsentAtMs: T0,
+      const intentContext = (messageKey: string): IntentContext => ({
+        processName: "ssoDomainProofNotification",
+        projectId: ORG,
+        processKey: CONNECTION,
+        tenantId: ORG,
+        messageKey,
+        attempt: 1,
       });
 
+      await runNotifyProofWavering({ notifications })(
+        {
+          connectionId: CONNECTION,
+          organizationId: ORG,
+          domain: DOMAIN,
+          firstAbsentAtMs: T0,
+          graceEndsAtMs: T0 + GRACE_MS,
+        },
+        intentContext("wavering-key"),
+      );
+      await runNotifyProofLapsed({ notifications })(
+        {
+          connectionId: CONNECTION,
+          organizationId: ORG,
+          domain: DOMAIN,
+          firstAbsentAtMs: T0,
+        },
+        intentContext("lapsed-key"),
+      );
+
       expect(notifications.proofWavering).toHaveBeenCalledWith({
+        notificationKey: "wavering-key",
         connectionId: CONNECTION,
         organizationId: ORG,
         domain: DOMAIN,
         graceEndsAtMs: T0 + GRACE_MS,
       });
       expect(notifications.proofLapsed).toHaveBeenCalledWith({
+        notificationKey: "lapsed-key",
         connectionId: CONNECTION,
         organizationId: ORG,
         domain: DOMAIN,

@@ -42,11 +42,19 @@ const ALL_PERSONAL_FEATURES_ENABLED: PersonalFeatures = {
   automations: true,
 };
 
+/** Where a newly created workspace is recorded as organization's event (§9); never throws. */
+export type PersonalWorkspaceNotices = Readonly<{
+  personalWorkspaceProvisioned(
+    input: Readonly<{ organizationId: string; userId: string; projectId: string }>,
+  ): void;
+}>;
+
 type PersonalWorkspaceOptions = {
   repository: OrganizationRepository;
   identities: PersonalWorkspaceIdentity;
   grants: AuthzApi;
   diagnostics: PersonalWorkspaceDiagnostics | undefined;
+  notices: PersonalWorkspaceNotices | undefined;
 };
 
 export class PersonalWorkspaceService {
@@ -63,6 +71,15 @@ export class PersonalWorkspaceService {
       workspace: parsed,
       resources,
     });
+    // After the commit, so a rolled-back workspace records nothing, and before the grant, whose
+    // failure would otherwise skip it for good (main's order). Project records the project.
+    if (result.created) {
+      this.deps.notices?.personalWorkspaceProvisioned({
+        organizationId: parsed.organizationId,
+        userId: parsed.userId,
+        projectId: result.workspace.project.id,
+      });
+    }
     const grant = {
       userId: parsed.userId,
       organizationId: parsed.organizationId,

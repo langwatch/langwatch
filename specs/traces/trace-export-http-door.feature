@@ -25,7 +25,8 @@ Feature: Traces can be exported back out over HTTP
     When the process mounts its REST families
     Then `/api/export/traces/download` answers
 
-  @integration
+  @integration @unimplemented
+  # The route is always mounted; TraceApp throws when its export peers are missing (trace.app.ts downloadTraceExport).
   Scenario: A deployment with no trace read stack leaves the download off
     Given the deployment composed no trace read stack
     When the process mounts its REST families

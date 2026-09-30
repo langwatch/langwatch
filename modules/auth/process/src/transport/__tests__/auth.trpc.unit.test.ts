@@ -23,7 +23,6 @@ const addressIsRegistered = vi.fn<AuthApi["addressIsRegistered"]>();
 const requestSignUpVerification = vi.fn<AuthApi["requestSignUpVerification"]>();
 const requestNewAccountVerification = vi.fn<AuthApi["requestNewAccountVerification"]>();
 const sendMyAddressConfirmation = vi.fn<AuthApi["sendMyAddressConfirmation"]>();
-const completeSignUpVerification = vi.fn<AuthApi["completeSignUpVerification"]>();
 const readInviteLanding = vi.fn<AuthApi["readInviteLanding"]>();
 const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
 const getSignUpEnrollment = vi.fn<AuthApi["getSignUpEnrollment"]>();
@@ -44,7 +43,6 @@ const door: AuthApi = {
   requestSignUpVerification,
   requestNewAccountVerification,
   sendMyAddressConfirmation,
-  completeSignUpVerification,
   claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
   claimUnconfirmedSignUpAddressProof: () => unreached("claimUnconfirmedSignUpAddressProof"),
   getSignUpEnrollment,
@@ -109,7 +107,6 @@ describe("the signed-out front door", () => {
   describe("given the mounted router", () => {
     it("publishes exactly the procedure names the signed-out screens call", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
-        "completeSignUpVerification",
         "inviteLanding",
         "myAddressConfirmation",
         "priorSession",
@@ -132,7 +129,6 @@ describe("the signed-out front door", () => {
       expect(kinds).toEqual({
         route: "mutation",
         requestSignUpVerification: "mutation",
-        completeSignUpVerification: "mutation",
         inviteLanding: "query",
         requestFreshInvite: "mutation",
         sendMyAddressConfirmation: "mutation",
@@ -234,6 +230,25 @@ describe("the signed-out front door", () => {
         sent: false,
         addressProof: "proof-1",
       });
+    });
+  });
+
+  describe("when one caller asks for confirmation link after confirmation link", () => {
+    /** @scenario "Asking again and again for a confirmation link stops being answered" */
+    it("refuses with the wait once the caller's hour is spent, and mails nothing", async () => {
+      isWithinBudget.mockResolvedValue({ allowed: false, retryAfterSeconds: 120 });
+
+      await expect(
+        visitor.requestSignUpVerification({ email: "someone-new@acme.com" }),
+      ).rejects.toMatchObject({
+        cause: { code: "auth_rate_limited", meta: { retryAfterSeconds: 120 } },
+      });
+      expect(isWithinBudget).toHaveBeenCalledWith({
+        key: "auth.requestSignUpVerification:203.0.113.7",
+        windowSeconds: 3600,
+        max: 20,
+      });
+      expect(requestNewAccountVerification).not.toHaveBeenCalled();
     });
   });
 
@@ -346,24 +361,6 @@ describe("the signed-out front door", () => {
       await expect(
         visitor.signUpEnrollment({ email: "sam@example.com", addressProof: "stale" }),
       ).rejects.toMatchObject({ cause: { code: "auth_no_address_to_confirm" } });
-    });
-  });
-
-  describe("when a confirmation link is spent", () => {
-    it("answers the address it confirmed and what spending it made", async () => {
-      completeSignUpVerification.mockResolvedValue({
-        email: "ana@acme.com",
-        accountCreated: false,
-        accountExists: false,
-        addressProof: "proof",
-      });
-
-      await expect(visitor.completeSignUpVerification({ token: "tok" })).resolves.toEqual({
-        email: "ana@acme.com",
-        accountCreated: false,
-        accountExists: false,
-        addressProof: "proof",
-      });
     });
   });
 

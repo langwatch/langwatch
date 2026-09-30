@@ -14,6 +14,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	aigateway "github.com/langwatch/langwatch/services/aigateway/cmd"
+	analyticssim "github.com/langwatch/langwatch/services/analyticssim/cmd"
 	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
 	langyagent "github.com/langwatch/langwatch/services/langyagent/cmd"
 	llmsim "github.com/langwatch/langwatch/services/llmsim/cmd"
@@ -49,14 +50,15 @@ func serviceTelemetryName(cmd string) string {
 type ServiceBoot func(ctx context.Context, args []string) error
 
 var services = map[string]ServiceBoot{
-	"aigateway":  aigateway.Root,
-	"idpsim":     idpsim.Root,
-	"langyagent": langyagent.Root,
-	"llmsim":     llmsim.Root,
-	"mailsim":    mailsim.Root,
-	"nlpgo":      nlpgo.Root,
-	"storagesim": storagesim.Root,
-	"voicesim":   voicesim.Root,
+	"aigateway":    aigateway.Root,
+	"analyticssim": analyticssim.Root,
+	"idpsim":       idpsim.Root,
+	"langyagent":   langyagent.Root,
+	"llmsim":       llmsim.Root,
+	"mailsim":      mailsim.Root,
+	"nlpgo":        nlpgo.Root,
+	"storagesim":   storagesim.Root,
+	"voicesim":     voicesim.Root,
 	// The development topology (ADR-004, 2026-09-07): the Go data-plane
 	// services in one process. Never a deployment — each service is still its
 	// own container in production.

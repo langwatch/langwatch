@@ -74,7 +74,11 @@ function rates(enriched: OtlpSpan): Record<string, unknown> {
 describe("OtlpSpanCostEnrichmentService", () => {
   describe("given a project with a matching cost rule", () => {
     describe("when a span naming the model is enriched", () => {
-      /** @scenario "A matched rule stamps both token rates" */
+      /**
+       * @scenario "A matched rule stamps both token rates"
+       * @scenario "Record-time cost enrichment composes from the catalog port alone"
+       * @scenario "The composed path prices a span from the operator's own rules"
+       */
       it("stamps the input and output rates under the fold's own attribute keys", async () => {
         const { port } = catalog([
           cost({
@@ -421,7 +425,10 @@ describe("OtlpSpanCostEnrichmentService", () => {
 
   describe("given an organization-level custom cost", () => {
     describe("when a span for a project under that organization is enriched", () => {
-      /** @scenario An organization-level custom cost prices spans at ingestion */
+      /**
+       * @scenario An organization-level custom cost prices spans at ingestion
+       * @scenario An organization-scoped rule prices a project's spans
+       */
       it("prices the span from the org-scoped rule the catalog port returned", async () => {
         const { port } = catalog([
           cost({
@@ -452,6 +459,23 @@ describe("OtlpSpanCostEnrichmentService", () => {
     });
   });
 
+  describe("given a project with no cost rules at all", () => {
+    describe("when a span naming a model is enriched", () => {
+      /** @scenario A project with no rules leaves the span unpriced */
+      it("leaves the span without cost attributes", async () => {
+        const { port } = catalog([]);
+        const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
+        const target = span([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
+        ]);
+
+        await service.enrichSpan({ span: target, tenantId: "project-1" });
+
+        expect(target.attributes).toHaveLength(1);
+      });
+    });
+  });
+
   describe("given a project with no matching rule", () => {
     describe("when enrichment runs", () => {
       /** @scenario "An unmatched model is left unpriced" */
@@ -475,6 +499,7 @@ describe("OtlpSpanCostEnrichmentService", () => {
     describe("when enrichment runs for a project", () => {
       /**
        * @scenario "The catalog is read for the ingesting project"
+       * @scenario Record-time cost enrichment reads the project's own cost rules
        *
        * The port's implementation resolves the PROJECT -> TEAM -> ORGANIZATION
        * cascade behind this one id. Passing anything but the tenant here would

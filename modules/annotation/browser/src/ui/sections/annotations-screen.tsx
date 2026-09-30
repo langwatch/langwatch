@@ -82,7 +82,7 @@ export function AnnotationsScreen({ view }: { view: AnnotationView }) {
           onClose={() => host.setQuery(closedQueueEditorAddress(query))}
           onSaved={(queueName) =>
             host.succeeded({
-              title: editor.queueId ? "Annotation queue updated" : "Annotation queue created",
+              title: editor.queueId ? "Annotation Queue Updated" : "Annotation Queue Created",
               description: `Successfully ${editor.queueId ? "updated" : "created"} ${queueName} annotation queue`,
             })
           }

@@ -7,6 +7,7 @@ import { LuCalendarClock } from "react-icons/lu";
 // recents headings render the real face on every home — including the one
 // where no Langy surface mounts.
 import { homeApi } from "../../../behavior/home-api.ts";
+import { PendingJoinRequests } from "../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { safeReturnToPath } from "../../../model/project-switch.ts";
 import { DocsGuides } from "./components/docs-guides.tsx";
@@ -53,6 +54,10 @@ export function HomePage() {
                   leave a bare "Request a demo" with nothing explaining it. */}
               <ConsideringLangWatch />
             </HStack>
+
+            {/* Above every composition: whoever can answer a join request sees the
+                wait wherever the home opens. Organization draws nothing for anyone else. */}
+            <PendingJoinRequests />
 
             {composition === "undecided" && <HomeCompositionSkeleton />}
             {composition === "langy" && <LangyHome />}

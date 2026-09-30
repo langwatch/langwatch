@@ -11,7 +11,6 @@ export type AuthPublicEnvironment = Readonly<{
   BASE_HOST: string;
   DEMO_PROJECT_SLUG: string | undefined;
   NODE_ENV: "development" | "test" | "production";
-  IDENTITY_FRONT_DOOR: boolean;
   PASSKEYS_ENABLED: boolean;
   HAS_EMAIL_PROVIDER_KEY: boolean;
   IS_SAAS: boolean;

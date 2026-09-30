@@ -381,6 +381,7 @@ describe("given one name and one environment holding a personal row and a host-s
   }
 
   /** @scenario "A listed connected agent carries its owner and whether the caller can choose it" */
+  /** @scenario "A listing carries every row of a name, whoever holds it" */
   it("lists both rows and marks the personal one as not selectable", async () => {
     const api = await buildAgentApps({
       viewerUserId: "user_reader",

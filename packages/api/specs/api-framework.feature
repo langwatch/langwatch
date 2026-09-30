@@ -72,3 +72,11 @@ Feature: API framework boundary and package authoring
     When the same rule is exercised from a JavaScript-shaped call
     Then a startup assert rejects it with the same rule named
     And one test table drives both statements so they cannot drift
+
+  @security @integration
+  Scenario: A key bound at one project is refused where its door asks at the organization
+    Given an organization-key route that also asks its permission at the project its path names
+    And a key whose only binding is that permission at that one project
+    When the key calls the route
+    Then the door asks the permission at the organization, as main's requires() does
+    And the key is refused 403 there, before any project is asked about

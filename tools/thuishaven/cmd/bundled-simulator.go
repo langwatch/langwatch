@@ -7,6 +7,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
+	analyticssim "github.com/langwatch/langwatch/services/analyticssim/cmd"
 	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
 	llmsim "github.com/langwatch/langwatch/services/llmsim/cmd"
 	mailsim "github.com/langwatch/langwatch/services/mailsim/cmd"
@@ -26,7 +27,7 @@ func simulatorArgv() []string {
 
 func runBundledSimulator(ctx context.Context, _ deps, inv invocation) error {
 	if len(inv.args) != 1 {
-		return fmt.Errorf("haven simulator requires mail, idp, storage, voice or llm")
+		return fmt.Errorf("haven simulator requires mail, idp, storage, voice, llm or analytics")
 	}
 
 	var run func(context.Context, []string) error
@@ -42,8 +43,10 @@ func runBundledSimulator(ctx context.Context, _ deps, inv invocation) error {
 		run, service = voicesim.Root, "voicesim"
 	case "llm":
 		run, service = llmsim.Root, "llmsim"
+	case "analytics":
+		run, service = analyticssim.Root, "analyticssim"
 	default:
-		return fmt.Errorf("unknown simulator %q — use mail, idp, storage, voice or llm", inv.args[0])
+		return fmt.Errorf("unknown simulator %q — use mail, idp, storage, voice, llm or analytics", inv.args[0])
 	}
 
 	info := *contexts.MustGetServiceInfo(ctx)

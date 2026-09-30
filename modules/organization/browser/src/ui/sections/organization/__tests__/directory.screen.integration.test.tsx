@@ -189,6 +189,18 @@ describe("the directory page", () => {
       expect(screen.getByText("Hand-made")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Add a group" })).toBeInTheDocument();
     });
+
+    /** @scenario A directory group is marked in the list */
+    it("lists the groups and marks only the one the directory sent", () => {
+      renderDirectory({ query: { tab: "groups" } });
+
+      expect(screen.getByTestId("groups-list")).toBeInTheDocument();
+      const rows = screen.getAllByTestId("group-row");
+      expect(rows).toHaveLength(2);
+      const chips = screen.getAllByTestId("group-directory-chip");
+      expect(chips).toHaveLength(1);
+      expect(rows[0]).toContainElement(chips[0] ?? null);
+    });
   });
 
   describe("when the address names a tab the page does not have", () => {

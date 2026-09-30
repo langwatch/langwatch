@@ -15,6 +15,14 @@ export * from "./telemetry/session-context.ts";
 // session store read: content-key lookups, transcript building and span filtering.
 export * from "./coding-agent-log-content.ts";
 export {
+  AUXILIARY_SESSION_FACT,
+  codexAuxiliarySessionFacts,
+  HELPER_THREAD_ID_ATTR,
+  isCodexTemporaryStructuredRequestSpan,
+  queuedThreadIdOf,
+  REQUEST_QUEUE_SPAN_NAME,
+} from "./telemetry/codex-helper-thread.ts";
+export {
   CODEX_EXEC_SCOPE,
   isCodexScope,
   shouldFilterCodingAgentSpan,

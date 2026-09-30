@@ -292,7 +292,8 @@ Feature: Transport declaration split
     Given a REST router declared with docs on every route
     And its application provider refuses resolution before the process boots
     When the process mounts it under its namespace and version
-    Then every route appears in the OpenAPI document under that namespace and version with its summary
+    Then every route appears in the OpenAPI document at its bare path with its summary
+    And no dated or latest address of a route appears in the document
     And no route is documented that the router did not declare
     And mounting and documenting routes never resolve the application provider
 

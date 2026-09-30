@@ -5,7 +5,7 @@
  * it does not manage. Lent to organization's Directory through `withCapabilities`.
  * Spec: specs/identity/directory-administration.feature
  */
-import { Card, HStack, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Alert, Card, HStack, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { UiDirectorySummaryProps } from "@langwatch/browser-host/declarations";
 import { Link } from "@langwatch/browser-host/link";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
@@ -15,7 +15,8 @@ import { Boxes, Clock, Plug, Plus, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
-import { relativeTime } from "../../model/display-formatters.ts";
+import { readableDate, relativeTime } from "../../model/display-formatters.ts";
+import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
 
 /** Sources named before the rest collapse into a count. */
 const SOURCES_SHOWN = 3;
@@ -31,6 +32,7 @@ export default function DirectorySummary({
   const { reconciliation } = facts;
 
   if (reconciliation.isError) {
+    if (isEnterpriseGateError(reconciliation.error)) return <EnterpriseGate />;
     return (
       <HandledErrorAlert
         error={reconciliation.error}
@@ -42,36 +44,68 @@ export default function DirectorySummary({
   if (reconciliation.isLoading) return <DirectorySummarySkeleton />;
 
   return (
-    <SimpleGrid
-      columns={{ base: 1, sm: 2, lg: 5 }}
-      gap={3}
-      width="full"
-      data-testid="directory-summary"
-    >
-      <Fact label="Sources" icon={<Plug size={14} />}>
-        <DirectorySources connections={facts.connections} />
-      </Fact>
-      <Fact label="Last directory change" icon={<Clock size={14} />}>
-        <FactNumber muted={facts.lastPushedAtMs === null}>
-          {facts.lastPushedAtMs === null
-            ? "No push yet"
-            : relativeTime({ atMs: facts.lastPushedAtMs, nowMs: nowInstant().epochMilliseconds })}
-        </FactNumber>
-      </Fact>
-      <Fact
-        label="People it manages"
-        hint="Counted from the directory itself, so it holds even when the membership cannot be read."
-        icon={<Users size={14} />}
-      >
-        <FactNumber data-testid="directory-managed-people">{facts.managedPeople}</FactNumber>
-      </Fact>
-      <Fact label="Groups it sent" icon={<Boxes size={14} />}>
-        <Unavailable canRead={canReadMembership} read={facts.groups}>
-          <FactNumber>{facts.directoryGroups.length}</FactNumber>
-        </Unavailable>
-      </Fact>
-      <MembersOutsideDirectory facts={facts} canReadMembership={canReadMembership} />
-    </SimpleGrid>
+    <VStack align="stretch" gap={3} width="full">
+      <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} data-testid="directory-summary">
+        <Fact label="Sources" icon={<Plug size={14} />}>
+          <DirectorySources connections={facts.connections} />
+        </Fact>
+        <Fact label="Last directory change" icon={<Clock size={14} />}>
+          <FactNumber
+            muted={facts.lastPushedAtMs === null}
+            title={
+              facts.lastPushedAtMs === null
+                ? void 0
+                : readableDate(facts.lastPushedAtMs).toLocaleString()
+            }
+          >
+            {facts.lastPushedAtMs === null
+              ? "No push yet"
+              : relativeTime({ atMs: facts.lastPushedAtMs, nowMs: nowInstant().epochMilliseconds })}
+          </FactNumber>
+        </Fact>
+        <Fact
+          label="People it manages"
+          hint="Counted from the directory itself, so it holds even when the membership cannot be read."
+          icon={<Users size={14} />}
+        >
+          <FactNumber data-testid="directory-managed-people">{facts.managedPeople}</FactNumber>
+        </Fact>
+        <Fact label="Groups it sent" icon={<Boxes size={14} />}>
+          <Unavailable canRead={canReadMembership} read={facts.groups}>
+            <FactNumber>{facts.directoryGroups.length}</FactNumber>
+          </Unavailable>
+        </Fact>
+        <MembersOutsideDirectory facts={facts} canReadMembership={canReadMembership} />
+      </SimpleGrid>
+      {facts.groups.isError && (
+        <HandledErrorAlert
+          error={facts.groups.error}
+          fallbackTitle="Couldn't count the groups your directory sent"
+        />
+      )}
+      {facts.provenance.isError && (
+        <HandledErrorAlert
+          error={facts.provenance.error}
+          fallbackTitle="Couldn't work out which members your directory manages"
+        />
+      )}
+    </VStack>
+  );
+}
+
+/** A plan state, not a failure: said as an upsell, as the directory band does on main. */
+function EnterpriseGate() {
+  return (
+    <Alert.Root status="info" data-testid="directory-enterprise-gate">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Directory sync is an Enterprise feature</Alert.Title>
+        <Alert.Description>
+          Connect your identity provider and the people, groups and sync status this band reports
+          fill themselves in. Contact sales to upgrade.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 
@@ -102,7 +136,11 @@ function DirectorySources({ connections }: { connections: DirectoryFactsRead["co
   if (connections.length === 0) {
     return (
       <VStack align="start" gap={1}>
-        <StatusChip label="Not set up yet" data-testid="directory-source-chip" />
+        <StatusChip
+          label="Not set up yet"
+          title="No identity provider is connected, so nothing is provisioned here automatically."
+          data-testid="directory-source-chip"
+        />
         <Text fontSize="xs" color="fg.muted">
           Nobody is provisioned here automatically.
         </Text>
@@ -159,7 +197,12 @@ function Unavailable({
 }) {
   if (!canRead || read.isError) {
     return (
-      <Text fontSize="sm" color="fg.muted" data-testid="directory-fact-unavailable">
+      <Text
+        fontSize="sm"
+        color="fg.muted"
+        title={canRead ? void 0 : "Not yours to read."}
+        data-testid="directory-fact-unavailable"
+      >
         Unavailable
       </Text>
     );
@@ -225,10 +268,12 @@ function Fact({
 function FactNumber({
   children,
   muted = false,
+  title,
   "data-testid": testId,
 }: {
   children: ReactNode;
   muted?: boolean;
+  title?: string;
   "data-testid"?: string;
 }) {
   return (
@@ -240,6 +285,7 @@ function FactNumber({
       fontVariantNumeric="tabular-nums"
       truncate
       maxWidth="full"
+      title={title}
       data-testid={testId}
     >
       {children}

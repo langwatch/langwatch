@@ -140,6 +140,7 @@ describe("given an install whose license names a hosted service", () => {
 
   describe("when usage statistics are switched off for the deployment", () => {
     /** @scenario "Product statistics stay optional and separate" */
+    /** @scenario "An operator's opt-out stops the usage report" */
     it("sends no statistics", async () => {
       expect(await service({ disabled: true }).send()).toBe("switched_off");
       expect(channel.posts).toEqual([]);
@@ -151,6 +152,17 @@ describe("given an install whose license names a hosted service", () => {
 
       expect(opsHealthReads).toBe(0);
       expect(channel.posts).toEqual([]);
+    });
+  });
+});
+
+describe("given the deployment is the hosted product", () => {
+  describe("when the daily report runs", () => {
+    /** @scenario "The hosted product sends no self-hosted usage report" */
+    it("takes no report and posts nothing", async () => {
+      expect(await service({ isSaas: true }).send()).toBe("switched_off");
+      expect(channel.posts).toEqual([]);
+      expect(install.minted).toBe(0);
     });
   });
 });

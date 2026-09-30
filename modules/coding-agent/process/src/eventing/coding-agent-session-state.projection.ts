@@ -1,4 +1,5 @@
 import {
+  AUXILIARY_SESSION_FACT,
   type CodingAgentSessionContextUsage,
   parseMcpToolName,
   type SessionWorkingContext,
@@ -55,6 +56,11 @@ export interface CodingAgentSessionData {
   userId: string | null;
   parentSessionId: string | null;
   isFork: boolean;
+  /**
+   * Sticky once any contribution carried the auxiliary fact: a thread the agent ran for itself
+   * (codex's title generator, its recap). It keeps its row and priced traces; the list omits it.
+   */
+  auxiliary: boolean;
   /** Repository identity is once-set; branch is last-write-wins. */
   repositoryHost: string | null;
   repositoryOwner: string | null;
@@ -210,6 +216,7 @@ export class CodingAgentSessionStateProjection {
       userId: null,
       parentSessionId: null,
       isFork: false,
+      auxiliary: false,
       repositoryHost: null,
       repositoryOwner: null,
       repositoryName: null,
@@ -479,6 +486,9 @@ export class CodingAgentSessionStateProjection {
       // empty reads as "no lineage reported", never as "this is a root session".
       parentSessionId: state.parentSessionId ?? this.coerceString(attrs.parent_session_id),
       isFork: state.isFork || this.coerceScalarString(attrs.is_fork) === "true",
+      // Sticky: the helper's other signals fold in whatever order their batches land.
+      auxiliary:
+        state.auxiliary || this.coerceScalarString(attrs[AUXILIARY_SESSION_FACT]) === "true",
     };
   }
 

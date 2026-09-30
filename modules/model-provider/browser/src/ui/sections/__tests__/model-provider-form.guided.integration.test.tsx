@@ -84,7 +84,7 @@ import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../tes
 import { EditModelProviderForm } from "../model-provider-form.tsx";
 import { inputFor, keyedRow } from "./model-provider-drawer-harness.tsx";
 
-function renderGuided(providerKey: string, onSaved = vi.fn()) {
+function renderGuided(providerKey: string, onSaved = vi.fn(), onFailed = vi.fn()) {
   renderWithModelProviderHost(
     <EditModelProviderForm
       projectId="proj-1"
@@ -93,10 +93,11 @@ function renderGuided(providerKey: string, onSaved = vi.fn()) {
       providerKey={providerKey}
       guided
       onSaved={onSaved}
+      onFailed={onFailed}
     />,
     new FakeModelProviderHost({ grants: new Set(["organization:manage"]) }),
   );
-  return { onSaved };
+  return { onSaved, onFailed };
 }
 
 describe("the shared provider form in its guided presentation", () => {
@@ -235,6 +236,8 @@ describe("the shared provider form in its guided presentation", () => {
       renderGuided("openai_codex");
       const user = userEvent.setup();
 
+      expect(screen.getByTestId("codex-pending")).toBeInTheDocument();
+      expect(screen.getByTestId("codex-waiting")).toHaveTextContent("Waiting for ChatGPT…");
       expect(screen.getByText("Waiting for ChatGPT…").closest("button")).toBeNull();
       expect(
         screen.getByText("Enter this code on OpenAI's device page to approve the sign-in:"),
@@ -260,8 +263,12 @@ describe("the shared provider form in its guided presentation", () => {
         message: "The sign-in timed out before it was approved.",
         timedOut: true,
       };
-      renderGuided("openai_codex");
+      const { onFailed } = renderGuided("openai_codex");
 
+      expect(onFailed).toHaveBeenCalledWith({
+        provider: "openai_codex",
+        code: "codex_sign_in_timed_out",
+      });
       expect(screen.getByText("The sign-in timed out before it was approved.")).toBeInTheDocument();
       await userEvent.setup().click(screen.getByRole("button", { name: "Start sign-in again" }));
       expect(codex.begin).toHaveBeenCalled();

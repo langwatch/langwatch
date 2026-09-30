@@ -15,6 +15,7 @@ import {
   type AnnotationQueueScope,
 } from "@langwatch/annotation-contract";
 import { fromDate } from "@langwatch/time";
+import slugify from "slugify";
 import { z } from "zod";
 
 import {
@@ -64,11 +65,7 @@ export class AnnotationQueueService {
   }
 
   async configure(input: AnnotationQueueConfiguration): Promise<AnnotationQueueRecord> {
-    const slug = input.name
-      .replace("_", "-")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+    const slug = slugify(input.name.replace("_", "-"), { lower: true, strict: true });
 
     if (RESERVED_QUEUE_SLUGS.has(slug)) throw new AnnotationQueueNameReservedError(slug);
 

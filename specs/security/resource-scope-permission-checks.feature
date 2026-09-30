@@ -115,17 +115,11 @@ Feature: Permissions are resolved at the scope of the resource acted on
   # ────────────────────────────────────────────────────────────────────────────
 
   @integration
-  Scenario: A key renaming a prompt tag is held to every project the catalog reaches
+  Scenario: A key renaming a prompt tag needs the permission on its own project only
     Given an API key that may manage prompts in its own project only
     And a tag catalog shared with a sibling project of the same organization
     When the key renames a tag over the REST API
-    Then the request is refused with the insufficient-permission code and no tag is renamed
-
-  @integration
-  Scenario: A key renaming a prompt tag succeeds when it reaches the whole catalog
-    Given an API key that may manage prompts in every project of its organization
-    When the key renames a tag over the REST API
-    Then the tag is renamed
+    Then the tag is renamed and no sibling project is checked
 
   @unit
   Scenario: A model-defaults write is authorized against the key, not its owner

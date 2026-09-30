@@ -132,6 +132,8 @@ export interface SsoDomainProofMail {
     domain: string;
     record: SsoDomainProofRecord;
     graceEndsAtMs: number;
+    /** This admin's delivery identity for this notice, so a retry is not a second mail. */
+    idempotencyKey?: string;
   }): Promise<unknown>;
 
   /** The grace ran out. Sent to one admin. */
@@ -140,6 +142,8 @@ export interface SsoDomainProofMail {
     organizationName: string;
     domain: string;
     record: SsoDomainProofRecord;
+    /** This admin's delivery identity for this notice, so a retry is not a second mail. */
+    idempotencyKey?: string;
   }): Promise<unknown>;
 }
 
@@ -160,6 +164,8 @@ export interface JoinRequestNotificationMail {
      * or below the habit floor, the mail says nothing about it.
      */
     approvedFromDomainCount?: number;
+    /** This recipient's delivery identity, so a retry is not a second mail. */
+    idempotencyKey?: string;
   }): Promise<unknown>;
 
   /** The one nudge, on the seventh day. Sent to one organization admin. */
@@ -167,6 +173,8 @@ export interface JoinRequestNotificationMail {
     adminEmail: string;
     organizationName: string;
     requesterName: string;
+    /** This recipient's delivery identity, so a retry is not a second mail. */
+    idempotencyKey?: string;
   }): Promise<unknown>;
 
   /** They are in. Sent to the requester. */
@@ -178,12 +186,16 @@ export interface JoinRequestNotificationMail {
      * the steps every reader can take.
      */
     intent?: "AGENT_GOVERNANCE" | "LLM_OPS";
+    /** This recipient's delivery identity, so a retry is not a second mail. */
+    idempotencyKey?: string;
   }): Promise<unknown>;
 
   /** They are not. Sent to the requester, who may ask again after the cool-down. */
   sendRequestRejected(input: {
     requesterEmail: string;
     organizationName: string;
+    /** This recipient's delivery identity, so a retry is not a second mail. */
+    idempotencyKey?: string;
   }): Promise<unknown>;
 
   /** Nobody answered in time. Sent to the requester, who may ask again. */
@@ -195,6 +207,8 @@ export interface JoinRequestNotificationMail {
      * line, never the button — the organization is what this reader came for.
      */
     personalProjectUrl?: string;
+    /** This recipient's delivery identity, so a retry is not a second mail. */
+    idempotencyKey?: string;
   }): Promise<unknown>;
 
   /** The domain policy admitted somebody. Sent to one organization admin. */
@@ -208,6 +222,8 @@ export interface JoinRequestNotificationMail {
      * enterprise/negotiated terms, whose ceiling is not the public ladder's.
      */
     seats?: { used: number; ceiling: number };
+    /** This recipient's delivery identity, so a retry is not a second mail. */
+    idempotencyKey?: string;
   }): Promise<unknown>;
 }
 

@@ -56,7 +56,13 @@ function worker() {
 
   return createApp({ role: "worker" })
     .withModules([withMemoryRepositories(webhookServer)])
-    .withConfig({ webhook: { allowInsecureLocalUrls: false, allowAmbientAwsCredentials: false } })
+    .withConfig({
+      webhook: {
+        allowInsecureLocalUrls: false,
+        allowAmbientAwsCredentials: false,
+        outboundProxy: {},
+      },
+    })
     .withStores(stores())
     .withEventing(eventing)
     .withMember("isSaas", false)

@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * The device grant's seven addresses, pinned: released builds poll them.
+ * The device grant's eight addresses, pinned: released builds poll them.
  * @see specs/ai-governance/cli-onboarding/login-unified.feature
  */
 import { describe, expect, it } from "vitest";
@@ -28,6 +28,7 @@ describe("the /api/auth/cli REST family", () => {
         ["/api/auth/cli/approve", "approveCliDeviceCode", ["post"]],
         ["/api/auth/cli/deny", "denyCliDeviceCode", ["post"]],
         ["/api/auth/cli/logout", "endCliDeviceSession", ["post"]],
+        ["/api/auth/cli/device-approval", "watchCliDeviceApproval", ["get"]],
       ]);
     });
 
@@ -46,12 +47,10 @@ describe("the /api/auth/cli REST family", () => {
       );
     });
 
-    it("writes OAuth's own bodies rather than a schema's", () => {
+    it("writes OAuth's own bodies rather than a schema's, and streams the approval wake-up", () => {
       for (const route of declaration.routes) {
-        expect([route.operation, route.response?.kind === "protocol"]).toEqual([
-          route.operation,
-          true,
-        ]);
+        const kind = route.operation === "watchCliDeviceApproval" ? "sse" : "protocol";
+        expect([route.operation, route.response?.kind]).toEqual([route.operation, kind]);
       }
     });
 

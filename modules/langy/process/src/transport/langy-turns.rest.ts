@@ -32,12 +32,12 @@ const MAX_WAIT_SECONDS = 120;
 /** Hono's own 404, byte-for-byte what an unmounted path returns. */
 const HONO_NOT_FOUND = {
   status: 404,
-  mediaType: "text/plain;charset=UTF-8",
+  mediaType: "text/plain; charset=UTF-8",
   body: "404 Not Found",
 } as const;
 
 /** What a turn route publishes: its JSON answers, and the dark surface's bare 404. */
-const TURN_PRODUCES = ["application/json", "text/plain;charset=UTF-8"] as const;
+const TURN_PRODUCES = ["application/json", "text/plain; charset=UTF-8"] as const;
 
 function parseRequestedWaitSeconds(request: Request): number | null {
   const prefer = request.headers.get("prefer");

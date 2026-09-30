@@ -30,9 +30,6 @@
       "path": "../kernel/tsconfig.build.json"
     },
     {
-      "path": "../mail/tsconfig.declarations.json"
-    },
-    {
       "path": "../observability/tsconfig.build.json"
     },
     {

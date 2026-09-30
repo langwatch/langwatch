@@ -1,4 +1,5 @@
 import { CUTOVER_SIGN_IN_ERROR_CODES, type CutoverSignInErrorCode } from "@langwatch/auth-contract";
+import { looksLikeSsoConnectionId } from "@langwatch/identity-contract";
 
 /** What one refused sign-in says to the person it refused. */
 export interface SignInRefusalCopy {
@@ -42,3 +43,22 @@ export const cutoverSignInRefusal = (error: string): SignInRefusalCopy | undefin
   const code = CUTOVER_SIGN_IN_ERROR_CODES.find((candidate) => candidate === error);
   return code ? CUTOVER_SIGN_IN_ERRORS[code] : undefined;
 };
+
+/** The refusal that is a bounce: a native social button at an organization's own connection. */
+export const SSO_BOUNCE_ERROR = "SSO_REQUIRED_BY_ORGANIZATION";
+
+/**
+ * The connection a bounce names. The target arrives over the wire, so it is read as a connection
+ * IDENTIFIER and only ever handed to `signIn`, never navigated to: anything else is not followed.
+ */
+export function bounceConnectionFrom({
+  error,
+  target,
+}: {
+  error: string | null | undefined;
+  target: string | null | undefined;
+}): string | null {
+  if (error !== SSO_BOUNCE_ERROR) return null;
+  if (!target || !looksLikeSsoConnectionId(target)) return null;
+  return target;
+}

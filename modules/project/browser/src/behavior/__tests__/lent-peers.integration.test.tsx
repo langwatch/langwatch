@@ -14,7 +14,11 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   useUiDeclarations: () => declarations.current,
 }));
 
-import { InlineCommandPalette, ProjectDepartmentField } from "../lent-peers.tsx";
+import {
+  InlineCommandPalette,
+  PendingJoinRequests,
+  ProjectDepartmentField,
+} from "../lent-peers.tsx";
 
 const peerLends = uiDeclarations([
   {
@@ -41,6 +45,9 @@ const peerLends = uiDeclarations([
               <span>department of {projectId}</span>
             ),
           }),
+        },
+        pendingJoinRequests: {
+          load: async () => ({ default: () => <span>people are waiting to join</span> }),
         },
       },
     },
@@ -70,6 +77,14 @@ describe("what navigation and organization lend project", () => {
         />,
       );
       expect(await screen.findByText("department of project_1")).toBeInTheDocument();
+    });
+  });
+
+  describe("given organization lends its waiting join requests", () => {
+    it("draws the card where project's home places it", async () => {
+      declarations.current = peerLends;
+      render(<PendingJoinRequests />);
+      expect(await screen.findByText("people are waiting to join")).toBeInTheDocument();
     });
   });
 

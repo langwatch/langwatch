@@ -7,7 +7,7 @@ import type {
   GatewayBudgetScopeType,
   RecordBudgetCrossingCommandData,
 } from "@langwatch/gateway-contract";
-import { Temporal } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { BudgetSpendTarget, ScopeSpend } from "../../app/gateway.members.ts";
@@ -24,11 +24,13 @@ function resolved({
   limitUsd = "100",
   scopeType = "VIRTUAL_KEY",
   bucketScopeId = `${id}-bucket`,
+  cycleAnchorAt = null,
 }: {
   id: string;
   limitUsd?: string;
   scopeType?: GatewayBudgetScopeType;
   bucketScopeId?: string;
+  cycleAnchorAt?: Instant | null;
 }): GatewayResolvedBudget {
   return {
     budget: {
@@ -49,7 +51,7 @@ function resolved({
       currentPeriodStartedAt: epoch,
       resetsAt: epoch,
       lastResetAt: null,
-      cycleAnchorAt: null,
+      cycleAnchorAt,
       archivedAt: null,
       createdAt: epoch,
       updatedAt: epoch,
@@ -111,10 +113,12 @@ function harness({
   spent,
   boundaries,
   refusal,
+  now = NOW,
 }: {
   spent: Record<string, string>;
   boundaries?: BucketBoundaryRow[];
   refusal?: Error;
+  now?: Instant;
 }) {
   const spend = new StaticSpend(spent, refusal);
   const facts = new RecordingFacts();
@@ -122,7 +126,7 @@ function harness({
     budgets: new StaticBudgets(boundaries),
     spend,
     facts,
-    clock: () => NOW,
+    clock: () => now,
   });
   return { crossings, spend, facts };
 }
@@ -224,6 +228,30 @@ describe("GatewayBudgetCrossingService", () => {
         }),
       ).rejects.toBe(refusal);
       expect(facts.recorded).toEqual([]);
+    });
+  });
+
+  describe("given an anchored budget that crosses its limit", () => {
+    const anchor = Temporal.Instant.from("2026-06-17T09:00:00Z");
+    const crossingAt = async (now: Instant) => {
+      const { crossings, facts } = harness({ spent: { anchored: "120" }, now });
+      await crossings.detect({
+        tenantId: "project-1",
+        organizationId: "org-1",
+        budgets: [resolved({ id: "anchored", cycleAnchorAt: anchor })],
+      });
+      return facts.recorded[0]?.period_started_at_ms;
+    };
+
+    /** @scenario A breach fires once per anchored period */
+    it("stamps the anchored period start, holding it inside the period and moving it after", async () => {
+      const early = await crossingAt(Temporal.Instant.from("2026-09-20T00:00:00Z"));
+      const late = await crossingAt(Temporal.Instant.from("2026-10-10T00:00:00Z"));
+      const afterRollover = await crossingAt(Temporal.Instant.from("2026-10-18T00:00:00Z"));
+
+      expect(early).toBe(Temporal.Instant.from("2026-09-17T09:00:00Z").epochMilliseconds);
+      expect(late).toBe(early);
+      expect(afterRollover).toBe(Temporal.Instant.from("2026-10-17T09:00:00Z").epochMilliseconds);
     });
   });
 });

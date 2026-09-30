@@ -5,6 +5,8 @@ import {
   type SendEmailCommandOutput,
   SendRawEmailCommand,
 } from "@aws-sdk/client-ses";
+import type { OutboundProxyResolver } from "@langwatch/aws-client";
+import { resolveProxyForHost } from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -12,6 +14,7 @@ import { buildRawMessage } from "../../rules/email-mime.rules.ts";
 import {
   type EmailContent,
   EmailGateway,
+  type EmailOutboundProxyConfig,
   type MailerConfiguration,
 } from "../email-delivery.channel.ts";
 
@@ -26,13 +29,12 @@ export interface SesAwsClientConfiguration {
   build(input: { region?: string; targetHost: string; endpoint?: string }): SESClientConfig;
 }
 
-/** The SES client over the default AWS credential chain, as the process runs it. */
-export const directSesClientConfiguration: SesAwsClientConfiguration = {
-  build: ({ region, endpoint }) => ({
-    ...(region === undefined ? {} : { region }),
-    ...(endpoint === undefined ? {} : { endpoint }),
-  }),
-};
+/** Proxy routing for the process's AWS clients, decided per target host at client build. */
+export const emailProxyResolver = (
+  outboundProxy: EmailOutboundProxyConfig,
+): OutboundProxyResolver => ({
+  tryResolveForHost: (host) => resolveProxyForHost(outboundProxy, host),
+});
 
 /** Public regional SES endpoint, used to decide proxy applicability. */
 const defaultSesHost = (region: string) =>

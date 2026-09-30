@@ -88,6 +88,20 @@ export class OpsOperatorSessionRequiredError extends HandledError {
   }
 }
 
+/** A search with neither a query nor a tenant would scan the whole event log. */
+export class OpsSearchQueryRequiredError extends HandledError {
+  declare readonly code: "ops_search_query_required";
+
+  constructor() {
+    super(
+      "ops_search_query_required",
+      "Enter a search query or pick at least one tenant before searching.",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "OpsSearchQueryRequiredError";
+  }
+}
+
 /**
  * The operator scope falls back to the impersonator's own grant, so
  * `ops:manage` is inherited by an impersonation session — the wrong posture

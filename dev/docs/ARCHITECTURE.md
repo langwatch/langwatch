@@ -1177,6 +1177,12 @@ action }` and no row data. Its live repository registry resolves it by requiring
 `operatorReads` member (`operatorReads.into(handle, build)`); the memory twin needs none.
 Spec: `specs/server/operator-reads.feature`.
 
+**Main's byte intakes stay for now** (Alex, 2026-09-30). The user avatar and AI tool icon
+data URLs, the deprecated multipart dataset routes, bug-report transcripts and inline scenario
+media keep main's shapes; each moves to createUpload, PUT and confirmUpload only by its own
+ruling. main's signal-focused home (`release_ui_home_signal_focused_enabled`) is not ported;
+automation email previews render in the browser, as on main.
+
 **Object storage is a store, like the other three** (ruled 2026-09-24,
 ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
 local filesystem. It routes per project inside the client, as the ClickHouse
@@ -1475,7 +1481,20 @@ not declare this way is registered by nobody; no application line stands in.
 A projection over every pipeline's events, not only its own (the SaaS billable-events meter), is
 declared on the owning module's pipeline with `.withGlobalMapProjection(projection, subscribers)`;
 the runtime registers it onto its global registry when that pipeline registers, in both roles, and
-refuses by name one that arrives after the registry started routing. The runtime's own maintenance
+refuses by name one that arrives after the registry started routing. The registry starts routing
+when consumers start, or at its first dispatch where none are held, so several modules may declare
+global lanes, registered in any order (2026-09-30).
+
+A module reacts to a peer's event with a peer subscriber (2026-09-30), the primitive the subscriber
+rule above names: `.withPeerSubscriber(name, { eventType, data, handle })` on its own pipeline,
+naming the event by the owner contract's type and data schema, so its one edge is that contract.
+It rides the global registry: staged wherever the owner appends, at least once, ordered per
+aggregate, re-driven through the hand-off outbox, never replayed; the handler is idempotent and
+throws to be retried. Analytics writes a new project's LangWatchQL key-map row from project's
+`lw.project.created`; organization's new personal workspace reaches it through project, which
+records that project as created from its own side. A peer subscriber writes its own read-model row
+directly; it sends its own command only when the reaction is a fact others react to, since the
+lane already gives retry safety (Alex, 2026-09-30). The runtime's own maintenance
 pipelines (blob sweep, process-manager retention) are built by the eventing member where a Redis and a
 process store exist, answered by `maintenancePipelines()`, and installed once by the process after the
 modules', where the role drains (2026-09-25). The producer role holds the process store too, so

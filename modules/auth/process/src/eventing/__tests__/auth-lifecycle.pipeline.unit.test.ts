@@ -91,6 +91,7 @@ describe("auth's lifecycle pipeline", () => {
         occurredAt: AT,
         userId: "user_ada",
         organizationId: "org_acme",
+        organizationName: "Acme",
       },
     ]);
   });

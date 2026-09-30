@@ -40,6 +40,12 @@
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/aws-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/egress/tsconfig.build.json"
     }
   ]
 }

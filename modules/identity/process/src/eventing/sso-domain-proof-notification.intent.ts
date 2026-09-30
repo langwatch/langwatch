@@ -1,3 +1,4 @@
+import type { IntentContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { z } from "zod";
 
@@ -11,9 +12,13 @@ const logger = createLogger("langwatch:identity:sso-domain-proof-notification");
 
 export function runNotifyProofWavering(deps: {
   notifications: SsoDomainProofNotifications;
-}): (payload: z.infer<typeof notifyProofWaveringIntentSchema>) => Promise<void> {
-  return async (payload: z.infer<typeof notifyProofWaveringIntentSchema>): Promise<void> => {
+}): (
+  payload: z.infer<typeof notifyProofWaveringIntentSchema>,
+  context: IntentContext,
+) => Promise<void> {
+  return async (payload, context): Promise<void> => {
     await deps.notifications.proofWavering({
+      notificationKey: context.messageKey,
       connectionId: payload.connectionId,
       organizationId: payload.organizationId,
       domain: payload.domain,
@@ -28,9 +33,13 @@ export function runNotifyProofWavering(deps: {
 
 export function runNotifyProofLapsed(deps: {
   notifications: SsoDomainProofNotifications;
-}): (payload: z.infer<typeof notifyProofLapsedIntentSchema>) => Promise<void> {
-  return async (payload: z.infer<typeof notifyProofLapsedIntentSchema>): Promise<void> => {
+}): (
+  payload: z.infer<typeof notifyProofLapsedIntentSchema>,
+  context: IntentContext,
+) => Promise<void> {
+  return async (payload, context): Promise<void> => {
     await deps.notifications.proofLapsed({
+      notificationKey: context.messageKey,
       connectionId: payload.connectionId,
       organizationId: payload.organizationId,
       domain: payload.domain,

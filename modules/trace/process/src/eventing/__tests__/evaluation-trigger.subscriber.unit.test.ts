@@ -232,6 +232,7 @@ describe("createEvaluationTriggerSubscriber", () => {
       /**
        * @scenario "A span emitted by an evaluator never triggers another evaluation"
        * @scenario "Incoming span with causality_depth=1 does not trigger evaluations"
+       * @scenario The composed loop guard refuses an evaluator's own span
        *
        * This is the money loop. An online evaluator's workflow emits spans;
        * those spans land on a trace; that trace would trigger the same
@@ -402,7 +403,12 @@ describe("createEvaluationTriggerSubscriber", () => {
 
   describe("given a project with enabled on-message monitors", () => {
     describe("when a trace is dispatched", () => {
-      /** @scenario "One evaluation command is sent per monitor" */
+      /**
+       * @scenario "One evaluation command is sent per monitor"
+       * @scenario The evaluation trigger composes from published services
+       * @scenario The composed path dispatches one evaluation per monitor
+       * @scenario The evaluation trigger names one monitor read
+       */
       it("sends a command per monitor with the monitor's own identity", async () => {
         const { built, dispatch } = subscriber({
           monitors: [

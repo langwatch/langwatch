@@ -12,6 +12,7 @@ const { state } = vi.hoisted(() => ({
     connections: [] as Record<string, unknown>[],
     groups: [] as Record<string, unknown>[],
     provenance: {} as Record<string, { source: string }>,
+    readError: void 0 as unknown,
   },
 }));
 
@@ -25,7 +26,10 @@ vi.mock("../../../behavior/scim-api.ts", () => {
     scimApi: {
       scimReconciliation: {
         getAll: {
-          useQuery: () => read(() => ({ connections: state.connections, recentChanges: [] })),
+          useQuery: () =>
+            state.readError
+              ? { data: void 0, isLoading: false, isError: true, error: state.readError }
+              : read(() => ({ connections: state.connections, recentChanges: [] })),
         },
       },
     },
@@ -44,6 +48,7 @@ const { default: DirectorySummary } = await import("../directory-summary.tsx");
 afterEach(cleanup);
 
 beforeEach(() => {
+  state.readError = void 0;
   state.connections = [
     {
       connectionId: "conn-1",
@@ -93,6 +98,10 @@ describe("the directory's status band", () => {
       renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
       expect(screen.getByTestId("directory-source-chip")).toHaveTextContent("Not set up yet");
+      expect(screen.getByTestId("directory-source-chip")).toHaveAttribute(
+        "title",
+        "No identity provider is connected, so nothing is provisioned here automatically.",
+      );
       expect(screen.getByTestId("connect-identity-provider")).toHaveAttribute(
         "href",
         "/settings/authentication",
@@ -108,5 +117,15 @@ describe("the directory's status band", () => {
       expect(screen.getAllByTestId("directory-fact-unavailable")).toHaveLength(2);
       expect(screen.queryByTestId("members-outside-directory")).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("given a plan that does not carry directory sync", () => {
+  it("says it is an Enterprise feature rather than that the read failed", () => {
+    state.readError = { data: { error: { code: "enterprise_plan_required" } } };
+    renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
+
+    expect(screen.getByText("Directory sync is an Enterprise feature")).toBeInTheDocument();
+    expect(screen.queryByTestId("directory-summary")).not.toBeInTheDocument();
   });
 });

@@ -76,6 +76,16 @@ describe("given an address an organization's connection governs", () => {
     expect(getOrganization).toHaveBeenCalledWith({ connectionId: CONNECTION });
   });
 
+  /** @scenario "A holder's role change does not revoke an existing recovery grant" */
+  it("asks only whether the holder's grant is live, never what role they hold now", async () => {
+    const { policy, findGrants } = policyFor({ grants: [{ userId: "alice", live: true }] });
+
+    await expect(policy.canSignIn({ userId: "alice", email: "alice@acme.test" })).resolves.toBe(
+      true,
+    );
+    expect(findGrants).toHaveBeenCalledWith({ organizationId: ORG });
+  });
+
   /** @scenario "Recovery login ends at grant expiry or revocation without waiting for a worker" */
   it("refuses the same holder once the grant stops being live", async () => {
     const { policy } = policyFor({ grants: [{ userId: "alice", live: false }] });

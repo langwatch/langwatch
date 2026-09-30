@@ -77,6 +77,8 @@ type CompletedVerification = {
   accountCreated: boolean;
   accountExists: boolean;
   addressProof: string | null;
+  /** Spent by THIS request; a reopening inside the grace confirms but opens nothing. */
+  freshClaim: boolean;
 };
 
 export class SignUpVerificationService {
@@ -218,6 +220,7 @@ export class SignUpVerificationService {
       accountCreated: false,
       accountExists: false,
       addressProof: await this.issueAddressProof({ email: pending.email }),
+      freshClaim: true,
     };
   }
 
@@ -258,6 +261,7 @@ export class SignUpVerificationService {
       accountCreated: false,
       accountExists: await this.addressIsRegistered({ email: pending.email }),
       addressProof: null,
+      freshClaim: false,
     };
   }
 

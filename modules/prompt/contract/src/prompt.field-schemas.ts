@@ -2,6 +2,11 @@ import { z } from "zod";
 
 import { SchemaVersion, datasetColumnTypeSchema } from "./prompt.enums.ts";
 
+/** Postgres text columns refuse U+0000 (22021), so it is refused at the boundary as a 400. */
+export const nulFreeStringSchema = z
+  .string()
+  .refine((value) => !value.includes("\u0000"), "Must not contain a null byte");
+
 /** Parameter types a prompt input may declare; shared between studio and contract. */
 export const LlmConfigInputTypes = [
   "str",
@@ -61,7 +66,7 @@ export const handleSchema = z
  */
 export const messageSchema = z.object({
   role: z.enum(["user", "assistant", "system"]),
-  content: z.string(),
+  content: nulFreeStringSchema,
 });
 
 /**
@@ -69,7 +74,7 @@ export const messageSchema = z.object({
  * Defines input fields that can be used in prompt templates
  */
 export const inputsSchema = z.object({
-  identifier: z.string().min(1, "Identifier cannot be empty"),
+  identifier: nulFreeStringSchema.min(1, "Identifier cannot be empty"),
   type: z.enum(LlmConfigInputTypes),
 });
 
@@ -79,7 +84,7 @@ export const inputsSchema = z.object({
  * Includes optional JSON schema for structured outputs
  */
 export const outputsSchema = z.object({
-  identifier: z.string().min(1, "Identifier cannot be empty"),
+  identifier: nulFreeStringSchema.min(1, "Identifier cannot be empty"),
   type: z.enum(LlmConfigOutputTypes),
   json_schema: z
     .object({
@@ -117,7 +122,7 @@ export const scopeSchema = z.enum(["PROJECT", "ORGANIZATION"]);
 /**
  * Schema for commit message
  */
-export const commitMessageSchema = z.string();
+export const commitMessageSchema = nulFreeStringSchema;
 
 /**
  * Schema for prompt configuration version
@@ -141,7 +146,7 @@ export const responseFormatSchema = z.object({
 /**
  * Schema for model name
  */
-export const modelNameSchema = z.string();
+export const modelNameSchema = nulFreeStringSchema;
 
 /**
  * Schema for schema version
@@ -174,7 +179,7 @@ export function deriveResponseFormatFromOutputs(
 // at spec build time.
 const jsonValue: z.ZodType<unknown> = z.lazy(() =>
   z.union([
-    z.string(),
+    nulFreeStringSchema,
     z.number(),
     z.boolean(),
     z.null(),

@@ -9,6 +9,7 @@ import type {
   RecordIntegrationMethodChosenCommandData,
   RecordInviteAcceptedCommandData,
   RecordMembersInvitedCommandData,
+  RecordPersonalWorkspaceProvisionedCommandData,
   RecordSignedUpCommandData,
 } from "../eventing/organization-lifecycle.events.ts";
 
@@ -20,6 +21,7 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordMembersInvited: Sender<RecordMembersInvitedCommandData>;
   recordInviteAccepted: Sender<RecordInviteAcceptedCommandData>;
   recordIntegrationMethodChosen: Sender<RecordIntegrationMethodChosenCommandData>;
+  recordPersonalWorkspaceProvisioned: Sender<RecordPersonalWorkspaceProvisionedCommandData>;
 }>;
 
 /**
@@ -62,6 +64,16 @@ export class OrganizationLifecycleNoticeService {
 
   inviteAccepted(input: Recorded<RecordInviteAcceptedCommandData>): void {
     this.#send(this.#senders?.recordInviteAccepted, {
+      ...this.#envelope(input.organizationId),
+      ...input,
+    });
+  }
+
+  /** Project records the new personal project as created, so analytics writes its key-map row. */
+  personalWorkspaceProvisioned(
+    input: Recorded<RecordPersonalWorkspaceProvisionedCommandData>,
+  ): void {
+    this.#send(this.#senders?.recordPersonalWorkspaceProvisioned, {
       ...this.#envelope(input.organizationId),
       ...input,
     });

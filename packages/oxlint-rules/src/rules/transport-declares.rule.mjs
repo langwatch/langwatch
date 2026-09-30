@@ -18,6 +18,7 @@ import {
   stringKey,
   unwrapTypeAssertions,
 } from "./transport-handlers.mjs";
+import { reportRequestRechecks } from "./transport-request-checks.mjs";
 
 // ARCHITECTURE.md §8: transport files declare; the framework parses, refuses,
 // serialises, and a handler takes `{ input, app, actor, scope, signal }`, calls
@@ -30,6 +31,7 @@ const TEST_SOURCE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const TEST_DIRECTORY = /(?:^|\/)__(?:tests|mocks)__\//;
 const NESTED_TRANSPORT = /^transport\/api-(rest|trpc)\/.+\.(?:api|rest|trpc)\.ts$/;
 const API_TRANSPORT_DIRECTORY = /(?:^|\/)transport\/api-/;
+const PROCESS_SERVER = /^[^/]+\.server\.ts$/;
 const API_MODULE = /^@langwatch\/api(?:\/|$)/;
 const HONO_OPENAPI = /^hono-openapi(?:\/|$)/;
 const PATH_SEPARATOR = /[./]/;
@@ -100,7 +102,7 @@ function frameworkSurface(file) {
   return file.sourcePath === `transport/${file.feature}.trpc.ts` ? "trpc" : undefined;
 }
 
-/** The three readings a process source gets: every source, transport files, route families. */
+/** The readings a process source gets: every source, transport and server files, route families. */
 function scopeOf(file) {
   const path = file.workspacePath;
   const featureServer =
@@ -108,8 +110,9 @@ function scopeOf(file) {
   const production = !TEST_SOURCE.test(path) && !TEST_DIRECTORY.test(path);
   const boundary = production && file.sourcePath.startsWith("transport/");
   const surface = production ? frameworkSurface(file) : undefined;
+  const request = boundary || (production && PROCESS_SERVER.test(file.sourcePath));
 
-  return { boundary, featureServer, surface };
+  return { boundary, featureServer, request, surface };
 }
 
 function isProcessSource(file) {
@@ -557,6 +560,19 @@ export const transportDeclaresRule = defineRule({
       what: "The handler branches, loops or catches.",
       fix: "Move the decision into the module behind `app`; the handler calls one operation and returns its result or throws.",
     },
+    handlerChecksInput: {
+      what: "The handler throws when its input fails `{{test}}`.",
+      fix: "Delete the check and require the field in the route's `.withInput(...)` schema (no `.optional()`, and `.min(1)` for a string or array); the framework refuses the request before the handler runs.",
+      why: "The schema is the route's published contract, so a check outside it is invisible to callers and to the OpenAPI document.",
+    },
+    mediaTypeCheck: {
+      what: "This source decides on the request's media type through `{{text}}`.",
+      fix: "Delete the check and declare the body on the route, `.withInput(schema)` for JSON or `.withRawBody(form, { mediaType })` otherwise; the framework refuses a request that does not match its declaration.",
+    },
+    requestBodyRead: {
+      what: "This source reads the request body through `{{text}}`.",
+      fix: "Declare the body on the route with `.withInput(schema)`, or `.withRawBody(form)` when the handler needs the exact bytes; a middleware binding carries credentials and never reads the body.",
+    },
     handlerTooLong: {
       what: "The handler has {{count}} top-level statements; the ceiling is {{max}}.",
       fix: "Keep it to one operation call on `app` and a pure mapping of the result; declare permission and limits on the route.",
@@ -613,6 +629,7 @@ export const transportDeclaresRule = defineRule({
           state.imports = importAnalysis(program);
           state.declaresTransports = declaresTransports(file, state.imports);
           if (scope.boundary) boundaryChecks(program, tools);
+          if (scope.request) reportRequestRechecks(program, tools);
           if (scope.surface) frameworkImportChecks(program, scope.surface, tools);
           if (!scope.featureServer) return;
           for (const statement of state.imports.compositionStatements) {

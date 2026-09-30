@@ -1,5 +1,6 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
+import { PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE } from "@langwatch/organization-contract";
 
 import {
   INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
@@ -12,9 +13,11 @@ import {
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   type OrganizationSignedUpEvent,
+  type PersonalWorkspaceProvisionedEvent,
   RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE,
   RECORD_INVITE_ACCEPTED_COMMAND_TYPE,
   RECORD_MEMBERS_INVITED_COMMAND_TYPE,
+  RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
   RECORD_SIGNED_UP_COMMAND_TYPE,
   type RecordIntegrationMethodChosenCommandData,
   recordIntegrationMethodChosenCommandDataSchema,
@@ -22,6 +25,8 @@ import {
   recordInviteAcceptedCommandDataSchema,
   type RecordMembersInvitedCommandData,
   recordMembersInvitedCommandDataSchema,
+  type RecordPersonalWorkspaceProvisionedCommandData,
+  recordPersonalWorkspaceProvisionedCommandDataSchema,
   type RecordSignedUpCommandData,
   recordSignedUpCommandDataSchema,
 } from "./organization-lifecycle.events.ts";
@@ -153,5 +158,39 @@ export class RecordIntegrationMethodChosenCommand implements CommandHandler<
 
   static getAggregateId(payload: RecordIntegrationMethodChosenCommandData): string {
     return payload.userId;
+  }
+}
+
+/** Records a newly created personal workspace; its project is created once, so one event. */
+export class RecordPersonalWorkspaceProvisionedCommand implements CommandHandler<
+  Command<RecordPersonalWorkspaceProvisionedCommandData>,
+  PersonalWorkspaceProvisionedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
+    recordPersonalWorkspaceProvisionedCommandDataSchema,
+    "Record that a personal workspace and its project were created",
+  );
+
+  handle(
+    command: Command<RecordPersonalWorkspaceProvisionedCommandData>,
+  ): PersonalWorkspaceProvisionedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<PersonalWorkspaceProvisionedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+        version: ORGANIZATION_LIFECYCLE_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:personal_workspace_provisioned`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordPersonalWorkspaceProvisionedCommandData): string {
+    return payload.organizationId;
   }
 }

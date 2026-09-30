@@ -61,6 +61,8 @@ export const codingAgentSessionSchema = z
     entrypoint: z.string(),
     parentSessionId: z.string(),
     isFork: z.boolean(),
+    /** A thread the agent ran for itself (00096): kept and priced, never listed as a session. */
+    auxiliary: z.boolean().default(false),
     repositoryHost: z.string(),
     repositoryOwner: z.string(),
     repositoryName: z.string(),

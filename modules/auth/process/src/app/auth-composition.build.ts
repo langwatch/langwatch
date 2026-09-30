@@ -11,8 +11,9 @@ import {
   type SignInProviderConfiguration,
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import {
+  IdentityVerificationExpiredError,
   SignInMethodPolicyService,
-  routesToOrganizationConnection,
+  organizationConnectionsOf,
   sealedProviderConfigCipher,
   type IdentityApi,
   type RoutingDecision,
@@ -46,6 +47,7 @@ import {
 import { CredentialSessionGuard } from "../channels/http/http.credential-session-guard.channel.ts";
 import type { SignUpVerification } from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
+import type { SignUpAddressConfirmation } from "../channels/http/http.sign-up-confirmation.channel.ts";
 import type { PasswordResetMailChannel } from "../channels/password-reset-mail.channel.ts";
 import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
@@ -149,23 +151,27 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
   }
 }
 
-/**
- * The identity ceremonies, absent. Every method is the no-op the legacy branch
- * already ran: a user delete erases no identifier, an account write is not
- * restated as an attach, and its id is Better Auth's own.
- */
-export class AbsentBetterAuthIdentityCeremonies extends BetterAuthIdentityCeremonies {
-  static create(): AbsentBetterAuthIdentityCeremonies {
-    return new AbsentBetterAuthIdentityCeremonies();
+/** The identity ceremonies, over identity's `*Api`: a user delete erases, an account write attaches. */
+export class IdentityBetterAuthCeremonies extends BetterAuthIdentityCeremonies {
+  static create(identity: Pick<IdentityApi, "ceremonies">): IdentityBetterAuthCeremonies {
+    return new IdentityBetterAuthCeremonies(identity);
   }
 
-  async beforeUserDelete(): Promise<void> {}
-
-  async createAccountIdentifier(): Promise<BetterAuthAccountPin> {
-    return { pinned: false };
+  private constructor(private readonly identity: Pick<IdentityApi, "ceremonies">) {
+    super();
   }
 
-  async beforeAccountDelete(_account: BetterAuthAccountRow): Promise<void> {}
+  beforeUserDelete(user: { id: string }): Promise<void> {
+    return this.identity.ceremonies().beforeUserDelete(user);
+  }
+
+  createAccountIdentifier(account: BetterAuthAccountRow): Promise<BetterAuthAccountPin> {
+    return this.identity.ceremonies().createAccountIdentifier(account);
+  }
+
+  beforeAccountDelete(account: BetterAuthAccountRow): Promise<void> {
+    return this.identity.ceremonies().beforeAccountDelete(account);
+  }
 }
 
 /** The announcements, over what this process holds: the sign-up one reaches our own Slack. */
@@ -246,15 +252,20 @@ export class OffSignInRouterShadow extends SignInRouterShadow {
 }
 
 /**
- * Sign-up's address proofs, absent: no proof is live, so passkey sign-up refuses.
- * Reached only when the passkey plugin is mounted.
+ * Sign-up's address proofs, absent: no proof is live, so passkey sign-up refuses and no
+ * confirmation link can be spent, answered as a dead link.
  */
-export class AbsentSignUpVerification implements SignUpVerification {
+export class AbsentSignUpVerification implements SignUpVerification, SignUpAddressConfirmation {
   static create(logger: Logger): AbsentSignUpVerification {
     return new AbsentSignUpVerification(logger);
   }
 
   private constructor(private readonly logger: Logger) {}
+
+  async completeVerification(): Promise<never> {
+    this.refuse();
+    throw new IdentityVerificationExpiredError();
+  }
 
   async validateAddressProof(): Promise<boolean> {
     return this.refuse();
@@ -342,7 +353,7 @@ export type BuildBetterAuthOptions = Readonly<{
   signInLockout: SignInAttemptCounter;
   /** The mailbox proofs passkey sign-up checks and spends, or `null` where this
    *  process composed no sign-up ceremony — then passkey sign-up refuses. */
-  signUpProofs: SignUpVerification | null;
+  signUpProofs: (SignUpVerification & SignUpAddressConfirmation) | null;
   /** Where an address signs in, or `null` where this process composed no
    *  routing directory - then no connection governs a credential sign-in. */
   signInRouting:
@@ -444,7 +455,7 @@ export async function buildBetterAuth(
       isSaas: options.isSaas,
       localPasswords: options.localPasswords,
     }),
-    identity: AbsentBetterAuthIdentityCeremonies.create(),
+    identity: IdentityBetterAuthCeremonies.create(options.identityApi),
     invites: options.organizations,
     announcements: LoggedBetterAuthAnnouncements.create({
       logger,
@@ -477,9 +488,10 @@ export async function buildBetterAuth(
     signUpVerification: options.signUpProofs ?? AbsentSignUpVerification.create(logger),
     sendResetPassword: options.sendResetPassword,
     signInLockout: options.signInLockout,
-    addressRoutesToConnection: async ({ email }) =>
-      signInRouting !== null &&
-      routesToOrganizationConnection(await signInRouting({ identifier: email, breakGlass: false })),
+    findGoverningConnections: async ({ email }) =>
+      signInRouting === null
+        ? []
+        : organizationConnectionsOf(await signInRouting({ identifier: email, breakGlass: false })),
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: signInRouting === null ? null : { route: signInRouting },

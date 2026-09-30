@@ -24,6 +24,10 @@ import {
   type ConversationListItem,
   type ConversationListPage,
 } from "../rules/langy-conversation-shape.rules.ts";
+import {
+  pickLatestControlRequest,
+  type LatestControlRequest,
+} from "../rules/langy-local-control-request-state.rules.ts";
 import type { LangyConversationEventsReader } from "./langy-conversation.service.ts";
 
 /**
@@ -262,6 +266,28 @@ export class LangyConversationReadService {
       waits: recordWaitsOf(foldWaitTurns(all)),
       workspaceConnected: lastWorkspaceConnection(all),
     };
+  }
+
+  /**
+   * The latest request to share a folder this conversation recorded, and whether a folder
+   * connected through it (ADR-129). The open request lives in Redis only while a terminal can
+   * approve it; this says why there is nothing to approve. The caller proves the conversation.
+   */
+  async getLatestLocalControlRequest({
+    projectId,
+    conversationId,
+  }: {
+    projectId: string;
+    conversationId: string;
+  }): Promise<LatestControlRequest | null> {
+    if (!this.deps.events) return null;
+    const all = await this.deps.events.getEventsOccurredSince({
+      aggregateId: conversationId,
+      context: { tenantId: createTenantId(projectId) },
+      aggregateType: "langy_conversation",
+      occurredAtFromMs: 0,
+    });
+    return pickLatestControlRequest(all);
   }
 
   /**

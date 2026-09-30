@@ -5,7 +5,7 @@
  */
 
 import {
-  DatasetConflictError,
+  DatasetStaleColumnsError,
   DatasetTooLargeToEditColumnsError,
   convertRowsToColumnTypes,
   type DatasetColumns,
@@ -221,10 +221,7 @@ function assertColumnEditAllowed({
   oldColumnTypes: DatasetColumns;
 }): void {
   if (JSON.stringify(current.columnTypes) !== JSON.stringify(oldColumnTypes)) {
-    throw new DatasetConflictError(
-      "Dataset columns changed since you opened the editor — please reopen and retry.",
-      { reason: "stale_columns" },
-    );
+    throw new DatasetStaleColumnsError();
   }
 
   const currentSizeBytes = Number(current.sizeBytes ?? 0n);

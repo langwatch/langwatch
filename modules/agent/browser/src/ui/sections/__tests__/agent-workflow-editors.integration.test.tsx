@@ -76,6 +76,27 @@ describe("workflow agent editor", () => {
     expect(props.onClose).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Edit Workflow Agent drawer lists an unwired entry field as a mappable input" */
+  it("hands the mapping section every entry field, wired or not", () => {
+    const renderMappings = vi.fn(() => <div>Mappings</div>);
+    editor({
+      workflowInputs: [
+        { identifier: "message", type: "str" },
+        { identifier: "new_field", type: "str" },
+      ],
+      renderMappings,
+    });
+
+    expect(renderMappings).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        inputs: [
+          { identifier: "message", type: "str" },
+          { identifier: "new_field", type: "str" },
+        ],
+      }),
+    );
+  });
+
   it("does not save while the workflow is loading or has no published inputs", () => {
     const { props } = editor({ isLoading: true, workflowInputs: [] });
     fireEvent.click(screen.getByTestId("save-agent-button"));

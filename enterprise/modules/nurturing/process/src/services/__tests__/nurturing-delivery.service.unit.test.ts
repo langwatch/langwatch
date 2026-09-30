@@ -527,6 +527,39 @@ describe("NurturingDeliveryService", () => {
     });
   });
 
+  describe("when Customer.io is unavailable as a guided onboarding event is delivered", () => {
+    /** @scenario 'a Customer.io failure never fails the write' */
+    it("paths_selected: returns normally and reports the failure", async () => {
+      const cio = customerIo(503);
+      const delivery = NurturingDeliveryService.create({
+        claims: claims(),
+        users: users(),
+        customerIo: cio.service,
+        posthog: undefined,
+      });
+
+      await expect(
+        delivery.deliver({
+          key: "guided_onboarding_paths:event-15",
+          signal: {
+            kind: "guided_onboarding_paths",
+            sourceEventId: "event-15",
+            ...source,
+            userId: "user-1",
+            organizationId: "org-1",
+            event: "paths_selected",
+            previousPaths: [],
+            paths: ["gateway", "llmops"],
+          },
+        }),
+      ).resolves.toBeUndefined();
+      await settle();
+
+      expect(cio.sent.length).toBeGreaterThan(0);
+      expect(cio.reported.length).toBe(cio.sent.length);
+    });
+  });
+
   describe("when a deployment named no Customer.io key", () => {
     /** @scenario "Signup with no Customer.io key configured completes without errors" */
     it("signed_up: makes no request at all and raises nothing", async () => {

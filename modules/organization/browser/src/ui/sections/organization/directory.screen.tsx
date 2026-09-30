@@ -7,6 +7,7 @@ import { Tabs, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Suspense } from "react";
 
+import { useDepartmentColumn } from "../../../behavior/use-department-column.ts";
 import { useDirectoryTabCounts } from "../../../behavior/use-directory-tab-counts.ts";
 import {
   DIRECTORY_TAB_PARAM,
@@ -16,6 +17,7 @@ import {
 import { useOrganizationHost, type OrganizationHostApi } from "../../../model/organization-host.ts";
 import { PermissionAlert } from "../../elements/permission-alert.tsx";
 import { TabCount } from "../../elements/tab-count.tsx";
+import DepartmentsScreen from "./departments.screen.tsx";
 import GroupsScreen from "./groups.screen.tsx";
 import MembersScreen from "./members.screen.tsx";
 import TeamsScreen from "./teams.screen.tsx";
@@ -42,7 +44,15 @@ function Directory({
   organizationId: string;
 }) {
   const route = host.route();
-  const tab = parseDirectoryTab(route.query[DIRECTORY_TAB_PARAM]);
+  const department = useDepartmentColumn(
+    organizationId,
+    host.isFeatureEnabled("release_ui_ai_governance_enabled"),
+  );
+  const departmentsShown = department.show && host.hasOrganizationPermission("governance:view");
+  const tab = parseDirectoryTab({
+    value: route.query[DIRECTORY_TAB_PARAM],
+    departmentsShown,
+  });
   const selectTab = (next: string) =>
     host.setQuery(
       { ...route.query, [DIRECTORY_TAB_PARAM]: next === "people" ? void 0 : next },
@@ -67,7 +77,12 @@ function Directory({
           </Suspense>
         )}
 
-        <DirectoryTabs organizationId={organizationId} tab={tab} onSelectTab={selectTab} />
+        <DirectoryTabs
+          organizationId={organizationId}
+          tab={tab}
+          onSelectTab={selectTab}
+          departmentCount={departmentsShown ? department.departments.length : undefined}
+        />
       </VStack>
     </>
   );
@@ -78,10 +93,13 @@ function DirectoryTabs({
   organizationId,
   tab,
   onSelectTab,
+  departmentCount,
 }: {
   organizationId: string;
   tab: DirectoryTab;
   onSelectTab: (next: string) => void;
+  /** Undefined where the Departments tab is not offered to this reader. */
+  departmentCount: number | undefined;
 }) {
   const counts = useDirectoryTabCounts({ organizationId, enabled: true });
 
@@ -102,11 +120,21 @@ function DirectoryTabs({
         <Tabs.Trigger value="groups" gap={2}>
           Groups <TabCount value={counts.groups} />
         </Tabs.Trigger>
+        {departmentCount !== void 0 && (
+          <Tabs.Trigger value="departments" gap={2}>
+            Departments <TabCount value={departmentCount} />
+          </Tabs.Trigger>
+        )}
       </Tabs.List>
 
       <Tabs.Content value="people">{tab === "people" && <MembersScreen />}</Tabs.Content>
       <Tabs.Content value="teams">{tab === "teams" && <TeamsScreen />}</Tabs.Content>
       <Tabs.Content value="groups">{tab === "groups" && <GroupsScreen />}</Tabs.Content>
+      {departmentCount !== void 0 && (
+        <Tabs.Content value="departments">
+          {tab === "departments" && <DepartmentsScreen organizationId={organizationId} />}
+        </Tabs.Content>
+      )}
     </Tabs.Root>
   );
 }

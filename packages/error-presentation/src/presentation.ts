@@ -2215,6 +2215,10 @@ const presentations = {
     title: "You need to be signed in",
     describe: () => "Nothing was changed. Sign in again, then try this action.",
   },
+  ops_search_query_required: {
+    title: "Enter something to search for",
+    describe: () => "Type a search query or pick a tenant, then search the event log again.",
+  },
   ops_impersonated_operator_refused: {
     // The audit trail would name the account being impersonated, not the
     // person doing the work, which is why this is refused rather than allowed.

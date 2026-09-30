@@ -281,6 +281,8 @@ export interface CodingAgentSessionRow {
   entrypoint: string;
   parentSessionId: string;
   isFork: boolean;
+  /** A thread the agent ran for itself (00096): kept and priced, never listed as a session. */
+  auxiliary: boolean;
   /** Git identity from the companion event, and the generated title (00075). */
   repositoryHost: string;
   repositoryOwner: string;

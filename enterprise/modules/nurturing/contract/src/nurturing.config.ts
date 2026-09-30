@@ -7,6 +7,8 @@ import { z } from "zod";
 export const nurturingConfig = Config.define((c) => ({
   /** Customer.io's data centre; the channel sends to the EU one unless this names "us". */
   customerIoRegion: c.env("CUSTOMER_IO_REGION", z.enum(["us", "eu"]).optional()),
+  /** Replaces the regional CDP endpoint, e.g. a local analyticssim; absent, the vendor's. */
+  customerIoBaseUrl: c.env("CUSTOMER_IO_BASE_URL", z.string().min(1).optional()),
   posthogKey,
   posthogHost,
 }));

@@ -2,7 +2,7 @@ export function Xai() {
   return (
     <svg
       fill="currentColor"
-      fill-rule="evenodd"
+      fillRule="evenodd"
       style={{ flex: "none", lineHeight: "1" }}
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"

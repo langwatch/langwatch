@@ -139,7 +139,8 @@ Feature: Triggering online evaluations from an ingested trace
     When a trace is ingested
     Then a command is sent for the project's monitor
 
-  @unit
+  @unit @unimplemented
+  # The dedup identity is minted by the evaluation module's command dispatcher; trace only sends.
   Scenario: The dedup key is the evaluation command's own
     Given the composed evaluation trigger
     When the queue asks for a command's deduplication key

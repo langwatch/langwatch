@@ -145,7 +145,8 @@ const HANDLED_CODE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
  */
 function fromRestBody(error: unknown): AuthHandledError | null {
   if (!isRecord(error)) return null;
-  const code = error.error;
+  // `error` in main's REST body, `code` in the canonical envelope a Better Auth endpoint answers.
+  const code = typeof error.error === "string" ? error.error : error.code;
   if (typeof code !== "string" || !HANDLED_CODE.test(code)) return null;
   const status = typeof error.httpStatus === "number" ? error.httpStatus : error.status;
   return {

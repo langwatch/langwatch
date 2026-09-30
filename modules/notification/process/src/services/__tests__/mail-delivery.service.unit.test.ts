@@ -28,6 +28,14 @@ const config: NotificationServerConfig = {
   provider: undefined,
   ses: { enabled: undefined, region: undefined, endpoint: undefined },
   smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
+  outboundProxy: {
+    HTTPS_PROXY: undefined,
+    https_proxy: undefined,
+    HTTP_PROXY: undefined,
+    http_proxy: undefined,
+    NO_PROXY: undefined,
+    no_proxy: undefined,
+  },
 };
 
 /** The gateway-facing message each send is handed, recorded rather than delivered. */
@@ -164,6 +172,62 @@ describe("MailDeliveryService", () => {
       await expect(serviceOver(settingsWith()).verifySmtp()).rejects.toBeInstanceOf(
         EmailProviderConfigurationError,
       );
+    });
+  });
+});
+
+describe("the email capability the interface reads", () => {
+  const capabilityOf = (settings: MailGatewaySettings) =>
+    notificationBrowserConfig.project(config, {
+      getMailDelivery: () => serviceOver(settings).getView(),
+    });
+
+  describe("when no gateway can be resolved", () => {
+    /** @scenario "Email options stay hidden when no gateway is usable" */
+    it("reports email as off, so an invitation can only be shared as a link", async () => {
+      await expect(capabilityOf(settingsWith())).resolves.toEqual({ email: false });
+    });
+  });
+
+  describe("when EMAIL_PROVIDER names SMTP and a relay is set", () => {
+    /** @scenario "Email options appear once any gateway is usable" */
+    it("reports email as on, so an invitation can be sent by email", async () => {
+      await expect(
+        capabilityOf(settingsWith({ provider: "smtp", smtp: { host: "mail.acme.test" } })),
+      ).resolves.toEqual({ email: true });
+    });
+  });
+
+  describe("when EMAIL_PROVIDER names a gateway missing its credentials", () => {
+    /** @scenario "A misconfigured gateway does not break the interface" */
+    it("reports email as off rather than failing to answer", async () => {
+      await expect(capabilityOf(settingsWith({ provider: "resend" }))).resolves.toEqual({
+        email: false,
+      });
+    });
+  });
+});
+
+describe("a delivery identity on a send", () => {
+  describe("when a module sends with an idempotency key", () => {
+    /** @scenario "Resend retries reuse the same provider idempotency key" */
+    /** @scenario "SMTP retries preserve the notification message identity" */
+    it("hands the gateway the same key, so a retry is recognisable", async () => {
+      const delivery = new RecordingDelivery();
+      const command = {
+        to: "ada@example.com",
+        subject: "s",
+        html: "h",
+        idempotencyKey: "org:join:a",
+      };
+
+      await serviceOver(settingsWith(), delivery).sendEmail(command);
+      await serviceOver(settingsWith(), delivery).sendEmail(command);
+
+      expect(delivery.sent.map((sent) => sent.idempotencyKey)).toEqual([
+        "org:join:a",
+        "org:join:a",
+      ]);
     });
   });
 });

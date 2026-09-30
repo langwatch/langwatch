@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlKeyMapRepository } from "../repositories/langwatch-ql-key-map.repository.ts";
@@ -14,97 +15,61 @@ const lwqlCapability = LangWatchQLCapabilityService.create();
 
 const logger = createLogger("langwatch:lwql-key-map-service");
 
+/** Where the rows go: the restricted identity's names, and the database the approved views read. */
+export type LwqlKeyMapTarget = Readonly<{
+  connection: LangWatchQLConnection;
+  /** The app's own ClickHouse database, which holds the key map (migration 00084). */
+  sourceDatabase: string;
+}>;
+
 /**
- * Where a failed sync is reported beyond the log line.
+ * Writes a new project's LangWatchQL key-map row, analytics' reaction to project's created event
+ * (ARCHITECTURE §9). A duplicate (KeyHash, TenantId) pair is harmless to the row policy, so a
+ * redelivery writes again; a failed insert throws so the queue retries it.
  */
-export abstract class LwqlKeyMapErrorSink {
-  abstract capture(error: Error, context: Readonly<{ projectId: string; cause: unknown }>): void;
-}
-
-/** Reports nothing beyond the log line, for a deployment that wired no sink. */
-class SilentLwqlKeyMapErrorSink extends LwqlKeyMapErrorSink {
-  capture(): void {}
-}
-
 export class LwqlKeyMapService {
-  private readonly repository: LwqlKeyMapRepository;
-  private readonly sourceDatabase: string;
-  private readonly connection: LangWatchQLConnection | null;
-  private readonly errors: LwqlKeyMapErrorSink;
+  private constructor(
+    private readonly deps: {
+      repository: LwqlKeyMapRepository;
+      projects: Pick<ProjectApi, "findById">;
+      /** Absent where the deployment offers no LangWatchQL. */
+      target?: LwqlKeyMapTarget;
+    },
+  ) {}
 
-  private constructor(deps: {
-    repository: LwqlKeyMapRepository;
-    sourceDatabase: string;
-    connection: LangWatchQLConnection | null;
-    errors: LwqlKeyMapErrorSink;
-  }) {
-    this.repository = deps.repository;
-    this.sourceDatabase = deps.sourceDatabase;
-    this.connection = deps.connection;
-    this.errors = deps.errors;
-  }
-
-  /**
-   * `sourceDatabase` is the ClickHouse database the approved views read,
-   * known to a process from its own connection string — taken as an
-   * argument rather than parsed here, since that config belongs to the composer.
-   */
   static create(options: {
     repository: LwqlKeyMapRepository;
-    sourceDatabase: string;
-    /** The restricted identity, or `null` where a deployment provisioned none. */
-    connection: LangWatchQLConnection | null;
-    errors?: LwqlKeyMapErrorSink;
+    projects: Pick<ProjectApi, "findById">;
+    target?: LwqlKeyMapTarget;
   }): LwqlKeyMapService {
-    return new LwqlKeyMapService({
-      repository: options.repository,
-      sourceDatabase: options.sourceDatabase,
-      connection: options.connection,
-      errors: options.errors ?? new SilentLwqlKeyMapErrorSink(),
-    });
+    return new LwqlKeyMapService(options);
   }
 
-  /**
-   * Best-effort synchronization. The deploy-time backfill repairs any missed
-   * row, so project creation must not fail when ClickHouse is unavailable.
-   */
-  async syncProject(input: { projectId: string; lwqlKey: string | null }): Promise<void> {
-    const { connection } = this;
-    if (!connection) {
-      return;
-    }
+  /** Nothing to write without LangWatchQL, for a deleted project, or for an empty key. */
+  async syncProject(input: { projectId: string }): Promise<void> {
+    const { target, projects, repository } = this.deps;
+    if (!target) return;
 
-    if (!input.lwqlKey) {
+    const project = await projects.findById(input.projectId);
+    if (!project) return;
+    if (!project.lwqlKey) {
       logger.error(
-        { projectId: input.projectId },
+        { projectId: project.id },
         "new project has an empty lwqlKey — cannot sync its LangWatchQL key-map row",
       );
-
       return;
     }
 
-    try {
-      const names = lwqlProvisioning.names({ connection });
-      const row: LwqlKeyMapRow = {
-        KeyHash: lwqlCapability.tenantCapability({ secret: input.lwqlKey }),
-        TenantId: input.projectId,
-      };
-      await this.repository.insertRow({
-        table: lwqlProvisioning.keyMapTableQualifiedName({
-          names,
-          sourceDatabase: this.sourceDatabase,
-        }),
-        row,
-      });
-    } catch (error) {
-      logger.error(
-        { projectId: input.projectId, error },
-        "failed to sync LangWatchQL key-map row; the scheduled backfill will retry it",
-      );
-      this.errors.capture(new Error("Failed to sync LangWatchQL key-map row"), {
-        projectId: input.projectId,
-        cause: error,
-      });
-    }
+    const row: LwqlKeyMapRow = {
+      KeyHash: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
+      TenantId: project.id,
+    };
+    await repository.insertRow({
+      table: lwqlProvisioning.keyMapTableQualifiedName({
+        names: lwqlProvisioning.names({ connection: target.connection }),
+        sourceDatabase: target.sourceDatabase,
+      }),
+      row,
+    });
   }
 }

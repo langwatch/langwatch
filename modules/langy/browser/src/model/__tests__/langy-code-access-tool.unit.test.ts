@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   codeAccessCallId,
+  codeAccessOffersDescribe,
   LANGY_CODE_ACCESS_CARD_ANSWER,
   latestCodeAccessCallId,
 } from "../langy-code-access-tool.ts";
@@ -111,6 +112,29 @@ describe("given a folder that is already connected", () => {
         { role: "assistant", parts: [raisedTheCard("b")] },
       ];
       expect(latestCodeAccessCallId(messages)).toBe("b");
+    });
+  });
+
+  describe("codeAccessOffersDescribe", () => {
+    const withInput = (input: unknown, state = "input-available") => ({
+      type: "tool-code_access",
+      state,
+      toolCallId: "a",
+      input,
+    });
+
+    it("is on only when the last call's input offers it", () => {
+      expect(codeAccessOffersDescribe([withInput({ offer_describe: true })])).toBe(true);
+      expect(codeAccessOffersDescribe([withInput({ reason: "x" })])).toBe(false);
+      expect(codeAccessOffersDescribe([withInput({ offer_describe: true }), withInput({})])).toBe(
+        false,
+      );
+    });
+
+    it("waits for a complete input", () => {
+      expect(
+        codeAccessOffersDescribe([withInput({ offer_describe: true }, "input-streaming")]),
+      ).toBe(false);
     });
   });
 });

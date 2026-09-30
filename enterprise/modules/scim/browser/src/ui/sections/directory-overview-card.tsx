@@ -11,10 +11,14 @@ import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Settings2 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import {
+  useDirectoryDepartments,
+  GOVERNANCE_FLAG,
+} from "../../behavior/use-directory-departments.ts";
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
 import { directorySyncChipFor } from "../../model/directory-sync-chip.ts";
 import { relativeTime } from "../../model/display-formatters.ts";
-import { CONNECTORS_PAGE } from "../../model/scim-host.ts";
+import { CONNECTORS_PAGE, useScimHost } from "../../model/scim-host.ts";
 
 /** Groups named before the rest collapse into a count. */
 const GROUPS_SHOWN = 4;
@@ -31,6 +35,10 @@ export function DirectoryOverviewCard({
   canReadMembership: boolean;
 }) {
   const facts = useDirectoryFacts({ organizationId, canReadMembership });
+  const department = useDirectoryDepartments({
+    organizationId,
+    governanceEnabled: useScimHost().isFeatureEnabled(GOVERNANCE_FLAG),
+  });
   const { reconciliation } = facts;
 
   if (reconciliation.isError) {
@@ -66,7 +74,11 @@ export function DirectoryOverviewCard({
       {nothingHasArrived ? (
         <DirectoryCardWaiting waiting={waiting} attention={attention} />
       ) : (
-        <DirectoryCardFacts facts={facts} canReadMembership={canReadMembership} />
+        <DirectoryCardFacts
+          facts={facts}
+          canReadMembership={canReadMembership}
+          department={department}
+        />
       )}
     </OverviewCard>
   );
@@ -161,9 +173,11 @@ function DirectoryCardWaiting({
 function DirectoryCardFacts({
   facts,
   canReadMembership,
+  department,
 }: {
   facts: DirectoryFactsRead;
   canReadMembership: boolean;
+  department: ReturnType<typeof useDirectoryDepartments>;
 }) {
   const shownGroups = facts.directoryGroups.slice(0, GROUPS_SHOWN);
   const restGroups = facts.directoryGroups.length - shownGroups.length;
@@ -230,6 +244,34 @@ function DirectoryCardFacts({
           )}
         </FactUnavailable>
       </VStack>
+
+      {department.show && (
+        <VStack align="start" gap={1.5} paddingTop={1} width="full">
+          <Text
+            fontSize="10.5px"
+            fontWeight="600"
+            letterSpacing="0.06em"
+            textTransform="uppercase"
+            color="fg.subtle"
+          >
+            Departments
+          </Text>
+          <HStack gap={1} flexWrap="wrap">
+            {department.departments.slice(0, GROUPS_SHOWN).map((option) => (
+              <StatusChip
+                key={option.id}
+                label={option.name}
+                data-testid="directory-card-department-chip"
+              />
+            ))}
+            {department.departments.length > GROUPS_SHOWN && (
+              <Text fontSize="11.5px" color="fg.subtle">
+                {`+${department.departments.length - GROUPS_SHOWN} more`}
+              </Text>
+            )}
+          </HStack>
+        </VStack>
+      )}
     </>
   );
 }

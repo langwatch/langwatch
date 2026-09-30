@@ -13,6 +13,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import { NotificationService } from "@langwatch/notification-contract";
 import type {
   GuidedOnboardingRecord,
   OnboardingInitializeOrganizationInput,
@@ -320,6 +321,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     billing: BillingApi,
     /** Told of a sign-up, an invitation batch and an acceptance by this module's subscriber. */
     nurturing: NurturingApi,
+    /** Sends the invitation mails; notification owns the gateway. */
+    notifications: NotificationService,
   };
   /** Named raw: the process answers these two, no store carries them. */
   static readonly reads = [
@@ -366,6 +369,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
         governance: setup.dependencies.governance,
         permissions: setup.dependencies.permissions,
         roles: setup.dependencies.roles,
+        notifications: setup.dependencies.notifications,
       },
     });
     const organizations = OrganizationEntityService.create({
@@ -379,6 +383,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       grants: setup.dependencies.permissions,
       settingsSecrets: members.settingsSecrets,
       diagnostics: members.diagnostics,
+      notices: members.lifecycle,
     });
     const membershipRepository = setup.repositories.membership(setup.dependencies.permissions);
     const membership = OrganizationMembershipService.create({

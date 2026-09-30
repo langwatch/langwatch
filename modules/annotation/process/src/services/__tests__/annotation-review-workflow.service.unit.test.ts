@@ -145,6 +145,7 @@ describe("AnnotationService review workflow", () => {
     });
   });
 
+  /** @scenario "a trace marker failure does not fail a committed annotation mutation" */
   it("keeps create and delete successful when marker sync fails", async () => {
     const harnessed = harness();
     harnessed.recordAnnotation.mockRejectedValue(new Error("record failed"));

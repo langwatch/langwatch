@@ -21,7 +21,6 @@ import type {
   PriorSession,
   SignUpEnrollment,
   SignUpVerificationRequest,
-  SignUpVerificationResult,
 } from "./front-door.responses.ts";
 import type {
   ReleaseHeldAccountResult,
@@ -211,8 +210,6 @@ export interface AuthApi {
     password?: string | undefined;
     code: string;
   }): Promise<void>;
-  /** Spends a confirmation link and answers the address it confirmed. */
-  completeSignUpVerification(input: Readonly<{ token: string }>): Promise<SignUpVerificationResult>;
   /**
    * Spends the single-use proof a spent link minted for an address with no
    * account. False for a proof that is missing, expired, spent or another address's.

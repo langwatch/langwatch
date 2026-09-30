@@ -1,11 +1,11 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import type { SignUpEnrollment, SignUpVerificationResult } from "@langwatch/auth-contract";
-import { Link } from "@langwatch/browser-host/link";
+import { Button, HStack, Text } from "@chakra-ui/react";
+import type { SignUpEnrollment } from "@langwatch/auth-contract";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn } from "../../behavior/auth-client.tsx";
+import { confirmSignUpAddress } from "../../behavior/confirm-sign-up-address.ts";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
@@ -14,12 +14,16 @@ import type { FrontDoorDepth } from "../../model/ground-palette.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
 import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
+import { JOIN_BEFORE_CREATE_PATH } from "../../model/sign-up-destination.ts";
+import { useTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { SuccessPulse } from "../elements/success-pulse.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
+import { RoutedToConnection } from "./identifier-first-sign-in.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
 import {
   AlternativeMethods,
@@ -27,12 +31,7 @@ import {
   SignInMethodPicker,
 } from "./sign-in-method-picker.tsx";
 import { SignUpCredentialForm } from "./sign-up-credential-form.tsx";
-
-/**
- * Where a new account goes before it makes an organization: the
- * join-before-create step (D12 fills it; today it passes straight through).
- */
-const JOIN_BEFORE_CREATE_PATH = "/auth/join";
+import { TwoStepChallengePanel, twoStepChallengeTitle } from "./two-step-challenge-panel.tsx";
 
 /**
  * Sign-up (D13, ADR-117 §6): address, link, proof, then password. The account
@@ -51,16 +50,23 @@ export function VerificationFirstSignUp() {
   useEffect(forgetCarriedEmail, []);
 
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
-  const completeVerification = api.auth.completeSignUpVerification.useMutation();
+  // Spent against the Better Auth endpoint, which can set a cookie; its refusal is held here.
+  const [linkError, setLinkError] = useState<unknown>(null);
+  // The address the link signed in, once it has: the card becomes the hand-off into the app.
+  const [signedInAs, setSignedInAs] = useState<string | null>(null);
   const routing = useSignInRouting();
   const { decide } = routing;
 
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // The address's domain routes through an identity provider, which makes the account.
+  const [routedEmail, setRoutedEmail] = useState<string | null>(null);
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
   // The single-use proof `user.register` spends; only where no account stands behind the address.
   const [addressProof, setAddressProof] = useState<string | null>(null);
   // False where the installation cannot send email: the proof confirms nobody's address.
   const [addressConfirmed, setAddressConfirmed] = useState(true);
+  // A link opened again after its proof was spent elsewhere: a fresh link is the way on.
+  const [proofRecoveryEmail, setProofRecoveryEmail] = useState<string | null>(null);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
@@ -73,40 +79,43 @@ export function VerificationFirstSignUp() {
     decide,
     routingError: routing.error,
     onWelcomeBack: setWelcomeBackEmail,
+    onRouted: setRoutedEmail,
     onEnrolled: (email, proof) => {
       setVerifiedEmail(email);
       setAddressProof(proof);
     },
   });
-  const { enrollment, failedLink, resolveEnrollment, settleSpentLink } = proofEnrollment;
+  const { enrollment, failedLink, resolveEnrollment } = proofEnrollment;
 
   // The emailed link is spent once, on arrival. Guarded by a ref rather than
-  // by mutation state because the token is single-use: a second attempt would
+  // by request state because the token is single-use: a second attempt would
   // fail on a link that worked.
   useEffect(() => {
     if (!verifyToken || spent.current) return;
     spent.current = true;
-    completeVerification
-      .mutateAsync({ token: verifyToken })
-      .then((result) =>
-        settleSpentLink(
-          result,
-          async ({ email, accountCreated, accountExists, addressProof: proof }) => {
-            setVerifiedEmail(email);
-            setAddressProof(proof);
-            // "Ready" means there is nothing left to choose. An account that was
-            // already there is just as ready as one this link created — sign-up
-            // made it and the link is the address catching up, so asking such a
-            // person to pick a sign-in method would be asking twice.
-            setAccountIsReady(accountCreated || accountExists);
-            await decide({ identifier: email });
-          },
-        ),
-      )
-      .catch(() => {
-        // Rendered from the mutation's error below, through the registry.
-      });
-  }, [verifyToken, completeVerification, decide, settleSpentLink]);
+    confirmSignUpAddress({ token: verifyToken })
+      .then(async ({ email, accountCreated, accountExists, addressProof: proof, signedIn }) => {
+        // The link opened the session: a full navigation, so everything cached as signed out goes.
+        if (signedIn) {
+          setSignedInAs(email);
+          hardRedirect(callbackUrl ?? JOIN_BEFORE_CREATE_PATH);
+          return;
+        }
+        // A reopened link opens no second session, so the way in is offered.
+        if (accountCreated || accountExists) {
+          setVerifiedEmail(email);
+          setAccountIsReady(true);
+          await decide({ identifier: email });
+          return;
+        }
+        if (!proof) {
+          setProofRecoveryEmail(email);
+          return;
+        }
+        await resolveEnrollment(email, proof);
+      })
+      .catch(setLinkError);
+  }, [verifyToken, callbackUrl, decide, resolveEnrollment]);
 
   const instanceMethods = useInstanceMethods({ decide, verifyToken });
 
@@ -114,19 +123,22 @@ export function VerificationFirstSignUp() {
     rememberPendingMethod(method);
     void signIn(method.id, {
       callbackUrl: callbackUrl ?? JOIN_BEFORE_CREATE_PATH,
+      // The routed address prefills the provider's screen as the OIDC login hint.
+      loginHint: routedEmail?.trim() || undefined,
     });
   };
 
-  const sendTo = async (email: string) => {
+  const sendTo = async (email: string): Promise<"link_sent" | "unconfirmed" | null> => {
     try {
       const result = await requestVerification.mutateAsync({ email });
       if (!result.sent) {
         // No link can be mailed here, so the password step comes straight away.
         setAddressConfirmed(false);
         await resolveEnrollment(email, result.addressProof);
-        return;
+        return "unconfirmed";
       }
       setSentTo(email);
+      return "link_sent";
     } catch (failure) {
       // Not a refusal, a wrong door: the address has an account, so the screen
       // turns into the way into it rather than telling somebody to start again
@@ -134,27 +146,35 @@ export function VerificationFirstSignUp() {
       if (readHandledError(failure)?.code === "email_already_registered") {
         setWelcomeBackEmail(email);
         await decide({ identifier: email });
-        return;
       }
       // Anything else renders from the mutation's error, through the registry.
+      return null;
     }
   };
 
   // Told once, from the same state the returns below branch on, so the ground
-  // can never be showing a step other than the one drawn over it. A confirmed
-  // address being asked for a password is the same DEPTH as a log-in asking
-  // for one — the field does not care which door reached it, only how far in
-  // it is.
+  // can never be showing a step other than the one drawn over it.
+  const twoStep = useTwoStepChallenge();
   usePublishFrontDoorStage({
     door: "signup",
     depth: signUpDepth({
-      verifiedEmail,
-      accountIsReady,
+      verifiedEmail: signedInAs ?? verifiedEmail,
+      accountIsReady: accountIsReady || signedInAs !== null,
       addressProof,
       welcomeBackEmail,
       sentTo,
+      routedEmail,
     }),
   });
+
+  // Ahead of everything: a password typed on the welcome-back step was accepted.
+  if (twoStep) {
+    return (
+      <AuthCard title={twoStepChallengeTitle({ factor: twoStep.factor })}>
+        <TwoStepChallengePanel factor={twoStep.factor} callbackUrl={twoStep.callbackUrl} />
+      </AuthCard>
+    );
+  }
 
   if (welcomeBackEmail) {
     return (
@@ -164,14 +184,39 @@ export function VerificationFirstSignUp() {
         lastUsedMethodId={lastUsedMethodId}
         callbackUrl={callbackUrl}
         onFederatedMethodChosen={dialFederated}
-        onUseDifferentEmail={() => setWelcomeBackEmail(null)}
+        onUseDifferentEmail={() => {
+          setWelcomeBackEmail(null);
+          // The refusal that sent this address here was THAT address's.
+          requestVerification.reset();
+        }}
       />
     );
   }
 
-  if (verifiedEmail && accountIsReady) {
+  // The navigation is already under way; this is the card it leaves behind meanwhile.
+  if (signedInAs) {
     return (
-      <AccountIsReady email={verifiedEmail} callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH} />
+      <AuthCard title="You're in">
+        <HStack gap={3}>
+          <SuccessPulse label="Signed in" />
+          <Text data-testid="signed-in-handoff">
+            {signedInAs} is confirmed. Taking you to LangWatch.
+          </Text>
+        </HStack>
+      </AuthCard>
+    );
+  }
+
+  if (proofRecoveryEmail) {
+    return (
+      <LinkNoLongerWorks
+        error={{ error: "identity_verification_used" }}
+        isSending={requestVerification.isPending}
+        callbackUrl={callbackUrl}
+        onResend={async (email) => {
+          if ((await sendTo(email)) !== null) setProofRecoveryEmail(null);
+        }}
+      />
     );
   }
 
@@ -181,6 +226,18 @@ export function VerificationFirstSignUp() {
         addressConfirmed={addressConfirmed}
         error={proofEnrollment.failure}
         onRetry={() => resolveEnrollment(failedLink.email, failedLink.addressProof)}
+      />
+    );
+  }
+
+  if (verifiedEmail && accountIsReady) {
+    return (
+      <AccountIsReady
+        email={verifiedEmail}
+        decision={routing.decision}
+        lastUsedMethodId={lastUsedMethodId}
+        callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
+        onFederatedMethodChosen={dialFederated}
       />
     );
   }
@@ -206,18 +263,35 @@ export function VerificationFirstSignUp() {
     return (
       <CheckYourEmail
         email={sentTo}
-        what="Open it to confirm the address."
+        what="Open it to confirm the address and finish signing in."
         onUseDifferentEmail={() => setSentTo(null)}
       />
     );
   }
 
-  if (verifyToken && completeVerification.error) {
+  if (verifyToken && linkError) {
     return (
       <LinkNoLongerWorks
-        error={completeVerification.error}
+        error={linkError}
         isSending={requestVerification.isPending}
+        callbackUrl={callbackUrl}
         onResend={sendTo}
+      />
+    );
+  }
+
+  // Ahead of the credential step: the organization routes this domain through an identity
+  // provider, so the account is made there and a password box here would be the thing the
+  // connection forbids.
+  if (routedEmail && routing.decision?.outcome === "redirect_to_connection") {
+    return (
+      <RoutedToConnection
+        decision={routing.decision}
+        onContinue={dialFederated}
+        callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
+        loginHint={routedEmail.trim() || undefined}
+        title="Create your LangWatch account"
+        footer={<LogInLink callbackUrl={callbackUrl} label="Or log in instead" />}
       />
     );
   }
@@ -231,6 +305,13 @@ export function VerificationFirstSignUp() {
           className="lw-front-door-alert"
         />
       ) : null}
+      {/* The router decides whether this address may hold a password at all: its failure
+          is why the journey stopped, so it stays on screen with a way to try again. */}
+      <HandledErrorAlert
+        error={routing.error}
+        fallbackTitle="Couldn't check how you sign in"
+        className="lw-front-door-alert"
+      />
       <HandledErrorAlert
         error={passkeyError}
         fallbackTitle="Could not use a passkey"
@@ -238,11 +319,20 @@ export function VerificationFirstSignUp() {
       />
       <IdentifierStepForm
         submitLabel="Continue"
-        isSubmitting={requestVerification.isPending}
+        isSubmitting={requestVerification.isPending || routing.isDeciding}
         defaultEmail={carriedEmail}
-        // The link comes first: no credential is collected until it is opened.
-        onSubmit={({ email }) => sendTo(email)}
-        footer={<LogInLink callbackUrl={callbackUrl} label="Already have an account? Log in" />}
+        // The ROUTER decides what this address is offered, the same question log-in asks.
+        // No answer is not "no connection": a routing failure stops here, rendered above.
+        onSubmit={async ({ email }) => {
+          const decision = await decide({ identifier: email });
+          if (decision?.outcome === "redirect_to_connection") {
+            setRoutedEmail(email);
+            return;
+          }
+          if (!decision) return;
+          await sendTo(email);
+        }}
+        footer={<LogInLink callbackUrl={callbackUrl} label="Or log in instead" />}
         alternatives={
           hasAlternativeMethods({ methodSet: instanceMethods }) ? (
             <AlternativeMethods
@@ -317,22 +407,56 @@ function WelcomeBack({
 }
 
 /**
- * The link carried a credential, so confirming it finished the job: the
- * account exists. All that is left is the log-in it was always going to be,
- * with the address in place and the password the browser has just saved.
+ * The account exists and the link is the address catching up, so what is left is the way
+ * in: the ROUTED methods rather than a password box, because the account's credential may
+ * be a passkey. Same picker as log-in, so the two can never offer different things.
  */
-function AccountIsReady({ email, callbackUrl }: { email: string; callbackUrl: string }) {
+function AccountIsReady({
+  email,
+  decision,
+  lastUsedMethodId,
+  callbackUrl,
+  onFederatedMethodChosen,
+}: {
+  email: string;
+  decision: RoutingDecision | null;
+  lastUsedMethodId: string | null;
+  callbackUrl: string;
+  onFederatedMethodChosen: (method: SignInMethod) => void;
+}) {
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
+
   return (
     <AuthCard title="Your account is ready">
       <HStack gap={3}>
         <SuccessPulse label="Account created" />
         <Text data-testid="account-ready">{email} is confirmed.</Text>
       </HStack>
-      <CredentialSignInForm
-        email={email}
-        callbackUrl={callbackUrl}
-        onUseDifferentEmail={() => hardRedirect("/auth/signin")}
+      <HandledErrorAlert
+        error={passkeyError}
+        fallbackTitle="Could not use a passkey"
+        className="lw-front-door-alert"
       />
+      {decision ? (
+        <SignInMethodPicker
+          methodSet={decision.methodSet}
+          reasonCode={decision.reasonCode}
+          lastUsedMethodId={lastUsedMethodId}
+          onFederatedMethodChosen={onFederatedMethodChosen}
+          callbackUrl={callbackUrl}
+          onPasskeyError={setPasskeyError}
+          renderLocalMethod={(method) =>
+            method.kind === "password" ? (
+              <CredentialSignInForm
+                key={method.id}
+                email={email}
+                callbackUrl={callbackUrl}
+                onUseDifferentEmail={() => hardRedirect("/auth/signin")}
+              />
+            ) : null
+          }
+        />
+      ) : null}
     </AuthCard>
   );
 }
@@ -345,10 +469,12 @@ function AccountIsReady({ email, callbackUrl }: { email: string; callbackUrl: st
 function LinkNoLongerWorks({
   error,
   isSending,
+  callbackUrl,
   onResend,
 }: {
   error: unknown;
   isSending: boolean;
+  callbackUrl?: string;
   onResend: (email: string) => undefined | Promise<unknown>;
 }) {
   return (
@@ -361,6 +487,7 @@ function LinkNoLongerWorks({
         submitLabel="Send a new link"
         isSubmitting={isSending}
         onSubmit={({ email }) => onResend(email)}
+        footer={<LogInLink callbackUrl={callbackUrl} label="Or log in instead" />}
       />
     </AuthCard>
   );
@@ -377,16 +504,20 @@ function signUpDepth({
   addressProof,
   welcomeBackEmail,
   sentTo,
+  routedEmail,
 }: {
   verifiedEmail: string | null;
   accountIsReady: boolean;
   addressProof: string | null;
   welcomeBackEmail: string | null;
   sentTo: string | null;
+  routedEmail: string | null;
 }): FrontDoorDepth {
   if (verifiedEmail && accountIsReady) return "settled";
   if (welcomeBackEmail !== null) return "credential";
   if (verifiedEmail !== null && addressProof !== null) return "credential";
+  // The hand-off is as far in as the credential step it replaces.
+  if (routedEmail !== null) return "credential";
   if (sentTo !== null) return "sent";
   return "entry";
 }
@@ -462,6 +593,7 @@ function MethodChoice({
           }
         />
       ) : null}
+      <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
     </AuthCard>
   );
 }
@@ -484,8 +616,9 @@ function useInstanceMethods({
     if (askedOnMount.current || verifyToken) return;
     askedOnMount.current = true;
     void decide({ identifier: null }).then((decision) => {
+      // Never an existing passkey: on the door that makes accounts, it signs somebody else in.
       if (decision?.outcome === "method_picker") {
-        setInstanceMethods(decision.methodSet);
+        setInstanceMethods(decision.methodSet.filter((method) => method.kind !== "passkey"));
       }
     });
   }, [decide, verifyToken]);
@@ -498,11 +631,13 @@ function useProofEnrollment({
   decide,
   routingError,
   onWelcomeBack,
+  onRouted,
   onEnrolled,
 }: {
   decide: (input: { identifier: string }) => Promise<RoutingDecision | null>;
   routingError: unknown;
   onWelcomeBack: (email: string) => void;
+  onRouted: (email: string) => void;
   onEnrolled: (email: string, proof: string) => void;
 }) {
   const { mutateAsync: requestEnrollment, error } = api.auth.signUpEnrollment.useMutation();
@@ -516,44 +651,28 @@ function useProofEnrollment({
       const next = await nextStepForProof({ email, proof, requestEnrollment, decide });
       setFailedLink(next.kind === "retry" ? { email, addressProof: proof } : null);
       if (next.kind === "welcome_back") onWelcomeBack(email);
+      if (next.kind === "routed") onRouted(email);
       if (next.kind !== "enroll") return;
 
       setEnrollment(next.enrollment);
       onEnrolled(email, proof);
     },
-    [decide, requestEnrollment, onWelcomeBack, onEnrolled],
+    [decide, requestEnrollment, onWelcomeBack, onRouted, onEnrolled],
   );
 
-  /** A link that proved an address with no account asks for its enrollment; any other settles. */
-  const settleSpentLink = useCallback(
-    async (
-      result: SignUpVerificationResult,
-      settle: (result: SignUpVerificationResult) => Promise<void>,
-    ) => {
-      const { email, accountCreated, accountExists, addressProof } = result;
-      if (addressProof && !accountCreated && !accountExists) {
-        return resolveEnrollment(email, addressProof);
-      }
-      return settle(result);
-    },
-    [resolveEnrollment],
-  );
-
-  return {
-    enrollment,
-    failedLink,
-    resolveEnrollment,
-    settleSpentLink,
-    failure: error ?? routingError,
-  };
+  return { enrollment, failedLink, resolveEnrollment, failure: error ?? routingError };
 }
 
 type ProofStep =
   | { kind: "enroll"; enrollment: SignUpEnrollment }
+  | { kind: "routed" }
   | { kind: "welcome_back" }
   | { kind: "retry" };
 
-/** Where a proven address goes: its enrollment, the log-in step, or a retry that offers nothing. */
+/**
+ * Where a proven address goes: its enrollment, the identity provider its domain now routes
+ * to, the log-in step, or a retry that offers nothing.
+ */
 async function nextStepForProof({
   email,
   proof,
@@ -571,9 +690,8 @@ async function nextStepForProof({
     if (answer.outcome === "unavailable") return { kind: "retry" };
 
     const routed = await decide({ identifier: email });
-    const signsInElsewhere =
-      routed?.outcome === "redirect_to_connection" || routed?.outcome === "method_picker";
-    return signsInElsewhere ? { kind: "welcome_back" } : { kind: "retry" };
+    if (routed?.outcome === "redirect_to_connection") return { kind: "routed" };
+    return routed?.outcome === "method_picker" ? { kind: "welcome_back" } : { kind: "retry" };
   } catch {
     return { kind: "retry" };
   }
@@ -611,26 +729,5 @@ function LogInLink({ callbackUrl, label }: { callbackUrl: string | undefined; la
     callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
   }`;
 
-  // The question reads quiet and only the answer is the link, the way the
-  // board draws its footers. A label with no question is all link.
-  const splitAt = label.indexOf("? ");
-  const lead = splitAt === -1 ? "" : label.slice(0, splitAt + 2);
-  const linked = splitAt === -1 ? label : label.slice(splitAt + 2);
-
-  return (
-    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
-      {lead}
-      <Box
-        asChild
-        color="fg"
-        fontWeight={600}
-        textDecoration="underline"
-        textUnderlineOffset="3px"
-        textDecorationColor="border"
-        _hover={{ textDecorationColor: "fg" }}
-      >
-        <Link href={href}>{linked}</Link>
-      </Box>
-    </Text>
-  );
+  return <SecondaryActionLink href={href} label={label} testId="go-to-sign-in" />;
 }

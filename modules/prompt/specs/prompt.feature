@@ -62,3 +62,16 @@ Feature: Prompt service
     When a caller creates a prompt that names "openai/gpt-5-mini"
     Then the prompt's first version uses "openai/gpt-5-mini"
     And the project's default model is not resolved
+
+  @unit
+  Scenario: a prompt field carrying a null byte is refused as a bad request
+    Given a create, update or sync body whose text carries a null byte
+    When the REST schema validates the body
+    Then the body is refused as a validation error naming the field
+    And no write reaches Postgres, which would answer 22021 as a 500
+
+  @integration
+  Scenario: a renamed prompt tag is listed under its new name
+    Given the organization has a custom prompt tag
+    When a caller renames it over the REST API
+    Then the tag list shows the new name and no longer the old one

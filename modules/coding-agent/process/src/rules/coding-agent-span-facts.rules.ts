@@ -1,5 +1,6 @@
 import {
   CODING_AGENT_CONTRIBUTION_KEYS,
+  codexAuxiliarySessionFacts,
   type CodingAgentReceivedSpan,
   type ContributeSpanFactsCommandData,
   detectCodingAgent,
@@ -25,7 +26,15 @@ export function liftSpanContribution({
     name: span.name,
     attrs: span.spanAttributes,
   });
-  const facts = liftSpanFacts(span.spanAttributes);
+  const facts = {
+    ...liftSpanFacts(span.spanAttributes),
+    // A codex helper thread's request span says so through its request id; the fold reads the
+    // derived fact, never the vendor literal.
+    ...codexAuxiliarySessionFacts({
+      scopeName: span.instrumentationScope.name,
+      attributes: span.spanAttributes,
+    }),
+  };
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
     facts["service.version"] = serviceVersion;

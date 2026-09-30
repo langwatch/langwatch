@@ -20,6 +20,7 @@ const identity = {
 };
 
 describe("workbenchStateAnswer", () => {
+  /** @scenario "A poller checks for changes without pulling the setup" */
   it("answers the version and timestamp only when fields is version", () => {
     expect(workbenchStateAnswer({ workbench, fields: "version" })).toStrictEqual(identity);
   });

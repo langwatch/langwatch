@@ -57,6 +57,12 @@ const ADMIN_LOCAL_PART = "admin";
 const ADMIN_PASSWORD = "LocalHavenAdmin!2026";
 const ADMIN_NAME = "Haven Local Admin";
 
+/** Accounts of their own for the tools, so no tool answers the admin's passkey offer or sessions. */
+const TOOL_USERS = [
+  { id: "local-dev-fuzz-ui-user", localPart: "fuzz-ui", name: "Fuzz UI" },
+  { id: "local-dev-passkey-probe-user", localPart: "passkey-probe", name: "Passkey Probe" },
+] as const;
+
 // Must match domain.DefaultLocalAPIKey in tools/thuishaven/domain/overlay.go.
 const DEFAULT_INGESTION_KEY = "sk-lw-local-development-key";
 
@@ -275,6 +281,57 @@ export async function storageSeed({ connections, environment }: TaskInput): Prom
     userId: user.id,
   })) {
     await seedGrantBinding({ prisma, binding });
+  }
+
+  for (const toolUser of TOOL_USERS) {
+    const seeded = await prisma.user.upsert(
+      buildAdminUserUpsertArgs({
+        adminUserId: toolUser.id,
+        email: seedEmailAddress({
+          localPart: toolUser.localPart,
+          domainOverride: resolveSeedEmailDomain({ environment }),
+        }),
+        name: toolUser.name,
+      }),
+    );
+    await prisma.account.upsert({
+      where: {
+        provider_providerAccountId: { provider: "credential", providerAccountId: seeded.id },
+      },
+      create: {
+        userId: seeded.id,
+        provider: "credential",
+        issuer: "local:credential",
+        providerAccountId: seeded.id,
+        type: "credentials",
+        password: hashedPassword,
+      },
+      update: { issuer: "local:credential", password: hashedPassword },
+    });
+    await prisma.organizationUser.upsert({
+      where: { userId_organizationId: { userId: seeded.id, organizationId: organization.id } },
+      create: { userId: seeded.id, organizationId: organization.id, role: "ADMIN" },
+      update: { role: "ADMIN" },
+    });
+    await prisma.teamUser.upsert({
+      where: { userId_teamId: { userId: seeded.id, teamId: team.id } },
+      create: { userId: seeded.id, teamId: team.id, role: "ADMIN" },
+      update: { role: "ADMIN" },
+    });
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId: organization.id, userId: seeded.id },
+    });
+    for (const binding of adminGrantBindings({
+      organizationId: organization.id,
+      teamId: team.id,
+      userId: seeded.id,
+      ids: {
+        organization: `${toolUser.id}-organization-binding`,
+        team: `${toolUser.id}-team-binding`,
+      },
+    })) {
+      await seedGrantBinding({ prisma, binding });
+    }
   }
 
   // The two ApiKey rows are the only seeded state that needs the pepper, so a

@@ -48,7 +48,7 @@ function fakeAudience(): JoinRequestAudienceRepository {
       throw new JoinRequestNotFoundError("no such request");
     }),
     getOrganizationName: vi.fn(async () => "Acme Corp"),
-    findAdminEmails: vi.fn(async () => ["priya@acme.example"]),
+    findAdmins: vi.fn(async () => [{ userId: "user_priya", email: "priya@acme.example" }]),
     getUserProfile: vi.fn(async () => ({ name: "Morgan Ellis", email: "morgan@acme.example" })),
   };
 }
@@ -88,6 +88,40 @@ describe("JoinRequestNotifierService", () => {
       expect(recording.sendRequestArrived).toHaveBeenCalledWith(
         expect.objectContaining({ approvedFromDomainCount: 3 }),
       );
+    });
+  });
+
+  describe("when a notice reaches two administrators", () => {
+    /** @scenario "Each join-request mail carries a delivery key naming its notice and its recipient" */
+    it("gives each administrator's mail its own delivery key, the same on a resend", async () => {
+      const recording = recordingMail();
+      const audience = fakeAudience();
+      audience.findAdmins = vi.fn(async () => [
+        { userId: "user_priya", email: "priya@acme.example" },
+        { userId: "user_sam", email: "sam@acme.example" },
+      ]);
+      const adapter = JoinRequestNotifierService.create({
+        audience,
+        context: fakeContext(),
+        mail: recording.mail,
+        baseHost: "https://app.langwatch.ai",
+      });
+      const notice = {
+        joinRequestId: "joinreq_1",
+        organizationId: "organization_acme",
+        requesterUserId: "user_morgan",
+        domain: "acme.example",
+      };
+
+      await adapter.requestArrived(notice);
+      await adapter.requestArrived(notice);
+
+      const keys = recording.sendRequestArrived.mock.calls.map(([sent]) => sent.idempotencyKey);
+      expect(keys[0]).toBe(
+        "joinRequestLifecycle:organization_acme:join:joinreq_1:requestArrived:user_priya",
+      );
+      expect(keys[0]).not.toBe(keys[1]);
+      expect(keys.slice(2)).toEqual(keys.slice(0, 2));
     });
   });
 

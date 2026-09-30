@@ -44,7 +44,8 @@ export function ProviderScreen({
     organizationId,
     projectId,
     onConnected: (connected) => {
-      emit("connected", "provider", { ...connected });
+      const kind = providers.find((p) => p.registryKey === connected.provider)?.kind;
+      emit("connected", "provider", { ...connected, kind });
       onConnected(connected);
     },
   });
@@ -81,16 +82,17 @@ export function ProviderScreen({
         aria-hidden={!typed}
         data-testid="provider-connect"
       >
-        <Flex wrap="wrap" gap={2} aria-label="AI provider">
+        <Flex wrap="wrap" gap={2} role="radiogroup" aria-label="AI provider">
           {providers.map((provider) => {
             const isSelected = provider.id === selected.id;
             return (
               <chakra.button
                 key={provider.id}
                 type="button"
-                aria-pressed={isSelected}
+                role="radio"
+                aria-checked={isSelected}
                 aria-label={provider.name}
-                title={provider.hint}
+                title={provider.name}
                 onClick={() => {
                   setSelectedId(provider.id);
                   emit("selected", "provider", { provider: provider.id });
@@ -134,7 +136,12 @@ export function ProviderScreen({
             organizationId={organizationId}
             projectId={projectId}
             guided
-            onSaved={(saved) => void onSaved(selected, saved)}
+            onFailed={(failure) => emit("failed", "provider", failure)}
+            onSaved={(saved) =>
+              onSaved(selected, saved).catch(() =>
+                emit("failed", "provider", { provider: selected.registryKey, code: "save_failed" }),
+              )
+            }
           />
         </Box>
 

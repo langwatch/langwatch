@@ -3,6 +3,10 @@ import {
   nurturingSignUpDataSchema,
 } from "@langwatch/enterprise-nurturing-contract";
 import { EventSchema } from "@langwatch/eventing";
+import {
+  PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+  personalWorkspaceProvisionedEventDataSchema,
+} from "@langwatch/organization-contract";
 import { z } from "zod";
 
 /** An organization's membership milestones, and the integration method its founder chose. */
@@ -22,6 +26,8 @@ export const RECORD_INVITE_ACCEPTED_COMMAND_TYPE =
   "lw.organization.record_invite_accepted" as const;
 export const RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE =
   "lw.organization.record_integration_method_chosen" as const;
+export const RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE =
+  "lw.organization.record_personal_workspace_provisioned" as const;
 
 const envelope = {
   tenantId: z.string().min(1),
@@ -70,6 +76,13 @@ export type RecordIntegrationMethodChosenCommandData = z.infer<
   typeof recordIntegrationMethodChosenCommandDataSchema
 >;
 
+/** A personal workspace was created; project records its project as created (§9). */
+export const recordPersonalWorkspaceProvisionedCommandDataSchema =
+  personalWorkspaceProvisionedEventDataSchema;
+export type RecordPersonalWorkspaceProvisionedCommandData = z.infer<
+  typeof recordPersonalWorkspaceProvisionedCommandDataSchema
+>;
+
 const event = <Type extends string, Data extends z.ZodTypeAny>(type: Type, data: Data) =>
   z.object({
     ...EventSchema.shape,
@@ -94,12 +107,20 @@ export const integrationMethodChosenEventSchema = event(
   INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
   recordIntegrationMethodChosenCommandDataSchema,
 );
+export const personalWorkspaceProvisionedEventSchema = event(
+  PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
+  recordPersonalWorkspaceProvisionedCommandDataSchema,
+);
 export type OrganizationSignedUpEvent = z.infer<typeof organizationSignedUpEventSchema>;
 export type MembersInvitedEvent = z.infer<typeof membersInvitedEventSchema>;
 export type InviteAcceptedEvent = z.infer<typeof inviteAcceptedEventSchema>;
 export type IntegrationMethodChosenEvent = z.infer<typeof integrationMethodChosenEventSchema>;
+export type PersonalWorkspaceProvisionedEvent = z.infer<
+  typeof personalWorkspaceProvisionedEventSchema
+>;
 export type OrganizationLifecycleEvent =
   | OrganizationSignedUpEvent
   | MembersInvitedEvent
   | InviteAcceptedEvent
-  | IntegrationMethodChosenEvent;
+  | IntegrationMethodChosenEvent
+  | PersonalWorkspaceProvisionedEvent;

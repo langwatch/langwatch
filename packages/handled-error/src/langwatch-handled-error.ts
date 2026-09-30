@@ -91,12 +91,19 @@ const asReasons = (value: unknown): LangWatchHandledErrorReason[] | undefined =>
       (r): r is Record<string, unknown> =>
         !!r && (typeof r.code === "string" || typeof r.kind === "string"),
     )
-    .map((r) => ({
-      kind: (typeof r.code === "string" ? r.code : r.kind) as string,
-      retryable: r.retryable === true,
-      ...(asRecord(r.meta) ? { meta: asRecord(r.meta)! } : {}),
-      ...(asReasons(r.reasons) ? { reasons: asReasons(r.reasons) } : {}),
-    }));
+    .flatMap((r) => {
+      const kind = isString(r.code) ? r.code : r.kind;
+      if (!isString(kind)) return [];
+      const meta = asRecord(r.meta);
+      return [
+        {
+          kind,
+          retryable: r.retryable === true,
+          ...(meta ? { meta } : {}),
+          ...(asReasons(r.reasons) ? { reasons: asReasons(r.reasons) } : {}),
+        },
+      ];
+    });
 
   return reasons.length > 0 ? reasons : undefined;
 };
@@ -513,7 +520,7 @@ const safeParseJson = (value: string): unknown => {
   const trimmed = value.trim();
   if (!trimmed.startsWith("{")) return null;
   try {
-    return JSON.parse(trimmed) as unknown;
+    return JSON.parse(trimmed);
   } catch {
     return null;
   }

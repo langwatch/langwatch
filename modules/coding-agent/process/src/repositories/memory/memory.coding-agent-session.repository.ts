@@ -72,6 +72,7 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
       .filter((row) => row.tenantId === input.tenantId)
       .filter((row) => withinWindow(row.startedAtMs, { fromMs: input.fromMs, toMs: input.toMs }))
       .filter((row) => input.userId === undefined || row.userId === input.userId)
+      .filter((row) => !row.auxiliary)
       .toSorted((left, right) => right.startedAtMs - left.startedAtMs)
       .slice(0, input.limit);
   }

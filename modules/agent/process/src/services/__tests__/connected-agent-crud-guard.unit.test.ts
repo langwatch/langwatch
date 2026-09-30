@@ -27,6 +27,7 @@ function setup() {
 }
 
 describe("AgentService connected Agent write guard", () => {
+  /** @scenario "A connected agent cannot be created by hand" */
   it("rejects manual connected-agent creation before persistence", async () => {
     const { service, repository } = setup();
 
@@ -41,6 +42,7 @@ describe("AgentService connected Agent write guard", () => {
     expect(await repository.findAll({ projectId: registration.projectId })).toEqual([]);
   });
 
+  /** @scenario "An archived connected agent is still registered from code" */
   it("rejects renaming an archived connected agent and preserves its registered name", async () => {
     const { service, repository } = setup();
     await service.registerConnected(registration);
@@ -54,6 +56,7 @@ describe("AgentService connected Agent write guard", () => {
     expect(before.name).toBe("support-agent");
   });
 
+  /** @scenario "A connected agent can be archived, and nothing else edited" */
   it("allows archive but refuses config and type changes", async () => {
     const { service, repository } = setup();
     await service.registerConnected(registration);

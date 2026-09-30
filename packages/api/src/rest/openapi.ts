@@ -55,37 +55,20 @@ export type RestTransportDocs = Readonly<{
   }>;
 }>;
 
-/**
- * The operation id one mount publishes. Every version mount needs a distinct id since OpenAPI
- * requires uniqueness across the document: the declared name belongs to the bare alias a
- * client is told to call, and every other mount suffixes the version it serves.
- */
-export function operationIdOf({
-  operation,
-  suffix,
-}: {
-  operation: string;
-  suffix?: string | undefined;
-}): string {
-  return suffix ? `${operation}_${suffix}` : operation;
-}
-
 /** The OpenAPI block one declared route publishes at one of its mounts. */
 export function restRouteDocumentation({
   route,
-  suffix,
   deprecated,
   credential,
 }: {
   route: RestTransportRoute<unknown>;
-  suffix?: string | undefined;
   deprecated?: RestDeprecation | undefined;
   /** The family's door, for the scheme an optional credential publishes. */
   credential?: RestDoorCredential | undefined;
 }): DescribeRouteOptions {
   const options: DescribeRouteOptions = {
     responses: documentedAnswers(route),
-    operationId: operationIdOf({ operation: route.operation, suffix }),
+    operationId: route.operation,
   };
 
   if (route.docs?.description !== undefined) options.description = route.docs.description;
@@ -135,7 +118,6 @@ export function restRouteDocumentation({
 /** The same block, as the middleware that attaches it to a mounted route. */
 export function documentRoute(input: {
   route: RestTransportRoute<unknown>;
-  suffix?: string | undefined;
   deprecated?: RestDeprecation | undefined;
   credential?: RestDoorCredential | undefined;
 }): MiddlewareHandler {

@@ -106,10 +106,15 @@ export const joinRequestArrivedTemplate = defineTemplate({
 
 export const sendJoinRequestArrivedEmail = async ({
   mailer,
+  idempotencyKey,
   ...props
-}: JoinRequestArrivedProps & { mailer: MailSender }) => {
+}: JoinRequestArrivedProps & {
+  mailer: MailSender;
+  /** Stable identity of this recipient's delivery, so a retry is not a second mail. */
+  idempotencyKey?: string;
+}) => {
   const { subject, html } = await renderMailTemplate(joinRequestArrivedTemplate, props);
-  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
+  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html, idempotencyKey } });
 };
 
 /* ── The one nudge, on the seventh day. ──────────────────────────────────── */
@@ -175,11 +180,17 @@ export const renderJoinRequestReminderEmail = async (
 
 export const sendJoinRequestReminderEmail = async ({
   mailer,
+  idempotencyKey,
   adminEmail,
   ...props
-}: JoinRequestReminderProps & { mailer: MailSender; adminEmail: string }) => {
+}: JoinRequestReminderProps & {
+  mailer: MailSender;
+  /** Stable identity of this recipient's delivery, so a retry is not a second mail. */
+  idempotencyKey?: string;
+  adminEmail: string;
+}) => {
   const { subject, html } = await renderMailTemplate(joinRequestReminderTemplate, props);
-  await sendEmail({ mailer, content: { to: adminEmail, subject, html } });
+  await sendEmail({ mailer, content: { to: adminEmail, subject, html, idempotencyKey } });
 };
 
 /* ── You are in. Sent to the requester. ──────────────────────────────────── */
@@ -265,10 +276,15 @@ export const joinRequestApprovedTemplate = defineTemplate({
 
 export const sendJoinRequestApprovedEmail = async ({
   mailer,
+  idempotencyKey,
   ...props
-}: JoinRequestApprovedProps & { mailer: MailSender }) => {
+}: JoinRequestApprovedProps & {
+  mailer: MailSender;
+  /** Stable identity of this recipient's delivery, so a retry is not a second mail. */
+  idempotencyKey?: string;
+}) => {
   const { subject, html } = await renderMailTemplate(joinRequestApprovedTemplate, props);
-  await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html } });
+  await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html, idempotencyKey } });
 };
 
 /* ── It was not approved. No reason, nobody named. ───────────────────────── */
@@ -313,10 +329,15 @@ export const joinRequestRejectedTemplate = defineTemplate({
 
 export const sendJoinRequestRejectedEmail = async ({
   mailer,
+  idempotencyKey,
   ...props
-}: JoinRequestRejectedProps & { mailer: MailSender }) => {
+}: JoinRequestRejectedProps & {
+  mailer: MailSender;
+  /** Stable identity of this recipient's delivery, so a retry is not a second mail. */
+  idempotencyKey?: string;
+}) => {
   const { subject, html } = await renderMailTemplate(joinRequestRejectedTemplate, props);
-  await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html } });
+  await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html, idempotencyKey } });
 };
 
 /* ── Nobody answered in time. ────────────────────────────────────────────── */
@@ -383,11 +404,17 @@ export const renderJoinRequestExpiredEmail = async (
 
 export const sendJoinRequestExpiredEmail = async ({
   mailer,
+  idempotencyKey,
   requesterEmail,
   ...props
-}: JoinRequestExpiredProps & { mailer: MailSender; requesterEmail: string }) => {
+}: JoinRequestExpiredProps & {
+  mailer: MailSender;
+  /** Stable identity of this recipient's delivery, so a retry is not a second mail. */
+  idempotencyKey?: string;
+  requesterEmail: string;
+}) => {
   const { subject, html } = await renderMailTemplate(joinRequestExpiredTemplate, props);
-  await sendEmail({ mailer, content: { to: requesterEmail, subject, html } });
+  await sendEmail({ mailer, content: { to: requesterEmail, subject, html, idempotencyKey } });
 };
 
 /* ── A colleague walked straight in on the domain setting. ───────────────── */
@@ -488,8 +515,13 @@ export const domainAutoJoinedTemplate = defineTemplate({
 
 export const sendDomainAutoJoinedEmail = async ({
   mailer,
+  idempotencyKey,
   ...props
-}: DomainAutoJoinedProps & { mailer: MailSender }) => {
+}: DomainAutoJoinedProps & {
+  mailer: MailSender;
+  /** Stable identity of this recipient's delivery, so a retry is not a second mail. */
+  idempotencyKey?: string;
+}) => {
   const { subject, html } = await renderMailTemplate(domainAutoJoinedTemplate, props);
-  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
+  await sendEmail({ mailer, content: { to: props.adminEmail, subject, html, idempotencyKey } });
 };

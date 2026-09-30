@@ -175,7 +175,7 @@ describe("given an invitation link", () => {
       sessionRef.current = { data: { user: { id: "u1" } } };
       renderLanding();
 
-      await userEvent.click(await screen.findByRole("button", { name: /join acme/i }));
+      await userEvent.click(await screen.findByRole("button", { name: "Let me in" }));
       expect(acceptMock).toHaveBeenCalledWith({ inviteCode: INVITE_CODE });
     });
   });
@@ -189,8 +189,28 @@ describe("given an invitation link", () => {
       expect(await screen.findByTestId("invite-confirm")).toBeTruthy();
       expect(acceptMock).not.toHaveBeenCalled();
 
-      await userEvent.click(screen.getByRole("button", { name: /join acme/i }));
+      await userEvent.click(screen.getByRole("button", { name: "Let me in" }));
       expect(acceptMock).toHaveBeenCalledWith({ inviteCode: INVITE_CODE });
+    });
+
+    it("uses a warmer confirmation and keeps docs and sign-out quiet", async () => {
+      sessionRef.current = { data: { user: { id: "u1" } } };
+      signOutMock.mockResolvedValue(undefined);
+      renderLanding();
+
+      expect(await screen.findByText("You’re invited to join Acme")).toBeTruthy();
+      expect(screen.getByText("Join your team on LangWatch.")).toBeTruthy();
+
+      const docsLink = screen.getByRole("link", { name: "Read the docs" });
+      expect(docsLink).toHaveAttribute("href", "https://docs.langwatch.ai/");
+      expect(docsLink).toHaveAttribute("target", "_blank");
+      expect(docsLink).toHaveAttribute("rel", "noreferrer");
+
+      await userEvent.click(screen.getByTestId("invite-sign-out"));
+      expect(signOutMock).toHaveBeenCalledWith({ redirect: false });
+      await vi.waitFor(() =>
+        expect(hardRedirectMock).toHaveBeenCalledWith(`/invite/accept?inviteCode=${INVITE_CODE}`),
+      );
     });
   });
 
@@ -275,7 +295,8 @@ describe("given an invitation link", () => {
       renderLanding();
 
       expect(await screen.findByTestId("invite-switch-account")).toBeTruthy();
-      expect(screen.queryByRole("button", { name: /^Join Acme$/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Let me in" })).toBeNull();
+      expect(screen.queryByTestId("invite-sign-out")).toBeNull();
     });
 
     /** @scenario Signing out from the mismatch returns to the same invitation */

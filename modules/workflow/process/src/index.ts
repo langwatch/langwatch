@@ -68,7 +68,7 @@ export {
   type NlpLambdaFunction,
   type NlpLambdaArnCache,
 } from "./app/workflow.app.ts";
-export { buildStudioLambdaConfig, workflowServer } from "./workflow.server.ts";
+export { workflowServer } from "./workflow.server.ts";
 
 /** The five declarations the installer carries, and the sixth the process builds. */
 export { workflowTrpcTransport } from "./transport/workflow.trpc.ts";
@@ -109,9 +109,10 @@ export type {
 } from "./services/workflow-studio-version.service.ts";
 export { AwsNlpLambdaFleetChannel } from "./channels/aws.nlp-lambda-fleet.channel.ts";
 export type { NlpLambdaCleanupReport } from "./services/nlp-lambda-cleanup.service.ts";
-export type {
-  StudioLambdaConfig,
-  StudioLambdaFleetFields,
+export {
+  buildStudioLambdaConfig,
+  type StudioLambdaConfig,
+  type StudioLambdaFleetFields,
 } from "./rules/nlp-lambda-config.rules.ts";
 export type { NlpLambdaStreamInvoke, NlpLambdaStreamChunk } from "./channels/nlp-lambda.channel.ts";
 export { AwsNlpLambdaStreamInvokeChannel } from "./channels/aws.nlp-lambda-stream-invoke.channel.ts";

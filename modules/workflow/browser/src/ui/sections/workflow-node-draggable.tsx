@@ -120,6 +120,7 @@ export const NodeDraggable = (props: {
         }
       >
         <Box
+          data-testid={`workflow-palette-${props.type}`}
           background="bg"
           ref={props.disableDrag ? void 0 : drag}
           borderRadius={4}

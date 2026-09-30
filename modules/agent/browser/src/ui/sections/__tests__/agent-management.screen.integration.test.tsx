@@ -269,6 +269,7 @@ async function openAgentActions(user: ReturnType<typeof userEvent.setup>) {
 
 describe("testing an agent from the real management screen", () => {
   /** @scenario "Test agent is wired to the real management action" */
+  /** @scenario "The card menu offers Test agent and opens the run drawer" */
   it("starts a test and opens the returned run", async () => {
     const user = userEvent.setup();
     const { host } = await mountScreen();
@@ -280,6 +281,7 @@ describe("testing an agent from the real management screen", () => {
     expect(host.testRunsOpened).toEqual([{ scenarioRunId: "run_1", batchRunId: "batch_1" }]);
   });
 
+  /** @scenario "A refused test run is explained in the words of the registry" */
   it("explains a refusal without opening a run", async () => {
     const user = userEvent.setup();
     const failure = new Error("agent_test_refused");
@@ -296,6 +298,7 @@ describe("testing an agent from the real management screen", () => {
   });
 
   /** @scenario "Test agent is wired to the real management action" */
+  /** @scenario "The connected agent row offers Test agent" */
   it("starts a test from the connected agent menu", async () => {
     const user = userEvent.setup();
     const connectedAgent = {
@@ -575,7 +578,9 @@ describe("given the agents page", () => {
           { error: failure, fallbackTitle: "Couldn't load related agent resources" },
         ]),
       );
-      expect(screen.queryByTestId("cascade-archive-confirm-button")).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.queryByTestId("cascade-archive-confirm-button")).not.toBeInTheDocument(),
+      );
       expect(browser.archived).toEqual([]);
     });
 

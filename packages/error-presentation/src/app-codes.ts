@@ -513,6 +513,7 @@ export const APP_ERROR_CODES = [
   "ops_feature_flag_unknown",
   "ops_impersonated_operator_refused",
   "ops_operator_session_required",
+  "ops_search_query_required",
   "org_exclusive_permission_scope",
   "organization_not_found",
   "organization_not_found_for_project",

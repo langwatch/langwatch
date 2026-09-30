@@ -774,7 +774,9 @@ allowance is a product constant a run's page loads exceed. Main raises the
 passkey offer on every screen, so every capture declines it before its
 screenshot; sign-in photographs it once as the `sign-in` flow, as the seeded
 `passkey-probe` account in a context of its own and never answers it (an answer lasts 30
-days on the account, and both stacks share one database), falling back to the run's account.
+days on the account, and both stacks share one database), falling back to the run's account. The fallback may have declined it already (main and the
+branch both ask again after 30 days), so a missing offer there is not a failure; a missing offer for
+the probe account is, and means the stack was seeded before the probe existed.
 
 ## Layout
 

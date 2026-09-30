@@ -55,6 +55,7 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
 
 describe("given the /api/auth family mounted on a process's own doors", () => {
   describe("when the browser reads the session endpoint", () => {
+    /** @scenario "The browser can read who is signed in" */
     it("answers the session document, never cached, rather than falling through to the catch-all", async () => {
       const getSessionByCookie = vi.fn<AuthDoorApi["getSessionByCookie"]>(async () => SIGNED_IN);
       const world = authWorld({ getSessionByCookie });
@@ -180,6 +181,7 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
   });
 
   describe("when a sign-in call reaches the catch-all", () => {
+    /** @scenario "The Better Auth catch-all serves the sign-in call" */
     it("is answered by the Better Auth handshake this process composed", async () => {
       const world = authWorld();
 

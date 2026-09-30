@@ -77,7 +77,7 @@ describe("given the sign-in methods summary on the profile", () => {
 
       expect(screen.queryByRole("button", { name: /add|link|rename|remove/i })).toBeNull();
       const manage = screen.getByTestId("sign-in-methods-manage");
-      expect(manage.getAttribute("href")).toBe("/settings/authentication");
+      expect(manage.getAttribute("href")).toBe("/settings/security");
     });
   });
 });

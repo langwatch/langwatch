@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { TenantId } from "../domain/tenantId.ts";
 import type { Event, EventMetadataBase } from "../domain/types.ts";
@@ -78,4 +80,15 @@ export interface EventSubscriberDefinition<E extends Event = Event> {
   eventTypes: readonly string[];
   handle: (event: E, context: EventSubscriberContext) => Promise<void>;
   options?: EventSubscriberOptions<E>;
+}
+
+/**
+ * A module's subscriber on a peer pipeline's event (§9), named by the peer contract's event type
+ * and data schema; the handler reads only the parsed data. Delivered at least once, per aggregate
+ * ordered, never replayed, so the handler is idempotent and throws to be retried.
+ */
+export interface PeerSubscriberDefinition<Data extends z.ZodType> {
+  eventType: string;
+  data: Data;
+  handle: (data: z.output<Data>, context: EventSubscriberContext) => Promise<void>;
 }

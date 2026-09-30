@@ -380,6 +380,7 @@ describe("POST /api/experiments/:slug/run", () => {
   });
 
   describe("when no experiment answers to the slug", () => {
+    /** @scenario "Evaluation not found returns 404" */
     it("answers 404 with the handled refusal", async () => {
       const { request } = await harness({ experiments: { findBySlugAndType: async () => null } });
 
@@ -425,6 +426,7 @@ describe("POST /api/experiments/:slug/run", () => {
 
   describe("when the caller asks for JSON", () => {
     /** @scenario "A polled saved run starts on the run's pipeline and answers at once" */
+    /** @scenario "Default response returns runId for polling" */
     it("starts the run on its pipeline and answers main's body with its id, total and link", async () => {
       const { request, starts } = await harness({
         experiments: found(savedState()),
@@ -570,6 +572,7 @@ describe("POST /api/experiments/:slug/run", () => {
 describe("GET /api/experiments/runs", () => {
   describe("when the module mounts every experiments family", () => {
     /** @scenario "The run list is not answered as an experiment named runs" */
+    /** @scenario "The runs routes keep their own handlers" */
     it("answers the run list's own 400 rather than an experiment lookup", async () => {
       const { mounted } = await harness();
 
@@ -583,6 +586,7 @@ describe("GET /api/experiments/runs", () => {
   });
 
   describe("when no experimentSlug is given", () => {
+    /** @scenario "Missing experimentSlug returns 400" */
     it("answers 400 with main's flat body", async () => {
       const { request } = await harness();
 
@@ -596,6 +600,7 @@ describe("GET /api/experiments/runs", () => {
   });
 
   describe("when a page is asked for", () => {
+    /** @scenario "Authenticated request returns runs for the experiment" */
     it("caps the page size, falls back on a bad page and reports more pages", async () => {
       const getRunsPageBySlug = vi.fn(async () => ({
         experiment: { id: "experiment-1", slug: "checkout-eval" },
@@ -622,7 +627,32 @@ describe("GET /api/experiments/runs", () => {
     });
   });
 
+  describe("when the experiment has no runs", () => {
+    /** @scenario "Experiment without runs returns an empty list" */
+    it("answers 200 with an empty list", async () => {
+      const { request } = await harness({
+        experiments: {
+          getRunsPageBySlug: async () => ({
+            experiment: { id: "experiment-2", slug: "support-bot" },
+            runs: [],
+            totalHits: 0,
+          }),
+        },
+      });
+
+      const response = await request("/runs?experimentSlug=support-bot");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        experimentSlug: "support-bot",
+        runs: [],
+        pagination: { totalHits: 0, hasMore: false },
+      });
+    });
+  });
+
   describe("when the experiment does not exist", () => {
+    /** @scenario "Unknown experiment slug returns 404" */
     it("answers 404 experiment_not_found", async () => {
       const { request } = await harness({
         experiments: {
@@ -651,6 +681,7 @@ describe("GET /api/experiments/runs/:runId", () => {
   });
 
   /** @scenario "A poll answers main's poller body from the run's progress fold" */
+  /** @scenario "Poll for non-existent run returns 404" */
   it("answers 404 for a run the progress fold does not hold", async () => {
     const { request } = await harness({ redis: true });
 
@@ -701,6 +732,7 @@ describe("GET /api/experiments/runs/:runId", () => {
   });
 
   /** @scenario "A poll answers main's poller body from the run's progress fold" */
+  /** @scenario "Poll for run status when completed" */
   it("answers main's summary and the run's link once the run completed", async () => {
     const summary = { ...doneSummary("run-1"), runUrl: "https://app.test/acme/run-1" };
     const { request } = await harness({
@@ -827,6 +859,7 @@ describe("POST /api/experiments/abort", () => {
   });
 
   /** @scenario "Aborting a run reads its progress fold and refuses another project's run" */
+  /** @scenario "Project members can stop their own running workbench execution" */
   it("sets the run's stop flag and sends the abort under the fold's experiment", async () => {
     const { abortRun, abort, aborts } = await harness({
       redis: true,
@@ -885,6 +918,7 @@ describe("POST /api/experiments/execute", () => {
   });
 
   /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */
+  /** @scenario "Browser execution authenticates by user session" */
   it("starts the run with its plan, credited to the person who started it", async () => {
     const { execute, starts } = await harness({ redis: true, worker });
 
@@ -898,6 +932,39 @@ describe("POST /api/experiments/execute", () => {
         plan: { origin: "workbench", actor: { userId: "user-1", label: "user" }, cells: [] },
       },
     ]);
+  });
+
+  describe("when the page starts a run", () => {
+    const workerDone = ({ runId }: { runId: string }): ExperimentRunStreamMessage[] => [
+      { seq: 1, frame: { type: "execution_started", runId, total: 0 } },
+      { seq: 2, frame: { type: "done", summary: doneSummary(runId) } },
+    ];
+
+    it("writes the cells back when it runs the saved dataset untouched", async () => {
+      const { execute, starts } = await harness({ redis: true, worker: workerDone });
+
+      await (await execute(request)).text();
+
+      expect(starts).toMatchObject([{ plan: { persistResults: true } }]);
+    });
+
+    /** @scenario "A run started from the open page with its own rows is not written back" */
+    it("writes nothing back when the request carries its own rows", async () => {
+      const { execute, starts } = await harness({ redis: true, worker: workerDone });
+
+      await (await execute({ ...request, data: [{ input: "hello" }] })).text();
+
+      expect(starts).toMatchObject([{ plan: { persistResults: false } }]);
+    });
+
+    /** @scenario "A run started from a page with no saved experiment is not written back" */
+    it("writes nothing back when the page names no experiment", async () => {
+      const { execute, starts } = await harness({ redis: true, worker: workerDone });
+
+      await (await execute({ ...request, experimentId: undefined })).text();
+
+      expect(starts).toMatchObject([{ plan: { persistResults: false } }]);
+    });
   });
 
   /** @scenario "A workbench run against someone else's personal agent streams its refusal and starts nothing" */

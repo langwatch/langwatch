@@ -48,19 +48,13 @@ import type { Instant } from "@langwatch/time";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
 import { mintProjectSlug, projectIdSlugToken } from "../rules/project-slug-service.rules.ts";
+import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
 
-/** The LWQL column mapping a project's ingestion key is synced to. Nothing in
- * this module implements it yet — it is the one caller-supplied capability
- * `create` reaches for, kept optional until a concrete channel exists. */
-export abstract class ProjectKeyMap {
-  abstract syncProject(input: { projectId: string; lwqlKey: string }): Promise<void>;
-}
-
 /** The project's own stored objects (attachments, blobs) in whatever object
- * store owns them. Optional for the same reason as `ProjectKeyMap`: `archive`
- * reaches for it, nothing in this module implements it yet. */
+ * store owns them. Optional: `archive` reaches for it, nothing in this module
+ * implements it yet. */
 export abstract class ProjectStoredObjects {
   abstract deleteOwnedBy(input: { projectId: string }): Promise<void>;
 }
@@ -94,7 +88,7 @@ export class ProjectService {
   private readonly repository: ProjectRepository;
   private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
-  private readonly keyMap?: ProjectKeyMap;
+  private readonly created: ProjectCreatedNoticeService;
   private readonly storedObjects?: ProjectStoredObjects;
   private readonly diagnostics?: ProjectDiagnostics;
 
@@ -103,7 +97,7 @@ export class ProjectService {
     repository,
     credentials,
     organizations,
-    keyMap,
+    created,
     storedObjects,
     diagnostics,
   }: {
@@ -111,7 +105,7 @@ export class ProjectService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
-    keyMap?: ProjectKeyMap;
+    created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
   }) {
@@ -119,7 +113,7 @@ export class ProjectService {
     this.repository = repository;
     this.credentials = credentials;
     this.organizations = organizations;
-    this.keyMap = keyMap;
+    this.created = created;
     this.storedObjects = storedObjects;
     this.diagnostics = diagnostics;
   }
@@ -128,7 +122,7 @@ export class ProjectService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
-    keyMap?: ProjectKeyMap;
+    created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
   }): ProjectService {
@@ -140,7 +134,7 @@ export class ProjectService {
       repository: options.repository,
       credentials: options.credentials,
       organizations: options.organizations,
-      keyMap: options.keyMap,
+      created: options.created,
       storedObjects: options.storedObjects,
       diagnostics: options.diagnostics,
     });
@@ -345,17 +339,7 @@ export class ProjectService {
         apiKey: this.credentials.generateApiKey(),
       }),
     );
-    try {
-      await this.keyMap?.syncProject({
-        projectId: project.id,
-        lwqlKey: project.lwqlKey,
-      });
-    } catch (error) {
-      this.diagnostics?.error(
-        { projectId: project.id, error },
-        "project key-map sync failed; backfill will retry",
-      );
-    }
+    await this.created.created({ projectId: project.id, organizationId: input.organizationId });
 
     return project;
   }

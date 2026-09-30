@@ -37,6 +37,13 @@ Feature: Walking an annotation queue into a dataset
       And the annotation rail does not move the turns around it
 
     @integration
+    Scenario: A queued trace is read as the whole thread it belongs to
+      Given the trace behind the open queue item belongs to a thread
+      When I open that queue item
+      Then that thread's turns are rendered as a conversation
+      And the turn under review is the one marked as current
+
+    @integration
     Scenario: A single or unavailable conversation still shows the queued trace
       Given the queued trace has no thread or its thread is outside the read window
       When I open the queue item
@@ -131,3 +138,23 @@ Feature: Walking an annotation queue into a dataset
       Given an item belongs only to a teammate or an unrelated queue
       When I try to finish or remove it
       Then the item remains unchanged
+
+  Rule: Reaching and finishing an item follows the reviewer's own work
+
+    @unit
+    Scenario: A link to an item that is no longer waiting opens the first item still waiting
+      Given the item a link names has since been finished or removed
+      When I follow that link
+      Then the first item still waiting is opened instead
+
+    @unit
+    Scenario: An item whose trace is gone does not hold the finished queue back
+      Given every item I can read is done and one item's trace no longer resolves
+      When I open my queue
+      Then I am told all tasks are complete
+
+    @integration
+    Scenario: A reviewer finishes an item on their own queue
+      Given an item assigned to me
+      When I mark it done
+      Then it is recorded as done

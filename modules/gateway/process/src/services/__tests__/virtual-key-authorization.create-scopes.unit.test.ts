@@ -70,6 +70,7 @@ const service = VirtualKeyAuthorizationService.create({ directory: new ProjectsO
 
 describe("assertActorCanCreateScopes", () => {
   describe("when the only scope is the caller's own project", () => {
+    /** @scenario A key that can create but not manage mints a key for its own project */
     it("asks for virtualKeys:create there and nothing more", async () => {
       const { ctx, asked } = keyHolding(["virtualKeys:create"]);
 
@@ -99,6 +100,7 @@ describe("assertActorCanCreateScopes", () => {
   });
 
   describe("when a scope reaches beyond the caller's own project", () => {
+    /** @scenario A key that can create but not manage cannot mint above its project */
     it("requires virtualKeys:manage on a team scope", async () => {
       const { ctx } = keyHolding(["virtualKeys:create"]);
 

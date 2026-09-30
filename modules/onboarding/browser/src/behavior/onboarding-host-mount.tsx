@@ -10,6 +10,7 @@ import {
   useUiDeclarations,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
+import type { UiLangyGuidedOnboarding } from "@langwatch/browser-host/declarations";
 import { lazy, useMemo, type ReactNode } from "react";
 import { useLocation, useParams } from "react-router";
 
@@ -31,10 +32,7 @@ import {
 import { writeToClipboard } from "./browser-clipboard.ts";
 import { useOnboardingOrganizationGraph } from "./onboarding-organization-graph.ts";
 
-/**
- * Inert until the shell wires `langy`/`sidebar`/`governance` through
- * `UiCapabilities` (handoff §10) — not a code defect in the meantime.
- */
+/** What a composition without Langy reads: nothing to dock, nothing to hand a kickoff to. */
 const INERT_LANGY: OnboardingLangyCapability = {
   dock() {
     /* no panel to dock until the shell wires the langy capability */
@@ -46,6 +44,19 @@ const INERT_LANGY: OnboardingLangyCapability = {
     return () => undefined;
   },
 };
+/** Langy's lent capability, keyed by the organization its scope must announce. */
+function langyCapabilityOf(lent: UiLangyGuidedOnboarding | undefined): OnboardingLangyCapability {
+  if (!lent) return INERT_LANGY;
+  return {
+    dock: () => lent.dock(),
+    queueKickoff: (kickoff) => lent.queueKickoff(kickoff),
+    onScopeAnnounced: (organizationId, callback) =>
+      lent.onScopeAnnounced((scope) => {
+        if (scope.organizationId === null || scope.organizationId === organizationId) callback();
+      }),
+  };
+}
+
 const INERT_SIDEBAR: OnboardingSidebarCapability = {
   expandGroup() {
     /* no sidebar capability wired yet */
@@ -205,6 +216,11 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
     [declarations],
   );
 
+  const langy = useMemo(
+    () => langyCapabilityOf(declarations.declared("guidedOnboarding")[0]?.capability),
+    [declarations],
+  );
+
   const scope: OnboardingScope = useMemo(
     () => ({
       organization: graph.organization,
@@ -237,7 +253,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
         projectApiKey: graph.activeProject?.project.apiKey ?? void 0,
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
-        langy: INERT_LANGY,
+        langy,
         sidebar: INERT_SIDEBAR,
         governance: INERT_GOVERNANCE,
         joinOffers,
@@ -255,6 +271,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
       graph,
       feedback,
       joinOffers,
+      langy,
     ],
   );
 

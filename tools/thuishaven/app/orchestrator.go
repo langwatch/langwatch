@@ -1132,6 +1132,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Voice
 	case domain.LLMService:
 		return opts.Selection.LLM
+	case domain.AnalyticsService:
+		return opts.Selection.Analytics
 	default:
 		return true
 	}

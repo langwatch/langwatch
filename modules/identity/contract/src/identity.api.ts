@@ -172,6 +172,29 @@ export interface IdentityLedgerApi {
   proposeLink(input: ProposeLinkCommandData): Promise<IdentityFact[]>;
 }
 
+/** The `Account` fields a ceremony reads. Structural: the contract does not track better-auth's row type. */
+export interface IdentityCeremonyAccountRow {
+  id?: unknown;
+  userId?: unknown;
+  providerId?: unknown;
+  issuer?: unknown;
+  accountId?: unknown;
+  createdAt?: unknown;
+}
+
+/** Whether the account-create ceremony pinned the row id Better Auth must write. */
+export type IdentityCeremonyAccountPin = { pinned: true; data: { id: string } } | { pinned: false };
+
+/** What a Better Auth row write means in identity terms; no-ops for a user not yet latched. */
+export interface IdentityCeremoniesApi {
+  /** A `User` row is about to be deleted: erase their identifiers. */
+  beforeUserDelete(user: { id: string }): Promise<void>;
+  /** An `Account` row is about to be created: attach its identifier and pin the row id. */
+  createAccountIdentifier(account: IdentityCeremonyAccountRow): Promise<IdentityCeremonyAccountPin>;
+  /** An `Account` row is about to be deleted: detach what it mirrors. */
+  beforeAccountDelete(account: IdentityCeremonyAccountRow): Promise<void>;
+}
+
 /** The abandoned-newborn sweep (ADR-116 §3). */
 export interface IdentityNewbornSweepApi {
   runPass(): Promise<IdentityNewbornSweepSummary>;
@@ -717,6 +740,7 @@ export interface IdentityApi {
   reservations(): IdentityReservationsApi;
   identity(): IdentityLedgerApi;
   newbornSweep(): IdentityNewbornSweepApi;
+  ceremonies(): IdentityCeremoniesApi;
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
   userMigrations(): readonly SystemMigration[];
   /** The ORGANIZATION-rooted migrations identity registers (D04), main's `registeredMigrations`. */

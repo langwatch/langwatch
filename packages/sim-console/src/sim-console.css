@@ -26,6 +26,10 @@
   --sim-accent: var(--rust);
 }
 
+.sim-console[data-sim="analytics"] {
+  --sim-accent: var(--moss);
+}
+
 .sim-console .ds-topbar-mark {
   background: var(--sim-accent);
 }

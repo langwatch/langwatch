@@ -217,6 +217,22 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TTL_DAYS",
     hardcodedDefault: 49,
   },
+  // Indefinite by default: a judgement stays unless a day count is deliberately stamped.
+  {
+    table: "instant_eval_judgments",
+    ttlColumn: "CreatedAt",
+    retentionTTLColumn: "CreatedAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_JUDGMENTS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  // The run's own row keeps the same default, so no verdict is left unexplained.
+  {
+    table: "instant_eval_runs",
+    ttlColumn: "CreatedAt",
+    retentionTTLColumn: "CreatedAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_RUNS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
 ] as const;
 
 function parseNonNegativeInt(value: string, label: string): number {

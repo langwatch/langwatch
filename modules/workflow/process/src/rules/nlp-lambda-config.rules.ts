@@ -81,3 +81,42 @@ export function buildStudioLambdaEnvironment(config: StudioLambdaConfig): Record
     NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: String(config.codeBlockTimeoutSeconds),
   };
 }
+
+function positiveNumber(raw: unknown, fallback: number): number {
+  const parsed = Number(raw);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Assembles the studio's Lambda deployment from its already-parsed fields. */
+export function buildStudioLambdaConfig(input: {
+  fields: StudioLambdaFleetFields;
+  /** Where a running function reports its traces back to; blank if unnamed. */
+  langwatchEndpoint: string;
+  codeBlockTimeoutRawValue: string | undefined;
+  stagingThresholdBytesRawValue: unknown;
+  stagingTtlSecondsRawValue: unknown;
+}): StudioLambdaConfig {
+  const { fields } = input;
+
+  return {
+    region: fields.region,
+    accessKeyId: fields.accessKeyId,
+    secretAccessKey: fields.secretAccessKey,
+    roleArn: fields.roleArn,
+    imageUri: fields.imageUri,
+    cacheBucket: fields.cacheBucket,
+    subnetIds: fields.subnetIds,
+    securityGroupIds: fields.securityGroupIds,
+    langwatchEndpoint: input.langwatchEndpoint,
+    codeBlockTimeoutSeconds: clampCodeBlockTimeoutSeconds(input.codeBlockTimeoutRawValue),
+    stagingThresholdBytes: positiveNumber(
+      input.stagingThresholdBytesRawValue,
+      STUDIO_INVOKE_STAGING_THRESHOLD_BYTES,
+    ),
+    stagingTtlSeconds: positiveNumber(
+      input.stagingTtlSecondsRawValue,
+      STUDIO_STAGING_TTL_SECONDS_DEFAULT,
+    ),
+  };
+}

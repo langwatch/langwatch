@@ -17,8 +17,14 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import { getLangWatchTracer } from "langwatch";
 
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
+import {
+  codexHelperThreadMarkersOf,
+  stampCodexHelperThread,
+  type ScopedSpans,
+} from "../rules/codex-helper-thread.rules.ts";
 import { storableSpanTimesOf, type UnstorableSpanTime } from "../rules/storable-span-time.rules.ts";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
+import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 
@@ -82,6 +88,10 @@ class SpanIngestionTally {
     otelSpanRef.setAttribute("spans.ingestion.filtered", this.counts.filtered);
   }
 
+  outcomes(): Readonly<Record<SpanIngestionStatus, number>> {
+    return this.counts;
+  }
+
   collectionResult(): TraceRequestCollectionResult {
     return {
       rejectedSpans: this.counts.dropped + this.counts.failed,
@@ -113,6 +123,7 @@ function unstorableSpanTimeMessage({ field }: UnstorableSpanTime): string {
 export class TraceIngestionService {
   private readonly tracer = getLangWatchTracer("langwatch.trace-processing.span-ingestion");
   private readonly logger = createLogger("langwatch:trace-processing:span-ingestion");
+  private readonly outcomeMetrics = TraceIngestionMetricsService.create();
 
   private constructor(
     private readonly codingAgents: CodingAgentIngestFilter,
@@ -154,6 +165,11 @@ export class TraceIngestionService {
       },
       async (otelSpanRef) => {
         const tally = new SpanIngestionTally();
+        // A codex helper's request span names its thread only through a child in the same
+        // export, so the join runs over the whole request before any span is processed.
+        const helperThreads = codexHelperThreadMarkersOf({
+          scopes: scopedSpansOf(traceRequest),
+        });
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = this.parseResource(resourceSpan?.resource, tenantId);
@@ -170,6 +186,7 @@ export class TraceIngestionService {
                   scope,
                   piiRedactionLevel,
                   otelSpanRef,
+                  helperThreads,
                 }),
               );
             }
@@ -177,6 +194,7 @@ export class TraceIngestionService {
         }
 
         tally.describeOn(otelSpanRef);
+        this.outcomeMetrics.record(tally.outcomes());
 
         return tally.collectionResult();
       },
@@ -229,6 +247,8 @@ export class TraceIngestionService {
     scope: OtlpInstrumentationScope | null;
     piiRedactionLevel: PIIRedactionLevel;
     otelSpanRef: OtelSpan;
+    /** Codex helper threads by request span id; absent, nothing is stamped. */
+    helperThreads?: Map<string, string>;
   }): Promise<SpanIngestionResult> {
     const spanParseResult = spanSchema.safeParse(input.otelSpan);
     if (!spanParseResult.success) {
@@ -255,12 +275,21 @@ export class TraceIngestionService {
       return { status: "dropped", error: "span start time is more than 31 days in the past" };
     }
 
+    // The stamp is the admission: it is applied before the filter reads the span.
+    const helperThreadId = input.helperThreads?.get(
+      OtlpTraceRequestService.normalizeOtlpId(spanParseResult.data.spanId),
+    );
+    const span =
+      helperThreadId === undefined
+        ? spanParseResult.data
+        : stampCodexHelperThread({ span: spanParseResult.data, threadId: helperThreadId });
+
     const isFilteredCodingAgentSpan =
       this.codingAgentSpanFilterEnabled &&
       this.codingAgents.shouldFilterSpan({
         scopeName: input.scope?.name,
-        spanName: spanParseResult.data.name,
-        attributeKeys: spanParseResult.data.attributes.map((attribute) => attribute.key),
+        spanName: span.name,
+        attributeKeys: span.attributes.map((attribute) => attribute.key),
       });
     if (isFilteredCodingAgentSpan) {
       return { status: "filtered" };
@@ -268,7 +297,7 @@ export class TraceIngestionService {
 
     return this.ingestNormalizedSpan({
       tenantId: input.tenantId,
-      span: this.withHexIds(spanParseResult.data),
+      span: this.withHexIds(span),
       resource: input.resource,
       instrumentationScope: input.scope,
       piiRedactionLevel: input.piiRedactionLevel,
@@ -387,4 +416,17 @@ export class TraceSpanCollectionService {
       };
     }
   }
+}
+
+/** Every scope entry of the request with its parsed spans, for the helper-thread join. */
+function scopedSpansOf(traceRequest: IExportTraceServiceRequest): ScopedSpans[] {
+  return (traceRequest.resourceSpans ?? []).flatMap((resourceSpan) =>
+    (resourceSpan?.scopeSpans ?? []).map((scopeSpan) => ({
+      scopeName: scopeSpan?.scope?.name,
+      spans: (scopeSpan?.spans ?? []).flatMap((candidate) => {
+        const parsed = spanSchema.safeParse(candidate);
+        return parsed.success ? [parsed.data] : [];
+      }),
+    })),
+  );
 }

@@ -2,20 +2,28 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Trace's lent menu reaches a skill-prompt query these scenarios never open;
 // only its trigger's own label and ordering are asserted.
 vi.mock("../../../../../behavior/lent-peers.tsx", () => ({
   InlineCommandPalette: () => <input placeholder="ask" />,
+  GuidedOnboardingOffer: () => null,
   AgentActionsMenu: ({ trigger }: { trigger: React.ReactNode }) => trigger,
 }));
 
-const askLangy = vi.fn();
+const langyState = {
+  askLangy: vi.fn(),
+  openPanel: vi.fn(),
+  isOpen: false,
+  activeConversationId: null as string | null,
+  pendingPrompt: null as string | null,
+};
 vi.mock("@langwatch/langy-browser-kit", () => ({
-  useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) => selector({ askLangy }),
+  LangyMark: () => null,
+  useLangyStore: (selector: (s: typeof langyState) => unknown) => selector(langyState),
   selectLangySuggestions: ({ reach }: { reach: { hasTraces: boolean } }) =>
     reach.hasTraces
       ? [{ label: "Compare two runs", icon: () => null, prompt: "compare two runs" }]
@@ -84,6 +92,12 @@ const onboardingTriggers = () =>
 /** True when `a` comes before `b` in the document. */
 const renders_before = (a: Element, b: Element) =>
   (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+beforeEach(() => {
+  langyState.isOpen = false;
+  langyState.activeConversationId = null;
+  langyState.pendingPrompt = null;
+});
 
 afterEach(() => {
   cleanup();
@@ -166,6 +180,65 @@ describe("LangyHomeHero ask row", () => {
       expect(screen.getByPlaceholderText("ask")).toBeDefined();
       expect(screen.queryByText("Show me around")).toBeNull();
       expect(screen.queryByText("Compare two runs")).toBeNull();
+    });
+  });
+});
+
+describe("LangyHomeHero while a conversation is open", () => {
+  describe("given the panel is open on a conversation", () => {
+    beforeEach(() => {
+      reachMock.mockReturnValue(POPULATED_REACH);
+      langyState.isOpen = true;
+      langyState.activeConversationId = "conv-open";
+    });
+
+    /** @scenario The field stands down while a conversation is open */
+    it("offers the way back into that conversation instead of a field that starts one", () => {
+      renderHero();
+
+      expect(screen.queryByPlaceholderText("ask")).toBeNull();
+      expect(screen.getByText("Continue your conversation")).toBeDefined();
+      expect(screen.getByText("Compare two runs")).not.toBeVisible();
+      expect(screen.getByText("Onboard your agent")).toBeDefined();
+    });
+
+    it("opens the panel and puts the cursor in its composer", () => {
+      const panel = document.createElement("div");
+      panel.setAttribute("data-langy-composer", "panel");
+      const textarea = document.createElement("textarea");
+      panel.appendChild(textarea);
+      document.body.appendChild(panel);
+      try {
+        renderHero();
+
+        fireEvent.click(screen.getByText("Continue your conversation"));
+
+        expect(langyState.openPanel).toHaveBeenCalledTimes(1);
+        expect(langyState.askLangy).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(textarea);
+      } finally {
+        panel.remove();
+      }
+    });
+
+    it("keeps the field while the panel is open on nothing", () => {
+      langyState.activeConversationId = null;
+      renderHero();
+
+      expect(screen.getByPlaceholderText("ask")).toBeDefined();
+      expect(screen.queryByText("Continue your conversation")).toBeNull();
+    });
+  });
+
+  describe("given a question handed to Langy is still on its way", () => {
+    /** @scenario The field stands down while a conversation is open */
+    it("stands down the same way, before the conversation has an id", () => {
+      reachMock.mockReturnValue(POPULATED_REACH);
+      langyState.pendingPrompt = "why are my traces failing";
+      renderHero();
+
+      expect(screen.queryByPlaceholderText("ask")).toBeNull();
+      expect(screen.getByText("Continue your conversation")).toBeDefined();
     });
   });
 });

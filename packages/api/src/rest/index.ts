@@ -270,7 +270,6 @@ export {
   handWrittenDocs,
   isHttpMethod,
   normalizeExclusiveBounds,
-  operationIdOf,
   restRouteDocumentation,
   securityForCredentialClass,
   type DocumentedRouteResponse,

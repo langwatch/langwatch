@@ -1,9 +1,9 @@
-import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
-import { Link } from "@langwatch/browser-host/link";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { authApi as api } from "../../behavior/auth-api.ts";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { replaceLocation } from "../../behavior/browser-navigation.ts";
 import { useExpiredSessionRecovery } from "../../behavior/use-expired-session-recovery.ts";
@@ -19,10 +19,16 @@ import {
   rememberPendingMethod,
 } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels.ts";
+import { shouldStartPasskeyOnArrival } from "../../model/method-ranking.ts";
+import { readHandledError } from "../../model/read-handled-error.ts";
+import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { signInGreeting } from "../../model/sign-in-greeting.ts";
+import { JOIN_BEFORE_CREATE_PATH } from "../../model/sign-up-destination.ts";
+import { useTwoStepChallenge } from "../../model/two-step-challenge.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
@@ -32,11 +38,12 @@ import {
   hasAlternativeMethods,
   SignInMethodPicker,
 } from "./sign-in-method-picker.tsx";
+import { TwoStepChallengePanel, twoStepChallengeTitle } from "./two-step-challenge-panel.tsx";
 
 /**
  * The identifier-first log-in screen (D13, ADR-117 §6): ask for the address,
- * ask the server where it signs in, render the answer. A password typed for
- * an unheld address is a sign-up, not a refusal.
+ * ask the server where it signs in, render the answer. An address nobody
+ * holds becomes a sign-up with the address carried (revision 2026-08-25).
  */
 export function IdentifierFirstSignIn() {
   const query = useSearchParams();
@@ -50,11 +57,19 @@ export function IdentifierFirstSignIn() {
   const askedOnMount = useRef(false);
   const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
-  const [signingUp, setSigningUp] = useState<string | null>(null);
+  // The address is becoming an account; nothing is created or sent yet.
+  const [signingUpEmail, setSigningUpEmail] = useState<string | null>(null);
+  // The account's link is on its way, and nobody is signed in.
+  const [sentTo, setSentTo] = useState<string | null>(null);
   // Every failure this card can have shows in one place, at the top. A
   // passkey is refused from a button part-way down the rail of methods, and
   // an alert opening there pushes the rest of the rail down the page.
   const [passkeyError, setPasskeyError] = useState<unknown>(null);
+  // One automatic passkey ceremony per screen, held here because the button
+  // remounts; set when it starts and when it ends without a session.
+  const [passkeyTried, setPasskeyTried] = useState(false);
+  // A correct password that owes a second factor takes the whole card.
+  const twoStep = useTwoStepChallenge();
 
   // The recommended way in, ahead of the button in the rail below: a passkey
   // offered from the address field's own autofill, where somebody who does not
@@ -97,7 +112,9 @@ export function IdentifierFirstSignIn() {
 
   const dialFederated = (method: SignInMethod) => {
     rememberPendingMethod(method);
-    void signIn(method.id, { callbackUrl });
+    // The typed address rides along as the OIDC login hint, trimmed, so the
+    // provider's own screen arrives prefilled.
+    void signIn(method.id, { callbackUrl, loginHint: routing.identifier?.trim() || undefined });
   };
 
   const decision = routing.decision;
@@ -111,24 +128,44 @@ export function IdentifierFirstSignIn() {
   // picker built from the decision before it: the methods on offer are the
   // answer to a question that just failed to be answered.
   const showPicker = !routing.error && decision && (breakGlass || submittedIdentifier !== null);
+  // The address on its way to becoming an account, from either conversion:
+  // the router said so, or a refused password found nobody holds it.
+  const creatingAccountFor =
+    signingUpEmail ??
+    (decision?.outcome === "route_to_signup" && submittedIdentifier ? submittedIdentifier : null);
 
   // Told once, from the same state the returns below branch on, so the ground
   // can never be showing a step other than the one drawn over it.
   usePublishFrontDoorStage({
     door: "signin",
-    depth: signInDepth({ signingUp, showPicker: Boolean(showPicker) }),
+    depth: signInDepth({
+      sentTo,
+      creatingAccountFor,
+      challenged: twoStep !== null,
+      showPicker: Boolean(showPicker),
+    }),
   });
 
-  if (signingUp) {
+  // Ahead of everything: a password has already been accepted.
+  if (twoStep) {
+    return (
+      <AuthCard title={twoStepChallengeTitle({ factor: twoStep.factor })}>
+        <TwoStepChallengePanel factor={twoStep.factor} callbackUrl={twoStep.callbackUrl} />
+      </AuthCard>
+    );
+  }
+
+  if (sentTo) {
     return (
       <CheckYourEmail
-        email={signingUp}
-        what="Open it to confirm the address, then choose a password."
+        email={sentTo}
+        what="Open it to confirm the address and finish signing in."
         onUseDifferentEmail={() => {
-          // Both, and in this order: the address step reads the router's
+          // All three, in this order: the address step reads the router's
           // identifier, so clearing only the sent-to state would land back on
           // the password step for the address they came here to change.
-          setSigningUp(null);
+          setSentTo(null);
+          setSigningUpEmail(null);
           routing.clear();
         }}
       />
@@ -148,6 +185,35 @@ export function IdentifierFirstSignIn() {
         decision={decision}
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
+        loginHint={submittedIdentifier?.trim() || undefined}
+        autoStart={submittedIdentifier !== null}
+      />
+    );
+  }
+
+  // Nobody holds this address, so the journey is a sign-up and the screen says
+  // so rather than drawing a password box that can only fail. The address is
+  // carried, so nothing is retyped.
+  if (creatingAccountFor) {
+    return (
+      <NoAccountYet
+        email={creatingAccountFor}
+        reasonCode={decision?.outcome === "route_to_signup" ? decision.reasonCode : null}
+        callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
+        onAwaitingConfirmation={(email) => {
+          setSigningUpEmail(null);
+          setSentTo(email);
+        }}
+        onAddressAlreadyRegistered={() => {
+          // The projection had not caught up with the account: the way in is
+          // the picker, which asking the router again renders.
+          setSigningUpEmail(null);
+          void decide({ identifier: creatingAccountFor, breakGlass });
+        }}
+        onUseDifferentEmail={() => {
+          setSigningUpEmail(null);
+          routing.clear();
+        }}
       />
     );
   }
@@ -167,6 +233,15 @@ export function IdentifierFirstSignIn() {
           onFederatedMethodChosen={dialFederated}
           callbackUrl={callbackUrl}
           onPasskeyError={setPasskeyError}
+          // The address submit IS the gesture the ceremony answers, so an
+          // account holding a passkey gets the prompt, once.
+          autoStartPasskey={shouldStartPasskeyOnArrival({
+            reasonCode: decision.reasonCode,
+            methodSet: decision.methodSet,
+            alreadyTried: passkeyTried,
+          })}
+          onPasskeyAutoStarted={() => setPasskeyTried(true)}
+          onPasskeyDeclined={() => setPasskeyTried(true)}
           renderLocalMethod={(method) => {
             if (method.kind !== "password") return null;
             return (
@@ -175,7 +250,7 @@ export function IdentifierFirstSignIn() {
                 email={submittedIdentifier ?? ""}
                 callbackUrl={callbackUrl}
                 onUseDifferentEmail={routing.clear}
-                onSignUpStarted={setSigningUp}
+                onSignUpStarted={setSigningUpEmail}
               />
             );
           }}
@@ -187,7 +262,7 @@ export function IdentifierFirstSignIn() {
         <SignUpLink
           callbackUrl={callbackUrl}
           email={submittedIdentifier}
-          label="Don't have an account? Sign up"
+          label="Or create an account instead"
         />
       </AuthCard>
     );
@@ -214,7 +289,7 @@ export function IdentifierFirstSignIn() {
         submitLabel="Continue"
         isSubmitting={routing.isDeciding}
         onSubmit={({ email }) => decide({ identifier: email, breakGlass })}
-        footer={<SignUpLink callbackUrl={callbackUrl} label="Don't have an account? Sign up" />}
+        footer={<SignUpLink callbackUrl={callbackUrl} label="Or create an account instead" />}
         alternatives={
           hasAlternativeMethods({ methodSet: instanceMethods }) ? (
             <AlternativeMethods
@@ -237,15 +312,93 @@ export function IdentifierFirstSignIn() {
  * only ever agree.
  */
 function signInDepth({
-  signingUp,
+  sentTo,
+  creatingAccountFor,
+  challenged,
   showPicker,
 }: {
-  signingUp: string | null;
+  sentTo: string | null;
+  creatingAccountFor: string | null;
+  challenged: boolean;
   showPicker: boolean;
 }): FrontDoorDepth {
-  if (signingUp) return "sent";
-  if (showPicker) return "credential";
+  if (challenged) return "credential";
+  if (sentTo) return "sent";
+  if (creatingAccountFor || showPicker) return "credential";
   return "entry";
+}
+
+/**
+ * The address routed to no account (ADR-117, revision 2026-08-25). Says what
+ * happened, offers the sign-up, keeps a mistyped address one click away. It
+ * sends the sign-up door's link; no credential is mounted until it returns.
+ */
+function NoAccountYet({
+  email,
+  reasonCode,
+  callbackUrl,
+  onAwaitingConfirmation,
+  onAddressAlreadyRegistered,
+  onUseDifferentEmail,
+}: {
+  email: string;
+  /** Absent where a refused password found this address, not the router. */
+  reasonCode: string | null;
+  callbackUrl: string;
+  onAwaitingConfirmation: (email: string) => void;
+  onAddressAlreadyRegistered: () => void;
+  onUseDifferentEmail: () => void;
+}) {
+  const guidance = reasonCode ? signInRoutingReasonCopy(reasonCode) : null;
+  const requestVerification = api.auth.requestSignUpVerification.useMutation();
+
+  const beginSignUp = async () => {
+    try {
+      await requestVerification.mutateAsync({ email });
+      onAwaitingConfirmation(email);
+    } catch (failure) {
+      if (readHandledError(failure)?.code === "email_already_registered") {
+        onAddressAlreadyRegistered();
+      }
+    }
+  };
+
+  return (
+    <AuthCard
+      title={guidance?.title ?? "Let's create your account"}
+      intro={
+        guidance?.describe ??
+        "There is no account for that email address yet, so this is a sign-up."
+      }
+      finePrint={<FrontDoorFinePrint />}
+    >
+      <VStack width="full" align="stretch" gap="14px">
+        <div data-testid="unknown-identifier" hidden>
+          {email}
+        </div>
+        <HandledErrorAlert
+          error={requestVerification.error}
+          fallbackTitle="Couldn't start your sign-up"
+          className="lw-front-door-alert"
+        />
+        <Button
+          colorPalette="orange"
+          loading={requestVerification.isPending}
+          onClick={() => void beginSignUp()}
+        >
+          Send confirmation link
+        </Button>
+        <Button variant="outline" onClick={onUseDifferentEmail}>
+          Use a different email
+        </Button>
+        <SignUpLink
+          callbackUrl={callbackUrl}
+          email={email}
+          label="Rather use the sign-up page? Go there instead"
+        />
+      </VStack>
+    </AuthCard>
+  );
 }
 
 /**
@@ -259,24 +412,38 @@ const HANDOFF_QUIET_MS = 400;
  * while the browser is on its way there. A slow or refused hand-off shows a
  * card saying where it's going, with a button for the refused case.
  */
-function RoutedToConnection({
+export function RoutedToConnection({
   decision,
   onContinue,
   callbackUrl,
+  loginHint,
+  title = "Log in to LangWatch",
+  footer,
+  autoStart = true,
 }: {
   decision: RoutingDecision;
   onContinue: (method: SignInMethod) => void;
   callbackUrl?: string;
+  /** Handed to the provider as the OIDC login hint, so its screen arrives prefilled. */
+  loginHint?: string;
+  /** Sign-up reaches this screen too, and it is not a log-in until the provider says so. */
+  title?: string;
+  /** The way out, which differs by the screen that routed here. */
+  footer?: ReactNode;
+  /** A typed address is a sign-in gesture; opening the page alone is not. */
+  autoStart?: boolean;
 }) {
   const method: SignInMethod | undefined = decision.methodSet[0];
   const dialed = useRef(false);
   const [waitIsVisible, setWaitIsVisible] = useState(false);
 
   useEffect(() => {
-    if (!method || dialed.current) return;
+    if (!autoStart || !method || dialed.current) return;
     dialed.current = true;
-    void signIn(method.id, { callbackUrl });
-  }, [method, callbackUrl]);
+    // Parked here too: the people routed by address are the dial nobody presses.
+    rememberPendingMethod(method);
+    void signIn(method.id, { callbackUrl, loginHint });
+  }, [autoStart, method, callbackUrl, loginHint]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);
@@ -284,19 +451,23 @@ function RoutedToConnection({
   }, []);
 
   if (!method) return null;
-  if (!waitIsVisible) return null;
+  if (autoStart && !waitIsVisible) return null;
 
   return (
-    <AuthCard title="Log in to LangWatch">
+    <AuthCard title={title}>
       <HStack gap={3}>
-        <Spinner size="sm" color="orange.500" />
+        {autoStart && <Spinner size="sm" color="orange.500" />}
         <Text data-testid="routed-to-connection">
-          Taking you to your organization's sign-in with {signInMethodLabel(method)}.
+          {autoStart
+            ? `Taking you to your organization's sign-in with ${signInMethodLabel(method)}.`
+            : `Log in with ${signInMethodLabel(method)} to continue.`}
         </Text>
       </HStack>
       <Button colorPalette="orange" onClick={() => onContinue(method)}>
         {signInMethodActionLabel(method)}
       </Button>
+      {/* The way to the other screen, on this stage as on every other. */}
+      {footer ?? <SignUpLink callbackUrl={callbackUrl} label="Or create an account instead" />}
     </AuthCard>
   );
 }
@@ -316,26 +487,5 @@ function SignUpLink({
   // other door. See `signUpHref`.
   const href = signUpHref({ callbackUrl, email });
 
-  // The question reads quiet and only the answer is the link, the way the
-  // board draws its footers. A label with no question is all link.
-  const splitAt = label.indexOf("? ");
-  const lead = splitAt === -1 ? "" : label.slice(0, splitAt + 2);
-  const linked = splitAt === -1 ? label : label.slice(splitAt + 2);
-
-  return (
-    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
-      {lead}
-      <Box
-        asChild
-        color="fg"
-        fontWeight={600}
-        textDecoration="underline"
-        textUnderlineOffset="3px"
-        textDecorationColor="border"
-        _hover={{ textDecorationColor: "fg" }}
-      >
-        <Link href={href}>{linked}</Link>
-      </Box>
-    </Text>
-  );
+  return <SecondaryActionLink href={href} label={label} testId="go-to-sign-up" />;
 }

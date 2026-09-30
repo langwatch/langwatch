@@ -387,6 +387,7 @@ describe("POST /search", () => {
   });
 
   describe("when no projection select is provided", () => {
+    /** @scenario "Request without from or select returns the current response shape" */
     it("does not compile a projection", async () => {
       const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
@@ -437,6 +438,7 @@ describe("POST /search", () => {
       expect(body.traces).toEqual([{ trace_id: "trace-1" }, { trace_id: "trace-2" }]);
     });
 
+    /** @scenario "Response includes schema when select is present" */
     it("includes the resolved schema in the response envelope", async () => {
       const { send } = mount();
       const res = await send({
@@ -452,6 +454,7 @@ describe("POST /search", () => {
       });
     });
 
+    /** @scenario "Select without from defaults to the traces entity root" */
     it("defaults from to traces when only select is provided", async () => {
       const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
@@ -468,6 +471,7 @@ describe("POST /search", () => {
   });
 
   describe("when the projection select is invalid", () => {
+    /** @scenario "Unknown select path returns 422" */
     it("responds 422", async () => {
       const { send } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, select: ["nonexistent_field"] });
@@ -497,6 +501,7 @@ describe("POST /search", () => {
   });
 
   describe("when the projection request fails schema validation", () => {
+    /** @scenario "Unknown from entity returns 422" */
     it("rejects an unsupported from entity with 422", async () => {
       const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
@@ -510,6 +515,7 @@ describe("POST /search", () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Empty select array returns 422" */
     it("rejects an empty select array with 422", async () => {
       const spy = vi.mocked(compileProjection).mockClear();
       const { send } = mount();
@@ -560,6 +566,7 @@ describe("POST /search", () => {
       );
     });
 
+    /** @scenario "Invalid dateField value returns 422" */
     it("rejects an unsupported date axis with 422", async () => {
       const { send } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, dateField: "created" });
@@ -610,6 +617,7 @@ describe("POST /search with a trace filter", () => {
   });
 
   describe("when the filter is whitespace", () => {
+    /** @scenario "An empty filter is the same request as no filter" */
     it("is the same request as no filter", async () => {
       const { send, listTraces } = mount();
       await send({ startDate: 1000, endDate: 5000, filter: "   " });
@@ -661,6 +669,7 @@ describe("POST /search with a trace filter", () => {
   });
 
   describe("when the filter cannot be parsed", () => {
+    /** @scenario "A malformed filter is a validation failure naming the field" */
     it("answers 422 naming the filter field", async () => {
       const { send, listTraces } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, filter: "status:" });
@@ -672,6 +681,7 @@ describe("POST /search with a trace filter", () => {
   });
 
   describe("when a span clause rides the updated axis", () => {
+    /** @scenario "A span clause is refused on the updated axis rather than silently dropping traces" */
     it("answers 422 rather than a result set missing rows", async () => {
       const { send, listTraces } = mount();
       const res = await send({
@@ -711,6 +721,7 @@ describe("POST /search with a trace filter", () => {
   });
 
   describe("when the filter names a field the language does not have", () => {
+    /** @scenario "A filter naming an unknown field lists the fields that exist" */
     it("answers 422 and names the fields that exist", async () => {
       const { send, listTraces } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, filter: "statuz:error" });

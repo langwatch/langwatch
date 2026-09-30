@@ -3,7 +3,7 @@
  * @vitest-environment node
  * @see specs/agents/agent-test-run.feature
  */
-import { type AgentApi, type AgentWithFields } from "@langwatch/agent-contract";
+import { type AgentApi, type AgentOverview, type AgentWithFields } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -56,7 +56,23 @@ function httpAgent(overrides: Partial<AgentWithFields> = {}): AgentWithFields {
   } as AgentWithFields;
 }
 
-function fakeAgents(namesById: Record<string, string> = {}) {
+function overviewOf(agent: AgentWithFields, status: "online" | "offline"): AgentOverview {
+  return {
+    ...agent,
+    environment: agent.environment ?? null,
+    ownerUserId: agent.ownerUserId ?? null,
+    hostLabel: agent.hostLabel ?? null,
+    lastSeenAt: agent.lastSeenAt ?? null,
+    parameters: [],
+    owner: null,
+    status,
+    instances: [],
+    selectable: true,
+    notSelectableReason: null,
+  };
+}
+
+function fakeAgents(namesById: Record<string, string> = {}, connected?: AgentOverview) {
   const callConnected = vi.fn<AgentApi["callConnected"]>().mockResolvedValue({
     output: "answer",
     durationMs: 1,
@@ -69,6 +85,7 @@ function fakeAgents(namesById: Record<string, string> = {}) {
     ownersOf: async () =>
       new Map(Object.entries(namesById).map(([userId, name]) => [userId, { userId, name }])),
     callConnected,
+    ...(connected ? { getById: vi.fn<AgentApi["getById"]>().mockResolvedValue(connected) } : {}),
   });
   return { agents, callConnected };
 }
@@ -76,9 +93,10 @@ function fakeAgents(namesById: Record<string, string> = {}) {
 function serviceFor(options: {
   queueRun?: ReturnType<typeof vi.fn>;
   namesById?: Record<string, string>;
+  connected?: AgentOverview;
 }) {
   const queueRun = options.queueRun ?? vi.fn().mockResolvedValue(undefined);
-  const { agents, callConnected } = fakeAgents(options.namesById);
+  const { agents, callConnected } = fakeAgents(options.namesById, options.connected);
   const service = AgentTestService.create({
     agents,
     projects: { findById: vi.fn().mockResolvedValue(null) } as never,
@@ -124,7 +142,7 @@ describe("AgentTestService.sendTurn", () => {
         config: {
           timeoutMs: 999_999,
           sticky: true,
-          parameters: [],
+          parameters: [{ name: "region", type: "string" }],
           sdk: { name: "test-sdk", version: "1.0.0", language: "typescript" },
         },
       }),
@@ -148,6 +166,69 @@ describe("AgentTestService.sendTurn", () => {
       instance: { hostname: "host", label: null },
     });
   });
+  describe("given a connected agent that declares a model parameter with options", () => {
+    const modelAgent = httpAgent({
+      type: "connected",
+      environment: "production",
+      config: {
+        parameters: [{ name: "model", type: "string", options: ["gpt-4", "gpt-5"] }],
+        sdk: { name: "test-sdk", version: "1.0.0", language: "typescript" },
+      },
+    });
+
+    describe("when a turn names a parameter it does not declare", () => {
+      /** @scenario "A test turn naming an undeclared parameter is refused" */
+      it("is refused as scenario_parameter_unknown and reaches no instance", async () => {
+        const { service, callConnected } = serviceFor({});
+
+        await expect(
+          service.sendTurn({
+            projectId: "proj_1",
+            agent: modelAgent,
+            actor,
+            message: "ping",
+            params: { temperature: "0.2" },
+          }),
+        ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+        expect(callConnected).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a turn carries a value outside the declared options", () => {
+      /** @scenario "A test turn value outside the declared options is refused" */
+      it("is refused as scenario_parameter_option_invalid and reaches no instance", async () => {
+        const { service, callConnected } = serviceFor({});
+
+        await expect(
+          service.sendTurn({
+            projectId: "proj_1",
+            agent: modelAgent,
+            actor,
+            message: "ping",
+            params: { model: "gpt-6" },
+          }),
+        ).rejects.toMatchObject({ code: "scenario_parameter_option_invalid" });
+        expect(callConnected).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a turn carries a declared option", () => {
+      it("sends the turn with that value", async () => {
+        const { service, callConnected } = serviceFor({});
+
+        await service.sendTurn({
+          projectId: "proj_1",
+          agent: modelAgent,
+          actor,
+          message: "ping",
+          params: { model: "gpt-5" },
+        });
+
+        expect(callConnected.mock.calls[0]?.[0].call.params).toEqual({ model: "gpt-5" });
+      });
+    });
+  });
+
   describe("given an HTTP agent that never answers", () => {
     /** @scenario "A turn that outlives the call deadline is failed" */
     it("fails with agent_call_timeout at the platform cap", async () => {
@@ -225,6 +306,7 @@ describe("AgentTestService.sendTurn", () => {
 describe("AgentTestService.scheduleRun", () => {
   describe("given an http agent", () => {
     /** @scenario "A test run is queued with no scenario saved" */
+    /** @scenario "An HTTP agent is never offline" */
     it("queues one run in the agent test set with the agent test scenario id", async () => {
       const { service, queueRun } = serviceFor({});
 
@@ -325,23 +407,42 @@ describe("AgentTestService.scheduleRun", () => {
   });
 
   describe("given a connected agent nobody else owns", () => {
-    it("refuses as not available on this deployment yet", async () => {
-      const { service, queueRun } = serviceFor({});
+    const connectedAgent = httpAgent({
+      id: "agent_conn",
+      type: "connected",
+      environment: "production",
+      ownerUserId: null,
+      config: { name: "support-agent" } as never,
+    });
 
-      await expect(
-        service.scheduleRun({
-          projectId: "proj_1",
-          agent: httpAgent({
-            id: "agent_conn",
-            type: "connected",
-            environment: "production",
-            ownerUserId: null,
-            config: { name: "support-agent" } as never,
-          }),
-          actor,
-        }),
-      ).rejects.toMatchObject({ code: "agent_test_refused" });
-      expect(queueRun).not.toHaveBeenCalled();
+    describe("when a process is connected", () => {
+      /** @scenario "An online connected agent is scheduled" */
+      it("queues one run against the agent", async () => {
+        const { service, queueRun } = serviceFor({
+          connected: overviewOf(connectedAgent, "online"),
+        });
+
+        await service.scheduleRun({ projectId: "proj_1", agent: connectedAgent, actor });
+
+        expect(queueRun).toHaveBeenCalledTimes(1);
+        expect(queueRun.mock.calls[0]?.[0]).toMatchObject({
+          target: { type: "connected", referenceId: "agent_conn" },
+        });
+      });
+    });
+
+    describe("when no process is connected", () => {
+      /** @scenario "An offline connected agent is refused before a run exists" */
+      it("refuses with agent_offline and queues nothing", async () => {
+        const { service, queueRun } = serviceFor({
+          connected: overviewOf(connectedAgent, "offline"),
+        });
+
+        await expect(
+          service.scheduleRun({ projectId: "proj_1", agent: connectedAgent, actor }),
+        ).rejects.toMatchObject({ code: "agent_offline" });
+        expect(queueRun).not.toHaveBeenCalled();
+      });
     });
   });
 });

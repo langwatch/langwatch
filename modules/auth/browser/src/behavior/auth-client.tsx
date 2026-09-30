@@ -1,6 +1,7 @@
 "use client";
 
 import { passkeyClient } from "@better-auth/passkey/client";
+import { looksLikeSsoConnectionId } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
 import { type ReactElement, type ReactNode, useCallback, useEffect, useState } from "react";
@@ -171,6 +172,16 @@ export const useSession = (
   };
 };
 
+/** The two-factor plugin's own flag for a challenge in place of a session. */
+function isTwoStepChallenge(data: unknown): boolean {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "twoFactorRedirect" in data &&
+    data.twoFactorRedirect === true
+  );
+}
+
 export const signIn = async (
   provider: string,
   options?: {
@@ -178,6 +189,8 @@ export const signIn = async (
     password?: string;
     callbackUrl?: string;
     redirect?: boolean;
+    /** The address already typed, handed to the provider as the OIDC login hint. */
+    loginHint?: string;
   },
 ): Promise<
   | {
@@ -191,6 +204,8 @@ export const signIn = async (
        * say how long instead of guessing "a minute".
        */
       retryAfterSeconds?: number;
+      /** A correct password still owes a second factor; no session exists yet. */
+      twoStepRequired?: boolean;
     }
   | undefined
 > => {
@@ -229,6 +244,7 @@ export const signIn = async (
         ok: false,
       };
     }
+    if (isTwoStepChallenge(result.data)) return { ok: false, twoStepRequired: true };
     // NextAuth compat: the caller expects signIn to navigate on success.
     // BetterAuth's signIn.email returns a JSON result and does NOT auto-
     // redirect the browser — the caller has to do it.
@@ -238,7 +254,25 @@ export const signIn = async (
     return { ok: true };
   }
 
-  // Every provider goes through signIn.social, social (google, github, gitlab, microsoft) and
+  // An organization's connection is registered with the SSO plugin, not as a social provider.
+  if (looksLikeSsoConnectionId(provider)) {
+    const result = await client.$fetch<{ url?: string }>("/sign-in/sso", {
+      method: "POST",
+      body: { providerId: provider, callbackURL: callbackURL ?? "/" },
+    });
+    if (result.error) {
+      return {
+        error: result.error.message ?? "OAuthSignin",
+        code: result.error.code,
+        status: result.error.status,
+        ok: false,
+      };
+    }
+    if (shouldRedirect && result.data?.url) navigate(result.data.url);
+    return { ok: true };
+  }
+
+  // Every other provider goes through signIn.social, social (google, github, gitlab, microsoft) and
   // generic-OAuth (see `PLAIN_OIDC_PROVIDERS` and the named entries beside it in
   // `ee/sso/providers.ts`) alike: the social plugin and the generic-oauth plugin both honor the
   // same providerId. BetterAuth handles the redirect to the provider URL itself when
@@ -248,6 +282,7 @@ export const signIn = async (
     provider: mappedProvider as "google",
     callbackURL,
     disableRedirect: !shouldRedirect,
+    ...(options?.loginHint ? { loginHint: options.loginHint } : {}),
   });
   if (result.error) {
     return {

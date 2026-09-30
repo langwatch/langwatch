@@ -18,6 +18,8 @@ const configuration = (overrides: Partial<MailerConfiguration> = {}): MailerConf
 describe("given a mailer configuration naming one provider", () => {
   describe("when the gateway is resolved", () => {
     /** @scenario "The gateway named by the deployment is the one that sends" */
+    /** @scenario "Operator picks a provider explicitly" */
+    /** @scenario "Every supported gateway can be selected" */
     it.each([
       ["ses", configuration({ provider: "ses", ses: { enabled: true, region: "eu-central-1" } })],
       ["sendgrid", configuration({ provider: "sendgrid", sendgrid: { apiKey: "SG.test" } })],
@@ -28,6 +30,7 @@ describe("given a mailer configuration naming one provider", () => {
     });
 
     /** @scenario "The gateway named by the deployment is the one that sends" */
+    /** @scenario "A named provider wins over inferred credentials" */
     it("keeps the explicit name over the legacy inference order", () => {
       expect(
         EmailProviderService.create(
@@ -60,9 +63,37 @@ describe("given a mailer configuration naming one provider", () => {
   });
 });
 
+describe("given a mailer configuration naming no provider", () => {
+  describe("when the gateway is resolved", () => {
+    /** @scenario "Existing deployments keep working without naming a provider" */
+    it("infers SendGrid from a lone API key", () => {
+      expect(
+        EmailProviderService.create(
+          configuration({ sendgrid: { apiKey: "SG.test" } }),
+        ).pickProviderName(),
+      ).toBe("sendgrid");
+    });
+
+    /** @scenario "Existing AWS deployments keep working without naming a provider" */
+    it("infers SES from the legacy AWS settings", () => {
+      expect(
+        EmailProviderService.create(
+          configuration({ ses: { enabled: true, region: "eu-central-1" } }),
+        ).pickProviderName(),
+      ).toBe("ses");
+    });
+
+    /** @scenario "No email configuration at all is reported clearly" */
+    it("names no gateway when nothing is configured", () => {
+      expect(EmailProviderService.create(configuration()).pickProviderName()).toBeNull();
+    });
+  });
+});
+
 describe("given a mailer configuration naming a provider whose credentials are absent", () => {
   describe("when the gateway is resolved", () => {
     /** @scenario "A named but unusable gateway refuses instead of falling back" */
+    /** @scenario "A named provider missing its credentials is rejected loudly" */
     it("refuses naming the setting the operator must supply", () => {
       expect(() =>
         EmailProviderService.create(configuration({ provider: "resend" })).pickProviderName(),
@@ -79,6 +110,7 @@ describe("given a mailer configuration naming a provider whose credentials are a
     });
 
     /** @scenario "A named but unusable gateway refuses instead of falling back" */
+    /** @scenario "An unknown provider name is rejected loudly" */
     it("rejects a name no gateway answers to", () => {
       expect(() =>
         EmailProviderService.create(

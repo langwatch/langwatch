@@ -25,7 +25,12 @@ function contextFor({
   returned?: unknown;
   user?: Record<string, unknown> | null;
 }) {
-  const createSession = vi.fn(async (userId: string) => ({ id: "session-1", userId }));
+  const createSession = vi.fn(
+    async (userId: string): Promise<{ id: string; userId: string } | null> => ({
+      id: "session-1",
+      userId,
+    }),
+  );
   const ctx: PasswordResetEndpointContext = {
     path,
     request,
@@ -56,6 +61,19 @@ describe("the password reset session", () => {
 
       expect(createSession).toHaveBeenCalledWith("user-1");
       expect(setSessionCookie).toHaveBeenCalled();
+    });
+
+    /** @scenario "Password reset cannot open a session on an unconfirmed sign-up" */
+    it("sets no cookie when the session gate refuses an unconfirmed sign-up", async () => {
+      vi.mocked(setSessionCookie).mockClear();
+      const { ctx, createSession } = contextFor({ request });
+      // Better Auth answers null when the before-create hook refuses the pending latch.
+      createSession.mockResolvedValueOnce(null);
+
+      await channel.signInAfterPasswordReset(ctx);
+
+      expect(createSession).toHaveBeenCalledWith("user-1");
+      expect(setSessionCookie).not.toHaveBeenCalled();
     });
 
     it("opens nothing for an account holding a second factor", async () => {

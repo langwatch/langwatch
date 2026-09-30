@@ -87,7 +87,7 @@ describe("given an administrator on the Authentication page", () => {
       );
 
       expect(screen.getByTestId("organization-policy")).toBeInTheDocument();
-      expect(screen.getByTestId("domain-join-card")).toBeInTheDocument();
+      expect(screen.getByTestId("join-policy-card")).toBeInTheDocument();
       expect(screen.getByTestId("two-step-requirement-card")).toBeInTheDocument();
       expect(
         screen.getByText(/also apply when your organization uses password sign-in/),

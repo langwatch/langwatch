@@ -17,13 +17,15 @@ Feature: Delivering the trace ingestion path's product event from a worker
   process that keyed it any other way would file the milestone against a person
   who does not exist in the funnel.
 
-  @unit
+  @unit @unimplemented
+  # Delivery moved to enterprise/modules/nurturing (NurturingApi.recordSignal); trace holds no client.
   Scenario: A deployment that configured no product analytics records nothing
     Given a process whose deployment named no PostHog key
     When the first-trace milestone is recorded
     Then no capture leaves the process and nothing fails
 
-  @unit
+  @unit @unimplemented
+  # Delivery moved to enterprise/modules/nurturing (NurturingApi.recordSignal); trace holds no client.
   Scenario: A deployment that configured PostHog delivers the milestone
     Given a process whose deployment named a PostHog key
     When the first-trace milestone is recorded
@@ -35,13 +37,15 @@ Feature: Delivering the trace ingestion path's product event from a worker
     When the milestone is captured
     Then the admin's user id is the distinct id it is captured against
 
-  @unit
+  @unit @unimplemented
+  # Delivery moved to enterprise/modules/nurturing (NurturingApi.recordSignal); trace holds no client.
   Scenario: The project rides along as a property
     Given a milestone carrying the SDK language and framework
     When the milestone is captured
     Then the project id joins those properties rather than replacing them
 
-  @unit
+  @unit @unimplemented
+  # Delivery moved to enterprise/modules/nurturing (NurturingApi.recordSignal); trace holds no client.
   Scenario: A milestone with no project carries no project property
     Given a product event recorded without a project
     When the milestone is captured
@@ -53,13 +57,15 @@ Feature: Delivering the trace ingestion path's product event from a worker
     When the first-trace milestone is recorded
     Then the ingestion path is not interrupted
 
-  @unit
+  @unit @unimplemented
+  # Delivery moved to enterprise/modules/nurturing (NurturingApi.recordSignal); trace holds no client.
   Scenario: Pending events are flushed when the process shuts down
     Given a process holding a capture client with queued events
     When the process closes its resources
     Then the client is shut down so the queue is flushed
 
-  @unit
+  @unit @unimplemented
+  # Delivery moved to enterprise/modules/nurturing (NurturingApi.recordSignal); trace holds no client.
   Scenario: The host is the deployment's own, never one invented here
     Given a deployment that named a PostHog host
     When the capture client is built

@@ -1,6 +1,5 @@
 // biome-ignore lint/suspicious/noEmptyBlockStatements: empty blocks are deliberate.
 
-import { Heading } from "@chakra-ui/react";
 import type { UiInviteMemberDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type React from "react";
@@ -59,8 +58,8 @@ export function InviteMemberDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Drawer.Title>
-            <Heading size="lg">Add members</Heading>
+          <Drawer.Title textStyle="lg" fontWeight="semibold">
+            Add members
           </Drawer.Title>
           <Drawer.CloseTrigger onClick={closeDrawer} />
         </Drawer.Header>

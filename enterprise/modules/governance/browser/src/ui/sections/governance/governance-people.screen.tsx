@@ -17,7 +17,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 import { Archive, ChevronDown, ExternalLink, MoreVertical, Pencil, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
@@ -114,6 +114,24 @@ function usePeopleTab() {
       { replace: true },
     );
   return { tab, selectTab };
+}
+
+/** `?add=1` on the address asks for the create drawer once, then is cleared, as on main. */
+function useAddDepartmentDeepLink({ canManage, open }: { canManage: boolean; open: () => void }) {
+  const [searchParams, setSearchParams] = useGovernanceSearchParams();
+  const requested = searchParams.get("add") === "1";
+  useEffect(() => {
+    if (!requested) return;
+    if (canManage) open();
+    setSearchParams(
+      (previous) => {
+        const params = new URLSearchParams(previous);
+        params.delete("add");
+        return params;
+      },
+      { replace: true },
+    );
+  }, [requested, canManage, open, setSearchParams]);
 }
 
 const SPEND_SORT_FIELDS: readonly SpendSortField[] = ["spend", "requests", "lastActivity"];
@@ -413,6 +431,7 @@ function PeoplePage() {
   // Main opened this from a URL-routed drawer singleton this branch has no
   // host for (see the merge handoff); local state opens it instead.
   const [creatingDepartment, setCreatingDepartment] = useState(false);
+  useAddDepartmentDeepLink({ canManage, open: () => setCreatingDepartment(true) });
 
   return (
     <GovernanceLayout pageTitle="People · AI Governance · LangWatch">

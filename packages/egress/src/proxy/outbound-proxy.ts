@@ -10,8 +10,6 @@ export interface OutboundProxyConfig {
   noProxy?: string;
 }
 
-let processOutboundProxyConfig: OutboundProxyConfig | undefined;
-
 const readProxyEnvironmentValue = (
   source: Readonly<Record<string, string | undefined>>,
   name: string,
@@ -21,7 +19,7 @@ const readProxyEnvironmentValue = (
   return trimmed ? trimmed : undefined;
 };
 
-/** Parses proxy compatibility spellings once at process boot. */
+/** Parses proxy compatibility spellings once, from the owning module's declared config. */
 export function parseOutboundProxyConfig(
   source: Readonly<Record<string, string | undefined>>,
 ): OutboundProxyConfig {
@@ -30,15 +28,6 @@ export function parseOutboundProxyConfig(
     httpProxy: readProxyEnvironmentValue(source, "HTTP_PROXY"),
     noProxy: readProxyEnvironmentValue(source, "NO_PROXY"),
   };
-}
-
-/** Installs the config parsed by the process composition root. */
-export function configureProcessOutboundProxy(config: OutboundProxyConfig): void {
-  processOutboundProxyConfig = config;
-}
-
-export function getProcessOutboundProxyConfig(): Readonly<OutboundProxyConfig> {
-  return processOutboundProxyConfig ?? {};
 }
 
 /**

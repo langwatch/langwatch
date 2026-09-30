@@ -24,6 +24,8 @@ import {
   generateBatchRunId,
   generateScenarioRunId,
   getAgentTestSetId,
+  parseScenarioParameterDefinitions,
+  resolveRunParameters,
   withActor,
   type RunActor,
   type SimulationService,
@@ -48,6 +50,7 @@ import {
   type AdapterRead,
   type ProjectRead,
 } from "./agent-test-prefetch.service.ts";
+import { ConnectedTargetService } from "./connected-target.service.ts";
 import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
 import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
@@ -82,16 +85,15 @@ function usableTimeouts({
 }
 
 const NOT_TESTABLE_REASON = "Only HTTP, code, workflow and connected agents can be tested this way";
-const CONNECTED_RUN_NOT_QUEUEABLE_REASON =
-  "Testing a connected agent through a scripted run is not available on this deployment yet";
 
 const connectedCallConfigSchema = z.looseObject({
   timeoutMs: z.number().int().positive().optional(),
   sticky: z.boolean().optional(),
+  parameters: z.unknown().optional(),
 });
 
-/** The targets a test RUN can queue, once a connected one is refused. */
-type QueueableTarget = TargetConfig & { type: "http" | "code" | "workflow" };
+/** The targets a test RUN can queue: every kind a scenario runs against but a prompt. */
+type QueueableTarget = TargetConfig & { type: "http" | "code" | "workflow" | "connected" };
 
 export class AgentTestService {
   static create(options: AgentTestServiceOptions): AgentTestService {
@@ -108,12 +110,17 @@ export class AgentTestService {
       voiceTargets: null,
     });
 
-    return new AgentTestService(options, targetPrefetch);
+    return new AgentTestService(
+      options,
+      targetPrefetch,
+      ConnectedTargetService.create(options.agents),
+    );
   }
 
   private constructor(
     private readonly options: AgentTestServiceOptions,
     private readonly targetPrefetch: ScenarioTargetPrefetchService,
+    private readonly connectedTargets: ConnectedTargetService,
   ) {}
 
   /** The target a test points at, with a connected agent's ownership already
@@ -234,6 +241,12 @@ export class AgentTestService {
 
   async #sendConnectedTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
     const config = connectedCallConfigSchema.parse(input.agent.config ?? {});
+    await resolveRunParameters({
+      scenarios: [],
+      targetDefinitions: parseScenarioParameterDefinitions(config.parameters),
+      targetLabel: input.agent.name,
+      values: input.params,
+    });
     const messages = [{ role: "user" as const, content: input.message }];
     const dispatched = await this.options.agents.callConnected({
       projectId: input.projectId,
@@ -263,13 +276,13 @@ export class AgentTestService {
   }
 
   async scheduleRun(input: TestAgentRunInput): Promise<AgentTestRunResult> {
-    const target = await this.resolveTarget(input);
-    if (target.type === "connected") {
-      throw new AgentTestRefusedError({ reason: CONNECTED_RUN_NOT_QUEUEABLE_REASON });
-    }
+    const target = await this.connectedTargets.resolve({
+      projectId: input.projectId,
+      target: await this.resolveTarget(input),
+      actorId: input.actor?.id,
+    });
 
-    // `mapAgentTestTarget` never answers "prompt"; only "connected" was excluded
-    // above, so what remains is exactly what a run can queue.
+    // `mapAgentTestTarget` never answers "prompt", so what remains is what a run can queue.
     const queueableTarget = target as QueueableTarget;
 
     const batchRunId = generateBatchRunId();

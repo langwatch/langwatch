@@ -119,3 +119,11 @@ Feature: Composing the join-request ledger in a background worker
     When a domain match joins somebody automatically
     Then the seats used and the seats the plan covers reach the notice
     And an organization on a negotiated plan gets no seat count
+
+  @unit
+  Scenario: Each join-request mail carries a delivery key naming its notice and its recipient
+    Given a join request whose notice reaches two administrators
+    When the notice is sent
+    Then each administrator's mail carries its own delivery key
+    And sending the same notice again derives the same keys
+    And the mail reaches notification's sender with that key intact

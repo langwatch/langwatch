@@ -10,6 +10,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -64,6 +65,8 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
         permissions: createApiFixture<AuthzApi>(),
         roles: createApiFixture<InviteAssignableRoles>(),
         governance: createApiFixture<Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">>(),
+        notifications:
+          createApiFixture<Pick<NotificationService, "sendEmail" | "getMailDelivery">>(),
       },
     });
     const recorded: RecordSeatLimitReachedCommandData[] = [];

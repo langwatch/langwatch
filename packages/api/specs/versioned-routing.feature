@@ -87,14 +87,12 @@ Feature: Explicit compatibility version namespaces
     When a request fails validation under a dated namespace
     Then the error response carries X-API-Version and X-API-Version-Status
 
-  @unimplemented
-  Scenario: The document carries every dated version plus latest
+  @integration
+  Scenario: The dated and latest aliases are served but never documented
     Given the service declares documentable endpoints
     When the OpenAPI document is generated
-    Then it contains a path for /api/things/2026-01-15/things.list
-    And a path for /api/things/2026-08-07/things.list
-    And a path for /api/things/latest/things.list
-    And each version's schemas are the ones that version serves
+    Then it contains a path for /api/things/things.list
+    And no documented path contains a dated namespace or the latest namespace
 
   @unimplemented
   Scenario: Preview never reaches the document
@@ -106,8 +104,7 @@ Feature: Explicit compatibility version namespaces
   Scenario: One logical route reaches the document once
     When the OpenAPI document is generated
     Then the bare path carries the declared operation id
-    And the latest namespace's operation id is suffixed "latest"
-    And no /api/v1 twin appears as a second operation
+    And no dated, latest or /api/v1 address appears as a second operation
 
   @integration
   Scenario: A family serves one static generation instead of dated namespaces

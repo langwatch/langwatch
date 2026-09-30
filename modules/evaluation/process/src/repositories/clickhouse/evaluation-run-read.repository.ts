@@ -217,6 +217,23 @@ export class EvaluationRunClickHouseReadRepository {
     }
   }
 
+  async countRuns(input: { tenantId: string }): Promise<number> {
+    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.countRuns");
+    const client = await this.options.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT uniqExact(EvaluationId) AS Total
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+      `,
+      query_params: { tenantId: input.tenantId },
+      format: "JSONEachRow",
+    });
+    const [row] = await result.json<{ Total: number | string }>();
+
+    return row ? Number(row.Total) : 0;
+  }
+
   async findSummariesByTraceIds(input: {
     tenantId: string;
     traceIds: string[];

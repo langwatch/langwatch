@@ -120,6 +120,38 @@ describe("AgentHttpEditorDrawer", () => {
       });
     });
 
+    describe("when the agent is saved", () => {
+      /** @scenario "The HTTP and code agent drawers test a saved agent" */
+      it("shows the test panel below the form for that agent", async () => {
+        const agent = savedAgent({});
+        const panelFor: unknown[] = [];
+
+        renderEditor({
+          agent,
+          agentId: agent.id,
+          renderTestPanel: (input) => {
+            panelFor.push(input);
+            return <div data-testid="test-panel" />;
+          },
+        });
+
+        expect(await screen.findByTestId("test-panel")).toBeInTheDocument();
+        expect(panelFor).toContainEqual({ agentId: "agent_1", projectId: "project_1" });
+      });
+    });
+
+    describe("when the agent is a new draft", () => {
+      /** @scenario "A draft has no test panel" */
+      it("shows no test panel", async () => {
+        renderEditor({ renderTestPanel: () => <div data-testid="test-panel" /> });
+
+        await waitFor(() => {
+          expect(screen.getByText("Output Path (JSONPath)")).toBeInTheDocument();
+        });
+        expect(screen.queryByTestId("test-panel")).not.toBeInTheDocument();
+      });
+    });
+
     describe("when the editor saves a session path", () => {
       /** @scenario "The HTTP agent editor offers a session path" */
       it("persists the trimmed session path on the agent config", async () => {

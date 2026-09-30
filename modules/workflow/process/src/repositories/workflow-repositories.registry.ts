@@ -1,7 +1,18 @@
 import { defineRepositories } from "@langwatch/kernel";
+import type { ObjectStorage } from "@langwatch/process-stores/members";
 
+import type { NlpLambdaArnCache } from "../app/workflow.app.ts";
+import type { NlpPayloadStaging } from "../channels/nlp-lambda.channel.ts";
 import { MemoryWorkflowRepositories } from "./memory/memory.workflow.repositories.ts";
-import { PostgresWorkflowRepositories } from "./prisma/prisma.workflow.repositories.ts";
+import { ObjectStorageNlpPayloadStagingRepository } from "./object-storage/object-storage.nlp-payload-staging.repository.ts";
+import {
+  PostgresWorkflowRepositories,
+  type WorkflowPrismaDatabase,
+} from "./prisma/prisma.workflow.repositories.ts";
+import {
+  RedisNlpLambdaArnRepository,
+  type NlpLambdaArnRedis,
+} from "./redis/redis.nlp-lambda-arn.repository.ts";
 import type { WorkflowLineageRepository } from "./workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "./workflow-project-environment.repository.ts";
 import type { WorkflowRowRepository } from "./workflow-row.repository.ts";
@@ -17,9 +28,31 @@ export interface WorkflowRepositories {
   readonly workflowRows: WorkflowRowRepository;
   readonly projectEnvironment: WorkflowProjectEnvironmentRepository;
   readonly lineage: WorkflowLineageRepository;
+  /** Each project's resolved studio function, shared cluster-wide. */
+  readonly nlpLambdaArns: NlpLambdaArnCache;
+  /** Oversized engine payloads, parked while their invoke is in flight. */
+  readonly payloadStaging: NlpPayloadStaging;
 }
 
+/** Postgres rows beside the shared ARN cache in Redis and staged payloads in object storage. */
+const liveWorkflowRepositories = {
+  requires: ["prisma", "redis", "objectStorage"] as const,
+  create: (
+    members: Readonly<{
+      prisma: WorkflowPrismaDatabase;
+      redis: NlpLambdaArnRedis;
+      objectStorage: ObjectStorage;
+    }>,
+  ): WorkflowRepositories => ({
+    ...PostgresWorkflowRepositories.create({ prisma: members.prisma }),
+    nlpLambdaArns: RedisNlpLambdaArnRepository.create({ redis: members.redis }),
+    payloadStaging: ObjectStorageNlpPayloadStagingRepository.create({
+      objectStorage: members.objectStorage,
+    }),
+  }),
+};
+
 export const workflowRepositories = defineRepositories({
-  live: PostgresWorkflowRepositories,
+  live: liveWorkflowRepositories,
   memory: MemoryWorkflowRepositories,
 });

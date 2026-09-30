@@ -47,22 +47,28 @@ export function adminGrantBindings({
   organizationId,
   teamId,
   userId,
+  ids = {
+    organization: LOCAL_DEV_BINDING_IDS.adminOrganization,
+    team: LOCAL_DEV_BINDING_IDS.adminTeam,
+  },
 }: {
   organizationId: string;
   teamId: string;
   userId: string;
+  /** The two binding ids; the admin's by default, distinct for any other seeded admin. */
+  ids?: { organization: string; team: string };
 }): SeedGrantBinding[] {
   const principal: SeedGrantBinding["principal"] = { type: "user", id: userId };
   return [
     {
-      id: LOCAL_DEV_BINDING_IDS.adminOrganization,
+      id: ids.organization,
       organizationId,
       principal,
       role: "ADMIN",
       scope: { type: "ORGANIZATION", id: organizationId },
     },
     {
-      id: LOCAL_DEV_BINDING_IDS.adminTeam,
+      id: ids.team,
       organizationId,
       principal,
       role: "ADMIN",

@@ -22,7 +22,8 @@ const CLAUDE = {
   },
 } as const;
 const CODEX = {
-  SPAN: { TURN: "session_task.turn" },
+  // `HELPER_REQUEST` is a codex helper thread's request span: its one fact is the auxiliary mark.
+  SPAN: { TURN: "session_task.turn", HELPER_REQUEST: "turn/start" },
   ATTR: {
     INPUT_TOKENS: "gen_ai.usage.input_tokens",
     OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
@@ -152,6 +153,10 @@ export class CodingAgentSessionSpanProjection {
         },
         context,
       });
+    }
+
+    if (span.name === CODEX.SPAN.HELPER_REQUEST) {
+      return this.stateProjection.withIdentity(state, attrs);
     }
 
     if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) return this.applySubagentSpawn(state, attrs);

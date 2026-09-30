@@ -9,6 +9,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -44,6 +45,7 @@ function planGateFor({ planType }: { planType: string }) {
       permissions: createApiFixture<AuthzApi>(),
       roles: createApiFixture<InviteAssignableRoles>(),
       governance: createApiFixture<Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">>(),
+      notifications: createApiFixture<Pick<NotificationService, "sendEmail" | "getMailDelivery">>(),
     },
   }).plans;
 }

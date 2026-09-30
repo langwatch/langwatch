@@ -4,6 +4,7 @@
  * packages/api/specs/transport-declaration-split.feature.
  */
 
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel";
 import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
@@ -17,7 +18,11 @@ import {
   publicRoute,
   securityRequirement,
 } from "../../access/access.ts";
-import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
+import {
+  createErrorHandler,
+  OrganizationPermissionError,
+  PayloadTooLargeError,
+} from "../../errors.ts";
 import { defineRestRouter, projectRestFacts } from "../declaration.ts";
 import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
@@ -180,8 +185,11 @@ async function post(app: Hono, path: string, name: string): Promise<Response> {
 
 describe("a declared REST router mounted through the runtime", () => {
   describe("given the document is generated from the mounted app", () => {
-    /** @scenario "The declarations publish the OpenAPI document" */
-    it("publishes one operation per mount, uniquely identified, without resolving the app", async () => {
+    /**
+     * @scenario "The declarations publish the OpenAPI document"
+     * @scenario "The dated and latest aliases are served but never documented"
+     */
+    it("publishes the bare path once and hides the dated and latest aliases", async () => {
       const refuse = vi.fn(() => {
         throw new Error("OpenAPI generation must not resolve the application");
       });
@@ -197,16 +205,11 @@ describe("a declared REST router mounted through the runtime", () => {
       );
 
       expect(operationIds).toContain("getAnnotation");
-      expect(operationIds).toContain(`getAnnotation_${VERSION.replaceAll("-", "_")}`);
-      expect(operationIds).toContain("getAnnotation_latest");
-      // Every published operation is uniquely identified, which OpenAPI requires.
       expect(new Set(operationIds).size).toBe(operationIds.length);
-
-      const dated = published.paths?.[`/api/annotations/${VERSION}/{id}`] as
-        | { get?: { summary?: string } }
-        | undefined;
-
-      expect(dated?.get?.summary).toBe("Get an annotation in the caller’s project");
+      expect(Object.keys(published.paths ?? {})).not.toContainEqual(
+        expect.stringMatching(/\/(latest|preview|\d{4}-\d{2}-\d{2})(\/|$)/),
+      );
+      expect(published.paths?.["/api/annotations/{id}"]).toBeDefined();
     });
   });
 
@@ -332,11 +335,9 @@ describe("the document a declared route publishes", () => {
   it("files the operation under the tags the declaration named", async () => {
     const published = await generateSpecs(secretsApp(), SPEC_OPTIONS);
 
-    const dated = published.paths?.[`/api/secrets/${VERSION}`] as
-      | { get?: { tags?: string[] } }
-      | undefined;
+    const bare = published.paths?.["/api/secrets"] as { get?: { tags?: string[] } } | undefined;
 
-    expect(dated?.get?.tags).toEqual(["Secrets"]);
+    expect(bare?.get?.tags).toEqual(["Secrets"]);
   });
 });
 
@@ -1065,6 +1066,25 @@ describe("a route whose permission is checked at the scope its path names", () =
         target: { tier: "project", id: PROJECT_ID },
       }),
     );
+  });
+
+  /** @scenario "A key bound at one project is refused where its door asks at the organization" */
+  it("asks the door the permission at the organization first, and never the project", async () => {
+    const { app, identify, authenticate, authorize } = projectsApp();
+
+    authenticate.mockImplementation(({ permission }: { permission: AuthzPermission }) => {
+      throw new OrganizationPermissionError(permission);
+    });
+
+    const response = await app.request(`/api/projects/${VERSION}/${PROJECT_ID}`);
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "insufficient_permissions" });
+    expect(authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({ permission: "project:view" }),
+    );
+    expect(identify).not.toHaveBeenCalled();
+    expect(authorize).not.toHaveBeenCalled();
   });
 
   /** @scenario "A route checks its permission at the scope its own path names" */

@@ -26,6 +26,8 @@ export class FakeScimHost extends ScimHostApi {
       query?: Readonly<Record<string, string | undefined>>;
       /** Permissions the reader lacks; everything else is held. */
       withheld?: readonly string[];
+      /** Feature flags that are on; everything else is off. */
+      flags?: readonly string[];
     } = {},
   ) {
     super();
@@ -42,6 +44,10 @@ export class FakeScimHost extends ScimHostApi {
 
   hasPermission(permission: string): boolean {
     return !this.options.withheld?.includes(permission);
+  }
+
+  isFeatureEnabled(flag: string): boolean {
+    return this.options.flags?.includes(flag) ?? false;
   }
 
   succeeded(notice: ScimSuccessNotice): void {

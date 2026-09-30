@@ -40,4 +40,22 @@ describe("given a browser that installs dataset", () => {
       expect(loaded).toHaveProperty("default");
     });
   });
+
+  describe("when the router opens the datasets address", () => {
+    /** @scenario "The datasets page is behind the grant its platform page asked for" */
+    it("requires datasets:view, as main's page guard did", () => {
+      expect(datasetWeb.installation.screens["pages/[project]/datasets"]?.requires).toBe(
+        "datasets:view",
+      );
+    });
+  });
+
+  describe("when the router opens one dataset's address", () => {
+    /** @scenario "One dataset's editor opens for anyone who can reach the project" */
+    it("requires no grant of its own, as on main", () => {
+      expect(datasetWeb.installation.screens["pages/[project]/datasets/[id]"]).not.toHaveProperty(
+        "requires",
+      );
+    });
+  });
 });

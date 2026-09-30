@@ -335,7 +335,10 @@ export function middlewareScopesOf<Api>(declaration: RestTransportDeclaration<Ap
   return [...scopes];
 }
 
-/** The addresses one route answers at, and what each one reports. */
+/**
+ * The addresses one route answers at, and what each one reports. The dated and `latest`
+ * addresses are served but hidden: only the bare path reaches the OpenAPI document.
+ */
 export function addressesOf<Api>({
   route,
   declaration,
@@ -344,7 +347,7 @@ export function addressesOf<Api>({
   declaration: RestTransportDeclaration<Api>;
 }): readonly {
   path: string;
-  context: { version: string; status: VersionStatus; suffix?: string };
+  context: { version: string; status: VersionStatus; documented?: boolean };
 }[] {
   const version = declaration.version;
   // A collection route's path is the family root, so it contributes nothing to
@@ -363,16 +366,12 @@ export function addressesOf<Api>({
   return [
     {
       path: `/${version}${suffix}`,
-      context: { version, status: "stable", suffix: dated(version) },
+      context: { version, status: "stable", documented: false },
     },
     {
       path: `/${VERSION_LATEST}${suffix}`,
-      context: { version: VERSION_LATEST, status: "latest", suffix: VERSION_LATEST },
+      context: { version: VERSION_LATEST, status: "latest", documented: false },
     },
     { path: suffix || "/", context: { version: VERSION_LATEST, status: "latest" } },
   ];
-}
-
-function dated(version: string): string {
-  return version.replaceAll("-", "_");
 }

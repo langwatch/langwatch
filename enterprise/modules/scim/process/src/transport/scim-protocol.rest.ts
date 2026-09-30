@@ -28,6 +28,7 @@ import {
 } from "@langwatch/api/rest";
 import {
   ScimApi,
+  scimErrorSchema,
   scimGroupSchema,
   scimListResponseSchema,
   scimResourceTypeSchema,
@@ -76,13 +77,35 @@ const DEPROVISIONED: Record<number, DocumentedRouteResponse> = {
   204: { description: "Deprovisioned. No body.", content: {} },
 };
 
-/** `documentedResponses()`'s generated block with the SCIM-specific sentence in place of its generic reason phrase. */
-function scimAnswer(
-  status: number,
-  description: string,
-  schema: z.ZodType,
+/** `documentedResponses()`'s block, its SCIM sentence and media type in place of the generic ones. */
+function scimAnswer({
+  status,
+  description,
+  schema,
+  mediaType = SCIM_MEDIA_TYPE,
+}: {
+  status: number;
+  description: string;
+  schema: z.ZodType;
+  mediaType?: string;
+}): Record<number, DocumentedRouteResponse> {
+  const generated = documentedResponses({ [status]: schema })[status];
+  const [published] = Object.values(generated?.content ?? {});
+
+  return { [status]: { description, content: { [mediaType]: { ...published } } } };
+}
+
+/** Each refusal a route names, answered in RFC 7644's error document as main documents it. */
+function scimRefusals(
+  refusals: readonly { status: number; description: string }[],
 ): Record<number, DocumentedRouteResponse> {
-  return { [status]: { ...documentedResponses({ [status]: schema })[status], description } };
+  return refusals.reduce<Record<number, DocumentedRouteResponse>>(
+    (all, { status, description }) => ({
+      ...all,
+      ...scimAnswer({ status, description, schema: scimErrorSchema }),
+    }),
+    {},
+  );
 }
 
 /** Every answer on the twelve provisioning routes is the protocol's own document. */
@@ -414,7 +437,12 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "What this SCIM implementation supports (RFC 7643 section 5), which is how an identity provider decides what it may call: PATCH and filtering are supported, bulk operations, sorting, ETags and password change are not. Unauthenticated, because a provider reads it while being configured, before a token exists.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(200, "The supported capabilities.", scimServiceProviderConfigSchema),
+    responses: scimAnswer({
+      status: 200,
+      description: "The supported capabilities.",
+      schema: scimServiceProviderConfigSchema,
+      mediaType: DISCOVERY_ANSWER[0],
+    }),
   })
   .handle(({ response }) => discoveryJson({ response, data: SERVICE_PROVIDER_CONFIG }))
 
@@ -426,11 +454,12 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "The resources this service provisions, User and Group, each naming the endpoint and the schema URN that serves it (RFC 7643 section 6). Unauthenticated, like the rest of SCIM discovery.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(
-      200,
-      "The User and Group resource types.",
-      scimListResponseSchema(scimResourceTypeSchema),
-    ),
+    responses: scimAnswer({
+      status: 200,
+      description: "The User and Group resource types.",
+      schema: scimListResponseSchema(scimResourceTypeSchema),
+      mediaType: DISCOVERY_ANSWER[0],
+    }),
   })
   .handle(({ response }) => discoveryJson({ response, data: RESOURCE_TYPES_DOCUMENT }))
 
@@ -442,11 +471,12 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "The attribute definitions for the User and Group resources (RFC 7643 section 7), which an identity provider reads to build its attribute mapping. A LangWatch group is an access group: its membership drives role bindings, and it is not a team. Unauthenticated, like the rest of SCIM discovery.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(
-      200,
-      "The User and Group schema definitions.",
-      scimListResponseSchema(scimSchemaDefinitionSchema),
-    ),
+    responses: scimAnswer({
+      status: 200,
+      description: "The User and Group schema definitions.",
+      schema: scimListResponseSchema(scimSchemaDefinitionSchema),
+      mediaType: DISCOVERY_ANSWER[0],
+    }),
   })
   .handle(({ response }) => discoveryJson({ response, data: SCIM_SCHEMAS_DOCUMENT }))
 
@@ -462,12 +492,14 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       'The members of the organization the token belongs to, as SCIM users. Two filter expressions are understood: `userName eq "someone@example.com"`, matched against the member\'s email without regard to case, and `externalId eq "..."`, matched against the identifier the presented token\'s own directory connection pushed. Any other filter is refused.',
     tags: SCIM_TAGS,
-    responses: scimAnswer(
-      200,
-      "A page of provisioned users.",
-      scimListResponseSchema(scimUserSchema),
-    ),
-    errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED],
+    responses: {
+      ...scimAnswer({
+        status: 200,
+        description: "A page of provisioned users.",
+        schema: scimListResponseSchema(scimUserSchema),
+      }),
+      ...scimRefusals([UNAUTHORIZED, PLAN_NOT_ENTITLED]),
+    },
   })
   .handle(async ({ app, input, scope, response }, { connectionId }) =>
     scimJson({
@@ -487,21 +519,24 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
+  .withStatus(201)
   .withDocs({
     summary: "Provision a user",
     description:
       "Adds a member to the organization, creating the LangWatch account when the email is new. Someone who already has an account is added and reactivated rather than refused, which is what lets a directory sync be re-run without special-casing the people it already knows. New members join with the MEMBER role at organization scope. `costCenter` on the enterprise user extension assigns their department, creating that department on first use.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(201, "The provisioned user.", scimUserSchema),
-    errors: [
-      INVALID_BODY,
-      UNAUTHORIZED,
-      PLAN_NOT_ENTITLED,
-      {
-        status: 409,
-        description: "A member with this userName already exists in the organization.",
-      },
-    ],
+    responses: {
+      ...scimAnswer({ status: 201, description: "The provisioned user.", schema: scimUserSchema }),
+      ...scimRefusals([
+        INVALID_BODY,
+        UNAUTHORIZED,
+        PLAN_NOT_ENTITLED,
+        {
+          status: 409,
+          description: "A member with this userName already exists in the organization.",
+        },
+      ]),
+    },
   })
   .handle(async ({ app, raw, scope, response }, { connectionId }) =>
     scimJson({
@@ -525,8 +560,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "Reads one member of the organization the token belongs to. An id that is not a member answers 404, whether or not it names a LangWatch account elsewhere.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(200, "The user.", scimUserSchema),
-    errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
+    responses: {
+      ...scimAnswer({ status: 200, description: "The user.", schema: scimUserSchema }),
+      ...scimRefusals([UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND]),
+    },
   })
   .handle(async ({ app, input, scope, response }) =>
     scimJson({ response, data: await app.getUser({ id: input.id, organizationId: scope.id }) }),
@@ -543,8 +580,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the identity provider leaves out is reset rather than kept: omitting `active` reactivates the member. Send PATCH instead to change one attribute.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(200, "The updated user.", scimUserSchema),
-    errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
+    responses: {
+      ...scimAnswer({ status: 200, description: "The updated user.", schema: scimUserSchema }),
+      ...scimRefusals([INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND]),
+    },
   })
   .handle(async ({ app, input, raw, scope, response }, { connectionId }) =>
     scimJson({
@@ -569,8 +608,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(200, "The updated user.", scimUserSchema),
-    errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
+    responses: {
+      ...scimAnswer({ status: 200, description: "The updated user.", schema: scimUserSchema }),
+      ...scimRefusals([INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND]),
+    },
   })
   .handle(async ({ app, input, raw, scope, response }, { connectionId }) =>
     scimJson({
@@ -594,8 +635,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "Removes the member from the organization, drops the role bindings they held there, and deactivates their account. The LangWatch user record itself is kept, so past traces, evaluations and audit entries stay attributable.",
     tags: SCIM_TAGS,
-    responses: DEPROVISIONED,
-    errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
+    responses: {
+      ...DEPROVISIONED,
+      ...scimRefusals([UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND]),
+    },
   })
   .handle(async ({ app, input, scope, response }, { connectionId }) => {
     await app.deleteUser({ id: input.id, organizationId: scope.id, connectionId });
@@ -615,12 +658,14 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       'The organization\'s SCIM-provisioned access groups. Groups created in LangWatch itself are not listed: the directory sees what it provisioned, and nothing else. One filter expression is understood, `displayName eq "Engineering"`, matched without regard to case.',
     tags: SCIM_TAGS,
-    responses: scimAnswer(
-      200,
-      "A page of provisioned groups.",
-      scimListResponseSchema(scimGroupSchema),
-    ),
-    errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED],
+    responses: {
+      ...scimAnswer({
+        status: 200,
+        description: "A page of provisioned groups.",
+        schema: scimListResponseSchema(scimGroupSchema),
+      }),
+      ...scimRefusals([UNAUTHORIZED, PLAN_NOT_ENTITLED]),
+    },
   })
   .handle(async ({ app, input, scope, response }, { connectionId }) =>
     scimJson({
@@ -641,22 +686,29 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
+  .withStatus(201)
   .withDocs({
     summary: "Provision a group",
     description:
       "Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints return; an id that is not a member of the organization is skipped rather than failing the call, so a group can be provisioned before everyone in it is. Granting the group access is a separate step: a group carries no permissions until a role binding is created for it.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(201, "The provisioned group.", scimGroupSchema),
-    errors: [
-      INVALID_BODY,
-      UNAUTHORIZED,
-      PLAN_NOT_ENTITLED,
-      {
-        status: 409,
-        description:
-          "A provisioned group with this displayName already exists in the organization.",
-      },
-    ],
+    responses: {
+      ...scimAnswer({
+        status: 201,
+        description: "The provisioned group.",
+        schema: scimGroupSchema,
+      }),
+      ...scimRefusals([
+        INVALID_BODY,
+        UNAUTHORIZED,
+        PLAN_NOT_ENTITLED,
+        {
+          status: 409,
+          description:
+            "A provisioned group with this displayName already exists in the organization.",
+        },
+      ]),
+    },
   })
   .handle(async ({ app, raw, scope, response }, { connectionId }) =>
     scimJson({
@@ -681,8 +733,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "Reads one provisioned group and its members. A group that exists but was created in LangWatch rather than provisioned is not readable here.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(200, "The group.", scimGroupSchema),
-    errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
+    responses: {
+      ...scimAnswer({ status: 200, description: "The group.", schema: scimGroupSchema }),
+      ...scimRefusals([UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND]),
+    },
   })
   .handle(async ({ app, input, scope, response }, { connectionId }) =>
     scimJson({
@@ -707,8 +761,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "Replaces the group's display name and its membership with the body. Membership is a whole-resource write: a member absent from `members` is removed from the group, and omitting `members` empties it. Role bindings granted to the group are untouched.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(200, "The updated group.", scimGroupSchema),
-    errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
+    responses: {
+      ...scimAnswer({ status: 200, description: "The updated group.", schema: scimGroupSchema }),
+      ...scimRefusals([INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND]),
+    },
   })
   .handle(async ({ app, input, raw, scope, response }, { connectionId }) =>
     scimJson({
@@ -733,8 +789,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.",
     tags: SCIM_TAGS,
-    responses: scimAnswer(200, "The updated group.", scimGroupSchema),
-    errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
+    responses: {
+      ...scimAnswer({ status: 200, description: "The updated group.", schema: scimGroupSchema }),
+      ...scimRefusals([INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND]),
+    },
   })
   .handle(async ({ app, input, raw, scope, response }, { connectionId }) =>
     scimJson({
@@ -758,8 +816,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     description:
       "Deletes the group along with its memberships and every role binding granted through it, so the access it carried is revoked with it. The members themselves keep their organization membership and any access they hold directly.",
     tags: SCIM_TAGS,
-    responses: DEPROVISIONED,
-    errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
+    responses: {
+      ...DEPROVISIONED,
+      ...scimRefusals([UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND]),
+    },
   })
   .handle(async ({ app, input, scope, response }, { connectionId }) => {
     await app.deleteGroup({ externalScimId: input.id, organizationId: scope.id, connectionId });

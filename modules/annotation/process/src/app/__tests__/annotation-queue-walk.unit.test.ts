@@ -81,6 +81,7 @@ describe("annotation queue walk step", () => {
       });
     });
 
+    /** @scenario "A link to an item that is no longer waiting opens the first item still waiting" */
     it("lands a link to a finished item on the next thing waiting", async () => {
       const { app } = await appWithQueue(["trace-a", "trace-b"]);
       const first = await step(app);
@@ -105,6 +106,7 @@ describe("annotation queue walk step", () => {
       await expect(step(app)).resolves.toMatchObject({ queueFinished: false });
     });
 
+    /** @scenario "An item whose trace is gone does not hold the finished queue back" */
     it("calls the queue finished when no queued trace exists any more", async () => {
       const { app, resolvable } = await appWithQueue(["trace-a", "trace-b"]);
       resolvable.clear();

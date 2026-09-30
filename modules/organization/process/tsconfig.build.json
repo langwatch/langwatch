@@ -106,6 +106,12 @@
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/mail/tsconfig.declarations.json"
+    },
+    {
+      "path": "../../notification/contract/tsconfig.build.json"
     }
   ]
 }

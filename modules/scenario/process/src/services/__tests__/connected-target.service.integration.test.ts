@@ -68,6 +68,7 @@ function serviceFor(agent: Agent, status: "online" | "offline") {
 
 describe("ConnectedTargetService", () => {
   /** @scenario "A scenario run cannot target an offline connected agent" */
+  /** @scenario "A run plan cannot target an offline connected agent" */
   it("refuses an offline connected target", async () => {
     const agent = connectedAgent("agent-offline", "offline-agent");
     const { service } = serviceFor(agent, "offline");
@@ -85,6 +86,7 @@ describe("ConnectedTargetService", () => {
   });
 
   /** @scenario "A scenario run against an online connected agent resolves its target" */
+  /** @scenario "A run plan against an online connected agent is scheduled" */
   it("resolves a connected name and environment to its agent id", async () => {
     const agent = connectedAgent("agent-online", "online-agent");
     const { service, getById, getConnectedByNameAndEnvironment } = serviceFor(agent, "online");
@@ -109,6 +111,7 @@ describe("ConnectedTargetService", () => {
   });
 
   /** @scenario "A scenario run against an HTTP agent reads no presence" */
+  /** @scenario "An HTTP agent target is never offline" */
   it("does not consult agents for a non-connected target", async () => {
     const agent = connectedAgent("agent-unused", "unused-agent");
     const { service, getById, getConnectedByNameAndEnvironment } = serviceFor(agent, "online");

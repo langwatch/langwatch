@@ -4,7 +4,9 @@ import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import type {
   UiAgentActionsMenuProps,
   UiCustomGraphProps,
+  UiGuidedOnboardingOfferProps,
   UiInlineCommandPaletteProps,
+  UiPendingJoinRequestsProps,
   UiProjectDepartmentFieldProps,
 } from "@langwatch/browser-host/declarations";
 import { lazy, Suspense, useMemo } from "react";
@@ -27,6 +29,24 @@ export function InlineCommandPalette(props: UiInlineCommandPaletteProps) {
   ));
 }
 
+/** Onboarding's "Start guided onboarding" pill, drawn as onboarding lends it. */
+export function GuidedOnboardingOffer(props: UiGuidedOnboardingOfferProps) {
+  const declarations = useUiDeclarations();
+  // `lazy` once per declaration, never per render, so it is not remounted.
+  const lent = useMemo(
+    () =>
+      declarations
+        .declared("guidedOnboardingOffer")
+        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
+    [declarations],
+  );
+  return lent.map(({ key, Lent }) => (
+    <Suspense key={key} fallback={null}>
+      <Lent {...props} />
+    </Suspense>
+  ));
+}
+
 /** Organization's department row for a project, as organization lends it. */
 export function ProjectDepartmentField(props: UiProjectDepartmentFieldProps) {
   const declarations = useUiDeclarations();
@@ -35,6 +55,24 @@ export function ProjectDepartmentField(props: UiProjectDepartmentFieldProps) {
     () =>
       declarations
         .declared("projectDepartmentField")
+        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
+    [declarations],
+  );
+  return lent.map(({ key, Lent }) => (
+    <Suspense key={key} fallback={null}>
+      <Lent {...props} />
+    </Suspense>
+  ));
+}
+
+/** Organization's card of people waiting to join, drawn as organization lends it. */
+export function PendingJoinRequests(props: UiPendingJoinRequestsProps) {
+  const declarations = useUiDeclarations();
+  // `lazy` once per declaration, never per render, so it is not remounted.
+  const lent = useMemo(
+    () =>
+      declarations
+        .declared("pendingJoinRequests")
         .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
     [declarations],
   );

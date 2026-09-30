@@ -12,11 +12,15 @@ import type {
 export class RetentionPlanService implements DataRetentionPlanResolver {
   static create(options: {
     entitlement: Pick<EntitlementApi, "getActivePlan">;
+    isSaas: boolean;
   }): RetentionPlanService {
-    return new RetentionPlanService(options.entitlement);
+    return new RetentionPlanService(options.entitlement, options.isSaas);
   }
 
-  private constructor(private readonly entitlement: Pick<EntitlementApi, "getActivePlan">) {}
+  private constructor(
+    private readonly entitlement: Pick<EntitlementApi, "getActivePlan">,
+    private readonly isSaas: boolean,
+  ) {}
 
   async getPlan(input: {
     organizationId: string;
@@ -27,6 +31,6 @@ export class RetentionPlanService implements DataRetentionPlanResolver {
       ...(input.userId ? { user: { id: input.userId } } : {}),
     });
 
-    return { free: plan.free, uncapped: isEnterpriseTier(plan.type) };
+    return { free: plan.free, uncapped: !this.isSaas || isEnterpriseTier(plan.type) };
   }
 }

@@ -8,7 +8,9 @@ export const codexAgent: CodingAgentDefinition = {
   matches: (signal) => signalSays(signal, "codex"),
   namePrefixes: ["codex."],
 
-  sessionSpanNames: ["session_task.turn"],
+  // `turn/start` is a helper thread's app-server request span, admitted at ingestion only once
+  // it carries the helper's thread id under `langwatch.thread.id`.
+  sessionSpanNames: ["session_task.turn", "turn/start"],
   foldsToolRunsFromEvents: true,
   wrapperToolNames: ["exec"],
   logsRequireSessionKey: true,
@@ -19,8 +21,14 @@ export const codexAgent: CodingAgentDefinition = {
   // shared order would split turns into their own sessions. Guarded to
   // UUID shape since codex's OTHER spans stamp tokio worker id "10" here too.
   deriveSessionKeyFromSpan: ({ name, attrs }) => {
-    if (name !== "session_task.turn") return null;
-    const threadId = attrs["thread.id"];
+    // The helper's request span names its thread only through the ingestion stamp; its own
+    // `thread.id` is a tokio worker id.
+    const threadId =
+      name === "turn/start"
+        ? attrs["langwatch.thread.id"]
+        : name === "session_task.turn"
+          ? attrs["thread.id"]
+          : null;
     return typeof threadId === "string" && threadId.includes("-") ? threadId : null;
   },
 

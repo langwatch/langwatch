@@ -85,6 +85,21 @@ describe("TraceExportDownloadService", () => {
     expect(built.getTotalCount).not.toHaveBeenCalled();
   });
 
+  /** @scenario The export reads through the same redactions every other trace surface applies */
+  it("resolves the caller's own protections and reads every trace through them", async () => {
+    const { bounds } = boundsFake();
+    const built = buildService({ bounds });
+    const download = await built.service.download({ request, userId: "user-1" });
+
+    for await (const chunk of download.stream) void chunk;
+
+    expect(built.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: "project-1", userId: "user-1" }),
+    );
+    expect(built.getTotalCount).toHaveBeenCalledWith({ request, protections });
+    expect(built.exportTraces).toHaveBeenCalledWith(expect.objectContaining({ protections }));
+  });
+
   it("releases the claimed slot when sizing fails", async () => {
     const { bounds, slot } = boundsFake();
     const built = buildService({

@@ -25,6 +25,7 @@ function setup() {
 }
 
 describe("AgentService connected identity registration", () => {
+  /** @scenario "A register frame creates one row per agent name and environment" */
   it("creates one connected row for its name and environment", async () => {
     const { service, repository } = setup();
     const row = await service.registerConnected(registration);
@@ -39,6 +40,7 @@ describe("AgentService connected identity registration", () => {
     expect(await repository.findAll(registration)).toHaveLength(1);
   });
 
+  /** @scenario "A second register of the same identity updates the same row" */
   it("updates config and name on the same identity without changing its creation timestamp", async () => {
     const { service, repository } = setup();
     const first = await service.registerConnected(registration);
@@ -59,6 +61,7 @@ describe("AgentService connected identity registration", () => {
     expect(await repository.exists({ ...registration, id: "agent_2" })).toBe(false);
   });
 
+  /** @scenario "Two instances registering together settle on one row" */
   it("converges concurrent registrations on one stored Agent", async () => {
     const { service, repository } = setup();
     const [first, second] = await Promise.all([
@@ -74,6 +77,7 @@ describe("AgentService connected identity registration", () => {
     });
   });
 
+  /** @scenario "A reconnect of an unseen identity lists the row again" */
   it("refreshes stale presence and restores visibility without changing the Agent id", async () => {
     const { service, repository } = setup();
     const existing = await service.registerConnected(registration);
@@ -92,6 +96,7 @@ describe("AgentService connected identity registration", () => {
     expect((await service.getAll(registration)).map((agent) => agent.id)).toEqual([existing.id]);
   });
 
+  /** @scenario "A reconnect of an archived identity restores the row" */
   it("revives an archived identity instead of creating a new row", async () => {
     const { service, repository } = setup();
     const existing = await service.registerConnected(registration);

@@ -94,6 +94,7 @@ afterEach(cleanup);
 describe("given a reader who may create datasets in one of their projects and not in another", () => {
   describe("when they open the dataset replicate dialog", () => {
     /** @scenario "Replicating a dataset offers only the projects I may create datasets in" */
+    /** @scenario "Replication targets are the teams the reader may create datasets in" */
     it("offers only the project they may create datasets in", async () => {
       const Mount = await declaredMount();
       const lent = new LentCopyTargets();

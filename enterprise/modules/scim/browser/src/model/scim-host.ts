@@ -32,6 +32,9 @@ export abstract class ScimHostApi {
   /** Whether the reader holds a permission in the organization in scope. */
   abstract hasPermission(permission: string): boolean;
 
+  /** Whether a feature flag is on for the organization in scope. */
+  abstract isFeatureEnabled(flag: string): boolean;
+
   abstract succeeded(notice: ScimSuccessNotice): void;
 
   abstract failed(failure: ScimFailureNotice): void;

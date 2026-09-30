@@ -21,6 +21,12 @@ import {
   type LangyUiActionHandlers,
 } from "@langwatch/langy-browser-kit";
 import {
+  guidedKickoffPartOf,
+  guidedPathInProgress,
+  guidedPullRequestFromMessages,
+  isGuidedConversation,
+} from "@langwatch/onboarding-browser-kit";
+import {
   AppWindow,
   Braces,
   Check,
@@ -65,6 +71,7 @@ import {
   useLangyForeignTurnRehydration,
   useLangyTurnProjectionSeed,
 } from "../../behavior/panel/use-langy-engine-sync.ts";
+import { useLangyKickoffSend } from "../../behavior/panel/use-langy-kickoff-send.ts";
 import {
   useLangyChoiceAnswer,
   useLangyLocalWaits,
@@ -100,6 +107,7 @@ import {
   useLangyGithubRedrive,
   useLangyTurnFailure,
 } from "../../behavior/panel/use-langy-turn-failure.ts";
+import { useGuidedTour } from "../../behavior/use-guided-tour.ts";
 import { useLangyChatEngine } from "../../behavior/use-langy-chat-engine.ts";
 import { useLangyFreshness } from "../../behavior/use-langy-freshness.ts";
 import { useLangyStickToBottom } from "../../behavior/use-langy-stick-to-bottom.ts";
@@ -312,6 +320,8 @@ function LangyPanel({
   const pickModel = useLangyStore((s) => s.pickModel);
   const activeConversationId = useLangyStore((s) => s.activeConversationId);
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
+  const pendingKickoff = useLangyStore((s) => s.pendingKickoff);
+  const guidedTourRunning = useGuidedTour().useRunning();
   const pendingConversationId = useLangyStore((s) => s.pendingConversationId);
   const interruptedConversationId = useLangyStore((s) => s.interruptedConversationId);
   const pinnedFeedbackMessageId = useLangyStore((s) => s.pinnedFeedbackMessageId);
@@ -490,6 +500,17 @@ function LangyPanel({
     leaveReconnect: () => failure.setReconnectCodex(false),
     closeHistory: () => setHistoryOpen(false),
   });
+  useLangyKickoffSend({
+    projectId,
+    isBusy,
+    isRestoring: flags.isRestoring,
+    modelQueriesSettled: model.modelQueriesSettled,
+    langyNeedsModel: model.langyNeedsModel,
+    resetEngine: engine.resetEngine,
+    resetRecovery: failure.recovery.reset,
+    sendMessage: engine.sendMessage,
+    kickoffNamedRef: refs.kickoffNamedRef,
+  });
   const proposals = useLangyProposalApply({ proposalHandlersRef });
   const turnSignals = useLangyTurnSignals(activeConversationId);
   const view = useLangyTimeTravelView({
@@ -541,6 +562,17 @@ function LangyPanel({
     retryTurn: failure.retryTurn,
   });
 
+  // A guided conversation tells its pull request as a sentence before the proposal and as one
+  // card after the closing line; the progress receipt and the feedback ask stay out of the way.
+  const guided = useMemo(() => {
+    const conversation = isGuidedConversation(view.displayMessages);
+    return {
+      conversation,
+      inProgress: conversation && guidedPathInProgress(view.displayMessages),
+      pullRequest: conversation ? guidedPullRequestFromMessages(view.displayMessages) : null,
+    };
+  }, [view.displayMessages]);
+
   const live = !view.timeTravel;
   const transcript = (
     <LangyTranscript
@@ -563,6 +595,7 @@ function LangyPanel({
         onAskCodeAccessAgain: askCodeAccessAgain,
         interruptedConversationId,
         pinnedFeedbackMessageId,
+        guided,
       })}
       cardAnchorIndex={waitingCardsAnchor({
         turnInFlight: view.turnInFlight,
@@ -711,6 +744,15 @@ function LangyPanel({
                         onHistoryErrorAction: history.refetch,
                         restoringMessageCount: facts.restoringMessageCount,
                         hasPendingPrompt: !!pendingPrompt,
+                        // Before the kickoff message exists: in progress while the tour runs,
+                        // settled once it ended and the kickoff only waits to send.
+                        tourCard:
+                          guidedTourRunning || pendingKickoff
+                            ? {
+                                kickoff: guidedKickoffPartOf(pendingKickoff?.parts),
+                                organizationId: organizationId ?? null,
+                              }
+                            : null,
                         empty: {
                           panelWidth: placement.floatingPanelWidth,
                           suggestions: emptySuggestions,
@@ -719,26 +761,26 @@ function LangyPanel({
                       })}
                       transcript={transcript}
                     />
-                    {live ? (
+                    {live && (
                       <LangyFailureSurface
                         floating={floating}
                         failure={failure}
                         organizationId={organizationId}
                         onGithubConnected={onGithubConnected}
                       />
-                    ) : null}
+                    )}
                   </LangyConversationScroller>
-                  {activity.pinnedPlan ? (
+                  {activity.pinnedPlan && (
                     <LangyPinnedPlan floating={floating} plan={activity.pinnedPlan} />
-                  ) : null}
+                  )}
                   <LangyComposerNotice
                     floating={floating}
                     presentation={failure.turnError}
                     onDismiss={engine.clearError}
                   />
-                  {view.timeTravel ? (
+                  {view.timeTravel && (
                     <LangyTimeTravelVeil floating={floating} atMs={view.timeTravel.atMs} />
-                  ) : null}
+                  )}
                   {/* The composer reads the turn phase straight from the store (ADR-078). */}
                   <LangyComposerSlot inert={!live}>
                     <Composer

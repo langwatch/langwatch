@@ -8,9 +8,21 @@ import type {
   BrowserSessionResolution,
   BrowserSessionVerification,
 } from "@langwatch/auth-contract";
+import type * as observabilityModule from "@langwatch/observability";
 import { describe, expect, it, vi } from "vitest";
 
 import { AuthDoorService, type AuthDoorDeps } from "../auth-door.service.ts";
+
+const loggerSpies = vi.hoisted(() => ({
+  warn: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof observabilityModule>()),
+  createLogger: () => loggerSpies,
+}));
 
 const BASE_URL = "https://app.test";
 const SESSION_COOKIE = "better-auth.session_token=abc.sig";
@@ -90,6 +102,7 @@ describe("AuthDoorService", () => {
   });
 
   describe("when a state-changing call comes from another origin", () => {
+    /** @scenario "A cross-site sign-in post reaches no further than the refusal" */
     it("refuses it and never reaches Better Auth", async () => {
       const world = door();
 
@@ -106,6 +119,38 @@ describe("AuthDoorService", () => {
         code: "INVALID_ORIGIN",
       });
       expect(world.handler).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The refused address is recorded for whoever runs the installation" */
+    it("logs the address it expected beside the one it received", async () => {
+      loggerSpies.warn.mockClear();
+
+      await door().service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/sign-in/email`, {
+          method: "POST",
+          headers: { origin: "https://evil.test" },
+        }),
+      );
+
+      expect(loggerSpies.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedOrigin: BASE_URL, receivedOrigin: "https://evil.test" }),
+        expect.any(String),
+      );
+    });
+
+    it("lets an identity provider's SAML assertion post reach Better Auth", async () => {
+      const world = door();
+
+      const response = await world.service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/sso/saml2/sp/acs/ssoc_acme`, {
+          method: "POST",
+          headers: { origin: "https://idp.example.com" },
+          body: new URLSearchParams({ SAMLResponse: "assertion" }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(world.handler).toHaveBeenCalledTimes(1);
     });
 
     it("lets a read through whatever origin it names, so a callback still lands", async () => {

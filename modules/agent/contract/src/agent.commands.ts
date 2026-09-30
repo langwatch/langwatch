@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
 import type * as connectedModule from "./config/connected.ts";
@@ -69,7 +70,8 @@ const createAgentRequestVariants = [
 export const createAgentRequestSchema = z.discriminatedUnion("type", createAgentRequestVariants);
 
 const createAgentCommandBaseSchema = z.object({
-  id: z.string().optional(),
+  // Minted here, as on main, so the audited args carry the id the history reads by.
+  id: z.string().default(() => generate("agent").toString()),
   projectId: z.string(),
 });
 

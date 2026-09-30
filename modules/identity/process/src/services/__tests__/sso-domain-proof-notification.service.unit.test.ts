@@ -15,18 +15,28 @@ const CONNECTION = "ssoc_1";
 const DOMAIN = "acme.example";
 const GRACE_ENDS_AT = 1_756_172_800_000;
 
+const NOTICE = "sso-domain-proof:wavering:sso_conn_1:acme.example:1756000000000";
+
 const WAVERING = {
+  notificationKey: NOTICE,
   connectionId: CONNECTION,
   organizationId: ORG,
   domain: DOMAIN,
   graceEndsAtMs: GRACE_ENDS_AT,
 };
 
+const LAPSED = {
+  notificationKey: "sso-domain-proof:lapsed:sso_conn_1:acme.example:1756000000000",
+  connectionId: CONNECTION,
+  organizationId: ORG,
+  domain: DOMAIN,
+};
+
 function audience() {
   return {
-    findAdminEmails: vi.fn<SsoDomainProofAudience["findAdminEmails"]>(async () => [
-      "ana@acme.example",
-      "bo@acme.example",
+    findAdmins: vi.fn<SsoDomainProofAudience["findAdmins"]>(async () => [
+      { userId: "user_ana", email: "ana@acme.example" },
+      { userId: "user_bo", email: "bo@acme.example" },
     ]),
     getOrganizationName: vi.fn<SsoDomainProofAudience["getOrganizationName"]>(
       async () => "Acme Corp",
@@ -63,7 +73,29 @@ describe("who is told a domain's proof went missing", () => {
           recordLabel: "_langwatch-verification",
         },
         graceEndsAtMs: GRACE_ENDS_AT,
+        idempotencyKey: `${NOTICE}:user_ana`,
       });
+    });
+
+    /** @scenario "Each domain-proof mail carries a delivery key naming its notice and its administrator" */
+    it("gives each administrator's mail the notice's key and their own user id", async () => {
+      const sent = mail();
+      const service = SsoDomainProofNotificationService.create({
+        audience: audience(),
+        mail: sent,
+      });
+
+      await service.proofWavering(WAVERING);
+      await service.proofLapsed({ ...LAPSED, notificationKey: "sso-domain-proof:lapsed:k" });
+
+      expect(sent.sendProofWavering.mock.calls.map(([mailed]) => mailed.idempotencyKey)).toEqual([
+        `${NOTICE}:user_ana`,
+        `${NOTICE}:user_bo`,
+      ]);
+      expect(sent.sendProofLapsed.mock.calls.map(([mailed]) => mailed.idempotencyKey)).toEqual([
+        "sso-domain-proof:lapsed:k:user_ana",
+        "sso-domain-proof:lapsed:k:user_bo",
+      ]);
     });
 
     it("carries no token value, because only a fingerprint of it was ever kept", async () => {
@@ -80,6 +112,7 @@ describe("who is told a domain's proof went missing", () => {
         "adminEmail",
         "domain",
         "graceEndsAtMs",
+        "idempotencyKey",
         "organizationName",
         "record",
       ]);
@@ -115,7 +148,7 @@ describe("who is told a domain's proof went missing", () => {
     it("sends nothing at all when the organization has no administrator left", async () => {
       const sent = mail();
       const reads = audience();
-      reads.findAdminEmails.mockResolvedValue([]);
+      reads.findAdmins.mockResolvedValue([]);
       const service = SsoDomainProofNotificationService.create({ audience: reads, mail: sent });
 
       await service.proofWavering(WAVERING);
@@ -132,11 +165,7 @@ describe("who is told a domain's proof went missing", () => {
         mail: sent,
       });
 
-      await service.proofLapsed({
-        connectionId: CONNECTION,
-        organizationId: ORG,
-        domain: DOMAIN,
-      });
+      await service.proofLapsed(LAPSED);
 
       expect(sent.sendProofLapsed).toHaveBeenCalledTimes(2);
       expect(sent.sendProofLapsed).toHaveBeenCalledWith(
@@ -155,13 +184,7 @@ describe("who is told a domain's proof went missing", () => {
       const unaddressed = UnaddressedSsoDomainProofNotifications.create();
 
       await expect(unaddressed.proofWavering(WAVERING)).resolves.toBeUndefined();
-      await expect(
-        unaddressed.proofLapsed({
-          connectionId: CONNECTION,
-          organizationId: ORG,
-          domain: DOMAIN,
-        }),
-      ).resolves.toBeUndefined();
+      await expect(unaddressed.proofLapsed(LAPSED)).resolves.toBeUndefined();
     });
   });
 });

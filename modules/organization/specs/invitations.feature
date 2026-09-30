@@ -47,6 +47,26 @@ Feature: Invitation acceptance and role recomputation
     When it is sent again
     Then the second send is throttled and the recipient receives one mail
 
+  # invite-creation.service.ts, ses.organization-invite-mail.channel.ts; main's
+  # invite.service.ts sends through the same template on the configured gateway.
+  @unit
+  Scenario: An invitation is emailed through notification with its accept link
+    Given a deployment that names an email gateway
+    When an administrator invites a teammate
+    Then notification sends one mail to the invited address carrying the accept link
+
+  @unit
+  Scenario: An invitation reports it was not emailed when no gateway is named
+    Given a deployment that names no email gateway
+    When an administrator invites a teammate
+    Then the invitation is created and reports that its email was not sent
+
+  @unit
+  Scenario: An invitee's request for a fresh invitation emails each administrator
+    Given an organization with two administrators
+    When the invitee asks for a fresh invitation
+    Then notification sends one mail to each administrator naming the invited address
+
   @unit @unimplemented
   Scenario: Lowering a member's organization role narrows their team roles with it
     Given a member holding an admin team role under an admin organization role

@@ -148,6 +148,7 @@ describe("given an evaluation whose saved state already holds results for every 
 describe("given a backend run that filled some cells before it was stopped", () => {
   describe("when the run stops", () => {
     /** @scenario "A stopped backend run keeps the cells it already produced" */
+    /** @scenario "A stopped run started from the open page keeps the cells it produced" */
     it("writes the cells it produced into the workbench state", async () => {
       const { experiments, recordWorkbenchRunResults } = persistenceFor();
       const draft = foldedDraft(cellEvents({ rowIndex: 0, output: "before the stop", score: 1 }));

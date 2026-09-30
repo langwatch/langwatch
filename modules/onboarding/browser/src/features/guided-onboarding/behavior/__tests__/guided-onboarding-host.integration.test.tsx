@@ -7,12 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const invalidateGuidedState = vi.fn();
 const recordTourMutate = vi.fn();
+const attachConversationMutate = vi.fn();
 let recordTourOnSuccess: (() => void) | undefined;
 
 vi.mock("../../../../behavior/onboarding-api.ts", () => ({
   onboardingApi: {
     useUtils: () => ({ onboarding: { getGuidedState: { invalidate: invalidateGuidedState } } }),
     onboarding: {
+      attachConversation: { useMutation: () => ({ mutate: attachConversationMutate }) },
       recordTour: {
         useMutation: (opts: { onSuccess?: () => void }) => {
           recordTourOnSuccess = opts.onSuccess;
@@ -152,6 +154,7 @@ function guidedState(overrides: Record<string, unknown> = {}) {
 describe("GuidedOnboardingHost", () => {
   beforeEach(() => {
     recordTourMutate.mockClear();
+    attachConversationMutate.mockClear();
     invalidateGuidedState.mockClear();
     mockRegisterOnboardingExperiment.mockClear();
     recordTourOnSuccess = undefined;
@@ -233,10 +236,17 @@ describe("GuidedOnboardingHost", () => {
     expect(host.langyQueueKickoff).toHaveBeenCalledTimes(1);
     expect(host.langyQueueKickoff).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: "gateway",
-        orgName: "Acme",
-        firstName: "Ada",
-        tourStatus: "completed",
+        brief: expect.stringContaining("Guided onboarding kickoff."),
+        parts: [
+          expect.objectContaining({
+            type: "guided-onboarding-kickoff",
+            path: "gateway",
+            orgName: "Acme",
+            firstName: "Ada",
+            tourStatus: "completed",
+          }),
+          expect.objectContaining({ type: "text" }),
+        ],
       }),
     );
 
@@ -260,8 +270,35 @@ describe("GuidedOnboardingHost", () => {
     expect(host.langyDock).toHaveBeenCalledTimes(1);
     expect(useGuidedTourStore.getState().running).toBe(false);
     expect(host.langyQueueKickoff).toHaveBeenCalledWith(
-      expect.objectContaining({ path: "coding", tourStatus: "none" }),
+      expect.objectContaining({
+        parts: [
+          expect.objectContaining({ path: "coding", tourStatus: "none" }),
+          expect.objectContaining({ type: "text" }),
+        ],
+      }),
     );
+  });
+
+  /** @scenario "The panel attaches a fresh kickoff conversation to the organization" */
+  it("attaches the conversation the panel names, for a fresh kickoff only", () => {
+    guidedView = {
+      guided: true,
+      state: guidedState({ currentPath: "coding" }),
+      organizationId: "org_1",
+    };
+    const host = new TestOnboardingHost({
+      pathname: "/project/p1/traces",
+      organizationId: "org_1",
+    });
+    mount(host);
+
+    const queued = host.langyQueueKickoff.mock.calls[0]?.[0];
+    queued.onConversationNamed("conv_1");
+
+    expect(attachConversationMutate).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      conversationId: "conv_1",
+    });
   });
 
   /** @scenario "the tour never runs twice for the same path" */

@@ -10,7 +10,7 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "@langwatch/model-provider-contract";
 import type { TimeInput } from "@langwatch/time";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { useModelProviderToaster } from "../../behavior/model-provider-feedback.ts";
@@ -85,6 +85,8 @@ export type EditModelProviderFormProps = {
   onSaved?: (saved: GuidedSave) => void;
   /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
   guided?: boolean;
+  /** Why the connection did not happen: a refused credential, or a sign-in that failed or timed out. */
+  onFailed?: (failure: { provider: string; code: string }) => void;
 };
 
 export type { GuidedSave } from "../../behavior/use-guided-save.ts";
@@ -292,6 +294,7 @@ function ProviderCredentialsArea({
   fieldErrors,
   isOAuthDeviceProvider,
   guided,
+  onFailed,
   onSaved,
   organizationId,
   projectId,
@@ -307,6 +310,7 @@ function ProviderCredentialsArea({
   fieldErrors: Record<string, string>;
   isOAuthDeviceProvider: boolean;
   guided: boolean;
+  onFailed?: EditModelProviderFormProps["onFailed"];
   onSaved?: () => void;
   organizationId?: string;
   projectId: string;
@@ -333,6 +337,7 @@ function ProviderCredentialsArea({
   return (
     <CodexSignIn
       guided={guided}
+      onFailed={(code) => onFailed?.({ provider: provider.provider, code })}
       projectId={projectId}
       scopes={state.scopes}
       setAsCodingDefaults={false}
@@ -681,6 +686,7 @@ export const EditModelProviderForm = ({
   providerKey,
   onSaved: onSavedBy,
   guided = false,
+  onFailed,
 }: EditModelProviderFormProps) => {
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
@@ -886,6 +892,7 @@ export const EditModelProviderForm = ({
     validate: validateApiKey,
     isValidating: isValidatingApiKey,
     validationError: apiKeyValidationError,
+    validationErrorCode: apiKeyValidationErrorCode,
     clearError: clearApiKeyError,
   } = useModelProviderApiKeyValidation({
     provider: provider.provider,
@@ -901,6 +908,13 @@ export const EditModelProviderForm = ({
     customKeys: state.customKeys,
     resetKey: providerId,
   });
+
+  const reportRefusal = useEffectEvent((code: string) =>
+    onFailed?.({ provider: providerKey, code }),
+  );
+  useEffect(() => {
+    if (apiKeyValidationErrorCode) reportRefusal(apiKeyValidationErrorCode);
+  }, [apiKeyValidationErrorCode]);
 
   const handleSave = useCallback(async () => {
     // Clear previous errors
@@ -995,6 +1009,7 @@ export const EditModelProviderForm = ({
           fieldErrors={fieldErrors}
           isOAuthDeviceProvider={isOAuthDeviceProvider}
           guided={guided}
+          onFailed={onFailed}
           onSaved={onSaved}
           organizationId={organizationId}
           projectId={project?.id ?? ""}

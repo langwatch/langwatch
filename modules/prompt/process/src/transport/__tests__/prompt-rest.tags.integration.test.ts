@@ -64,6 +64,14 @@ function inMemoryTagDatabase(): PromptTagDatabase {
       ),
     findFirst: (args?: { where?: unknown }) =>
       Promise.resolve(rows.find((row) => matches(row, args?.where)) ?? null),
+    update: (args: { where?: unknown; data?: { name?: string } }) => {
+      const row = rows.find((candidate) => matches(candidate, args.where));
+      if (!row || typeof args.data?.name !== "string") {
+        return Promise.reject(new Error("unexpected tag update"));
+      }
+      row.name = args.data.name;
+      return Promise.resolve(row);
+    },
     delete: (args: { where?: unknown }) => {
       const at = rows.findIndex((row) => matches(row, args.where));
       return Promise.resolve(at === -1 ? null : rows.splice(at, 1)[0]);
@@ -125,12 +133,16 @@ function buildApi() {
       createTag: (input: { organizationId: string; name: string }) => tags.create(input),
       deleteTagByName: (input: { organizationId: string; name: string }) =>
         tags.deleteByName(input),
+      renameTag: (input: { organizationId: string; oldName: string; newName: string }) =>
+        tags.rename(input),
     }),
   });
   const app = createApiFixture<PromptApi>({
     listTags: (input: { organizationId: string }) => tags.getAll(input),
     createTagDefinition: (input: { organizationId: string; name: string }) =>
       catalogue.createTagDefinition(input),
+    renameTagDefinition: (input: { organizationId: string; oldName: string; newName: string }) =>
+      catalogue.renameTagDefinition(input),
     deleteTagDefinition: ({ organizationId, name }: { organizationId: string; name: string }) =>
       catalogue.deleteTagDefinition({ organizationId, name }),
   });
@@ -149,6 +161,12 @@ function buildApi() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
+      }),
+    renameTag: (name: string, newName: string) =>
+      family.request(`/api/prompts/tags/${name}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
       }),
     deleteTag: (name: string) => family.request(`/api/prompts/tags/${name}`, { method: "DELETE" }),
   };
@@ -192,6 +210,28 @@ describe("the prompt tag routes", () => {
       it("answers 201 and puts the tag in the org tag list", async () => {
         expect((await api.createTag("canary")).status).toBe(201);
         expect(await api.listTagNames()).toContain("canary");
+      });
+    });
+
+    describe("when the caller renames a tag over REST", () => {
+      /**
+       * @scenario "a renamed prompt tag is listed under its new name"
+       * @scenario "A key renaming a prompt tag needs the permission on its own project only"
+       */
+      it("answers 200 and lists the tag under its new name", async () => {
+        const response = await api.renameTag("staging", "canary");
+
+        expect(response.status).toBe(200);
+        expect(await api.listTagNames()).toContain("canary");
+        expect(await api.listTagNames()).not.toContain("staging");
+      });
+    });
+
+    describe("when a tag name carries a null byte", () => {
+      /** @scenario "a prompt field carrying a null byte is refused as a bad request" */
+      it("answers 400 on create and on rename instead of a database failure", async () => {
+        expect((await api.createTag("ca\u0000nary")).status).toBe(400);
+        expect((await api.renameTag("staging", "ca\u0000nary")).status).toBe(400);
       });
     });
 

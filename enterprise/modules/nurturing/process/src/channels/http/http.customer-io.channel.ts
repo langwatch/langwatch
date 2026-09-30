@@ -27,7 +27,8 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
     super();
     this.apiKey = options.config.customerIoApiKey;
     this.baseUrl =
-      options.config.customerIoRegion === "us" ? REGIONAL_ENDPOINTS.us : REGIONAL_ENDPOINTS.eu;
+      options.config.customerIoBaseUrl ??
+      (options.config.customerIoRegion === "us" ? REGIONAL_ENDPOINTS.us : REGIONAL_ENDPOINTS.eu);
     this.fetchFn = options.fetchFn ?? fetch;
     this.errorReporter = options.errorReporter;
   }

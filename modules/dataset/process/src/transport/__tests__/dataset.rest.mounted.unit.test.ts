@@ -752,36 +752,63 @@ describe("the mounted dataset REST family", () => {
   });
 
   describe("when one record is patched over a real request", () => {
-    it("answers 201 for a record it created and 200 for one it updated", async () => {
-      const record = {
+    const record = {
+      id: "rec-1",
+      datasetId: "dataset_1",
+      projectId: "project-1",
+      entry: { input: "updated" },
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+
+    async function patch({ created }: { created: boolean }) {
+      const upsertRecord = vi.fn(async () => ({ record, created }));
+      const { send } = mount({ upsertRecord });
+      const response = await send("PATCH", "/api/dataset/my-dataset/records/rec-1", {
+        entry: { input: "updated" },
+      });
+
+      return { response, upsertRecord };
+    }
+
+    /** @scenario "Update a record entry" */
+    it("answers 200 with the updated entry for a record that existed", async () => {
+      const { response, upsertRecord } = await patch({ created: false });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
         id: "rec-1",
-        datasetId: "dataset_1",
+        entry: { input: "updated" },
+      });
+      expect(upsertRecord).toHaveBeenCalledWith({
+        slugOrId: "my-dataset",
         projectId: "project-1",
-        entry: { input: "hi" },
-        createdAt: NOW,
-        updatedAt: NOW,
-      };
-      for (const [created, status] of [
-        [true, 201],
-        [false, 200],
-      ] as const) {
-        const upsertRecord = vi.fn(async () => ({ record, created }));
-        const { send } = mount({ upsertRecord });
+        recordId: "rec-1",
+        updatedRecord: { input: "updated" },
+      });
+    });
 
-        const response = await send("PATCH", "/api/dataset/my-dataset/records/rec-1", {
-          entry: { input: "hi" },
-        });
+    /** @scenario "Update a non-existent record creates it" */
+    it("answers 201 with the record it created", async () => {
+      const { response } = await patch({ created: true });
 
-        expect(response.status).toBe(status);
-        await expect(response.json()).resolves.toMatchObject({ id: "rec-1" });
-        expect(upsertRecord).toHaveBeenCalledWith(
-          expect.objectContaining({
-            slugOrId: "my-dataset",
-            recordId: "rec-1",
-            projectId: "project-1",
-          }),
-        );
-      }
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toMatchObject({ id: "rec-1" });
+    });
+
+    /** @scenario "Update a record for non-existent dataset returns 404" */
+    it("answers 404 when the project has no such dataset", async () => {
+      const { send } = mount({
+        upsertRecord: vi.fn(async () => {
+          throw new DatasetNotFoundError("no such dataset");
+        }) as never,
+      });
+
+      const response = await send("PATCH", "/api/dataset/ghost/records/rec-1", {
+        entry: { input: "x" },
+      });
+
+      expect(response.status).toBe(404);
     });
   });
 

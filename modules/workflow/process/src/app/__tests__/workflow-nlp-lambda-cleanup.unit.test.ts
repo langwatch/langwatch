@@ -16,11 +16,12 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import type { NlpPayloadStaging } from "../../channels/nlp-lambda.channel.ts";
 import { NLP_LAMBDA_CLEANUP_PROCESS_NAME } from "../../eventing/workflow-nlp-lambda-cleanup.process.ts";
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { WorkflowApp, type NlpLambdaFleet } from "../workflow.app.ts";
+import { WorkflowApp, type NlpLambdaArnCache, type NlpLambdaFleet } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 /** Decrypts nothing a test named - the sweep never reaches it. */
@@ -38,7 +39,7 @@ class NoopTestEncryption {
  * The App reads nothing off a setup but its members, so a test builds the one
  * it cares about rather than booting a process to reach one method.
  */
-function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
+async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowApp> {
   const members = createWorkflowTestInfrastructure(fleet ? { nlpLambdaFleet: fleet } : {});
 
   return WorkflowApp.create({
@@ -62,6 +63,7 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
     config: {
       stagingThresholdBytes: undefined,
       stagingTtlSeconds: 600,
+      codeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -73,6 +75,8 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
         "WorkflowProjectEnvironmentRepository",
       ),
       lineage: createApiFixture<WorkflowLineageRepository>({}, "WorkflowLineageRepository"),
+      nlpLambdaArns: createApiFixture<NlpLambdaArnCache>({}, "NlpLambdaArnCache"),
+      payloadStaging: createApiFixture<NlpPayloadStaging>({}, "NlpPayloadStaging"),
     },
   });
 }
@@ -101,7 +105,7 @@ describe("the studio's NLP Lambda sweep", () => {
   describe("given a deployment that composed no NLP Lambda account", () => {
     /** @scenario "A deployment that composed no Lambda account sweeps nothing on its daily wake" */
     it("reads nothing and succeeds", async () => {
-      await expect(runSweep(appWith())).resolves.toBeUndefined();
+      await expect(runSweep(await appWith())).resolves.toBeUndefined();
     });
   });
 
@@ -119,7 +123,7 @@ describe("the studio's NLP Lambda sweep", () => {
         deleteLogGroup: async () => {},
       };
 
-      await runSweep(appWith(fleet));
+      await runSweep(await appWith(fleet));
 
       expect(listFunctions).toHaveBeenCalledTimes(1);
       expect(deleteFunction).toHaveBeenCalledWith({ functionName: "langwatch_nlp_project-1" });

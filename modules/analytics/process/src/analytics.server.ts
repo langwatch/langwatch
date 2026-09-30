@@ -35,7 +35,7 @@ export const analyticsServer = defineServerModule("analytics")
   .withTransportFacts(() => [
     bindRestMiddleware(langWatchQLKeyReach, (context) => keyCredentialOfRequest(context.req.raw)),
   ])
-  // Worker-hosted: the access-model reconvergence watch (ADR-159).
+  // Worker-hosted: the access-model reconvergence watch (ADR-159) and the key-map row (§9).
   .withEventing(lwqlReconvergenceEventing);
 
 /**

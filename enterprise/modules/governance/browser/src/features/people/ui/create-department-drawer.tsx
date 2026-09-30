@@ -2,7 +2,7 @@
 
 import { Button, Field, HStack, Input, Spacer, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
@@ -30,7 +30,9 @@ export function CreateDepartmentDrawer({
 }) {
   const showErrorToast = useShowErrorToast();
   const toaster = useGovernanceToaster();
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const createMutation = api.departments.create.useMutation();
 
@@ -42,7 +44,7 @@ export function CreateDepartmentDrawer({
   const submit = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      toaster.create({ title: "Name is required", type: "error" });
+      setNameError("Give the department a name.");
       return;
     }
     try {
@@ -60,7 +62,13 @@ export function CreateDepartmentDrawer({
   };
 
   return (
-    <Drawer.Root open={open} onOpenChange={() => close()} placement="end" size="md">
+    <Drawer.Root
+      open={open}
+      onOpenChange={() => close()}
+      placement="end"
+      size="md"
+      initialFocusEl={() => nameInputRef.current}
+    >
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Add department</Drawer.Title>
@@ -68,18 +76,25 @@ export function CreateDepartmentDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
-            <Field.Root required>
-              <Field.Label>Name</Field.Label>
+            <Field.Root invalid={nameError !== null} required>
+              <Field.Label>Department name</Field.Label>
               <Input
+                ref={nameInputRef}
+                aria-label="Department name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && name.trim()) {
-                    void submit();
-                  }
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameError(null);
                 }}
-                placeholder="e.g. Engineering, Marketing"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void submit();
+                }}
+                placeholder="Engineering"
               />
+              <Field.HelperText>
+                Spend rolls up by department, including personal AI use.
+              </Field.HelperText>
+              <Field.ErrorText>{nameError}</Field.ErrorText>
             </Field.Root>
           </VStack>
         </Drawer.Body>
@@ -93,7 +108,6 @@ export function CreateDepartmentDrawer({
               colorPalette="orange"
               onClick={() => void submit()}
               loading={createMutation.isPending}
-              disabled={!name.trim()}
             >
               Create
             </Button>

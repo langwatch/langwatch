@@ -15,14 +15,12 @@ import {
   priorSessionSchema,
   signUpEnrollmentSchema,
   signUpVerificationRequestSchema,
-  signUpVerificationResultSchema,
 } from "./front-door.responses.ts";
 import {
   frontDoorEmailInputSchema,
   frontDoorInviteCodeInputSchema,
   frontDoorOwnAddressInputSchema,
   frontDoorRouteInputSchema,
-  frontDoorTokenInputSchema,
   signUpEnrollmentInputSchema,
 } from "./front-door.schemas.ts";
 
@@ -44,10 +42,6 @@ export const authTrpc = defineTrpcContract("auth")
   .mutation("requestSignUpVerification")
   .withInput(frontDoorEmailInputSchema)
   .withOutput(signUpVerificationRequestSchema)
-
-  .mutation("completeSignUpVerification")
-  .withInput(frontDoorTokenInputSchema)
-  .withOutput(signUpVerificationResultSchema)
 
   .query("inviteLanding")
   .withInput(frontDoorInviteCodeInputSchema)

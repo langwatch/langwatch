@@ -292,9 +292,15 @@ function routeWithoutDomain({
  * company saying how its people sign in.
  */
 export function routesToOrganizationConnection(decision: RoutingDecision): boolean {
-  return (
-    decision.outcome === "redirect_to_connection" &&
-    decision.methodSet.some((method) => method.connectionId !== null)
+  return organizationConnectionsOf(decision).length > 0;
+}
+
+/** The organization connections this decision hands the address to, the same question answered
+ *  with the connections rather than with a yes. */
+export function organizationConnectionsOf(decision: RoutingDecision): string[] {
+  if (decision.outcome !== "redirect_to_connection") return [];
+  return decision.methodSet.flatMap((method) =>
+    method.connectionId === null ? [] : [method.connectionId],
   );
 }
 

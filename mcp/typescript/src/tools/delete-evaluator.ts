@@ -4,7 +4,7 @@ import { deleteEvaluator as apiDeleteEvaluator } from "../langwatch-api-evaluato
  * Handles the platform_delete_evaluator MCP tool invocation.
  */
 export async function handleDeleteEvaluator(params: { idOrSlug: string }): Promise<string> {
-  const result = await apiDeleteEvaluator(params.idOrSlug);
+  await apiDeleteEvaluator(params.idOrSlug);
 
-  return `Evaluator ${result.id} has been archived (soft-deleted).`;
+  return `Evaluator ${params.idOrSlug} has been archived (soft-deleted).`;
 }

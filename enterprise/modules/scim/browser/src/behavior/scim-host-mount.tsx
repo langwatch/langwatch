@@ -62,6 +62,10 @@ class CapabilityScimHost extends ScimHostApi {
     return this.session.hasPermission(permission);
   }
 
+  isFeatureEnabled(flag: string): boolean {
+    return this.session.isFeatureEnabled(flag);
+  }
+
   succeeded(notice: ScimSuccessNotice): void {
     this.feedback.succeeded(notice);
   }

@@ -10,10 +10,10 @@ describe("webhook server configuration", () => {
   describe("given a deployment sets neither fence", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("keeps both fences closed", () => {
-      expect(read({})).toEqual({
-        allowInsecureLocalUrls: false,
-        allowAmbientAwsCredentials: false,
-      });
+      const config = read({});
+
+      expect(config.allowInsecureLocalUrls).toBe(false);
+      expect(config.allowAmbientAwsCredentials).toBe(false);
     });
   });
 
@@ -28,6 +28,16 @@ describe("webhook server configuration", () => {
     /** @scenario "An unreadable switch is refused instead of read as off" */
     it("refuses the boot rather than leaving the fence quietly closed", () => {
       expect(() => read({ WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS: "true" })).toThrow(ConfigParseError);
+    });
+  });
+
+  describe("given a deployment sets the standard proxy variables", () => {
+    /** @scenario "Queue deliveries follow the configured outbound proxy" */
+    it("reads each spelling for the SQS calls to follow", () => {
+      const { outboundProxy } = read({ https_proxy: "http://proxy.corp:8080", NO_PROXY: ".corp" });
+
+      expect(outboundProxy.https_proxy).toBe("http://proxy.corp:8080");
+      expect(outboundProxy.NO_PROXY).toBe(".corp");
     });
   });
 });

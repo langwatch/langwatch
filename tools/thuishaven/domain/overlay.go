@@ -432,6 +432,27 @@ func VoiceProviderEnv(resolved map[string]string, port int) []string {
 	return []string{fmt.Sprintf("ELEVENLABS_BASE_URL=http://127.0.0.1:%d", port)}
 }
 
+// AnalyticsProviderEnv points the product's PostHog (server and browser) and
+// nurturing's Customer.io client at analyticssim's haven route, with dummy keys
+// when none is set so both actually send. A host .env already names is left
+// alone. POSTHOG_HOST is the routed URL because posthog-js calls it from the page.
+func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string {
+	var env []string
+	for _, p := range []struct{ key, keyValue, host, hostValue string }{
+		{"POSTHOG_KEY", "phc_analyticssim", "POSTHOG_HOST", endpoint},
+		{"CUSTOMER_IO_API_KEY", "analyticssim", "CUSTOMER_IO_BASE_URL", endpoint + "/v1"},
+	} {
+		if resolved[p.host] != "" {
+			continue
+		}
+		env = append(env, p.host+"="+p.hostValue)
+		if resolved[p.key] == "" {
+			env = append(env, p.key+"="+p.keyValue)
+		}
+	}
+	return env
+}
+
 // LLMProviderEnv points the product's OpenAI and Anthropic providers at llmsim
 // on port: the base URL the seed, the gateway and LiteLLM read, plus a dummy
 // key when none is set. A provider whose base URL .env already names is left

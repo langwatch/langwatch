@@ -299,6 +299,9 @@ describe("a legacy project key's organization-wide gateway writes", () => {
     ] as const;
 
     /** @scenario "A legacy project key cannot aim a budget at another organization" */
+    /** @scenario A TEAM budget cannot target another org's team */
+    /** @scenario A GROUP budget cannot target another org's group */
+    /** @scenario A PRINCIPAL budget must target a member of the org */
     it.each(foreignScopes)(
       "refuses the %s scope by code and writes nothing",
       async (_name, scope, status, code) => {

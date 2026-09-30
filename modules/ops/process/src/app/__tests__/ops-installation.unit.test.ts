@@ -186,10 +186,10 @@ describe("ops app installation", () => {
 
   describe("given the deployment asks for Cloud admin (LANGWATCH_CLOUD_OPS)", () => {
     /** @scenario "Asking for Cloud admin without a matching licence key refuses boot" */
-    it("refuses boot naming both variables when no licence private key is held", async () => {
-      await expect(process("api", [], void 0, void 0, { asked: true }).boot()).rejects.toThrow(
-        /LANGWATCH_CLOUD_OPS.*LANGWATCH_LICENSE_PRIVATE_KEY/,
-      );
+    it("refuses boot with the key mismatch code when no licence private key is held", async () => {
+      await expect(
+        process("api", [], void 0, void 0, { asked: true }).boot(),
+      ).rejects.toMatchObject({ code: "cloud_ops_key_mismatch" });
     });
 
     /** @scenario "Asking for Cloud admin without a matching licence key refuses boot" */
@@ -199,7 +199,7 @@ describe("ops app installation", () => {
 
       await expect(
         process("api", [], void 0, void 0, { asked: true, privateKey: other }).boot(),
-      ).rejects.toThrow(/LANGWATCH_CLOUD_OPS.*LANGWATCH_LICENSE_PRIVATE_KEY/);
+      ).rejects.toMatchObject({ code: "cloud_ops_key_mismatch" });
     });
   });
 

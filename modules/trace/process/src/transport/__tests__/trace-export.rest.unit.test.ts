@@ -25,7 +25,17 @@ async function* downloadStream(contents: string): AsyncGenerator<Uint8Array> {
   yield encoder.encode(contents);
 }
 
-function buildApi() {
+class SignInRequiredError extends HandledError {
+  constructor() {
+    super("unauthenticated", "Sign in to download traces", { httpStatus: 401 });
+    this.name = "SignInRequiredError";
+  }
+}
+
+function buildApi({
+  signedIn = true,
+  permitted = true,
+}: { signedIn?: boolean; permitted?: boolean } = {}) {
   const downloadTraceExport = vi.fn(async () => ({
     exportId: "export-1",
     totalCount: 2,
@@ -36,8 +46,11 @@ function buildApi() {
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({ actor: { type: "user", id: "user-1" }, scope: null }),
-      identify: () => ({ actor: { type: "user", id: "user-1" }, scope: null }),
-      authorize: () => ({ permitted: true, organizationRole: null }),
+      identify: () => {
+        if (!signedIn) throw new SignInRequiredError();
+        return { actor: { type: "user", id: "user-1" }, scope: null };
+      },
+      authorize: () => ({ permitted, organizationRole: null }),
     },
   });
   const hono = runtime.mount(traceExportRest.router(), {
@@ -64,6 +77,27 @@ function buildApi() {
 }
 
 describe("POST /api/export/traces/download", () => {
+  /** @scenario An anonymous caller is refused before anything is read */
+  it("refuses a request nobody is signed in behind without reading a trace", async () => {
+    const { download, downloadTraceExport } = buildApi({ signedIn: false });
+
+    const response = await download();
+
+    expect(response.status).toBe(401);
+    expect(downloadTraceExport).not.toHaveBeenCalled();
+  });
+
+  /** @scenario A signed-in caller without permission on the project is refused */
+  it("refuses a person without traces:view on the project without reading a trace", async () => {
+    const { download, downloadTraceExport } = buildApi({ permitted: false });
+
+    const response = await download();
+
+    expect(response.status).toBe(403);
+    expect(downloadTraceExport).not.toHaveBeenCalled();
+  });
+
+  /** @scenario The download is reachable on a deployment that composed it */
   it("forwards the parsed request and authenticated actor to Trace, then returns its bytes", async () => {
     const { download, downloadTraceExport } = buildApi();
 

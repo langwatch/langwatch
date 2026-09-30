@@ -80,7 +80,7 @@ endif
 # runs it first; a console that fails to build (--no-bail keeps the others)
 # serves a page naming this target instead.
 haven-web:
-	@pnpm exec nx run-many -t build -p @langwatch/haven-web @langwatch/mailsim-web @langwatch/idpsim-web @langwatch/storagesim-web @langwatch/voicesim-web @langwatch/llmsim-web --outputStyle=static
+	@pnpm exec nx run-many -t build -p @langwatch/haven-web @langwatch/mailsim-web @langwatch/idpsim-web @langwatch/storagesim-web @langwatch/voicesim-web @langwatch/llmsim-web @langwatch/analyticssim-web --outputStyle=static
 
 # =============================================================================
 # LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)

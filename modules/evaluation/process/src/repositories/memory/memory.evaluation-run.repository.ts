@@ -129,6 +129,10 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
     return this.#runs.get(`${input.tenantId}\u0000${input.evaluationId}`)?.inputs ?? null;
   }
 
+  async countRuns(input: { tenantId: string }): Promise<number> {
+    return this.#tenantRuns(input.tenantId).length;
+  }
+
   #tenantRuns(tenantId: string): EvaluationRunData[] {
     return [...this.#runs.entries()]
       .filter(([key]) => key.startsWith(`${tenantId}\u0000`))

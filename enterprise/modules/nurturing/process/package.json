@@ -23,6 +23,7 @@
   "dependencies": {
     "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",

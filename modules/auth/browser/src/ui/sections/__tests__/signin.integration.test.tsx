@@ -1,35 +1,37 @@
 /**
  * @vitest-environment jsdom
- * Sign-in: forgot-password entry, SSO hide credential form, auth bounce same-origin.
+ * The sign-in page: a signed-in arrival bounces same-origin only, and a
+ * signed-out arrival says so instead of asking for an address.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockSignIn, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() => ({
-  mockSignIn: vi.fn(),
+const { routeMock, sessionRef, searchParamsRef, replace } = vi.hoisted(() => ({
+  routeMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
-  publicEnvRef: {
-    current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
-  },
   searchParamsRef: { current: new URLSearchParams("") },
+  replace: vi.fn(),
 }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
   const actual = await importOriginal<typeof authClientModule>();
-  return {
-    ...actual,
-    signIn: mockSignIn,
-    useSession: () => sessionRef.current,
-  };
+  return { ...actual, signIn: vi.fn(), useSession: () => sessionRef.current };
 });
 
-// A full-page navigation goes through this seam rather than `window.location`:
-// jsdom defines `location` as non-configurable, so replacing it throws, and
-// assigning for real is a navigation jsdom can't implement or record. Mocking
-// the module is the only way to see the redirect.
-const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+vi.mock("../../../behavior/auth-api.ts", () => ({
+  authApi: {
+    auth: {
+      route: { useMutation: () => ({ mutateAsync: routeMock, isPending: false, error: null }) },
+      priorSession: { useQuery: () => ({ data: undefined }) },
+      requestSignUpVerification: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+      },
+    },
+  },
+}));
 
+// jsdom's `location` cannot be replaced, so the navigation seam is mocked.
 vi.mock("../../../behavior/browser-navigation.ts", () => ({
   replaceLocation: replace,
   hardNavigate: vi.fn(),
@@ -41,79 +43,35 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 }));
 
 vi.mock("../../../behavior/use-public-env.ts", () => ({
-  usePublicEnv: () => ({ data: publicEnvRef.current }),
+  usePublicEnv: () => ({ data: { NEXTAUTH_PROVIDER: "email" } }),
 }));
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import SignIn from "../signin-screen.tsx";
 
-const renderPage = () => {
-  const view = render(
+const renderPage = () =>
+  render(
     <ChakraProvider value={defaultSystem}>
       <SignIn />
     </ChakraProvider>,
   );
-  return view;
-};
-
-describe("SignIn forgot-password entry point", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    sessionRef.current = { data: null };
-    publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
-    searchParamsRef.current = new URLSearchParams("");
-  });
-
-  afterEach(() => {
-    cleanup();
-  });
-
-  describe("when the deployment uses credential (email) mode", () => {
-    /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
-    it("renders the email/password form with a link to forgot-password", () => {
-      const { container } = renderPage();
-
-      expect(container.querySelector('input[type="email"]')).not.toBeNull();
-      expect(container.querySelector('input[type="password"]')).not.toBeNull();
-      const link = screen.getByRole("link", { name: /forgot password/i });
-      expect(link.getAttribute("href")).toBe("/auth/forgot-password");
-    });
-  });
-
-  describe("when the deployment uses an SSO identity provider", () => {
-    it("renders no credential form and no forgot-password link", () => {
-      publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0" };
-      const { container } = renderPage();
-
-      expect(container.querySelector('input[type="email"]')).toBeNull();
-      expect(container.querySelector('input[type="password"]')).toBeNull();
-      expect(screen.queryByRole("link", { name: /forgot password/i })).toBeNull();
-    });
-  });
-});
 
 describe("SignIn already-authenticated redirect", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionRef.current = { data: { user: { id: "user-1" } } };
-    publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
-
-    replace.mockClear();
   });
 
-  afterEach(() => {
-    cleanup();
-  });
+  afterEach(() => cleanup());
 
   describe("given a protocol-relative callbackUrl (@regression: open redirect via //host)", () => {
     it("falls back to the dashboard instead of following it off-domain", async () => {
       searchParamsRef.current = new URLSearchParams("callbackUrl=//evil.example.com");
       renderPage();
 
-      await waitFor(() => {
-        expect(replace).toHaveBeenCalledTimes(1);
-      });
+      await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
       expect(replace).toHaveBeenCalledWith("/");
+      expect(routeMock).not.toHaveBeenCalled();
     });
   });
 
@@ -122,10 +80,28 @@ describe("SignIn already-authenticated redirect", () => {
       searchParamsRef.current = new URLSearchParams("callbackUrl=/settings/members");
       renderPage();
 
-      await waitFor(() => {
-        expect(replace).toHaveBeenCalledTimes(1);
-      });
+      await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
       expect(replace).toHaveBeenCalledWith("/settings/members");
     });
+  });
+});
+
+describe("SignIn after signing out", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionRef.current = { data: null };
+    searchParamsRef.current = new URLSearchParams("signedOut=1");
+  });
+
+  afterEach(() => cleanup());
+
+  it("says so and offers the way back in, asking the router nothing", () => {
+    renderPage();
+
+    expect(screen.getByText("You’ve signed out of LangWatch.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Log in again" }).getAttribute("href")).toBe(
+      "/auth/signin",
+    );
+    expect(routeMock).not.toHaveBeenCalled();
   });
 });

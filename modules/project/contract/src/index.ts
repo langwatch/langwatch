@@ -1,5 +1,6 @@
 export * from "./project.ts";
 export * from "./project.errors.ts";
+export * from "./project.events.ts";
 export * from "./project.responses.ts";
 export * from "./project-rest.schemas.ts";
 export * from "./project.api.ts";

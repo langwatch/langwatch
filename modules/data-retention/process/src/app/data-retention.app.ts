@@ -194,7 +194,10 @@ export class DataRetentionApp implements DataRetentionApiContract {
     const policy = DataRetentionPolicyService.create({
       directory: repositories.directory,
       permissions,
-      plans: RetentionPlanService.create({ entitlement: dependencies.entitlement }),
+      plans: RetentionPlanService.create({
+        entitlement: dependencies.entitlement,
+        isSaas: config.isSaas,
+      }),
       administrators: dependencies.users,
     });
 

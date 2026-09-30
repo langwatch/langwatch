@@ -11,6 +11,7 @@ const TRANSPORT = "modules/widget/process/src/transport/widget.api.ts";
 const REST_FAMILY = "modules/widget/process/src/transport/api-rest/widget.api.ts";
 const TRPC_FAMILY = "modules/widget/process/src/transport/api-trpc/widget.api.ts";
 const SERVICE = "modules/widget/process/src/services/widget.service.ts";
+const SERVER = "modules/widget/process/src/widget.server.ts";
 
 function report(code, filename = TRANSPORT) {
   return runRule(transportDeclaresRule, { code, cwd: workspace.cwd, filename });
@@ -571,6 +572,101 @@ describe("given a transport that talks to Hono, the context bag or a string disp
     ].join("\n");
 
     expect(report(code)).toEqual([]);
+  });
+});
+
+describe("given a handler that re-checks its own input", () => {
+  /** @scenario "A handler that refuses a missing input field is sent to the route's schema" */
+  it("reports each presence check that throws, and still reports the handler's other branch", () => {
+    const code = [
+      'rest.post("/runs").handle(({ app, input }) => {',
+      "  const { projectId, ...body } = input;",
+      "  if (!projectId) throw new ProjectRequiredError();",
+      "  if (body.name === undefined || !body.name.trim()) {",
+      "    throw new NameRequiredError();",
+      "  }",
+      "  if (body.dryRun) return undefined;",
+      "  return app.workflows.run({ projectId, ...body });",
+      "});",
+      'rest.get("/runs").handle((context) => {',
+      "  if (context.input.ids.length === 0) throw new IdsRequiredError();",
+      "  return context.app.workflows.list(context.input);",
+      "});",
+    ].join("\n");
+
+    expect(found(code)).toEqual([
+      ["handlerChecksInput", 3],
+      ["handlerChecksInput", 4],
+      ["handlerControlFlow", 7],
+      ["handlerChecksInput", 11],
+    ]);
+  });
+
+  it("leaves a check on anything but the input, or one that does not throw, to handlerControlFlow", () => {
+    const code = [
+      'rest.post("/a").handle(({ app, input, actor }) => {',
+      "  if (!actor.id) throw new UnauthenticatedError();",
+      "  return app.widgets.get(input);",
+      "});",
+      'rest.post("/b").handle(({ app, input }) => {',
+      "  if (!input.name) return [];",
+      "  return app.widgets.get(input);",
+      "});",
+    ].join("\n");
+
+    expect(found(code)).toEqual([
+      ["handlerControlFlow", 2],
+      ["handlerControlFlow", 6],
+    ]);
+  });
+});
+
+describe("given a transport or server file that re-checks the request itself", () => {
+  /** @scenario "A transport or middleware binding that re-checks the request's media type or body is refused" */
+  it("reports a middleware binding that decides on the media type or reads the body", () => {
+    const code = [
+      'import { bindRestMiddleware } from "@langwatch/api/rest";',
+      "export const facts = [",
+      "  bindRestMiddleware(bodyIsJson, (context) =>",
+      '    Boolean(context.req.header("content-type")?.includes("application/json")),',
+      "  ),",
+      "  bindRestMiddleware(payload, async (context) => context.req.json()),",
+      '  bindRestMiddleware(caller, (context) => context.req.header("authorization")),',
+      "];",
+    ].join("\n");
+
+    expect(found(code, SERVER)).toEqual([
+      ["mediaTypeCheck", 4],
+      ["requestBodyRead", 6],
+    ]);
+  });
+
+  it("reports a transport that compares the media type, directly or through a name", () => {
+    const code = [
+      "function readBody(request: Request, raw: string) {",
+      '  const contentType = request.headers.get("content-type");',
+      '  if (!contentType?.includes("application/json")) return undefined;',
+      "  return JSON.parse(raw);",
+      "}",
+      "function decode(request: Request, raw: string) {",
+      '  const contentType = request.headers.get("content-type") ?? undefined;',
+      "  return parseOtlp(raw, contentType);",
+      "}",
+      'const isForm = (headers: Record<string, string>) => headers["Content-Type"] === "text/plain";',
+      'export const outgoing = { headers: { "Content-Type": "application/json" } };',
+    ].join("\n");
+
+    expect(found(code)).toEqual([
+      ["mediaTypeCheck", 3],
+      ["mediaTypeCheck", 10],
+    ]);
+  });
+
+  it("does not read a service, which may compare an upstream response's media type", () => {
+    const code =
+      'export const isJson = (response: Response) => response.headers.get("content-type") === "application/json";';
+
+    expect(report(code, SERVICE)).toEqual([]);
   });
 });
 

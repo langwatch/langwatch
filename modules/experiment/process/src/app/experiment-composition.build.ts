@@ -81,7 +81,10 @@ import { ExperimentWorkbenchTargetNamesService } from "../services/experiment-wo
 import { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
 import { ExperimentWorkflowSourceService } from "../services/experiment-workflow-source.service.ts";
 import { ExperimentService } from "../services/experiment.service.ts";
-import type { ExperimentWorkbenchObserver } from "./experiment-workbench.members.ts";
+import type {
+  ExperimentRanAnnouncer,
+  ExperimentWorkbenchObserver,
+} from "./experiment-workbench.members.ts";
 import type {
   ExperimentAppDependencies,
   ExperimentBroadcast,
@@ -512,6 +515,8 @@ export function buildExperimentInfrastructure(input: {
   runConcurrency: number;
   /** The fence a run reads a row's attachment link behind. */
   attachmentEgress: ExperimentAttachmentEgressPolicy;
+  /** Where a workbench run that ended is announced, as the lifecycle pipeline's own send. */
+  announceRan: ExperimentRanAnnouncer;
   dependencies: {
     workflows: WorkflowApi;
     dataset: DatasetApi;
@@ -533,7 +538,7 @@ export function buildExperimentInfrastructure(input: {
     /** Each tenant's traces retention, which DSPy step rows are stamped with. */
     retention: Pick<DataRetentionApi, "getRetentionDays">;
   };
-}): Omit<ExperimentAppDependencies, "runLookup" | "runProcessing"> & {
+}): Omit<ExperimentAppDependencies, "runLookup" | "runProcessing" | "lifecycle"> & {
   runCells: ExperimentRunCells;
 } {
   const { prisma, clickhouse, redis, logger, execution, publicBaseUrl, dependencies } = input;
@@ -607,15 +612,24 @@ export function buildExperimentInfrastructure(input: {
       requests: execution,
       baseUrl: publicBaseUrl,
     }),
-    workbenchObserver: loggedObserver(logger),
+    workbenchObserver: announcingObserver({ logger, announce: input.announceRan }),
   };
 }
 
-/** Where a run is recorded and an unnamed workbench failure reported. Both best-effort. */
-function loggedObserver(logger: Logger): ExperimentWorkbenchObserver {
+/** Where a run that ended is announced and an unnamed workbench failure reported. Both best-effort. */
+function announcingObserver(input: {
+  logger: Logger;
+  announce: ExperimentRanAnnouncer;
+}): ExperimentWorkbenchObserver {
+  const { logger, announce } = input;
   return {
-    recordExperimentRan: (input) => {
-      logger.debug(input, "an experiment ran; no product-analytics sink is composed to record it");
+    recordExperimentRan: (ran) => {
+      void announce(ran).catch((error: unknown) =>
+        logger.error(
+          { error, projectId: ran.projectId },
+          "the experiment ran event was not recorded",
+        ),
+      );
     },
     reportError: (error, context) => {
       logger.error({ error, ...context }, "an unnamed workbench failure");

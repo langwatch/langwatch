@@ -4,9 +4,10 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { type FoldProjectionStore, createTenantId } from "@langwatch/eventing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { LogApi } from "@langwatch/log-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { Logger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
@@ -54,6 +55,8 @@ import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-
 import { SpanCostService } from "../services/span-cost.service.ts";
 import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
+import { TraceEdgeMediaPayloadService } from "../services/trace-edge-media-payload.service.ts";
+import { TraceEdgeMediaTelemetryService } from "../services/trace-edge-media-telemetry.service.ts";
 import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
 import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
@@ -76,6 +79,7 @@ import { TraceQueryClassificationService } from "../services/trace-query-classif
 import { TraceRetentionFloorService } from "../services/trace-retention-floor.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
 import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
+import { TraceStoredMediaStoreService } from "../services/trace-stored-media-store.service.ts";
 import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
 import { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
 import {
@@ -222,6 +226,11 @@ export type TraceReaderCompositionOptions = {
   instantEvals?: TraceAppDependencies["instantEvals"];
   codingAgents: TraceAppDependencies["codingAgents"];
   storedObjects: TraceAppDependencies["storedObjects"];
+  /**
+   * Gates the edge media hook (`release_trace_media_extraction`). Absent, the
+   * ingestion doors externalise nothing, as with the flag off.
+   */
+  featureFlags?: FeatureFlagApi | undefined;
   presence?: TraceAppDependencies["presence"];
   share: TraceAppDependencies["share"];
   broadcast: TraceAppDependencies["broadcast"];
@@ -285,6 +294,18 @@ export function composeTraceAppDependencies(
   const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
   const spanStorageRepository = options.repositories.spanStorage;
   const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
+  const edgeMedia = options.featureFlags
+    ? TraceEdgeMediaPayloadService.create({
+        deps: {
+          featureFlags: options.featureFlags,
+          hasContentDropRules: (projectId) =>
+            options.protections.dataPrivacy.dropsAnyContent({ projectId }),
+          telemetry: TraceEdgeMediaTelemetryService.create(),
+          service: TraceStoredMediaStoreService.create(options.storedObjects),
+        },
+        logger: createLogger("langwatch:traces:edge-media-extraction"),
+      })
+    : undefined;
   const logRecords = LogRecordStorageService.create({
     repository: options.repositories.logRecords,
     canonical: options.logs,
@@ -382,6 +403,7 @@ export function composeTraceAppDependencies(
       codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
       dedup: options.dedup,
       commands: TraceComposedIngressCommand.create(options.commands),
+      ...(edgeMedia ? { payloads: edgeMedia } : {}),
     }),
     viewer: TraceViewerReadService.create({
       read,

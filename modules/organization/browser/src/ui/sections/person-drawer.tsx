@@ -49,8 +49,8 @@ export function PersonDrawer({ open = true, userId }: { open?: boolean; userId?:
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Drawer.Title>
-            <Heading size="lg">Person</Heading>
+          <Drawer.Title textStyle="lg" fontWeight="semibold">
+            Person
           </Drawer.Title>
           <Drawer.CloseTrigger onClick={closeDrawer} />
         </Drawer.Header>

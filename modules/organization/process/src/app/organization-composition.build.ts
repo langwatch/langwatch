@@ -14,6 +14,7 @@ import {
 } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { Logger } from "@langwatch/observability";
 import type {
   LimitCheckResult,
@@ -26,6 +27,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 
+import { organizationInviteMailChannels } from "../channels/organization-invite-mail-channels.registry.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
@@ -552,8 +554,8 @@ function organizationDirectory(options: {
 
 /**
  * `InviteService` composed from this process's own reads plus the peers
- * `ServerOrganizationApp` depends on. Mail and the workspace-size census
- * stay uncomposed — their absence is supported: invitations still write and carry an accept URL.
+ * `ServerOrganizationApp` depends on. The workspace-size census stays
+ * uncomposed: its absence is supported, the invitation mail just says less.
  */
 function organizationInvitations(input: {
   prisma: ProcessMembers["prisma"];
@@ -564,6 +566,7 @@ function organizationInvitations(input: {
   entitlement: Pick<EntitlementApi, "getActivePlan">;
   permissions: AuthzApi;
   roles: InviteAssignableRoles;
+  notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
 }): OrganizationInvitations {
   const repository = PrismaOrganizationInviteRepository.create({ database: input.prisma });
   const throttle = InviteSendThrottleService.create(
@@ -579,6 +582,7 @@ function organizationInvitations(input: {
     roles: input.roles,
     throttle,
     baseHost: input.baseHost,
+    mail: organizationInviteMailChannels.ses.create({ notifications: input.notifications }),
   });
 
   return InviteServiceOrganizationInvitations.create({
@@ -613,6 +617,7 @@ export function buildOrganizationInfrastructure(input: {
     permissions: AuthzApi;
     roles: InviteAssignableRoles;
     governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
+    notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
   };
 }): OrganizationInfrastructure {
   const { prisma, logger, dependencies } = input;
@@ -648,6 +653,7 @@ export function buildOrganizationInfrastructure(input: {
       entitlement: dependencies.entitlement,
       permissions: dependencies.permissions,
       roles: dependencies.roles,
+      notifications: dependencies.notifications,
     }),
     // The sender-scoped creation counter: same fixed-window adapter the
     // resend throttle spends, so both invite limits live behind one port.

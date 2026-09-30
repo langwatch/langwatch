@@ -26,9 +26,9 @@ export const frontDoorAskedSchema = z.object({ asked: z.boolean() }).strict();
 export type FrontDoorAsked = z.infer<typeof frontDoorAskedSchema>;
 
 /**
- * What a spent confirmation link resolved to: the address it confirmed, whether
- * spending it brought the account into being, and — only where no account stands
- * behind the address — the single-use proof `user.register` spends.
+ * `POST /api/auth/sign-up/confirm-address`: the address a spent link confirmed, whether
+ * an account stands behind it, the single-use proof `user.register` spends where none
+ * does, and whether this spend opened a session.
  */
 export const signUpVerificationResultSchema = z
   .object({
@@ -36,6 +36,7 @@ export const signUpVerificationResultSchema = z
     accountCreated: z.boolean(),
     accountExists: z.boolean(),
     addressProof: z.string().nullable(),
+    signedIn: z.boolean(),
   })
   .strict();
 export type SignUpVerificationResult = z.infer<typeof signUpVerificationResultSchema>;

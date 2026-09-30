@@ -6,6 +6,8 @@ import {
   IssuedLicenseNotActiveError,
   IssuedLicenseNotFoundError,
   LicenseAlreadyRegisteredError,
+  LicenseKeyInvalidError,
+  LicenseOverageMaxRequiresOverageError,
   LicenseSigningNotConfiguredError,
   type IssuedLicenseCustomerRecord,
 } from "@langwatch/enterprise-licensing-contract";
@@ -538,5 +540,84 @@ describe("the seats a connected customer holds", () => {
       lastSyncAt: "2026-06-02T06:00:00Z",
       managedVirtualKeyId: "vk-managed",
     });
+  });
+});
+
+describe("registering a license signed before the registry existed", () => {
+  /** @scenario "A license issued before the registry existed is registered by pasting it" */
+  it("verifies the signature and reads the seats and term from the license", async () => {
+    const { licenseKey } = await harness().registry.issue(issueInput({ maxMembers: 7 }));
+    const { registry, organizations } = harness();
+
+    const view = await registry.registerLegacy({
+      licenseKey,
+      organizationId: "org-acme",
+      operatorId: "operator-2",
+    });
+
+    expect(view.organizationId).toBe("org-acme");
+    expect(view.maxMembers).toBe(7);
+    expect(view.status).toBe("active");
+    expect(organizations.marked).toEqual(["org-acme"]);
+  });
+
+  /** @scenario "A pasted license with a bad signature is refused" */
+  it("refuses a license edited after signing and writes nothing", async () => {
+    const { licenseKey } = await harness().registry.issue(issueInput({ maxMembers: 7 }));
+    const signed = JSON.parse(Buffer.from(licenseKey, "base64").toString("utf-8"));
+    signed.data.plan.maxMembers = 5000;
+    const edited = Buffer.from(JSON.stringify(signed)).toString("base64");
+    const { registry, organizations } = harness();
+
+    await expect(
+      registry.registerLegacy({
+        licenseKey: edited,
+        organizationId: "org-acme",
+        operatorId: "operator-2",
+      }),
+    ).rejects.toBeInstanceOf(LicenseKeyInvalidError);
+    expect((await registry.list({ page: 0, pageSize: 10 })).licenses).toEqual([]);
+    expect(organizations.marked).toEqual([]);
+  });
+});
+
+describe("the commercial terms on a registry row", () => {
+  /** @scenario "Commercial terms are set on the registry row" */
+  it("records the seat rate, the commit and the overage terms", async () => {
+    const { registry, repository } = harness();
+    const { license } = await registry.issue(issueInput());
+
+    await registry.updateTerms({
+      id: license.id,
+      operatorId: "operator-3",
+      seatRateCents: 60_000,
+      seatCurrency: "USD",
+      commitUsdCents: 100_000,
+      overageEnabled: true,
+      overageMaxUsdCents: 50_000,
+    });
+
+    expect(await repository.findById(license.id)).toMatchObject({
+      seatRateCents: 60_000,
+      commitUsdCents: 100_000,
+      overageEnabled: true,
+      overageMaxUsdCents: 50_000,
+    });
+  });
+
+  /** @scenario "An overage maximum without overage enabled is refused" */
+  it("refuses a maximum while on-demand overage is off", async () => {
+    const { registry, repository } = harness();
+    const { license } = await registry.issue(issueInput());
+
+    await expect(
+      registry.updateTerms({
+        id: license.id,
+        operatorId: "operator-3",
+        overageEnabled: false,
+        overageMaxUsdCents: 50_000,
+      }),
+    ).rejects.toBeInstanceOf(LicenseOverageMaxRequiresOverageError);
+    expect(await repository.findById(license.id)).toMatchObject({ overageEnabled: false });
   });
 });

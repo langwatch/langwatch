@@ -122,6 +122,7 @@ describe("given a sign-up address to confirm", () => {
         accountCreated: false,
         accountExists: false,
         addressProof: "token-2",
+        freshClaim: true,
       });
       expect(harness.memory.verificationTokens.get("token-2")?.expires).toEqual(
         NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
@@ -145,6 +146,7 @@ describe("given a sign-up address to confirm", () => {
         accountCreated: false,
         accountExists: false,
         addressProof: null,
+        freshClaim: false,
       });
     });
 
@@ -207,6 +209,7 @@ describe("given a sign-up address to confirm", () => {
         accountCreated: false,
         accountExists: false,
         addressProof: "token-1",
+        freshClaim: true,
       });
     });
   });
@@ -298,6 +301,7 @@ describe("given a signed-out sign-up asking for a new account's link", () => {
   });
 
   describe("when the address has spent its hourly budget", () => {
+    /** @scenario "A stranger's address cannot be mail-bombed through sign-up" */
     it("refuses with the wait, keyed on the address", async () => {
       const harness = makeService({ budgetAllowed: false });
 

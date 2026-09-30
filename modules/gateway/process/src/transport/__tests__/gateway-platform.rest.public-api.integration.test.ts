@@ -16,6 +16,7 @@ import {
 } from "@langwatch/api/rest";
 import {
   type GatewayApi,
+  GatewayBudgetCycleAnchorInvalidError,
   GatewayCacheRuleNotFoundError,
   type GatewayRequestCredential,
   GatewaySpendSourceUnavailableError,
@@ -435,6 +436,53 @@ describe("the gateway platform family's public wire", () => {
       expect([answer.status, answer.body.code]).toEqual([422, "validation_error"]);
       expect(answer.body.meta?.target).toBe("header");
       expect(createBudget).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a cycle anchor on a budget", () => {
+    const anchored = (window: string) => ({
+      scope: { kind: "project", project_id: PROJECT_ID },
+      name: "b",
+      window,
+      limit_usd: "1",
+      cycle_anchor_at: "2026-06-17T09:00:00.000Z",
+    });
+
+    /** @scenario A cycle anchor is rejected on windows that do not cycle */
+    it("answers 400 gateway_budget_cycle_anchor_invalid echoing the window, creating nothing", async () => {
+      for (const window of ["manual", "total"]) {
+        const groupMemberCounts = vi.fn();
+        const answer = await mount({
+          createBudget: async () => {
+            throw new GatewayBudgetCycleAnchorInvalidError(window);
+          },
+          groupMemberCounts,
+        })("POST", "/budgets", { body: anchored(window) });
+
+        expect([answer.status, answer.body.code]).toEqual([
+          400,
+          "gateway_budget_cycle_anchor_invalid",
+        ]);
+        expect(answer.body.message).toBe(
+          "That window does not cycle, so it cannot take a cycle anchor",
+        );
+        expect(answer.body.meta?.window).toBe(window);
+        expect(groupMemberCounts).not.toHaveBeenCalled();
+      }
+    });
+
+    it("hands the anchor to the create as an instant and never to a patch", async () => {
+      const createBudget = vi.fn().mockRejectedValue(new Error("stop after the input"));
+      const updateBudget = vi.fn().mockRejectedValue(new Error("stop after the input"));
+      const call = mount({ createBudget, updateBudget });
+
+      await call("POST", "/budgets", { body: anchored("month") });
+      await call("PATCH", "/budgets/bgt_1", {
+        body: { name: "renamed", cycle_anchor_at: "2026-01-01T00:00:00.000Z" },
+      });
+
+      expect(createBudget.mock.calls[0]?.[0].cycleAnchorAt.toString()).toBe("2026-06-17T09:00:00Z");
+      expect(updateBudget.mock.calls[0]?.[0]).not.toHaveProperty("cycleAnchorAt");
     });
   });
 });

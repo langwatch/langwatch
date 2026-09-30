@@ -23,6 +23,7 @@ import type { z } from "zod";
 import type { LangyConversationCommands, LocalControlRuntime } from "../app/langy.members.ts";
 import type { ConnectedWorkspace } from "../repositories/langy-local-presence.repository.ts";
 import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
+import { controlRequestState } from "../rules/langy-local-control-request-state.rules.ts";
 import { conversationTitle, conversationUrl } from "../rules/langy-local-session-text.rules.ts";
 import { reconcileSkipPolicy } from "../rules/langy-local-skip-policy.rules.ts";
 import { ControlRequestService } from "./langy-local-control-request.service.ts";
@@ -34,7 +35,10 @@ type WorkspaceStatus = z.infer<typeof langyLocalWorkspaceStatusSchema>;
 
 export type LangyPanelLocalMembers = Readonly<{
   access: LangyPanelAccessService;
-  conversations: Pick<LangyService, "findByIdVisible" | "getLocalRecord">;
+  conversations: Pick<
+    LangyService,
+    "findByIdVisible" | "getLocalRecord" | "getLatestLocalControlRequest"
+  >;
   runtime: LocalControlRuntime;
   commands: Pick<
     LangyConversationCommands,
@@ -109,8 +113,38 @@ export class LangyPanelLocalService {
         changePolicy: (args) => this.recordPolicy({ ...args, projectId: input.projectId }),
       }),
       pendingRequest: pendingRequest ? ControlRequestService.toWire(pendingRequest) : null,
+      requestState: await this.readRequestState({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        open: pendingRequest ?? null,
+        connected: connected !== undefined,
+      }),
       codeAccessPreference: preference,
     };
+  }
+
+  /** The open request answers on its own; the durable log is read only when none does. */
+  private async readRequestState({
+    projectId,
+    conversationId,
+    open,
+    connected,
+  }: {
+    projectId: string;
+    conversationId: string;
+    open: { expiresAt: number } | null;
+    connected: boolean;
+  }) {
+    const now = nowInstant().epochMilliseconds;
+    if (open) return controlRequestState({ open, latest: null, claimed: false, connected, now });
+    const latest = await this.members.conversations.getLatestLocalControlRequest({
+      projectId,
+      conversationId,
+    });
+    const claimed = latest
+      ? await this.members.runtime.requests.wasApproved(latest.requestId)
+      : false;
+    return controlRequestState({ open, latest, claimed, connected, now });
   }
 
   async getCodeAccessPreference(

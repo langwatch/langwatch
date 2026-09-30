@@ -214,6 +214,7 @@ describe.skipIf(!databaseUrl)("queue mutations and the caller's reach", () => {
   });
 
   describe("given an item assigned to the reviewer", () => {
+    /** @scenario "A reviewer finishes an item on their own queue" */
     it("finishes and then removes it, which is what the refusals above are measured against", async () => {
       const marked = await queues.markQueueItemDone({ ...caller, queueItemId: ownItemId });
       expect(marked).toMatchObject({ id: ownItemId, doneAt: expect.any(Date) });

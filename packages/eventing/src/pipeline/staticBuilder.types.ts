@@ -148,7 +148,7 @@ export interface StaticPipelineDefinition<
   /** Process managers mounted on this pipeline (ADR-049/052). */
   processManagers: Map<string, ProcessManagerDefinition>;
 
-  /** Map projections over every pipeline's events, each sealed with its subscribers (§9). */
+  /** Global-registry lanes: map projections over every pipeline's events; peer subscribers. */
   globalProjections?: readonly GlobalProjection[];
 
   /** Type-level marker for registered commands (not used at runtime) */

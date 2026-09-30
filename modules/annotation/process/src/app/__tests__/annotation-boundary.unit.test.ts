@@ -128,6 +128,7 @@ describe("AnnotationApp boundary", () => {
     ).rejects.toBeInstanceOf(AnnotationAnnotatorInvalidError);
   });
 
+  /** @scenario "a missing project retains its original handled error" */
   it("propagates the original project not-found error", async () => {
     const error = new ProjectNotFoundError("missing");
     const projects = createAnnotationTestProjects();
@@ -147,5 +148,41 @@ describe("AnnotationApp boundary", () => {
         scoreTypeIds: [],
       }),
     ).rejects.toBe(error);
+
+    await expect(app.listQueues({ projectId: "missing" })).resolves.toEqual([]);
+  });
+
+  /** @scenario "trace projections receive anchored annotations" */
+  it("returns the trace's own comment and its field comment with their anchors", async () => {
+    const app = createAnnotationTestApp();
+    const base = { projectId: "project-1", traceId: "trace-1", isThumbsUp: null, scoreOptions: {} };
+
+    await app.create({ ...base, id: "on-trace", comment: "whole", expectedOutput: null });
+    await app.create({
+      ...base,
+      id: "on-span",
+      comment: "field",
+      expectedOutput: null,
+      anchorKind: "field",
+      anchorId: "span-1",
+      anchorPath: "output",
+    });
+
+    const rows = await app.listForProjection({
+      projectId: "project-1",
+      traceIds: ["trace-1"],
+      anchor: "all",
+    });
+
+    expect(rows).toHaveLength(2);
+    expect(rows).toContainEqual(expect.objectContaining({ id: "on-trace", anchorKind: null }));
+    expect(rows).toContainEqual(
+      expect.objectContaining({
+        id: "on-span",
+        anchorKind: "field",
+        anchorId: "span-1",
+        anchorPath: "output",
+      }),
+    );
   });
 });

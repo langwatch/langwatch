@@ -1,3 +1,5 @@
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import { LambdaClient } from "@aws-sdk/client-lambda";
 import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import {
@@ -22,6 +24,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   clearDsl,
@@ -79,13 +82,27 @@ import {
   WorkflowOptimizationRemovedError,
   WorkflowStudioEventInvalidError,
   workflowStudioRestEventSchema,
+  nlpLambdaFleetFromSecret,
+  type NlpLambdaFleetFields,
 } from "@langwatch/workflow-contract";
 
-import { UnconfiguredWorkflowNlpRuntimeAdapter } from "../channels/http/http.workflow-nlp-runtime.channel.ts";
+import { LambdaWorkflowStudioStreamChannel } from "../channels/aws.lambda-workflow-studio-stream.channel.ts";
+import { AwsNlpLambdaArnResolverChannel } from "../channels/aws.nlp-lambda-arn-resolver.channel.ts";
+import { AwsNlpLambdaFleetChannel } from "../channels/aws.nlp-lambda-fleet.channel.ts";
+import { AwsNlpLambdaInvokeChannel } from "../channels/aws.nlp-lambda-invoke.channel.ts";
+import { AwsNlpLambdaStreamInvokeChannel } from "../channels/aws.nlp-lambda-stream-invoke.channel.ts";
+import {
+  HttpWorkflowNlpRuntimeAdapter,
+  UnconfiguredWorkflowNlpRuntimeAdapter,
+} from "../channels/http/http.workflow-nlp-runtime.channel.ts";
 import {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
 } from "../channels/http/http.workflow-studio-stream.channel.ts";
+import type {
+  NlpLambdaFunctionReader,
+  WorkflowStudioStream,
+} from "../channels/nlp-lambda.channel.ts";
 import {
   buildWorkflowLifecyclePipeline,
   type WorkflowLifecyclePipeline,
@@ -97,6 +114,7 @@ import {
   type WorkflowRepositories,
 } from "../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
+import { buildStudioLambdaConfig } from "../rules/nlp-lambda-config.rules.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
 import {
   DISPATCHABLE_STUDIO_EVENT_TYPES,
@@ -104,6 +122,7 @@ import {
   studioFailureFrame,
 } from "../rules/workflow-studio-event.rules.ts";
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
+import { NlpLambdaRuntimeService } from "../services/nlp-lambda-runtime.service.ts";
 import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
 import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.service.ts";
 import { WorkflowCodeCompletionService } from "../services/workflow-code-completion.service.ts";
@@ -359,6 +378,121 @@ type WorkflowSetup = FeatureSetup<
   WorkflowRepositories
 >;
 
+/** The per-project studio fleet (`LANGWATCH_NLP_LAMBDA_CONFIG`): a credential, not config. */
+const nlpLambdaFleetSecret = Secret.load("LANGWATCH_NLP_LAMBDA_CONFIG", { optional: true });
+
+/** Main's retry budget, enough to ride out a cold fleet's concurrency burst. */
+const NLP_LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
+
+/** Where studio graphs and workflow runs execute, and the fleet the daily sweep reads. */
+type WorkflowEngine = Readonly<{
+  stream: WorkflowStudioStream;
+  runtime: WorkflowNlpRuntime;
+  fleet?: NlpLambdaFleet;
+}>;
+
+/**
+ * Main's precedence: a named fleet wins, and one that cannot be used refuses by
+ * name rather than falling back; with none, the engine address; with neither,
+ * every run refuses by name. See modules/workflow/specs/studio-lambda-stream.feature.
+ */
+async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
+  const named = await setup.secrets.into(nlpLambdaFleetSecret, (raw) =>
+    nlpLambdaFleetFromSecret.safeParse(raw),
+  );
+  if (!named.success) {
+    const reason =
+      named.error.issues[0]?.message ?? "The NLP Lambda fleet configuration cannot be used.";
+    logger.error({ reason }, "the named NLP Lambda fleet is unusable; studio runs will refuse");
+
+    return {
+      stream: UnconfiguredWorkflowStudioStreamAdapter.create({ reason }),
+      runtime: UnconfiguredWorkflowNlpRuntimeAdapter.create({ reason }),
+    };
+  }
+
+  if (named.data) return lambdaEngine({ fields: named.data, setup });
+
+  const serviceUrl = setup.members.nlpServiceUrl;
+  if (!serviceUrl) {
+    return {
+      stream: UnconfiguredWorkflowStudioStreamAdapter.create(),
+      runtime: UnconfiguredWorkflowNlpRuntimeAdapter.create(),
+    };
+  }
+
+  return {
+    stream: HttpWorkflowStudioStreamAdapter.create({ serviceUrl }),
+    runtime: HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl }),
+  };
+}
+
+/** Each project's own function, resolved once cluster-wide and invoked over AWS. */
+function lambdaEngine({
+  fields,
+  setup,
+}: {
+  fields: NlpLambdaFleetFields;
+  setup: WorkflowSetup;
+}): WorkflowEngine {
+  const config = buildStudioLambdaConfig({
+    fields: {
+      region: fields.AWS_REGION,
+      accessKeyId: fields.AWS_ACCESS_KEY_ID,
+      secretAccessKey: fields.AWS_SECRET_ACCESS_KEY,
+      roleArn: fields.role_arn,
+      imageUri: fields.image_uri,
+      cacheBucket: fields.cache_bucket,
+      subnetIds: fields.subnet_ids,
+      securityGroupIds: fields.security_group_ids,
+    },
+    langwatchEndpoint: setup.members.publicBaseUrl ?? "",
+    codeBlockTimeoutRawValue: setup.config.codeBlockTimeoutSeconds,
+    stagingThresholdBytesRawValue: setup.config.stagingThresholdBytes,
+    stagingTtlSecondsRawValue: setup.config.stagingTtlSeconds,
+  });
+  const credentials = { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey };
+  const lambda = new LambdaClient({
+    region: config.region,
+    credentials,
+    maxAttempts: NLP_LAMBDA_CLIENT_MAX_ATTEMPTS,
+  });
+  const logs = new CloudWatchLogsClient({ region: config.region, credentials });
+  setup.resources.own("Workflow NLP Lambda clients", () => {
+    lambda.destroy();
+    logs.destroy();
+  });
+
+  const arns = NlpLambdaRuntimeService.create({
+    cache: setup.repositories.nlpLambdaArns,
+    resolver: AwsNlpLambdaArnResolverChannel.create({ lambda, logs, config, logger }),
+    imageUri: config.imageUri,
+    logger,
+  });
+  const functions: NlpLambdaFunctionReader = {
+    arnFor: ({ projectId }) => arns.resolveArn(projectId),
+  };
+  const staging = setup.repositories.payloadStaging;
+  const { stagingThresholdBytes, stagingTtlSeconds } = config;
+
+  return {
+    stream: LambdaWorkflowStudioStreamChannel.create({
+      functions,
+      invoke: AwsNlpLambdaStreamInvokeChannel.create({ lambda }),
+      staging,
+      stagingThresholdBytes,
+      stagingTtlSeconds,
+    }),
+    runtime: HttpWorkflowNlpRuntimeAdapter.onProjectFunctions({
+      functions,
+      lambda: AwsNlpLambdaInvokeChannel.create({ lambda }),
+      staging,
+      stagingConfig: { stagingThresholdBytes, stagingTtlSeconds },
+    }),
+    fleet: AwsNlpLambdaFleetChannel.create({ lambda, logs, logger }),
+  };
+}
+
 /** The lineage reads: the workflow's own rows, and what hangs off it through its owners. */
 function lineageOf({
   rows,
@@ -490,8 +624,10 @@ export class WorkflowApp implements WorkflowApi {
     "publicBaseUrl",
   ] as const;
   static readonly repositories = workflowRepositories;
+  static readonly secrets = { nlpLambdaFleet: nlpLambdaFleetSecret } as const;
 
-  static create(setup: WorkflowSetup): WorkflowApp {
+  static async create(setup: WorkflowSetup): Promise<WorkflowApp> {
+    const engine = await composeEngine(setup);
     const datasets = setup.dependencies.datasets;
     const llmParameters = ModelProviderWorkflowLlmParameters.create({
       modelProviders: setup.dependencies.modelProviders,
@@ -505,9 +641,7 @@ export class WorkflowApp implements WorkflowApi {
       projectEnvironment,
       llmParameters,
     });
-    // `LANGWATCH_NLP_SERVICE` is model-provider's own leaf (config-schema-nuke-batch-c
-    // handoff: a cross-module shared-fact collision, unresolved — always Unconfigured here).
-    const nlpRuntime = UnconfiguredWorkflowNlpRuntimeAdapter.create();
+    const nlpRuntime = engine.runtime;
     const ids = KsuidWorkflowId.create();
     const workflows = WorkflowService.create({
       repository: setup.repositories.workflows,
@@ -525,14 +659,13 @@ export class WorkflowApp implements WorkflowApi {
 
     const modelProviders = setup.dependencies.modelProviders;
     const studioDispatch = WorkflowStudioDispatchService.create({
-      stream: setup.members.nlpServiceUrl
-        ? HttpWorkflowStudioStreamAdapter.create({ serviceUrl: setup.members.nlpServiceUrl })
-        : UnconfiguredWorkflowStudioStreamAdapter.create(),
+      stream: engine.stream,
       modelProviders,
     });
 
     return new WorkflowApp({
       ...setup.members,
+      ...(engine.fleet ? { nlpLambdaFleet: engine.fleet } : {}),
       permissions: WorkflowPermissionService.create({ authz: setup.dependencies.authz }),
       commitMessages: WorkflowCommitMessageService.create({ modelProviders }),
       codeCompletions: WorkflowCodeCompletionService.create({ modelProviders }),

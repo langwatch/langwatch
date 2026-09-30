@@ -170,6 +170,7 @@ describe("the connected agent drawer", () => {
 
   describe("given an online connected agent", () => {
     /** @scenario "The drawer sends one test turn to the agent" */
+    /** @scenario "The connected agent drawer sends one test turn" */
     it("sends the typed message and shows the answer with the instance that served it", async () => {
       renderDrawer(connectedAgent());
       const user = userEvent.setup();

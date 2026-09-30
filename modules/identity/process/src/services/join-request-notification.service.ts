@@ -57,14 +57,14 @@ export class JoinRequestNotificationService {
     const [organizationName, requesterName, admins] = await Promise.all([
       this.organizationName({ organizationId }),
       this.displayName({ userId: requesterUserId }),
-      this.audience.findAdminEmails({ organizationId }),
+      this.audience.findAdmins({ organizationId }),
     ]);
 
     await this.fanOut({
       joinRequestId,
       what: "requestStillWaiting",
-      sends: admins.map((adminEmail) =>
-        this.mail.sendStillWaiting({ adminEmail, organizationName, requesterName }),
+      sends: admins.map((admin) =>
+        this.mail.sendStillWaiting({ adminEmail: admin.email, organizationName, requesterName }),
       ),
     });
   }

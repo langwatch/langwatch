@@ -2,6 +2,7 @@ import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -25,9 +26,14 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { HttpPostHogEventsChannel } from "../channels/http/http.posthog-events.channel.ts";
+import {
+  buildGuidedOnboardingLifecyclePipeline,
+  type GuidedOnboardingLifecyclePipeline,
+} from "../eventing/guided-onboarding-lifecycle.pipeline.ts";
 import { withInstanceFacts } from "../rules/guided-onboarding-instance.rules.ts";
 import { GuidedOnboardingService } from "../services/guided-onboarding.service.ts";
 import { OnboardingChecksService } from "../services/onboarding-checks.service.ts";
@@ -65,6 +71,8 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
     "initializeOrganization" | "recordIntegrationMethod"
   >;
   readonly #projects: Pick<ProjectApi, "getOrganizationId">;
+  readonly #lifecycle: GuidedOnboardingLifecyclePipeline;
+  readonly #senders: { commands?: EventingCommands<GuidedOnboardingLifecyclePipeline> };
 
   private constructor(parts: {
     guided: GuidedOnboardingService;
@@ -73,6 +81,8 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
     gateway: Pick<GatewayApi, "getDeploymentAddresses">;
     organizations: Pick<OrganizationApi, "initializeOrganization" | "recordIntegrationMethod">;
     projects: Pick<ProjectApi, "getOrganizationId">;
+    lifecycle: GuidedOnboardingLifecyclePipeline;
+    senders: { commands?: EventingCommands<GuidedOnboardingLifecyclePipeline> };
   }) {
     this.#guided = parts.guided;
     this.#checks = parts.checks;
@@ -80,6 +90,8 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
     this.#gateway = parts.gateway;
     this.#organizations = parts.organizations;
     this.#projects = parts.projects;
+    this.#lifecycle = parts.lifecycle;
+    this.#senders = parts.senders;
   }
 
   static create(setup: OnboardingSetup): OnboardingApp {
@@ -88,9 +100,21 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
       targets: () => ops.findProductAnalyticsTargets(),
     });
     setup.resources.own("Onboarding PostHog client", () => events.close());
+    const lifecycle = buildGuidedOnboardingLifecyclePipeline();
+    const senders: { commands?: EventingCommands<GuidedOnboardingLifecyclePipeline> } = {};
     const guided = GuidedOnboardingService.create({
       organizations: setup.dependencies.organizations,
       events,
+      announce: async (input) => {
+        if (!senders.commands) {
+          throw new Error("guided_onboarding_lifecycle pipeline senders are not connected yet");
+        }
+        await senders.commands.recordGuidedOnboarding.send({
+          tenantId: input.organizationId,
+          occurredAt: nowInstant().epochMilliseconds,
+          ...input,
+        });
+      },
     });
 
     const { dependencies } = setup;
@@ -117,7 +141,19 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
       gateway: setup.dependencies.gateway,
       organizations: setup.dependencies.organizations,
       projects: setup.dependencies.projects,
+      lifecycle,
+      senders,
     });
+  }
+
+  /** The guided lifecycle pipeline this module registers, built once by {@link create}. */
+  lifecyclePipeline(): GuidedOnboardingLifecyclePipeline {
+    return this.#lifecycle;
+  }
+
+  /** Binds the built lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: EventingCommands<GuidedOnboardingLifecyclePipeline>): void {
+    this.#senders.commands = commands;
   }
 
   async getGuidedState(input: {

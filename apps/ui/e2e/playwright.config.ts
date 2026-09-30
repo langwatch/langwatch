@@ -3,6 +3,17 @@ import { defineConfig, devices } from "@playwright/test";
 // The product journey lives in dev/tests/agentic-e2e now, and it signs up its own
 // account, so nothing here reads a hand-saved auth.json any more.
 
+/* Lean headless Chromium: no GPU, no anti-aliasing, no /dev/shm, capped V8 heap.
+ * Leaves out --single-process/--no-zygote: they crash Chromium once a test opens a second context. */
+const CHROMIUM_ARGS = [
+  "--disable-gpu",
+  "--disable-canvas-aa",
+  "--disable-2d-canvas-clip-aa",
+  "--disable-gl-drawing-for-tests",
+  "--disable-dev-shm-usage",
+  "--js-flags=--max-old-space-size=256",
+];
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -28,13 +39,14 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    reducedMotion: "reduce",
   },
 
   /* Configure projects for major browsers */
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], launchOptions: { args: CHROMIUM_ARGS } },
     },
 
     {

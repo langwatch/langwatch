@@ -66,6 +66,7 @@ import type { AnalyticsRecencyRepository } from "../repositories/analytics-recen
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseAnalyticsRecencyRepository } from "../repositories/clickhouse/clickhouse.analytics-recency.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
+import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
@@ -98,6 +99,7 @@ import {
   type LangWatchQLTraceSource,
 } from "../services/langwatch-ql-hydration-read.service.ts";
 import { LangWatchQLHydrationService } from "../services/langwatch-ql-hydration.service.ts";
+import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLQueryScopeService,
@@ -169,6 +171,8 @@ export interface AnalyticsAppDependencies {
   recency: AnalyticsRecencyRepository;
   /** The access model's owner probe and convergence; no-ops where LangWatchQL is unavailable. */
   lwqlProvisioning: LwqlProvisioningOperations;
+  /** A new project's key-map row, written on project's created event; no-op without LangWatchQL. */
+  lwqlKeyMap: LwqlKeyMapService;
 }
 
 export type AnalyticsInfrastructure = Readonly<{
@@ -482,6 +486,13 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
         appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
         recency: ClickHouseAnalyticsRecencyRepository.create(clickhouse),
         lwqlProvisioning,
+        lwqlKeyMap: LwqlKeyMapService.create({
+          repository: LwqlKeyMapClickHouseRepository.create({ resolveClient }),
+          projects: setup.dependencies.projects,
+          ...(admin.configured && connection
+            ? { target: { connection, sourceDatabase: admin.target.database } }
+            : {}),
+        }),
       },
       setup.members.publicBaseUrl,
     );
@@ -518,6 +529,11 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
   /** Re-provisions the access model once a config store released it (SQL mode only). */
   convergeLwqlAccessModel(): Promise<void> {
     return this.#dependencies.lwqlProvisioning.converge();
+  }
+
+  /** Writes a created project's key-map row; throws on a failed insert so the queue retries. */
+  syncLwqlKeyMapRow(input: { projectId: string }): Promise<void> {
+    return this.#dependencies.lwqlKeyMap.syncProject(input);
   }
 
   /** The series behind every analytics chart and every dashboard graph card. */

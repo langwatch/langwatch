@@ -5,10 +5,12 @@ import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import numeral from "numeral";
 import { useState } from "react";
 
+import { GuidedOnboardingOffer } from "../../../behavior/lent-guided-onboarding-offer.tsx";
 import {
   type PersonalContext,
   usePersonalContext,
 } from "../../../behavior/use-personal-context.ts";
+import { usePersonalSpaceInUse } from "../../../behavior/use-personal-space-in-use.ts";
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
@@ -40,6 +42,7 @@ const fmtPctDelta = (pct: number | null) =>
 
 export function PersonalOverviewScreen() {
   const ctx = usePersonalContext();
+  const spaceInUse = usePersonalSpaceInUse();
   const {
     summary,
     budget,
@@ -83,6 +86,7 @@ export function PersonalOverviewScreen() {
       <PersonalWorkspaceLayout>
         <VStack align="stretch" gap={6} width="full">
           <PersonalWorkspaceViewOnlyNotice />
+          <GuidedOnboardingOffer space="me" spaceInUse={spaceInUse} />
 
           <VStack id={PERSONAL_AI_TOOLS_ANCHOR} align="stretch" gap={3} scrollMarginTop={4}>
             <Text color="fg.muted" fontSize="sm">

@@ -74,7 +74,10 @@ import type { TeamRepository } from "../repositories/team.repository.ts";
 import { OrganizationGroupService } from "./organization-group.service.ts";
 import { OrganizationTeamAccessService } from "./organization-team-access.service.ts";
 import { OrganizationTeamMembersService } from "./organization-team-members.service.ts";
-import { PersonalWorkspaceService } from "./personal-workspace.service.ts";
+import {
+  PersonalWorkspaceService,
+  type PersonalWorkspaceNotices,
+} from "./personal-workspace.service.ts";
 
 export class OrganizationService extends OrganizationServiceContract {
   private readonly repository: OrganizationRepository;
@@ -99,6 +102,7 @@ export class OrganizationService extends OrganizationServiceContract {
     grants,
     diagnostics,
     settingsSecrets,
+    notices,
   }: {
     repository: OrganizationRepository;
     teams: TeamRepository;
@@ -110,6 +114,7 @@ export class OrganizationService extends OrganizationServiceContract {
     grants: AuthzApi;
     diagnostics: PersonalWorkspaceDiagnostics | undefined;
     settingsSecrets: OrganizationSettingsSecret;
+    notices: PersonalWorkspaceNotices | undefined;
   }) {
     super();
     this.repository = repository;
@@ -143,6 +148,7 @@ export class OrganizationService extends OrganizationServiceContract {
       identities,
       grants,
       diagnostics,
+      notices,
     });
   }
 
@@ -304,6 +310,8 @@ export class OrganizationService extends OrganizationServiceContract {
     grants: AuthzApi;
     diagnostics?: PersonalWorkspaceDiagnostics;
     settingsSecrets: OrganizationSettingsSecret;
+    /** Where a newly created personal workspace is recorded, so project records its project. */
+    notices?: PersonalWorkspaceNotices;
   }): OrganizationService {
     return new OrganizationService({
       repository: options.repository,
@@ -316,6 +324,7 @@ export class OrganizationService extends OrganizationServiceContract {
       grants: options.grants,
       diagnostics: options.diagnostics,
       settingsSecrets: options.settingsSecrets,
+      notices: options.notices,
     });
   }
 

@@ -1,25 +1,17 @@
+import type {
+  IdentityCeremonyAccountPin,
+  IdentityCeremonyAccountRow,
+} from "@langwatch/identity-contract";
+
 /** The effect seams the ceremonies share, composed once in the app. */
 export interface IdentityCeremonyClock {
   now: () => number;
   newCommandId: () => string;
 }
 
-/** The `Account` fields a ceremony reads. Structural on purpose: this
- *  package should not track better-auth's row type version to version. */
-export interface CeremonyAccountRow {
-  id?: unknown;
-  userId?: unknown;
-  providerId?: unknown;
-  /** better-auth 1.7's account key half. Absent on a row written by an
-   *  older library version, which is why the ceremony falls back to
-   *  deriving it rather than declining to state the attach. */
-  issuer?: unknown;
-  accountId?: unknown;
-  createdAt?: unknown;
-}
+export type CeremonyAccountRow = IdentityCeremonyAccountRow;
 
-/** Whether the account-create ceremony pinned the row id better-auth must write. */
-export type CeremonyAccountPin = { pinned: true; data: { id: string } } | { pinned: false };
+export type CeremonyAccountPin = IdentityCeremonyAccountPin;
 
 /**
  * What the identity storage adapter needs a ceremony to do: the same two

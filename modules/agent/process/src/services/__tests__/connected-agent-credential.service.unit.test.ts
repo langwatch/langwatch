@@ -69,6 +69,8 @@ function build() {
 }
 
 describe("ConnectedAgentCredentialService", () => {
+  /** @scenario "An ingestion key cannot connect" */
+  /** @scenario "A Langy session key cannot connect" */
   it.each([{ ingestionTemplateId: "ingestion_1" }, { isLangySessionKey: true }])(
     "refuses unsupported key kinds before permission lookup: %j",
     async (change) => {
@@ -84,6 +86,7 @@ describe("ConnectedAgentCredentialService", () => {
     },
   );
 
+  /** @scenario "A key without scenarios manage cannot connect" */
   it("checks scenarios:manage against the resolved project and key", async () => {
     const fixture = build();
     fixture.authorize.mockResolvedValue(false);
@@ -128,6 +131,7 @@ describe("ConnectedAgentCredentialService", () => {
     expect(fixture.authorize).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A key that reaches several projects must name one" */
   it("lists only project identifiers and names after resolving an organization key", async () => {
     const fixture = build();
     fixture.resolve.mockResolvedValueOnce(null);
@@ -213,6 +217,7 @@ describe("ConnectedAgentCredentialService", () => {
     },
   );
 
+  /** @scenario "An invalid key cannot connect" */
   it.each([project.id, null])(
     "rejects an unknown token without enumerating projects: %s",
     async (projectId) => {
