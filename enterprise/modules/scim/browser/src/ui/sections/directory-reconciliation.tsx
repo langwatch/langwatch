@@ -100,6 +100,10 @@ export function DirectoryReconciliation({
       </VStack>
 
       <RecentDirectoryChanges changes={recentChanges} />
+      <Text fontSize="sm" color="fg.muted" data-testid="directory-event-log-pointer">
+        Changes to the connection itself (who set it up, proved a domain or turned it on) are in its{" "}
+        <Link href="/settings/authentication/provider">event log</Link>.
+      </Text>
     </VStack>
   );
 }

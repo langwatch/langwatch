@@ -134,6 +134,13 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     And the change names the directory as its author, with when it happened
 
   @integration
+  Scenario: The panel points to the connection's event log for changes to the connection itself
+    Given "acme" has a connection registered under Authentication
+    When "ana" opens the reconciliation panel
+    Then it says changes to the connection itself are in its event log
+    And the words "event log" link to the identity provider page
+
+  @integration
   Scenario: A directory-caused change and the audit page tell the same story
     Given the directory deactivated "sam" in its last push
     Then the change the reconciliation panel shows for "sam"

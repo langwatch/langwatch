@@ -109,7 +109,32 @@ describe("given the reader's own account", () => {
       ).toBeTruthy();
       const offers = within(scope.getByTestId("identifier-action-row"));
       expect(offers.getByTestId("add-address")).toBeTruthy();
-      expect(offers.getByRole("button", { name: /Link another sign-in method/i })).toBeTruthy();
+      expect(offers.getByRole("button", { name: /Connect single sign-on/i })).toBeTruthy();
+    });
+  });
+});
+
+describe("given a deployment that offers several federated providers", () => {
+  describe("when the page renders", () => {
+    /** @scenario "Each provider that can still be linked has its own connect button" */
+    it("offers one named button per provider not yet linked", () => {
+      state.linkedAccounts = [
+        { id: "acc-1", provider: "auth0", providerAccountId: "auth0|user-123" },
+        { id: "acc-2", provider: "google", providerAccountId: "g-1" },
+      ];
+      const { scope } = renderSection({
+        deployment: {
+          isSaas: true,
+          appBaseUrl: "https://app.langwatch.ai",
+          passkeysEnabled: false,
+          authProvider: "auth0",
+          federatedProviders: ["github", "google", "auth0"],
+        },
+      });
+
+      expect(scope.getByRole("button", { name: "Connect GitHub" })).toBeTruthy();
+      expect(scope.getByRole("button", { name: "Connect single sign-on" })).toBeTruthy();
+      expect(scope.queryByRole("button", { name: "Connect Google" })).toBeNull();
     });
   });
 });
@@ -121,7 +146,7 @@ describe("given a deployment that reports no identity provider", () => {
       const { scope } = renderSection();
 
       expect(scope.getByTestId("add-address")).toBeTruthy();
-      expect(scope.queryByRole("button", { name: /Link another sign-in method/i })).toBeNull();
+      expect(scope.queryByRole("button", { name: /Connect single sign-on/i })).toBeNull();
     });
   });
 });
@@ -139,7 +164,7 @@ describe("given an organization pinned to a single sign-on provider", () => {
       });
 
       expect(scope.getByText(/company's SSO provider/i)).toBeTruthy();
-      expect(scope.queryByRole("button", { name: /Link another sign-in method/i })).toBeNull();
+      expect(scope.queryByRole("button", { name: /Connect single sign-on/i })).toBeNull();
       expect(scope.queryByRole("button", { name: /Remove sign-in method/i })).toBeNull();
     });
   });
@@ -183,7 +208,7 @@ describe("given an organization with no single sign-on and two linked methods", 
       state.linkedAccounts = [{ id: "acc-1", provider: "auth0", providerAccountId: "okta|a" }];
       const { scope, host } = renderSection();
 
-      await userEvent.click(scope.getByRole("button", { name: /Link another sign-in method/i }));
+      await userEvent.click(scope.getByRole("button", { name: /Connect single sign-on/i }));
 
       await waitFor(() => expect(host.recording.linkedProviders).toEqual(["auth0"]));
     });

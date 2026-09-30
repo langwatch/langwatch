@@ -4,6 +4,7 @@ import {
   Button,
   Heading,
   HStack,
+  IconButton,
   Stack,
   Table,
   Text,
@@ -23,6 +24,8 @@ export type OperatorFeatureFlag = Omit<StoredOperatorFeatureFlag, "updatedAt"> &
   updatedAt: string | null;
 };
 import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { summarizeTargeting, targetingLabel } from "../../model/targeting-summary.ts";
@@ -268,9 +271,17 @@ function FlagRow({
               onCheckedChange={(details) => void setEnabled(details.checked)}
             />
             {canManage && !envLocked && (
-              <Button size="xs" variant="ghost" onClick={() => setRulesOpen(true)}>
-                Target ({row.rules.length})
-              </Button>
+              <Tooltip content={targetingTooltip(row.rules.length)}>
+                <IconButton
+                  aria-label="Specific targeting"
+                  size="xs"
+                  variant="ghost"
+                  color="gray.500"
+                  onClick={() => setRulesOpen(true)}
+                >
+                  <Settings2 size={14} />
+                </IconButton>
+              </Tooltip>
             )}
             {envLocked && (
               <Badge colorPalette="orange" size="sm" variant="subtle">
@@ -372,4 +383,9 @@ function groupByScope(flags: OperatorFeatureFlag[]): {
       product: OperatorFeatureFlag[];
     },
   );
+}
+
+function targetingTooltip(ruleCount: number): string {
+  if (ruleCount === 0) return "Specific targeting";
+  return `Specific targeting (${ruleCount} rule${ruleCount === 1 ? "" : "s"})`;
 }

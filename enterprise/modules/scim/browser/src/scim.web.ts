@@ -18,6 +18,7 @@ export const scimWeb = defineWebModule("scim")
       path: "/settings/authentication/connectors",
       within: "settings",
       label: "Connectors",
+      requires: "sso:view",
       load: () => import("./ui/sections/connectors.screen.tsx"),
     },
     // Ops' directory sync across every customer; the server answers

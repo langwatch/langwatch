@@ -157,6 +157,20 @@ type SummaryIdentifier = {
   confirmed: boolean;
 };
 
+/** An auth0 account counts as the method behind it (`github|123` is GitHub), as on main. */
+export function linkedAccountMethodId({
+  provider,
+  providerAccountId,
+}: {
+  provider: string;
+  providerAccountId: string;
+}): string {
+  if (provider !== "auth0") return provider;
+  // ponytail: main also maps strategy names to native ids (google-oauth2 is google);
+  // port that map if a strategy name differs from its method id.
+  return providerAccountId.split("|")[0] || provider;
+}
+
 /**
  * The lines this account earns, addresses first. The identifier projection is
  * the richer answer but is empty for an account that never attached one, so the
@@ -235,4 +249,31 @@ function addressChip({
   if (count > 1) return { label: `${count} addresses`, tone: "neutral" };
   if (shown && !shown.confirmed) return { label: "Not confirmed yet", tone: "warning" };
   return null;
+}
+
+/**
+ * The providers still offered for linking: what the sign-in rail offers, less
+ * any already connected. A credential account is not a provider, so it never
+ * hides one. An organization pinned to single sign-on can link nothing.
+ */
+export function connectableProviders({
+  offered,
+  linked,
+  hasSsoProvider,
+}: {
+  offered: readonly string[];
+  linked: readonly { provider: string; providerAccountId: string }[];
+  hasSsoProvider: boolean;
+}): string[] {
+  if (hasSsoProvider) return [];
+  const held = new Set(
+    linked.filter((account) => !isCredentialAccount(account)).map(linkedAccountMethodId),
+  );
+  return Array.from(new Set(offered)).filter((id) => !held.has(id));
+}
+
+/** The button's noun: a provider's own name, else "single sign-on" in running text. */
+export function connectLabel(provider: string): string {
+  const label = federatedMethodLabel(provider);
+  return label === "Single sign-on" ? "single sign-on" : label;
 }

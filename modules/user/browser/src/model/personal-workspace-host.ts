@@ -101,6 +101,11 @@ export type PersonalDeployment = {
    */
   authProvider: string | undefined;
   /**
+   * The federated providers the sign-in rail offers, ids only. Absent means
+   * the one `authProvider`, which is all a deployment reports until the shell carries the list.
+   */
+  federatedProviders?: readonly string[];
+  /**
    * Whether this deployment issues its own passwords (the server's
    * `EMAIL_PASSWORD_ENABLED`), even behind an enterprise provider. Absent reads as no.
    */

@@ -178,6 +178,19 @@ describe("given the directory removed somebody", () => {
   });
 });
 
+describe("given any connection", () => {
+  /** @scenario "The panel points to the connection's event log for changes to the connection itself" */
+  it("says the connection's own changes are in its event log", () => {
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
+
+    const pointer = screen.getByTestId("directory-event-log-pointer");
+    expect(pointer.textContent).toContain("are in its event log");
+    expect(screen.getByRole("link", { name: "event log" }).getAttribute("href")).toBe(
+      "/settings/authentication/provider",
+    );
+  });
+});
+
 describe("given a connection that has been removed", () => {
   it("folds it away with the count, and says its people are still here", () => {
     state.panel = {

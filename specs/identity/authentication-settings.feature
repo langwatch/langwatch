@@ -61,6 +61,14 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the addresses and the identity providers are one section
     And adding an address and connecting a provider are offered on one row
 
+  @integration
+  Scenario: Each provider that can still be linked has its own connect button
+    Given the deployment offers GitHub, Google and single sign-on
+    And "sam" already has Google linked
+    When the authentication settings are shown
+    Then "Connect GitHub" and "Connect single sign-on" are offered on the same row as adding an address
+    And "Connect Google" is not offered
+
   # ── One way in, said before it is too late ─────────────────────────────
 
   # The detach guard's own reasoning, read forwards. The guard refuses to

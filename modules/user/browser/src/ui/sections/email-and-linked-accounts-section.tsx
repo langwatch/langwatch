@@ -10,7 +10,12 @@ import { AtSign, KeyRound, X } from "lucide-react";
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { EmailIdentifiersSection } from "../../features/account-identifiers/ui/sections/email-identifiers-section.tsx";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
-import { isRemovableMethod, providerDisplayName } from "../../model/sign-in-methods.ts";
+import {
+  connectableProviders,
+  connectLabel,
+  isRemovableMethod,
+  providerDisplayName,
+} from "../../model/sign-in-methods.ts";
 
 export function EmailAndLinkedAccountsSection() {
   const host = usePersonalWorkspaceHost();
@@ -40,7 +45,11 @@ export function EmailAndLinkedAccountsSection() {
       <EmailIdentifiersSection
         providerRows={federated ? <LinkedAccountRows hasSsoProvider={hasSsoProvider} /> : null}
         trailingActions={
-          federated && !hasSsoProvider ? <LinkProviderButton provider={authProvider} /> : null
+          federated && !hasSsoProvider ? (
+            <ConnectProviderButtons
+              offered={host.deployment().federatedProviders ?? [authProvider]}
+            />
+          ) : null
         }
       />
     </VStack>
@@ -92,9 +101,19 @@ function LinkedAccountRows({ hasSsoProvider }: { hasSsoProvider: boolean }) {
   );
 }
 
-function LinkProviderButton({ provider }: { provider: string }) {
+function ConnectProviderButtons({ offered }: { offered: readonly string[] }) {
   const host = usePersonalWorkspaceHost();
-  const handleLinkProvider = async () => {
+  const accounts = api.user.getLinkedAccounts.useQuery({});
+  const hasSsoProvider = !!host.organization()?.ssoProvider;
+
+  if (accounts.isLoading) return null;
+
+  const providers = connectableProviders({
+    offered,
+    linked: accounts.data ?? [],
+    hasSsoProvider,
+  });
+  const connect = async (provider: string) => {
     const result = await host.linkSignInMethod(provider);
     if (!result.ok) {
       host.failed({
@@ -104,9 +123,20 @@ function LinkProviderButton({ provider }: { provider: string }) {
       });
     }
   };
+
   return (
-    <Button size="sm" variant="outline" onClick={() => void handleLinkProvider()}>
-      Link another sign-in method
-    </Button>
+    <HStack gap={3} flexWrap="wrap">
+      {providers.map((provider) => (
+        <Button
+          key={provider}
+          size="sm"
+          variant="outline"
+          onClick={() => void connect(provider)}
+          data-testid={`link-method-${provider}`}
+        >
+          Connect {connectLabel(provider)}
+        </Button>
+      ))}
+    </HStack>
   );
 }

@@ -72,4 +72,11 @@ describe("given an operator opens the feature flags page", () => {
     // document, which is the reading order on the page.
     expect(product.compareDocumentPosition(system) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it("offers targeting as an icon button beside each toggle, not a text link", () => {
+    renderView();
+
+    expect(screen.getAllByRole("button", { name: "Specific targeting" })).toHaveLength(2);
+    expect(screen.queryByText(/^Target \(/)).toBeNull();
+  });
 });
