@@ -98,20 +98,21 @@ export class ModelProviderCommandService {
 
   /** The project key's legacy shape: the provider string names the one row it already holds. */
   async upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProvider> {
-    const existing = await this.findOwnProjectRow(input);
+    const [existing] = await this.findOwnProjectRows(input);
     return this.upsert(existing ? { ...input, id: existing.id } : input);
   }
 
-  private findOwnProjectRow(input: ModelProviderWriteInput): Promise<ModelProvider | null> {
-    if (!input.projectId) return Promise.resolve(null);
+  private findOwnProjectRows(input: ModelProviderWriteInput): Promise<ModelProvider[]> {
+    if (!input.projectId) return Promise.resolve([]);
 
     return this.options.repository
       .getByProviderForProject({
         provider: input.provider,
         projectScopes: [{ scopeType: "PROJECT", scopeId: input.projectId }],
       })
+      .then((row) => [row])
       .catch((error: unknown) => {
-        if (error instanceof ModelProviderNotFoundError) return null;
+        if (error instanceof ModelProviderNotFoundError) return [];
         throw error;
       });
   }

@@ -67,6 +67,7 @@ beforeEach(() => {
 });
 
 describe("Authz binding management writes", () => {
+  /** @scenario "A binding naming no principal, or more than one, is refused" */
   it("rejects a missing or ambiguous principal before emitting a command", async () => {
     const { writes, writer } = setup();
 
@@ -79,6 +80,7 @@ describe("Authz binding management writes", () => {
     expect(writes.attachBindings).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Binding an API key from another organization is refused" */
   it("checks every principal against the target organization", async () => {
     const { bindings, writes, writer } = setup();
     bindings.findOrganizationRole.mockResolvedValue(null);
@@ -100,6 +102,7 @@ describe("Authz binding management writes", () => {
     expect(writes.attachBindings).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Binding to a scope from another organization is refused" */
   it("refuses a foreign scope without disclosing whether it exists", async () => {
     const { bindings, writes, writer } = setup();
     bindings.findScopeRows.mockResolvedValue([]);
@@ -111,6 +114,7 @@ describe("Authz binding management writes", () => {
     expect(writes.attachBindings).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A binding into a personal workspace is refused" */
   it("refuses writes into a personal workspace", async () => {
     const { bindings, writes, writer } = setup();
     bindings.findScopeRows.mockResolvedValue([
@@ -124,6 +128,7 @@ describe("Authz binding management writes", () => {
     expect(writes.attachBindings).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Binding an organization-exclusive permission at team scope is refused" */
   it("requires an assignable custom role and enforces the scope fence", async () => {
     const { bindings, writes, writer } = setup();
     const custom = { ...createInput, role: "CUSTOM" as const };
@@ -185,6 +190,7 @@ describe("Authz binding management writes", () => {
   });
 
   /** @scenario "Every write goes through the group queue" */
+  /** @scenario "A duplicate binding is reported as already existing" */
   it("emits one ledger attach and maps duplicate storage signals", async () => {
     const { writes, writer } = setup();
 

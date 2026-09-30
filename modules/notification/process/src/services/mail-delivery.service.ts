@@ -31,7 +31,7 @@ export class MailDeliveryService {
   }
 
   async sendEmail(command: SendEmailCommand): Promise<void> {
-    await this.delivery.send(envelopeOf(command, this.delivery.defaultFrom()));
+    await this.delivery.send(envelopeOf({ command, defaultFrom: this.delivery.defaultFrom() }));
   }
 
   async getView(): Promise<MailDeliveryView> {
@@ -73,7 +73,13 @@ function readProviderChoice(settings: MailGatewaySettings): {
 }
 
 /** The message as a gateway sends it; the no-reply To and the one-click pair are main's bytes. */
-function envelopeOf(command: SendEmailCommand, defaultFrom: string): EmailContent {
+function envelopeOf({
+  command,
+  defaultFrom,
+}: {
+  command: SendEmailCommand;
+  defaultFrom: string;
+}): EmailContent {
   const { undisclosedRecipients, unsubscribe, replyless, ...message } = command;
   const hidden = [
     ...(replyless === undefined ? [] : [message.to].flat()),
@@ -81,7 +87,7 @@ function envelopeOf(command: SendEmailCommand, defaultFrom: string): EmailConten
   ];
   return {
     ...message,
-    ...(replyless === undefined ? {} : { to: noReplyAddress(replyless.tag, defaultFrom) }),
+    ...(replyless === undefined ? {} : { to: noReplyAddress({ tag: replyless.tag, defaultFrom }) }),
     ...(hidden.length === 0 ? {} : { bcc: hidden }),
     ...(unsubscribe === undefined
       ? {}
@@ -95,7 +101,7 @@ function envelopeOf(command: SendEmailCommand, defaultFrom: string): EmailConten
 }
 
 /** A bare sender address has no domain to read, so `langwatch.ai` stands in, as on main. */
-function noReplyAddress(tag: string, defaultFrom: string): string {
+function noReplyAddress({ tag, defaultFrom }: { tag: string; defaultFrom: string }): string {
   const domain = defaultFrom.match(/<[^@]+@([^>]+)>/)?.[1]?.trim() || "langwatch.ai";
   return `LangWatch Triggers <no-reply+${tag}@${domain}>`;
 }
