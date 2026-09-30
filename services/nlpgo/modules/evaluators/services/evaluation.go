@@ -68,6 +68,7 @@ type EvaluationDeps struct {
 	LLM           channels.LLMChannel
 	CustomerTrace channels.CustomerTraceChannel
 	Vendor        channels.VendorChannel
+	PIIAnalyzer   channels.PIIAnalyzer
 	OpsTracer     trace.Tracer
 	Logger        *zap.Logger
 	Evaluators    map[string]Evaluator
@@ -79,6 +80,7 @@ type EvaluationService struct {
 	llm        channels.LLMChannel
 	trace      channels.CustomerTraceChannel
 	vendor     channels.VendorChannel
+	pii        channels.PIIAnalyzer
 	ops        trace.Tracer
 	logger     *zap.Logger
 	evaluators map[string]Evaluator
@@ -96,6 +98,7 @@ func NewEvaluationService(deps EvaluationDeps) *EvaluationService {
 		llm:        deps.LLM,
 		trace:      deps.CustomerTrace,
 		vendor:     deps.Vendor,
+		pii:        deps.PIIAnalyzer,
 		ops:        deps.OpsTracer,
 		logger:     deps.Logger,
 		evaluators: evaluators,
