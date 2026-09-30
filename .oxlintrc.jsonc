@@ -38,6 +38,8 @@
     "node",
   ],
   "rules": {
+    // Slow (a fifth of the whole run); .oxlintrc.architecture.jsonc runs it instead.
+    "langwatch/comment-block-size": "off",
     "no-nested-ternary": "error",
     // A comment inside the block counts as the decision to swallow the failure.
     "no-empty": ["error", { "allowEmptyCatch": false }],

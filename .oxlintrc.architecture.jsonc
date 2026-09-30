@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // The rules too slow for every edit; `pnpm lint:architecture` runs this beside
+  // the enforcer and CI blocks on it. `.oxlintrc.jsonc` turns each of them off, so a
+  // finding is reported by exactly one config. Choice of rules: dev/docs/lint-config.md.
+  "jsPlugins": [{ "name": "langwatch", "specifier": "./packages/architecture-enforcer/oxlint-plugin.mjs" }],
+  "plugins": [],
+  "categories": { "correctness": "off" },
+  "options": { "reportUnusedDisableDirectives": "off" },
+  "ignorePatterns": [
+    "**/*.generated.ts",
+    "**/*.generated.tsx",
+    "**/*.generated.js",
+    "plugins/langwatch/scripts/session-context.mjs",
+    "plugins/langwatch/scripts/session-guidance.mjs",
+    "tools/apidiff/inventory/**",
+  ],
+  "rules": {
+    "langwatch/comment-block-size": "error",
+  },
+}

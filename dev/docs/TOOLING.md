@@ -53,12 +53,19 @@ Each layer is slower and sees more than the one before, so the cheap ones run
 first.
 
 ```
-  pnpm lint                 whole tree, no type info       seconds
-     |
+  pnpm lint                 whole tree, no type info,      the fast rules
+     |                      every edit
   nx affected -t lint:types type-aware, per project,       cached per project
      |                      only what the change reached
-  pnpm lint:architecture    whole-tree policies            the slow one
+  pnpm lint:architecture    the slow oxlint rules          CI blocks on it; run it
+                            (.oxlintrc.architecture.jsonc)  on demand
+                            + the enforcer's whole-tree
+                            policies
 ```
+
+A rule joins the architecture layer by measured cost, not by kind: at least 5%
+of the plugin's time in one whole-tree run (each rule's `create` and visitors
+timed with `process.hrtime`), and dropping it cuts the fast run by 10% or more. Today that is `langwatch/comment-block-size` alone.
 
 `lint:types` isn't written in any `package.json`. A small plugin,
 `dev/nx/lint-types-plugin.mjs`, adds it to every workspace package, so the

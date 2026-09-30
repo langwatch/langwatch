@@ -12,8 +12,9 @@ Area guidance lives in .claude/rules/*.md (path-scoped), procedures in
 In this order. When they disagree, the higher one wins and the lower one is the
 defect.
 
-1. **The linters.** `pnpm lint` (oxlint + the `langwatch` plugin, every rule at
-   `error`) and `pnpm lint:architecture` (whole-tree policies). Every finding
+1. **The linters.** `pnpm lint` (oxlint + the fast `langwatch` rules, every rule at
+   `error`) and `pnpm lint:architecture` (the slow rules plus whole-tree
+   policies; CI runs it, you run it on demand). Every finding
    carries its own fix: do what it says. Never game a rule by renaming.
 2. **`dev/docs/ARCHITECTURE.md`**, the architecture record. Read the relevant
    section before composing a process, writing a module or citing a shape.
@@ -77,6 +78,7 @@ After each change, scoped to the paths you touched:
 ```bash
 pnpm exec oxfmt --write --disable-nested-config <paths>
 pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc <paths>
+pnpm exec oxlint --quiet --config .oxlintrc.architecture.jsonc <paths>   # slow rules (comment size)
 VITEST_MAX_WORKERS=2 pnpm --filter <package> test <paths>   # never npx vitest; no `--`
 tsc --noEmit --ignoreConfig <file>                            # one file while iterating
 ```

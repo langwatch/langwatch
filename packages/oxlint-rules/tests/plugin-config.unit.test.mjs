@@ -7,7 +7,11 @@ import { describe, expect, it } from "vitest";
 import { rules } from "../src/index.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const CONFIGS = ["packages/architecture-enforcer/oxlint.architecture.jsonc", ".oxlintrc.jsonc"];
+const CONFIGS = [
+  "packages/architecture-enforcer/oxlint.architecture.jsonc",
+  ".oxlintrc.jsonc",
+  ".oxlintrc.architecture.jsonc",
+];
 const COMMENT_OR_STRING = /"(?:[^"\\]|\\.)*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
 const TRAILING_COMMA = /,(\s*[}\]])/g;
 

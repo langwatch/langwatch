@@ -11,11 +11,12 @@ per rule).
 
 ## How the configs are built today
 
-- **Two files.** `.oxlintrc.jsonc` is the entry point: the oxlint built-ins
+- **Three files.** `.oxlintrc.jsonc` is the entry point: the oxlint built-ins
   enabled workspace-wide sit in its `rules`, and the scoped ones in its
   `overrides`. It extends `packages/architecture-enforcer/oxlint.architecture.jsonc`,
   which enables every `langwatch/*` rule and holds only threshold overrides
   (cognitive complexity and condition shape by category of path).
+  `.oxlintrc.architecture.jsonc` loads the plugin and enables only the slow rules.
 - **The plugin registry is one map.** `rules` in
   `packages/oxlint-rules/src/index.mjs` keys each rule by the name its
   `defineRule` declaration carries. Adding a rule is the rule file, its entry
@@ -29,9 +30,17 @@ per rule).
   registry does not hold.
 - **No baseline, no per-file exemption.** A rule the repository does not enforce
   is off by name. An override names a category of path, never a list of files.
-- **`pnpm lint` is oxlint only.** architecture-enforcer runs as
-  `pnpm lint:architecture`, outside `pnpm lint` until the tree is clean; CI runs
-  the policies already at zero by id.
+- **`pnpm lint` is the fast oxlint layer.** The rules too slow for every edit
+  are `off` in `.oxlintrc.jsonc` and `error` in `.oxlintrc.architecture.jsonc`, so
+  each finding comes from exactly one config. `pnpm lint:architecture` runs that
+  config, then architecture-enforcer; CI blocks on the oxlint half plus the
+  enforcer policies already at zero by id.
+- **The cut is measured.** CPU time per rule, from a timer around each rule's
+  `create` and visitors. A rule moves when it holds
+  5% or more of the plugin's time and removing it cuts the whole-tree run by 10%
+  or more (2026-09-30: `comment-block-size`, about 46% of plugin time and 20% of
+  user CPU; `pass-through-class` read 18% under the timer but its removal moved
+  nothing, so it stayed).
 - **The reference is generated.** `pnpm --filter @langwatch/architecture-enforcer docs`
   rewrites `dev/docs/lint-rules.md`; CI runs `docs:check` and fails when it is
   stale.
