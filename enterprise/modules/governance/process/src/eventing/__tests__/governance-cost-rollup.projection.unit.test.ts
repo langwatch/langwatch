@@ -261,7 +261,6 @@ describe("a retraction", () => {
     expect(state).toMatchObject({ revisionCount: 1, previousAmountNanoUsd: 900, revisedAt: T2 });
   });
 
-  /** @scenario "The rebuild the erasure asks for cannot re-derive the identifier" */
   it("addresses an erased spender under the stand-in, never the original", () => {
     const { projection } = rollupFold({ pseudonyms: new Map([["ada@corp", "digest-1"]]) });
 

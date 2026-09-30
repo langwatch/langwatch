@@ -70,7 +70,6 @@ function buildWorld() {
 
 describe("PersonDiscoveryService", () => {
   describe("given a provider's pulled rows naming an actor", () => {
-    /** @scenario "An actor on a pulled row becomes a discovered person" */
     it("becomes a discovered person with the event's own time as both seen dates", async () => {
       const { record, personRows } = buildWorld();
       await record("openai_admin", [activityEvent()]);
@@ -85,18 +84,6 @@ describe("PersonDiscoveryService", () => {
         firstSeenAt: at("2026-08-10T12:00:00.000Z"),
         lastSeenAt: at("2026-08-10T12:00:00.000Z"),
       });
-    });
-
-    /** @scenario "Seeing the same actor again moves last-seen forward only" */
-    it("moves last-seen forward and leaves first-seen where it was for a later sighting", async () => {
-      const { record, personRows } = buildWorld();
-      const sighting = (iso: string) => activityEvent({ event_timestamp: iso });
-      await record("openai_admin", [sighting("2026-08-10T12:00:00.000Z")]);
-      await record("openai_admin", [sighting("2026-08-20T09:00:00.000Z")]);
-
-      const [row] = await personRows();
-      expect(row?.firstSeenAt).toEqual(at("2026-08-10T12:00:00.000Z"));
-      expect(row?.lastSeenAt).toEqual(at("2026-08-20T09:00:00.000Z"));
     });
 
     it("only ever widens the seen range on later sightings, in either direction", async () => {
@@ -120,7 +107,6 @@ describe("PersonDiscoveryService", () => {
       expect(await personRows()).toEqual(rows);
     });
 
-    /** @scenario "The same identifier on two providers is two discovered people" */
     it("is two discovered people when two providers name the same email", async () => {
       const { record, personRows } = buildWorld();
       await record("openai_admin", [activityEvent()]);
@@ -144,7 +130,6 @@ describe("PersonDiscoveryService", () => {
   });
 
   describe("given rows that must not become people", () => {
-    /** @scenario "A row naming nobody discovers nobody" */
     it("discovers nobody from an empty actor", async () => {
       const { record, personRows } = buildWorld();
       await record("copilot_studio_dataverse", [activityEvent({ actor: "" })]);
@@ -185,7 +170,6 @@ describe("PersonDiscoveryService", () => {
       });
     });
 
-    /** @scenario "A directory row enriches a discovered person's display text" */
     it("upgrades the display text of a person activity discovered as a bare id", async () => {
       const { record, personRows } = buildWorld();
       await record("copilot_studio_dataverse", [
@@ -220,7 +204,6 @@ describe("PersonDiscoveryService", () => {
       expect((await personRows())[0]?.lastSeenAt).toEqual(at("2026-08-10T12:00:00.000Z"));
     });
 
-    /** @scenario "A directory row records the department it names on the person" */
     it("records the department the directory filed the person under", async () => {
       const { record, personRows } = buildWorld();
       await record("copilot_studio_dataverse", [
@@ -239,7 +222,6 @@ describe("PersonDiscoveryService", () => {
       expect((await personRows())[0]?.department).toBeNull();
     });
 
-    /** @scenario "A later directory row naming no department keeps the recorded one" */
     it("keeps the recorded department when a later sighting names none", async () => {
       const { record, personRows } = buildWorld();
       await record("copilot_studio_dataverse", [

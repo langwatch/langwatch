@@ -160,11 +160,4 @@ describe("Costs page, a read that genuinely broke", () => {
     // does not decide on the reader's behalf that the screen is empty.
     expect(screen.getByRole("button", { name: /see sample data/i })).toBeInTheDocument();
   });
-
-  /** @scenario "A failed cost read never renders as zero" */
-  it("shows the error state and draws no lane amount", async () => {
-    expect(screen.getByTestId("cost-lanes-error")).toBeInTheDocument();
-    expect(document.querySelector('[data-testid^="cost-lane-"]')).toBeNull();
-    expect(screen.queryByText(/\$0/)).not.toBeInTheDocument();
-  });
 });

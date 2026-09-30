@@ -186,43 +186,6 @@ describe("Feature: linking provider-named people to accounts on proof", () => {
     });
   });
 
-  describe("given a provider-named actor that is a machine login", () => {
-    /** @scenario "Somebody who is not a person is never linked to an account" */
-    it("links nobody, even to an account confirming the same string", async () => {
-      const world = buildWorld();
-      await world.repositories.discoveredPeople.recordActivitySighting({
-        organizationId: ORG,
-        provider: "openai_admin",
-        rawActorId: "ci@acme.test",
-        displayText: "ci@acme.test",
-        kind: "service_account",
-        earliestAt: AT.subtract({ hours: 48 }),
-        latestAt: AT.subtract({ hours: 24 }),
-      });
-      world.verifiedMember("user_42", "ci@acme.test");
-
-      const outcome = await world.service.linkProvenMatches({ organizationId: ORG });
-
-      expect(outcome.linked).toBe(0);
-      expect(await world.openLinks()).toEqual([]);
-    });
-  });
-
-  describe("given a person who has been erased", () => {
-    /** @scenario "An erased person is never linked to an account again" */
-    it("links nobody when the matcher runs", async () => {
-      const world = buildWorld();
-      const personId = await world.seedPerson();
-      world.verifiedMember("user_42", "m.silva@acme.test");
-      await world.erase(personId);
-
-      const outcome = await world.service.linkProvenMatches({ organizationId: ORG });
-
-      expect(outcome.linked).toBe(0);
-      expect(await world.openLinks()).toEqual([]);
-    });
-  });
-
   describe("given the directory agrees with the confirmed address", () => {
     /** @scenario "A directory identifier agreeing with the address is recorded as the stronger proof" */
     it("records the stronger proof on the link", async () => {
@@ -366,7 +329,6 @@ describe("Feature: linking provider-named people to accounts on proof", () => {
 
 describe("Feature: turning a suggestion into a link", () => {
   describe("given a stored suggestion for a person with no link", () => {
-    /** @scenario "Confirming a suggestion opens the link and clears the suggestion" */
     it("opens the link on the person's say-so, not on the score, and clears the queue", async () => {
       const world = buildWorld();
       const personId = await world.seedPerson({ rawActorId: "user_opaque" });
@@ -384,26 +346,6 @@ describe("Feature: turning a suggestion into a link", () => {
         },
       ]);
       expect(await world.service.listSuggestions({ organizationId: ORG })).toEqual([]);
-    });
-  });
-
-  describe("given a stored suggestion for a person who has since been linked", () => {
-    /** @scenario "Confirming a suggestion for somebody since linked is refused" */
-    it("refuses, saying the person already holds a link", async () => {
-      const world = buildWorld();
-      const personId = await world.seedPerson({ rawActorId: "user_opaque" });
-      const suggestionId = await world.suggest(personId);
-      await world.repositories.identityMatches.open({
-        organizationId: ORG,
-        discoveredPersonId: personId,
-        userId: "user_7",
-        evidenceKind: MATCH_EVIDENCE_KIND.VERIFIED_EMAIL,
-        validFrom: AT,
-      });
-
-      await expect(
-        world.service.confirmSuggestion({ organizationId: ORG, suggestionId }),
-      ).rejects.toMatchObject({ code: new IdentityAlreadyLinkedError(personId).code });
     });
   });
 

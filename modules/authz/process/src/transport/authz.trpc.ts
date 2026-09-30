@@ -8,7 +8,7 @@ import {
 } from "@langwatch/authz-contract";
 
 export const authzTrpc = defineTrpcContract("authz")
-  .query("effectivePermissions")
+  .query("effectivePermissions", { cache: { tier: "session" } })
   .withInput(authzOwnStandingInputSchema)
   .withOutput(authzOwnStandingSchema)
   .build();

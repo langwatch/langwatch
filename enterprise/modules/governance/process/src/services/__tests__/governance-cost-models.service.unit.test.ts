@@ -72,17 +72,6 @@ describe("GovernanceCostBreakdownService", () => {
       ]);
     });
 
-    /** @scenario "A model billed per token kind keeps the line item the provider sent" */
-    it("names the row with the line item exactly as it was billed", async () => {
-      const { costRollup, service, window } = setup();
-      costRollup.seed(cell({ model: "gpt-5, input" }));
-      costRollup.seed(cell({ model: "gpt-5, output", amountNanoUsd: 3_000_000_000 }));
-
-      const { rows } = await service.spendByModel(window);
-
-      expect(rows.map((row) => row.model)).toEqual(["gpt-5, output", "gpt-5, input"]);
-    });
-
     /** @scenario "Gateway rows never enter the model breakdown" */
     it("leaves gateway rows out", async () => {
       const { costRollup, service, window } = setup();

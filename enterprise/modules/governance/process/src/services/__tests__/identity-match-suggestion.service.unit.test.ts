@@ -196,7 +196,6 @@ describe("Feature: computing who a provider-named person might be", () => {
   });
 
   describe("given stored suggestions from an earlier run", () => {
-    /** @scenario "Running the suggestion job again replaces what it found last time" */
     it("replaces them with what the new inputs imply", async () => {
       const world = buildWorld();
       await world.seedPerson("m.silva");

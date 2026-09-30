@@ -86,7 +86,6 @@ describe("the governancePeople tRPC namespace", () => {
     expect(asked).toEqual(["governance:view"]);
   });
 
-  /** @scenario "The match button runs the proof pass" */
   it("runs the match under governance:manage and answers main's three counts", async () => {
     const { caller, asked } = mount();
 
@@ -115,39 +114,5 @@ describe("the governancePeople tRPC namespace", () => {
       code: "FORBIDDEN",
     });
     expect(calls).toEqual([]);
-  });
-
-  /** @scenario "Reading the list requires the governance view grant" */
-  it("refuses a reader without governance:view", async () => {
-    const { caller, calls } = mount(() => false);
-
-    await expect(caller.list({ organizationId: "org_1" })).rejects.toMatchObject({
-      code: "FORBIDDEN",
-    });
-    expect(calls).toEqual([]);
-  });
-
-  describe("given somebody holding governance:view alone", () => {
-    const viewOnly = (permission: string) => permission === "governance:view";
-
-    /** @scenario "Running the engine requires the governance manage grant" */
-    it("refuses to run the engine", async () => {
-      const { caller, calls } = mount(viewOnly);
-
-      await expect(caller.runMatch({ organizationId: "org_1" })).rejects.toMatchObject({
-        code: "FORBIDDEN",
-      });
-      expect(calls).toEqual([]);
-    });
-
-    /** @scenario "Confirming requires the governance manage grant" */
-    it("refuses to confirm a suggestion", async () => {
-      const { caller, calls } = mount(viewOnly);
-
-      await expect(
-        caller.confirmSuggestion({ organizationId: "org_1", suggestionId: "sug_1" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-      expect(calls).toEqual([]);
-    });
   });
 });

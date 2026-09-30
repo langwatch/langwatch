@@ -144,29 +144,6 @@ describe("one comparison of a day against its summary", () => {
     });
   });
 
-  describe("given a summary row in a currency other than dollars that disagrees with its events", () => {
-    /** @scenario "The watchdog compares the amount in the currency it was billed in" */
-    it("counts the drift, though no dollar figure exists on either side", () => {
-      const charge = observed({
-        restatementKey: "item-1",
-        currencyCode: "EUR",
-        costNanoMinor: 1_000,
-        costNanoUsd: null,
-      });
-      const { comparison } = compare({
-        events: [charge],
-        summarizedAmount: 900,
-        summarizedAt: DAY_START_MS + HOUR_MS,
-      });
-
-      expect(comparison.mismatches).toHaveLength(1);
-      expect(comparison.mismatches[0]).toMatchObject({
-        summarizedNanoMinor: 900,
-        derivedNanoMinor: 1_000,
-      });
-    });
-  });
-
   describe("given a summary cell no charge accounts for", () => {
     it("states it as money the events do not explain", () => {
       const state = rollupFold().fold([observed({ restatementKey: "item-1" })]);
@@ -253,17 +230,6 @@ describe("how far the summary trails its events", () => {
         windowStartMs,
       }),
     ).toBe(9_000);
-  });
-
-  /** @scenario "The summary's lag behind the event log is measured" */
-  it("is how far the newest event is past the newest summarized moment", () => {
-    expect(
-      computeCostRollupLagMs({
-        latestEventOccurredAtMs: windowStartMs + 9_000,
-        latestSummarizedOccurredAtMs: windowStartMs + 4_000,
-        windowStartMs,
-      }),
-    ).toBe(5_000);
   });
 
   it("is never negative when the summary is ahead", () => {

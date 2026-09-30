@@ -207,7 +207,6 @@ describe("governance pages for a delegated viewer", () => {
     });
 
     /** @scenario "Departments offers no controls a viewer cannot use" */
-    /** @scenario "The Departments tab offers no controls to a viewer without the manage grant" */
     it("offers no department controls without governance:manage", () => {
       renderPage({
         Page: PeoplePage,

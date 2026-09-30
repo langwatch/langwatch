@@ -1655,6 +1655,12 @@ states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md
 
 **An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
 
+**A read's cache tier is declared on its contract** (Alex, 2026-09-30): `.query(name, { cache: { tier: "live" | "session" | "reference", persist } })`, applied by browser-host through `setQueryDefaults`; the session tier is invalidated by a newer `x-lw-session-version` or a 403 and revalidated by ETag, never by a call site's `staleTime`. ADR-164, specs/ui/browser-query-caching.feature.
+
+**The session version is authz's, per user, and a contract's tiers travel with its browser Api** (Alex, 2026-09-30): `AuthzApi.getSessionVersion({ userId })` backs `x-lw-session-version`, and a browser declaration states `.withApi(api, { contracts })`. ADR-164.
+
+**A session or reference read revalidates by a content ETag** (Alex, 2026-09-30): the tRPC host hashes an unbatched GET's 200 body into `"<userId>.<sha256>"` with `Cache-Control: private, no-cache` and `Vary: Cookie`, and answers a matching `If-None-Match` with a bodyless 304; no read opts in and no write bumps for it. ADR-164.
+
 A surface too wide for a typed hook calls a procedure by PATH through the
 shell's `UiRpc`, and the answer is published under the key the typed hook
 would have written, so the two never hold two versions of one read. **A

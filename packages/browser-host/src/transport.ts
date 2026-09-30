@@ -15,6 +15,7 @@ import {
 } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
 
+import type { CacheDeclaringContract } from "./cache-tiers.ts";
 import { type SseEventSourceConstructor, sseSubscriptionLink } from "./sse-subscription-link";
 
 /** Same-origin, so the browser sends the session cookie without configuration. */
@@ -53,6 +54,8 @@ export type UiFeatureApiClientOptions = {
   subscriptionUrl?: string;
   /** The EventSource to open live channels with. Defaults to the browser's. */
   eventSource?: SseEventSourceConstructor;
+  /** Reads sent alone, so one URL is one read and its ETag means one thing (ADR-164). */
+  unbatchedPaths?: ReadonlySet<string>;
 };
 
 /**
@@ -63,9 +66,11 @@ function uiFeatureApiLinks({
   fetch,
   subscriptionUrl = subscriptionOrigin(),
   eventSource,
+  unbatchedPaths,
 }: UiFeatureApiClientOptions) {
   const batchRouting = splitLink({
-    condition: (operation) => operation.context.skipBatch === true,
+    condition: (operation) =>
+      operation.context.skipBatch === true || unbatchedPaths?.has(operation.path) === true,
     true: httpLink({ url, ...(fetch ? { fetch } : {}) }),
     false: httpBatchStreamLink({
       url,
@@ -126,4 +131,6 @@ export type UiFeatureApiBinding = {
   /** The package this transport serves, named for composition diagnostics. */
   readonly name: string;
   readonly Provider: UiFeatureApiProvider;
+  /** The contracts whose declared cache tiers this package's reads follow (ADR-164). */
+  readonly contracts?: readonly CacheDeclaringContract[];
 };

@@ -14,6 +14,12 @@ import type { z } from "zod";
 /** Every kind of procedure a contract declares. */
 export type TrpcContractKind = "query" | "mutation" | "subscription";
 
+/** How long the browser trusts a read (ADR-164); an undeclared read keeps the 30s default. */
+export type TrpcCacheTier = "live" | "session" | "reference";
+
+/** A read's cache policy: its tier, and whether a reload may paint it from disk. */
+export type TrpcCachePolicy = Readonly<{ tier: TrpcCacheTier; persist?: boolean }>;
+
 /** One declared procedure. `output` is absent when the procedure answers nothing. */
 export type TrpcContractMember<
   Kind extends TrpcContractKind = TrpcContractKind,
@@ -23,6 +29,7 @@ export type TrpcContractMember<
   readonly kind: Kind;
   readonly input: Input;
   readonly output: Output;
+  readonly cache?: TrpcCachePolicy;
 }>;
 
 /** The procedures of one namespace, keyed by the wire name. */
@@ -59,9 +66,10 @@ export interface TrpcContractBuilder<
   Namespace extends string,
   Members extends TrpcContractMembers,
 > {
-  /** A read. */
+  /** A read; `cache` declares its browser cache tier (ADR-164). */
   query<Name extends string>(
     name: Name,
+    options?: { cache?: TrpcCachePolicy },
   ): TrpcContractInputBuilder<Namespace, Members, Name, "query">;
   /** A write. */
   mutation<Name extends string>(
@@ -115,21 +123,26 @@ function contractBuilder<Namespace extends string, Members extends TrpcContractM
   namespace: Namespace,
   members: MutableMembers,
 ): TrpcContractBuilder<Namespace, Members> {
-  const member = <Name extends string, Kind extends TrpcContractKind>(name: Name, kind: Kind) => ({
+  const member = <Name extends string, Kind extends TrpcContractKind>(
+    name: Name,
+    kind: Kind,
+    cache?: TrpcCachePolicy,
+  ) => ({
     withInput: (input: z.ZodType) => {
       assertUndeclared(namespace, name, members);
-      const declared = { ...members, [name]: { kind, input, output: undefined } };
+      const cached = cache ? { cache } : {};
+      const declared = { ...members, [name]: { kind, input, output: undefined, ...cached } };
 
       return {
         ...contractBuilder(namespace, declared),
         withOutput: (output: z.ZodType) =>
-          contractBuilder(namespace, { ...members, [name]: { kind, input, output } }),
+          contractBuilder(namespace, { ...members, [name]: { kind, input, output, ...cached } }),
       };
     },
   });
 
   return {
-    query: (name) => member(name, "query"),
+    query: (name, options) => member(name, "query", options?.cache),
     mutation: (name) => member(name, "mutation"),
     subscription: (name) => member(name, "subscription"),
     build: () => ({ namespace, members: Object.freeze({ ...members }) as Members }),
