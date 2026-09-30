@@ -2,7 +2,8 @@
  * @vitest-environment node
  *
  * A run against connected agents, through the suite service and a real
- * database: who may run a personal one, and how one is addressed by name.
+ * database: who may run a personal one, how one is addressed by name, and
+ * that one no process is holding is refused before anything is scheduled.
  *
  * @see specs/agents/connected-agents.feature
  */
@@ -19,6 +20,8 @@ import {
 } from "vitest";
 import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
 import { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
+import type { InstanceMeta } from "~/server/connected-agents/instance.registry";
+import { getConnectedAgentRuntime } from "~/server/connected-agents/runtime";
 import { prisma } from "~/server/db";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -72,6 +75,26 @@ async function registerAgent({
       hostLabel,
       identityKey: `${name}@${environment}${scope}`,
     },
+  });
+}
+
+/** Holds the agent from one live instance, the way a running SDK process does. */
+async function connectInstance(agentId: string): Promise<void> {
+  const meta: InstanceMeta = {
+    instanceId: `inst_${nanoid(8)}`,
+    projectId,
+    hostname: "dev-box",
+    username: "dev",
+    pid: 1,
+    sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+    label: null,
+    podId: "pod_test",
+    connectedAt: Date.now(),
+    maxConcurrency: 1,
+  };
+  await getConnectedAgentRuntime().registry.register({
+    meta,
+    agentIds: [agentId],
   });
 }
 
@@ -195,6 +218,7 @@ describe("running against a personal development agent", () => {
         environment: "development",
         ownerUserId: owner.id,
       });
+      await connectInstance(agent.id);
 
       const result = await runAgainst({
         referenceId: agent.id,
@@ -232,6 +256,7 @@ describe("running against a personal development agent", () => {
         environment: "development",
         hostLabel: "ci-runner-1",
       });
+      await connectInstance(agent.id);
 
       const result = await runAgainst({
         referenceId: agent.id,
@@ -239,6 +264,51 @@ describe("running against a personal development agent", () => {
       });
 
       expect(result.jobCount).toBe(1);
+    });
+  });
+});
+
+describe("running against a connected agent no process is holding", () => {
+  describe("when the run starts", () => {
+    /** @scenario "A run plan cannot target an offline connected agent" */
+    it("refuses the run with agent_offline and schedules nothing", async () => {
+      const agent = await registerAgent({
+        name: "support-agent",
+        environment: "production",
+      });
+
+      const failure = await runAgainst({
+        referenceId: agent.id,
+        actor: { id: owner.id, label: "user" },
+      }).catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "agent_offline",
+        meta: { agentName: "support-agent", environment: "production" },
+      });
+      expect(queueSimulationRun).not.toHaveBeenCalled();
+      expect(await prisma.simulationSuite.count({ where: { projectId } })).toBe(
+        0,
+      );
+    });
+  });
+
+  describe("when a process connects before the run starts", () => {
+    /** @scenario "A run plan against an online connected agent is scheduled" */
+    it("schedules the run", async () => {
+      const agent = await registerAgent({
+        name: "support-agent",
+        environment: "production",
+      });
+      await connectInstance(agent.id);
+
+      const result = await runAgainst({
+        referenceId: agent.id,
+        actor: { id: owner.id, label: "user" },
+      });
+
+      expect(result.jobCount).toBe(1);
+      expect(queueSimulationRun).toHaveBeenCalledTimes(1);
     });
   });
 });
@@ -251,6 +321,7 @@ describe("addressing a connected agent by name and environment", () => {
         name: "support-agent",
         environment: "production",
       });
+      await connectInstance(agent.id);
 
       const result = await runAgainst({
         referenceId: "support-agent@production",

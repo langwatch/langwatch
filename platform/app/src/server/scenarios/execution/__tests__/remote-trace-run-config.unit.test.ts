@@ -14,6 +14,7 @@ import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   buildRemoteTraceRunConfig,
+  TRACE_QUIET_PERIOD_MS,
   TRACE_WAIT_CAP_MS,
 } from "../remote-trace-run-config";
 
@@ -35,6 +36,7 @@ describe("buildRemoteTraceRunConfig", () => {
       expect(config).toEqual({
         fetchRemoteTraces: true,
         traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
+        traceQuietPeriodMs: TRACE_QUIET_PERIOD_MS,
         langwatch: {
           endpoint: "https://app.langwatch.test",
           apiKey: "sk-lw-test",
@@ -55,6 +57,18 @@ describe("buildRemoteTraceRunConfig", () => {
         expect(config).toMatchObject({
           traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
         });
+      });
+    });
+
+    describe("when the verdict reads the trace", () => {
+      /** @scenario "The child process passes the quiet period through" */
+      it("passes a two second quiet period for every remote-fetching target", () => {
+        expect(TRACE_QUIET_PERIOD_MS).toBe(2_000);
+        for (const targetType of ["http", "connected"] as const) {
+          expect(
+            buildRemoteTraceRunConfig({ ...base, targetType }),
+          ).toMatchObject({ traceQuietPeriodMs: TRACE_QUIET_PERIOD_MS });
+        }
       });
     });
 

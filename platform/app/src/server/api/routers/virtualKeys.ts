@@ -19,6 +19,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
@@ -50,7 +51,7 @@ import {
 import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-import { authorizeInResolver } from "../rbac";
+import { OneTimeRevealService } from "~/server/secrets/oneTimeReveal.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /** The session expressed in the shared actor vocabulary. */
@@ -273,13 +274,13 @@ export const virtualKeysRouter = createTRPCRouter({
       // destination, the exact boundary `create` will hold them to when
       // they submit; previewing a target's budgets must not be cheaper
       // than creating a key against it.
-      await assertActorCanManageAllScopes(
-        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-        input.scopes,
-      );
       await assertScopesBelongToOrg(
         ctx.prisma,
         input.organizationId,
+        input.scopes,
+      );
+      await assertActorCanManageAllScopes(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         input.scopes,
       );
       await assertTraceProjectBelongsToOrg(
@@ -338,6 +339,13 @@ export const virtualKeysRouter = createTRPCRouter({
         expiresAt: z.coerce.date().optional(),
         budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
+        /**
+         * Also park the secret under a one-time reveal id, for a reader other
+         * than this caller: the guided tour mints the key here, and Langy
+         * shows the same secret once more through its secret snippet card.
+         * The secret is still returned, since the dialog is its first showing.
+         */
+        revealOnce: z.boolean().optional(),
       }),
     )
     // Per-scope authz (manage on EVERY requested scope) is data-dependent,
@@ -349,13 +357,13 @@ export const virtualKeysRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertActorCanManageAllScopes(
-        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-        input.scopes,
-      );
       await assertScopesBelongToOrg(
         ctx.prisma,
         input.organizationId,
+        input.scopes,
+      );
+      await assertActorCanManageAllScopes(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         input.scopes,
       );
       await assertTraceProjectBelongsToOrg(
@@ -402,6 +410,15 @@ export const virtualKeysRouter = createTRPCRouter({
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
+      const reveal = input.revealOnce
+        ? await OneTimeRevealService.create().stash({
+            organizationId: input.organizationId,
+            kind: "virtual_key",
+            keyId: virtualKey.id,
+            preview: virtualKey.displayPrefix,
+            secret,
+          })
+        : null;
       return {
         virtualKey: toVirtualKeyCamelDto({
           virtualKey,
@@ -411,6 +428,9 @@ export const virtualKeysRouter = createTRPCRouter({
           }),
         }),
         secret,
+        ...(reveal
+          ? { revealId: reveal.revealId, preview: virtualKey.displayPrefix }
+          : {}),
       };
     }),
 
@@ -454,13 +474,13 @@ export const virtualKeysRouter = createTRPCRouter({
       // Re-scoping additionally needs manage on every NEW scope, so a key
       // can't be moved into a scope the caller doesn't control.
       if (input.scopes) {
-        await assertActorCanManageAllScopes(
-          { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-          input.scopes,
-        );
         await assertScopesBelongToOrg(
           ctx.prisma,
           input.organizationId,
+          input.scopes,
+        );
+        await assertActorCanManageAllScopes(
+          { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
           input.scopes,
         );
       }

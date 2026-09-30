@@ -35,8 +35,19 @@ const FATAL =
 // (SMOKE_BROWSER_CHANNEL=chrome) to skip the ~170 MB Chromium download.
 // Locally it falls back to Playwright's bundled Chromium.
 const channel = process.env.SMOKE_BROWSER_CHANNEL || undefined;
-const browser = await chromium.launch(channel ? { channel } : {});
-const page = await (await browser.newContext()).newPage();
+// A blocked renderer cannot run an in-page timeout. Keep the deadline in Node.
+const watchdog = setTimeout(() => {
+  console.error("BOOT SMOKE FAILED: exceeded the five-minute deadline");
+  process.exit(1);
+}, 300_000);
+watchdog.unref();
+// Own the process so shutdown can terminate this smoke browser's children too.
+const server = await chromium.launchServer({ host: "127.0.0.1", channel });
+const browser = await chromium.connect(server.wsEndpoint(), {
+  timeout: 30_000,
+});
+const context = await browser.newContext();
+const page = await context.newPage();
 
 const fatal = [];
 page.on("pageerror", (e) => {
@@ -49,6 +60,7 @@ try {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForFunction(
     () => (document.getElementById("root")?.innerHTML?.length ?? 0) > 100,
+    void 0,
     { timeout: 30000 },
   );
   mounted = true;
@@ -60,7 +72,10 @@ try {
 // Phase 2 — every emitted chunk evaluates without a module-init error.
 let scanned = 0;
 try {
-  const files = readdirSync(assetsDir).filter((f) => f.endsWith(".js"));
+  const files = readdirSync(assetsDir)
+    .filter((f) => f.endsWith(".js"))
+    .sort();
+  if (files.length === 0) throw new Error("no emitted JavaScript chunks found");
   // Scan from a terminal public page (/auth/signin) so nothing redirects
   // mid-scan and tears down the JS context we're importing into.
   //
@@ -77,38 +92,66 @@ try {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (!message.includes("interrupted by another navigation")) throw err;
+    const redirected =
+      message.includes("interrupted by another navigation") ||
+      message.includes("net::ERR_ABORTED");
+    if (!redirected) throw err;
   }
   await page.waitForURL(/\/auth\/signin/, {
     waitUntil: "domcontentloaded",
     timeout: 60000,
   });
-  const chunkErrors = await page.evaluate(async (names) => {
-    const errs = [];
-    // Sequential so a chunk that navigates can't abort the whole batch.
-    for (const name of names) {
-      try {
-        await import(`/assets/${name}`);
-      } catch (e) {
-        errs.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
-      }
+  // Batch browser round trips while still evaluating every emitted chunk.
+  // The deadline lives in Node so a blocked renderer cannot bypass it.
+  for (let offset = 0; offset < files.length; offset += 32) {
+    const batch = files.slice(offset, offset + 32);
+    console.log(
+      `Importing chunks ${offset + 1}-${offset + batch.length}/${files.length}`,
+    );
+    const errors = await withinDeadline(
+      page.evaluate(async (chunks) => {
+        return await Promise.all(
+          chunks.map(async (chunk) => {
+            try {
+              await import(`/assets/${chunk}`);
+              return null;
+            } catch (e) {
+              return `${chunk}: ${e instanceof Error ? e.message : String(e)}`;
+            }
+          }),
+        );
+      }, batch),
+      15_000,
+      `chunk imports timed out: ${batch.join(", ")}`,
+    );
+    scanned += batch.length;
+    for (const error of errors) {
+      if (error === null) continue;
+      if (FATAL.test(error)) fatal.push(`chunk failed to evaluate: ${error}`);
+      else console.warn(`WARN non-fatal chunk import error: ${error}`);
     }
-    return errs;
-  }, files);
-  scanned = files.length;
-  // Only the chunk-init signatures we care about fail the build. Anything else
-  // a chunk might throw on import in a headless/no-backend context is surfaced
-  // as a warning so a benign quirk can't wedge CI.
-  for (const e of chunkErrors) {
-    if (FATAL.test(e)) fatal.push(`chunk failed to evaluate: ${e}`);
-    else console.warn(`WARN non-fatal chunk import error: ${e}`);
   }
 } catch (err) {
   const message = err instanceof Error ? err.message : String(err);
   fatal.push(`chunk scan did not run: ${message}`);
 }
 
-await browser.close();
+try {
+  await withinDeadline(context.close(), 10_000, "context shutdown timed out");
+} catch (err) {
+  fatal.push(err instanceof Error ? err.message : String(err));
+}
+try {
+  await withinDeadline(browser.close(), 10_000, "browser disconnect timed out");
+} catch (err) {
+  fatal.push(err instanceof Error ? err.message : String(err));
+}
+try {
+  await withinDeadline(server.kill(), 10_000, "browser shutdown timed out");
+} catch (err) {
+  fatal.push(err instanceof Error ? err.message : String(err));
+}
+clearTimeout(watchdog);
 
 if (fatal.length > 0) {
   console.error("BOOT SMOKE FAILED:");
@@ -119,3 +162,23 @@ if (fatal.length > 0) {
 console.log(
   `BOOT SMOKE PASSED (#root mounted: ${mounted}, chunks scanned: ${scanned})`,
 );
+
+/**
+ * @template T
+ * @param {Promise<T>} operation
+ * @param {number} timeoutMs
+ * @param {string} message
+ */
+async function withinDeadline(operation, timeoutMs, message) {
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let timer;
+  try {
+    /** @type {Promise<never>} */
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    });
+    return await Promise.race([operation, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}

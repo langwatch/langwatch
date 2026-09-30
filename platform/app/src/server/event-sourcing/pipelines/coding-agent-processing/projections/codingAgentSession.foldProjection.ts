@@ -27,10 +27,13 @@ import {
 } from "../services/coding-agent-session.derivation";
 import {
   type CodingAgentSessionData,
+  contextUsageKey,
   type MetricSeriesFact,
+  type SessionContextUsage,
   type SessionTitleSource,
   sessionTitleSourceSchema,
 } from "../services/coding-agent-session.types";
+import { stampedContextOf } from "../services/session-context-memo";
 
 /**
  * The coding-agent session fold (ADR-056).
@@ -351,6 +354,9 @@ export class CodingAgentSessionFoldProjection
       // The contribution's own label, not the folded (first-writer-wins)
       // state's — same reasoning as the log handler below.
       agent: data.agent,
+      // The stamp the contribute command put on the event, so the call's
+      // tokens are charged to the context declared before it.
+      context: stampedContextOf(data),
     });
 
     // The computed half of the cost-drift canary: what this span's tokens
@@ -382,6 +388,7 @@ export class CodingAgentSessionFoldProjection
       // state's — the logs-only gate must reflect what THIS record is.
       agent: data.agent,
       occurredAtMs: data.timeUnixMs,
+      context: stampedContextOf(data),
     });
 
     // The reported half of the cost-drift canary: what the agent says this
@@ -461,6 +468,11 @@ export interface CodingAgentSessionRow {
   entrypoint: string;
   parentSessionId: string;
   isFork: boolean;
+  /**
+   * A thread the agent ran for itself (00096): codex's thread title
+   * generator, its recap. Kept and priced, never listed as a session.
+   */
+  auxiliary: boolean;
   /** Git identity from the companion event, and the generated title (00075). */
   repositoryHost: string;
   repositoryOwner: string;
@@ -502,6 +514,13 @@ export interface CodingAgentSessionRow {
   cacheCreationTokens: number;
   costUsd: number;
   agentReportedCostUsd: number;
+  /**
+   * What the session spent under each declared working context (00097),
+   * first seen first. The counters above are the amount; this says where it
+   * went. Empty on a row folded before the column, whose whole usage then
+   * reads as spent before any declaration.
+   */
+  usageByContext: SessionContextUsage[];
 
   modelCallMs: number;
   toolMs: number;
@@ -604,6 +623,7 @@ export function projectCodingAgentSessionToRow({
     entrypoint: state.entrypoint ?? "",
     parentSessionId: state.parentSessionId ?? "",
     isFork: state.isFork,
+    auxiliary: state.auxiliary,
     ...gitContextColumns(state),
 
     modelCalls: state.modelCalls,
@@ -630,6 +650,7 @@ export function projectCodingAgentSessionToRow({
     cacheCreationTokens: state.cacheCreationTokens,
     costUsd: state.costUsd,
     agentReportedCostUsd: state.agentReportedCostUsd,
+    usageByContext: Object.values(state.usageByContext),
 
     modelCallMs: state.modelCallMs,
     toolMs: state.toolMs,
@@ -790,6 +811,7 @@ export function codingAgentSessionStateFromRow(
     userId: nullIfEmpty(row.userId),
     parentSessionId: nullIfEmpty(row.parentSessionId),
     isFork: row.isFork,
+    auxiliary: row.auxiliary,
     repositoryHost: nullIfEmpty(row.repositoryHost),
     repositoryOwner: nullIfEmpty(row.repositoryOwner),
     repositoryName: nullIfEmpty(row.repositoryName),
@@ -829,6 +851,9 @@ export function codingAgentSessionStateFromRow(
     cacheCreationTokens: row.cacheCreationTokens,
     costUsd: row.costUsd,
     agentReportedCostUsd: row.agentReportedCostUsd,
+    usageByContext: Object.fromEntries(
+      row.usageByContext.map((usage) => [contextUsageKey(usage), usage]),
+    ),
 
     modelCallMs: row.modelCallMs,
     toolMs: row.toolMs,

@@ -6,7 +6,9 @@ import {
   QueryTimeoutError,
 } from "~/server/app-layer/traces/errors";
 import {
-  isClickHouseObjectUnavailableError,
+  isClickHouseObjectAccessDeniedError,
+  isClickHouseObjectMissingError,
+  isClickHouseResultTooLargeError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
@@ -199,27 +201,72 @@ describe("translateClickHouseQueryError", () => {
   });
 });
 
-describe("isClickHouseObjectUnavailableError", () => {
+describe("isClickHouseObjectMissingError", () => {
+  describe("when the error names a missing table or database", () => {
+    it.each([
+      [
+        "UNKNOWN_TABLE by driver properties",
+        { code: "60", type: "UNKNOWN_TABLE" },
+        "boom",
+      ],
+      [
+        "UNKNOWN_DATABASE by driver properties",
+        { code: "81", type: "UNKNOWN_DATABASE" },
+        "boom",
+      ],
+      [
+        "UNKNOWN_TABLE from raw HTTP text",
+        {},
+        "Code: 60. DB::Exception: Table lwql.traces does not exist. (UNKNOWN_TABLE)",
+      ],
+    ])("recognises %s", (_case, props, message) => {
+      const raw = Object.assign(new Error(message), props);
+
+      expect(isClickHouseObjectMissingError(raw)).toBe(true);
+    });
+  });
+
+  describe("when the error is ACCESS_DENIED", () => {
+    it("does not recognise it — that is isClickHouseObjectAccessDeniedError's job", () => {
+      const raw = Object.assign(new Error("boom"), {
+        code: "497",
+        type: "ACCESS_DENIED",
+      });
+
+      expect(isClickHouseObjectMissingError(raw)).toBe(false);
+    });
+  });
+
+  describe("when a variant name only appears echoed inside the query text", () => {
+    it("does not classify by it", () => {
+      // The engine echoes the submitted query in the message; only the anchored
+      // `Code: <n>.` prefix the engine writes itself gets a vote.
+      const raw = new Error(
+        "Code: 62. DB::Exception: Syntax error near UNKNOWN_TABLE",
+      );
+
+      expect(isClickHouseObjectMissingError(raw)).toBe(false);
+    });
+  });
+
+  describe("when the value is an unrelated error or not an Error at all", () => {
+    it("is false", () => {
+      expect(
+        isClickHouseObjectMissingError(
+          Object.assign(new Error("boom"), { code: "241" }),
+        ),
+      ).toBe(false);
+      expect(isClickHouseObjectMissingError("nope")).toBe(false);
+    });
+  });
+});
+
+describe("isClickHouseObjectAccessDeniedError", () => {
   it.each([
-    [
-      "UNKNOWN_TABLE by driver properties",
-      { code: "60", type: "UNKNOWN_TABLE" },
-      "boom",
-    ],
-    [
-      "UNKNOWN_DATABASE by driver properties",
-      { code: "81", type: "UNKNOWN_DATABASE" },
-      "boom",
-    ],
     [
       "ACCESS_DENIED by driver properties",
       { code: "497", type: "ACCESS_DENIED" },
       "boom",
-    ],
-    [
-      "UNKNOWN_TABLE from raw HTTP text",
-      {},
-      "Code: 60. DB::Exception: Table lwql.traces does not exist. (UNKNOWN_TABLE)",
     ],
     [
       "ACCESS_DENIED from raw HTTP text",
@@ -229,26 +276,71 @@ describe("isClickHouseObjectUnavailableError", () => {
   ])("recognises %s", (_case, props, message) => {
     const raw = Object.assign(new Error(message), props);
 
-    expect(isClickHouseObjectUnavailableError(raw)).toBe(true);
+    expect(isClickHouseObjectAccessDeniedError(raw)).toBe(true);
   });
 
-  it("does not classify by a variant name echoed from the query", () => {
-    // The engine echoes the submitted query in the message; only the anchored
-    // `Code: <n>.` prefix the engine writes itself gets a vote.
-    const raw = new Error(
-      "Code: 62. DB::Exception: Syntax error near UNKNOWN_TABLE",
-    );
+  it("does not recognise UNKNOWN_TABLE — that is isClickHouseObjectMissingError's job", () => {
+    const raw = Object.assign(new Error("boom"), {
+      code: "60",
+      type: "UNKNOWN_TABLE",
+    });
 
-    expect(isClickHouseObjectUnavailableError(raw)).toBe(false);
+    expect(isClickHouseObjectAccessDeniedError(raw)).toBe(false);
   });
 
   it("is false for unrelated errors and non-Error values", () => {
     expect(
-      isClickHouseObjectUnavailableError(
+      isClickHouseObjectAccessDeniedError(
         Object.assign(new Error("boom"), { code: "241" }),
       ),
     ).toBe(false);
-    expect(isClickHouseObjectUnavailableError("nope")).toBe(false);
+    expect(isClickHouseObjectAccessDeniedError("nope")).toBe(false);
+  });
+});
+
+describe("isClickHouseResultTooLargeError", () => {
+  it.each([
+    [
+      "TOO_MANY_ROWS_OR_BYTES by driver properties",
+      { code: "396", type: "TOO_MANY_ROWS_OR_BYTES" },
+      "boom",
+    ],
+    [
+      "TOO_MANY_ROWS_OR_BYTES from raw HTTP text",
+      {},
+      "Code: 396. DB::Exception: Limit for result exceeded, max rows: 10.00 thousand, current rows: 20.00 thousand. (TOO_MANY_ROWS_OR_BYTES)",
+    ],
+  ])("recognises %s", (_case, props, message) => {
+    const raw = Object.assign(new Error(message), props);
+
+    expect(isClickHouseResultTooLargeError(raw)).toBe(true);
+  });
+
+  it("does not recognise TOO_MANY_ROWS — that is the scan-limit check's job", () => {
+    const raw = Object.assign(new Error("boom"), {
+      code: "158",
+      type: "TOO_MANY_ROWS",
+    });
+
+    expect(isClickHouseResultTooLargeError(raw)).toBe(false);
+  });
+
+  it("is false for unrelated errors and non-Error values", () => {
+    expect(
+      isClickHouseResultTooLargeError(
+        Object.assign(new Error("boom"), { code: "241" }),
+      ),
+    ).toBe(false);
+    expect(isClickHouseResultTooLargeError("nope")).toBe(false);
+  });
+
+  it("is not mapped inside translateClickHouseQueryError — the LangWatchQL executor maps it itself", () => {
+    const raw = Object.assign(new Error("boom"), {
+      code: "396",
+      type: "TOO_MANY_ROWS_OR_BYTES",
+    });
+
+    expect(translateClickHouseQueryError(raw, 1)).toBe(raw);
   });
 });
 
@@ -270,6 +362,13 @@ describe("isClickHouseUnknownIdentifierError", () => {
       "Code: 47. DB::Exception: Unknown expression identifier `trace_idd` in scope SELECT trace_idd FROM traces. (UNKNOWN_IDENTIFIER)",
     ],
     [
+      // Verbatim from a real 25.8 server: a name passed to a function gets
+      // the longer "expression or function" sentence.
+      "the analyzer's sentence for a name used as a function argument",
+      { code: "47", type: "UNKNOWN_IDENTIFIER" },
+      "Unknown expression or function identifier `trace_idd` in scope SELECT arrayJoin(trace_idd) AS label, count() AS n FROM traces GROUP BY label ORDER BY n DESC. Maybe you meant: ['label']. ",
+    ],
+    [
       "the older non-analyzer path, which single-quotes",
       {},
       "Code: 47. DB::Exception: Missing columns: 'trace_idd' while processing query: 'SELECT trace_idd FROM traces', required columns: 'trace_idd'. (UNKNOWN_IDENTIFIER)",
@@ -281,6 +380,7 @@ describe("isClickHouseUnknownIdentifierError", () => {
       expect(isClickHouseUnknownIdentifierError(raised())).toBe(true);
     });
 
+    /** @scenario "A missing column passed to a function is named in the refusal" */
     it("names the column, and nothing else from the message", () => {
       expect(unknownIdentifierFromError(raised())).toBe("trace_idd");
     });

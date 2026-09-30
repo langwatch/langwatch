@@ -61,9 +61,13 @@ The only exception is an environment where asking is truly impossible (for examp
 Each hypothesis becomes real artifacts. Pick the right tool per case:
 
 ### Reproduce failures as scenario tests
-Turn real failing traces into scenario tests that fail today and pass once fixed. Fetch the exact inputs with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. Real production inputs beat invented ones.
+Turn real failing traces into scenario tests that fail today and pass once fixed. Read what happened with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. The trace tells you what the conversation did; the scenario reproduces it with test data of your own.
 
-Sanitize before you commit: production traces can carry names, emails, account data, or secrets. Reproduce the STRUCTURE of the failing input (length, language, format, the property that triggers the failure) with the sensitive values replaced by realistic stand-ins, and reference the original as a trace link in the test's comment instead of pasting it. Never commit raw customer content into tests, fixtures, or PR descriptions.
+A scenario is a simulation, so its inputs are test data and never the customer's. Invent every identifier it needs, the names, emails, order, ticket and account ids, and keep only the shape of the original: its length, language, format and the property that triggers the failure. A `[REDACTED]` value is the same case with nothing to recover, so invent a stand-in rather than asking anyone for the original. The real conversation stays in the trace, linked from the test or the scenario description, and raw customer content never reaches a scenario, a test, a fixture or a PR.
+
+Write the invented identifier into the situation instead of leaving a role unnamed. A situation that says "a colleague" leaves the simulated user to make an address up, and it makes up a different one every run, so the run stops being reproducible. Naming the colleague and the address the customer would have typed pins it for every run.
+
+Then make the lookup resolve. When the agent looks one of those identifiers up, its fixtures or test data need a record to find: use an identifier the data already carries, or add the record in the same change. A scenario whose lookup always misses proves the miss rather than the behaviour you are chasing, and it can never go green.
 
 ### Change prompts and code as a reviewable PR
 Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
@@ -101,7 +105,7 @@ After executing:
 - Do NOT propose changes without production evidence behind them; "best practice says so" is not a hypothesis
 - Do NOT skip the explanation; if the user cannot restate why the hypothesis is plausible, you explained it badly
 - Do NOT build all hypotheses at once; execute the agreed ones, show results, then continue
-- Do NOT invent test inputs when real failing traces exist; reproduce their structure, with sensitive values swapped for stand-ins
+- Do NOT copy a customer's identifiers out of a trace into a scenario, a test or a PR; invent stand-ins, name them in the situation, and seed the record the agent looks up
 - Do NOT paste raw customer content from traces into committed tests or PR text; link the trace instead
 - Do NOT merge or push anything yourself; changes ship as PRs the user reviews
 - Do NOT create evaluators or monitors for signals no one will act on; every artifact needs an owner and a purpose

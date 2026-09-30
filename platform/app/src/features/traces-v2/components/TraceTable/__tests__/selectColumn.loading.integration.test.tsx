@@ -19,7 +19,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useSelectionStore } from "../../../stores/selectionStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import type { TraceListItem } from "../../../types/trace";
 import { traceSelectColumnDef } from "../selectColumn";
 import { buildTracePlaceholderRows } from "../skeletonPlaceholders";
@@ -58,10 +58,11 @@ const renderHeader = (props: { data: TraceListItem[]; isLoading: boolean }) =>
 const selectAllButton = () =>
   screen.queryByRole("button", { name: "Select all on this page" });
 
-const selection = () => Array.from(useSelectionStore.getState().traceIds);
+const selection = () =>
+  Array.from(useExplorerStore.getState().selection.traceIds);
 
 beforeEach(() => {
-  useSelectionStore.getState().clear();
+  useExplorerStore.getState().clearSelection();
 });
 
 afterEach(() => {

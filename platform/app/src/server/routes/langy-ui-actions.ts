@@ -85,8 +85,9 @@ const dispatchBodySchema = z.object({
 
 /**
  * Authenticate the key, open the flag, and resolve the owning user. Mirrors
- * `langy-api.ts`'s `authorizeTurn` including the dark-404 contract; the
- * permission ceiling is enforced by the caller once the action names it.
+ * `authorizeLangyApiKey` in `app-layer/langy/langyApiKeyAuthorization.ts`
+ * including the dark-404 contract; the permission ceiling is enforced by the
+ * caller once the action names it.
  */
 async function authorizeUiRequest(c: Context) {
   const credentials = extractCredentials((name) => c.req.header(name));

@@ -2,12 +2,14 @@ import {
   type BackfillDiff,
   backfillParityDiffs,
   IdentityCommandRefusedError,
+  isLiveIdentifierState,
   orphanedIdentifierRows,
 } from "@langwatch/identity";
 import { mintUserHashKey } from "./crypto/user-hash-key";
 import {
   type PlannedIdentifier,
   planIdentifiers,
+  supersededDerivedAccountIds,
 } from "./identity-backfill-plan";
 import type {
   BackfillAccountRow,
@@ -115,6 +117,13 @@ export class IdentityBackfillService {
       accounts,
     });
 
+    // Before the adoptions, not after: a derived identifier a real native row
+    // has overtaken holds that subject against the identifier this pass is
+    // about to state, and the live unique index would park the newcomer. The
+    // person's sign-in is not at risk in the window between — the real
+    // `Account` row is what answers their callback now, and it is already
+    // there, which is the whole reason this row is superseded.
+    await this.detachSupersededDerived({ userId, accounts });
     await this.adoptPlanned({ userId, email: user.email, planned });
     await this.establishEmail({
       userId,
@@ -200,6 +209,52 @@ export class IdentityBackfillService {
         actor: IDENTITY_BACKFILL_ACTOR,
       }),
     );
+  }
+
+  /**
+   * The other compensating fact: a DERIVED identifier whose subject a real
+   * native `Account` row now asserts is detached, so the adopted identifier
+   * that row implies can take the subject.
+   *
+   * Without it those users are stuck for good rather than briefly. The
+   * derived row's source broker account is still live, so
+   * `orphanedIdentifierRows` never reaches it; the adopted identifier carries
+   * the native row's own business time and so derives a different id; the
+   * attach collides with the live derived row every pass, the loser parks,
+   * the parity diff never clears, and the user never finalizes — which also
+   * means `carryForUser` never runs and their secrets stay on the legacy
+   * branch.
+   *
+   * A refusal is tolerated exactly as it is for an orphan: it is a parity
+   * fact the check reports, and the next pass sees it again.
+   */
+  private async detachSupersededDerived({
+    userId,
+    accounts,
+  }: {
+    userId: string;
+    accounts: BackfillAccountRow[];
+  }): Promise<void> {
+    const superseded = supersededDerivedAccountIds({ accounts });
+    if (superseded.size === 0) return;
+    const rows = await this.reads.findIdentifierRows({ userId });
+    for (const row of rows) {
+      if (row.accountId === null || !superseded.has(row.accountId)) continue;
+      if (!isLiveIdentifierState(row.state)) continue;
+      await tolerateRefusal(() =>
+        this.identity.detachIdentifier({
+          tenantId: userId,
+          userId,
+          commandId: detachOrphanCommandId({
+            identifierId: row.id,
+            accountId: row.accountId as string,
+          }),
+          identifierId: row.id,
+          occurredAtMs: this.now(),
+          actor: IDENTITY_BACKFILL_ACTOR,
+        }),
+      );
+    }
   }
 
   /**

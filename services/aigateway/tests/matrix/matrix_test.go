@@ -1,4 +1,4 @@
-//go:build live_openai || live_anthropic || live_gemini || live_bedrock || live_azure || live_vertex || live_embeddings || live_audio
+//go:build live_openai || live_anthropic || live_gemini || live_bedrock || live_azure || live_vertex || live_embeddings || live_audio || live_images
 
 // Package matrix runs the provider × scenario coverage matrix against a live
 // gateway + control plane + real provider credentials. Build-tagged per

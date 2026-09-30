@@ -11,8 +11,8 @@
   "author": "LangWatch",
   "license": "MIT",
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.6",
-    "ai": "^5.0.52",
+    "@ai-sdk/openai": "^3.0.79",
+    "ai": "^6.0.0",
     "langwatch": "file:../../",
     "zod": "^4.0.14"
   },

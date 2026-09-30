@@ -1,0 +1,158 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/agenttest/agenttest.webm",
+  "output": "../../../../.claude/tmp/video/hero/beat3.webm",
+  "fps": 30,
+  "page": {
+    "width": 1440,
+    "height": 900
+  },
+  "size": {
+    "width": 1664,
+    "height": 1040
+  },
+  "frame": {
+    "background": "backgrounds/default.webp",
+    "fit": "native"
+  },
+  "quality": {
+    "crf": 38,
+    "cpuUsed": 2
+  },
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [
+        9.2,
+        16.4
+      ],
+      [
+        31.0,
+        39.5
+      ],
+      [
+        58.0,
+        69.5,
+        3
+      ],
+      [
+        158.4,
+        166.2,
+        2.5
+      ],
+      [
+        169.5,
+        173.3
+      ]
+    ]
+  },
+  "cursor": {
+    "start": {
+      "x": 430,
+      "y": 330
+    }
+  },
+  "beats": [
+    {
+      "tRaw": 12.19,
+      "x": 1361,
+      "y": 137,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 1230,
+        "y": 130
+      },
+      "hold": 0.15,
+      "pause": {
+        "before": 0.5,
+        "after": 0.4
+      },
+      "note": "the scenarios in the suite, then Run suite, a corner, so it earns the zoom"
+    },
+    {
+      "tRaw": 15.87,
+      "x": 932,
+      "y": 650,
+      "zoom": 1,
+      "note": "run three scenarios against checkout-prod, the camera lets go of the dialog"
+    },
+    {
+      "tRaw": 32.92,
+      "x": 771,
+      "y": 219,
+      "zoom": 1,
+      "pause": {
+        "before": 0.35
+      },
+      "note": "all three are running, open one of them while it still is"
+    },
+    {
+      "tRaw": 37.6,
+      "hide": true,
+      "note": "the conversation is the subject now, not the cursor"
+    },
+    {
+      "tRaw": 159.0,
+      "show": true,
+      "x": 1150,
+      "y": 146,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1275,
+        "y": 250
+      },
+      "hold": 0.1,
+      "click": false,
+      "arc": 0,
+      "note": "the judge has read the whole conversation: FAILED"
+    },
+    {
+      "tRaw": 161.0,
+      "x": 1150,
+      "y": 210,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1275,
+        "y": 250
+      },
+      "hold": 0.1,
+      "click": false,
+      "arc": 0,
+      "note": "typewriter down to the criterion the agent failed"
+    },
+    {
+      "tRaw": 162.6,
+      "x": 1390,
+      "y": 210,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1275,
+        "y": 250
+      },
+      "hold": 0.3,
+      "click": false,
+      "arc": 0,
+      "note": "it promised a refund before it verified the order"
+    },
+    {
+      "tRaw": 163.6,
+      "zoom": 1,
+      "cursor": false,
+      "click": false,
+      "note": "back to 1x while the drawer is still on screen, so the camera does not ease out over the results page"
+    },
+    {
+      "tRaw": 170.2,
+      "x": 690,
+      "y": 137,
+      "zoom": 1,
+      "hold": 1.0,
+      "click": false,
+      "arc": 0,
+      "note": "the run is finished: 67% pass, one scenario failed and two passed"
+    },
+    {
+      "tRaw": 172.9,
+      "hide": true
+    }
+  ]
+}

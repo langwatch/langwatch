@@ -24,16 +24,17 @@ export type {
   AuthzGrantVia,
   AuthzPrincipalRef,
   AuthzScopeRef,
+  BindingRoleKey,
   CollectedBinding,
   CollectedGrants,
   GrantAudience,
-  LegacyTeamMembership,
   ResourceGrant,
   RoleBindingScopeType,
   TeamUserRole,
 } from "./types";
 export {
   ALL_PERMISSIONS,
+  AUTHZ_ACTIONS,
   AUTHZ_RESOURCES,
   bindingScopeCanGrantPermission,
   isRegistryPermission,
@@ -43,6 +44,7 @@ export {
   SHAREABLE_RESOURCE_KINDS,
 } from "./registry";
 export type {
+  AuthzAction,
   AuthzPermission,
   AuthzResource,
   AuthzScopeType,
@@ -118,7 +120,4 @@ export type {
   EnforcedScopeFields,
 } from "./declared-middleware";
 export { arbitrateClaims } from "./credential-claims";
-export type {
-  ClaimArbitration,
-  CredentialClaim,
-} from "./credential-claims";
+export type { ClaimArbitration, CredentialClaim } from "./credential-claims";

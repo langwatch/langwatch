@@ -1,29 +1,26 @@
 /**
- * ADR-092 §1 — the permission registry: one authoritative declaration of
- * every resource, the actions it actually supports, and the scopes it can be
- * granted at. Everything else (Permission type, validators, bitset indices,
- * hierarchy rules) is derived from this object.
+ * Authoritative permission vocabulary, shared by server and browser.
+ * Persisted custom roles retain lenient expansion in the engine.
  *
- * Client-safe by design: no Prisma, no env, no server imports. The frontend
- * (useCan) and the passport/bitset layer both import from here.
- *
- * Stage-A parity note: this vocabulary mirrors the legacy one in
- * `server/api/rbac.ts` exactly — same resources, and per-resource actions
- * reconstructed from what the role bags grant plus what call sites request.
- * The registry deliberately does NOT admit the full Resource × Action cross
- * product the legacy `Permission` type allows: `traces:rotate` is a type
- * error here. Legacy custom-role rows validated against the cross product
- * keep working because the engine expands custom roles leniently (see
- * engine.ts); the strict validator below is for NEW write surfaces only
- * until the stage-E sweep.
- *
- * APPEND-ONLY RULE: bitset indices (stage F passports) are derived from
- * declaration order. Never remove or reorder resources or actions — append
- * new actions at the end of a resource's list, new resources at the end of
- * the object. registry.unit.test.ts pins sentinel indices to enforce this.
+ * Resource and action order determines passport bitset indices. Append new
+ * entries; never reorder or remove them. Tests pin the stable indices.
  */
-
 import type { ScopeTier } from "./vocabulary";
+
+export const AUTHZ_ACTIONS = [
+  "view",
+  "create",
+  "update",
+  "delete",
+  "manage",
+  "share",
+  "rotate",
+  "attach",
+  "detach",
+  "viewOtherPersonal",
+] as const;
+
+export type AuthzAction = (typeof AUTHZ_ACTIONS)[number];
 
 const READ_ONLY = ["view"] as const;
 
@@ -192,6 +189,37 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "manage"],
     scopes: ["project", "team", "organization"],
   },
+  governanceCost: {
+    // The organization's cost screen (ADR-128): what the provider billed,
+    // what the gateway metered, and the seat lane, side by side.
+    //
+    // `view` only. Nothing on the screen is editable — the figures are
+    // summarized from the cost rollup, so there is no write grain to grant,
+    // and a `manage` nobody can act on would still widen `view` through the
+    // hierarchy rule for anyone holding it.
+    //
+    // Org-tier only: the screen aggregates every lane of the organization's
+    // spend across every team, so a team- or project-scoped binding must
+    // never grant it.
+    actions: ["view"],
+    scopes: ["organization"],
+  },
+  // D05. Seeing a connection and changing one are two permissions, because
+  // they are two jobs: a security reviewer reads which domains route and who
+  // proved them; an IT administrator sets the thing up. Org-tier only, like
+  // `governance` and `webhookEndpoints` above — a connection decides how
+  // EVERYONE in the organization signs in, so a team- or project-scoped
+  // grant of it would be a grant whose blast radius is the whole
+  // organization while its label says otherwise.
+  //
+  // The directory that provisions people into the organization is gated by
+  // these same two: federating sign-in and letting a directory write your
+  // membership are set up by the same administrator, out of the same
+  // connection, and a second pair would have been a second name for one job.
+  sso: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
 } as const satisfies Record<
   string,
   {
@@ -209,7 +237,9 @@ export type AuthzScopeType = Exclude<ScopeTier, "resource">;
 
 /** Only VALID resource:action pairs — `traces:rotate` is a type error. */
 export type AuthzPermission = {
-  [R in AuthzResource]: `${R}:${(typeof AUTHZ_RESOURCES)[R]["actions"][number]}`;
+  [
+    R in AuthzResource
+  ]: `${R}:${(typeof AUTHZ_RESOURCES)[R]["actions"][number]}`;
 }[AuthzResource];
 
 /**
@@ -241,9 +271,8 @@ export function permissionResource(permission: string): string {
 }
 
 /**
- * Legacy hierarchy rule, verbatim semantics: `<resource>:manage` satisfies
+ * Permission hierarchy: `<resource>:manage` satisfies
  * view/create/update/delete/rotate/attach/detach on the same resource.
- * Parity-tested against `hasPermissionWithHierarchy` in rbac.ts.
  */
 const MANAGE_IMPLIED_ACTIONS: ReadonlySet<string> = new Set([
   "view",

@@ -1,3 +1,4 @@
+import { auditLog } from "@ee/audit-log/auditLog";
 import {
   DOMAIN_JOIN_SETTINGS,
   type JoinLookupDecision,
@@ -54,6 +55,74 @@ export const joinRequestsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         verifiedEmail,
       });
+    }),
+
+  /**
+   * The same answer, for somebody who is already signed in and already has an
+   * organization: the post-login offer rather than the sign-up step.
+   *
+   * One difference, and it is the reason this is not `lookup`: an offer this
+   * person has waved away stays waved away, for that domain and no other.
+   */
+  offer: protectedProcedure
+    .noPermission({
+      reason:
+        "the same own-verified-address answer `lookup` gives, minus the domains this caller has dismissed; no other person's organizations are reachable",
+    })
+    .query(async ({ ctx }): Promise<JoinLookupDecision> => {
+      const verifiedEmail = await verifiedEmailFor({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+      });
+      return joinRequestsService().offerForSignedInUser({
+        userId: ctx.session.user.id,
+        verifiedEmail,
+      });
+    }),
+
+  /** "No thanks." Remembered for the caller's own verified domain. */
+  dismissOffer: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason:
+        "the caller silencing their own offer, on the domain their own session's verified address holds",
+    })
+    .mutation(async ({ ctx }) => {
+      const verifiedEmail = await verifiedEmailFor({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+      });
+      await joinRequestsService().dismissOffer({
+        userId: ctx.session.user.id,
+        verifiedEmail,
+      });
+      return { success: true };
+    }),
+
+  /**
+   * Walk in, where the organization asked for that.
+   *
+   * Not a second mechanism: the service makes the same request and approves
+   * it by policy in one move. Answers null when nothing admits this address
+   * automatically, which is the ordinary case and not a failure — the screen
+   * carries on to the offer or to workspace creation.
+   */
+  admitAutomatically: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason:
+        "admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else",
+    })
+    .mutation(async ({ ctx }) => {
+      const verifiedEmail = await verifiedEmailFor({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+      });
+      const joined = await joinRequestsService().joinAutomaticallyIfAdmitted({
+        userId: ctx.session.user.id,
+        verifiedEmail,
+      });
+      return { organization: joined?.organization ?? null };
     }),
 
   /** Everything this person is waiting on, so a screen can say so rather
@@ -194,7 +263,14 @@ export const joinRequestsRouter = createTRPCRouter({
       });
     }),
 
-  /** How colleagues on a matching domain get in. */
+  /**
+   * How colleagues on a matching domain get in.
+   *
+   * `organization:manage`, the same authority that gates inviting: deciding
+   * who may walk in is the same decision as deciding who is asked in. And the
+   * change is audited with BOTH values, because "automatic joining is on" is
+   * only readable next to what it was before.
+   */
   setJoining: protectedProcedure
     .input(
       z.object({
@@ -204,14 +280,72 @@ export const joinRequestsRouter = createTRPCRouter({
       }),
     )
     .permission("organization:manage")
-    .mutation(async ({ input }) => {
-      return joinRequestsService().setJoining({
+    .mutation(async ({ ctx, input }) => {
+      const change = await joinRequestsService().setJoining({
         organizationId: input.organizationId,
         domainJoin: input.domainJoin,
         domains: input.domains,
       });
+
+      // Awaited, unlike the fire-and-forget audit rows elsewhere: a setting
+      // that decides who may walk in without anybody approving is exactly the
+      // change a customer comes to the audit page looking for, so the row
+      // lands before the caller is told it saved.
+      await auditLog({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        action: JOIN_SETTING_AUDIT_ACTION,
+        args: {
+          from: change.previous,
+          to: change.next,
+          fromDomains: change.previousDomains,
+          toDomains: change.nextDomains,
+        },
+        targetKind: "organization",
+        targetId: input.organizationId,
+      });
+
+      return change;
+    }),
+
+  /**
+   * Who walked in without anybody approving, lately.
+   *
+   * The in-product half of "the admins are told after the fact": the mail
+   * goes out the moment it happens, and this is what the members area shows
+   * an admin who was not reading their inbox. Read off the same projection
+   * the pending list comes from, so an automatic join is no harder to find
+   * than an approval somebody clicked.
+   */
+  automaticJoins: protectedProcedure
+    .input(z.object({ organizationId: z.string().min(1) }))
+    .permission("organization:manage")
+    .query(async ({ ctx, input }) => {
+      const joins = await joinRequestsService().automaticJoinsForOrganization({
+        organizationId: input.organizationId,
+      });
+      const names = await ctx.prisma.user.findMany({
+        where: { id: { in: joins.map((join) => join.userId) } },
+        select: { id: true, name: true },
+      });
+      const nameById = new Map(names.map((user) => [user.id, user.name]));
+
+      return joins.map((join) => ({
+        joinRequestId: join.joinRequestId,
+        userId: join.userId,
+        name: nameById.get(join.userId) ?? "A colleague",
+        domain: join.domain,
+        joinedAt:
+          join.resolvedAtMs === null ? null : new Date(join.resolvedAtMs),
+      }));
     }),
 });
+
+/**
+ * The audit action a change to the joining setting carries. A customer-facing
+ * string: once a row holds it, it cannot move.
+ */
+export const JOIN_SETTING_AUDIT_ACTION = "organization.joining.changed";
 
 /**
  * The caller's own verified address, and the reason every procedure above

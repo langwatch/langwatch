@@ -3,7 +3,8 @@ import {
   isStableAuthError,
   normalizeErrorCode,
   STABLE_AUTH_ERRORS,
-} from "../../../pages/auth/error";
+  signInErrorMayCross,
+} from "../../../features/auth/logic/signInErrorCodes";
 
 describe("normalizeErrorCode", () => {
   describe("when given null or undefined", () => {
@@ -28,6 +29,14 @@ describe("normalizeErrorCode", () => {
   });
 
   describe("when given a BetterAuth account-already-linked error", () => {
+    /** @scenario "The native account-link refusal maps to a stable sign-in error" */
+    it("normalizes the native account-link refusal", () => {
+      const code = normalizeErrorCode("account not linked");
+      expect(code).toBe("OAuthAccountNotLinked");
+      expect(signInErrorMayCross("account not linked")).toBe(true);
+      expect(isStableAuthError(code)).toBe(true);
+    });
+
     it("maps account_already_linked_to_different_user to OAuthAccountNotLinked", () => {
       expect(
         normalizeErrorCode("account_already_linked_to_different_user"),
@@ -64,9 +73,7 @@ describe("normalizeErrorCode", () => {
 
 describe("isStableAuthError", () => {
   describe("when given a wrong-method / collision error the user must act on", () => {
-    it.each(
-      STABLE_AUTH_ERRORS,
-    )("treats %s as stable (no auto-redirect)", (code) => {
+    it.each(STABLE_AUTH_ERRORS)("recognizes %s as stable", (code) => {
       expect(isStableAuthError(code)).toBe(true);
     });
 

@@ -59,7 +59,13 @@ const wait = async ({
   jobCount = 2,
   machine = true,
   advanceMs = 3000,
-}: { jobCount?: number; machine?: boolean; advanceMs?: number } = {}) => {
+  timeoutMs = 45 * 60 * 1000,
+}: {
+  jobCount?: number;
+  machine?: boolean;
+  advanceMs?: number;
+  timeoutMs?: number;
+} = {}) => {
   vi.useFakeTimers();
   try {
     const promise = waitForBatchRun({
@@ -67,6 +73,7 @@ const wait = async ({
       jobCount,
       subject: "run",
       machine,
+      timeoutMs,
     });
     await vi.advanceTimersByTimeAsync(advanceMs);
     return await promise;
@@ -150,10 +157,23 @@ describe("waitForBatchRun()", () => {
         throw new Error("process.exit called");
       }) as never);
 
-      const answer = await wait({ advanceMs: 10 * 60 * 1000 + 3000 });
+      const answer = await wait({ advanceMs: 45 * 60 * 1000 + 3000 });
 
       expect(answer.outcome).toBe("timeout");
       expect(exit).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "Wait for a number of minutes" */
+    it("gives up at the limit the caller set", async () => {
+      answersWith([{ batchRunId: "batch_123", status: "IN_PROGRESS" }]);
+
+      const answer = await wait({
+        timeoutMs: 60 * 1000,
+        advanceMs: 60 * 1000 + 3000,
+      });
+
+      expect(answer.outcome).toBe("timeout");
       expect(process.exitCode).toBe(1);
     });
   });

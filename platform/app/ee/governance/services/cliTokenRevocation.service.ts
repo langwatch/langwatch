@@ -14,8 +14,9 @@ type RedisLike = Redis | Cluster;
 /**
  * Force-revoke every CLI device-flow token held by a user.
  *
- * Today, `userService.deactivate` calls `revokeAllSessionsForUser` which
- * clears BetterAuth Postgres + Redis sessions used by the web UI. The CLI
+ * Today, `userService.deactivate` revokes every session through
+ * `SessionRevocationService`, which clears the BetterAuth Postgres rows and
+ * the Redis session cache the web UI reads through. The CLI
  * device-flow tokens (`lwcli:access:*` + `lwcli:refresh:*`) live in Redis
  * independently of BetterAuth — minted by `/api/auth/cli/exchange`,
  * rotated by `/api/auth/cli/refresh`, validated by every authenticated
@@ -56,7 +57,7 @@ export class CliTokenRevocationService {
    * "there are no CLI tokens to revoke" — which is not what "the App is not
    * initialized" means. Collapsing the two would report a successful revocation
    * of nothing and leave live CLI credentials working, the same reasoning that
-   * keeps `revokeSessions` on `getApp` (ADR-093).
+   * keeps the CLI token revoker on `getApp` (ADR-093).
    *
    * Construction stays App-free regardless, because this getter runs during a
    * revocation rather than at build time.

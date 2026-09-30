@@ -114,6 +114,47 @@ describe("ProcessRuntime", () => {
         },
       });
       expect(process?.state).toEqual({ count: 1 });
+      expect(subscriber!.options?.groupKeyFn).toBeUndefined();
+      await runtime.stop();
+    });
+  });
+
+  describe("given a process manager declares keyBy", () => {
+    it("keys the instance by it and drains those events in one lane", async () => {
+      const store = new InMemoryProcessStore();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+      const definition = buildProcessManager<AutomationEvent>({
+        name: "tenantWatch",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .intent("noop", z.object({}), async () => {})
+            .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state) => ({
+              state: { count: state.count + 1 },
+            }))
+            .keyBy((event) => `tenant:${event.tenantId}`),
+      });
+      const [subscriber] = runtime.registerPipeline<AutomationEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["tenantWatch", definition]]),
+      }).subscribers;
+
+      await subscriber!.handle(physicalEvent("physical-1"), {
+        tenantId,
+        aggregateId: "trigger-1",
+      });
+
+      const process = await store.findByRef<{ count: number }>({
+        ref: {
+          processName: "tenantWatch",
+          projectId: tenantId,
+          processKey: `tenant:${tenantId}`,
+        },
+      });
+      expect(process?.state).toEqual({ count: 1 });
+      expect(
+        subscriber!.options?.groupKeyFn?.(physicalEvent("physical-1")),
+      ).toBe(`tenant:${tenantId}`);
       await runtime.stop();
     });
   });
@@ -215,6 +256,39 @@ describe("ProcessRuntime", () => {
         });
         expect(process?.nextWakeAt).not.toBeNull();
       });
+
+      await runtime.stop();
+    });
+  });
+
+  describe("given a scheduled process manager is registered without consumers", () => {
+    it("does not arm its singleton schedule outside the worker role", async () => {
+      const store = new InMemoryProcessStore();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+      const definition = buildProcessManager<AutomationEvent>({
+        name: "webOnlySchedule",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .schedule({ everyMs: 60_000 })
+            .onWake((state) => ({ state }))
+            .intent("noop", z.object({}), async () => {}),
+      });
+
+      runtime.registerPipeline<AutomationEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["webOnlySchedule", definition]]),
+      });
+
+      await new Promise((resolve) => setImmediate(resolve));
+      const process = await store.findByRef({
+        ref: {
+          processName: "webOnlySchedule",
+          projectId: SCHEDULED_SINGLETON_PROJECT_ID,
+          processKey: "webOnlySchedule",
+        },
+      });
+      expect(process).toBeNull();
 
       await runtime.stop();
     });

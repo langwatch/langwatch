@@ -1,4 +1,23 @@
 import type { SystemStyleObject } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
+
+// Emitted through emotion's helper rather than an `"@keyframes …"` key:
+// `SystemStyleObject` has no such key, and a plain object never reaches the
+// document head, so the animation would name a rule that does not exist.
+const instantEvalGlow = keyframes`
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--chakra-colors-green-solid) 28%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 12px 2px color-mix(in srgb, var(--chakra-colors-green-solid) 55%, transparent);
+  }
+`;
+
+/** Both halves of an `eval` chip: the token and the remove button beside it. */
+const INSTANT_EVAL_CHIP =
+  "& .filter-token-eval, & .filter-token-delete[data-filter-chip-field='eval'], & .filter-token-delete[data-filter-chip-field^='eval.']";
+const BUSY_INSTANT_EVAL_CHIP =
+  "&[data-instant-eval-busy] .filter-token-eval, &[data-instant-eval-busy] .filter-token-delete[data-filter-chip-field='eval'], &[data-instant-eval-busy] .filter-token-delete[data-filter-chip-field^='eval.']";
 
 export const editorStyles: SystemStyleObject = {
   "& .tiptap": {
@@ -57,10 +76,17 @@ export const editorStyles: SystemStyleObject = {
   // and collapse the underlying id to zero width (font-size:0). The chip then
   // hugs the *label*, not the longer id — no spare space reserved for the
   // value tail. The id stays in the DOM (selection / copy / the query
-  // language all keep it) and returns to full size on hover, where the label
-  // hides and the chip grows in place to reveal the full id. The `evaluator:`
-  // prefix is part of both the label and the id, so it never moves — only the
-  // value tail differs.
+  // language all keep it) and is surfaced on demand through the chip's
+  // `title` tooltip, which costs no layout.
+  //
+  // The chip width never changes with pointer state. An earlier version
+  // swapped the label back to the id on hover; because ids are much wider
+  // than names (`monitor_0005p7YMsdI0Oy…` vs `Ragas Response Relevancy`),
+  // the pill grew in place and pushed the remove button out from under the
+  // cursor — and the `:has(+ .filter-token-delete:hover)` half of the rule
+  // kept it expanded once the pointer arrived, so the X never settled and
+  // the chip could not be deleted. The tooltip gives the same information
+  // without moving anything.
   "& .filter-token[data-filter-chip-label]": {
     fontSize: "0px",
   },
@@ -73,17 +99,6 @@ export const editorStyles: SystemStyleObject = {
     whiteSpace: "nowrap",
     pointerEvents: "none",
   },
-  // Reveal the underlying id on hover — also when the X-button half is
-  // hovered, so the whole pill reads consistently. Restore the id text to
-  // full size and drop the label so only the id shows; the chip grows to fit.
-  "& .filter-token[data-filter-chip-label]:hover, & .filter-token[data-filter-chip-label]:has(+ .filter-token-delete:hover)":
-    {
-      fontSize: "var(--chakra-font-sizes-xs)",
-    },
-  "& .filter-token[data-filter-chip-label]:hover::after, & .filter-token[data-filter-chip-label]:has(+ .filter-token-delete:hover)::after":
-    {
-      display: "none",
-    },
   // Field name was unrecognised (typo, removed key) — still parses as a
   // tag but the rest of the platform won't filter on it. A warning tint
   // makes that visible without rejecting the query outright.
@@ -103,6 +118,28 @@ export const editorStyles: SystemStyleObject = {
   "& .filter-token-numeric": {
     background: "green.subtle",
     borderColor: "green.muted",
+  },
+  // An Instant Eval chip carries a judgement rather than a field match, so
+  // it wears a fuller green than the blue field chips around it. The remove
+  // button is matched by its own field attribute rather than as a sibling:
+  // in the live editor it is a ProseMirror widget, and the sibling selector
+  // left it blue beside a green chip.
+  [INSTANT_EVAL_CHIP]: {
+    background: "green.muted",
+    borderColor: "green.solid",
+  },
+  "& .filter-token-eval[data-filter-chip-label]::after": {
+    color: "green.fg",
+  },
+  // While its run is estimated, started or judging, the chip breathes a
+  // green halo, the same affordance the ask button wears, at a quicker pace
+  // because this one ends. The ask button drops its own halo meanwhile, so
+  // the bar never has two things pulsing at once.
+  [BUSY_INSTANT_EVAL_CHIP]: {
+    animation: `${instantEvalGlow} 1.2s ease-in-out infinite`,
+  },
+  "@media (prefers-reduced-motion: reduce)": {
+    [BUSY_INSTANT_EVAL_CHIP]: { animation: "none" },
   },
   "& .filter-keyword": {
     color: "fg.muted",

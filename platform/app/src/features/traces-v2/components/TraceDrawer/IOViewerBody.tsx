@@ -1,11 +1,13 @@
 import { Text } from "@chakra-ui/react";
 import { useColorMode } from "~/components/ui/color-mode";
+import type {
+  ContentBlock,
+  ConversationTurn,
+} from "~/shared/traces/transcript/types";
 import { RenderedMarkdown, ShikiCodeBlock } from "./markdownView";
 import {
   AssistantTurnCard,
   type ChatLayout,
-  type ContentBlock,
-  type ConversationTurn,
   ConversationTurnsList,
 } from "./transcript";
 import type { MarkdownSubmode, ViewFormat } from "./useIOViewerState";

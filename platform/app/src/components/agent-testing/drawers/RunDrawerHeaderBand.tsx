@@ -10,6 +10,10 @@ import { Button, Heading, HStack, Icon, VStack } from "@chakra-ui/react";
 import { Edit2, Square } from "lucide-react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { CopyIdChip } from "~/components/simulations/CopyIdChip";
+import {
+  CutAtLimitBadge,
+  isCutAtLimitOf,
+} from "~/components/simulations/CutAtLimitBadge";
 import { RunCriteriaChip } from "~/components/simulations/RunCriteriaChip";
 import { ScenarioRunActions } from "~/components/simulations/ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
@@ -25,6 +29,7 @@ import type {
   RunScenarioState,
   useRunDrawerStop,
 } from "./useRunDrawerState";
+import { shouldShowWholeCallAudio, WholeCallAudio } from "./WholeCallAudio";
 
 export type RunDrawerHeaderBandProps = Pick<
   RunDrawerState,
@@ -57,6 +62,7 @@ function HeadingRow({
       <Heading size="md" truncate title={displayTitle}>
         {displayTitle}
       </Heading>
+      {isCutAtLimitOf(scenarioState.metadata) && <CutAtLimitBadge />}
       {scenarioVersion != null && (
         <HStack data-testid="run-drawer-version">
           <CaseVersionChip version={scenarioVersion} />
@@ -207,6 +213,17 @@ export function RunDrawerHeaderBand({
       </HStack>
 
       <ChipStrip detail={detail} scenarioState={scenarioState} />
+
+      {shouldShowWholeCallAudio({
+        langwatch: scenarioState.metadata?.langwatch,
+        scenarioRunId: scenarioState.scenarioRunId,
+        projectId: detail.project?.id,
+      }) && (
+        <WholeCallAudio
+          scenarioRunId={scenarioState.scenarioRunId}
+          projectId={detail.project!.id}
+        />
+      )}
     </VStack>
   );
 }

@@ -71,6 +71,7 @@ const TERMINAL_STATUS_OUTCOME: Record<
   [ScenarioRunStatus.PENDING]: null,
   [ScenarioRunStatus.QUEUED]: null,
   [ScenarioRunStatus.RUNNING]: null,
+  [ScenarioRunStatus.PENDING_EVALUATION]: null,
 };
 
 function classifyTerminalStatus(

@@ -10,7 +10,7 @@
  * existence of another tenant; the only caller-supplied text any of them
  * carries is an identifier the caller wrote themselves, length-capped.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 import type { SqlSourcePosition } from "./parser";
 
@@ -51,12 +51,64 @@ export const LWQL_VIOLATION_CODES = [
   "FUNCTION_NOT_ALLOWED",
   /** A restricted field was referenced. */
   "GATED_COLUMN",
-  /** A wildcard column set was selected while restricted fields exist. */
+  /** A wildcard column set was referenced, in any position, while restricted fields exist. */
   "WILDCARD_NOT_ALLOWED",
+  /**
+   * The statement's own top-level `LIMIT` asks for more rows than one request
+   * may return.
+   *
+   * Its own code rather than `UNSUPPORTED_SYNTAX` because the remedy is precise
+   * and mechanical: lower the `LIMIT` to the cap and page the rest with
+   * `LIMIT`/`OFFSET` and an `ORDER BY`. The cap and that advice ride on the
+   * violation (`maxRows`, `hint`).
+   */
+  "LIMIT_TOO_HIGH",
+  /**
+   * A `UNION` branch names no `LIMIT` of its own.
+   *
+   * Each branch of a `UNION` runs and returns independently, so a default
+   * `LIMIT` appended once to the whole statement cannot bound a branch that
+   * lacks one — the append is refused for any statement with more than one
+   * top-level branch, and every branch must name its own bounded `LIMIT`.
+   */
+  "LIMIT_REQUIRED_PER_BRANCH",
   /** Subqueries, CTEs, or expressions nested past the allowed depth. */
   "NESTING_TOO_DEEP",
   /** The default-deny fallthrough: syntax the validator does not recognise. */
   "UNSUPPORTED_SYNTAX",
+  /**
+   * An app function was called somewhere other than the top-level SELECT list.
+   *
+   * Its own code, and the one refusal in this list that is a *correctness*
+   * rule rather than a policy one. The database holds each app function as a
+   * projection UDF over its key, so ClickHouse will happily evaluate
+   * `WHERE conversation(ConversationId) = 'x'` and compare the raw
+   * conversation id — answering with the wrong rows rather than with an error.
+   * Nothing downstream can detect that, so the refusal has to happen here.
+   */
+  "APP_FUNCTION_POSITION",
+  /**
+   * An app function was called without an alias.
+   *
+   * Required so the hydration stage can find the call by output column name.
+   * Without one the column is named after the call text itself, quoting and
+   * all, and locating it would mean parsing a column name back into a call.
+   */
+  "APP_FUNCTION_ALIAS_REQUIRED",
+  /** An app function's arguments do not match its one signature. */
+  "APP_FUNCTION_ARGUMENT",
+  /** An app function was called without the permissions it requires. */
+  "APP_FUNCTION_GATED",
+  /**
+   * An app function was called with a spelling other than the catalogued one.
+   *
+   * The statement is never rewritten and ClickHouse resolves a SQL UDF by its
+   * exact name, so `CONVERSATION(x)` would reach the database as an unknown
+   * function. The name is recognised here anyway, case-insensitively, so the
+   * refusal can name the spelling to use instead of reporting a function the
+   * caller can see in the schema as not allowed.
+   */
+  "APP_FUNCTION_NAME_CASE",
 ] as const;
 
 export type LangWatchQLViolationCode = (typeof LWQL_VIOLATION_CODES)[number];
@@ -95,6 +147,49 @@ export interface LangWatchQLViolation {
   readonly message: string;
   /** Where in the submitted SQL, when the parser reported a position. */
   readonly at?: SqlSourcePosition;
+  /**
+   * A generic, code-keyed corrective sentence, present on every violation.
+   *
+   * The bar this API holds itself to: a caller — usually an agent with no
+   * UI — never receives a refusal with nothing to act on. The more specific
+   * fields below (`allowedFunctions`, `availableViews`,
+   * `availableColumns`) are the sharper answer where one is resolvable;
+   * `hint` is the floor every code clears regardless.
+   */
+  readonly hint: string;
+  /**
+   * The complete function allowlist a query may call.
+   *
+   * The validator attaches it structurally to `FUNCTION_NOT_ALLOWED` and to no
+   * other code (see `report` in `./validate.ts`, which derives it from the code
+   * rather than taking it as an argument), so it is present on exactly the
+   * refusal it helps and absent everywhere else. A refused caller — usually an
+   * agent with no UI — recovers from what it should have called without a
+   * second round trip to `GET /api/v1/query/schema`.
+   */
+  readonly allowedFunctions?: readonly string[];
+  /**
+   * The view names the caller may reference, attached to `TABLE_NOT_ALLOWED`
+   * when a written name failed to resolve — never to the bound-parameter
+   * variant of that code, which named no view to correct.
+   */
+  readonly availableViews?: readonly string[];
+  /**
+   * The view a `GATED_COLUMN` refusal's field was read from, when the walk
+   * could resolve it to exactly one table in scope.
+   */
+  readonly view?: string;
+  /**
+   * The columns of {@link view} the caller may reference, attached
+   * alongside it when the policy carries column data for that view.
+   */
+  readonly availableColumns?: readonly string[];
+  /**
+   * The row cap a `LIMIT_TOO_HIGH` refusal names — the largest `LIMIT` one
+   * request may carry. Attached to that code alone, so a refused caller learns
+   * the ceiling to page under without a second round trip.
+   */
+  readonly maxRows?: number;
 }
 
 /**

@@ -2,13 +2,15 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
+import { EVENT_METRIC_SEP } from "../query-language/eventMetrics";
+import { scopeTraceFilterToTable } from "../trace-filter-scope";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
   BatchedFacetResult,
   CategoricalFacetResult,
   DiscreteFacetResult,
-  FacetCountResult,
+  EventMetricValues,
   FacetTableName,
   TraceListPage,
   TraceListQuery,
@@ -125,6 +127,25 @@ function buildWhereClauseForTable(
   return { sql: parts.join(" AND "), params };
 }
 
+/**
+ * The active trace filter as an `AND` fragment for a facet read on `table`,
+ * placed after the version dedup so it never decides which version is the
+ * latest (see `buildWhereClause`). Empty when there is no filter.
+ */
+function facetFilterFragment(
+  table: FacetTableName,
+  filterWhere: { sql: string; params: Record<string, unknown> } | undefined,
+  timeRange: { to: number; live?: boolean },
+): { sql: string; params: Record<string, unknown> } {
+  if (!filterWhere) return { sql: "", params: {} };
+  const scoped = scopeTraceFilterToTable({
+    table,
+    filterWhere,
+    isLiveWindow: isLiveUpperBound(timeRange),
+  });
+  return { sql: `AND ${scoped.sql}`, params: scoped.params };
+}
+
 export class TraceListClickHouseRepository implements TraceListRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -165,9 +186,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const client = await this.resolveClient(query.tenantId);
 
-    // Latest-version dedup, shared by the page, the heavy read, and the count.
+    // Latest-version dedup, shared by the page's inner stage and the count.
     // Decided on the base predicates alone, so the filter chooses among current
     // traces rather than deciding which version is current.
+    //
+    // It is a whole-window aggregate: it groups every row this tenant has in
+    // the time range, so each place it appears is another pass over that set.
+    // State it once per read — see the outer stage below, which reuses the
+    // inner stage's result instead of deriving the same thing again.
     const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM ${TABLE_NAME}
@@ -175,13 +201,33 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           GROUP BY TenantId, TraceId
         )`;
 
-    // Page the matching TraceIds first (key + sort columns only), then read
-    // the heavy columns (ComputedInput/ComputedOutput and the rest) for that
+    // Page the matching rows first (key + sort columns only), then read the
+    // heavy columns (ComputedInput/ComputedOutput and the rest) for that
     // bounded page alone. The previous single query materialized those
     // payloads for every deduped trace in the window before ORDER BY ... LIMIT
     // trimmed it, and `count() OVER ()` forced the whole deduped set to buffer
     // — together the dominant read-bytes cost on this list. The total is now a
     // separate light count that never touches the payload columns.
+    //
+    // The inner stage hands the outer stage the winning rows' full identity
+    // (TenantId, TraceId, UpdatedAt), not just their TraceIds. That identity
+    // IS the dedup result, so the outer stage does not restate `dedupFilter`:
+    // re-stating it made ClickHouse build the whole-window aggregate a second
+    // time to reach rows the inner stage had already named. On a tenant with
+    // ~1.3M traces in the window, dropping that second pass measured 4.45M ->
+    // 2.98M rows read and 4.6s -> 2.3s.
+    //
+    // The outer WHERE does keep the full `whereClause`, not just the base
+    // predicates. `trace_summaries` is a ReplacingMergeTree, so until a merge
+    // runs, two physical rows can share one (TenantId, TraceId, UpdatedAt) and
+    // disagree on everything else — a re-publish at the same version lands in
+    // its own part. Identity alone cannot tell those apart, so the outer stage
+    // has to re-apply the user's filter to pick the version that actually
+    // matches it; without that, a filtered page returns the version that does
+    // not match and disagrees with its own total. Re-applying the filter is
+    // cheap next to the dedup (it is the same predicate over an already
+    // identity-bounded set, and it costs nothing at all on the unfiltered
+    // default view, where `whereClause` IS `baseWhereClause`).
     //
     // The inner subquery keeps WHERE/ORDER BY on raw DateTime columns —
     // aliasing DateTime to millis in the same scope shadows the column and
@@ -306,8 +352,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE ${whereClause}
-            AND TraceId IN (
-              SELECT TraceId
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, UpdatedAt
               FROM ${TABLE_NAME}
               WHERE ${whereClause}
                 AND ${dedupFilter}
@@ -321,7 +367,6 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             )
-            AND ${dedupFilter}
           ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
           LIMIT {limit:UInt32}
         )
@@ -360,95 +405,6 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       rows: rows.map((row) => this.toTraceSummaryData(row)),
       totalHits,
     };
-  }
-
-  async findFacetCounts(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    facetExpression: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<FacetCountResult> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findFacetCounts",
-    );
-
-    const {
-      sql: whereClause,
-      baseSql: baseWhereClause,
-      params: queryParams,
-    } = buildWhereClause(params.tenantId, params.timeRange, params.filterWhere);
-
-    const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          ${params.facetExpression} AS facet_value,
-          count() AS cnt
-        FROM ${TABLE_NAME}
-        WHERE ${whereClause}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${baseWhereClause}
-            GROUP BY TenantId, TraceId
-          )
-          AND ${params.facetExpression} != ''
-        GROUP BY facet_value
-        ORDER BY cnt DESC
-        LIMIT 100
-      `,
-      query_params: queryParams,
-      format: "JSONEachRow",
-    });
-
-    const rows = await result.json<{ facet_value: string; cnt: number }>();
-    const values: Record<string, number> = {};
-    for (const row of rows) {
-      values[row.facet_value] = Number(row.cnt);
-    }
-    return { values };
-  }
-
-  async findRangeStats(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    column: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<{ min: number; max: number }> {
-    EventUtils.validateTenantId(
-      { tenantId: params.tenantId },
-      "TraceListClickHouseRepository.findRangeStats",
-    );
-
-    const {
-      sql: whereClause,
-      baseSql: baseWhereClause,
-      params: queryParams,
-    } = buildWhereClause(params.tenantId, params.timeRange, params.filterWhere);
-
-    const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
-        SELECT
-          min(${params.column}) AS min_val,
-          max(${params.column}) AS max_val
-        FROM ${TABLE_NAME}
-        WHERE ${whereClause}
-          AND (TenantId, TraceId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE ${baseWhereClause}
-            GROUP BY TenantId, TraceId
-          )
-      `,
-      query_params: queryParams,
-      format: "JSONEachRow",
-    });
-
-    const rows = await result.json<{ min_val: number; max_val: number }>();
-    const row = rows[0];
-    return { min: Number(row?.min_val ?? 0), max: Number(row?.max_val ?? 0) };
   }
 
   async findCount(params: {
@@ -508,6 +464,43 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return Number(rows[0]?.cnt ?? 0);
   }
 
+  async findTraceIds(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+    limit: number;
+  }): Promise<string[]> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findTraceIds",
+    );
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params: queryParams,
+    } = buildWhereClause(params.tenantId, params.timeRange, params.filterWhere);
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT TraceId
+        FROM ${TABLE_NAME}
+        WHERE ${whereClause}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE ${baseWhereClause}
+            GROUP BY TenantId, TraceId
+          )
+        ORDER BY OccurredAt DESC, TraceId
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { ...queryParams, limit: params.limit },
+      format: "JSONEachRow",
+    });
+    return (await result.json<{ TraceId: string }>()).map((row) => row.TraceId);
+  }
+
   async findDistinctValues(params: {
     tenantId: string;
     column: string;
@@ -558,12 +551,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   async findCategoricalFacet(params: {
     tenantId: string;
     timeRange: { from: number; to: number };
-    table: string;
+    table: FacetTableName;
     timeColumn: string;
     facetExpression: string;
     limit: number;
     offset: number;
     prefix?: string;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<CategoricalFacetResult> {
     EventUtils.validateTenantId(
       { tenantId: params.tenantId },
@@ -574,6 +568,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.tenantId,
       params.timeRange,
       params.timeColumn,
+    );
+    const filter = facetFilterFragment(
+      params.table,
+      params.filterWhere,
+      params.timeRange,
     );
 
     const prefixFilter = params.prefix
@@ -605,6 +604,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         FROM ${params.table}
         WHERE ${whereClause}
           ${dedupFilter}
+          ${filter.sql}
           AND ${params.facetExpression} != ''
           ${prefixFilter}
         GROUP BY facet_value
@@ -612,6 +612,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       query_params: {
+        ...filter.params,
         ...queryParams,
         limit: params.limit,
         offset: params.offset,
@@ -631,6 +632,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     timeColumn: string;
     column: string;
     limit: number;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<DiscreteFacetResult> {
     EventUtils.validateTenantId(
       { tenantId: params.tenantId },
@@ -641,6 +643,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.tenantId,
       params.timeRange,
       params.timeColumn,
+    );
+    const filter = facetFilterFragment(
+      params.table,
+      params.filterWhere,
+      params.timeRange,
     );
 
     // Same ReplacingMergeTree dedup as findCategoricalFacet — only
@@ -665,12 +672,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         FROM ${params.table}
         WHERE ${whereClause}
           ${dedupFilter}
+          ${filter.sql}
           AND ${params.column} IS NOT NULL
         GROUP BY discrete_value
         ORDER BY discrete_value ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: { ...queryParams, limit: params.limit },
+      query_params: { ...filter.params, ...queryParams, limit: params.limit },
       format: "JSONEachRow",
     });
 
@@ -718,9 +726,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   async findRangeStatsForTable(params: {
     tenantId: string;
     timeRange: { from: number; to: number };
-    table: string;
+    table: FacetTableName;
     timeColumn: string;
     column: string;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<{ min: number; max: number }> {
     EventUtils.validateTenantId(
       { tenantId: params.tenantId },
@@ -731,6 +740,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.tenantId,
       params.timeRange,
       params.timeColumn,
+    );
+    const filter = facetFilterFragment(
+      params.table,
+      params.filterWhere,
+      params.timeRange,
     );
 
     // Match the dedup behaviour of findCategoricalFacet/findBatchedFacets:
@@ -757,8 +771,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         FROM ${params.table}
         WHERE ${whereClause}
           ${dedupFilter}
+          ${filter.sql}
       `,
-      query_params: queryParams,
+      query_params: { ...filter.params, ...queryParams },
       format: "JSONEachRow",
     });
 
@@ -775,17 +790,24 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     categoricalSpecs: { key: string; expression: string }[];
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<BatchedFacetResult> {
     EventUtils.validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findBatchedFacets",
     );
 
-    const { sql: whereClause, params: queryParams } = buildWhereClauseForTable(
+    const { sql: whereClause, params: baseParams } = buildWhereClauseForTable(
       params.tenantId,
       params.timeRange,
       params.timeColumn,
     );
+    const filter = facetFilterFragment(
+      params.table,
+      params.filterWhere,
+      params.timeRange,
+    );
+    const queryParams = { ...filter.params, ...baseParams };
 
     // `trace_summaries` is a ReplacingMergeTree-style projection — same trace
     // can have multiple `UpdatedAt` versions until merge runs. The other facet
@@ -831,6 +853,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
                     FROM ${params.table}
                     WHERE ${whereClause}
                       ${dedupFilter}
+                      ${filter.sql}
                   )
                   WHERE facet_value != ''
                   GROUP BY facet_key, facet_value
@@ -887,6 +910,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               FROM ${params.table}
               WHERE ${whereClause}
                 ${dedupFilter}
+                ${filter.sql}
             `;
 
             const result = await client.query({
@@ -1000,6 +1024,144 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return mapFacetRows(rows);
   }
 
+  async findEventAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findEventAttributeValues",
+    );
+
+    // Same bounded-sample strategy as findAttributeValues, against the store
+    // the `event.attribute.` filter actually queries: `Events.Attributes` is
+    // an Array(Map) parallel to `Events.Name`, so a span contributes one
+    // candidate value per event that carries the key.
+    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
+
+    // The prefix filter lives INSIDE arrayFilter (not a WHERE on the
+    // arrayJoin alias) so the sample keeps its one-pass shape.
+    const valuePredicate = params.prefix
+      ? "v -> v != '' AND lower(v) LIKE concat({prefix:String}, '%')"
+      : "v -> v != ''";
+
+    const sql = `
+      SELECT
+        facet_value,
+        0 AS cnt,
+        0 AS total_distinct
+      FROM (
+        SELECT DISTINCT arrayJoin(
+          arrayFilter(
+            ${valuePredicate},
+            arrayMap(m -> m[{attrKey:String}], \`Events.Attributes\`)
+          )
+        ) AS facet_value
+        FROM stored_spans
+        PREWHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
+          AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
+          AND arrayExists(m -> mapContains(m, {attrKey:String}), \`Events.Attributes\`)
+        LIMIT {sampleRows:UInt32}
+        SETTINGS
+          max_execution_time = 3,
+          timeout_overflow_mode = 'break',
+          max_threads = 8
+      )
+      ORDER BY facet_value
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `;
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: sql,
+      query_params: {
+        tenantId: params.tenantId,
+        timeFrom: params.timeRange.from,
+        timeTo: params.timeRange.to,
+        attrKey: params.attributeKey,
+        limit: params.limit,
+        offset: params.offset,
+        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<FacetRow>();
+    return mapFacetRows(rows);
+  }
+
+  async findSpanAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findSpanAttributeValues",
+    );
+
+    // Same bounded-sample strategy as findAttributeValues, against
+    // `stored_spans.SpanAttributes` — the store the `span.attribute.` filter
+    // actually queries.
+    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
+
+    const innerPrefix = params.prefix
+      ? "AND lower(SpanAttributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')"
+      : "";
+
+    const sql = `
+      SELECT
+        facet_value,
+        0 AS cnt,
+        0 AS total_distinct
+      FROM (
+        SELECT DISTINCT SpanAttributes[{attrKey:String}] AS facet_value
+        FROM stored_spans
+        PREWHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
+          AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
+          AND mapContains(SpanAttributes, {attrKey:String})
+        WHERE SpanAttributes[{attrKey:String}] != ''
+          ${innerPrefix}
+        LIMIT {sampleRows:UInt32}
+        SETTINGS
+          max_execution_time = 3,
+          timeout_overflow_mode = 'break',
+          max_threads = 8
+      )
+      ORDER BY facet_value
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `;
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: sql,
+      query_params: {
+        tenantId: params.tenantId,
+        timeFrom: params.timeRange.from,
+        timeTo: params.timeRange.to,
+        attrKey: params.attributeKey,
+        limit: params.limit,
+        offset: params.offset,
+        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<FacetRow>();
+    return mapFacetRows(rows);
+  }
+
   private toTraceSummaryData(row: ClickHouseSummaryRow): TraceSummaryData {
     return {
       traceId: row.TraceId,
@@ -1076,6 +1238,11 @@ type FacetRow = {
   // the `Array(Tuple(String, UInt64))` as `[[value, count], …]`. Counts may
   // arrive as strings for large UInt64, so the mapper coerces with Number().
   label_values?: [string, number | string][];
+  // Event facet only: top-N (composite key, count) tuples where the composite
+  // is `<metric key>\x1F<stored value>` (see EVENT_METRIC_SEP in
+  // facets/events.ts). Same Array(Tuple(String, UInt64)) serialisation as
+  // label_values.
+  metric_values?: [string, number | string][];
 };
 
 function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
@@ -1085,8 +1252,45 @@ function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
       ...(r.facet_label ? { label: r.facet_label } : {}),
       count: Number(r.cnt),
       ...extractFacetAggregates(r),
+      ...extractEventMetrics(r),
     })),
     totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
+  };
+}
+
+/**
+ * Reshape the event facet's composite-key buckets into per-metric-key value
+ * lists. Values pass through as stored — verbatim strings — so a drilldown
+ * click round-trips exactly into `event.attribute.<key>:<value>`.
+ */
+function extractEventMetrics(r: FacetRow): {
+  eventMetrics?: EventMetricValues[];
+} {
+  if (!r.metric_values?.length) return {};
+  const byKey = new Map<string, { value: string; count: number }[]>();
+  for (const [composite, count] of r.metric_values) {
+    const sep = composite.indexOf(EVENT_METRIC_SEP);
+    if (sep <= 0) continue; // malformed bucket — no separator or empty key
+    const key = composite.slice(0, sep);
+    const value = composite.slice(sep + EVENT_METRIC_SEP.length);
+    // A second separator means the metric key itself carried one. Metric keys
+    // are unconstrained strings, so nothing stops a caller sending one with an
+    // embedded 0x1F, and the split point is then a guess. Drop the bucket
+    // rather than render a row whose key and value are both wrong.
+    if (value === "" || value.includes(EVENT_METRIC_SEP)) continue;
+    let list = byKey.get(key);
+    if (!list) {
+      list = [];
+      byKey.set(key, list);
+    }
+    list.push({ value, count: Number(count) });
+  }
+  if (byKey.size === 0) return {};
+  return {
+    eventMetrics: [...byKey.entries()].map(([key, values]) => ({
+      key,
+      values,
+    })),
   };
 }
 

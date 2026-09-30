@@ -5,6 +5,7 @@ import {
   Input,
   Spacer,
   Text,
+  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { Info, Plus, X } from "lucide-react";
@@ -304,6 +305,7 @@ const INPUT_TYPE_OPTIONS = [
   { value: "float", label: TYPE_LABELS.float ?? "Number" },
   { value: "bool", label: TYPE_LABELS.bool ?? "Boolean" },
   { value: "image", label: TYPE_LABELS.image ?? "Image" },
+  { value: "file", label: TYPE_LABELS.file ?? "File" },
   { value: "list", label: TYPE_LABELS.list ?? "List" },
   { value: "dict", label: TYPE_LABELS.dict ?? "Object" },
   { value: "chat_messages", label: TYPE_LABELS.chat_messages ?? "Messages" },
@@ -464,8 +466,11 @@ const VariableRow = ({
               />
             </Box>
           ) : (
-            // Simple value input (for Prompt Playground)
-            <Input
+            // The value typed in the Prompt Playground. It opens two lines
+            // tall and grows with the text up to a limit, then scrolls, so a
+            // long value reads in full without pushing the rows below it
+            // off the panel.
+            <Textarea
               value={defaultValue ?? ""}
               onChange={(e) => onDefaultValueChange?.(e.target.value)}
               size="sm"
@@ -475,6 +480,11 @@ const VariableRow = ({
               fontSize="13px"
               variant="flushed"
               borderColor="border"
+              autoresize
+              resize="none"
+              rows={2}
+              maxHeight="240px"
+              data-testid={`variable-value-input-${variable.identifier}`}
             />
           )}
         </>

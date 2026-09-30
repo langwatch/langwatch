@@ -54,6 +54,24 @@ describe("shouldRetryQuery", () => {
           shouldRetryQuery(0, handledTrpcError({ code, httpStatus: 409 })),
         ).toBe(false);
       });
+
+      it("does not retry a search refused for being over the row cap", () => {
+        // The dataset does not shrink between attempts, so every replay reads
+        // the same row count and gets the same refusal. Retrying it holds the
+        // query in `pending` through the whole backoff, and for that whole
+        // time `placeholderData: keepPreviousData` keeps serving the last
+        // UNSEARCHED page — rows that were never matched against the search,
+        // under a count chip that labels them as the matches.
+        expect(
+          shouldRetryQuery(
+            0,
+            handledTrpcError({
+              code: "dataset_too_large_to_search",
+              httpStatus: 413,
+            }),
+          ),
+        ).toBe(false);
+      });
     });
 
     describe("when the failure is a conflict that says it resolves itself", () => {

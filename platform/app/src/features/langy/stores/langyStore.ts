@@ -6,16 +6,20 @@ import {
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
   type LangyTurnProjectionState,
+  abandonSend as reduceAbandonSend,
   abandonStop as reduceAbandonStop,
+  beginSend as reduceBeginSend,
   beginTurn as reduceBeginTurn,
   observeBackendTurn as reduceObserveBackendTurn,
   requestStop as reduceRequestStop,
   settleTurn as reduceSettleTurn,
+  stopDispatched as reduceStopDispatched,
   seedLangyTurnProjection,
   type TurnPhaseState,
 } from "@langwatch/langy";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { GuidedKickoff } from "~/features/guided-onboarding/kickoff";
 import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
 
 /**
@@ -46,6 +50,11 @@ import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
  * it (a shared machine, an impersonation session), where the project id alone
  * says nothing has moved.
  */
+/**
+ * What the tour hands the panel: everything the takeover collected, plus the
+ * conversation to continue when the organization already attached one.
+ */
+
 export interface LangyScope {
   userId: string | null;
   organizationId: string | null;
@@ -209,6 +218,22 @@ interface LangyState extends TurnPhaseState {
   askLangy: (prompt: string) => void;
   /** The panel has taken the queued prompt — clear it so it fires once. */
   consumePendingPrompt: () => void;
+
+  /**
+   * The guided onboarding handing over to Langy: the tour ended (or was
+   * skipped, or the path has no tour) and the panel sends the kickoff message
+   * on the next idle render. Ephemeral like `pendingPrompt`; the message
+   * itself is what lasts (specs/langy/langy-guided-onboarding.feature).
+   */
+  pendingKickoff: GuidedKickoff | null;
+  /**
+   * Open Langy and queue the kickoff. With `conversationId` (the conversation
+   * the organization already attached) the panel continues that conversation;
+   * without one it starts fresh and attaches what the transport creates.
+   */
+  queueGuidedKickoff: (kickoff: GuidedKickoff) => void;
+  /** The panel has taken the queued kickoff: clear it so it sends once. */
+  consumePendingKickoff: () => void;
 
   /**
    * The panel's composer is asked to take focus. Three producers: an
@@ -485,10 +510,28 @@ interface LangyState extends TurnPhaseState {
   // The phase STATE fields (turnPhase, activeTurnId, settledTurnId,
   // backendSawTurnInFlight) come from `TurnPhaseState`; the machine's pure
   // transitions live in @langwatch/langy's turnPhase.ts. The store exposes them as events:
+  /**
+   * The user sent a message: go `active` at once, before the server has
+   * answered with the ids. What makes Stop available during the startup window
+   * instead of leaving Send on screen for the seconds a cold worker takes.
+   */
+  beginSend: () => void;
   /** A turn was dispatched (transport adopted its ids): adopt it, go `active`. */
   beginTurn: (args: { conversationId: string; turnId: string }) => void;
-  /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
-  requestStop: () => void;
+  /**
+   * The user hit Stop: `active` → `stopping` (a no-op in any other phase).
+   * `dispatched: false` says the caller had no turn id to name yet, so the
+   * intent is remembered (`stopPending`) and sent the moment one arrives.
+   */
+  requestStop: (args?: { dispatched?: boolean }) => void;
+  /** The remembered stop went out: nothing is owed, the phase stays `stopping`. */
+  stopDispatched: () => void;
+  /**
+   * The send failed before any turn id existed: back to `idle`, dropping a
+   * pending stop with it. A no-op once the turn has an id, where the turn's own
+   * terminal tells the story.
+   */
+  abandonSend: () => void;
   /**
    * The conversation whose last turn THIS browser stopped (ADR-078). What lets
    * an empty stopped reply read "Interrupted" instead of "No content". Session
@@ -649,6 +692,7 @@ const emptyConversationState = () => ({
   turnPlan: null as Array<{ content: string; status: string }> | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
+  pendingKickoff: null as GuidedKickoff | null,
   // A conversation change also drops the id a panel-open warm minted: the
   // pending id belongs to the fresh chat the warm was fired for, and the warm
   // hook re-warms (and re-mints) for whatever the panel points at next.
@@ -756,6 +800,26 @@ export const useLangyStore = create<LangyState>()(
           composerFocusRequested: true,
         })),
       consumePendingPrompt: () => set({ pendingPrompt: null }),
+
+      pendingKickoff: null,
+      queueGuidedKickoff: (kickoff) =>
+        set(() => ({
+          isOpen: true,
+          // The kickoff lands where the organization's conversation is: the
+          // attached one when there is one (its history loads, and the
+          // kickoff continues it), a fresh one otherwise.
+          activeConversationId: kickoff.conversationId ?? null,
+          historyLoadConversationId: kickoff.conversationId ?? null,
+          draft: "",
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
+          ...emptyConversationState(),
+          // AFTER the spread, like `pendingPrompt`: emptyConversationState()
+          // nulls the kickoff.
+          pendingKickoff: kickoff,
+        })),
+      consumePendingKickoff: () => set({ pendingKickoff: null }),
 
       composerFocusRequested: false,
       requestComposerFocus: () => set({ composerFocusRequested: true }),
@@ -996,8 +1060,21 @@ export const useLangyStore = create<LangyState>()(
         }),
 
       // The turn phase machine (@langwatch/langy turnPhase.ts) — pure transitions wired in a
-      // few lines. Every phase change goes through these four events.
+      // few lines. Every phase change goes through these events.
       ...initialTurnPhaseState,
+      beginSend: () =>
+        set((s) => ({
+          ...reduceBeginSend(s),
+          // The same live signals a dispatched turn clears: the previous
+          // answer's status line must not sit under the new question.
+          turnStatus: null,
+          turnStatusIsReadiness: false,
+          turnProgress: null,
+          turnProgressSample: null,
+          turnReasoning: null,
+          turnPlan: null,
+          interruptedConversationId: null,
+        })),
       beginTurn: ({ conversationId, turnId }) =>
         set((s) => ({
           ...reduceBeginTurn(s, turnId),
@@ -1034,15 +1111,32 @@ export const useLangyStore = create<LangyState>()(
           return { unconfirmedConversations: rest };
         }),
       interruptedConversationId: null,
-      requestStop: () =>
+      requestStop: (args) =>
         set((s) => ({
-          ...reduceRequestStop(s),
+          ...reduceRequestStop(s, args ?? {}),
           // Only a stop that actually moved the machine counts as an
           // interruption — requestStop is a no-op outside `active`.
           interruptedConversationId:
             s.turnPhase === "active"
               ? s.activeConversationId
               : s.interruptedConversationId,
+        })),
+      stopDispatched: () =>
+        set((s) => ({
+          ...reduceStopDispatched(s),
+          // The kept stop is real now, and the reply it cuts short belongs to
+          // this conversation: without this an empty stopped reply would read
+          // "No content" rather than "Interrupted".
+          interruptedConversationId: s.stopPending
+            ? s.activeConversationId
+            : s.interruptedConversationId,
+        })),
+      abandonSend: () =>
+        set((s) => ({
+          ...reduceAbandonSend(s),
+          // Nothing ran, so nothing was interrupted.
+          interruptedConversationId:
+            s.activeTurnId === null ? null : s.interruptedConversationId,
         })),
       abandonStop: () =>
         set((s) => ({

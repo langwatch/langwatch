@@ -7,8 +7,9 @@
  * The raw-LWQL routes those endpoints served (query and schema) were removed
  * by issue #7565 — the REST domain endpoint `POST /api/v1/query`
  * supersedes them. What remains here is `./app.charts.v1.ts`: the saved
- * workbench chart routes, which publish their refusals through the same
- * canonical error handler this app still wires.
+ * workbench chart routes, and `./app.dashboard-widgets.v1.ts`: the dashboard
+ * widget routes — both publish their refusals through the same canonical
+ * error handler this app still wires.
  *
  * Project-scoped rather than service-scoped: these endpoints authenticate with
  * a customer's API key and must resolve a project and its RBAC, which is what
@@ -19,6 +20,7 @@
 import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { registerSavedWorkbenchChartRoutes } from "./app.charts.v1";
+import { registerDashboardWidgetRoutes } from "./app.dashboard-widgets.v1";
 
 patchZodOpenapi();
 
@@ -30,5 +32,6 @@ const secured = createProjectApp({
 });
 
 registerSavedWorkbenchChartRoutes(secured);
+registerDashboardWidgetRoutes(secured);
 
 export const app = secured.hono;

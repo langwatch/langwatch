@@ -175,6 +175,11 @@ type toolFrame struct {
 	Output     string          `json:"output,omitempty"`
 	IsError    *bool           `json:"isError,omitempty"`
 	DurationMs *int64          `json:"durationMs,omitempty"`
+	// Local marks an end frame whose call ran in the developer's shared
+	// folder, on their machine, through the local control path. The GitHub
+	// gate and the panel read it: a git push or a gh call there used the
+	// developer's own credentials, whatever the tool is named.
+	Local bool `json:"local,omitempty"`
 }
 
 // ToolStart announces a tool the agent began running.
@@ -191,7 +196,18 @@ func ToolStart(id, name, title, command string, input json.RawMessage) (Frame, e
 // so one event answers both "what ran?" and "how did it end?" for the card, the
 // durable log, and anyone debugging a turn after the fact.
 func ToolEnd(id, name string, input json.RawMessage, isError bool, output string, durationMs int64) (Frame, error) {
-	f := toolFrame{Type: "tool", ID: id, Name: name, Phase: "end", Input: input, Output: output, IsError: &isError}
+	return toolEnd(false, id, name, input, isError, output, durationMs)
+}
+
+// ToolEndLocal reports a tool the agent finished whose call ran in the
+// developer's shared folder, on their machine. Same shape as ToolEnd, with
+// `local: true` on the frame.
+func ToolEndLocal(id, name string, input json.RawMessage, isError bool, output string, durationMs int64) (Frame, error) {
+	return toolEnd(true, id, name, input, isError, output, durationMs)
+}
+
+func toolEnd(local bool, id, name string, input json.RawMessage, isError bool, output string, durationMs int64) (Frame, error) {
+	f := toolFrame{Type: "tool", ID: id, Name: name, Phase: "end", Input: input, Output: output, IsError: &isError, Local: local}
 	if durationMs > 0 {
 		f.DurationMs = &durationMs
 	}
@@ -207,6 +223,8 @@ type ToolCall struct {
 	Input   json.RawMessage `json:"input,omitempty"`
 	Output  *string         `json:"output,omitempty"`
 	IsError *bool           `json:"isError,omitempty"`
+	// Local: the call ran in the developer's shared folder (see toolFrame).
+	Local bool `json:"local,omitempty"`
 }
 
 type finalFrame struct {
@@ -255,7 +273,7 @@ type handoffFrame struct {
 // Handoff is terminal (ADR-048): the worker checkpointed the in-flight turn on a
 // shutdown-imminent notice and hands back an opaque resume token the control plane
 // persists, so the NEXT turn resumes from it. The token is opaque here — authored
-// and consumed by opencode, only persisted by the relay.
+// and consumed by the agent, only persisted by the relay.
 func Handoff(resumeToken string) (Frame, error) {
 	return marshal(handoffFrame{Type: "handoff", ResumeToken: resumeToken})
 }

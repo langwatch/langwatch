@@ -1,31 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Who the directory means (D08).
- *
- * Two facts about one person, kept apart on purpose. This file owns the
- * first: the connection plus the directory's own identifier for them, a
- * PAIR. The address is not identity — people change theirs, and the same
- * person carries different identifiers on two different connections — so
- * every lookup and every write keys on both and `externalId` alone never
- * resolves anything.
- *
- * What falls out of that, and is the reason it exists:
- *
- *   - a person keeps their place when their email changes, because the
- *     mapping is what the push resolves through;
- *   - the same person on two connections is two directory identities and one
- *     LangWatch account, neither identifier overwriting the other;
- *   - the same identifier on two connections is two different people;
- *   - a push naming somebody a connection does not know provisions them
- *     under THAT connection only.
- *
- * The other fact — who made the write — is `system:scim`, stamped in
- * `scim.service.ts`, and deliberately says nothing about the connection.
- *
- * See specs/identity/scim-connection-sync.feature.
+ * Directory ownership survives absent or changed external identifiers.
+ * Real external identifiers resolve only within their connection.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
-import { ScimWriteOutsideConnectionError } from "./errors";
+
+import {
+  ScimConnectionNotFoundError,
+  ScimWriteOutsideConnectionError,
+} from "./errors";
 
 export class ScimDirectoryIdentityService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -52,41 +35,84 @@ export class ScimDirectoryIdentityService {
     return row?.userId ?? null;
   }
 
-  /**
-   * Record that this connection knows this person by this identifier.
-   *
-   * Upserted on the pair, so a re-push costs nothing and a person whose email
-   * changed keeps the same mapping. Re-pointing an identifier at a different
-   * account is allowed and is what the directory asking for it means: the
-   * identifier is theirs to define.
-   */
+  /** Ownership is independent of the directory's optional external identifier. */
   async remember({
+    organizationId,
     connectionId,
     externalId,
     userId,
   }: {
     connectionId: string;
-    externalId: string;
+    organizationId: string;
+    externalId: string | null;
     userId: string;
   }): Promise<void> {
-    await this.prisma.scimExternalId.upsert({
-      where: { connectionId_externalId: { connectionId, externalId } },
-      create: { connectionId, externalId, userId },
-      update: { userId },
+    const connection = await this.connectionForOrganization({
+      organizationId,
+      connectionId,
     });
+    const predecessor =
+      connection.migrationPhase === "FINALIZING" ||
+      connection.migrationPhase === "FINALIZED"
+        ? connection.replacesConnectionId
+        : null;
+    await this.prisma.$transaction([
+      ...(predecessor
+        ? [
+            this.prisma.scimDirectoryUser.deleteMany({
+              where: { organizationId, connectionId: predecessor, userId },
+            }),
+            this.prisma.scimExternalId.deleteMany({
+              where: { organizationId, connectionId: predecessor, userId },
+            }),
+          ]
+        : []),
+      this.prisma.scimDirectoryUser.upsert({
+        where: { connectionId_userId: { connectionId, userId } },
+        create: { organizationId, connectionId, userId },
+        update: {},
+      }),
+      ...(externalId
+        ? [
+            this.prisma.scimExternalId.upsert({
+              where: { connectionId_externalId: { connectionId, externalId } },
+              create: { organizationId, connectionId, externalId, userId },
+              update: { userId },
+            }),
+          ]
+        : []),
+    ]);
   }
 
-  /** Forget one directory identity — the person left this directory. */
+  /** DELETE forgets the person; deactivation keeps ownership for reactivation. */
   async forget({
     connectionId,
-    externalId,
+    userId,
   }: {
     connectionId: string;
-    externalId: string;
+    userId: string;
   }): Promise<void> {
-    await this.prisma.scimExternalId.deleteMany({
-      where: { connectionId, externalId },
+    await this.prisma.$transaction([
+      this.prisma.scimExternalId.deleteMany({
+        where: { connectionId, userId },
+      }),
+      this.prisma.scimDirectoryUser.deleteMany({
+        where: { connectionId, userId },
+      }),
+    ]);
+  }
+
+  async manages({
+    connectionId,
+    userId,
+  }: {
+    connectionId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const owner = await this.prisma.scimDirectoryUser.findUnique({
+      where: { connectionId_userId: { connectionId, userId } },
     });
+    return owner !== null;
   }
 
   /**
@@ -104,21 +130,56 @@ export class ScimDirectoryIdentityService {
    * check.
    */
   async assertWritable({
+    organizationId,
     connectionId,
     userId,
   }: {
+    organizationId: string;
     connectionId: string | null;
     userId: string;
   }): Promise<void> {
     if (!connectionId) return;
-    const claims = await this.prisma.scimExternalId.findMany({
-      where: { userId },
+    const connection = await this.connectionForOrganization({
+      organizationId,
+      connectionId,
+    });
+    const claims = await this.prisma.scimDirectoryUser.findMany({
+      where: { organizationId, userId },
       select: { connectionId: true },
     });
     if (claims.length === 0) return;
     if (claims.some((claim) => claim.connectionId === connectionId)) return;
-    // Names only the person the caller already sent. Which OTHER connection
-    // holds them is not the pushing directory's business.
-    throw new ScimWriteOutsideConnectionError({ userId });
+
+    const owners = await this.prisma.ssoConnection.findMany({
+      where: {
+        organizationId,
+        id: { in: claims.map((claim) => claim.connectionId) },
+        state: { notIn: ["DISCARDED", "TEARDOWN_PENDING", "TORN_DOWN"] },
+      },
+      select: { id: true },
+    });
+    const predecessor =
+      connection.migrationPhase === "FINALIZING" ||
+      connection.migrationPhase === "FINALIZED"
+        ? connection.replacesConnectionId
+        : null;
+    if (owners.some((owner) => owner.id !== predecessor)) {
+      throw new ScimWriteOutsideConnectionError({ userId });
+    }
+  }
+
+  private async connectionForOrganization({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }) {
+    const connection = await this.prisma.ssoConnection.findFirst({
+      where: { id: connectionId, organizationId },
+      select: { replacesConnectionId: true, migrationPhase: true },
+    });
+    if (!connection) throw new ScimConnectionNotFoundError(connectionId);
+    return connection;
   }
 }

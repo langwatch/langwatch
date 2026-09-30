@@ -9,6 +9,7 @@
  * not exist, and neither can widen a key past the access of the member it
  * belongs to.
  */
+import { roleFactToRow } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -23,6 +24,7 @@ import {
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -160,52 +162,65 @@ describe("Feature: API keys management REST API", () => {
     // this family) plus project:view, and nothing else. That is exactly the
     // caller the widening pin is about: allowed to edit keys, not allowed to
     // hand one more access than they have themselves.
+    const managerPermissions = ["organization:manage", "project:view"];
     const manageRole = await prisma.customRole.create({
       data: {
         name: `manage-and-view-${ns}`,
         organizationId: testOrganization.id,
-        permissions: ["organization:manage", "project:view"],
+        permissions: managerPermissions,
         kind: "custom",
       },
     });
 
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId: adminUserId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: testOrganization.id,
+    await prisma.role.create({
+      data: roleFactToRow({
+        organizationId: testOrganization.id,
+        role: {
+          roleId: manageRole.id,
+          name: manageRole.name,
+          permissions: managerPermissions,
+          kind: "custom",
+          occurredAtMs: manageRole.createdAt.getTime(),
         },
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId: managerUserId,
-          role: TeamUserRole.CUSTOM,
-          customRoleId: manageRole.id,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: testOrganization.id,
-        },
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId: memberUserId,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: testOrganization.id,
-        },
-        {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: testOrganization.id,
-          userId: memberUserId,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: testTeam.id,
-        },
-      ],
+      }),
     });
+    for (const binding of [
+      {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: testOrganization.id,
+        userId: adminUserId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: testOrganization.id,
+      },
+      {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: testOrganization.id,
+        userId: managerUserId,
+        role: TeamUserRole.CUSTOM,
+        customRoleId: manageRole.id,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: testOrganization.id,
+      },
+      {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: testOrganization.id,
+        userId: memberUserId,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: testOrganization.id,
+      },
+      {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: testOrganization.id,
+        userId: memberUserId,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: testTeam.id,
+      },
+    ]) {
+      await seedRoleBinding(prisma, binding);
+    }
 
     adminToken = (
       await apiKeyService.create({
@@ -245,6 +260,8 @@ describe("Feature: API keys management REST API", () => {
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId: testOrganization?.id }],
+      ["role", { organizationId: testOrganization?.id }],
       ["roleBinding", { organizationId: testOrganization?.id }],
       ["apiKey", { organizationId: testOrganization?.id }],
       ["customRole", { organizationId: testOrganization?.id }],

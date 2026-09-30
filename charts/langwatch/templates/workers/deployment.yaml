@@ -152,7 +152,7 @@ spec:
                    one is looking — the app pod, which HAS the pair, never makes
                    that call. Same Secret and same Service as the app block. */}}
             {{- if (index .Values "langyagent").chartManaged }}
-            - name: OPENCODE_AGENT_URL
+            - name: LANGY_AGENT_URL
               value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
@@ -189,12 +189,17 @@ spec:
           # /healthz is unauthenticated by design and carries no telemetry, so
           # no bearer token is copied into this podspec.
           # See specs/server/worker-liveness-probe.feature.
+          #
+          # 40 minutes (15s x 160), matching the app: this lane runs the same
+          # `start:prepare:db` + system-migration preflight before it listens,
+          # and that preflight is designed to take up to ~27 minutes. See the
+          # app deployment for why a shorter budget hides the real error.
           startupProbe:
             httpGet:
               path: /healthz
               port: 2999
-            failureThreshold: 12
-            periodSeconds: 10
+            failureThreshold: 160
+            periodSeconds: 15
             timeoutSeconds: 5
           livenessProbe:
             httpGet:

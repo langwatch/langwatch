@@ -12,6 +12,8 @@ Connect the agent in this codebase to LangWatch, so test suites run from the pla
 
 Three steps: install the SDK, add the connect function where the service starts, start the service the way the user always starts it. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot import the SDK: the agent is written in a language with no LangWatch SDK, or you have no access to its code.
 
 ## Step 1: Set up the LangWatch CLI
@@ -86,6 +88,7 @@ Rules for the connect function:
 - Change nothing about how the service starts. The connect function runs on the startup path, and the start command stays the same.
 - **Turn fields** are what the platform sends on every call: `messages` (the whole conversation, OpenAI-style), `new_messages` (`newMessages`, the delta since the last turn), `thread_id` (`threadId`), `session`, `trace_id` (`traceId`). In Python, declare only the ones you use and the SDK passes exactly those. In TypeScript, they arrive as one object, so destructure what you need.
 - Return a string, one message, a list of messages, or `langwatch.AgentReply(output, session=...)` (`{ output, session }` in TypeScript).
+- The connect function is the adapter, and only it carries the decorator. Never place the decorator on a function the app already has when that function returns its own result, for example a dict with the output, a thread id and an order number: the SDK cannot turn that into a reply, and every turn of the run times out. Call that function from the connect function and return its reply text.
 - Do not change the agent's own code to fit the connect function. Map the turn onto the agent's existing call in the connect function instead.
 - Do NOT add a `traceparent` middleware. The SDK adopts the turn's trace context before it calls the function, so the agent's spans land in the turn's trace and the judge reads them.
 
@@ -140,7 +143,7 @@ Use `session` when the agent's API creates its own conversation and cannot accep
 
 The SDK reads the environment from the `environment` argument, then `LANGWATCH_AGENT_ENVIRONMENT`, then `APP_ENV`, `ENVIRONMENT` and `NODE_ENV`, and falls back to `development`. Each environment is a separate row on the agents page, so production and a developer machine are two targets that a comparison run puts side by side.
 
-`development` makes the agent personal: only its owner can run it when the key is personal, and only that machine registers it when the key is a project key. Name the environment `dev-shared` for a development box the whole team runs against.
+`development` makes the agent personal: only its owner can run it when the key is personal, and only that machine registers it when the key is a project key. Name the environment `dev-shared` for a development box the whole team runs against. On a project key the machine is its hostname, so a container whose hostname changes on every recreate registers a new row each start; give it an environment name or pin the hostname (`hostname:` in Compose, `--hostname` on `docker run`).
 
 Leave `environment` out when the service already sets `LANGWATCH_AGENT_ENVIRONMENT`, `APP_ENV`, `ENVIRONMENT` or `NODE_ENV`. The SDK reads them on its own.
 
@@ -189,10 +192,10 @@ langwatch scenario create 'Order status question' \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
   --test-suite 'Smoke'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id. A name with a space goes in double quotes, `--target "connected:ACME checkout"`, and so does `--wait-online "ACME checkout"`: passed bare, the shell splits it and the command refuses the stray word.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -204,8 +207,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent@development?model=gpt-5' \
-  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-5' \
+  --target 'connected:support-agent?model=gpt-5-mini' \
   --name 'Smoke: model comparison' --format json
 ```
 
@@ -221,6 +224,16 @@ Report to the user:
 - The parameters the platform registered, as `langwatch agent get` lists them, so the user knows which levers the run dialog offers. The `scenarios` skill reads the same list when it proposes scenarios; its prompt is "Add scenario tests for my agent".
 
 Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
+
+### When the change goes into a pull request
+
+A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
+
+1. Restart the service that holds the connect call, on the same port.
+2. Run `langwatch agent get "<name>"` and read the parameter list back.
+3. Put that list in the pull request body, as the command printed it.
+
+When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
 
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
@@ -301,7 +314,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, register it as below and then run `langwatch agent dev --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
+If the agent only runs on the user's machine, register it as below and then run `langwatch agent tunnel --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
 
 ### Register and run
 
@@ -340,6 +353,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 | `langwatch agent get` lists a parameter without `options`, or does not list it at all | The annotation is not a `Literal`, an `Enum` or a `z.enum`, or the parameter has no default and the platform reads it as required. | Change the annotation or add the default, then restart the process. |
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
+| A new agent row appears on every start, each with a different host label | The agent registered under `development` with a project key from a container, and the container's hostname changes on every recreate. | Set `LANGWATCH_AGENT_ENVIRONMENT` to a name other than `development`, or pin the container's hostname with `hostname:` in Compose or `--hostname` on `docker run`. |
 | The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
 | A turn fails with `agent_call_timeout` | The call took longer than the agent's timeout. | Raise `timeout` on the connect function (up to 300 seconds), or make the agent answer faster. |
 | Trace-dependent criteria come back inconclusive | The agent reports its traces to a different LangWatch project, or it reports none at all. | Point the agent's tracing at the same project's API key. Set it up with the `tracing` skill. |
@@ -347,6 +361,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 ## Common Mistakes
 
 - Do NOT reimplement the agent inside the connect function, and do NOT point it at a simplified copy. It calls the agent the product already runs, so the simulation exercises the real code path.
+- Do NOT decorate a function the app already has when it returns its own result object instead of reply text. Write the connect function beside it, call it, and return the text.
 - Do NOT add a runner script or a second start command when the service already has one. The connect function goes on the existing startup path.
 - Do NOT add a `traceparent` middleware for a connected agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
 - Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.
@@ -357,3 +372,4 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 - Do NOT stop the agent process while a run is executing. Every turn of the run calls it.
 - Do NOT reach for the HTTP fallback because the decorator looks like more work. It is fewer steps: no public URL, no body template, no credential in the agent configuration, no middleware.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
+- Do NOT write a registration into a pull request body without the `langwatch agent get` output that shows it. A body that states what no command in the conversation printed is a false report.

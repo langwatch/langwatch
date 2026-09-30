@@ -51,7 +51,7 @@ gh api --paginate /installation/repositories --jq '.repositories[].full_name'
 ```
 
 That lists every repository this installation reaches, across every page. One
-result is the repo; several, ask which one with a `choices` card; zero results,
+result is the repo; several, ask which one with the `question` tool; zero results,
 or a failure here, is the concrete blocker to report (the GitHub App is not
 installed for this project).
 

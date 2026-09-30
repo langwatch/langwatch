@@ -1,0 +1,1027 @@
+{
+	"resource": {
+		"attributes": [
+			{
+				"key": "service.name",
+				"value": {
+					"stringValue": "codex_cli_rs"
+				}
+			},
+			{
+				"key": "telemetry.sdk.version",
+				"value": {
+					"stringValue": "0.31.0"
+				}
+			},
+			{
+				"key": "env",
+				"value": {
+					"stringValue": "acme-org"
+				}
+			},
+			{
+				"key": "telemetry.sdk.name",
+				"value": {
+					"stringValue": "opentelemetry"
+				}
+			},
+			{
+				"key": "service.version",
+				"value": {
+					"stringValue": "0.154.0"
+				}
+			},
+			{
+				"key": "telemetry.sdk.language",
+				"value": {
+					"stringValue": "rust"
+				}
+			}
+		]
+	},
+	"scope": {
+		"name": "codex_cli_rs",
+		"version": "",
+		"attributes": [],
+		"droppedAttributesCount": 0
+	},
+	"spans": [
+		{
+			"traceId": "2a5259d499ed08f5914c5a67d98acd1e",
+			"spanId": "5c79b92829ef392d",
+			"traceState": "",
+			"parentSpanId": "",
+			"flags": 257,
+			"name": "turn/start",
+			"kind": 2,
+			"startTimeUnixNano": "1789290649060107000",
+			"endTimeUnixNano": "1789290649117918000",
+			"attributes": [
+				{
+					"key": "code.file.path",
+					"value": {
+						"stringValue": "app-server/src/app_server_tracing.rs"
+					}
+				},
+				{
+					"key": "code.module.name",
+					"value": {
+						"stringValue": "codex_app_server::app_server_tracing"
+					}
+				},
+				{
+					"key": "code.line.number",
+					"value": {
+						"intValue": "100"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"intValue": "13"
+					}
+				},
+				{
+					"key": "target",
+					"value": {
+						"stringValue": "codex_app_server::app_server_tracing"
+					}
+				},
+				{
+					"key": "rpc.system",
+					"value": {
+						"stringValue": "jsonrpc"
+					}
+				},
+				{
+					"key": "rpc.method",
+					"value": {
+						"stringValue": "turn/start"
+					}
+				},
+				{
+					"key": "rpc.transport",
+					"value": {
+						"stringValue": "in-process"
+					}
+				},
+				{
+					"key": "rpc.request_id",
+					"value": {
+						"stringValue": "5"
+					}
+				},
+				{
+					"key": "app_server.connection_id",
+					"value": {
+						"stringValue": "0"
+					}
+				},
+				{
+					"key": "app_server.api_version",
+					"value": {
+						"stringValue": "v2"
+					}
+				},
+				{
+					"key": "app_server.client_name",
+					"value": {
+						"stringValue": "codex-tui"
+					}
+				},
+				{
+					"key": "app_server.client_version",
+					"value": {
+						"stringValue": "0.154.0"
+					}
+				},
+				{
+					"key": "turn.id",
+					"value": {
+						"stringValue": "01a09a08-95f1-7833-8d87-f5b505d8b05e"
+					}
+				}
+			],
+			"droppedAttributesCount": 0,
+			"events": [],
+			"droppedEventsCount": 0,
+			"links": [],
+			"droppedLinksCount": 0,
+			"status": {
+				"message": "",
+				"code": 0
+			}
+		},
+		{
+			"traceId": "23acde079f11803b0d3a03aeabac1029",
+			"spanId": "0f8b840e3d04211d",
+			"traceState": "",
+			"parentSpanId": "0721c1648094e9a1",
+			"flags": 257,
+			"name": "session_init.thread_persistence",
+			"kind": 1,
+			"startTimeUnixNano": "1789290649877298000",
+			"endTimeUnixNano": "1789290649877305000",
+			"attributes": [
+				{
+					"key": "code.file.path",
+					"value": {
+						"stringValue": "core/src/session/session.rs"
+					}
+				},
+				{
+					"key": "code.module.name",
+					"value": {
+						"stringValue": "codex_core::session::session"
+					}
+				},
+				{
+					"key": "code.line.number",
+					"value": {
+						"intValue": "937"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"intValue": "3"
+					}
+				},
+				{
+					"key": "target",
+					"value": {
+						"stringValue": "codex_core::session::session"
+					}
+				},
+				{
+					"key": "session_init.ephemeral",
+					"value": {
+						"boolValue": true
+					}
+				}
+			],
+			"droppedAttributesCount": 0,
+			"events": [],
+			"droppedEventsCount": 0,
+			"links": [],
+			"droppedLinksCount": 0,
+			"status": {
+				"message": "",
+				"code": 0
+			}
+		},
+		{
+			"traceId": "76fdf6e104a64cc2d781e26b8e4181f7",
+			"spanId": "2f4f474484582bc7",
+			"traceState": "",
+			"parentSpanId": "39f563ac3c1009e3",
+			"flags": 257,
+			"name": "app_server.serialized_request_queue",
+			"kind": 1,
+			"startTimeUnixNano": "1789290649905465000",
+			"endTimeUnixNano": "1789290649906084000",
+			"attributes": [
+				{
+					"key": "code.file.path",
+					"value": {
+						"stringValue": "app-server/src/request_serialization.rs"
+					}
+				},
+				{
+					"key": "code.module.name",
+					"value": {
+						"stringValue": "codex_app_server::request_serialization"
+					}
+				},
+				{
+					"key": "code.line.number",
+					"value": {
+						"intValue": "210"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"intValue": "13"
+					}
+				},
+				{
+					"key": "target",
+					"value": {
+						"stringValue": "codex_app_server::request_serialization"
+					}
+				},
+				{
+					"key": "key",
+					"value": {
+						"stringValue": "Thread { thread_id: \"01a09a08-9915-7450-bedb-bb08c55160d3\" }"
+					}
+				}
+			],
+			"droppedAttributesCount": 0,
+			"events": [],
+			"droppedEventsCount": 0,
+			"links": [],
+			"droppedLinksCount": 0,
+			"status": {
+				"message": "",
+				"code": 0
+			}
+		},
+		{
+			"traceId": "76fdf6e104a64cc2d781e26b8e4181f7",
+			"spanId": "39f563ac3c1009e3",
+			"traceState": "",
+			"parentSpanId": "",
+			"flags": 257,
+			"name": "turn/start",
+			"kind": 2,
+			"startTimeUnixNano": "1789290649905273000",
+			"endTimeUnixNano": "1789290649906080000",
+			"attributes": [
+				{
+					"key": "code.file.path",
+					"value": {
+						"stringValue": "app-server/src/app_server_tracing.rs"
+					}
+				},
+				{
+					"key": "code.module.name",
+					"value": {
+						"stringValue": "codex_app_server::app_server_tracing"
+					}
+				},
+				{
+					"key": "code.line.number",
+					"value": {
+						"intValue": "100"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"intValue": "13"
+					}
+				},
+				{
+					"key": "target",
+					"value": {
+						"stringValue": "codex_app_server::app_server_tracing"
+					}
+				},
+				{
+					"key": "rpc.system",
+					"value": {
+						"stringValue": "jsonrpc"
+					}
+				},
+				{
+					"key": "rpc.method",
+					"value": {
+						"stringValue": "turn/start"
+					}
+				},
+				{
+					"key": "rpc.transport",
+					"value": {
+						"stringValue": "in-process"
+					}
+				},
+				{
+					"key": "rpc.request_id",
+					"value": {
+						"stringValue": "temporary-structured-turn-5581615c-011e-4318-8146-70bcca34af4a"
+					}
+				},
+				{
+					"key": "app_server.connection_id",
+					"value": {
+						"stringValue": "0"
+					}
+				},
+				{
+					"key": "app_server.api_version",
+					"value": {
+						"stringValue": "v2"
+					}
+				},
+				{
+					"key": "app_server.client_name",
+					"value": {
+						"stringValue": "codex-tui"
+					}
+				},
+				{
+					"key": "app_server.client_version",
+					"value": {
+						"stringValue": "0.154.0"
+					}
+				},
+				{
+					"key": "turn.id",
+					"value": {
+						"stringValue": "01a09a08-9931-7a02-af4c-1301247d80ad"
+					}
+				}
+			],
+			"droppedAttributesCount": 0,
+			"events": [],
+			"droppedEventsCount": 0,
+			"links": [],
+			"droppedLinksCount": 0,
+			"status": {
+				"message": "",
+				"code": 0
+			}
+		},
+		{
+			"traceId": "2a5259d499ed08f5914c5a67d98acd1e",
+			"spanId": "f155b806a5e7a773",
+			"traceState": "",
+			"parentSpanId": "9fb23d5b356db832",
+			"flags": 257,
+			"name": "session_task.turn",
+			"kind": 1,
+			"startTimeUnixNano": "1789290649116956000",
+			"endTimeUnixNano": "1789290651207439000",
+			"attributes": [
+				{
+					"key": "code.file.path",
+					"value": {
+						"stringValue": "core/src/tasks/mod.rs"
+					}
+				},
+				{
+					"key": "code.module.name",
+					"value": {
+						"stringValue": "codex_core::tasks"
+					}
+				},
+				{
+					"key": "code.line.number",
+					"value": {
+						"intValue": "345"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"intValue": "4"
+					}
+				},
+				{
+					"key": "target",
+					"value": {
+						"stringValue": "codex_core::tasks"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"stringValue": "01a09a08-5141-7cf0-8d2a-4c245a60c12b"
+					}
+				},
+				{
+					"key": "turn.id",
+					"value": {
+						"stringValue": "01a09a08-95f1-7833-8d87-f5b505d8b05e"
+					}
+				},
+				{
+					"key": "model",
+					"value": {
+						"stringValue": "gpt-5.6-sol"
+					}
+				},
+				{
+					"key": "codex.turn.reasoning_effort",
+					"value": {
+						"stringValue": "low"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.input_tokens",
+					"value": {
+						"intValue": "14894"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.cached_input_tokens",
+					"value": {
+						"intValue": "10880"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.cache_write_input_tokens",
+					"value": {
+						"intValue": "0"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.non_cached_input_tokens",
+					"value": {
+						"intValue": "4014"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.output_tokens",
+					"value": {
+						"intValue": "5"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.reasoning_output_tokens",
+					"value": {
+						"intValue": "0"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.total_tokens",
+					"value": {
+						"intValue": "14899"
+					}
+				}
+			],
+			"droppedAttributesCount": 0,
+			"events": [],
+			"droppedEventsCount": 0,
+			"links": [],
+			"droppedLinksCount": 0,
+			"status": {
+				"message": "",
+				"code": 0
+			}
+		},
+		{
+			"traceId": "23acde079f11803b0d3a03aeabac1029",
+			"spanId": "37e0237a6c5f18ad",
+			"traceState": "",
+			"parentSpanId": "",
+			"flags": 257,
+			"name": "thread/start",
+			"kind": 2,
+			"startTimeUnixNano": "1789290649872419000",
+			"endTimeUnixNano": "1789290649904755000",
+			"attributes": [
+				{
+					"key": "code.file.path",
+					"value": {
+						"stringValue": "app-server/src/app_server_tracing.rs"
+					}
+				},
+				{
+					"key": "code.module.name",
+					"value": {
+						"stringValue": "codex_app_server::app_server_tracing"
+					}
+				},
+				{
+					"key": "code.line.number",
+					"value": {
+						"intValue": "100"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"intValue": "11"
+					}
+				},
+				{
+					"key": "target",
+					"value": {
+						"stringValue": "codex_app_server::app_server_tracing"
+					}
+				},
+				{
+					"key": "rpc.system",
+					"value": {
+						"stringValue": "jsonrpc"
+					}
+				},
+				{
+					"key": "rpc.method",
+					"value": {
+						"stringValue": "thread/start"
+					}
+				},
+				{
+					"key": "rpc.transport",
+					"value": {
+						"stringValue": "in-process"
+					}
+				},
+				{
+					"key": "rpc.request_id",
+					"value": {
+						"stringValue": "temporary-structured-d532359b-7d6f-4d7a-b702-156e58de9130"
+					}
+				},
+				{
+					"key": "app_server.connection_id",
+					"value": {
+						"stringValue": "0"
+					}
+				},
+				{
+					"key": "app_server.api_version",
+					"value": {
+						"stringValue": "v2"
+					}
+				},
+				{
+					"key": "app_server.client_name",
+					"value": {
+						"stringValue": "codex-tui"
+					}
+				},
+				{
+					"key": "app_server.client_version",
+					"value": {
+						"stringValue": "0.154.0"
+					}
+				}
+			],
+			"droppedAttributesCount": 0,
+			"events": [
+				{
+					"timeUnixNano": "1789290649904444000",
+					"name": "event otel/src/events/session_telemetry.rs:250",
+					"attributes": [
+						{
+							"key": "level",
+							"value": {
+								"stringValue": "INFO"
+							}
+						},
+						{
+							"key": "target",
+							"value": {
+								"stringValue": "codex_otel.trace_safe"
+							}
+						},
+						{
+							"key": "event.name",
+							"value": {
+								"stringValue": "codex.startup_phase"
+							}
+						},
+						{
+							"key": "startup.phase",
+							"value": {
+								"stringValue": "thread_start_create_thread"
+							}
+						},
+						{
+							"key": "startup.status",
+							"value": {
+								"stringValue": "ready"
+							}
+						},
+						{
+							"key": "duration_ms",
+							"value": {
+								"stringValue": "28"
+							}
+						},
+						{
+							"key": "event.timestamp",
+							"value": {
+								"stringValue": "2026-09-13T09:10:49.904Z"
+							}
+						},
+						{
+							"key": "conversation.id",
+							"value": {
+								"stringValue": "01a09a08-9915-7450-bedb-bb08c55160d3"
+							}
+						},
+						{
+							"key": "app.version",
+							"value": {
+								"stringValue": "0.154.0"
+							}
+						},
+						{
+							"key": "auth_mode",
+							"value": {
+								"stringValue": "Chatgpt"
+							}
+						},
+						{
+							"key": "originator",
+							"value": {
+								"stringValue": "codex-tui"
+							}
+						},
+						{
+							"key": "terminal.type",
+							"value": {
+								"stringValue": "tmux-256color"
+							}
+						},
+						{
+							"key": "model",
+							"value": {
+								"stringValue": "gpt-5.6-luna"
+							}
+						},
+						{
+							"key": "slug",
+							"value": {
+								"stringValue": "gpt-5.6-luna"
+							}
+						},
+						{
+							"key": "code.file.path",
+							"value": {
+								"stringValue": "otel/src/events/session_telemetry.rs"
+							}
+						},
+						{
+							"key": "code.module.name",
+							"value": {
+								"stringValue": "codex_otel::events::session_telemetry"
+							}
+						},
+						{
+							"key": "code.line.number",
+							"value": {
+								"intValue": "250"
+							}
+						}
+					],
+					"droppedAttributesCount": 0
+				},
+				{
+					"timeUnixNano": "1789290649904747000",
+					"name": "event otel/src/events/session_telemetry.rs:250",
+					"attributes": [
+						{
+							"key": "level",
+							"value": {
+								"stringValue": "INFO"
+							}
+						},
+						{
+							"key": "target",
+							"value": {
+								"stringValue": "codex_otel.trace_safe"
+							}
+						},
+						{
+							"key": "event.name",
+							"value": {
+								"stringValue": "codex.startup_phase"
+							}
+						},
+						{
+							"key": "startup.phase",
+							"value": {
+								"stringValue": "thread_start_total"
+							}
+						},
+						{
+							"key": "startup.status",
+							"value": {
+								"stringValue": "ready"
+							}
+						},
+						{
+							"key": "duration_ms",
+							"value": {
+								"stringValue": "32"
+							}
+						},
+						{
+							"key": "event.timestamp",
+							"value": {
+								"stringValue": "2026-09-13T09:10:49.904Z"
+							}
+						},
+						{
+							"key": "conversation.id",
+							"value": {
+								"stringValue": "01a09a08-9915-7450-bedb-bb08c55160d3"
+							}
+						},
+						{
+							"key": "app.version",
+							"value": {
+								"stringValue": "0.154.0"
+							}
+						},
+						{
+							"key": "auth_mode",
+							"value": {
+								"stringValue": "Chatgpt"
+							}
+						},
+						{
+							"key": "originator",
+							"value": {
+								"stringValue": "codex-tui"
+							}
+						},
+						{
+							"key": "terminal.type",
+							"value": {
+								"stringValue": "tmux-256color"
+							}
+						},
+						{
+							"key": "model",
+							"value": {
+								"stringValue": "gpt-5.6-luna"
+							}
+						},
+						{
+							"key": "slug",
+							"value": {
+								"stringValue": "gpt-5.6-luna"
+							}
+						},
+						{
+							"key": "code.file.path",
+							"value": {
+								"stringValue": "otel/src/events/session_telemetry.rs"
+							}
+						},
+						{
+							"key": "code.module.name",
+							"value": {
+								"stringValue": "codex_otel::events::session_telemetry"
+							}
+						},
+						{
+							"key": "code.line.number",
+							"value": {
+								"intValue": "250"
+							}
+						}
+					],
+					"droppedAttributesCount": 0
+				}
+			],
+			"droppedEventsCount": 0,
+			"links": [],
+			"droppedLinksCount": 0,
+			"status": {
+				"message": "",
+				"code": 0
+			}
+		},
+		{
+			"traceId": "76fdf6e104a64cc2d781e26b8e4181f7",
+			"spanId": "2440ae804629c38f",
+			"traceState": "",
+			"parentSpanId": "abe1e6eaba17cfbe",
+			"flags": 257,
+			"name": "handle_responses",
+			"kind": 1,
+			"startTimeUnixNano": "1789290654047155000",
+			"endTimeUnixNano": "1789290654059846000",
+			"attributes": [
+				{
+					"key": "code.file.path",
+					"value": {
+						"stringValue": "core/src/session/turn.rs"
+					}
+				},
+				{
+					"key": "code.module.name",
+					"value": {
+						"stringValue": "codex_core::session::turn"
+					}
+				},
+				{
+					"key": "code.line.number",
+					"value": {
+						"intValue": "2349"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"intValue": "6"
+					}
+				},
+				{
+					"key": "target",
+					"value": {
+						"stringValue": "codex_core::session::turn"
+					}
+				},
+				{
+					"key": "codex.request.reasoning_effort",
+					"value": {
+						"stringValue": "low"
+					}
+				},
+				{
+					"key": "gen_ai.usage.input_tokens",
+					"value": {
+						"intValue": "5253"
+					}
+				},
+				{
+					"key": "gen_ai.usage.cache_read.input_tokens",
+					"value": {
+						"intValue": "4864"
+					}
+				},
+				{
+					"key": "gen_ai.usage.cache_write.input_tokens",
+					"value": {
+						"intValue": "0"
+					}
+				},
+				{
+					"key": "gen_ai.usage.output_tokens",
+					"value": {
+						"intValue": "60"
+					}
+				},
+				{
+					"key": "codex.usage.reasoning_output_tokens",
+					"value": {
+						"intValue": "40"
+					}
+				},
+				{
+					"key": "codex.usage.total_tokens",
+					"value": {
+						"intValue": "5313"
+					}
+				}
+			],
+			"droppedAttributesCount": 0,
+			"events": [],
+			"droppedEventsCount": 0,
+			"links": [],
+			"droppedLinksCount": 0,
+			"status": {
+				"message": "",
+				"code": 0
+			}
+		},
+		{
+			"traceId": "76fdf6e104a64cc2d781e26b8e4181f7",
+			"spanId": "fcd552a13fc3076b",
+			"traceState": "",
+			"parentSpanId": "ae0733c0b5c2c21c",
+			"flags": 257,
+			"name": "session_task.turn",
+			"kind": 1,
+			"startTimeUnixNano": "1789290649906058000",
+			"endTimeUnixNano": "1789290654066099000",
+			"attributes": [
+				{
+					"key": "code.file.path",
+					"value": {
+						"stringValue": "core/src/tasks/mod.rs"
+					}
+				},
+				{
+					"key": "code.module.name",
+					"value": {
+						"stringValue": "codex_core::tasks"
+					}
+				},
+				{
+					"key": "code.line.number",
+					"value": {
+						"intValue": "345"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"intValue": "13"
+					}
+				},
+				{
+					"key": "target",
+					"value": {
+						"stringValue": "codex_core::tasks"
+					}
+				},
+				{
+					"key": "thread.id",
+					"value": {
+						"stringValue": "01a09a08-9915-7450-bedb-bb08c55160d3"
+					}
+				},
+				{
+					"key": "turn.id",
+					"value": {
+						"stringValue": "01a09a08-9931-7a02-af4c-1301247d80ad"
+					}
+				},
+				{
+					"key": "model",
+					"value": {
+						"stringValue": "gpt-5.6-luna"
+					}
+				},
+				{
+					"key": "codex.turn.reasoning_effort",
+					"value": {
+						"stringValue": "low"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.input_tokens",
+					"value": {
+						"intValue": "5253"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.cached_input_tokens",
+					"value": {
+						"intValue": "4864"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.cache_write_input_tokens",
+					"value": {
+						"intValue": "0"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.non_cached_input_tokens",
+					"value": {
+						"intValue": "389"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.output_tokens",
+					"value": {
+						"intValue": "60"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.reasoning_output_tokens",
+					"value": {
+						"intValue": "40"
+					}
+				},
+				{
+					"key": "codex.turn.token_usage.total_tokens",
+					"value": {
+						"intValue": "5313"
+					}
+				}
+			],
+			"droppedAttributesCount": 0,
+			"events": [],
+			"droppedEventsCount": 0,
+			"links": [],
+			"droppedLinksCount": 0,
+			"status": {
+				"message": "",
+				"code": 0
+			}
+		}
+	]
+}

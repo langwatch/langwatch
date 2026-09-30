@@ -11,6 +11,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../../db";
@@ -79,6 +80,13 @@ describe("suites.test suites integration", () => {
     await prisma.teamUser.create({
       data: { userId: admin.id, teamId: team.id, role: TeamUserRole.ADMIN },
     });
+    await seedRoleBinding(prisma, {
+      organizationId: organization.id,
+      userId: admin.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: "TEAM",
+      scopeId: team.id,
+    });
     caller = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: admin.id }, expires: "1" },
@@ -99,6 +107,13 @@ describe("suites.test suites integration", () => {
     await prisma.teamUser.create({
       data: { userId: viewer.id, teamId: team.id, role: TeamUserRole.VIEWER },
     });
+    await seedRoleBinding(prisma, {
+      organizationId: organization.id,
+      userId: viewer.id,
+      role: TeamUserRole.VIEWER,
+      scopeType: "TEAM",
+      scopeId: team.id,
+    });
     viewerCaller = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: viewer.id }, expires: "1" },
@@ -113,6 +128,7 @@ describe("suites.test suites integration", () => {
       ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
       ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
+      ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
     ]),
   );
 
@@ -121,8 +137,10 @@ describe("suites.test suites integration", () => {
       ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
       ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
+      ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
       ["project", { id: { in: [projectId, otherProjectId] } }],
       ["teamUser", { teamId }],
+      ["grant", { organizationId }],
       ["organizationUser", { organizationId }],
       ["team", { id: teamId }],
       ["user", { id: { in: userIds } }],
@@ -394,6 +412,171 @@ describe("suites.test suites integration", () => {
         where: { id: testSuite.id, projectId },
       });
       expect(kept?.scenarioIds).toEqual([]);
+    });
+  });
+
+  describe("given a test suite", () => {
+    async function createExactMatchEvaluator() {
+      return prisma.evaluator.create({
+        data: {
+          projectId,
+          name: "Exact match",
+          slug: `exact-match-${nanoid(6)}`,
+          type: "evaluator",
+          config: { evaluatorType: "langevals/exact_match", settings: {} },
+        },
+      });
+    }
+
+    const attachmentFor = ({ evaluatorId }: { evaluatorId: string }) => ({
+      id: "att_1",
+      evaluatorId,
+      required: true,
+      mappings: {
+        output: {
+          type: "source" as const,
+          sourceId: "conversation" as const,
+          path: ["last_agent_message"],
+        },
+        expected_output: {
+          type: "source" as const,
+          sourceId: "scenario" as const,
+          path: ["fields", "golden_sql"],
+        },
+      },
+    });
+
+    describe("when fields are saved through the suite editor", () => {
+      /** @scenario "A test suite declares fields and reads them back" */
+      it("saves fields through the suite editor and reads them back in order", async () => {
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+        });
+
+        await caller.suites.testSuites.update({
+          projectId,
+          testSuiteId: testSuite.id,
+          fields: [
+            { identifier: "golden_sql", type: "text" },
+            { identifier: "table_schema", type: "text" },
+          ],
+        });
+
+        const read = await caller.suites.getById({
+          projectId,
+          id: testSuite.id,
+        });
+        expect(read.fields).toEqual([
+          { identifier: "golden_sql", type: "text" },
+          { identifier: "table_schema", type: "text" },
+        ]);
+      });
+    });
+
+    describe("when an evaluator is attached with its mappings", () => {
+      /** @scenario "An evaluator is attached to a test suite with its mappings" */
+      it("saves an attachment with its mappings and reads it back", async () => {
+        const evaluator = await createExactMatchEvaluator();
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+        });
+
+        await caller.suites.testSuites.update({
+          projectId,
+          testSuiteId: testSuite.id,
+          evaluators: [attachmentFor({ evaluatorId: evaluator.id })],
+        });
+
+        const read = await caller.suites.getById({
+          projectId,
+          id: testSuite.id,
+        });
+        expect(read.evaluators).toEqual([
+          attachmentFor({ evaluatorId: evaluator.id }),
+        ]);
+      });
+    });
+
+    describe("when a field an attachment still reads is removed", () => {
+      /** @scenario "A field an evaluator reads cannot be removed" */
+      it("refuses to remove a field an attachment still reads", async () => {
+        const evaluator = await createExactMatchEvaluator();
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+          evaluators: [attachmentFor({ evaluatorId: evaluator.id })],
+        });
+
+        await expect(
+          caller.suites.testSuites.update({
+            projectId,
+            testSuiteId: testSuite.id,
+            fields: [],
+          }),
+        ).rejects.toMatchObject({
+          cause: expect.objectContaining({
+            code: "suite_field_in_use",
+            meta: { identifier: "golden_sql", evaluatorIds: [evaluator.id] },
+          }),
+        });
+
+        const kept = await prisma.simulationSuite.findFirst({
+          where: { id: testSuite.id, projectId },
+        });
+        expect(kept?.fields).toEqual([
+          { identifier: "golden_sql", type: "text" },
+        ]);
+        expect(kept?.evaluators).toEqual([
+          attachmentFor({ evaluatorId: evaluator.id }),
+        ]);
+      });
+    });
+
+    describe("when an attachment names an evaluator the project does not hold", () => {
+      /** @scenario "An attachment naming an evaluator the project does not have is refused" */
+      it("refuses an attachment naming an evaluator the project does not hold", async () => {
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+        });
+
+        await expect(
+          caller.suites.testSuites.update({
+            projectId,
+            testSuiteId: testSuite.id,
+            evaluators: [attachmentFor({ evaluatorId: "evaluator_missing" })],
+          }),
+        ).rejects.toMatchObject({
+          cause: expect.objectContaining({ code: "suite_evaluator_not_found" }),
+        });
+      });
+    });
+
+    describe("when an attachment maps to a field the suite does not declare", () => {
+      it("refuses a mapping to a field the suite does not declare", async () => {
+        const evaluator = await createExactMatchEvaluator();
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+        });
+
+        await expect(
+          caller.suites.testSuites.update({
+            projectId,
+            testSuiteId: testSuite.id,
+            evaluators: [attachmentFor({ evaluatorId: evaluator.id })],
+          }),
+        ).rejects.toMatchObject({
+          cause: expect.objectContaining({
+            code: "suite_evaluator_mapping_invalid",
+          }),
+        });
+      });
     });
   });
 

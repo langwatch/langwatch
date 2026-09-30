@@ -25,6 +25,7 @@ import {
   type ScenarioRunConfig,
   type UpdateScenarioInput,
 } from "./scenario.repository";
+import { readScenarioFieldValues } from "./scenario-field-values";
 import {
   buildSnapshotEnvelope,
   diffSnapshotFields,
@@ -36,6 +37,10 @@ import {
   snapshotFieldsOf,
   touchesVersionedFields,
 } from "./scenario-versioning";
+import {
+  parseScenarioFieldValues,
+  parseSuiteFieldDefinitions,
+} from "./suite-fields";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.service");
 const logger = createLogger("langwatch:scenarios:service");
@@ -120,6 +125,41 @@ async function reconcileTestSuites(params: {
   }
 }
 
+/**
+ * The client a field check reads the test suite through: the caller's
+ * transaction, so the suite it reads is the one the write files into.
+ */
+type SuiteFieldsClient = Pick<Prisma.TransactionClient, "simulationSuite">;
+
+/**
+ * The stored form of the values a write carries, checked against the fields
+ * the test suite declares. Absent values are absent; an empty record clears
+ * them.
+ *
+ * Read inside the caller's transaction, after the suite is known to be one
+ * the scenario may be filed into.
+ */
+async function resolveFieldValues(params: {
+  projectId: string;
+  testSuiteId: string | null | undefined;
+  fields: UpdateScenarioInput["fields"];
+  tx: SuiteFieldsClient;
+}): Promise<UpdateScenarioInput["fields"]> {
+  if (params.fields === undefined) return undefined;
+  const values = parseScenarioFieldValues(params.fields);
+  const suite = params.testSuiteId
+    ? await params.tx.simulationSuite.findFirst({
+        where: { id: params.testSuiteId, projectId: params.projectId },
+        select: { fields: true },
+      })
+    : null;
+  const stored = readScenarioFieldValues({
+    values,
+    definitions: parseSuiteFieldDefinitions(suite?.fields),
+  });
+  return stored as Prisma.InputJsonValue;
+}
+
 /** A stored version row as one history entry. */
 function toVersionSummary(row: ScenarioVersion): ScenarioVersionSummary {
   const envelope = parseSnapshotEnvelope(row.snapshot);
@@ -178,8 +218,18 @@ export class ScenarioService {
             testSuiteId,
             tx,
           });
+          const fields = await resolveFieldValues({
+            projectId: input.projectId,
+            testSuiteId,
+            fields: input.fields,
+            tx,
+          });
           const created = await this.repository.create(
-            { ...input, testSuiteId },
+            {
+              ...input,
+              testSuiteId,
+              ...(fields !== undefined && { fields }),
+            },
             tx,
           );
           await this.repository.createVersionRow(
@@ -396,13 +446,28 @@ export class ScenarioService {
         tx,
       });
     }
+    // The values are checked against the suite the scenario will be in once
+    // this write lands: the one it moves to, or the one it already has.
+    const fields = await resolveFieldValues({
+      projectId,
+      testSuiteId:
+        data.testSuiteId === undefined
+          ? existing.testSuiteId
+          : data.testSuiteId,
+      fields: data.fields,
+      tx,
+    });
+    const write: UpdateScenarioInput = {
+      ...data,
+      ...(fields !== undefined && { fields }),
+    };
 
     // An update that names an editable field is a save: it bumps the version
     // and records a version row. One that names none (a test suite move, an
     // author stamp) leaves the history alone.
-    const updated = touchesVersionedFields(data)
-      ? await this.saveNewVersion(tx, { existing, data, options })
-      : await this.repository.update({ id, projectId, data, tx });
+    const updated = touchesVersionedFields(write)
+      ? await this.saveNewVersion(tx, { existing, data: write, options })
+      : await this.repository.update({ id, projectId, data: write, tx });
 
     if (data.testSuiteId !== undefined) {
       await reconcileTestSuites({
@@ -640,6 +705,10 @@ export class ScenarioService {
             judgeModel: fields.judgeModel,
             maxTurns: fields.maxTurns,
             minTurns: fields.minTurns,
+            fields:
+              fields.fields === null || fields.fields === undefined
+                ? Prisma.DbNull
+                : (fields.fields as Prisma.InputJsonValue),
             lastUpdatedById: params.actor.userId,
           },
           options: {
@@ -720,6 +789,7 @@ export class ScenarioService {
           judgeModel: original.judgeModel,
           maxTurns: original.maxTurns,
           minTurns: original.minTurns,
+          fields: original.fields ?? undefined,
           testSuiteId: original.testSuiteId,
           lastUpdatedById: params.lastUpdatedById ?? null,
         });

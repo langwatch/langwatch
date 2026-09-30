@@ -2,7 +2,8 @@
  * Codex Extractor
  *
  * Handles: OpenAI Codex's native OpenTelemetry log records AND its
- * Rust-CLI native spans (scope `codex_cli_rs`), plus the bundled-cost
+ * Rust-CLI native spans (scopes `codex_cli_rs`, `codex-app-server`,
+ * `codex_exec`), plus the bundled-cost
  * classification of codex account-provider spans from any emitter (the
  * gateway's `gen_ai.provider.name = openai_codex` spans, or spans whose
  * model id carries the `openai_codex/` vendor prefix).
@@ -50,6 +51,9 @@
  * - langwatch.output_tokens
  * - langwatch.cache_read_tokens
  * - langwatch.thread.id (the session: thread.id, or turn.id when absent)
+ * - gen_ai.conversation.id (the session, off every log record's
+ *   conversation.id, so a turn is filed under its session even when its
+ *   turn span never lands)
  * - langwatch.principal.email (from user.email)
  * - langwatch.input (from codex.user_prompt prompt)
  */
@@ -58,6 +62,11 @@ import {
   CODEX_PROVIDER_KEY,
   isCodexModel,
 } from "~/server/modelProviders/codexRestrictions";
+// Which scopes are codex's is decided in one place, `isCodexScope`: the
+// interactive TUI is `codex_cli_rs` (or `codex-app-server` on newer releases,
+// which follow the TUI's rules here), `codex exec` is `codex_exec`, whose
+// usage rules are explained at its two branches in `apply`.
+import { CODEX_EXEC_SCOPE, isCodexScope } from "../../coding-agent-span-filter";
 import { ATTR_KEYS } from "./_constants";
 import type {
   CanonicalAttributesExtractor,
@@ -66,21 +75,7 @@ import type {
 } from "./_types";
 
 const CODEX_EVENT_NAME_PREFIX = "codex.";
-const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
-/**
- * codex sets its instrumentation scope to the originator: the interactive TUI
- * is `codex_cli_rs`, `codex exec` is `codex_exec`. On the exec wire the
- * `handle_responses` response spans are the authoritative usage record: older
- * codex emits no `session_task.turn` rollup there at all, and when a newer
- * codex does emit one it repeats the response spans' summed totals. So under
- * exec the response-span skip below must never fire, and it is the rollup
- * that defers instead.
- */
-const CODEX_EXEC_SCOPE_NAME = "codex_exec";
-const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
-  CODEX_RUST_SCOPE_NAME,
-  CODEX_EXEC_SCOPE_NAME,
-]);
+/** codex's per-turn rollup span: the turn's model and summed token usage. */
 export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
@@ -203,7 +198,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // Path A codex traffic flows through the gateway as gen_ai.*
     // spans; GenAIExtractor handles that side and emits canonical
     // attributes. This branch covers Path B native spans from the
-    // Rust CLI (scope `codex_cli_rs`), where the per-turn
+    // Rust CLI (any scope `isCodexScope` accepts), where the per-turn
     // `session_task.turn` span carries codex-namespaced attributes
     // that won't match GenAIExtractor's gen_ai.* gates.
     //
@@ -216,7 +211,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // span path's. Mastra + Vercel + the rest of the extractors all
     // target gen_ai.* on the span side.
     const scopeName = ctx.span.instrumentationScope?.name ?? "";
-    if (!CODEX_SCOPE_NAMES.has(scopeName)) return;
+    if (!isCodexScope(scopeName)) return;
 
     // codex emits ONE authoritative per-turn rollup span
     // (`session_task.turn`) carrying codex.turn.token_usage.*, AND a
@@ -235,7 +230,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       // the authoritative usage record (older codex emits no turn rollup
       // there at all), so skipping them would zero those traces' totals;
       // the exec-side duplicate is the rollup, handled below.
-      if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
+      if (scopeName !== CODEX_EXEC_SCOPE) {
         this.markRedundantUsageSpan(ctx);
       }
       return;
@@ -292,7 +287,7 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // codex-spelled is still recognised. If a future codex exec drops its
     // response spans, this zeroes those traces' totals; today every exec
     // trace carries both records and counting both doubles all of them.
-    if (scopeName === CODEX_EXEC_SCOPE_NAME && this.hasTokenUsage(ctx)) {
+    if (scopeName === CODEX_EXEC_SCOPE && this.hasTokenUsage(ctx)) {
       ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
       ctx.recordRule("codex/skip-exec-rollup-usage");
     }
@@ -410,6 +405,8 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     if (typeof eventName !== "string") return;
     if (!eventName.startsWith(CODEX_EVENT_NAME_PREFIX)) return;
 
+    this.liftConversationId(ctx);
+
     if (eventName === "codex.sse_event") {
       this.liftSseEvent(ctx);
       return;
@@ -424,12 +421,34 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     }
   }
 
+  /**
+   * Every codex log record names its session as `conversation.id`. The turn
+   * span (`session_task.turn`) carries the same id on the span side, but a
+   * turn whose span never lands has only its log records to say which
+   * session it belongs to, and the session fold keys the turn off this very
+   * record. Without this lift the session row moved on to a turn that the
+   * conversation strip and the session replay, which list the traces filed
+   * under the conversation, could not find.
+   *
+   * Lifted straight onto the conversation key the trace row is filed under
+   * (log lifts merge verbatim into the trace attributes; nothing downstream
+   * promotes `langwatch.thread.id` to it), and onto `langwatch.thread.id`
+   * for the metadata view. Read, not taken: the coding-agent pipeline keys a
+   * codex session off the same attribute.
+   */
+  private liftConversationId(ctx: LogExtractorContext): void {
+    const conversationId = asString(ctx.bag.attrs.get("conversation.id"));
+    if (conversationId === null) return;
+    ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, conversationId);
+    ctx.setAttr("langwatch.thread.id", conversationId);
+    ctx.recordRule("codex/conversation_id");
+  }
+
   private liftSseEvent(ctx: LogExtractorContext): void {
     const model = asString(ctx.bag.attrs.take("model"));
     const inputTokens = asNumber(ctx.bag.attrs.take("input_token_count"));
     const outputTokens = asNumber(ctx.bag.attrs.take("output_token_count"));
     const cacheReadTokens = asNumber(ctx.bag.attrs.take("cached_token_count"));
-    const threadId = asString(ctx.bag.attrs.take("conversation.id"));
     const principalEmail = asString(ctx.bag.attrs.take("user.email"));
     const reasoningEffort = asString(
       ctx.bag.attrs.take("model_reasoning_effort"),
@@ -458,10 +477,6 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     }
     if (cacheReadTokens !== null) {
       ctx.setAttr("langwatch.cache_read_tokens", String(cacheReadTokens));
-      fired = true;
-    }
-    if (threadId !== null) {
-      ctx.setAttr("langwatch.thread.id", threadId);
       fired = true;
     }
     if (principalEmail !== null) {

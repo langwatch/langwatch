@@ -1,7 +1,7 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "~/shared/format/time";
 import {
   DENSE_SPAN_THRESHOLD,
   ROW_GAP,

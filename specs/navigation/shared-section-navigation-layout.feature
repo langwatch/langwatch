@@ -45,3 +45,10 @@ Feature: Shared section navigation layout
   Scenario: A rail of page-local destinations stays
     Given I open the Automations workspace
     Then its local navigation rail renders
+
+  @integration @regression
+  Scenario: The local navigation stays visible while page content scrolls
+    Given a section page contains more content than fits in the viewport
+    When I scroll the page content on a desktop or phone
+    Then the local navigation remains in place
+    And the page content scrolls independently

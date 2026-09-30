@@ -13,6 +13,8 @@ import { TurnRunner } from "./runner.js";
 import { createLangySession } from "./session.js";
 import { attachJsonlReader } from "./stdin.js";
 import { composeSystemPrompt } from "./system-prompt.js";
+import { readSkillBody } from "./tools/skill.js";
+import { createTurnContext } from "./tools/turn-context.js";
 import { ProtocolWriter } from "./writer.js";
 
 function warn(message: string): void {
@@ -45,7 +47,13 @@ export async function runApp(): Promise<void> {
   const writer = new ProtocolWriter((chunk, callback) => rawStdoutWrite(chunk, callback));
 
   const systemPrompt = { current: composeSystem() };
-  const { session, resumed } = await createLangySession({ config, home, systemPrompt });
+  const turnContext = createTurnContext();
+  const { session, resumed } = await createLangySession({
+    config,
+    home,
+    systemPrompt,
+    turnContext,
+  });
 
   const runner = new TurnRunner({
     session,
@@ -55,9 +63,11 @@ export async function runApp(): Promise<void> {
       systemPrompt.current = composed;
     },
     warn,
+    turnContext,
     // A resumed session already carries the conversation, so the handoff
     // digest a turn may still bring along would tell it its own story twice.
     sessionResumed: resumed,
+    loadSkill: (name) => readSkillBody({ skillsDir: config.skillsDir, name }),
   });
   session.subscribe(runner.onSessionEvent);
 

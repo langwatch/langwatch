@@ -15,11 +15,13 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pandas as pd
 import pytest
 
 import langwatch
 from langwatch.experiment.experiment import Experiment
+from langwatch.http_client import create_client
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -59,17 +61,18 @@ def experiment(monkeypatch):
 
 
 def _mock_http_capture():
+    """A create_client stand-in whose transport records every JSON body sent
+    and answers 200, plus the list it records into."""
     captured = []
 
-    def mock_post(*args, **kwargs):
-        body = json.loads(kwargs.get("data", "{}"))
-        captured.append(body)
-        response = MagicMock()
-        response.status_code = 200
-        response.raise_for_status = MagicMock()
-        return response
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(json.loads(request.content))
+        return httpx.Response(200)
 
-    return captured, mock_post
+    def client_factory(**kwargs):
+        return create_client(transport=httpx.MockTransport(handler))
+
+    return captured, client_factory
 
 
 @pytest.mark.unit
@@ -345,7 +348,7 @@ class TestAsyncHttpPayload:
 
     @pytest.mark.asyncio
     async def test_batch_payload_contains_unique_trace_ids(self):
-        captured, mock_post = _mock_http_capture()
+        captured, client_factory = _mock_http_capture()
 
         experiment = Experiment("test-async-batch")
         experiment.initialized = True
@@ -355,7 +358,7 @@ class TestAsyncHttpPayload:
         async def task(row):
             await asyncio.sleep(0.005)
 
-        with patch("httpx.post", side_effect=mock_post):
+        with patch("langwatch.experiment.experiment.create_client", client_factory):
             async for _index, row in experiment.aloop(df.iterrows(), concurrency=3, total=6):
                 experiment.asubmit(task, row)
 
@@ -371,7 +374,7 @@ class TestAsyncHttpPayload:
 
     @pytest.mark.asyncio
     async def test_final_batch_includes_finished_at(self):
-        captured, mock_post = _mock_http_capture()
+        captured, client_factory = _mock_http_capture()
 
         experiment = Experiment("test-async-finished")
         experiment.initialized = True
@@ -379,7 +382,7 @@ class TestAsyncHttpPayload:
         async def task(item):
             await asyncio.sleep(0.005)
 
-        with patch("httpx.post", side_effect=mock_post):
+        with patch("langwatch.experiment.experiment.create_client", client_factory):
             async for item in experiment.aloop([1, 2, 3], concurrency=2):
                 experiment.asubmit(task, item)
 
