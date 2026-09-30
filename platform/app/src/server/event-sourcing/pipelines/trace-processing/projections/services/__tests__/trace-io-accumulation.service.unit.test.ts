@@ -21,6 +21,7 @@ import type { LogRecordReceivedEventData } from "../../../schemas/events";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import {
   extractIOFromLogRecord,
+  RESERVED_INPUT_SPAN_START_MS,
   TraceIOAccumulationService,
 } from "../trace-io-accumulation.service";
 
@@ -516,6 +517,82 @@ describe("TraceIOAccumulationService: media refs", () => {
       ]);
 
       expect(result.inputMediaRefs).toBeNull();
+    });
+  });
+});
+
+describe("TraceIOAccumulationService — top-most span input", () => {
+  const input = (text: string) => ({
+    raw: text,
+    text,
+    source: "langwatch" as const,
+  });
+
+  /** Fold spans in arrival order, carrying the persisted state forward. */
+  function foldInputs(
+    spans: Array<{ span: NormalizedSpan; text: string }>,
+  ): string | null {
+    let state = emptyState();
+    for (const { span, text } of spans) {
+      const result = new TraceIOAccumulationService(
+        stubExtractor({ input: input(text) }),
+      ).accumulateIO({ state, span });
+      const attributes = { ...state.attributes };
+      if (result.inputSpanStartTimeMs === null) {
+        delete attributes[RESERVED_INPUT_SPAN_START_MS];
+      } else {
+        attributes[RESERVED_INPUT_SPAN_START_MS] = String(
+          result.inputSpanStartTimeMs,
+        );
+      }
+      state = { ...state, computedInput: result.computedInput, attributes };
+    }
+    return state.computedInput;
+  }
+
+  // The turn span's own parent was never exported, so no span is a root.
+  const turn = rootSpan({
+    spanId: "turn",
+    parentSpanId: "never-exported",
+    startTimeUnixMs: 100,
+  });
+  const chain = rootSpan({
+    spanId: "chain",
+    parentSpanId: "turn",
+    startTimeUnixMs: 150,
+  });
+
+  describe("given no span in the trace has a null parent", () => {
+    /** @scenario Input comes from the top-most span when no root span is present */
+    it("takes the input of the earlier-starting parent folded after its child", () => {
+      expect(
+        foldInputs([
+          { span: chain, text: "internal prompt" },
+          { span: turn, text: "continue" },
+        ]),
+      ).toBe("continue");
+    });
+
+    /** @scenario A later-starting span does not replace the top-most span's input */
+    it("keeps the top-most input when a later-starting child folds after it", () => {
+      expect(
+        foldInputs([
+          { span: turn, text: "continue" },
+          { span: chain, text: "internal prompt" },
+        ]),
+      ).toBe("continue");
+    });
+  });
+
+  describe("given a root span's input has been folded", () => {
+    /** @scenario A root span's input is never replaced by a non-root span */
+    it("keeps the root input when an earlier-starting non-root span folds", () => {
+      expect(
+        foldInputs([
+          { span: rootSpan({ startTimeUnixMs: 500 }), text: "root input" },
+          { span: turn, text: "continue" },
+        ]),
+      ).toBe("root input");
     });
   });
 });

@@ -30,3 +30,27 @@ Feature: Trace I/O accumulation — human-readable summary text
     And the IO extraction service returns empty text
     When the IO accumulator folds the span
     Then computedOutput is JSON.stringify(raw) (non-null guarantee preserved)
+
+  # A trace whose top-level span points at a parent that is never exported
+  # (e.g. an uninstrumented client) has no span with a null parent. The input
+  # then comes from the top-most span present: the earliest-starting one.
+
+  @unit @trace-summary
+  Scenario: Input comes from the top-most span when no root span is present
+    Given no span in the trace has a null parent
+    And a child span with an input is folded first
+    When its earlier-starting parent span with an input is folded
+    Then computedInput is the parent span's input
+
+  @unit @trace-summary
+  Scenario: A later-starting span does not replace the top-most span's input
+    Given no span in the trace has a null parent
+    And the top-most span's input has been folded
+    When a later-starting child span with an input is folded
+    Then computedInput is still the top-most span's input
+
+  @unit @trace-summary
+  Scenario: A root span's input is never replaced by a non-root span
+    Given a root span's input has been folded
+    When a non-root span that started earlier is folded
+    Then computedInput is still the root span's input
