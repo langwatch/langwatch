@@ -45,12 +45,12 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
     {
       filename: "mcp/typescript/src/example.ts",
       code: 'import { AgentService } from "@langwatch/agent-process"; export { AgentService };',
-      errors: [{ messageId: "processOutsideModule" }],
+      errors: [{ messageId: "undeclaredDependency" }, { messageId: "processOutsideModule" }],
     },
     {
       filename: "mcp/typescript/src/__tests__/agent.integration.test.ts",
       code: 'import { AgentService } from "@langwatch/agent-process"; export { AgentService };',
-      errors: [{ messageId: "processOutsideModule" }],
+      errors: [{ messageId: "undeclaredDependency" }, { messageId: "processOutsideModule" }],
     },
     {
       filename: "modules/agent/contract/src/example.ts",
@@ -60,7 +60,7 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
     {
       filename: "modules/entitlement/contract/src/example.ts",
       code: 'export { Agent } from "@langwatch/agent-contract/private";',
-      errors: [{ messageId: "sealedExports" }],
+      errors: [{ messageId: "undeclaredDependency" }, { messageId: "sealedExports" }],
     },
     {
       filename: "modules/agent/process/src/example.ts",
@@ -232,7 +232,7 @@ tester.run("package-boundaries: portable contracts", plugin.rules["package-bound
     {
       filename: "modules/agent/contract/src/agent.service.ts",
       code: 'import { AgentService } from "@langwatch/agent-process"; export { AgentService };',
-      errors: [{ messageId: "contractRuntime" }],
+      errors: [{ messageId: "undeclaredDependency" }, { messageId: "contractRuntime" }],
     },
   ],
 });
@@ -288,12 +288,12 @@ tester.run("package-boundaries: server installers", plugin.rules["package-bounda
     {
       filename: "apps/ui/src/features/agent/ui/agent-list.tsx",
       code: 'import { AgentService } from "@langwatch/agent-process"; export { AgentService };',
-      errors: [{ messageId: "compositionRoot" }],
+      errors: [{ messageId: "undeclaredDependency" }, { messageId: "compositionRoot" }],
     },
     {
       filename: "sdks/typescript/src/example.ts",
       code: 'import { AgentService } from "@langwatch/agent-process"; export { AgentService };',
-      errors: [{ messageId: "processOutsideModule" }],
+      errors: [{ messageId: "undeclaredDependency" }, { messageId: "processOutsideModule" }],
     },
   ],
 });
@@ -305,7 +305,7 @@ tester.run("package-boundaries: composition root tests", plugin.rules["package-b
     {
       filename: "sdks/typescript/src/__tests__/agent.unit.test.ts",
       code: 'import { AgentService } from "@langwatch/agent-process"; export { AgentService };',
-      errors: [{ messageId: "processOutsideModule" }],
+      errors: [{ messageId: "undeclaredDependency" }, { messageId: "processOutsideModule" }],
     },
   ],
 });
@@ -331,13 +331,13 @@ tester.run("package-boundaries: package escape", plugin.rules["package-boundarie
 tester.run("package-boundaries: sealed exports", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "modules/prompt/browser/src/prompt-list.tsx",
+      filename: "modules/agent/browser/src/agent-list.tsx",
       code: 'import type { Agent } from "@langwatch/agent-contract"; export type Value = Agent;',
     },
   ],
   invalid: [
     {
-      filename: "modules/prompt/browser/src/prompt-list.tsx",
+      filename: "modules/agent/browser/src/agent-list.tsx",
       code: 'import type { Agent } from "@langwatch/agent-contract/src/agent.service"; export type Value = Agent;',
       errors: [{ messageId: "sealedExports" }],
     },

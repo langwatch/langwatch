@@ -815,6 +815,9 @@ Messages:
 - `sealedExports`
   - what: `{{subpath}}` is not in `{{package}}`'s `exports`.
   - fix: Import from `{{package}}` itself when its entry already re-exports the symbol. A browser package exports only `./declaration` and a kit only `.`, so there the symbol is private; for a contract or process package, add `"{{subpath}}"` to its `exports` and re-export the symbol from that entry.
+- `undeclaredDependency`
+  - what: `{{dependency}}` is imported but not declared in `{{packageRoot}}/package.json`, so the task graph has no edge to it and a cached result survives its changes.
+  - fix: Add `"{{dependency}}": "workspace:*"` to `{{packageRoot}}/package.json` (`devDependencies` when only tests import it), or remove the import.
 - `unownedEscape`
   - what: `{{specifier}}` resolves outside `{{packageRoot}}` into a directory no package owns, so nothing records that this package depends on it.
   - fix: Give the target directory a `package.json` and add it to `pnpm-workspace.yaml`, then import it by that name — the way `dev/scripts` became `@langwatch/dev-scripts`. Move the file into `{{packageRoot}}` instead when only this package reads it.

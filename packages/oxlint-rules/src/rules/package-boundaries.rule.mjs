@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { modulePackageOf } from "../classify.mjs";
@@ -32,7 +32,16 @@ const RETIRED_PACKAGE_ENTRYPOINTS = new Map([
   ["@ee", "the owning module's `@langwatch/enterprise-<module>-contract`"],
 ]);
 
+const WORKSPACE_SCOPE = "@langwatch/";
+const DEPENDENCY_FIELDS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
+
 const packageRootCache = new Map();
+const declaredCache = new Map();
 
 function remember(visited, root) {
   for (const seen of visited) packageRootCache.set(seen, root);
@@ -84,6 +93,34 @@ function escapeFinding(file, specifier, cwd) {
   return {
     messageId: intoAMember ? "packageEscape" : "unownedEscape",
     data: { specifier, packageRoot: workspaceRelative(cwd, packageRoot) },
+  };
+}
+
+/** The package's own name and every name its package.json declares as a dependency. */
+function declaredNamesOf(packageRoot) {
+  const cached = declaredCache.get(packageRoot);
+  if (cached) return cached;
+  const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
+  const names = new Set([manifest.name]);
+  for (const field of DEPENDENCY_FIELDS) {
+    for (const name of Object.keys(manifest[field] ?? {})) names.add(name);
+  }
+  declaredCache.set(packageRoot, names);
+
+  return names;
+}
+
+/** An `@langwatch/*` import its package.json does not declare: no graph edge, so a stale cache. */
+function undeclaredFinding(file, specifier, cwd) {
+  if (!specifier.startsWith(WORKSPACE_SCOPE)) return undefined;
+  const packageRoot = packageRootForFile(file.filename, cwd);
+  if (!packageRoot) return undefined;
+  const dependency = specifier.split("/").slice(0, 2).join("/");
+  if (declaredNamesOf(packageRoot).has(dependency)) return undefined;
+
+  return {
+    messageId: "undeclaredDependency",
+    data: { dependency, packageRoot: workspaceRelative(cwd, packageRoot) },
   };
 }
 
@@ -242,6 +279,8 @@ function specifierFindings({ file, specifier, cwd, node, typeOnly = false }) {
     const escape = escapeFinding(file, specifier, cwd);
     if (escape) findings.push(escape);
   }
+  const undeclared = undeclaredFinding(file, specifier, cwd);
+  if (undeclared) findings.push(undeclared);
   findings.push(...packageFindings({ file, specifier, cwd, node, typeOnly }));
   if (file.module && SCHEMA_BINDING.has(specifier)) {
     findings.push({ messageId: "schemaBoundary", data: { specifier } });
@@ -302,6 +341,10 @@ export const boundaryRule = defineRule({
     unownedEscape: {
       what: "`{{specifier}}` resolves outside `{{packageRoot}}` into a directory no package owns, so nothing records that this package depends on it.",
       fix: "Give the target directory a `package.json` and add it to `pnpm-workspace.yaml`, then import it by that name — the way `dev/scripts` became `@langwatch/dev-scripts`. Move the file into `{{packageRoot}}` instead when only this package reads it.",
+    },
+    undeclaredDependency: {
+      what: "`{{dependency}}` is imported but not declared in `{{packageRoot}}/package.json`, so the task graph has no edge to it and a cached result survives its changes.",
+      fix: 'Add `"{{dependency}}": "workspace:*"` to `{{packageRoot}}/package.json` (`devDependencies` when only tests import it), or remove the import.',
     },
     contractRuntime: {
       what: "A contract package is runtime-neutral: `{{specifier}}` is a node, browser or process runtime.",

@@ -118,6 +118,15 @@ or `make service-watch svc=nlpgo`. The gateway needs the "AI GATEWAY" block
 from `.env.example`; langyagent writes its own `.env` block on first run and
 needs the worker binary (`pnpm --filter @langwatch/langyworker build:binary`).
 
+## Build cache
+
+Every worktree shares one Nx cache, `~/.nx/<id>/`, whether it runs under haven
+or plain `pnpm`. Preparing a fresh worktree (`pnpm start:prepare:files`, then
+`pnpm ensure:built`) restores the Prisma client and the SDK, MCP, `ksuid` and
+`mail` builds from it when another worktree already made them from the same
+inputs. Don't set `NX_CACHE_DIRECTORY`: it makes the cache per worktree again.
+Why and how the cache stays trustworthy: ADR-150.
+
 ## Compose presets
 
 `make quickstart` is the interactive preset picker for compose-based stacks

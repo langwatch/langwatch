@@ -115,6 +115,7 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/onboarding-browser-kit": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/scenario-process": "workspace:*",

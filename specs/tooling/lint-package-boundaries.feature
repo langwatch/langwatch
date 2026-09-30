@@ -118,6 +118,13 @@ Feature: The package-boundaries lint rule
     Then it reports packageEscape
 
   @unit
+  Scenario: An @langwatch import the package does not declare is reported as undeclaredDependency
+    Given a workspace package whose package.json declares one @langwatch dependency
+    When a file in it imports another @langwatch package, by value or by type
+    Then it reports undeclaredDependency, because the task graph has no edge and a cached result would go stale
+    But the declared dependency and the package's own name are left alone
+
+  @unit
   Scenario: A well-formed cross-package import within a module is left alone
     Given a service that imports its own module's contract package
     When the package-boundaries rule runs over it

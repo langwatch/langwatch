@@ -43,7 +43,7 @@
     "ensure:ai-gateway-secrets": "bash dev/scripts/ensure-ai-gateway-secrets.sh",
     "prepare:files": "pnpm run start:prepare:files",
     "generate:modules": "bash dev/scripts/devscripts.sh generate-modules",
-    "start:prepare:files": "pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules && cp services/langevals/ts-integration/evaluators.generated.ts modules/evaluator/contract/src/evaluators.generated.ts && pnpm --filter @langwatch/prisma-client prisma:generate && pnpm --filter @langwatch/langy-browser generate:langy-skills && pnpm --filter @langwatch/langy-process generate:setup-skill-bodies",
+    "start:prepare:files": "pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules && cp services/langevals/ts-integration/evaluators.generated.ts modules/evaluator/contract/src/evaluators.generated.ts && nx run @langwatch/prisma-client:prisma:generate --outputStyle=static && pnpm --filter @langwatch/langy-browser generate:langy-skills && pnpm --filter @langwatch/langy-process generate:setup-skill-bodies",
     "ensure:built": "bash dev/scripts/devscripts.sh ensure-built",
     "prisma:migrate": "pnpm --filter @langwatch/tasks task prisma-migrate",
     "clickhouse:migrate": "pnpm --filter @langwatch/tasks task clickhouse-migrate",

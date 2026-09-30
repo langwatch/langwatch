@@ -4,6 +4,7 @@
   "namedInputs": {
     "sharedGlobals": [
       "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/tsconfig.shared.json",
       "{workspaceRoot}/pnpm-workspace.yaml",
       "{workspaceRoot}/pnpm-lock.yaml"
     ],
@@ -29,11 +30,47 @@
       "inputs": ["default", "^production"],
       "outputs": ["{projectRoot}/dist"]
     },
-    "build": {
+    "build": [
+      {
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production"],
+        "outputs": ["{projectRoot}/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["langwatch"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": [
+          "production",
+          "!{projectRoot}/src/internal/generated/**/*",
+          "^production",
+          "{workspaceRoot}/feature-map.json",
+          "{workspaceRoot}/skills/**/*",
+          "{workspaceRoot}/specs/api-reference/openapi-document.json",
+          "{workspaceRoot}/services/langevals/ts-integration/evaluators.generated.ts",
+          "{workspaceRoot}/modules/evaluator/contract/src/evaluators.native.ts",
+          "{workspaceRoot}/modules/model-provider/contract/src/catalog/model-catalog.json",
+          "{workspaceRoot}/modules/scenario/contract/src/evaluator-attachments.ts",
+          "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
+          "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
+          "{workspaceRoot}/packages/redaction/src/**/*"
+        ],
+        "outputs": ["{projectRoot}/dist", "{projectRoot}/src/internal/generated"]
+      }
+    ],
+    "prisma:generate": {
       "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"],
-      "outputs": ["{projectRoot}/dist"]
+      "inputs": [
+        "{projectRoot}/prisma/schema.prisma",
+        "{projectRoot}/prisma.config.ts",
+        "{projectRoot}/scripts/generate-table-catalogue.mjs",
+        "{projectRoot}/package.json",
+        "sharedGlobals"
+      ],
+      "outputs": ["{projectRoot}/src/generated", "{projectRoot}/src/table-catalogue.ts"]
     },
     "test": {
       "cache": true,
@@ -65,5 +102,6 @@
     }
   },
   "parallel": 4,
+  "maxCacheSize": "10GB",
   "analytics": false
 }

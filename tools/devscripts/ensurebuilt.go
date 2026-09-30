@@ -1,6 +1,7 @@
 package devscripts
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -113,10 +114,11 @@ func buildOne(root string, target buildTarget, stderr io.Writer) error {
 	}
 	defer os.RemoveAll(lock)
 	fmt.Fprintf(stderr, "ensure-built: building %s (%s missing or stale)\n", target.name, target.entry)
-	cmd := exec.Command("pnpm", "--filter", target.name, "build")
+	args := buildArgs(root, target.name)
+	cmd := exec.CommandContext(context.Background(), "pnpm", args...)
 	cmd.Dir, cmd.Stdout, cmd.Stderr = root, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("pnpm --filter %s build: %w", target.name, err)
+		return fmt.Errorf("pnpm %s: %w", strings.Join(args, " "), err)
 	}
 	now := time.Now()
 	if err := os.Chtimes(entry, now, now); err != nil {
@@ -127,6 +129,16 @@ func buildOne(root string, target buildTarget, stderr io.Writer) error {
 		fmt.Fprintf(stderr, "ensure-built: could not stamp %s: %s\n", target.entry, reason)
 	}
 	return nil
+}
+
+// buildArgs runs the build through Nx when the workspace has it, so a build some
+// other checkout already made is restored from the shared cache (ADR-150); a
+// tree installed without the root devDependencies builds directly.
+func buildArgs(root, name string) []string {
+	if exists(filepath.Join(root, "node_modules", ".bin", "nx")) {
+		return []string{"exec", "nx", "run", name + ":build", "--excludeTaskDependencies", "--outputStyle=static"}
+	}
+	return []string{"--filter", name, "build"}
 }
 
 // EnsureBuilt builds each requested (default all) dist that is missing or

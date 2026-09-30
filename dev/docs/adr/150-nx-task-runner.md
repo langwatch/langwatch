@@ -127,6 +127,45 @@ git-ignored. `.nxignore` keeps nested agent worktrees under `.claude/worktrees`
 out of the graph; they are separate checkouts carrying their own package.json
 files, and without the exclusion Nx reads them as projects of this workspace.
 
+## Amendment, 2026-09-30: one cache for every checkout, and what makes it trustworthy
+
+**The cache is already shared.** Nx 23 keeps one cache and its index per user
+and workspace identity, at `~/.nx/<id>/{cache,databases}`, so every worktree of
+this repository reads and writes the same entries. `.nx/cache` in a checkout is
+only the fallback when `~/.nx` cannot be written. Nothing sets the location:
+`NX_CACHE_DIRECTORY`, `NX_WORKSPACE_DATA_DIRECTORY` or a `cacheDirectory` in
+`nx.json` each turn sharing off and leave the index per checkout, so a second
+worktree misses on entries the first wrote. haven's overlay pins that it emits
+none of them (`TestOverlayLeavesNxCacheLocationToNx`). `maxCacheSize` caps the
+shared cache at 10 GB, least recently used first. `.claude/settings.json`
+already grants the agent sandbox `~/.nx`.
+
+**Prepare reads the cache.** The two slow, declarable steps of preparing a
+checkout are Nx targets with honest inputs and outputs:
+
+- `@langwatch/prisma-client:prisma:generate`: the schema, `prisma.config.ts`
+  and the table-catalogue script in; `src/generated` and `src/table-catalogue.ts`
+  out. `start:prepare:files` runs it through `nx run`.
+- `build` for the SDK, the MCP server, `ksuid` and `mail`. The SDK's build
+  copies files from outside its package (the evaluator catalogue, the trace
+  schemas, the skills, the OpenAPI document, the redaction sources), so its
+  entry in `targetDefaults` names each of them and treats
+  `src/internal/generated` as output, not input. `ensure-built` keeps its mtime
+  fast path and, when a build is due, runs it through `nx run` when the
+  workspace has Nx, so a build another checkout made is restored rather than
+  repeated.
+
+`generate:modules`, the two Langy generators and the evaluator-catalogue copy
+stay uncached: each costs less than an Nx task's own start-up, and
+`generate:modules` belongs to no project that could carry the target.
+
+**The trust precondition.** A cached result is only as good as the graph edges
+behind it: an import the graph does not know about is an input nobody hashed.
+`langwatch/package-boundaries` refuses both ways of making one, at error: a
+relative import that escapes its package (`packageEscape`, `unownedEscape`) and
+an `@langwatch/*` import its `package.json` does not declare
+(`undeclaredDependency`). A cached pass is trusted on that basis and no other.
+
 ## References
 
 - Related ADRs: [076](./076-single-pnpm-workspace.md) (single pnpm workspace),

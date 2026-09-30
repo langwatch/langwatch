@@ -185,6 +185,17 @@ func TestEnsureBuilt(t *testing.T) {
 			t.Error("lock left behind")
 		}
 	})
+	t.Run("builds through Nx when the workspace has it, so the shared cache can answer", func(t *testing.T) {
+		root, calls := ensureBuiltFixture(t), fakePnpm(t)
+		writeTree(t, root, map[string]string{"node_modules/.bin/nx": ""})
+		if code := EnsureBuilt(root, []string{"langwatch"}, &bytes.Buffer{}); code != 0 {
+			t.Fatalf("code %d", code)
+		}
+		got, _ := os.ReadFile(calls)
+		if want := "exec nx run langwatch:build --excludeTaskDependencies --outputStyle=static\n"; string(got) != want {
+			t.Errorf("pnpm calls = %q, want %q", got, want)
+		}
+	})
 	t.Run("refuses an unknown target by name", func(t *testing.T) {
 		var stderr bytes.Buffer
 		if code := EnsureBuilt(t.TempDir(), []string{"nope", "@langwatch/mail", "bad"}, &stderr); code != 1 ||

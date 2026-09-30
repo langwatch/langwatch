@@ -42,8 +42,11 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
+/** The fixture declares no dependencies, so these read every finding but undeclaredDependency. */
 function report(filename, code) {
-  return runRule(boundaryRule, { code, cwd: workspace.cwd, filename });
+  return runRule(boundaryRule, { code, cwd: workspace.cwd, filename }).filter(
+    (entry) => entry.messageId !== "undeclaredDependency",
+  );
 }
 
 function ids(filename, code) {
@@ -377,6 +380,35 @@ describe("given package-boundaries", () => {
       ["apps/api/src/main.ts", "@langwatch/scenario-process/scenario-child"],
     ])("still reports compositionRoot for %s importing %s", (file, specifier) => {
       expect(ids(file, `import { X } from "${specifier}";`)).toEqual(["compositionRoot"]);
+    });
+  });
+
+  describe("when a package imports a workspace package its package.json does not declare", () => {
+    const declared = createFixtureWorkspace({
+      files: {
+        "packages/widget/package.json": JSON.stringify({
+          name: "@langwatch/widget",
+          dependencies: { "@langwatch/time": "workspace:*" },
+        }),
+      },
+    });
+    afterAll(() => declared.cleanup());
+    const WIDGET = "packages/widget/src/widget.ts";
+    const run = (code) =>
+      runRule(boundaryRule, { code, cwd: declared.cwd, filename: WIDGET }).map(
+        (entry) => entry.messageId,
+      );
+
+    /** @scenario "An @langwatch import the package does not declare is reported as undeclaredDependency" */
+    it("reports undeclaredDependency, and leaves declared and self imports alone", () => {
+      expect(run('import { clock } from "@langwatch/clock/testing";')).toEqual([
+        "undeclaredDependency",
+      ]);
+      expect(run('import type { Clock } from "@langwatch/clock";')).toEqual([
+        "undeclaredDependency",
+      ]);
+      expect(run('import { now } from "@langwatch/time";')).toEqual([]);
+      expect(run('import { w } from "@langwatch/widget/inner";')).toEqual([]);
     });
   });
 });

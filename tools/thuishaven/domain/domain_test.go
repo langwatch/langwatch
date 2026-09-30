@@ -382,6 +382,21 @@ func TestOverlayNeverEmitsLangwatchApiKey(t *testing.T) {
 	}
 }
 
+// TestOverlayLeavesNxCacheLocationToNx pins ADR-150's shared cache: Nx 23 already
+// shares one cache and its index across every checkout (~/.nx/<id>), and any of
+// these variables makes it fall back to a per-checkout index over that cache.
+func TestOverlayLeavesNxCacheLocationToNx(t *testing.T) {
+	st := Stack{
+		Slug: "portless", APIPort: 1, LocalAPIKey: DefaultLocalAPIKey,
+		Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}, {Name: "langyagent"}},
+	}
+	for _, key := range []string{"NX_CACHE_DIRECTORY", "NX_WORKSPACE_DATA_DIRECTORY", "NX_PROJECT_GRAPH_CACHE_DIRECTORY"} {
+		if hasKey(st.OverlayEnv(), key) {
+			t.Errorf("overlay emitted %s, which turns off Nx's cross-checkout cache", key)
+		}
+	}
+}
+
 func TestBaselinePortFallsBackToLiveBaselineOnly(t *testing.T) {
 	alive := func(pid int) bool { return pid == 1 } // pid 1 live, others dead
 	stacks := []Stack{
