@@ -48,7 +48,10 @@
  * data is still redacted.
  */
 
-import { METADATA_SUBKEY_PREFIXES } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import {
+  ATTR_KEYS,
+  METADATA_SUBKEY_PREFIXES,
+} from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { spanTypesSchema } from "~/server/tracer/types";
 
 const HAS_LETTER = /[A-Za-z]/;
@@ -400,15 +403,11 @@ export function reservesModelOrToolName({
 }
 
 /**
- * The attribute LangWatch SDKs write a span's kind into (`llm`, `tool`,
- * `agent`, `workflow`, ...). The name/place pass reads some of those words as
- * a first name, so under the strict level top-level spans stored `[PERSON]` as
- * their type and lost their kind in the trace view.
- */
-const SPAN_TYPE_ATTRIBUTE_KEY = "langwatch.span.type";
-
-/**
- * Whether this attribute is the span kind carrying one of the known kinds.
+ * Whether this attribute is the span kind ({@link ATTR_KEYS.SPAN_TYPE})
+ * carrying one of the known kinds (`llm`, `tool`, `agent`, `workflow`, ...).
+ * The name/place pass reads some of those words as a first name, so under the
+ * strict level top-level spans stored `[PERSON]` as their kind and lost it in
+ * the trace view.
  *
  * Gated on the exact list ({@link spanTypesSchema}), not on shape: the name is
  * not a namespace anyone owns, and a known kind is a fixed word that cannot
@@ -423,7 +422,7 @@ export function reservesSpanType({
   value: string;
 }): boolean {
   return (
-    key.toLowerCase() === SPAN_TYPE_ATTRIBUTE_KEY &&
+    key.toLowerCase() === ATTR_KEYS.SPAN_TYPE &&
     spanTypesSchema.safeParse(value).success
   );
 }
