@@ -4,6 +4,7 @@ import { automationFilterValueSchema, automationFiltersSchema } from "./automati
 import { MAX_TRACE_DEBOUNCE_MS, MIN_TRACE_DEBOUNCE_MS } from "./cadences.ts";
 import { graphAlertActionParamsSchema } from "./graph-alert.ts";
 import { reportActionParamsSchema } from "./report.ts";
+import { triggerFireRowSchema } from "./trigger.queries.ts";
 import {
   alertTypeSchema,
   notificationCadenceSchema,
@@ -256,3 +257,23 @@ export const automationApiUpsertInputSchema = z.object({
   traceDebounceMs: automationApiTraceDebounceMsSchema.optional(),
 });
 export type AutomationApiUpsertInput = z.infer<typeof automationApiUpsertInputSchema>;
+
+/** Where a fire-history page resumes: the `(createdAt, id)` of the last fire of the page before. */
+export const triggerFireCursorSchema = z.object({ createdAt: z.date(), id: z.string().min(1) });
+export type TriggerFireCursor = z.infer<typeof triggerFireCursorSchema>;
+
+/** One page of a trigger's fires, newest first. Metadata only: no trace ids, no trace content. */
+export const triggerFirePageSchema = z.object({
+  fires: z.array(triggerFireRowSchema),
+  nextCursor: triggerFireCursorSchema.nullable(),
+});
+export type TriggerFirePage = z.infer<typeof triggerFirePageSchema>;
+
+/** One page of one automation's fires, resuming after `cursor` when one is given. */
+export const automationApiFireHistoryInputSchema = z.object({
+  projectId: z.string(),
+  triggerId: z.string(),
+  limit: z.number().int().min(1).max(100),
+  cursor: triggerFireCursorSchema.nullable(),
+});
+export type AutomationApiFireHistoryInput = z.infer<typeof automationApiFireHistoryInputSchema>;

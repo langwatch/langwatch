@@ -20,6 +20,10 @@ import {
   type AutomationApiToggleTriggerInput,
   type AutomationApiUpdateTriggerFiltersInput,
   type AutomationApiUpsertInput,
+  type AutomationApiFireHistoryInput,
+  type AutomationRestCreateInput,
+  type AutomationRestUpdateInput,
+  type TriggerFirePage,
   type AutomationAction,
   type AutomationAuthor,
   type AutomationEvaluationActivityContext,
@@ -52,6 +56,7 @@ import {
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
@@ -85,6 +90,7 @@ import { AutomationAuthoringService } from "../services/automation-authoring.ser
 import { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "../services/automation-evaluation-trigger-filter.service.ts";
 import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
+import { AutomationPublicApiService } from "../services/automation-public-api.service.ts";
 import {
   AutomationRulesService,
   type AutomationProjectIdentity,
@@ -102,6 +108,7 @@ import { AutomationPersistCapService } from "../services/persist-cap.service.ts"
 import { ReportScheduleService } from "../services/report-schedule.service.ts";
 import { SlackConnectionMigrationService } from "../services/slack-connection-migration.service.ts";
 import { SlackDestinationService } from "../services/slack-destination.service.ts";
+import { TriggerFilterValidationService } from "../services/trigger-filter-validation.service.ts";
 import { AutomationGraphService } from "../services/trigger-graph.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
@@ -243,6 +250,8 @@ const UNSUBSCRIBE_CONFIRM_MAX = 10;
 type AutomationDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
   monitors: typeof MonitorApi;
+  /** Whether an id a condition keys by is an evaluator's, which a condition cannot select by. */
+  evaluators: typeof EvaluatorApi;
   featureFlags: typeof FeatureFlagApi;
   entitlement: typeof EntitlementApi;
   projects: typeof ProjectApi;
@@ -290,6 +299,7 @@ interface AutomationAppCollaborators {
   monitors: MonitorApiContract;
   rules: AutomationRulesService;
   authoring: AutomationAuthoringService;
+  publicApi: AutomationPublicApiService;
   audit: AutomationAuditSink;
   limits: AutomationCallCounter;
   publicBaseUrl: string | undefined;
@@ -304,6 +314,7 @@ export class AutomationApp implements AutomationApi {
   static readonly dependencies = {
     analytics: AnalyticsApi,
     monitors: MonitorApi,
+    evaluators: EvaluatorApi,
     featureFlags: FeatureFlagApi,
     entitlement: EntitlementApi,
     projects: ProjectApi,
@@ -508,6 +519,10 @@ export class AutomationApp implements AutomationApi {
     });
 
     const triggerMatches = AutomationTriggerMatchDispatcherService.create();
+    const filterValidation = TriggerFilterValidationService.create({
+      evaluators: dependencies.evaluators,
+      monitors: dependencies.monitors,
+    });
 
     return new AutomationApp({
       automation,
@@ -522,6 +537,20 @@ export class AutomationApp implements AutomationApi {
         slackConnections: members.slackConnections,
         traceFilters: members.traceFilters,
         limits: members.limits,
+        filterValidation,
+        logger: members.logger,
+      }),
+      publicApi: AutomationPublicApiService.create({
+        automation,
+        rules,
+        providers: members.providers,
+        slackConnections: members.slackConnections,
+        slackDestinations: members.slackDestinations,
+        filterValidation,
+        history: repositories.history,
+        traceFilters: members.traceFilters,
+        limits: members.limits,
+        logger: members.logger,
       }),
       monitors: dependencies.monitors,
       audit: members.audit,
@@ -548,6 +577,7 @@ export class AutomationApp implements AutomationApi {
   #migration: SlackConnectionMigration | undefined;
   #rules: AutomationRulesService;
   #authoring: AutomationAuthoringService;
+  #publicApi: AutomationPublicApiService;
   #monitors: MonitorApiContract;
   #audit: AutomationAuditSink;
   #limits: AutomationCallCounter;
@@ -563,6 +593,7 @@ export class AutomationApp implements AutomationApi {
     this.#automation = collaborators.automation;
     this.#rules = collaborators.rules;
     this.#authoring = collaborators.authoring;
+    this.#publicApi = collaborators.publicApi;
     this.#monitors = collaborators.monitors;
     this.#audit = collaborators.audit;
     this.#limits = collaborators.limits;
@@ -821,6 +852,47 @@ export class AutomationApp implements AutomationApi {
    * scheduled-report entry, always both. A calendar entry left behind keeps
    * waking the scheduler forever. Idempotent for one that was never a report.
    */
+  getPublicTrigger(input: { projectId: string; triggerId: string }): Promise<Trigger> {
+    return this.#publicApi.getRedactedById(input);
+  }
+
+  deletePublicTrigger(input: { projectId: string; triggerId: string }): Promise<void> {
+    return this.#publicApi.deleteById(input);
+  }
+
+  createPublicTrigger(input: {
+    projectId: string;
+    actorId: string;
+    input: AutomationRestCreateInput;
+  }): Promise<Trigger> {
+    return this.#publicApi.create(input);
+  }
+
+  updatePublicTrigger(input: {
+    projectId: string;
+    triggerId: string;
+    actorId: string;
+    input: AutomationRestUpdateInput;
+  }): Promise<Trigger> {
+    return this.#publicApi.update(input);
+  }
+
+  setPublicTriggerActive(input: {
+    projectId: string;
+    triggerId: string;
+    active: boolean;
+  }): Promise<Trigger> {
+    return this.#publicApi.setActive(input);
+  }
+
+  getFireHistory(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
+    return this.#publicApi.getFireHistory(input);
+  }
+
+  testFireStoredTrigger(input: { projectId: string; triggerId: string }): Promise<TestFireResult> {
+    return this.#publicApi.testFire(input);
+  }
+
   async delete(input: { triggerId: string; projectId: string }): Promise<void> {
     await this.#automation.softDeleteById(input);
     await this.#automation.removeReportSchedule({

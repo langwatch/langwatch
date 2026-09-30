@@ -1,13 +1,14 @@
-import type {
-  EmailSuppression,
-  Trigger,
-  TriggerFire,
-  TriggerFireStats,
-  TriggerSummary,
-  WebhookDeliveryInput,
-  WebhookDeliveryRow,
+import {
+  TriggerNotFoundError,
+  type EmailSuppression,
+  type Trigger,
+  type TriggerFire,
+  type TriggerFirePage,
+  type TriggerFireStats,
+  type TriggerSummary,
+  type WebhookDeliveryInput,
+  type WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
-import { TriggerNotFoundError } from "@langwatch/automation-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -201,6 +202,9 @@ class Triggers extends TriggerRepository {
   }
 }
 class Fires extends TriggerFireHistoryRepository {
+  listPageByTriggerId(): Promise<TriggerFirePage> {
+    return Promise.resolve({ fires: [], nextCursor: null });
+  }
   stats: TriggerFireStats[] = [];
   fires: TriggerFire[] = [];
   create = vi.fn(

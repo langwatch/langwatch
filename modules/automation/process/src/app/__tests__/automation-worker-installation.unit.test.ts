@@ -15,6 +15,7 @@ import {
 import { type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -99,6 +100,7 @@ function process(role: "api" | "worker", eventing: EventSourcing, installed: Ins
     .provide({
       analytics: createApiFixture<AnalyticsApi>(),
       monitor: createApiFixture<MonitorApi>(),
+      evaluator: createApiFixture<EvaluatorApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       entitlement: installed.entitlement ?? createApiFixture<EntitlementApi>(),
       project: installed.project ?? createApiFixture<ProjectApi>(),

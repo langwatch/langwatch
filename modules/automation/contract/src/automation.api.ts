@@ -10,17 +10,23 @@ import type {
   AutomationTraceSubscriberContext,
 } from "./automation-evaluation-subscriber.ts";
 import type {
+  AutomationRestCreateInput,
+  AutomationRestUpdateInput,
+} from "./automation-rest.schemas.ts";
+import type {
   AutomationListRow,
   AutomationPersistCapStatus,
   SlackChannelListing,
 } from "./automation.responses.ts";
 import type {
   AutomationApiCreateInput,
+  AutomationApiFireHistoryInput,
   AutomationApiListSlackChannelsInput,
   AutomationApiTestFireInput,
   AutomationApiToggleTriggerInput,
   AutomationApiUpdateTriggerFiltersInput,
   AutomationApiUpsertInput,
+  TriggerFirePage,
 } from "./automation.trpc-schemas.ts";
 import type { EmailSuppression, EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
 import type { CustomGraphNameRef } from "./custom-graph.ts";
@@ -119,6 +125,33 @@ export interface AutomationApi {
   /** Replaces one automation's condition, keeping it from matching everything. */
   replaceAutomationFilters(input: AutomationApiUpdateTriggerFiltersInput): Promise<Trigger>;
   update(input: UpdateTriggerCommand): Promise<Trigger>;
+  /** Main's public-API read: one live automation, redacted; `trigger_not_found` on a miss. */
+  getPublicTrigger(input: { projectId: string; triggerId: string }): Promise<Trigger>;
+  /** Main's public-API create: held to the dashboard's rules, credentials never read back. */
+  createPublicTrigger(input: {
+    projectId: string;
+    actorId: string;
+    input: AutomationRestCreateInput;
+  }): Promise<Trigger>;
+  /** Main's public-API update: channel and kind fixed, a sent-back placeholder keeps the secret. */
+  updatePublicTrigger(input: {
+    projectId: string;
+    triggerId: string;
+    actorId: string;
+    input: AutomationRestUpdateInput;
+  }): Promise<Trigger>;
+  /** Main's public-API pause/resume: `trigger_not_found` on a miss; a resumed report re-syncs. */
+  setPublicTriggerActive(input: {
+    projectId: string;
+    triggerId: string;
+    active: boolean;
+  }): Promise<Trigger>;
+  /** Main's public-API delete: `trigger_not_found` on a miss; a report's schedule retires too. */
+  deletePublicTrigger(input: { projectId: string; triggerId: string }): Promise<void>;
+  /** One keyset page of an automation's fires, newest first; `trigger_not_found` on a miss. */
+  getFireHistory(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage>;
+  /** Sends a stored automation's message to its own saved destination, capped per project. */
+  testFireStoredTrigger(input: { projectId: string; triggerId: string }): Promise<TestFireResult>;
   delete(input: { triggerId: string; projectId: string }): Promise<void>;
   /** Deactivates and soft-deletes one automation in a single write. */
   softDeleteById(input: { triggerId: string; projectId: string }): Promise<Trigger>;

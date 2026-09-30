@@ -12,6 +12,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";
 import {
   createTestSlackConnections,
   createTestSlackDestinations,
@@ -51,6 +52,8 @@ function authoring(
     slackConnections: createTestSlackConnections(),
     traceFilters: { assertCompiles: () => undefined },
     limits: { count: async () => ({ allowed: true, resetAt: 0 }) },
+    filterValidation: { assertWritable: async () => undefined },
+    logger: new SilentLogger(),
   });
 }
 

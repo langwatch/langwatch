@@ -61,6 +61,7 @@ import type {
   AutomationTraceFilterCompiler,
   AutomationWebhookStoredParams,
 } from "../app/automation.app.ts";
+import type { AutomationLogger } from "../app/automation.members.ts";
 import {
   extractCheckKeys,
   notifyingActionOr,
@@ -75,6 +76,7 @@ import type { AutomationRulesService } from "./automation-rules.service.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import type { AutomationService } from "./automation.service.ts";
 import type { SlackDestinationService } from "./slack-destination.service.ts";
+import type { TriggerFilterValidationService } from "./trigger-filter-validation.service.ts";
 
 /**
  * The app's KSUID resource for a trigger row (`KSUID_RESOURCES.TRIGGER`). The
@@ -100,6 +102,9 @@ export interface AutomationAuthoringCollaborators {
   slackConnections: AutomationSlackConnectionService;
   traceFilters: AutomationTraceFilterCompiler;
   limits: AutomationCallCounter;
+  /** Refuses structured conditions that save fine and then match nothing. */
+  filterValidation: Pick<TriggerFilterValidationService, "assertWritable">;
+  logger: AutomationLogger;
 }
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
@@ -117,13 +122,23 @@ export class AutomationAuthoringService {
    * names echo, values never return). Identity for every other action.
    */
   redactForRead<T extends { action: AutomationAction; actionParams: unknown }>(trigger: T): T {
-    return {
-      ...trigger,
-      actionParams: this.collaborators.providers.redactActionParamsFor(
-        trigger.action,
-        trigger.actionParams ?? {},
-      ),
-    };
+    try {
+      return {
+        ...trigger,
+        actionParams: this.collaborators.providers.redactActionParamsFor(
+          trigger.action,
+          trigger.actionParams ?? {},
+        ),
+      };
+    } catch (error) {
+      // A row saved under another credentials secret cannot be decrypted by
+      // this one; it still lists, with its delivery configuration empty.
+      this.collaborators.logger.warn(
+        { error: error instanceof Error ? error.message : String(error), action: trigger.action },
+        "trigger delivery configuration could not be read; returning it empty",
+      );
+      return { ...trigger, actionParams: {} };
+    }
   }
 
   /** One automation as the browser reads it, or null when the project has none. */
@@ -227,6 +242,10 @@ export class AutomationAuthoringService {
     }
 
     this.collaborators.rules.assertTraceConditionPresent(input.filters);
+    await this.collaborators.filterValidation.assertWritable({
+      projectId: input.projectId,
+      filters: input.filters,
+    });
 
     await this.collaborators.rules.getProjectIdentity(input.projectId);
 
@@ -381,6 +400,10 @@ export class AutomationAuthoringService {
 
       this.collaborators.rules.assertConditionSurvivesEdit({ existing, filters: sanitized });
     }
+    await this.collaborators.filterValidation.assertWritable({
+      projectId: input.projectId,
+      filters: sanitized,
+    });
 
     const trigger = await this.collaborators.automation.update({
       id: input.triggerId,
@@ -456,6 +479,13 @@ export class AutomationAuthoringService {
     const saysWhichTraces = filterQuery !== null || hasActionableTriggerFilters(input.filters);
 
     if (isTraceAutomation && !saysWhichTraces) throw new TriggerFiltersRequiredError();
+    // Only a trace automation stores its structured conditions, when no query supersedes them.
+    if (isTraceAutomation && filterQuery === null) {
+      await this.collaborators.filterValidation.assertWritable({
+        projectId: input.projectId,
+        filters: input.filters,
+      });
+    }
 
     // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt the secrets and
     // resolve the "keep what is there" sentinels against the saved row.
