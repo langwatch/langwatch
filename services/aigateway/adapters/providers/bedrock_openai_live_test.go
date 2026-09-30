@@ -122,3 +122,22 @@ func TestBedrockOpenAILive_LangyShapedTurn(t *testing.T) {
 		t.Fatalf("expected the answer to count three files")
 	}
 }
+
+func TestBedrockOpenAILive_JSONSchema(t *testing.T) {
+	cred, model := liveBedrockOpenAICred(t)
+	router := newTestRouter(t)
+	resp, err := router.Dispatch(context.Background(), &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: model,
+		Body: []byte(`{"messages":[{"role":"user","content":"Capital of France? Answer as JSON."}],
+			"response_format":{"type":"json_schema","json_schema":{"name":"answer","strict":true,"schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"],"additionalProperties":false}}}}`),
+	}, cred)
+	if err != nil {
+		t.Fatalf("Dispatch error: %v", err)
+	}
+	text := gjson.GetBytes(resp.Body, "choices.0.message.content").String()
+	t.Logf("status=%d text=%q", resp.StatusCode, text)
+	if gjson.Get(text, "city").String() == "" {
+		t.Fatalf("want the answer under the schema's city key; body=%s", resp.Body)
+	}
+}

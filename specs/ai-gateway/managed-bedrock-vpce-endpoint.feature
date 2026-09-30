@@ -43,3 +43,13 @@ Feature: Managed-Bedrock dispatch through a customer VPC endpoint
       Then the request is sent to the regional Bedrock runtime endpoint through Converse
       And it is not sent to the bedrock-mantle endpoint
       And other Bedrock models stay on the default path
+
+    # OpenAI models on Converse take the Responses API shape for structured
+    # output: gpt-5.5 ignores a chat-completions response_format and gpt-6
+    # refuses it as an unknown parameter.
+    @unit
+    Scenario: Structured output on an OpenAI model on Bedrock is enforced through Converse
+      Given a chat request for "global.openai.gpt-5.5" with a json_schema response format
+      When the Converse request is built
+      Then the schema is sent as text.format
+      And a json_schema for gpt-oss, which does not enforce it, is refused

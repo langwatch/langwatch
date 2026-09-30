@@ -7680,7 +7680,7 @@ A dropped parameter is reported in three places:
 | `prompt_cache_key` | dropped | dropped | dropped |  |
 | `prompt_cache_retention` | dropped | dropped | dropped |  |
 | `reasoning_effort` | mapped | mapped | mapped | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only |
-| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only; gemini: json_object and json_schema both enforced |
+| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); the Converse lane (customer VPC endpoints, OpenAI models) enforces json_schema for Anthropic and OpenAI GPT models only; gemini: json_object and json_schema both enforced |
 | `safety_identifier` | dropped | dropped | dropped |  |
 | `seed` | dropped | dropped | dropped |  |
 | `service_tier` | dropped | dropped | dropped | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped |
@@ -61858,7 +61858,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.19.0 # x-release-please-version
+    targetRevision: 3.19.2 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -61907,7 +61907,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.19.0 # x-release-please-version
+      targetRevision: 3.19.2 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -62272,7 +62272,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.19.0 # x-release-please-version
+VERSION=3.19.2 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -62288,13 +62288,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.19.0" # x-release-please-version
+    tag: "3.19.2" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.19.0" # x-release-please-version
+    tag: "3.19.2" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.19.0" # x-release-please-version
+    tag: "3.19.2" # x-release-please-version
 
 imagePullSecrets:
   - name: registry-credentials
@@ -66576,7 +66576,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.19.0 \
+  --version 3.19.2 \
   -f values-production.yaml
 # x-release-please-end
 ```

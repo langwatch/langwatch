@@ -132,3 +132,30 @@ func TestVPCE_NoForcedOutputCap(t *testing.T) {
 		t.Fatal("inferenceConfig.maxTokens must stay absent")
 	}
 }
+
+// @scenario "Structured output on an OpenAI model on Bedrock is enforced through Converse"
+func TestConverse_MapsJSONSchemaToTextFormatForOpenAIModels(t *testing.T) {
+	params := vpceParams(t, `{"model":"m","messages":[],"response_format":{"type":"json_schema","json_schema":{"name":"city","strict":true,"schema":{"type":"object","properties":{"city":{"type":"string"}}}}}}`)
+	for _, model := range []string{"global.openai.gpt-5.5", "global.openai.gpt-6-luna"} {
+		doc, err := mapBedrockAdditionalFields(context.Background(), params, model)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", model, err)
+		}
+		j := docJSON(t, doc)
+		if gjson.GetBytes(j, "text.format.type").String() != "json_schema" ||
+			gjson.GetBytes(j, "text.format.name").String() != "city" ||
+			!gjson.GetBytes(j, "text.format.strict").Bool() ||
+			!gjson.GetBytes(j, "text.format.schema.properties.city").Exists() {
+			t.Fatalf("%s: want the schema under text.format, got %s", model, j)
+		}
+		if gjson.GetBytes(j, "output_config").Exists() || gjson.GetBytes(j, "response_format").Exists() {
+			t.Fatalf("%s: only text.format carries the schema, got %s", model, j)
+		}
+	}
+
+	// gpt-oss answers text.format with free text around the JSON, so the
+	// schema is refused rather than silently unenforced.
+	if _, err := mapBedrockAdditionalFields(context.Background(), params, "openai.gpt-oss-120b-1:0"); err == nil {
+		t.Fatal("gpt-oss: want the json_schema refused")
+	}
+}

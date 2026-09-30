@@ -390,13 +390,27 @@ func (m bedrockFieldMapper) applyThinkingEffort(ctx context.Context) error {
 // applyResponseFormat writes the output_config block for a json_schema
 // request, refusing the families this endpoint cannot enforce it for.
 func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
-	schema, _, ok := jsonSchemaFromResponseFormat(m.params.ResponseFormat)
+	schema, name, ok := jsonSchemaFromResponseFormat(m.params.ResponseFormat)
 	if !ok {
+		return nil
+	}
+	if bedrockOpenAIStructuredOutputModel(m.model) {
+		// OpenAI models on Converse take the Responses API shape,
+		// text.format. The chat-completions response_format is ignored by
+		// gpt-5.5 and refused by gpt-6 as an unknown parameter.
+		if name == "" {
+			name = "response"
+		}
+		format := map[string]any{"type": "json_schema", "name": name, "schema": schema}
+		if strict, isBool := jsonSchemaStrict(m.params.ResponseFormat); isBool {
+			format["strict"] = strict
+		}
+		m.fields["text"] = map[string]any{"format": format}
 		return nil
 	}
 	if !bfschemas.IsAnthropicModel(m.model) {
 		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
-			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: the managed Bedrock endpoint enforces json_schema for Anthropic models only. Remove it, or use an Anthropic model", m.model),
+			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: the Bedrock Converse lane enforces json_schema for Anthropic and OpenAI GPT models only. Remove it, or use one of those models", m.model),
 			"fault":   "customer",
 		})
 	}
@@ -404,6 +418,30 @@ func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
 	// so the schema name the caller sent has nowhere to go.
 	setOutputConfig(m.fields, "format", map[string]any{"type": "json_schema", "schema": schema})
 	return nil
+}
+
+// bedrockOpenAIStructuredOutputModel reports whether an OpenAI model on
+// Bedrock enforces a json_schema sent as text.format. gpt-oss answers it
+// with free text around the JSON, so it is not one of them.
+func bedrockOpenAIStructuredOutputModel(model string) bool {
+	return bedrockMantleModel(model) && !strings.Contains(model, "gpt-oss")
+}
+
+// jsonSchemaStrict reads json_schema.strict when the caller set it.
+func jsonSchemaStrict(rf *interface{}) (bool, bool) {
+	if rf == nil {
+		return false, false
+	}
+	m, isMap := (*rf).(map[string]interface{})
+	if !isMap {
+		return false, false
+	}
+	js, isMap := m["json_schema"].(map[string]interface{})
+	if !isMap {
+		return false, false
+	}
+	strict, isBool := js["strict"].(bool)
+	return strict, isBool
 }
 
 // anthropicMinimumThinkingBudget and bedrockDefaultCompletionMaxTokens

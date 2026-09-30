@@ -18,13 +18,9 @@
  *   parse", "An older job payload shape still parses and runs")
  */
 import { describe, expect, it } from "vitest";
-
+import { zodErrorMessage } from "~/utils/zodErrorMessage";
 import { selectRoleModelParams } from "../job-model-params";
-import {
-  ChildProcessJobDataSchema,
-  describeJobDataParseError,
-  type LiteLLMParams,
-} from "../types";
+import { ChildProcessJobDataSchema, type LiteLLMParams } from "../types";
 
 const scenario = {
   id: "scen_1",
@@ -271,10 +267,10 @@ describe("ChildProcessJobDataSchema", () => {
         return;
       }
 
-      const described = describeJobDataParseError(result.error);
+      const described = zodErrorMessage(result.error);
 
       expect(described).not.toContain("\n");
-      expect(described).toContain("simulatorModelParams.model: Required");
+      expect(described).toContain("simulatorModelParams.model");
     });
   });
 });

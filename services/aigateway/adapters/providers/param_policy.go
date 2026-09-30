@@ -332,7 +332,7 @@ var paramPolicyTable = map[string]map[policyLane]paramRule{
 	},
 	"response_format": {
 		laneAnthropic: {disp: dispMapped, refine: refineResponseFormat, note: "json_schema enforced; json_object refused (no parseable-JSON guarantee)"},
-		laneBedrock:   {disp: dispMapped, refine: refineResponseFormat, note: "json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only"},
+		laneBedrock:   {disp: dispMapped, refine: refineResponseFormat, note: "json_schema enforced; json_object refused (no parseable-JSON guarantee); the Converse lane (customer VPC endpoints, OpenAI models) enforces json_schema for Anthropic and OpenAI GPT models only"},
 		laneGemini:    {disp: dispMapped, refine: refineResponseFormat, note: "json_object and json_schema both enforced"},
 	},
 	"tools": {

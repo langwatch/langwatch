@@ -226,9 +226,13 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
  * `decodeProviderErrorBody`): `rate_limit_exceeded` from OpenAI and Azure
  * OpenAI, `rate_limit_error` from Anthropic, `RESOURCE_EXHAUSTED` from
  * Google. A real 429 arrives this way far more often than as the bare
- * `upstream_rate_limited`. A provider body with a code this list does not
- * name stays on the generic card: promotion is by exact code, never by the
- * presence of an upstream failure alone.
+ * `upstream_rate_limited`.
+ *
+ * The proxy's own `llm_upstream_error` promotes on its own: it already says
+ * the provider answered with a failure, whatever discriminant sits beneath
+ * it. The discriminants only select which sentence the card says, and one no
+ * list names gets the generic provider line. Promotion is still by exact
+ * code, never by reading a message.
  *
  * `llm_upstream_error` already writes one sentence per group, so promoting to
  * it reuses that copy rather than restating it here.
