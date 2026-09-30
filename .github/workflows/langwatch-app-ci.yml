@@ -986,10 +986,8 @@ jobs:
       # silently unenforced. REQUIRE_HELM_TESTS below turns a skip into a
       # failure, so this setup can never quietly rot.
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
-      - name: Add chart dependency repositories
-        run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo add langwatch https://langwatch.github.io/langwatch
+      - name: Build chart dependencies
+        run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
 
       - name: Run every workspace package suite
         env:

@@ -120,13 +120,22 @@ pnpm build:affected                         # only what your change reached
 `make service`) stay on `go run`: Go's own cache is faster there than an Nx
 cache hit. [ADR-150](adr/150-nx-task-runner.md) has the numbers.
 
+Charts, generators and the repo-wide steps are targets too:
+
+```bash
+pnpm exec nx run-many -t helm:deps helm:lint helm:template -p tag:helm
+pnpm exec nx run workspace:build:types      # tsc -b; `pnpm build:types` calls it
+make herrgen lint-rules test-scripts        # each calls its cached Nx target
+```
+
 ## What "prepare" does
 
 `pnpm start:prepare:files` runs before the stack starts:
 
 ```
   generate-modules  ->  modules/catalogue.json becomes the generated module lists
-  prisma:generate   ->  Prisma client (cached by Nx)
+  nx run-many       ->  prisma:generate, generate:langy-skills, generate:feature-map,
+                        generate:setup-skill-bodies, generate:evaluators (all cached)
   ensure-built      ->  rebuild the few packages that ship built output,
                         only if stale, through Nx so it's usually a cache hit
 ```

@@ -222,6 +222,33 @@ node by name and version, so a republished tarball under the same version is
 not seen. `pluginsConfig["@nx/js"]` sets `projectsAffectedByDependencyUpdates`
 to `auto` and keeps `analyzeSourceFiles` off, as it was.
 
+## Amendment, 2026-09-30: charts, generators and repo-wide builds
+
+**Helm is inferred.** `dev/nx/helm-plugin.mjs` makes one project per
+`charts/*/Chart.yaml`, named `chart-<dir>` (`langwatch` is the SDK's name). Each
+has cached `helm:deps` (repositories added, `helm dependency build`, output
+`charts/`), `helm:lint` and `helm:template` (`--set autogen.enabled=true`, the
+flags the chart workflows use). Inputs are the chart directory without its
+built `charts/`, plus `helm version --short`; the umbrella also hashes its three
+leaf charts and depends on them. Without helm the targets fail with an install
+hint. `helm package`, `push` and the release workflows stay as they are.
+
+**Generators are cached targets.** `generate:langy-skills`,
+`generate:feature-map`, `generate:setup-skill-bodies`, `generate:evaluators`
+(the langevals copy) and the SDK's `generate` (openapi types, feature map,
+evaluators) each declare exact inputs and outputs in `nx.json`.
+`start:prepare:files` is `ensure:ai-gateway-secrets` and `generate:modules`
+(never cached: secrets, and a Go run that is already fast) followed by one
+`nx run-many` over them and `prisma:generate`.
+
+**Repo-wide builds live on `workspace`** (`dev/nx/workspace-plugin.mjs`, since
+`go` owns the root): `build:types` is `tsc -b tsconfig.build.json`, its inputs
+and outputs read from the solution's references so `sync:references` keeps
+them true; it depends on the SDK build because the referenced packages import
+its declarations. `lint:rules` (semgrep) and `test:scripts` (bats) run the
+Makefile recipes, as `lint:go` does; `herrgen` is a target of `go`. The
+Makefile targets of the same names call Nx.
+
 ## References
 
 - Related ADRs: [076](./076-single-pnpm-workspace.md) (single pnpm workspace),

@@ -169,8 +169,12 @@ jobs:
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: npx-smoke
+
       - name: Build @langwatch/server CLI
-        run: pnpm --filter @langwatch/server build
+        run: pnpm exec nx run @langwatch/server:build --outputStyle=static
 
       # Runs here because this job's path filter is already the exact set of
       # files these assert about (the root manifest, the workspace definition,
@@ -201,7 +205,7 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm start:prepare:files && pnpm ensure:built && pnpm run build:types && pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." run build
+        run: pnpm start:prepare:files && pnpm ensure:built && pnpm run build
         env:
           NODE_ENV: production
 

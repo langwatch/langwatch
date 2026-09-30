@@ -21,7 +21,8 @@
   },
   "scripts": {
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:evaluators": "cp ../../../services/langevals/ts-integration/evaluators.generated.ts src/evaluators.generated.ts"
   },
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",

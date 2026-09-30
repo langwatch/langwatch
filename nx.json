@@ -70,7 +70,9 @@
   "plugins": [
     "./dev/nx/lint-types-plugin.mjs",
     "./dev/nx/go-plugin.mjs",
-    "./dev/nx/npm-deps-plugin.mjs"
+    "./dev/nx/npm-deps-plugin.mjs",
+    "./dev/nx/helm-plugin.mjs",
+    "./dev/nx/workspace-plugin.mjs"
   ],
   "targetDefaults": {
     "typecheck": {
@@ -244,6 +246,84 @@
     },
     "test:go": {
       "cache": false
+    },
+    "generate:langy-skills": {
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/scripts/**/*",
+        "{workspaceRoot}/infra/docker/Dockerfile.langyagent",
+        "{workspaceRoot}/skills/_lib/frontmatter.ts",
+        "{workspaceRoot}/skills/_compiled/native/**/*",
+        {
+          "runtime": "node --version"
+        },
+        "npmDeps"
+      ],
+      "outputs": ["{projectRoot}/src/model/shared/langy/langySkills.generated.json"]
+    },
+    "generate:feature-map": {
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/scripts/**/*",
+        "{workspaceRoot}/feature-map.json",
+        {
+          "runtime": "node --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/src/model/shared/langy/feature-map.generated.json"]
+    },
+    "generate:setup-skill-bodies": {
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/scripts/**/*",
+        "{workspaceRoot}/skills/_compiled/native/**/*",
+        "^production",
+        {
+          "runtime": "node --version"
+        },
+        "npmDeps"
+      ],
+      "outputs": ["{projectRoot}/src/rules/setup-skill-bodies.rules.ts"]
+    },
+    "generate:evaluators": {
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/services/langevals/ts-integration/evaluators.generated.ts",
+        "{projectRoot}/package.json"
+      ],
+      "outputs": ["{projectRoot}/src/evaluators.generated.ts"]
+    },
+    "generate": {
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/copy-types.sh",
+        "{projectRoot}/scripts/**/*",
+        "{projectRoot}/package.json",
+        "{workspaceRoot}/feature-map.json",
+        "{workspaceRoot}/skills/**/*",
+        "{workspaceRoot}/specs/api-reference/openapi-document.json",
+        "{workspaceRoot}/services/langevals/ts-integration/evaluators.generated.ts",
+        "{workspaceRoot}/modules/evaluator/contract/src/evaluators.native.ts",
+        "{workspaceRoot}/modules/model-provider/contract/src/catalog/model-catalog.json",
+        "{workspaceRoot}/modules/scenario/contract/src/evaluator-attachments.ts",
+        "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
+        "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
+        "{workspaceRoot}/packages/redaction/src/**/*",
+        {
+          "runtime": "node --version"
+        },
+        "npmDeps"
+      ],
+      "outputs": ["{projectRoot}/src/internal/generated"]
+    },
+    "herrgen": {
+      "cache": true,
+      "inputs": [
+        "go",
+        "{workspaceRoot}/packages/error-presentation/src/**/*",
+        "{workspaceRoot}/packages/handled-error/src/**/*"
+      ],
+      "outputs": ["{workspaceRoot}/packages/error-presentation/src/codes.generated.ts"]
     }
   },
   "parallel": 4,

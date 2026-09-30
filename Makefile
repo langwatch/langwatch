@@ -2,7 +2,7 @@
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
 .PHONY: dogfood-langy-local
-.PHONY: herrgen herrgen-check
+.PHONY: herrgen herrgen-check test-scripts-run lint-rules-run
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-slot go-lint-changed
 .PHONY: _dev-up-deprecation-warning
 
@@ -200,6 +200,9 @@ refresh-dev-s3:
 # git / docker / external CLIs against the real filesystem and need
 # fixtures.
 test-scripts:
+	@pnpm exec nx run workspace:test:scripts --outputStyle=static
+
+test-scripts-run:
 	@if ! command -v bats >/dev/null 2>&1; then \
 		echo "ERROR: bats not installed. Install with:" >&2; \
 		echo "  macOS:  brew install bats-core" >&2; \
@@ -218,7 +221,7 @@ test-scripts:
 # drift check, and go-ci.yaml's `generated` job calls this same target, so what
 # CI runs and what you run cannot drift apart.
 herrgen:
-	@go run ./cmd/herrgen
+	@pnpm exec nx run go:herrgen --outputStyle=static
 
 herrgen-check:
 	@go run ./cmd/herrgen -check
@@ -239,6 +242,9 @@ GOLANGCI_VERSION := v2.13.2
 SEMGREP := $(shell if command -v semgrep >/dev/null 2>&1 && semgrep --version 2>/dev/null | grep -q "$(SEMGREP_VERSION)"; then echo semgrep; else echo "uvx --from semgrep==$(SEMGREP_VERSION) semgrep"; fi)
 
 lint-rules:
+	@pnpm exec nx run workspace:lint:rules --outputStyle=static
+
+lint-rules-run:
 	@echo "==> semgrep (dev/lint/semgrep/langwatch.yml)"
 	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error --exclude platform .
 

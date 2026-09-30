@@ -112,7 +112,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "langwatch..."
+          install: "langwatch... @langwatch/workspace"
 
       # The "Install TypeScript Native Preview" step that used to sit here is
       # gone. It ran `pnpm install -D -w @typescript/native-preview`, and `-w`
@@ -126,6 +126,10 @@ jobs:
       # uses it: `lint` is `eslint .` and `typecheck` is `tsc --noEmit`, and
       # the SDK references neither `tsgo` nor native-preview anywhere. It was
       # installing a toolchain no step invokes.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: sdk
+
       - name: Run lint check
         run: pnpm run lint
 
@@ -138,7 +142,7 @@ jobs:
       # packages/observability, which imports this SDK through its built
       # declarations, so a typecheck before the build cannot resolve them.
       - name: Build
-        run: pnpm run build
+        run: pnpm exec nx run langwatch:build --outputStyle=static
 
       - name: Typecheck
         run: pnpm run typecheck
@@ -284,9 +288,14 @@ jobs:
           --filter "@langwatch/ui..."
           --filter "@langwatch/tasks..."
           --filter "langwatch..."
+          --filter "@langwatch/workspace"
+
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: sdk-e2e
 
       - name: Build mcp-server
-        run: pnpm --filter @langwatch/mcp-server run build
+        run: pnpm exec nx run @langwatch/mcp-server:build --outputStyle=static
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -336,7 +345,7 @@ jobs:
       # than 404ing every non-API route; the readiness probe below reads it.
       - name: Build LangWatch browser bundle
         working-directory: .
-        run: pnpm run build:types && NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
+        run: pnpm exec nx run workspace:build:types --outputStyle=static && pnpm exec nx run @langwatch/ui:build --outputStyle=static
 
       # Scenario runs need the NLP engine: a worker without LANGWATCH_NLP_SERVICE
       # composes no scenario executor and every queued run waits forever.
@@ -349,7 +358,7 @@ jobs:
         working-directory: .
         run: |
           go build -o /tmp/langwatch-service ./cmd/service
-          pnpm --filter @langwatch/scenario-child run build
+          pnpm exec nx run @langwatch/scenario-child:build --outputStyle=static
 
       - name: Start LangWatch server and worker
         working-directory: .
@@ -378,7 +387,7 @@ jobs:
       # Already installed above alongside the app; nothing further to fetch.
 
       - name: Build SDK
-        run: pnpm run build
+        run: pnpm exec nx run langwatch:build --outputStyle=static
 
       - name: Run e2e tests
         # Fork and Dependabot PRs don't receive repository secrets, so a

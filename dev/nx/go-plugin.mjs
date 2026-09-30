@@ -15,6 +15,7 @@ const goModule = {
   targets: {
     "test:go": { command: "go test ./..." },
     "lint:go": { command: "make --no-print-directory go-lint" },
+    herrgen: { command: "go run ./cmd/herrgen" },
   },
 };
 
