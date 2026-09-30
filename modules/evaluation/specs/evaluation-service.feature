@@ -338,3 +338,10 @@ Feature: Evaluation service boundary
     When the settings are parsed for dispatch on the API route
     Then the parse fails with the schema's error
     And the route answers 400 rather than dispatching the generation parameters alone
+
+  @unit
+  Scenario: An evaluation's organization count is read once, not once per project
+    Given an organization with three projects
+    When a settled evaluation in one of them is recorded for nurturing
+    Then the organization's evaluation count is asked for once, naming all three projects
+    And the count is one ClickHouse read across the projects, which share one route
