@@ -2,7 +2,11 @@
  * Where every tRPC namespace mounts: `/api/trpc`, plus the subscription lane at `/api/sse` over the
  * SAME router. tRPC is session-authenticated by definition, so the session reader is required.
  */
-import { LiteMemberRestrictedError } from "@langwatch/authz-contract";
+import {
+  LiteMemberRestrictedError,
+  type AuthzScopeLineageResult,
+  type PermissionDecision,
+} from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   FeatureTrpcHost,
@@ -163,6 +167,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   /** The session and reference reads, which revalidate by a content ETag (ADR-164). */
   readonly #revalidatedPaths = new Set<string>();
   readonly #options: Parameters<typeof TrpcHost.create>[0];
+  /** One request's decisions, by the request itself: never shared with the next one. */
+  readonly #decisions = new WeakMap<TrpcRequestLike, TrpcAuthorizationDecisions>();
   #composed: AnyTRPCRouter | undefined;
 
   private constructor(options: Parameters<typeof TrpcHost.create>[0]) {
@@ -376,6 +382,20 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     ];
   }
 
+  /**
+   * The decisions a request is authorized through (policy.ts `forRequest`): a batch asking one
+   * question on one scope asks authz once. A caller with no request asks authz directly.
+   */
+  #decisionsFor(ctx: Pick<TrpcRequestContext, "req">): TrpcAuthorizationDecisions {
+    if (!ctx.req) return this.#options.authz;
+    const known = this.#decisions.get(ctx.req);
+    if (known) return known;
+    const decisions = decidingOnce(this.#options.authz);
+    this.#decisions.set(ctx.req, decisions);
+
+    return decisions;
+  }
+
   #members(options: Parameters<typeof TrpcHost.create>[0]): TrpcRuntimeMembers<TrpcRequestContext> {
     return {
       identity: {
@@ -394,7 +414,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
           };
         },
       },
-      authorization: { forRequest: () => options.authz },
+      authorization: { forRequest: (ctx) => this.#decisionsFor(ctx) },
       denials: DENIALS,
       ...(options.throttle ? { throttle: throttleOf(options.throttle) } : {}),
       audit: {
@@ -446,6 +466,37 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       ...(entry.error ? { error: entry.error } : {}),
     });
   }
+}
+
+/** The same decisions, each distinct question asked once and its answer shared. */
+function decidingOnce(authz: TrpcAuthorizationDecisions): TrpcAuthorizationDecisions {
+  const decisions = new Map<string, Promise<PermissionDecision>>();
+  const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
+
+  return {
+    getDecision: (input) =>
+      askOnce(decisions, `one:${JSON.stringify(input)}`, () => authz.getDecision(input)),
+    getProjectAnyDecision: (input) =>
+      askOnce(decisions, `any:${JSON.stringify(input)}`, () => authz.getProjectAnyDecision(input)),
+    // Lineage reads only the three scope ids, so they alone are the question.
+    checkScopeLineage: (input) =>
+      askOnce(lineages, JSON.stringify([input.organizationId, input.teamId, input.projectId]), () =>
+        authz.checkScopeLineage(input),
+      ),
+  };
+}
+
+function askOnce<T>(
+  asked: Map<string, Promise<T>>,
+  key: string,
+  ask: () => Promise<T>,
+): Promise<T> {
+  const known = asked.get(key);
+  if (known) return known;
+  const answer = ask();
+  asked.set(key, answer);
+
+  return answer;
 }
 
 /** The session a resolved caller stands for, in the shape procedures read. */
