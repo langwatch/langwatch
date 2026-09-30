@@ -1345,6 +1345,13 @@ is on every plan; creating a custom role is the Enterprise capability.
   authentication, so no handler or module looks the owner up itself (Alex, 2026-09-25).
 - A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
   project on the request; no handler reads the key's headers (Alex, 2026-09-25).
+- A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout.
+  It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
+  replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
+  one, and a new project gets no customer-facing project key (Alex, 2026-09-30). Internal callers (scenario child,
+  workflows and nlpgo, gateway trace export, health probe) keep reading `Project.apiKey` until ADR-166's system
+  `Authorization` is built; the column goes after (Alex, 2026-09-30). The key row menu is Revoke only, and a new key
+  expires in 90 days by default, "never" allowed (Alex, 2026-09-30). `modules/api-key/adrs/002-project-keys-are-hidden.md`
 - A socket is declared like a route: a module declares its `WebSocketProtocol`, and the process opens one upgrade router
   and mounts every installed module's protocols, as it mounts REST (coordinator, 2026-09-25; main's connect gateway, pending Alex's review).
 - `publicRoute`/raw results only for genuinely non-JSON protocols
