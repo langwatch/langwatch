@@ -48,6 +48,7 @@ type scenarioSide struct {
 	shared   *shardContext
 	projects []*shardContext
 	orgs     []*shardContext
+	foreign  *shardContext
 	creds    sideCredentials
 	slots    chan struct{}
 }
@@ -278,6 +279,10 @@ func (runner *scenarioRunner) varsFor(side *scenarioSide, shard *shardContext, r
 	vars["side"] = side.name
 	if sibling := side.sibling(shard); sibling != nil {
 		vars["projectIdB"], vars["projectKeyB"] = sibling.vars["projectId"], sibling.keys.ProjectKey
+	}
+	if foreign := side.foreign; foreign != nil && foreign.err == "" {
+		vars["orgIdC"], vars["teamIdC"], vars["projectIdC"] = foreign.vars["orgId"], foreign.vars["teamId"], foreign.vars["projectId"]
+		vars["orgKeyC"], vars["projectKeyC"] = foreign.keys.OrgKey, foreign.keys.ProjectKey
 	}
 	vars["adminEmail"] = adminEmailFor(side.name)
 	if _, set := vars["userId"]; !set {

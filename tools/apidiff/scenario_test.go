@@ -122,10 +122,15 @@ func (stack *fakeStack) handler() http.Handler {
 	mux.HandleFunc("/api/organizations", func(writer http.ResponseWriter, _ *http.Request) {
 		stack.mu.Lock()
 		stack.orgs++
+		number := stack.orgs
 		stack.mu.Unlock()
 		replyJSON(writer, http.StatusCreated, map[string]any{
-			"organization": map[string]any{"id": "o1"}, "team": map[string]any{"id": "t1"}, "adminApiKey": map[string]any{"token": "ok1"},
+			"organization": map[string]any{"id": fmt.Sprintf("o%d", number)}, "team": map[string]any{"id": fmt.Sprintf("t%d", number)},
+			"adminApiKey": map[string]any{"token": fmt.Sprintf("ok%d", number)},
 		})
+	})
+	mux.HandleFunc("/api/echo", func(writer http.ResponseWriter, request *http.Request) {
+		replyJSON(writer, http.StatusOK, map[string]any{"token": request.Header.Get("X-Auth-Token"), "bearer": request.Header.Get("Authorization")})
 	})
 	mux.HandleFunc("/api/messages", func(writer http.ResponseWriter, request *http.Request) {
 		messages := []any{}

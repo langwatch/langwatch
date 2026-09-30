@@ -29,6 +29,7 @@ type stackRecord struct {
 	Shared   *shardRecord  `json:"shared,omitempty"`
 	Projects []shardRecord `json:"projects"`
 	Orgs     []shardRecord `json:"orgs"`
+	Foreign  *shardRecord  `json:"foreign,omitempty"`
 }
 
 type sharedRecord struct {
@@ -114,11 +115,14 @@ func (runner *scenarioRunner) seedShared(needs scenarioNeeds) {
 	side.projects = runner.liveShards(side, stack.Projects, false)
 	side.orgs = runner.liveShards(side, stack.Orgs, true)
 	runner.topUp(side, needs)
+	if needs.foreign {
+		side.foreign, stack.Foreign = runner.recordedOrg(side, stack.Foreign, runner.foreignOrgName())
+	}
 	side.projects, side.orgs = side.projects[:needs.projects], side.orgs[:needs.orgs]
 	if needs.restricted {
 		runner.seedRestricted()
 	}
-	record.Stacks[side.baseURL] = stackRecord{Shared: stack.Shared, Projects: recordsOf(side.projects, false), Orgs: recordsOf(side.orgs, true)}
+	record.Stacks[side.baseURL] = stackRecord{Shared: stack.Shared, Projects: recordsOf(side.projects, false), Orgs: recordsOf(side.orgs, true), Foreign: stack.Foreign}
 	if err := saveSharedRecord(path, record); err != nil {
 		say("scenarios: the seed record was not saved: " + err.Error())
 	}
@@ -206,19 +210,28 @@ func (runner *scenarioRunner) toolOrg(side *scenarioSide, recorded *shardRecord)
 		fmt.Fprintln(runner.options.Progress, "scenarios: no -admin-key, so no isolated apidiff organization is provisioned; the seeded organization is used")
 		return nil
 	}
-	if recorded != nil {
-		shard := runner.shardFromRecord(*recorded)
-		if runner.shardAnswers(side, shard, true) && runner.shardAnswers(side, shard, false) {
-			side.shared = shard
-			return recorded
-		}
-	}
-	shard := runner.seedOrg(side, toolOrgName+"-"+runner.tag)
-	if shard.err != "" {
+	shard, record := runner.recordedOrg(side, recorded, toolOrgName+"-"+runner.tag)
+	if record == nil {
 		side.shared = &shardContext{err: "apidiff organization: " + shard.err}
 		return nil
 	}
 	side.shared = shard
+	return record
+}
+
+// recordedOrg is the recorded organization while its keys still answer, else
+// a new one seeded under name; the record is nil when seeding failed.
+func (runner *scenarioRunner) recordedOrg(side *scenarioSide, recorded *shardRecord, name string) (*shardContext, *shardRecord) {
+	if recorded != nil {
+		shard := runner.shardFromRecord(*recorded)
+		if runner.shardAnswers(side, shard, true) && runner.shardAnswers(side, shard, false) {
+			return shard, recorded
+		}
+	}
+	shard := runner.seedOrg(side, name)
+	if shard.err != "" {
+		return shard, nil
+	}
 	record := recordOfShard(shard, true)
-	return &record
+	return shard, &record
 }

@@ -40,6 +40,10 @@ func (side *scenarioSide) authHeaders(shard *shardContext, kind string) (map[str
 		return projectBHeaders(side, shard)
 	case authProjectC:
 		return projectCHeaders(shard)
+	case authOrgC:
+		return side.foreignHeaders(kind, func(keys Keys) string { return keys.ProjectKey }, projectKeyHeader)
+	case authOrgCOrg:
+		return side.foreignHeaders(kind, func(keys Keys) string { return keys.OrgKey }, bearerHeader)
 	case authOrg:
 		return tokenHeaders(kind, shard.keys.OrgKey, bearerHeader)
 	case authAdmin:
@@ -81,6 +85,18 @@ func projectCHeaders(shard *shardContext) (map[string]string, error) {
 	return projectKeyHeader(shard.keys.ProjectKeyC), nil
 }
 
+// foreignHeaders is a key of the organization seeded apart from every shard,
+// the tenant a cross-organization scenario is refused as.
+func (side *scenarioSide) foreignHeaders(kind string, pick func(Keys) string, build func(string) map[string]string) (map[string]string, error) {
+	if side.foreign == nil {
+		return nil, fmt.Errorf("auth %q: no second organization was seeded on this stack", kind)
+	}
+	if side.foreign.err != "" {
+		return nil, fmt.Errorf("auth %q needs a second organization (LANGWATCH_INSTANCE_ADMIN_API_KEY on the stack provisions one): %s", kind, side.foreign.err)
+	}
+	return tokenHeaders(kind, pick(side.foreign.keys), build)
+}
+
 // sibling is a seeded project of the side other than the shard's own.
 func (side *scenarioSide) sibling(shard *shardContext) *shardContext {
 	for _, candidate := range side.projects {
@@ -117,7 +133,7 @@ func sessionCredentialHeaders(side *scenarioSide) (map[string]string, error) {
 type scenarioNeeds struct {
 	projects, orgs           int
 	restricted, sessionLogin bool
-	siblings                 bool
+	siblings, foreign        bool
 }
 
 func needsOf(items []scenario, shards int) scenarioNeeds {
@@ -131,6 +147,7 @@ func needsOf(items []scenario, shards int) scenarioNeeds {
 			needs.orgs++
 		}
 		needs.siblings = needs.siblings || usesAuth(item, authProjectB)
+		needs.foreign = needs.foreign || usesAuth(item, authOrgC) || usesAuth(item, authOrgCOrg)
 		needs.restricted = needs.restricted || usesAuth(item, authRestricted)
 		needs.sessionLogin = needs.sessionLogin || usesAuth(item, authSession) || usesAuth(item, authCLI)
 	}
@@ -182,6 +199,10 @@ func (runner *scenarioRunner) seed(needs scenarioNeeds) {
 		for index := range side.orgs {
 			group.Add(1)
 			go func() { defer group.Done(); side.orgs[index] = runner.seedOrg(side, runner.orgName(index)) }()
+		}
+		if needs.foreign {
+			group.Add(1)
+			go func() { defer group.Done(); side.foreign = runner.seedOrg(side, runner.foreignOrgName()) }()
 		}
 	}
 	group.Wait()
@@ -259,6 +280,11 @@ func (runner *scenarioRunner) fileProject(shard *shardContext, created rawResult
 // seedOrg makes one isolated organization with a project of its own.
 func (runner *scenarioRunner) orgName(index int) string {
 	return fmt.Sprintf("apidiff-shard-%s-o%d", runner.tag, index)
+}
+
+// foreignOrgName is the organization the org-c kinds belong to.
+func (runner *scenarioRunner) foreignOrgName() string {
+	return fmt.Sprintf("apidiff-shard-%s-c", runner.tag)
 }
 
 func (runner *scenarioRunner) seedOrg(side *scenarioSide, name string) *shardContext {

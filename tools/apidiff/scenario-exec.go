@@ -340,8 +340,10 @@ func (exec *scenarioExec) expandQuery(query map[string]any) (url.Values, error) 
 // scenario's own, unless that one is deliberately broken or absent.
 func (exec *scenarioExec) stepAuth() string {
 	switch exec.item.Auth {
-	case authNone, authRestricted, authProjectB, authProjectC:
+	case authNone, authRestricted, authProjectB, authProjectC, authOrgC:
 		return authProject
+	case authOrgCOrg:
+		return authOrg
 	}
 	return exec.item.Auth
 }

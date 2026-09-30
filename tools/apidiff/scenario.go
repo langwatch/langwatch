@@ -29,6 +29,8 @@ const (
 	authRestricted = "restricted"
 	authProjectB   = "project-b"
 	authProjectC   = "project-c"
+	authOrgC       = "org-c"
+	authOrgCOrg    = "org-c-org"
 	authSession    = "session"
 	authCLI        = "cli"
 
@@ -41,6 +43,7 @@ const (
 var scenarioAuths = map[string]bool{
 	authProject: true, authOrg: true, authAdmin: true, authSCIM: true, authNone: true,
 	authRestricted: true, authProjectB: true, authProjectC: true, authSession: true, authCLI: true,
+	authOrgC: true, authOrgCOrg: true,
 }
 
 var scenarioShards = map[string]bool{shardShared: true, shardProject: true, shardOrg: true, shardSerial: true}

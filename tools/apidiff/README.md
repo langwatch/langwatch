@@ -681,7 +681,11 @@ mode).
   `body: { key: "<absent>" }` is not in the body at all. Methods: GET, HEAD,
   POST, PUT, PATCH, DELETE (no multipart bodies yet).
 - **Auth kinds:** project, project-b, project-c, org, admin, scim, none,
-  restricted (a read-only key minted per shard), session, cli.
+  restricted (a read-only key minted per shard), session, cli, and `org-c` /
+  `org-c-org`: the project key and the organization key of a second
+  organization the seed provisions per stack with `-admin-key` (recorded as
+  `foreign` in shared-seed.json). `{orgIdC}`, `{teamIdC}`, `{projectIdC}`,
+  `{orgKeyC}` and `{projectKeyC}` name it.
 - **Mail:** `-mail-a` / `-mail-b` are each side's mailsim base URL; `run`
   takes them from haven. On the shared check stack an organization invite
   returned 201 but no message reached the sink, so the `_example.yaml` mail

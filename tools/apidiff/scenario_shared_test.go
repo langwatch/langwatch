@@ -176,3 +176,38 @@ func TestProjectBIsASeededSiblingAndProjectCNamesTheAdminKey(t *testing.T) {
 		t.Errorf("the project-c refusal does not name the unblocker:\n%s", report)
 	}
 }
+
+const foreignScenarios = `
+- id: foreign-project-key
+  endpoint: GET /api/echo
+  auth: org-c
+  request: { path: /api/echo }
+  expect: { status: 200, body: { token: "{projectKeyC}" } }
+- id: foreign-org-key
+  endpoint: GET /api/echo
+  auth: org-c-org
+  request: { path: "/api/echo" }
+  expect: { status: 200, body: { bearer: "Bearer {orgKeyC}" } }
+`
+
+func TestOrgCIsASecondOrganizationSeededOnceAndNamesTheAdminKey(t *testing.T) {
+	stack := newFake()
+	server := httptest.NewServer(stack.handler())
+	t.Cleanup(server.Close)
+	options := singleOptions(t, server.URL)
+	options.Glob = writeScenarioYAML(t, foreignScenarios)
+	code, report := runSingle(options)
+	if code != exitError || !strings.Contains(report, "0 PASS, 0 FAIL, 2 ERROR") || !strings.Contains(report, "-admin-key") {
+		t.Fatalf("without the admin key, code %d:\n%s", code, report)
+	}
+	options.Keys.AdminKey = "admin"
+	runSingle(options)
+	code, report = runSingle(options)
+	if code != exitEqual || !strings.Contains(report, "2 PASS, 0 FAIL, 0 ERROR") {
+		t.Fatalf("code %d:\n%s", code, report)
+	}
+	record := loadSharedRecord(filepath.Join(options.SeedDir, sharedSeedFile)).Stacks[server.URL]
+	if stack.orgs != 2 || record.Foreign == nil || record.Foreign.OrgKey == record.Shared.OrgKey || record.Foreign.ProjectKey == record.Shared.ProjectKey {
+		t.Errorf("%d organizations made, record %+v: want the tool's and one other, reused", stack.orgs, record)
+	}
+}
