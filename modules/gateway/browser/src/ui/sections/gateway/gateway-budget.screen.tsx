@@ -15,13 +15,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { BackLink } from "@langwatch/design-system/back-link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
-import { Archive, ArrowLeft, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
+import { Archive, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
@@ -198,13 +199,9 @@ function BudgetDetailPage() {
     <AiGatewayLayout>
       <>
         <PageLayout.Header>
-          <HStack>
-            <Link href={`/gateway/budgets`} color="fg.muted" fontSize="sm">
-              <HStack gap={1}>
-                <ArrowLeft size={14} /> Budgets
-              </HStack>
-            </Link>
-          </HStack>
+          <BackLink href="/gateway/budgets" onNavigate={(href) => router.push(href)}>
+            Budgets
+          </BackLink>
           <PageLayout.Heading>
             {budget?.name ?? "Budget"}
             {isArchived && (
@@ -231,7 +228,7 @@ function BudgetDetailPage() {
           {isLoadingBudget && <Spinner />}
           {budgetMissing && <Text color="fg.muted">Budget not found.</Text>}
           {!isLoadingBudget && budget && (
-            <VStack align="stretch" gap={6} maxWidth="960px">
+            <VStack align="stretch" gap={6}>
               {!budget.spendAvailable && (
                 <Alert.Root status="warning" data-testid="budget-spend-unavailable">
                   <Alert.Indicator />

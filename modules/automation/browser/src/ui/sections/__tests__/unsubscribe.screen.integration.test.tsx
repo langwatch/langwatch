@@ -131,9 +131,10 @@ describe("given a link the server refuses", () => {
 
   /** @scenario An invalid or expired unsubscribe link is a dead end */
   it("says the link is not valid, and offers nothing to confirm", () => {
-    renderScreen("tok_dead");
+    const { container } = renderScreen("tok_dead");
 
-    expect(screen.getByText("Link not valid")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Link not valid" })).toBeDefined();
+    expect(container.querySelector("svg")).not.toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
   });
 });

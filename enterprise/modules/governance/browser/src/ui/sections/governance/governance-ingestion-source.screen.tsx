@@ -14,6 +14,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { BackLink } from "@langwatch/design-system/back-link";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -28,7 +29,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
-import { ArrowLeft, Copy, KeyRound, Pencil, RotateCw, Trash2 } from "lucide-react";
+import { Copy, KeyRound, Pencil, RotateCw, Trash2 } from "lucide-react";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useState } from "react";
 
@@ -117,6 +118,7 @@ function SourceDetailHeader({
   onArchive: () => void;
   onEdit: () => void;
 }) {
+  const router = useGovernanceRouter();
   const status = sourceBadge({
     status: source.status,
     errorCount: source.errorCount,
@@ -127,12 +129,9 @@ function SourceDetailHeader({
   const StatusIcon = status.icon;
   return (
     <PageLayout.Header>
-      <Link href="/governance/ingestion-sources" color="blue.600" fontSize="xs">
-        <HStack gap={1}>
-          <ArrowLeft size={12} />
-          <Text>All sources</Text>
-        </HStack>
-      </Link>
+      <BackLink href="/governance/ingestion-sources" onNavigate={(href) => router.push(href)}>
+        All sources
+      </BackLink>
       <PageLayout.Heading>{source.name}</PageLayout.Heading>
       <Badge size="sm" variant="surface">
         {source.sourceType}

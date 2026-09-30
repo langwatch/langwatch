@@ -3,7 +3,9 @@
  * (security-critical second lock); wire and frame changed per port architecture.
  */
 
-import { Button, Card, Container, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
+import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -21,6 +23,11 @@ type OAuthParams = {
   code_challenge: string;
   code_challenge_method: string;
   scope: string;
+};
+
+/** What each scope lets the application do, in words a customer reads. */
+const SCOPE_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  "mcp:tools": "Use your project's tools and data",
 };
 
 type AllowOutcome = { kind: "handOff"; url: string } | { kind: "refuse"; message: string };
@@ -136,42 +143,42 @@ export default function McpAuthorize() {
     else host.navigate("/");
   };
 
-  const scopeDisplay = oauthParams.scope || "mcp:tools";
+  const scopes = (oauthParams.scope || "mcp:tools").split(/\s+/).filter(Boolean);
+  const appName = reading.query.client_name?.trim() || "This application";
 
   return (
-    <Container maxWidth="600px" paddingTop="200px">
-      <Card.Root>
-        <Card.Header>
-          <HStack width="full" align="center">
-            <Heading as="h1" size="md">
-              Authorize MCP Connection
-            </Heading>
-            <Spacer />
-            {host.projectSwitcher()}
-          </HStack>
-        </Card.Header>
-        <Card.Body>
-          <VStack align="start" gap={6}>
-            <Text>Allow this application to access your LangWatch project tools and data?</Text>
-            <Text fontSize="sm" color="fg.muted">
-              Scopes: {scopeDisplay}
-            </Text>
-            <HStack width="full" gap={2}>
-              <Button
-                colorScheme="blue"
-                onClick={handleAllow}
-                disabled={!projectId || isSubmitting}
-                loading={isSubmitting}
-              >
-                Allow
-              </Button>
-              <Button variant="outline" onClick={handleDeny}>
-                Deny
-              </Button>
+    <BrandedCardPage>
+      <BrandedCard
+        title="Authorize MCP Connection"
+        intro={`${appName} is asking to use your LangWatch project. Allow it?`}
+      >
+        <HStack width="full" justify="space-between">
+          <Text fontSize="sm" color="fg.muted">
+            Project
+          </Text>
+          {host.projectSwitcher()}
+        </HStack>
+        <VStack align="stretch" gap={2} data-testid="mcp-authorize-scopes">
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted" textTransform="uppercase">
+            Access requested
+          </Text>
+          {scopes.map((scope) => (
+            <HStack key={scope} gap={2} align="start">
+              <Check size={14} aria-hidden="true" />
+              <Text fontSize="sm">{SCOPE_DESCRIPTIONS[scope] ?? scope}</Text>
+              <Badge size="sm" variant="subtle">
+                {scope}
+              </Badge>
             </HStack>
-          </VStack>
-        </Card.Body>
-      </Card.Root>
-    </Container>
+          ))}
+        </VStack>
+        <Button onClick={handleAllow} disabled={!projectId || isSubmitting} loading={isSubmitting}>
+          Allow
+        </Button>
+        <Button variant="outline" onClick={handleDeny}>
+          Deny
+        </Button>
+      </BrandedCard>
+    </BrandedCardPage>
   );
 }

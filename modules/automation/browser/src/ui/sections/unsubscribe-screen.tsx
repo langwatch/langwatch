@@ -4,7 +4,8 @@
  * entire project. Spec: specs/automations/unsubscribe-landing.feature
  */
 
-import { Box, Button, Heading, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, Center, Spinner } from "@chakra-ui/react";
+import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
 import { useState } from "react";
 
 import { automationApi } from "../../behavior/automation-api.ts";
@@ -25,85 +26,58 @@ export default function UnsubscribeScreen({ token }: { token: string }) {
     confirm.mutate({ token, scope }, { onSuccess: () => setDone(scope) });
   };
 
-  function renderUnsubscribeBody() {
+  function renderUnsubscribeCard() {
     if (!token || resolved.isError) {
       return (
-        <VStack align="start" gap={2}>
-          <Heading size="md">Link not valid</Heading>
-          <Text color="fg.muted">This unsubscribe link is invalid or has expired.</Text>
-        </VStack>
+        <BrandedCard
+          title="Link not valid"
+          intro="This unsubscribe link is invalid or has expired."
+        />
       );
     }
     if (resolved.isLoading || !resolved.data) {
       return (
-        <VStack gap={3}>
-          <Spinner data-testid="unsubscribe-loading" />
-        </VStack>
+        <BrandedCard title="Unsubscribe">
+          <Center>
+            <Spinner data-testid="unsubscribe-loading" />
+          </Center>
+        </BrandedCard>
       );
     }
     if (done) {
       return (
-        <VStack align="start" gap={2}>
-          <Heading size="md">You&apos;re unsubscribed</Heading>
-          <Text color="fg.muted">
-            {done === "project"
+        <BrandedCard
+          title="You're unsubscribed"
+          intro={
+            done === "project"
               ? `${resolved.data.email} will no longer receive notifications from ${resolved.data.projectName}.`
               : `${resolved.data.email} will no longer receive ${
                   resolved.data.triggerName ?? "this notification"
-                }.`}
-          </Text>
-        </VStack>
+                }.`
+          }
+        />
       );
     }
     return (
-      <VStack align="start" gap={4}>
-        <Heading size="md">Unsubscribe</Heading>
-        <Text color="fg.muted">
-          Choose how {resolved.data.email} should stop receiving email from{" "}
-          {resolved.data.projectName}.
-        </Text>
-        <VStack align="stretch" width="full" gap={3}>
-          {resolved.data.triggerName && (
-            <Button
-              variant="outline"
-              loading={confirm.isPending}
-              onClick={() => onConfirm("trigger")}
-            >
-              Stop receiving {resolved.data.triggerName}
-            </Button>
-          )}
+      <BrandedCard
+        title="Unsubscribe"
+        intro={`Choose how ${resolved.data.email} should stop receiving email from ${resolved.data.projectName}.`}
+      >
+        {resolved.data.triggerName && (
           <Button
-            colorPalette="red"
+            variant="outline"
             loading={confirm.isPending}
-            onClick={() => onConfirm("project")}
+            onClick={() => onConfirm("trigger")}
           >
-            Stop all notifications from {resolved.data.projectName}
+            Stop receiving {resolved.data.triggerName}
           </Button>
-        </VStack>
-      </VStack>
+        )}
+        <Button colorPalette="red" loading={confirm.isPending} onClick={() => onConfirm("project")}>
+          Stop all notifications from {resolved.data.projectName}
+        </Button>
+      </BrandedCard>
     );
   }
 
-  return (
-    <Box
-      minH="100vh"
-      bg="bg.subtle"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      padding={6}
-    >
-      <Box
-        bg="bg.panel"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="lg"
-        padding={8}
-        maxW="480px"
-        width="full"
-      >
-        {renderUnsubscribeBody()}
-      </Box>
-    </Box>
-  );
+  return <BrandedCardPage>{renderUnsubscribeCard()}</BrandedCardPage>;
 }

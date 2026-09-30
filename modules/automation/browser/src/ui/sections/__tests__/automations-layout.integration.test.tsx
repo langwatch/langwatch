@@ -3,19 +3,20 @@
  * Spec: specs/navigation/shared-section-navigation-layout.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
 import { AutomationsLayout } from "../automations-layout.tsx";
 
 afterEach(cleanup);
 
-function renderLayout() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AutomationsLayout basePath="/demo/automations">page content</AutomationsLayout>
-    </ChakraProvider>,
+function renderLayout(host = fakeAutomationHost()) {
+  return renderWithAutomationHost(
+    <AutomationsLayout basePath="/demo/automations" section="alerts">
+      page content
+    </AutomationsLayout>,
+    { host },
   );
 }
 
@@ -35,6 +36,18 @@ describe("given the Automations workspace", () => {
       renderLayout();
 
       expect(screen.getByTestId("section-navigation-content").textContent).toBe("page content");
+    });
+
+    it("marks the current tab and routes a click in place through the host", () => {
+      const host = fakeAutomationHost();
+      renderLayout(host);
+
+      expect(screen.getByRole("link", { name: "Alerts" }).getAttribute("aria-current")).toBe(
+        "page",
+      );
+      fireEvent.click(screen.getByRole("link", { name: "Schedules" }));
+
+      expect(host.recording.navigations).toEqual(["/demo/automations/schedules"]);
     });
   });
 });

@@ -103,6 +103,9 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       minHeight={0}
       overflowY="auto"
       flex={1}
+      // The container already insets the page; a header inside it starts at
+      // the same edge as the body, so title, divider and content line up.
+      css={{ "& [data-page-header]": { paddingInline: 0 } }}
     >
       {children}
     </Container>

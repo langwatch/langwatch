@@ -5,7 +5,7 @@
 
 import { Input } from "@chakra-ui/react";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
-import { Copy, Eye, EyeOff } from "lucide-react";
+import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import { useAuthorizeHost } from "../../model/authorize-host.ts";
@@ -15,6 +15,8 @@ export function CopyInput(
     value: string;
     label: string;
     onClick?: () => void;
+    /** Called once the clipboard write has succeeded. */
+    onCopied?: () => void;
     /**
      * Masks the field until the reader asks to see it. Copy always copies the
      * real value.
@@ -24,20 +26,29 @@ export function CopyInput(
 ) {
   const host = useAuthorizeHost();
   const [visible, setVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
   const isSecure = !!props.secureMode;
+  const { onCopied, ...groupProps } = props;
 
   return (
     <InputGroup
-      {...props}
+      {...groupProps}
       fontFamily="monospace"
       width="full"
       cursor="pointer"
       onClick={() => {
         props.onClick?.();
-        void host.copyToClipboard({
-          text: props.value,
-          succeeded: { title: `${props.label} copied to your clipboard` },
-        });
+        void host
+          .copyToClipboard({
+            text: props.value,
+            succeeded: { title: `${props.label} copied to your clipboard` },
+          })
+          .then((succeeded) => {
+            if (!succeeded) return;
+            setCopied(true);
+            onCopied?.();
+            setTimeout(() => setCopied(false), 2500);
+          });
       }}
       endElement={
         <>
@@ -61,7 +72,14 @@ export function CopyInput(
               {visible ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           )}
-          <Copy size={18} style={{ marginLeft: isSecure ? 8 : 0 }} />
+          {copied ? (
+            <output style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <Check size={18} />
+              Copied
+            </output>
+          ) : (
+            <Copy size={18} style={{ marginLeft: isSecure ? 8 : 0 }} />
+          )}
         </>
       }
     >
@@ -71,9 +89,15 @@ export function CopyInput(
         value={props.value}
         data-testid={`copy-input-${props.label.toLowerCase().replaceAll(" ", "-")}`}
         readOnly
-        style={{ paddingRight: isSecure ? "4rem" : "2rem" }}
+        style={{ paddingRight: inputPaddingRight({ isSecure, copied }) }}
         _hover={{ backgroundColor: "bg.subtle" }}
       />
     </InputGroup>
   );
+}
+
+/** Room on the right for the eye toggle, or the "Copied" note, or just the copy icon. */
+function inputPaddingRight({ isSecure, copied }: { isSecure: boolean; copied: boolean }) {
+  if (isSecure) return "4rem";
+  return copied ? "6rem" : "2rem";
 }

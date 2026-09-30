@@ -501,7 +501,7 @@ function VirtualKeyDetailPage() {
           {detailQuery.isLoading && <Spinner />}
           {!detailQuery.isLoading && !vk && <Text color="fg.muted">Virtual key not found.</Text>}
           {!detailQuery.isLoading && vk && (
-            <VStack align="stretch" gap={6} maxWidth="900px">
+            <VStack align="stretch" gap={6}>
               <VirtualKeyIdentitySection vk={vk} />
 
               <VirtualKeyActivitySection vk={vk} />

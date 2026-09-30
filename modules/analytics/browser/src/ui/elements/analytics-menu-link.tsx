@@ -22,7 +22,7 @@ function opensElsewhere(event: MouseEvent<HTMLAnchorElement>): boolean {
 }
 
 export const MenuLink = ({
-  paddingX = 4,
+  paddingX = 3,
   href,
   children,
   icon,

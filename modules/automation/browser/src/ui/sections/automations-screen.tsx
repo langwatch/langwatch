@@ -690,7 +690,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
   );
 
   return (
-    <AutomationsLayout basePath={basePath}>
+    <AutomationsLayout basePath={basePath} section={section}>
       <PageLayout.Header>
         <PageLayout.Heading>{details.title}</PageLayout.Heading>
       </PageLayout.Header>

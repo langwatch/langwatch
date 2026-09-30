@@ -4,13 +4,17 @@
  * outermost wrapper. Which entry is selected ARRIVES AS A PROP, never read.
  */
 
-import { Container, HStack, VStack } from "@chakra-ui/react";
-import { SmallLabel } from "@langwatch/design-system/small-label";
+import { Box } from "@chakra-ui/react";
+import {
+  SectionNavigationFrame,
+  type SectionNavigationGroup,
+  type SectionNavigationLink,
+} from "@langwatch/design-system/section-navigation-frame";
+import { Gauge, Hash, LayoutDashboard, ListChecks, Users } from "lucide-react";
 import type { PropsWithChildren } from "react";
 
 import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { AnalyticsHeader, type AnalyticsHeaderProps } from "./analytics-header.tsx";
 import { CustomDashboardsSection } from "./custom-dashboards-section.tsx";
 import { SavedViewsScope } from "./saved-views-scope.tsx";
@@ -41,6 +45,31 @@ export default function AnalyticsLayout({
   const project = host.project();
   const { showFilters } = useFilterToggle();
 
+  const base = `/${project?.slug}/analytics`;
+  const link = (label: string, path: string, icon: SectionNavigationLink["icon"]) => ({
+    label,
+    href: `${base}${path}`,
+    icon,
+  });
+  const entries = {
+    overview: link("Overview", "", <LayoutDashboard size={14} />),
+    users: link("Users", "/users", <Users size={14} />),
+    topics: link("Topics", "/topics", <Hash size={14} />),
+    metrics: link("LLM Metrics", "/metrics", <Gauge size={14} />),
+    evaluations: link("Online Evaluations", "/evaluations", <ListChecks size={14} />),
+  };
+  const groups: SectionNavigationGroup[] = [
+    { label: "Engagement", links: [entries.users, entries.topics] },
+    { label: "Observability", links: [entries.metrics, entries.evaluations] },
+    {
+      label: "Custom",
+      links: [],
+      extra: project?.slug ? <CustomDashboardsSection projectSlug={project.slug} /> : null,
+    },
+  ];
+  const activeHref =
+    !railEntry || railEntry === "reports" || railEntry === "custom" ? "" : entries[railEntry].href;
+
   return (
     <SavedViewsScope>
       <AnalyticsHeader
@@ -48,63 +77,19 @@ export default function AnalyticsLayout({
         {...analyticsHeaderProps}
         extraHeaderButtons={extraHeaderButtons}
       />
-      <HStack align="start" width="full" minHeight="full">
-        <VStack
-          align="start"
-          paddingX={2}
-          paddingY={4}
-          textStyle="sm"
-          minWidth="180px"
-          position="sticky"
-          top={0}
-          alignSelf="start"
-          gap={1}
+      <Box width="full" padding={4} paddingBottom={16}>
+        <SectionNavigationFrame
+          label="Analytics"
+          links={[entries.overview]}
+          groups={groups}
+          activeHref={activeHref}
+          onNavigate={(href) => host.navigate(href)}
         >
-          <MenuLink href={`/${project?.slug}/analytics`} isSelected={railEntry === "overview"}>
-            Overview
-          </MenuLink>
-          <VStack align="start" width="full" gap={1}>
-            <SmallLabel paddingX={4} paddingTop={4} paddingBottom={2} color="fg" textStyle="xs">
-              Engagement
-            </SmallLabel>
-            <MenuLink href={`/${project?.slug}/analytics/users`} isSelected={railEntry === "users"}>
-              Users
-            </MenuLink>
-            <MenuLink
-              href={`/${project?.slug}/analytics/topics`}
-              isSelected={railEntry === "topics"}
-            >
-              Topics
-            </MenuLink>
-          </VStack>
-          <VStack align="start" width="full" gap={1}>
-            <SmallLabel paddingX={4} paddingTop={4} paddingBottom={2} color="fg" textStyle="xs">
-              Observability
-            </SmallLabel>
-            <MenuLink
-              href={`/${project?.slug}/analytics/metrics`}
-              isSelected={railEntry === "metrics"}
-            >
-              LLM Metrics
-            </MenuLink>
-            <MenuLink
-              href={`/${project?.slug}/analytics/evaluations`}
-              isSelected={railEntry === "evaluations"}
-            >
-              Online Evaluations
-            </MenuLink>
-          </VStack>
-          <VStack align="start" width="full" gap={1}>
-            <SmallLabel paddingX={4} paddingTop={4} paddingBottom={2} color="fg" textStyle="xs">
-              Custom
-            </SmallLabel>
-            {project?.slug && <CustomDashboardsSection projectSlug={project.slug} />}
-          </VStack>
-        </VStack>
-        <Container maxWidth={showFilters ? "1612" : "1200"} padding={4} paddingBottom={16}>
-          {children}
-        </Container>
-      </HStack>
+          <Box maxWidth={showFilters ? "1612px" : "1200px"} marginX="auto">
+            {children}
+          </Box>
+        </SectionNavigationFrame>
+      </Box>
     </SavedViewsScope>
   );
 }

@@ -43,4 +43,22 @@ describe("the analytics page", () => {
     expect(screen.getByText("Errors only")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "View options" })).toBeInTheDocument();
   });
+
+  it("lists every analytics page in its rail and marks the current one", () => {
+    render(
+      <AnalyticsTestHarness host={new StubAnalyticsHost()}>
+        <AnalyticsLayout title="Online Evaluations" railEntry="evaluations">
+          <p>page content</p>
+        </AnalyticsLayout>
+      </AnalyticsTestHarness>,
+    );
+
+    const rail = screen.getByRole("navigation", { name: "Analytics navigation" });
+    const links = Array.from(rail.querySelectorAll("a")).map((link) => link.textContent);
+    expect(links).toEqual(["Overview", "Users", "Topics", "LLM Metrics", "Online Evaluations"]);
+    expect(screen.getByRole("link", { name: "Online Evaluations" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
 });

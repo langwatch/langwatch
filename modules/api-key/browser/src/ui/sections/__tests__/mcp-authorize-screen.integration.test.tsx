@@ -49,7 +49,11 @@ describe("given a signed-in reader", () => {
     it("forwards the request and hands off to an allowed redirect", async () => {
       const host = hostWith({ answer: { ok: true, redirect: "https://app.example/cb?code=1" } });
       renderWithAuthorizeHost(<McpAuthorize />, host);
-      expect(screen.getByText("Scopes: mcp:tools")).toBeInTheDocument();
+      expect(screen.getByText("Use your project's tools and data")).toBeInTheDocument();
+      expect(screen.getByText("mcp:tools")).toBeInTheDocument();
+      expect(
+        screen.getByText(/This application is asking to use your LangWatch project/),
+      ).toBeInTheDocument();
       await press("Allow");
       await waitFor(() => expect(host.moves).toHaveLength(1));
       expect(host.requests).toEqual([
@@ -112,5 +116,13 @@ describe("given a signed-in reader", () => {
         { kind: "handOff", to: "https://app.example/cb?error=access_denied" },
       ]);
     });
+  });
+});
+
+describe("given a request that names the asking application", () => {
+  it("says which application is asking", () => {
+    const host = hostWith({ query: { ...QUERY, client_name: "Cursor" } });
+    renderWithAuthorizeHost(<McpAuthorize />, host);
+    expect(screen.getByText(/Cursor is asking to use your LangWatch project/)).toBeInTheDocument();
   });
 });

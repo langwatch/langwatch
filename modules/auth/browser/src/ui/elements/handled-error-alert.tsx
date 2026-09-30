@@ -54,16 +54,22 @@ export function HandledErrorAlert({
   const traceId = readErrorTraceId(error);
 
   return (
-    <Alert.Root status="error" role="alert" className={className}>
+    <Alert.Root status="error" role="alert" className={className} justifyContent="center">
       <Alert.Indicator>
         <AlertCircle aria-hidden="true" />
       </Alert.Indicator>
-      <Alert.Content>
+      <Alert.Content alignItems="center" textAlign="center" minWidth={0}>
         <Alert.Title>{headline}</Alert.Title>
         <Alert.Description>{description}</Alert.Description>
 
         {showAllTips && tips.length > 0 && (
-          <List.Root gap={0.5} marginTop={1} textStyle="xs" color="fg.muted" paddingLeft={4}>
+          <List.Root
+            gap={0.5}
+            marginTop={1}
+            textStyle="xs"
+            color="fg.muted"
+            listStylePosition="inside"
+          >
             {/* Index key: tips are server-supplied prose, so two can be
                   identical and collide as keys. Their order is fixed. */}
             {tips.map((tip, index) => (
@@ -78,7 +84,7 @@ export function HandledErrorAlert({
         )}
 
         {traceId ? (
-          <Text textStyle="xs" color="fg.subtle">
+          <Text textStyle="xs" color="fg.subtle" overflowWrap="anywhere">
             Error id {traceId}
           </Text>
         ) : null}

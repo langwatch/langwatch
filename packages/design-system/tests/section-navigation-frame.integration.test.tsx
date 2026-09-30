@@ -80,4 +80,28 @@ describe("SectionNavigationFrame", () => {
       expect(onNavigate).toHaveBeenCalledWith("/section/details");
     });
   });
+
+  describe("given labelled groups and a trailing slot", () => {
+    it("renders each group under its label with the slot beneath its entries", () => {
+      renderWithDesignSystem(
+        <SectionNavigationFrame
+          label="Section"
+          links={LINKS.slice(0, 1)}
+          groups={[
+            { label: "Engagement", links: [{ label: "Users", href: "/section/users" }] },
+            { label: "Custom", links: [], extra: <p>Saved dashboards</p> },
+          ]}
+          activeHref="/section/users"
+          onNavigate={() => {}}
+        >
+          <p>Page body</p>
+        </SectionNavigationFrame>,
+      );
+
+      const rail = screen.getByRole("navigation", { name: "Section navigation" });
+      expect(rail.textContent).toContain("Engagement");
+      expect(rail.textContent).toContain("Saved dashboards");
+      expect(screen.getByRole("link", { name: "Users" }).getAttribute("aria-current")).toBe("page");
+    });
+  });
 });

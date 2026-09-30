@@ -42,6 +42,7 @@ interface HeaderProps extends ChakraStackProps {
 function Header({ children, withBorder = true, ...props }: PropsWithChildren<HeaderProps>) {
   return (
     <HStack
+      data-page-header
       height="48px"
       flexShrink={0}
       paddingX={6}

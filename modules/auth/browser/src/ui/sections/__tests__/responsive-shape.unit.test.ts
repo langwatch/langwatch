@@ -10,20 +10,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** Read relative to the package `src` root, so a file can move between layers. */
 const sourceOf = (path: string): string => readFileSync(join(here, "..", "..", "..", path), "utf8");
 
-const authCard = readFileSync(join(here, "..", "..", "elements", "auth-card.tsx"), "utf8");
-
 describe("given the front door on a small viewport", () => {
-  describe("when the card is laid out", () => {
-    it("goes full bleed on a phone and stays a narrow column above it", () => {
-      expect(authCard).toContain('maxW={{ base: "100%", sm: "408px" }}');
-      expect(authCard).toContain('borderWidth={{ base: 0, sm: "1px" }}');
-      expect(authCard).toContain('borderRadius={{ base: 0, sm: "14px" }}');
-      // Nothing may be pinned wider than the narrowest phone this has to work
-      // on: a fixed pixel width is what produces a page that scrolls sideways.
-      expect(authCard).not.toMatch(/width="\d{3,}px"/);
-    });
-  });
-
   describe("when a field takes focus", () => {
     /**
      * Every file that renders an INPUT — now two, since the password boxes

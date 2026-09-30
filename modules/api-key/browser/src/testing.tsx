@@ -218,6 +218,7 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
       projectId?: string;
       query?: Readonly<Record<string, string | undefined>>;
       answer?: McpAuthorizeAnswer | Error;
+      apiKey?: string;
     } = {},
   ) {
     super();
@@ -248,7 +249,7 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
   }
 
   revealProjectApiKey(): string | undefined {
-    return void 0;
+    return this.options.apiKey;
   }
 
   projectSwitcher(): ReactNode {

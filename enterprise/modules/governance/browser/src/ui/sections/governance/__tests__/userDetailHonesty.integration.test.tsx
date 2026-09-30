@@ -86,3 +86,20 @@ describe("given a person with spend in the window", () => {
     }
   });
 });
+
+describe("given a person with no spend in the window", () => {
+  it("shows who they are above an empty state that says where spend will appear", () => {
+    harness.rows = [];
+    renderPage();
+
+    expect(screen.getByRole("link", { name: "People" })).toBeInTheDocument();
+    expect(screen.getByText("No spend yet")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Spend appears here once this person uses a governed AI tool or virtual key.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View all people" })).toBeInTheDocument();
+    expect(screen.getAllByText(ACTOR).length).toBeGreaterThan(0);
+  });
+});

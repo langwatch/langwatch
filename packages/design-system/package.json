@@ -86,6 +86,14 @@
       "types": "./dist/format-money.d.ts",
       "default": "./src/format-money.ts"
     },
+    "./back-link": {
+      "types": "./dist/components/back-link.d.ts",
+      "default": "./src/components/back-link.tsx"
+    },
+    "./branded-card": {
+      "types": "./dist/components/branded-card.d.ts",
+      "default": "./src/components/branded-card.tsx"
+    },
     "./full-logo": {
       "types": "./dist/components/full-logo.d.ts",
       "default": "./src/components/full-logo.tsx"

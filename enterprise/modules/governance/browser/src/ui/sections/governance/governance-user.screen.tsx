@@ -1,7 +1,10 @@
 import { Box, Heading, HStack, SimpleGrid, Spinner, Text, VStack } from "@chakra-ui/react";
+import { BackLink } from "@langwatch/design-system/back-link";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
+import { Wallet } from "lucide-react";
 import numeral from "numeral";
 
 import { api } from "../../../behavior/governance-api.ts";
@@ -63,15 +66,9 @@ function GovernanceUserDetailPage() {
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <PageLayout.Header>
-        <Text fontSize="xs" color="fg.muted">
-          <Link href="/governance" color="blue.600">
-            ← AI Governance
-          </Link>{" "}
-          ·{" "}
-          <Link href="/governance/people" color="blue.600">
-            People
-          </Link>
-        </Text>
+        <BackLink href="/governance/people" onNavigate={(href) => router.push(href)}>
+          People
+        </BackLink>
         <HStack gap={2}>
           <Box
             width="14px"
@@ -103,11 +100,44 @@ function GovernanceUserDetailPage() {
           )}
           {showSpinner && <Spinner />}
           {showNoData && (
-            <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
-              <Text fontSize="sm" color="fg.muted">
-                No spend data for this user in the last 30 days.
-              </Text>
-            </Box>
+            <>
+              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+                <Text
+                  fontSize="xs"
+                  fontWeight="semibold"
+                  color="fg.muted"
+                  textTransform="uppercase"
+                  letterSpacing="wider"
+                >
+                  Person
+                </Text>
+                <Text fontSize="sm" marginTop={1}>
+                  {actor}
+                </Text>
+                {personalProject && (
+                  <Link
+                    href={`/${personalProject.projectSlug}/traces`}
+                    color="blue.600"
+                    fontSize="sm"
+                    display="inline-block"
+                    marginTop={2}
+                  >
+                    View {personalProject.displayName}'s personal workspace →
+                  </Link>
+                )}
+              </Box>
+              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md">
+                <NoDataInfoBlock
+                  icon={<Wallet />}
+                  title="No spend yet"
+                  description="Spend appears here once this person uses a governed AI tool or virtual key."
+                >
+                  <Link href="/governance/people" color="blue.600" fontWeight="medium">
+                    View all people
+                  </Link>
+                </NoDataInfoBlock>
+              </Box>
+            </>
           )}
           {isSettled && user && (
             <>
