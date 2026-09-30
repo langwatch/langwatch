@@ -144,8 +144,6 @@ func (exec *scenarioExec) verifyStep(index int) *stepError {
 		return exec.poll(step.Eventually, func() *stepError { return exec.countStep(label, step, index) })
 	case step.Mail != nil:
 		return exec.mailStep(label, step)
-	case step.Analytics != nil:
-		return exec.analyticsStep(label, step)
 	}
 	return exec.requestStep(label, step)
 }
