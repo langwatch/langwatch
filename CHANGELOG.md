@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.19.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.0...langwatch@v3.19.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* 3.19.0 self-host dogfood findings (model id on Studio spans, mirror markers, Langy turns in CLI analytics) ([#8370](https://github.com/langwatch/langwatch/issues/8370)) ([5d70883](https://github.com/langwatch/langwatch/commit/5d708830634f2b63b0743970ddefa2a71b45e577))
+
 ## [3.19.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.18.1...langwatch@v3.19.0) (2026-09-30)
 
 
