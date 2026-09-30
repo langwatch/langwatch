@@ -17,7 +17,12 @@ describe("describeFigure", () => {
       ["p3", "3rd percentile"],
       ["p11", "11th percentile"],
     ])("captions %s as %s under the metric heading", (aggregation, caption) => {
-      expect(describeFigure("performance.total_cost", aggregation)).toEqual({
+      expect(
+        describeFigure({
+          metricKey: "performance.total_cost",
+          aggregation: aggregation,
+        }),
+      ).toEqual({
         title: "Total cost",
         caption,
       });
@@ -26,19 +31,32 @@ describe("describeFigure", () => {
     /** @scenario "A metrics card names its aggregation in words" */
     it("shows an unknown aggregation with its separators as spaces", () => {
       expect(
-        describeFigure("performance.completion_time", "weighted_mean-v2"),
+        describeFigure({
+          metricKey: "performance.completion_time",
+          aggregation: "weighted_mean-v2",
+        }),
       ).toEqual({ title: "Completion time", caption: "weighted mean v2" });
     });
 
     it("captions a distinct count as unique values of the metric", () => {
-      expect(describeFigure("metadata.labels", "cardinality")).toEqual({
+      expect(
+        describeFigure({
+          metricKey: "metadata.labels",
+          aggregation: "cardinality",
+        }),
+      ).toEqual({
         title: "Labels",
         caption: "unique labels",
       });
     });
 
     it("captions a figure with no aggregation by the metric itself", () => {
-      expect(describeFigure("performance.total_cost", null)).toEqual({
+      expect(
+        describeFigure({
+          metricKey: "performance.total_cost",
+          aggregation: null,
+        }),
+      ).toEqual({
         title: "Total cost",
         caption: "total cost",
       });
@@ -47,14 +65,21 @@ describe("describeFigure", () => {
 
   describe("when the metric is a count of ids", () => {
     it("titles and captions it as the entities counted", () => {
-      expect(describeFigure("metadata.trace_id", "cardinality")).toEqual({
+      expect(
+        describeFigure({
+          metricKey: "metadata.trace_id",
+          aggregation: "cardinality",
+        }),
+      ).toEqual({
         title: "Traces",
         caption: "traces",
       });
     });
 
     it("keeps the metric heading for a non-count aggregation over the id", () => {
-      expect(describeFigure("metadata.trace_id", "max")).toEqual({
+      expect(
+        describeFigure({ metricKey: "metadata.trace_id", aggregation: "max" }),
+      ).toEqual({
         title: "Trace id",
         caption: "maximum",
       });

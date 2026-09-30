@@ -68,10 +68,13 @@ function humanAggregation(aggregation: string): string {
  * entities ("Traces", "7 traces"); anything else keeps the metric as the
  * heading and names the aggregation under the number ("Total cost", "total").
  */
-export function describeFigure(
-  metricKey: string | undefined,
-  aggregation: string | null,
-): { title: string; caption: string } {
+export function describeFigure({
+  metricKey,
+  aggregation,
+}: {
+  metricKey: string | undefined;
+  aggregation: string | null;
+}): { title: string; caption: string } {
   const counted = metricKey ? COUNTED_ENTITIES[metricKey] : undefined;
   if (
     counted &&

@@ -317,7 +317,10 @@ export function LangyMetricsCard({
 }: CapabilityCardInput) {
   const parsed = parseAnalytics(output);
   const metricKey = parsed.metric ?? metricOfInput(input);
-  const { title, caption } = describeFigure(metricKey, parsed.aggregation);
+  const { title, caption } = describeFigure({
+    metricKey,
+    aggregation: parsed.aggregation,
+  });
   const metrics = figuresOf(parsed, caption, isMoneyMetric(metricKey));
   const footnote = footnoteOf(parsed, input);
 
