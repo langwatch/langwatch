@@ -304,3 +304,39 @@ describe("the sample panels on the cost screen", () => {
     });
   });
 });
+
+describe("given a deployment with no cost store", () => {
+  beforeEach(() => {
+    withNothingMeasured();
+    harness.costSummary = {
+      ...costSummary({ billedUsd: null }),
+      unavailableReason: "no_cost_store",
+    };
+  });
+
+  /** @scenario "A deployment without a cost store shows unavailable, not zero" */
+  it("states cost data is unavailable and draws no lane amount", () => {
+    renderScreen();
+
+    expect(screen.getByTestId("cost-lanes-unavailable")).toHaveTextContent(
+      "Cost data is unavailable",
+    );
+    expect(document.querySelector('[data-testid^="cost-lane-"]')).toBeNull();
+    expect(screen.queryByText(/\$0/)).toBeNull();
+  });
+});
+
+describe("given sample mode is on with nothing measured", () => {
+  beforeEach(() => {
+    withNothingMeasured();
+    window.sessionStorage.setItem("governance.sample", "true");
+  });
+
+  /** @scenario "The screen says figures are invented once, not once per panel" */
+  it("says so in one banner and repeats it in no panel badge", () => {
+    renderScreen();
+
+    expect(screen.getAllByText(/nothing here is real/i)).toHaveLength(1);
+    expect(screen.queryAllByText(/^sample$/i)).toHaveLength(0);
+  });
+});

@@ -247,6 +247,7 @@ describe("given people the providers named", () => {
   });
 
   describe("when a person is linked to a member with a department", () => {
+    /** @scenario "A linked person shows their member's department" */
     it("still shows the linked member and their department", () => {
       harness.people = [
         discovered({
@@ -290,6 +291,7 @@ describe("given people the providers named", () => {
 
   describe("when a person has been erased", () => {
     /** @scenario "An erased person's row names nobody it should not" */
+    /** @scenario "An erased person shows a stand-in, never the identifier" */
     it("shows the stand-in and nothing else about them", () => {
       harness.people = [
         discovered({

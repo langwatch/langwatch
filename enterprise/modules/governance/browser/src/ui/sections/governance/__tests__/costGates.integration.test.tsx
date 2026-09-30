@@ -60,6 +60,7 @@ afterEach(cleanup);
 describe("the Costs screen gates", () => {
   describe("when the billed-cost flag is off", () => {
     /** @scenario "With the billed-cost flag off, Costs does not exist" */
+    /** @scenario "The screen stays behind its release flag" */
     it("shows the not-found scene and reads nothing", () => {
       renderCosts({ enabledFlags: [] });
 
