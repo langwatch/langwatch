@@ -12,7 +12,7 @@ import type { Prisma } from "@langwatch/prisma-client/generated";
 import type { DataPrivacyPolicyRepository } from "../data-privacy.repository.ts";
 
 export class PrismaDataPrivacyPolicyRepository
-  extends PrismaRepository.for("DataPrivacyPolicy")
+  extends PrismaRepository.transactionalFor("DataPrivacyPolicy")
   implements DataPrivacyPolicyRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDataPrivacyPolicyRepository(prisma));
@@ -60,26 +60,31 @@ export class PrismaDataPrivacyPolicyRepository
     personalOnly: boolean;
     config: DataPrivacyConfig;
   }): Promise<DataPrivacyPolicy> {
-    const configJson = input.config as Prisma.InputJsonValue;
-    const row = await this.prisma.dataPrivacyPolicy.upsert({
-      where: {
-        scopeType_scopeId_personalOnly: {
+    const row = await this.prisma.dataPrivacyPolicy.upsert(upsertArgs(input));
+
+    return dataPrivacyPolicySchema.parse(row);
+  }
+
+  mergeConfigForScope(input: {
+    organizationId: string;
+    scope: DataPrivacyScope;
+    personalOnly: boolean;
+    merge: (config: DataPrivacyConfig | undefined) => DataPrivacyConfig;
+  }): Promise<DataPrivacyPolicy> {
+    return this.serializableTransaction(async (transaction) => {
+      const stored = await transaction.dataPrivacyPolicy.findFirst({
+        where: {
+          organizationId: input.organizationId,
           scopeType: input.scope.scopeType,
           scopeId: input.scope.scopeId,
           personalOnly: input.personalOnly,
         },
-      },
-      update: { config: configJson, organizationId: input.organizationId },
-      create: {
-        organizationId: input.organizationId,
-        scopeType: input.scope.scopeType,
-        scopeId: input.scope.scopeId,
-        personalOnly: input.personalOnly,
-        config: configJson,
-      },
-    });
+      });
+      const config = input.merge(stored ? dataPrivacyPolicySchema.parse(stored).config : undefined);
+      const row = await transaction.dataPrivacyPolicy.upsert(upsertArgs({ ...input, config }));
 
-    return dataPrivacyPolicySchema.parse(row);
+      return dataPrivacyPolicySchema.parse(row);
+    });
   }
 
   async deleteForScope(input: {
@@ -96,4 +101,32 @@ export class PrismaDataPrivacyPolicyRepository
       },
     });
   }
+}
+
+/** One rule written over the stored unique key, from either client. */
+function upsertArgs(input: {
+  organizationId: string;
+  scope: DataPrivacyScope;
+  personalOnly: boolean;
+  config: DataPrivacyConfig;
+}): Prisma.DataPrivacyPolicyUpsertArgs {
+  const configJson = input.config as Prisma.InputJsonValue;
+
+  return {
+    where: {
+      scopeType_scopeId_personalOnly: {
+        scopeType: input.scope.scopeType,
+        scopeId: input.scope.scopeId,
+        personalOnly: input.personalOnly,
+      },
+    },
+    update: { config: configJson, organizationId: input.organizationId },
+    create: {
+      organizationId: input.organizationId,
+      scopeType: input.scope.scopeType,
+      scopeId: input.scope.scopeId,
+      personalOnly: input.personalOnly,
+      config: configJson,
+    },
+  };
 }

@@ -775,6 +775,9 @@ list is deleted.
 `gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) are listed
 temporarily (Alex, 2026-09-30): hosted judging moves to instant-eval, and the guardrail check's owner is
 revisited later.
+`project -> data-privacy` is listed too (Alex, 2026-09-30): `/api/projects/{id}` carries `piiRedactionLevel`
+through `DataPrivacyApi.getPiiRedactionLevel`/`setPiiRedactionLevel`, which merge the level into the
+project-scope rule and read `custom` as `STRICT`.
 
 **Registry resolution ends at `ModuleApp.create`.** Inside the module,
 `create()` is the composition root: internal services are built explicitly

@@ -12235,6 +12235,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../data-privacy/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -12272,6 +12275,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../data-privacy/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

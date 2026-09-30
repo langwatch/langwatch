@@ -8,6 +8,7 @@ import { SessionReader } from "@langwatch/api/rest";
 import { TrpcHost } from "@langwatch/api/trpc";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { LangyApi } from "@langwatch/langy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -89,6 +90,7 @@ function installed(peers: Peers) {
       trace: peers.trace,
       "audit-log": peers.auditLog,
       langy: peers.langy,
+      "data-privacy": createApiFixture<DataPrivacyApi>({}),
     })
     .boot();
 }
