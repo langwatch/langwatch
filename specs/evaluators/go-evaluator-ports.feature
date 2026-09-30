@@ -23,35 +23,35 @@ Feature: Evaluators ported to the Go runtime answer as langevals answered
     When the Go runtime evaluates the same entries with the same settings
     Then every score matches within 1e-9
 
-  @unit @unimplemented
+  @unit
   Scenario: A moderation or content safety call uses only the tenant's own key
     Given the runtime's own process environment holds a vendor key
     And the request carries a different tenant key
     When the tenant runs a vendor evaluator
     Then the vendor receives the tenant's key and never the runtime's
 
-  @unit @unimplemented
+  @unit
   Scenario: A vendor evaluator without a tenant key does not call the vendor
     Given the request carries no key for the vendor
     When the tenant runs a vendor evaluator
     Then the vendor is not called
     And the entry's result says the vendor is not configured
 
-  @unit @unimplemented
+  @unit
   Scenario: A vendor endpoint at a private address is refused
     Given the request names a content safety endpoint on the internal network
     When the tenant runs a content safety evaluator
     Then no connection is made
     And the entry's result is an error
 
-  @unit @unimplemented
+  @unit
   Scenario: A vendor failure is an entry error, not a server error
     Given the vendor answers with a server error
     When the tenant runs a vendor evaluator
     Then the entry's result is an error
     And the response is not a server error
 
-  @unit @unimplemented
+  @unit
   Scenario: Embeddings evaluators use the tenant's embeddings credentials
     Given the request carries embeddings credentials that differ from its chat credentials
     When the tenant runs the similarity or sentiment evaluator

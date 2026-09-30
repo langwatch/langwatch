@@ -18,6 +18,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/pkg/profiling"
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/gateway"
@@ -133,6 +134,7 @@ type EvaluatorsOptions struct {
 	Config     Config
 	Deps       *Deps
 	Dispatcher *dispatcher.Dispatcher
+	Egress     ssrf.Options
 }
 
 // NewEvaluatorsHandler builds the evaluator runtime and its transport. disp is
@@ -155,6 +157,7 @@ func NewEvaluatorsHandler(ctx context.Context, opts EvaluatorsOptions) (http.Han
 		Config:        cfg.Evaluators,
 		LLM:           gateway.New(gateway.Options{Dispatcher: disp, Logger: deps.Logger}),
 		CustomerTrace: customerTrace,
+		Vendor:        evalhttp.NewVendor(evalhttp.VendorOptions{Egress: opts.Egress}),
 		OpsTracer:     opsProvider.Tracer("langwatch.nlpgo.evaluators"),
 		Logger:        deps.Logger.Named("evaluators"),
 	})
