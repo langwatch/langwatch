@@ -73,7 +73,19 @@ describe("domainNextStepFor", () => {
         recordIssued: true,
       });
       expect(next.kind).toBe("get-record");
-      expect(next.action).toBe("Prove with our license");
+      expect(next.action).toBe("Verify this domain");
+    });
+
+    it("says a verified domain is added and gives no DNS instructions", () => {
+      const next = domainNextStepFor({
+        ...unproved,
+        proved: true,
+        provesWithLicense: true,
+      });
+      expect(next.kind).toBe("done");
+      expect(next.action).toBeNull();
+      expect(next.explanation).toMatch(/added/i);
+      expect(next.explanation).not.toMatch(/DNS|record|publish/i);
     });
   });
 

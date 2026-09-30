@@ -18,6 +18,7 @@ import type {
 } from "./support/in-memory-connections";
 import {
   createSsoSelfServeFixture,
+  SELF_SERVE_FIXTURE_LICENSE_KEY,
   type StubContext,
   type StubProofs,
 } from "./support/sso-self-serve.fixture";
@@ -37,13 +38,26 @@ const HOSTED_OPTED_IN: SsoSelfServeContext = {
   licensed: false,
   licenseActivatedSinceStart: false,
   optedIn: true,
+  singleOrganization: false,
+  actorIsPlatformOperator: false,
 };
 
+/** A licensed installation with several organizations, seen by an
+ *  organization administrator who is not a platform operator: the one
+ *  self-hosted case that still publishes a proof. */
 const SELF_HOSTED_LICENSED: SsoSelfServeContext = {
   deployment: "self-hosted",
   licensed: true,
   licenseActivatedSinceStart: false,
   optedIn: false,
+  singleOrganization: false,
+  actorIsPlatformOperator: false,
+};
+
+/** A licensed installation holding one organization. */
+const SELF_HOSTED_SINGLE_ORG: SsoSelfServeContext = {
+  ...SELF_HOSTED_LICENSED,
+  singleOrganization: true,
 };
 
 /** What an administrator hands over for an OpenID Connect provider. */
@@ -99,6 +113,7 @@ beforeEach(() => {
     legacy: { findLegacySso: async () => legacySso },
     now: () => clock,
   }));
+  licenseAuthority.setSingleOrganization(false);
 });
 
 /** Every command the journey issued, in order. */
@@ -125,33 +140,9 @@ async function register(): Promise<string> {
 }
 
 describe("self-serve single sign-on setup", () => {
-  describe("given a self-hosted installation holding a genuine licence", () => {
-    /** @scenario "A self-hosted administrator sets single sign-on up with nobody else involved" */
-    it("uses the licence for entitlement without treating it as domain evidence", async () => {
-      await register();
-      const { waitsForReview } = await selfServe.claimDomain({
-        organizationId: ORG,
-        connectionId: CONNECTION,
-        domain: "acme.com",
-        actor: ANA,
-      });
-
-      expect(waitsForReview).toBe(false);
-      const state = await held();
-      expect(state?.state).toBe("CLAIMED");
-      expect(state?.claimedDomains).toEqual(["acme.com"]);
-      expect(state?.domainClaims).toEqual([
-        expect.objectContaining({
-          domain: "acme.com",
-          state: "WAITING",
-          authority: null,
-        }),
-      ]);
-      expect(commanded()).toEqual(["register_connection", "claim_domain"]);
-    });
-
+  describe("given a self-hosted installation holding a genuine licence and several organizations", () => {
     /** @scenario "A licensed installation still needs domain-ownership evidence" */
-    it("does not qualify an unproven domain merely because the installation serves a licence", async () => {
+    it("asks an organization administrator on a multi-organization installation for a published proof", async () => {
       await register();
       await selfServe.claimDomain({
         organizationId: ORG,
@@ -223,25 +214,6 @@ describe("self-serve single sign-on setup", () => {
       });
     });
 
-    /** @scenario "A self-hosted administrator is not offered attestation either" */
-    it("offers a published proof and no self-serve attestation", async () => {
-      await register();
-      const view = await selfServe.getSetup({ organizationId: ORG });
-
-      expect(view.availability).toEqual({
-        available: true,
-        proof: "dns-txt",
-        claimWaitsForReview: false,
-      });
-      // Vouching for a domain is a LangWatch operator's act on every tier, so
-      // there is no value of this surface under which it is offered.
-      expect(view.attestationOffered).toBe(false);
-      expect(Object.keys(selfServe)).not.toContain("attestDomain");
-      expect(
-        (selfServe as unknown as Record<string, unknown>).attestDomain,
-      ).toBeUndefined();
-    });
-
     /** @scenario "The only connection on an installation still leaves a way in" */
     it("activates only while somebody holds a way in that does not use the identity provider", async () => {
       await register();
@@ -293,6 +265,173 @@ describe("self-serve single sign-on setup", () => {
     });
   });
 
+  describe("given a self-hosted installation holding a genuine licence and only one organization", () => {
+    beforeEach(() => {
+      context.set(SELF_HOSTED_SINGLE_ORG);
+      licenseAuthority.setSingleOrganization(true);
+    });
+
+    /** @scenario "A self-hosted administrator sets single sign-on up with nobody else involved" */
+    it("verifies the claimed domain at once with the licence as the proof", async () => {
+      await register();
+      const claimed = await selfServe.claimDomain({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: "ACME.com",
+        actor: ANA,
+      });
+
+      expect(claimed).toEqual({
+        waitsForReview: false,
+        disputed: false,
+        verified: true,
+      });
+      const state = await held();
+      expect(state?.state).toBe("VERIFIED");
+      expect(state?.verifiedDomains).toEqual(["acme.com"]);
+      expect(state?.domainClaims).toEqual([
+        expect.objectContaining({
+          domain: "acme.com",
+          state: "APPROVED",
+          authority: "license",
+        }),
+      ]);
+      expect(state?.domainVerifications).toEqual([
+        expect.objectContaining({
+          domain: "acme.com",
+          method: "license-token",
+          tokenHash: null,
+          evidenceRef: `sha256:${sha256Hex(SELF_SERVE_FIXTURE_LICENSE_KEY)}`,
+        }),
+      ]);
+      // It owns the domain now, which is what routing and activation read.
+      expect(
+        await connections.findDomainOwner({ domain: "acme.com" }),
+      ).toMatchObject({ organizationId: ORG });
+      // Nothing was looked up and no record was handed over.
+      expect(proofs.asked).toEqual([]);
+      expect(commanded()).toEqual([
+        "register_connection",
+        "claim_domain",
+        "request_verification",
+        "verify_domain",
+      ]);
+      expect(JSON.stringify(committed)).not.toContain(
+        SELF_SERVE_FIXTURE_LICENSE_KEY,
+      );
+    });
+
+    it("finishes a verification that stopped part way when the domain is proved again", async () => {
+      await register();
+      await connectionService.claimDomain({
+        tenantId: ORG,
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        commandId: "ssocmd_claim_only",
+        occurredAtMs: clock,
+        actor: { type: "user", id: ANA.userId },
+        source: "self-serve",
+        domain: "acme.com",
+      });
+
+      await expect(
+        selfServe.proveDomain({
+          organizationId: ORG,
+          connectionId: CONNECTION,
+          domain: "acme.com",
+          actor: ANA,
+        }),
+      ).resolves.toEqual({ proved: true });
+      expect((await held())?.verifiedDomains).toEqual(["acme.com"]);
+    });
+
+    /** @scenario "A self-hosted administrator is not offered attestation either" */
+    it("offers the licence as the proof and no self-serve attestation", async () => {
+      await register();
+      const view = await selfServe.getSetup({
+        organizationId: ORG,
+        viewerId: ANA.userId,
+      });
+
+      expect(view.availability).toEqual({
+        available: true,
+        proof: "license-token",
+        claimWaitsForReview: false,
+      });
+      // Vouching for a domain is a LangWatch operator's act on every tier, so
+      // there is no value of this surface under which it is offered.
+      expect(view.attestationOffered).toBe(false);
+      expect(Object.keys(selfServe)).not.toContain("attestDomain");
+      expect(
+        (selfServe as unknown as Record<string, unknown>).attestDomain,
+      ).toBeUndefined();
+    });
+
+    /** @scenario "A domain another organization on the installation holds is refused at claim time" */
+    it("refuses a domain another organization holds before recording anything", async () => {
+      seedOtherOrganizationOn("acme.com");
+      await register();
+
+      const refusal = await selfServe
+        .claimDomain({
+          organizationId: ORG,
+          connectionId: CONNECTION,
+          domain: "acme.com",
+          actor: ANA,
+        })
+        .then(
+          refused,
+          (error: unknown) => error as { code: string; message: string },
+        );
+
+      expect(refusal.code).toBe("sso_connection_domain_taken");
+      expect(refusal.message).not.toContain(OTHER_ORG);
+      expect(commanded()).toEqual(["register_connection"]);
+      expect((await held())?.domainClaims).toEqual([]);
+    });
+  });
+
+  describe("given a self-hosted installation holding a genuine licence and several organizations, and a platform operator", () => {
+    beforeEach(() => {
+      context.set({ ...SELF_HOSTED_LICENSED, actorIsPlatformOperator: true });
+    });
+
+    /** @scenario "A platform operator's claim on a multi-organization installation is verified at once" */
+    it("verifies the operator's claim at once with the licence as the proof", async () => {
+      await register();
+      const claimed = await selfServe.claimDomain({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: "acme.com",
+        actor: { userId: OLIVE.id },
+      });
+
+      expect(claimed.verified).toBe(true);
+      const state = await held();
+      expect(state?.verifiedDomains).toEqual(["acme.com"]);
+      expect(state?.domainVerifications).toEqual([
+        expect.objectContaining({
+          method: "license-token",
+          verifier: { type: "user", id: OLIVE.id },
+        }),
+      ]);
+    });
+
+    it("still refuses the licence to an administrator the context mistook for an operator", async () => {
+      await register();
+
+      await expect(
+        selfServe.claimDomain({
+          organizationId: ORG,
+          connectionId: CONNECTION,
+          domain: "acme.com",
+          actor: ANA,
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_operator_act_required" });
+      expect((await held())?.verifiedDomains).toEqual([]);
+    });
+  });
+
   describe("given a self-hosted installation holding no genuine licence", () => {
     beforeEach(() => {
       context.set({
@@ -300,6 +439,8 @@ describe("self-serve single sign-on setup", () => {
         licensed: false,
         licenseActivatedSinceStart: false,
         optedIn: false,
+        singleOrganization: false,
+        actorIsPlatformOperator: false,
       });
     });
 
@@ -342,6 +483,8 @@ describe("self-serve single sign-on setup", () => {
         // federates — which is the whole of why the answer is "restart".
         licenseActivatedSinceStart: true,
         optedIn: false,
+        singleOrganization: false,
+        actorIsPlatformOperator: false,
       });
 
       const view = await selfServe.getSetup({ organizationId: ORG });
@@ -382,7 +525,11 @@ describe("self-serve single sign-on setup", () => {
         actor: ANA,
       });
 
-      expect(claimed).toEqual({ waitsForReview: false, disputed: false });
+      expect(claimed).toEqual({
+        waitsForReview: false,
+        disputed: false,
+        verified: false,
+      });
       const state = await held();
       // The claim is WAITING because nothing has decided it yet, and what
       // will decide it is the record — not a person. Nobody was commanded to
@@ -512,7 +659,11 @@ describe("self-serve single sign-on setup", () => {
         domain: "acme.com",
         actor: ANA,
       });
-      expect(claimed).toEqual({ waitsForReview: true, disputed: true });
+      expect(claimed).toEqual({
+        waitsForReview: true,
+        disputed: true,
+        verified: false,
+      });
       expect((await held())?.domainClaims).toEqual([
         expect.objectContaining({ domain: "acme.com", state: "WAITING" }),
       ]);
@@ -1166,10 +1317,36 @@ describe("self-serve single sign-on setup", () => {
       });
       const reviewedStates = statesFrom(CONNECTION);
 
+      // Self-hosted with one organization: the licence decides and proves it.
+      ({
+        connections,
+        activationBindings: breakGlass,
+        licenseAuthority,
+        context,
+        proofs,
+        committed,
+        connectionService,
+        selfServe,
+      } = createSsoSelfServeFixture({
+        context: SELF_HOSTED_SINGLE_ORG,
+        licenseAuthorizesDomainClaims: true,
+        platformOperatorIds: [OLIVE.id],
+        now: () => clock,
+      }));
+      await register();
+      await selfServe.claimDomain({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: "gamma.example",
+        actor: ANA,
+      });
+      const licenceStates = statesFrom(CONNECTION);
+
       // The same states, in the same order. What differs is which fact
       // authorized the approval and which method proved the domain — never
       // which states a connection may be in or how it got between them.
       expect(reviewedStates).toEqual(licensedStates);
+      expect(licenceStates).toEqual(licensedStates);
       expect(reviewedStates).toEqual([
         "connection_registered",
         "domain_claimed",

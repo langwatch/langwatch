@@ -30,6 +30,8 @@ const HOSTED_OPTED_IN: SsoSelfServeContext = {
   licensed: false,
   licenseActivatedSinceStart: false,
   optedIn: true,
+  singleOrganization: false,
+  actorIsPlatformOperator: false,
 };
 
 let connections: InMemoryConnections;

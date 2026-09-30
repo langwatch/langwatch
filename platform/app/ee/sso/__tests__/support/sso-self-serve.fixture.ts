@@ -39,6 +39,10 @@ import {
   StubTestSignIns,
 } from "./in-memory-self-serve";
 
+/** The licence key the fixture's installation holds. Only its hash may
+ *  reach a fact. */
+export const SELF_SERVE_FIXTURE_LICENSE_KEY = "LW-LICENSE-ACME-FIXTURE";
+
 export class StubContext implements SsoSelfServeContextPort {
   constructor(private context: SsoSelfServeContext) {}
 
@@ -203,6 +207,9 @@ export function createSsoSelfServeFixture(options: SelfServeFixtureOptions) {
     discovery: { discover: async () => ({ reachable: true }) },
     baseUrl: "https://app.langwatch.test",
     testSignIns,
+    licenseProof: {
+      currentLicenseKey: async () => SELF_SERVE_FIXTURE_LICENSE_KEY,
+    },
     breakGlass: breakGlassReads,
     members,
     migrations: options.migrations ?? { getProgress: async () => null },

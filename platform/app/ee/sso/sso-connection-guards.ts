@@ -738,28 +738,34 @@ export class SsoConnectionGuards {
   ): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, REQUEST_VERIFICATION_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    // A record may be asked for against an approved claim, or against one
-    // still waiting — the record is what will decide the waiting one. Only
-    // the PUBLISHED-record ceremony may stand in for a decision: a licence
-    // speaks for an installation and has already decided at the claim, so
-    // asking for it here against an undecided claim would be a second,
-    // unwitnessed way to approve one.
+    // A proof may be asked for against an approved claim, or against one
+    // still waiting: the published record, or on a self-hosted installation
+    // the licence, is what will decide the waiting one when it lands. The
+    // licence is checked below and again when the proof lands.
     const decided = state.approvedDomains.includes(domain);
     const waiting = domainClaimFor({ state, domain })?.state === "WAITING";
-    if (!decided && !(waiting && data.method === "dns-txt")) {
+    if (!decided && !waiting) {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${data.connectionId}: domain ${domain} has no claim a ${data.method} ceremony may prove`,
       );
     }
-    // The licence-bound ceremony exists because a self-hosted customer has
-    // nobody to publish a record for. Asked of the port rather than of the
-    // command, so a hosted organization naming the method gets the same
-    // refusal an unlicensed installation does, and neither of them can talk
-    // its way past a DNS record it simply has to publish.
+    // The licence-bound ceremony is for a self-hosted installation, where
+    // whoever runs it already decides who has an account on it. Asked of the
+    // port rather than of the command, so a hosted organization naming the
+    // method gets the same refusal an unlicensed installation does, and
+    // neither of them can talk its way past a record it has to publish. On
+    // an installation with several organizations the licence speaks only
+    // through a platform operator.
     if (data.method === "license-token") {
-      throw new SsoDomainProofNotFoundError(
-        `connection ${data.connectionId}: a license proves entitlement, not control of ${domain}; use DNS proof or operator attestation`,
-      );
+      if (!(await this.licenseAuthority.licenseAuthorizesDomainClaims())) {
+        throw new SsoDomainProofNotFoundError(
+          `connection ${data.connectionId}: no license on this deployment proves ${domain}; publish the DNS record or file`,
+        );
+      }
+      await this.requireLicenseSpeaksFor({
+        actor: data.actor,
+        act: `prove ${domain} with the installation's license`,
+      });
     }
     await this.refuseIfDomainOwnedElsewhere({
       domain,
@@ -896,6 +902,9 @@ export class SsoConnectionGuards {
    * a caller that names it, so the only way that authority reaches a fact is
    * through this method, on a ceremony this method has just checked.
    *
+   * A licence ceremony decides a waiting claim the same way, under the
+   * authority `license`, after the licence gate is asked again.
+   *
    * Ownership is re-checked either way: the ceremony is not instantaneous,
    * and another organization's connection may have gone ACTIVE on the same
    * domain while this one was waiting for DNS. That refusal is what keeps a
@@ -936,11 +945,24 @@ export class SsoConnectionGuards {
     }
     const method = data.channel ?? pending.method;
     const undecided = state.claimedDomains.includes(domain);
-    if (undecided && pending.method !== "dns-txt") {
+    // Two ceremonies may decide a waiting claim: a published record, and a
+    // self-hosted installation's licence. The licence is asked again here,
+    // at the moment it decides, rather than trusted from the request.
+    if (undecided && pending.method === "license-token") {
+      await this.requireClaimAuthority({
+        authority: "license",
+        actor: data.actor,
+        act: `approve the claim on ${domain}`,
+      });
+    } else if (undecided && pending.method !== "dns-txt") {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${data.connectionId}: a ${pending.method} ceremony cannot decide the claim on ${domain}`,
       );
     }
+    const authority =
+      pending.method === "license-token"
+        ? ("license" as const)
+        : ("dns-proof" as const);
     return [
       ...(undecided
         ? [
@@ -950,7 +972,7 @@ export class SsoConnectionGuards {
                 connectionId: data.connectionId,
                 domain,
                 actor: data.actor,
-                authority: "dns-proof" as const,
+                authority,
                 source: data.source,
               },
             } satisfies SsoConnectionFactInput,
@@ -1536,10 +1558,29 @@ export class SsoConnectionGuards {
     }
     const licensed =
       await this.licenseAuthority.licenseAuthorizesDomainClaims();
-    if (licensed) return;
-    throw new SsoLicenseRequiredError(
-      `no license on this deployment authorizes ${act}`,
-    );
+    if (!licensed) {
+      throw new SsoLicenseRequiredError(
+        `no license on this deployment authorizes ${act}`,
+      );
+    }
+    await this.requireLicenseSpeaksFor({ actor, act });
+  }
+
+  /**
+   * Who the licence speaks for. With one organization on the installation,
+   * its administrator is the person who runs it. With several, an
+   * organization administrator is not, so only a platform operator may use
+   * the licence in place of a published proof.
+   */
+  private async requireLicenseSpeaksFor({
+    actor,
+    act,
+  }: {
+    actor: IdentityActor;
+    act: string;
+  }): Promise<void> {
+    if (await this.licenseAuthority.hostsSingleOrganization()) return;
+    await this.requirePlatformOperator({ actor, act });
   }
 
   private requireClaimed({

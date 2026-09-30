@@ -52,8 +52,8 @@ export function domainNextStepFor({
   claim:
     | { state: "WAITING" | "APPROVED" | "REJECTED"; waitsForReview: boolean }
     | undefined;
-  /** A licensed installation proves with its licence, in one press, with no
-   *  record to publish anywhere. */
+  /** A self-hosted installation where the licence is the proof: a claimed
+   *  domain is verified at once, with no record to publish anywhere. */
   provesWithLicense: boolean;
   /** Whether a value has already been handed over for THIS domain and is
    *  waiting to be published. */
@@ -71,8 +71,9 @@ export function domainNextStepFor({
     return {
       kind: "done",
       action: null,
-      explanation:
-        "This domain is proved. Anyone with an address at it can be sent to your identity provider.",
+      explanation: provesWithLicense
+        ? "This domain is added. Once the connection is live, sign-ins with an address at it go to your identity provider."
+        : "This domain is proved. Anyone with an address at it can be sent to your identity provider.",
     };
   }
   if (claim?.state === "REJECTED") {
@@ -109,9 +110,9 @@ export function domainNextStepFor({
   }
   return {
     kind: "get-record",
-    action: provesWithLicense ? "Prove with our license" : "Prove this domain",
+    action: provesWithLicense ? "Verify this domain" : "Prove this domain",
     explanation: provesWithLicense
-      ? "This installation's enterprise license is what proves the domain, so this finishes in one press and there is nothing to publish anywhere."
+      ? "This domain is not verified yet. On this installation that takes one press, and there is nothing to publish."
       : "Next you prove the domain is yours. We give you a short value to publish in your domain's DNS, or as a file on your website, and then we look for it.",
   };
 }

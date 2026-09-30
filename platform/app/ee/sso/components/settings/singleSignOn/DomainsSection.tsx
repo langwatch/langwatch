@@ -154,7 +154,7 @@ export function DomainsSection({
                 )
               }
             >
-              Claim domain
+              {provesWithLicense ? "Add domain" : "Claim domain"}
             </Button>
           </HStack>
           <InlineRefusal error={claim.error} what="Claiming that domain" />
@@ -344,9 +344,9 @@ function WhyADomainIsProved({
   if (provesWithLicense) {
     return (
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-        A domain has to be proved before it decides how people sign in. On this
-        installation your enterprise license is that proof, so there is nothing
-        to publish anywhere.
+        On this installation a domain you add is verified right away, with
+        nothing to publish. Once the connection is live, people who sign in with
+        an address at it go to your identity provider.
       </Text>
     );
   }
