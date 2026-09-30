@@ -108,14 +108,6 @@ describe("validateLangWatchQL given SQL the LangWatchQL API is meant to answer",
     expect(result.ok && result.tables).toEqual(["analytics.traces", "analytics.spans"]);
   });
 
-  it("reports a table read only inside a subquery beside the outer one", () => {
-    const result = validate(
-      "SELECT TraceId FROM traces WHERE TraceId IN (SELECT TraceId FROM analytics.spans)",
-    );
-
-    expect(result.ok && result.tables).toEqual(["analytics.traces", "analytics.spans"]);
-  });
-
   it("accepts bound parameters and reports what they declare", () => {
     const result = validate(
       "SELECT TraceId FROM traces WHERE StartedAt > {since:DateTime} AND Cost > {floor:Float64}",

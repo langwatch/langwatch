@@ -147,7 +147,7 @@ function recordingAnalytics(refusal?: Error) {
     validateLangWatchQL: (input: LangWatchQLValidationInput) => {
       validated.push(input);
       if (refusal) throw refusal;
-      return { parameters: [], appFunctions: [], tables: [] };
+      return { parameters: [], appFunctions: [] };
     },
     executeLangWatchQL: async (input: unknown) => {
       executed.push(input);
