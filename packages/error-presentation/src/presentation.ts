@@ -4686,9 +4686,28 @@ const presentations = {
     title: "That expiration date has already passed",
     describe: () => "Pick a date in the future, or choose Never so the key does not expire.",
   },
-  gateway_budget_not_found: {
-    title: "Budget not found",
-    describe: () => "It may have been deleted. Reload to see the current list.",
+  routing_policy_required: {
+    title: "Choose a routing policy",
+    describe: () => "Policy routing needs a routing policy. Pick one, or switch the routing mode.",
+  },
+  routing_policy_conflict: {
+    title: "This routing mode does not use a routing policy",
+    describe: () => "Remove the routing policy, or switch the key to policy routing.",
+  },
+  providers_allowed_empty: {
+    title: "Select at least one provider",
+    describe: () =>
+      "A key with no providers can serve nothing. Pick a provider, or allow all of them.",
+  },
+  providers_not_in_scope: {
+    title: "That provider is not available to this key",
+    describe: () =>
+      "Choose providers from this key's own scope, or ask an admin to share the provider.",
+  },
+  cloud_ops_key_mismatch: {
+    title: "Cloud operations cannot start",
+    describe: () =>
+      "The licence key for this release is missing or does not match it. Ask whoever runs this deployment to fix it.",
   },
   // Main imported this from the voice-agents flag module so the copy could not
   // drift. That import is impossible here: @langwatch/feature-flag-contract, which
