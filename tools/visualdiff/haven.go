@@ -135,7 +135,10 @@ func (run *session) awaitBase(ctx context.Context, stack Stack) baseArrival {
 		return baseArrival{stack: stack, err: err}
 	}
 	options := run.request.Options
-	result, err := run.request.Deps.Seed(ctx, SeedRequest{APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount, Flows: run.request.Config.Flows})
+	result, err := run.request.Deps.Seed(ctx, SeedRequest{
+		APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount, Flows: run.request.Config.Flows,
+		ScimToken: stackScimToken(ctx, run.request.Deps.Run, run.request.Deps.Environ, stack, run.request.Config.Flows),
+	})
 	if err != nil {
 		return baseArrival{stack: stack, err: fmt.Errorf("seed %s: %w", stack.Name, err)}
 	}

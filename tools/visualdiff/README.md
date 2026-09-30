@@ -316,6 +316,9 @@ A click that misses fails the flow: `optional: "true"` is for tours and nudges.
 | `capture` | `testId` or `selector`, `as`, `match` (regex, first group kept); stored as `{as}` |
 | `mail` | `to`, `subject`, `as` (default `mailLink`); the newest message's first link, from the side's mailsim |
 | `acceptInvite` | `link` (a mailed invite link), `email`, `name`; signs that person up in a cookieless page and joins by the invite, leaving the signed-in page as it was |
+| `passkey` | none; opens a WebAuthn virtual authenticator (CTAP2, internal, resident keys, user verification) on the step's page, once, so passkey create, sign-in, rename and delete run headless; `anonymous` picks the context |
+| `totp` | `secret` (a captured value) or `from` (test id) / `fromSelector` (CSS) of the element showing it; `as` (default `totpCode`) keeps the current RFC 6238 code; with `testId`, `selector`, `label` or `placeholder` it types it there (`submit`) |
+| `request` | `path` (`{slug}` fills), `method` (default POST), `body` (JSON text), `auth` (a key sent as X-Auth-Token; unset sends the page's session), `status` (default any 2xx), `field` with `equals` / `contains` / `min`, `as` (keeps `field`, else the body) |
 | `go` | `path` (an absolute `{mailLink}` keeps its path and query); `anonymous: "true"` opens it in a fresh cookieless context; any other name (`anonymous: second`) is a further cookieless context of its own, kept for the flow |
 | `expect` | see above |
 | `wait`, `signIn`, `dismissTour` | as before; `signIn` takes `email` and `password` to sign in as an account the flow made |

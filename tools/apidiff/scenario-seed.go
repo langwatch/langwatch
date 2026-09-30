@@ -164,7 +164,7 @@ func usesAuth(item *scenario, kind string) bool {
 	if item.Auth == kind {
 		return true
 	}
-	for _, list := range [][]scenarioStep{item.Setup, item.Verify} {
+	for _, list := range [][]scenarioStep{item.Setup, item.Verify, item.Teardown} {
 		for index := range list {
 			if list[index].Request != nil && list[index].Request.Auth == kind {
 				return true

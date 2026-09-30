@@ -68,7 +68,7 @@ const EDGE_MILLIS = 1500;
  */
 export const totp: Action = async (context) => {
   const { args, side } = context;
-  const from =
+  const from: Record<string, string> =
     args.fromSelector === undefined
       ? { testId: argument({ context, name: "from" }) }
       : { selector: args.fromSelector };

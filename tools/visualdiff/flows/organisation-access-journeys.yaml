@@ -4,6 +4,34 @@
 # the Invite actions menu, "Edit this role", "Edit API key <name>", "Revoke API key <name>", the
 # "Token Created" dialog and its "Copy this token now" warning. Every name ends in {uid}.
 flows:
+  # main emails each invite with the subject "You were added to <organization> on LangWatch" and
+  # the accept link; the mail step reads both from the side's mailsim (org-mail-parity).
+  - id: members-invite-email-arrives
+    title: Invite a person and the invitation email arrives with its accept link
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-invmail-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-invmail-{uid}@mail.langwatch.localhost
+          subject: You were added to
+          as: inviteLink
+      - action: go
+        with:
+          path: "{inviteLink}"
+          anonymous: "true"
   - id: members-pending-invite-list-and-revoke
     title: Invite a person, see them on the Invited list, revoke the invite and see it revoked
     isolated: true

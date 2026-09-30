@@ -640,7 +640,10 @@ func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) 
 	}
 	fixtures := map[string]map[string]string{}
 	for _, stack := range stacks {
-		seed := SeedRequest{APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount, Flows: run.request.Config.Flows}
+		seed := SeedRequest{
+			APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount, Flows: run.request.Config.Flows,
+			ScimToken: stackScimToken(ctx, deps.Run, deps.Environ, *stack, run.request.Config.Flows),
+		}
 		result, err := deps.Seed(ctx, seed)
 		if err != nil {
 			return nil, fmt.Errorf("seed %s: %w", stack.Name, err)

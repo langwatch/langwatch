@@ -81,11 +81,26 @@ func (exec *scenarioExec) context() context.Context { return exec.runner.ctx }
 func (exec *scenarioExec) run() {
 	started := time.Now()
 	defer func() { exec.out.DurationMS = time.Since(started).Milliseconds() }()
-	if failure := exec.steps(); failure != nil {
+	failure := exec.steps()
+	exec.teardown()
+	if failure != nil {
 		exec.out.Failure = failure.Error()
 		if failure.harness {
 			exec.out.Error, exec.out.Failure = failure.Error(), ""
 		}
+	}
+}
+
+// teardown sends each cleanup request once the steps are over, whatever they
+// found. A step that cannot be built (its capture never came) or is refused is
+// on the record and nothing more: it never fails the scenario.
+func (exec *scenarioExec) teardown() {
+	if exec.shard.err != "" {
+		return
+	}
+	for index := range exec.item.Teardown {
+		step := &exec.item.Teardown[index]
+		_ = exec.requestStep(fmt.Sprintf("teardown[%d]", index), step)
 	}
 }
 
@@ -129,6 +144,8 @@ func (exec *scenarioExec) verifyStep(index int) *stepError {
 		return exec.poll(step.Eventually, func() *stepError { return exec.countStep(label, step, index) })
 	case step.Mail != nil:
 		return exec.mailStep(label, step)
+	case step.Analytics != nil:
+		return exec.analyticsStep(label, step)
 	}
 	return exec.requestStep(label, step)
 }

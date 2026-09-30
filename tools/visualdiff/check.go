@@ -67,7 +67,8 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 		return ExitOperational
 	}
 	setupStarted := time.Now()
-	setups, warnings := runFlowSetups(ctx, setupRequest{apiURL: side.BaseURL, key: DefaultProjectKey, fixtures: side.Fixtures, flows: config.Flows})
+	setups, warnings := runFlowSetups(ctx, setupRequest{apiURL: side.BaseURL, key: DefaultProjectKey, fixtures: side.Fixtures, flows: config.Flows,
+		scimToken: stackScimToken(ctx, execRunner, os.Environ, checkedStack(parsed), config.Flows)})
 	for _, warning := range warnings {
 		fmt.Fprintln(streams.Err, "check:", warning)
 	}
@@ -253,6 +254,14 @@ func fromSuite(parsed *checkFlags, flags *flag.FlagSet) {
 	if main, ok := diffkit.SuiteStack(diffkit.SuiteMain); ok && parsed.baseURL == "" {
 		parsed.baseURL = main.AppURL
 	}
+}
+
+// checkedStack is the haven stack check drives, or none when -url named the app.
+func checkedStack(parsed checkFlags) Stack {
+	if parsed.url != "" {
+		return Stack{}
+	}
+	return Stack{Dir: parsed.root, HavenSlug: parsed.stack}
 }
 
 // liveBase seeds a running main as run seeds its base, and answers it as the runner's base side.

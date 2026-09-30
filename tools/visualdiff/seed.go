@@ -81,6 +81,8 @@ type SeedRequest struct {
 	TraceCount int
 	// Flows are the run's flows, whose `setup:` the seed posts too (setup.go).
 	Flows []Flow
+	// ScimToken is the stack's seeded SCIM token for the setups' `auth: scim`.
+	ScimToken string
 }
 
 // SeedResult reports what the seeding step created. Fixtures are the ids
@@ -166,7 +168,7 @@ func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 		return result, err
 	}
 	started := time.Now()
-	setups, warnings := runFlowSetups(ctx, setupRequest{client: client, apiURL: request.APIURL, key: key, fixtures: result.Fixtures, flows: request.Flows})
+	setups, warnings := runFlowSetups(ctx, setupRequest{client: client, apiURL: request.APIURL, key: key, fixtures: result.Fixtures, flows: request.Flows, scimToken: request.ScimToken})
 	keep("setups", started, setups, warnings)
 	return result, nil
 }
