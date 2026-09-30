@@ -115,6 +115,13 @@ Feature: Langy notifies the person when it needs them or has finished
       When Langy puts up a card that waits for my answer
       Then a notification says Langy needs a decision
 
+    @unit
+    Scenario: A card already waiting when I reopen a conversation sends nothing
+      Given a conversation with a card that was already waiting for my answer
+      When I reopen it and its record loads after its folder state
+      Then the waiting card is part of what the tab already knew
+      And no notification is sent
+
     @integration
     Scenario: A card that comes up while the tab is hidden still reaches it
       Given a turn is in flight and the tab is hidden

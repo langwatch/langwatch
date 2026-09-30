@@ -104,6 +104,20 @@ function advanceTurnClock({
   return { startedAt: null, finishedMs: status === "ready" ? now - startedAt : null };
 }
 
+/**
+ * The waiting cards are known once both of their reads answered: the folder state and the
+ * conversation record. A baseline taken before the record lands would call old cards new.
+ */
+export function langyDecisionKeysReady({
+  workspaceFetched,
+  recordFetched,
+}: {
+  workspaceFetched: boolean;
+  recordFetched: boolean;
+}): boolean {
+  return workspaceFetched && recordFetched;
+}
+
 type DecisionBaseline = { conversationId: string | null; keys: Set<string> };
 
 /** Whether a key arrived after the conversation's baseline; a new conversation resets it. */

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../behavior/langy-api.ts", () => ({ api: {} }));
 
-import { useLangyNotifier } from "../use-langy-notifications.ts";
+import { langyDecisionKeysReady, useLangyNotifier } from "../use-langy-notifications.ts";
 
 const close = vi.fn();
 
@@ -137,6 +137,37 @@ describe("useLangyNotifier", () => {
       });
 
       view.rerender({ ...base, decisionKeys: ["wait-1"] });
+
+      expect(shown).toHaveLength(0);
+    });
+  });
+});
+
+describe("langyDecisionKeysReady", () => {
+  describe("given a reopened conversation whose record loads after its folder state", () => {
+    /** @scenario "A card already waiting when I reopen a conversation sends nothing" */
+    it("is not ready until the record is read too", () => {
+      expect(langyDecisionKeysReady({ workspaceFetched: true, recordFetched: false })).toBe(false);
+      expect(langyDecisionKeysReady({ workspaceFetched: false, recordFetched: true })).toBe(false);
+      expect(langyDecisionKeysReady({ workspaceFetched: true, recordFetched: true })).toBe(true);
+    });
+
+    it("takes the waiting card as the baseline, so it notifies nothing", () => {
+      setAway(true);
+      const view = renderHook((props: Props) => useLangyNotifier(props), {
+        initialProps: {
+          ...base,
+          decisionKeysReady: langyDecisionKeysReady({
+            workspaceFetched: true,
+            recordFetched: false,
+          }),
+        },
+      });
+      view.rerender({
+        ...base,
+        decisionKeys: ["wait-open-before"],
+        decisionKeysReady: langyDecisionKeysReady({ workspaceFetched: true, recordFetched: true }),
+      });
 
       expect(shown).toHaveLength(0);
     });

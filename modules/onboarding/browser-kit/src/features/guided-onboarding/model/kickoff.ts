@@ -4,15 +4,12 @@
  * brief the model reads. @see specs/langy/langy-guided-onboarding.feature
  */
 import {
-  GUIDED_KICKOFF_CONVERSATION_TITLE,
   GUIDED_ONBOARDING_KICKOFF_PART_TYPE,
   GUIDED_PATH_TITLES,
   type GuidedPath,
   guidedPathSchema,
 } from "@langwatch/onboarding-contract";
 import { z } from "zod";
-
-export { GUIDED_KICKOFF_CONVERSATION_TITLE, GUIDED_ONBOARDING_KICKOFF_PART_TYPE };
 
 export const GUIDED_ONBOARDING_SKILL_NAME = "guided-onboarding";
 

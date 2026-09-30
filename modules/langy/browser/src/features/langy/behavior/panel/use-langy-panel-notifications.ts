@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 
-import { useLangyNotificationPreference, useLangyNotifier } from "../use-langy-notifications.ts";
+import {
+  langyDecisionKeysReady,
+  useLangyNotificationPreference,
+  useLangyNotifier,
+} from "../use-langy-notifications.ts";
 import type { useLangyLocalWaits } from "./use-langy-local-waits.ts";
 
 type LocalWaits = ReturnType<typeof useLangyLocalWaits>;
@@ -45,7 +49,7 @@ export function useLangyPanelNotifications({
     status,
     messages,
     decisionKeys,
-    decisionKeysReady: waits.workspaceFetched,
+    decisionKeysReady: langyDecisionKeysReady(waits),
     enabled: preference.choice === "enabled",
     permission: preference.permission,
   });
