@@ -3,6 +3,16 @@ import { Config, type ProcessConfigOf } from "@langwatch/config";
 import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 import { z } from "zod";
 
+function readDrainTimeoutMs(value: unknown): number | undefined {
+  if (value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  console.error(
+    `[shutdown] SHUTDOWN_DRAIN_TIMEOUT_MS must be a positive whole number of milliseconds, got "${String(value)}"; using the queue's default drain. The pod's terminationGracePeriodSeconds may not match this budget.`,
+  );
+  return undefined;
+}
+
 export const storesOwner = {
   name: "stores",
   config: Config.define((c) => ({
@@ -11,16 +21,13 @@ export const storesOwner = {
       z.coerce.number().int().positive().default(30),
     ),
     /**
-     * How long the queue waits for in-flight jobs on shutdown, in milliseconds.
-     * The chart sets it from shutdownDrainSeconds; absent keeps the queue's
-     * own default. The process deadline defaults to this plus its close slack.
+     * Queue drain on shutdown in ms, from the chart's shutdownDrainSeconds; the
+     * process deadline defaults to it plus close slack. Absent or malformed keeps
+     * the queue's default: a bad value is reported, never fatal to boot.
      */
     shutdownDrainTimeoutMs: c.env(
       "SHUTDOWN_DRAIN_TIMEOUT_MS",
-      z.preprocess(
-        (value) => (value === "" ? undefined : value),
-        z.coerce.number().int().positive().optional(),
-      ),
+      z.preprocess(readDrainTimeoutMs, z.number().int().positive().optional()),
     ),
     clickhousePool: {
       override: c.env("CLICKHOUSE_MAX_OPEN_CONNECTIONS", z.coerce.number().optional()),

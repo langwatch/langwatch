@@ -88,9 +88,8 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     So that the pod cannot be sized for a budget the process no longer uses
 
   # The chart's shutdownDrainSeconds reaches the queue as
-  # SHUTDOWN_DRAIN_TIMEOUT_MS. Without it the queue kept its own 25s drain
-  # whatever the pod was sized for, so raising the drain for long jobs only
-  # widened the watchdog while in-flight jobs were still abandoned at 25s.
+  # SHUTDOWN_DRAIN_TIMEOUT_MS, so raising the drain for long jobs gives the
+  # in-flight jobs that long, and the process watchdog moves with it.
 
   @unit @shutdown-budget
   Scenario: The queue drains for as long as the chart's drain value

@@ -4,7 +4,7 @@
  * as its drain timeout.
  */
 import { parseProcessConfig } from "@langwatch/config";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { storesOwner } from "../config-owner.ts";
 import { PipelineParticipation } from "../pipeline-selection.ts";
@@ -59,9 +59,28 @@ describe("queue drain budget", () => {
     }
   });
 
+  /** @scenario "A malformed drain override is reported and falls back, never fatal" */
   describe("given a drain budget that is not a positive number", () => {
-    it.each(["0", "-5", "abc"])("refuses %s at boot, naming the variable", (value) => {
-      expect(() => read({ SHUTDOWN_DRAIN_TIMEOUT_MS: value })).toThrow(/SHUTDOWN_DRAIN_TIMEOUT_MS/);
+    let reported: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      reported = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      reported.mockRestore();
+    });
+
+    describe.each(["0", "-5", "abc", "1.5"])("when it is %s", (value) => {
+      it("boots with the queue's own default", () => {
+        expect(read({ SHUTDOWN_DRAIN_TIMEOUT_MS: value }).shutdownDrainTimeoutMs).toBeUndefined();
+      });
+
+      it("reports the variable and the bad value", () => {
+        read({ SHUTDOWN_DRAIN_TIMEOUT_MS: value });
+        expect(String(reported.mock.calls[0]?.[0])).toContain(`SHUTDOWN_DRAIN_TIMEOUT_MS`);
+        expect(String(reported.mock.calls[0]?.[0])).toContain(`"${value}"`);
+      });
     });
   });
 });
