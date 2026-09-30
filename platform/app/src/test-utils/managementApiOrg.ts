@@ -24,6 +24,7 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { seedRoleBinding } from "./authz-seeds";
 
 /**
  * Enterprise with room: the management suites are about the APIs, not the
@@ -77,15 +78,13 @@ export async function seedManagementOrg({
     },
   });
 
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: organization.id,
-      userId: admin.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
+  await seedRoleBinding(prisma, {
+    id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+    organizationId: organization.id,
+    userId: admin.id,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organization.id,
   });
 
   const created = await ApiKeyService.create(prisma).create({
@@ -163,15 +162,13 @@ export async function seedOrgMember({
     data: { userId: user.id, organizationId, role },
   });
   if (hasOrgBinding && role !== OrganizationUserRole.EXTERNAL) {
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        userId: user.id,
-        role: ORGANIZATION_BINDING_ROLE[role],
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId,
+      userId: user.id,
+      role: ORGANIZATION_BINDING_ROLE[role],
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
   }
   return { userId: user.id, email: user.email ?? "" };

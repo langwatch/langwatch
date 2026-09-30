@@ -50,7 +50,7 @@ const bar = (extra: Record<string, unknown>) => ({
 describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a spec that names a data source", () => {
     describe("when the name is not registered", () => {
-      /** @scenario "Every data source must resolve to a registered named dataset" */
+      /** @scenario "Every data source must resolve to a registered named view" */
       it("names the unknown dataset and the registered ones", () => {
         const errors = refusals({
           $schema: S,
@@ -91,7 +91,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
 
   describe("given a spec that carries its own data", () => {
     describe("when it is validated", () => {
-      /** @scenario "Caller-supplied datasets and inline values are rejected" */
+      /** @scenario "Caller-supplied views and inline values are rejected" */
       it("refuses a top-level datasets property and inline values before Vega sees them", () => {
         expect(
           refusalRules(bar({ datasets: { smuggled: [{ model: "a" }] } })),
@@ -225,7 +225,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
 
   describe("given a lookup transform", () => {
     describe("when it names another dataset", () => {
-      /** @scenario "Lookup is admitted only between registered datasets within limits" */
+      /** @scenario "Lookup is admitted only between registered views within limits" */
       it("admits a registered source within limits and refuses every other source", () => {
         expect(validate(lookupBetweenRegisteredDatasets).ok).toBe(true);
 

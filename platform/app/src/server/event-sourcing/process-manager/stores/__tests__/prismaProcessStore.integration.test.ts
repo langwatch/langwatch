@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 import type { JsonValue } from "../../json";
 import type { ProcessRef } from "../../processManager.types";
 import { PrismaProcessStore } from "../prismaProcessStore";
@@ -352,6 +354,54 @@ describe("PrismaProcessStore", () => {
           expect.objectContaining({
             status: "dispatched",
             attempts: 2,
+            leaseToken: null,
+          }),
+        ]);
+      });
+    });
+
+    describe("when two acknowledgements of one lease land at the same moment", () => {
+      /** @scenario "Two acknowledgements of one lease: the second is refused" */
+      it("applies the dispatch and refuses the failure, which waited on the row", async () => {
+        const identity = identityOf();
+        await store.commit(commit({ now: base }));
+        const leased = (
+          await store.leaseDueMessages({
+            now: base,
+            limit: 1,
+            leaseDurationMs: 100,
+          })
+        )[0]!;
+        // The store's own lease query opens a transaction, so the store is
+        // built over the root client; the acknowledgements are plain writes
+        // and run on the transaction the interleaving hands them.
+        const storeOn = (tx: unknown) =>
+          new PrismaProcessStore(tx as PrismaClient);
+
+        const acknowledgements = await raceOnOneRow({
+          prisma,
+          table: "ProcessManagerOutbox",
+          first: (tx) =>
+            storeOn(tx).markDispatched({
+              identity,
+              leaseToken: leased.leaseToken,
+              now: base + 10,
+            }),
+          second: (tx) =>
+            storeOn(tx).markFailed({
+              identity,
+              leaseToken: leased.leaseToken,
+              now: base + 11,
+              nextAttemptAt: base + 1_000,
+              dead: true,
+            }),
+        });
+
+        expect(acknowledgements.first).toEqual({ applied: true });
+        expect(acknowledgements.second).toEqual({ applied: false });
+        expect(await store.findMessagesByRef({ ref: ref() })).toEqual([
+          expect.objectContaining({
+            status: "dispatched",
             leaseToken: null,
           }),
         ]);

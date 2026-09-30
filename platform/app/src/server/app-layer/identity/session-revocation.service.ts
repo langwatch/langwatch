@@ -85,31 +85,54 @@ export interface SessionRevocationServiceDeps {
 }
 
 /**
- * Ending somebody's sessions — all of them, all but one, the ones one sign-in
- * method minted, or a single named one.
- *
- * WHY EVERY VERB TOUCHES BOTH STORES. With `secondaryStorage` configured,
- * better-auth's `findSession` reads its Redis cache FIRST and short-circuits
- * before the database. Deleting the Postgres row alone is therefore invisible
- * to it: the person stays signed in, on a cached session and a cached user
- * object, until the entry expires — up to thirty days (`session.expiresIn`).
- * So a revocation clears the cache and then deletes the rows, and it is the
- * cache half that makes it take effect now.
- *
- * better-auth's own `revoke*` endpoints all operate on the CALLER's session
- * rather than a named person's, which is why none of them serves an admin
- * kicking somebody else out; its `internalAdapter.deleteSessions` handles both
- * stores but is not public API. This is that logic, over ports.
- *
- * The cache is best-effort throughout. A cache we could not clear delays the
- * revocation to the entry's TTL; it does not cancel it, so the rows still go
- * and the failure is logged rather than raised. The rows are the truth, which
- * is also why every verb sweeps them for tokens the index never listed: the
- * index is written as a convenience at sign-in, and a stale one would
- * otherwise leave a cached session behind.
+ * Better Auth reads Redis before PostgreSQL, so revocation must clear both.
+ * Bulk operations sweep stored tokens as well as the cache index, log cache
+ * failures, and still delete the rows. Browser logout (`revokeOne`) deletes
+ * the row first, attempts both cache removals, and throws any failure so the
+ * caller can retry without reporting a successful sign-out.
  */
 export class SessionRevocationService {
   constructor(private readonly deps: SessionRevocationServiceDeps) {}
+
+  /**
+   * Revoke rows already scoped by a caller-facing inventory.
+   *
+   * Personal inventory historically dropped the complete index after clearing
+   * its selected token entries. Keeping that policy here avoids leaving stale
+   * index members behind while still letting the inventory retain ownership
+   * checks and current-session refusal.
+   */
+  async revokeSessions({
+    userId,
+    sessions,
+  }: {
+    userId: string;
+    sessions: readonly RevocableSession[];
+  }): Promise<{ ended: number }> {
+    if (sessions.length === 0) return { ended: 0 };
+
+    const ended = await this.deps.records.deleteByIds({
+      ids: sessions.map((session) => session.id),
+    });
+
+    try {
+      await this.deps.cache.dropSessions({
+        tokens: sessions.map((session) => session.sessionToken),
+      });
+      await this.deps.cache.dropIndex({ userId });
+    } catch (error) {
+      logger.error(
+        { error, userId, sessionCount: sessions.length },
+        "could not clear the session cache while ending selected sessions; the rows have been deleted",
+      );
+    }
+
+    logger.info(
+      { userId, deleted: ended, requested: sessions.length },
+      "ended selected sessions",
+    );
+    return { ended };
+  }
 
   /**
    * End every session this person holds.
@@ -241,6 +264,10 @@ export class SessionRevocationService {
     });
     if (doomed.length === 0) return { ended: 0 };
 
+    const ended = await this.deps.records.deleteByIds({
+      ids: doomed.map((session) => session.id),
+    });
+
     const doomedTokens = doomed.map((session) => session.sessionToken);
     try {
       const indexed = await this.deps.cache.readIndex({ userId });
@@ -258,13 +285,10 @@ export class SessionRevocationService {
     } catch (error) {
       logger.error(
         { error, userId, identifierId },
-        "could not clear the session cache while ending one sign-in method's sessions; the rows are still being deleted",
+        "could not clear the session cache while ending one sign-in method's sessions; the rows have been deleted",
       );
     }
 
-    const ended = await this.deps.records.deleteByIds({
-      ids: doomed.map((session) => session.id),
-    });
     logger.info(
       { userId, identifierId, deleted: ended },
       "ended the sessions one sign-in method minted",
@@ -272,17 +296,7 @@ export class SessionRevocationService {
     return { ended };
   }
 
-  /**
-   * End the ONE session a token names — what signing out does.
-   *
-   * The row is deleted first and the cache after, the opposite of the wider
-   * verbs, because the person doing this is holding the cookie: the request
-   * that follows carries no session token at all, so there is no window for a
-   * cached read to answer from.
-   *
-   * The user id is taken from the caller rather than from the row, so a token
-   * whose row has already gone still clears that person's index.
-   */
+  /** A successful logout has removed both copies of the session. */
   async revokeOne({
     token,
     userId,
@@ -290,23 +304,18 @@ export class SessionRevocationService {
     token: string;
     userId: string;
   }): Promise<void> {
-    try {
-      await this.deps.records.deleteByToken({ token });
-    } catch (error) {
-      logger.warn(
-        { error, userId },
-        "could not delete the session row while signing somebody out; the cached session is still being cleared",
-      );
-    }
-
-    try {
-      await this.deps.cache.dropSessions({ tokens: [token] });
-      await this.deps.cache.dropIndex({ userId });
-    } catch (error) {
-      logger.warn(
-        { error, userId },
-        "could not clear the cached session while signing somebody out",
-      );
+    // Delete the row first so a concurrent lookup cannot refill the cleared cache.
+    const deletion = await Promise.allSettled([
+      this.deps.records.deleteByToken({ token }),
+    ]);
+    const cache = await Promise.allSettled([
+      this.deps.cache.dropSessions({ tokens: [token] }),
+      this.deps.cache.dropIndex({ userId }),
+    ]);
+    for (const result of [...deletion, ...cache]) {
+      if (result.status === "rejected") {
+        throw result.reason;
+      }
     }
   }
 }

@@ -6,6 +6,10 @@ import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import {
+  checkOrganizationPermission,
+  checkTeamPermission,
+} from "~/server/app-layer/authz/permission-adapters";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
@@ -20,7 +24,6 @@ import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
-import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 /**
@@ -177,6 +180,10 @@ export const projectRouter = createTRPCRouter({
           apiKey: generateApiKey(),
         },
       });
+
+      // Best-effort and never throws: without its key-map row the project
+      // reads zero rows from LangWatchQL until the next deploy's backfill.
+      await getApp().projects.syncLwqlKeyMapRow(project);
 
       // (The eager per-project Langy service key that used to be minted here is
       // gone — Langy now mints a per-turn, per-user session key scoped to exactly

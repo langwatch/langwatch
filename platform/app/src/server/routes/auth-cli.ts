@@ -47,6 +47,7 @@ import {
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@ee/governance/services/platformToolPolicy.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -56,7 +57,6 @@ import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
-import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
   type CliKeySelection,
@@ -3262,6 +3262,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,
+      userEmail: session.user.email,
       // Device login picks an organization, not a project.
       projectId: NOT_TARGETED,
       organizationId: organization_id,

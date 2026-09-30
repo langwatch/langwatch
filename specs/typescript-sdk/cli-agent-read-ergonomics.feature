@@ -42,10 +42,23 @@ Feature: The CLI reads the way an agent expects
       Then the CLI refuses the expression and names the field
 
     @unit
+    Scenario: A pipe into a path reads the same as writing the path inline
+      Given a result that holds a list of projects
+      When the caller filters it with ".data[] | .slug"
+      Then the CLI answers the same list of slugs as ".data[].slug"
+
+    @unit
+    Scenario: A pipe into a path on a single value reads that value
+      Given a result with a "meta" object
+      When the caller filters it with ".meta | .name"
+      Then the CLI answers the name
+
+    @unit
     Scenario: Syntax the subset does not implement is still refused
       Given any result
       When the caller filters it with quoting, optionals, operators or function calls
       Then the CLI refuses the expression instead of answering null
+      And the refusal names what the subset does accept after a pipe
 
   Rule: Every list command takes the flag that caps a result
 

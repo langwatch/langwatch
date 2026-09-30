@@ -12,15 +12,13 @@ const logger = createLogger("langwatch:identity:signin-router");
 
 /**
  * The composition layer over `@langwatch/identity`'s pure router (ADR-117 §1):
- * it assembles the engine's inputs from injected ports, calls the engine, and
- * records the decision. It holds no routing policy of its own — every branch a
- * reviewer might look for is in the engine, where a test enumerates it without
- * a stub in sight.
+ * it assembles the engine's inputs from injected ports, applies the connection
+ * versus legacy lookup precedence, calls the engine, and records the decision.
  *
- * The ports are what make D04 a composition change rather than a router
- * change: today the domain lookup reads `Organization.ssoDomain` strings, and
- * it reads the `SsoConnection` projection first, and the strings only after.
- * Neither this file nor the engine learns which.
+ * The two domain ports keep storage ownership in the app while this service
+ * owns the fallback decision: a projected connection answers only in a state
+ * the engine routes, and a projected connection list replaces the legacy list
+ * when one exists.
  */
 
 /** Org-level routing data. Never per-user: see the engine's docblock. */
@@ -33,6 +31,11 @@ export interface SignInDomainRoutingPort {
   /** Every connection this instance could auto-redirect to with no address
    *  in hand (the self-hosted sole-connection rule). */
   listActiveConnections(): Promise<readonly RoutableConnection[]>;
+}
+
+export interface SignInDomainRoutingSources {
+  legacy: SignInDomainRoutingPort;
+  connections: SignInDomainRoutingPort;
 }
 
 /** Instance-level method policy, including ADR-027's frozen license gate. */
@@ -121,7 +124,7 @@ const defaultRecorder: SignInRoutingRecorder = {
 };
 
 export interface SignInRouterDeps {
-  domains: SignInDomainRoutingPort;
+  domains: SignInDomainRoutingSources;
   policy: SignInMethodPolicyPort;
   breakGlass: SignInBreakGlassLimiter;
   accounts: SignInAccountLookupPort;
@@ -137,7 +140,7 @@ export interface SignInRouteRequest {
 }
 
 export class SignInRouterService {
-  private readonly domains: SignInDomainRoutingPort;
+  private readonly domains: SignInDomainRoutingSources;
   private readonly policy: SignInMethodPolicyPort;
   private readonly breakGlass: SignInBreakGlassLimiter;
   private readonly accounts: SignInAccountLookupPort;
@@ -232,26 +235,35 @@ export class SignInRouterService {
     });
   }
 
-  /**
-   * Exactly one of the two reads runs: a domain is asked about only when one
-   * was submitted, and the sole-connection list only when none was. Sign-in is
-   * a hot path (epic R12/R13), so it stays at one Postgres read either way.
-   */
+  /** A supplied domain selects one connection; without it, routing considers
+   * the active connection list. Projected connections take precedence over legacy routes. */
   private async lookups({ domain }: { domain: string | null }): Promise<{
     domainConnection: RoutableConnection | null;
     activeConnections: readonly RoutableConnection[];
   }> {
     if (domain) {
+      const projected = await this.domains.connections.findConnectionForDomain({
+        domain,
+      });
+      if (projected !== null && ROUTING_STATES.includes(projected.state)) {
+        return { domainConnection: projected, activeConnections: [] };
+      }
       return {
-        domainConnection: await this.domains.findConnectionForDomain({
+        domainConnection: await this.domains.legacy.findConnectionForDomain({
           domain,
         }),
         activeConnections: [],
       };
     }
+    const [legacy, projected] = await Promise.all([
+      this.domains.legacy.listActiveConnections(),
+      this.domains.connections.listActiveConnections(),
+    ]);
     return {
       domainConnection: null,
-      activeConnections: await this.domains.listActiveConnections(),
+      activeConnections: projected.length > 0 ? projected : legacy,
     };
   }
 }
+
+const ROUTING_STATES: readonly string[] = ["ACTIVE", "SUSPENDED"];

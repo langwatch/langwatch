@@ -22,6 +22,7 @@ import {
   useFieldArray,
   useWatch,
 } from "react-hook-form";
+import { displayNameFor } from "~/features/auth/logic/displayName";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { ConfirmDialog } from "../../components/gateway/ConfirmDialog";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
@@ -149,7 +150,7 @@ export const TeamForm = ({
   const userOptions = useMemo(
     () =>
       users.data?.map((user) => ({
-        label: `${user.name} (${user.email})`,
+        label: `${displayNameFor(user)} (${user.email})`,
         value: user.id,
       })) ?? [],
     [users.data],

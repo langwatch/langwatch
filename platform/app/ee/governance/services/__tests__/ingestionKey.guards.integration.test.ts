@@ -24,8 +24,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 import { IngestionKeyService } from "../ingestionKey.service";
+
+wireDefaultTestApp();
 
 const suffix = nanoid(8);
 const ORG_ID = `org-ikg-${suffix}`;
@@ -44,14 +48,12 @@ async function seedTeamAdmin(userId: string): Promise<void> {
   });
   // TEAM-scoped ADMIN (not org-scoped) so the test proves the personal-team
   // ceiling actually cascades down to traces:create on a project in the team.
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: ORG_ID,
-      userId,
-      role: "ADMIN",
-      scopeType: "TEAM",
-      scopeId: TEAM_ID,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId: ORG_ID,
+    userId,
+    role: "ADMIN",
+    scopeType: "TEAM",
+    scopeId: TEAM_ID,
   });
 }
 
@@ -88,6 +90,9 @@ describe("IngestionKey ownership + list visibility", () => {
 
   afterAll(async () => {
     await prisma.roleBinding
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.grant
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
     await prisma.apiKey

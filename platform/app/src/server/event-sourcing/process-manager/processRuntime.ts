@@ -84,6 +84,7 @@ export function buildIntentHandlers(
         tenantId: message.tenantId,
         messageKey: message.messageKey,
         attempt: message.attempt,
+        leaseExpiresAt: message.leaseExpiresAt,
       });
     };
   }

@@ -38,6 +38,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { resolveLwqlReadableProjects } from "~/server/analytics/lwql/readableProjects";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
@@ -51,6 +52,7 @@ import { prisma } from "~/server/db";
 import { getDefaultModelsSnapshot } from "~/server/modelProviders/modelDefaults.read";
 import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
 import { TeamService } from "~/server/teams/team.service";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
@@ -248,6 +250,28 @@ const surfaces: ListingSurface[] = [
       return [...new Set(rows.map((r) => r.projectId))];
     },
   },
+  {
+    // The LangWatchQL query door fans a key out across the org's projects it
+    // can read. The candidate enumeration filters the governance home before
+    // the per-project `analytics:view` cut is even consulted, so a grant-all
+    // cut here is the strongest leak probe: anything the enumeration let
+    // through would show.
+    name: "the LangWatchQL readable-project fan-out",
+    module: "src/server/analytics/lwql/readableProjects.ts",
+    ids: async () => {
+      const projects = await resolveLwqlReadableProjects({
+        credential: { kind: "apiKey", organizationId },
+        viewableCut: async ({ candidates }) => {
+          const reachable = new Set(
+            candidates.map((candidate) => candidate.id),
+          );
+          return (projectId: string) => reachable.has(projectId);
+        },
+        prisma,
+      });
+      return projects.map((p) => p.id);
+    },
+  },
 ];
 
 /**
@@ -390,14 +414,12 @@ beforeAll(async () => {
   await prisma.organizationUser.create({
     data: { userId, organizationId, role: OrganizationUserRole.ADMIN },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId,
-      userId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organizationId,
   });
   await prisma.teamUser.create({
     data: { userId, teamId, role: TeamUserRole.ADMIN },
@@ -448,6 +470,7 @@ afterAll(async () => {
       "agent",
       { projectId: { in: [applicationProjectId, governanceProjectId] } },
     ],
+    ["grant", { organizationId }],
     ["roleBinding", { organizationId }],
     ["teamUser", { teamId }],
     ["organizationUser", { organizationId }],

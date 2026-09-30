@@ -14,14 +14,17 @@ import {
   createIdentityStorageAdapter,
   type PasskeyRemovalPort,
 } from "../../better-auth/identity-storage-adapter";
+const plaintextProviderConfigCipher = {
+  seal: (document: string): string => document,
+  open: (stored: string): string => stored,
+};
 import type {
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityResolutionPort,
 } from "../../better-auth/storage-ports";
 import { IdentityGuards } from "../../guards";
-import {
-  newIdentityCommandId,
-} from "../../identity-command-id";
+import { newIdentityCommandId } from "../../identity-command-id";
 import type { IdentityLedger } from "../../identity-ledger";
 import type { IdentityUsersRepository } from "../../identity-users.repository";
 import { IdentityService } from "../../identity.service";
@@ -136,6 +139,8 @@ export interface IdentityStack {
    *  restates facts the store already holds and they are absorbed, so
    *  this is also the count of what a retry did NOT duplicate. */
   events: InMemoryIdentityEventStore;
+  /** Registers a connection, the way its setup journey would have. */
+  registerConnection: (args: { providerId: string; issuer: string }) => void;
 }
 
 /**
@@ -258,15 +263,60 @@ export function identityStack({
     ? inertIdentityPorts.resolution
     : storage;
 
+  const connectionIssuers: IdentityConnectionIssuersPort = {
+    providerIdForIssuer: async ({ issuer }) => {
+      const row = (db.ssoProvider ?? []).find((held) => held.issuer === issuer);
+      return typeof row?.providerId === "string" ? row.providerId : null;
+    },
+    registeredIssuerFor: async ({ providerId }) => {
+      const row = (db.ssoProvider ?? []).find(
+        (held) => held.providerId === providerId,
+      );
+      return typeof row?.issuer === "string" ? row.issuer : null;
+    },
+  };
+
   const bridge = bridgeAccountCeremonies({
     ceremonies,
     routesToIdentity: isUserOnIdentityWrites,
   });
+  const legacyEngine = schemaBoundLegacy
+    ? schemaBoundLegacyEngine(db)
+    : memoryAdapter(db);
+
   const auth = authOver(
     createIdentityStorageAdapter({
-      legacyEngine: schemaBoundLegacy
-        ? schemaBoundLegacyEngine(db)
-        : memoryAdapter(db),
+      legacyEngine,
+      /**
+       * The Postgres transaction, as a memory store can keep it: take the
+       * tables' contents before the callback and put them back if it throws.
+       *
+       * The same engine is handed back rather than a second one, because
+       * there is no second client to bind — the rows ARE the store. What this
+       * reproduces is the promise the app's transaction makes (commit on
+       * return, roll the ROWS back on throw, re-throw unchanged) and not the
+       * row lock, which needs a database. The lock is proved against Postgres
+       * in the app's own suite.
+       */
+      postgresTransaction: async (work) => {
+        const taken = new Map(
+          Object.entries(db).map(([model, rows]) => [
+            model,
+            rows.map((row) => ({ ...row })),
+          ]),
+        );
+        try {
+          return await work(legacyEngine);
+        } catch (error) {
+          for (const [model, rows] of Object.entries(db)) {
+            // Splice rather than reassign: the identity storage stub holds
+            // the account array itself, so a replacement array would leave it
+            // reading rows nothing writes to any more.
+            rows.splice(0, rows.length, ...(taken.get(model) ?? []));
+          }
+          throw error;
+        }
+      },
       passkeyRemoval: passkeyRemoval ?? {
         deleteIfAnotherWayInRemains: async ({ passkeyId }) => {
           const passkeys = db.passkey ?? [];
@@ -280,17 +330,23 @@ export function identityStack({
       },
       accounts,
       resolution,
+      connectionIssuers,
       ceremonies,
       isUserOnIdentityWrites,
       isAnyoneOnIdentityWrites,
+      providerConfig: plaintextProviderConfigCipher,
     }),
     // The application's own wiring, verbatim: the account ceremonies bound to
     // better-auth's `databaseHooks` alongside the adapter that also runs them.
     withDatabaseHooks
       ? {
           account: {
-            create: { before: (account) => bridge.beforeAccountCreate(account) },
-            delete: { before: (account) => bridge.beforeAccountDelete(account) },
+            create: {
+              before: (account) => bridge.beforeAccountCreate(account),
+            },
+            delete: {
+              before: (account) => bridge.beforeAccountDelete(account),
+            },
           },
         }
       : undefined,
@@ -307,6 +363,10 @@ export function identityStack({
     migrationState,
     engine,
     events,
+    registerConnection: ({ providerId, issuer }) => {
+      db.ssoProvider ??= [];
+      db.ssoProvider.push({ id: providerId, providerId, issuer, domain: "" });
+    },
   };
 }
 
@@ -320,4 +380,3 @@ export async function signUp(
   });
   return response.headers.get("set-cookie") ?? "";
 }
-

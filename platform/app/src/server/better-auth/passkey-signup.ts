@@ -24,6 +24,13 @@ export const PASSKEY_SIGNUP_EMAIL_TAKEN = "EMAIL_ALREADY_REGISTERED";
 export const PASSKEY_SIGNUP_EMAIL_INVALID = "INVALID_EMAIL";
 
 /**
+ * The code for a sign-up ceremony run from a browser that already holds a
+ * session. Refused so it cannot land a new address's credential on the
+ * signed-in account, which is the only thing the plugin would let it do.
+ */
+export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
+
+/**
  * Everything the taken-address guard has to weigh about one row: who it is,
  * and every credential that could sign into it. Both credential tables,
  * because a user whose backfill has finalized keeps theirs on the identity
@@ -137,6 +144,23 @@ function requireSignUpContext(context: string | null | undefined): {
       .digest("base64url"),
     addressProof: carried.data.addressProof,
   };
+}
+
+/**
+ * Whether the ceremony carries a sign-up context at all — the address, claim
+ * and proof a NEW account is created from. The settings, nudge and post-reset
+ * "add a passkey" callers send none; only the sign-up screen does. It is what
+ * tells a signed-in caller adding to their own account apart from one running
+ * a sign-up they must not.
+ */
+function carriesSignUpContext(context: string | null | undefined): boolean {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(context ?? "");
+  } catch {
+    return false;
+  }
+  return signUpContextSchema.safeParse(decoded).success;
 }
 
 /** The one refusal an address that is somebody's answers with. */
@@ -264,6 +288,17 @@ export class PasskeySignUpRegistration {
     // The plugin compares that id against the session immediately after, so
     // this can only ever name the account the caller already holds.
     const session = await getSessionFromCtx(ctx);
+    // A sign-up ceremony from a signed-in browser: the account it names is
+    // never created (the plugin forces the credential onto the session), so
+    // it would land the wrong account's passkey and lose the other, silently.
+    // Refused here — the only seam the plugin runs for it (specs §"A signed-in
+    // browser cannot sign up a different address's passkey").
+    if (session?.user?.id && carriesSignUpContext(context)) {
+      throw new APIError("FORBIDDEN", {
+        code: PASSKEY_SIGNUP_ALREADY_SIGNED_IN,
+        message: "Sign out before creating a new account with a passkey.",
+      });
+    }
     if (session?.user?.id) {
       return { userId: session.user.id, name: session.user.email };
     }

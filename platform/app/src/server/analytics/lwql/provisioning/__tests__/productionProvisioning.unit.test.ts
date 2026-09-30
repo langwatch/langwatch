@@ -2,25 +2,23 @@
  * `productionProvisioning.ts` is pure composition — no I/O, so every branch is
  * unit-testable without a database. Two things this file exists to pin:
  *
- * 1. This deploy provisions ClickHouse-native views only — never the access
- *    model (grants, row policies, the restricted user) and never the
- *    PostgreSQL-mapped views. Both are infra's job (terraform), and a
- *    regression here would ship a `GRANT`/`CREATE USER` against infra's
- *    XML-managed identity.
+ * 1. The PostgreSQL-side approved views compose in the schema the connection
+ *    URL names, not a hardcoded `public`, and only for PostgreSQL-resident
+ *    datasets. (The app owns the ClickHouse access model and converges it at
+ *    boot through `selfProvisioning.ts`, ADR-142 — not this module.)
  * 2. `lwqlKeyMapTableQualifiedName` always resolves the key-map table under
  *    `sourceDatabase` (migration 00084's database), never `names.database`.
  *    A backfill using the wrong database writes rows a query never sees.
  *
  * @see ../productionProvisioning.ts — the composition under test
  * @see ../../clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";
 import { GATED_DATASET } from "../../__tests__/gatedDatasetFixture";
 import { lwqlTenantCapability } from "../../capability";
 import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
-import type { LangWatchQLViewDefinition } from "../../catalog/types";
 import { lwqlPostgresViews } from "../../catalog/types";
 import type { LangWatchQLConnection } from "../../connection";
 import type { LangWatchQLNames } from "../accessModel";
@@ -29,7 +27,6 @@ import {
   lwqlKeyMapTableQualifiedName,
   lwqlPostgresSchemaFromDatabaseUrl,
   planLwqlKeyMapBackfill,
-  productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
   withTenancyOptOut,
@@ -71,11 +68,6 @@ function firstPostgresResidentView() {
 
 const POSTGRES_RESIDENT_VIEW = firstPostgresResidentView();
 
-const MIXED_VIEWS: readonly LangWatchQLViewDefinition[] = [
-  GATED_DATASET,
-  POSTGRES_RESIDENT_VIEW,
-];
-
 describe("given productionLangWatchQLNames", () => {
   it("derives every name from the connection", () => {
     expect(productionLangWatchQLNames({ connection: CONNECTION })).toEqual({
@@ -97,49 +89,6 @@ describe("given lwqlKeyMapTableQualifiedName", () => {
 
     expect(result).toBe(`${SOURCE_DATABASE}.${LWQL_KEY_MAP_TABLE}`);
     expect(result).not.toBe(`${NAMES.database}.${LWQL_KEY_MAP_TABLE}`);
-  });
-});
-
-describe("given productionClickHouseObjectStatements", () => {
-  const statements = productionClickHouseObjectStatements({
-    names: NAMES,
-    sourceDatabase: SOURCE_DATABASE,
-    views: MIXED_VIEWS,
-  });
-
-  // @scenario "Provisioning does not alter the migrated database"
-  it("creates the LangWatchQL database first", () => {
-    expect(statements[0]).toBe(
-      `CREATE DATABASE IF NOT EXISTS ${NAMES.database}`,
-    );
-  });
-
-  it("creates a view for the ClickHouse-native dataset", () => {
-    expect(
-      statements.some((s) =>
-        s.includes(`${NAMES.database}.${GATED_DATASET.name}`),
-      ),
-    ).toBe(true);
-  });
-
-  it("does not create a view for the PostgreSQL-resident dataset", () => {
-    expect(
-      statements.some((s) =>
-        s.includes(`${NAMES.database}.${POSTGRES_RESIDENT_VIEW.name}`),
-      ),
-    ).toBe(false);
-  });
-
-  it.each([
-    ["GRANT", "grants"],
-    ["CREATE ROW POLICY", "row policies"],
-    ["CREATE USER", "a restricted user"],
-    [
-      LWQL_KEY_MAP_TABLE,
-      "the key-map table (migration 00084 already created it)",
-    ],
-  ])("never emits a statement containing %s — this deploy does not provision %s (infra's job)", (needle) => {
-    expect(statements.some((s) => s.includes(needle))).toBe(false);
   });
 });
 

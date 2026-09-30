@@ -63,6 +63,8 @@ export interface AppConfig {
   slackPlanLimitChannel?: string;
   slackSignupsChannel?: string;
   slackSubscriptionsChannel?: string;
+  /** Self-hosted lead signals (ADR-141). Falls back to the signups channel. */
+  slackSelfHostedChannel?: string;
   hubspotPortalId?: string;
   hubspotReachedLimitFormId?: string;
   hubspotFormId?: string;
@@ -109,6 +111,7 @@ export function createAppConfigFromEnv(overrides?: {
     slackPlanLimitChannel: env.SLACK_PLAN_LIMIT_CHANNEL,
     slackSignupsChannel: env.SLACK_CHANNEL_SIGNUPS,
     slackSubscriptionsChannel: env.SLACK_CHANNEL_SUBSCRIPTIONS,
+    slackSelfHostedChannel: env.SLACK_CHANNEL_SELF_HOSTED,
     hubspotPortalId: env.HUBSPOT_PORTAL_ID,
     hubspotReachedLimitFormId: env.HUBSPOT_REACHED_LIMIT_FORM_ID,
     hubspotFormId: env.HUBSPOT_FORM_ID,

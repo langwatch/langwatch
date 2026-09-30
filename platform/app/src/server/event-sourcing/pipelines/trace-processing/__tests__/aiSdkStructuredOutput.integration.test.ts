@@ -161,6 +161,12 @@ describe.skipIf(!hasTestcontainers)(
         store: new SpanAppendStore(spanStorageService.repository),
       });
       const normalizedSpan = mapProjection.mapTraceSpanReceived(event!);
+      // The fixture span carries an ordinary start time; a skip here would mean
+      // the storable-time gate refused it, and the assertions below would be
+      // asserting against an empty table rather than a mapping bug.
+      if (normalizedSpan === null) {
+        throw new Error("expected the fixture span to map to a stored span");
+      }
       await new SpanAppendStore(spanStorageService.repository).append(
         normalizedSpan,
         context,

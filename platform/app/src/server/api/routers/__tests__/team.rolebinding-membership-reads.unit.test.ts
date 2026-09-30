@@ -4,14 +4,11 @@ import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { teamRouter } from "../team";
 
-// Team membership is written ONLY to RoleBinding since migration
-// 20260407120000_migrate_team_users_to_role_bindings — the legacy TeamUser
-// relation is no longer populated for members added through the settings page.
-// These regression guards prove the read paths (getTeamWithMembers,
-// getTeamsWithMembers, getBySlug) resolve membership from TEAM-scoped
-// RoleBindings rather than the stale team.members (TeamUser) relation.
-// Without this, a freshly-added admin vanishes on refresh, disappears from
-// member pickers, and fails the getBySlug access gate.
+// Team membership is read from live TEAM-scoped grants. These regression
+// guards prove the read paths (getTeamWithMembers, getTeamsWithMembers,
+// getBySlug) resolve membership from grant rows rather than a stale
+// compatibility relation. Without this, a freshly-added admin vanishes on
+// refresh, disappears from member pickers, and fails the getBySlug access gate.
 //
 // The org-permission middleware/guard is real authorization the page already
 // passes for an org admin; it's mocked to a pass-through so these tests isolate
@@ -24,13 +21,19 @@ vi.mock("~/server/app-layer/app", async () => {
   return appPermissionsMock();
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    };
+  },
+);
 
 const ORG_ID = "org_1";
 const TEAM_ID = "team_1";
@@ -53,7 +56,7 @@ function team() {
 function buildMockPrisma({
   teamBindings,
 }: {
-  teamBindings: unknown[];
+  teamBindings: Array<ReturnType<typeof bindingFor>>;
 }): PrismaClient {
   return {
     team: {
@@ -62,8 +65,29 @@ function buildMockPrisma({
       findFirst: vi.fn().mockResolvedValue(team()),
       findMany: vi.fn().mockResolvedValue([team()]),
     },
-    roleBinding: {
-      findMany: vi.fn().mockResolvedValue(teamBindings),
+    grant: {
+      findMany: vi.fn().mockResolvedValue(
+        teamBindings.map((binding) => ({
+          id: binding.id,
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: binding.userId,
+          roleKey: binding.role.toLowerCase(),
+          legacyRole: binding.role,
+          scopeType: "TEAM",
+          scopeId: TEAM_ID,
+          occurredAt: binding.createdAt,
+          updatedAt: binding.updatedAt,
+        })),
+      ),
+    },
+    user: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue(teamBindings.map((binding) => binding.user)),
+    },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
   } as unknown as PrismaClient;
 }

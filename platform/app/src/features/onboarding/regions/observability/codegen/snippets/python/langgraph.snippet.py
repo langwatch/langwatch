@@ -44,9 +44,6 @@ def llm_call(state: dict):
             )
         ]
         + state["messages"],
-        config=RunnableConfig(
-            callbacks=[langwatch.get_current_trace().get_langchain_callback()]  # +
-        ),
     )
     return {"messages": [msg]}
 
@@ -83,7 +80,12 @@ agent = agent_builder.compile()
 
 @langwatch.trace(name="LangGraph - Calculator Agent")  # +
 def main(user_question: str) -> str:
-    result = agent.invoke({"messages": [HumanMessage(content=user_question)]})
+    result = agent.invoke(
+        {"messages": [HumanMessage(content=user_question)]},
+        config=RunnableConfig(
+            callbacks=[langwatch.get_current_trace().get_langchain_callback()]  # +
+        ),
+    )
     final_msg = result["messages"][-1]  # assistant reply
     return getattr(final_msg, "content", str(final_msg))
 

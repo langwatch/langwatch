@@ -30,6 +30,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 
 import { prisma } from "../../../db";
 import {
@@ -105,23 +106,19 @@ describe("user.requestBudgetIncrease integration", () => {
       ],
     });
     // RoleBindings for permission middleware
-    await prisma.roleBinding.createMany({
-      data: [
-        {
-          organizationId: ORG_ID,
-          userId: REQUESTER_USER_ID,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: ORG_ID,
-        },
-        {
-          organizationId: ORG_NO_ADMIN_ID,
-          userId: REQUESTER_USER_ID,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: ORG_NO_ADMIN_ID,
-        },
-      ],
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: REQUESTER_USER_ID,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
+    });
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_NO_ADMIN_ID,
+      userId: REQUESTER_USER_ID,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_NO_ADMIN_ID,
     });
 
     caller = appRouter.createCaller(
@@ -141,6 +138,9 @@ describe("user.requestBudgetIncrease integration", () => {
 
   afterAll(async () => {
     const orgIds = [ORG_ID, ORG_NO_ADMIN_ID];
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: orgIds } },
     });

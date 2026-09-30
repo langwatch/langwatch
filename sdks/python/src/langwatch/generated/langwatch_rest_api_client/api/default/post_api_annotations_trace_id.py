@@ -5,9 +5,9 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.annotation import Annotation
 from ...models.error import Error
 from ...models.post_api_annotations_trace_id_body import PostApiAnnotationsTraceIdBody
+from ...models.post_api_annotations_trace_id_response_200 import PostApiAnnotationsTraceIdResponse200
 from ...types import Response, safe_http_status
 
 
@@ -33,9 +33,11 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Annotation | Error | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Error | PostApiAnnotationsTraceIdResponse200 | None:
     if response.status_code == 200:
-        response_200 = Annotation.from_dict(response.json())
+        response_200 = PostApiAnnotationsTraceIdResponse200.from_dict(response.json())
 
         return response_200
 
@@ -50,7 +52,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Annotation | Error]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Error | PostApiAnnotationsTraceIdResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -67,7 +71,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: PostApiAnnotationsTraceIdBody,
-) -> Response[Annotation | Error]:
+) -> Response[Error | PostApiAnnotationsTraceIdResponse200]:
     """Create an annotation for a single trace
 
     Args:
@@ -79,7 +83,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Annotation | Error]
+        Response[Error | PostApiAnnotationsTraceIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -99,7 +103,7 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     body: PostApiAnnotationsTraceIdBody,
-) -> Annotation | Error | None:
+) -> Error | PostApiAnnotationsTraceIdResponse200 | None:
     """Create an annotation for a single trace
 
     Args:
@@ -111,7 +115,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Annotation | Error
+        Error | PostApiAnnotationsTraceIdResponse200
     """
 
     return sync_detailed(
@@ -126,7 +130,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     body: PostApiAnnotationsTraceIdBody,
-) -> Response[Annotation | Error]:
+) -> Response[Error | PostApiAnnotationsTraceIdResponse200]:
     """Create an annotation for a single trace
 
     Args:
@@ -138,7 +142,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Annotation | Error]
+        Response[Error | PostApiAnnotationsTraceIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -156,7 +160,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     body: PostApiAnnotationsTraceIdBody,
-) -> Annotation | Error | None:
+) -> Error | PostApiAnnotationsTraceIdResponse200 | None:
     """Create an annotation for a single trace
 
     Args:
@@ -168,7 +172,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Annotation | Error
+        Error | PostApiAnnotationsTraceIdResponse200
     """
 
     return (

@@ -7,6 +7,7 @@ import {
   deploymentOffersTwoStepVerification,
   resolveSignInMethodPolicy,
 } from "~/server/app-layer/identity/signin-method-policy";
+import { isEmailPasswordEnabled } from "~/server/better-auth/config/email-and-password";
 import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";
@@ -58,6 +59,12 @@ export const publicEnvRouter = publicProcedure
       // endpoint behind the button", and this is the same read the plugin
       // registration and the method policy make.
       PASSKEYS_ENABLED: deploymentOffersPasskeys(),
+      // Whether this deployment lets an account set and use a local password —
+      // the same server rule that mounts /sign-up/email. Derived, not the raw
+      // provider: self-hosted mounts it even behind an enterprise IdP (ADR-027),
+      // so a passkey-only admin can still set the password break-glass needs. A
+      // browser that keyed off NEXTAUTH_PROVIDER alone hid that door.
+      EMAIL_PASSWORD_ENABLED: isEmailPasswordEnabled(env),
       // The federated providers this deployment actually offers — mounted AND
       // licensed — as the sign-in method policy's own answer, so the
       // linked-accounts offer and the sign-in rail can never disagree. Ids
@@ -78,6 +85,7 @@ export const publicEnvRouter = publicProcedure
         .map((method) => method.id),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
+      HIDE_DEV_INDICATOR: env.HIDE_DEV_INDICATOR,
 
       HAS_EMAIL_PROVIDER_KEY: hasEmailProvider(),
       IS_SAAS: env.IS_SAAS,

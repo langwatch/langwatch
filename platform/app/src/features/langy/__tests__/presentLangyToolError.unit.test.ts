@@ -376,4 +376,33 @@ describe("presentLangyToolError", () => {
       expect(presentation.detail).toContain("gh auth login");
     });
   });
+
+  describe("given a shell call the settled frame marked as local", () => {
+    const ghOutput =
+      "To get started with GitHub CLI, please run: gh auth login";
+
+    /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
+    it("keeps gh's instruction, because the marker says where it ran", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        errorText: ghOutput,
+        toolName: "bash",
+        local: true,
+      });
+
+      expect(presentation.code).toBeUndefined();
+      expect(presentation.detail).toContain("gh auth login");
+    });
+
+    /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
+    it("still names the missing GitHub App when nothing marked the call", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        errorText: ghOutput,
+        toolName: "bash",
+      });
+
+      expect(presentation.code).toBe("langy_github_not_connected");
+    });
+  });
 });

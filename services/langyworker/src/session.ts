@@ -5,8 +5,9 @@
  *   provider is the mediated gateway, keyed by env reference.
  * - Everything pi persists lives under the worker home: agentDir at
  *   `$HOME/.langy-pi`, the session JSONL under config.sessionDir.
- * - Auto-compaction ON, pi's own transient retry OFF (the manager and the
- *   product's self-retry own retries).
+ * - Auto-compaction ON, pi's own transient retry OFF: the manager's LLM
+ *   proxy retries a burst rate limit with the provider's Retry-After
+ *   (llmretry.go), and the product's self-retry owns the rest.
  * - The resource loader discovers nothing (noExtensions/noSkills/
  *   noContextFiles): the system prompt is wholly owned by the wrapper, and
  *   the only extensions are the inline factories: `todowrite`, `skill`,
@@ -33,6 +34,13 @@ import {
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
+import { SAY_TOOL_NAME, createSayExtension, repeatedLineRefusal } from "./tools/say.js";
+import { guidedSkillRefusal } from "./guided-kickoff.js";
+import { closingLineRefusal } from "./guided-turn-end.js";
+import {
+  SECRET_SNIPPET_TOOL_NAME,
+  createSecretSnippetExtension,
+} from "./tools/secret-snippet.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
 import { TODOWRITE_TOOL_NAME, createTodowriteExtension } from "./tools/todowrite.js";
 import type { TurnContext } from "./tools/turn-context.js";
@@ -48,6 +56,8 @@ export const ENABLED_TOOLS = [
   TODOWRITE_TOOL_NAME,
   SKILL_TOOL_NAME,
   QUESTION_TOOL_NAME,
+  SAY_TOOL_NAME,
+  SECRET_SNIPPET_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
   ...LOCAL_TOOL_NAMES,
 ] as const;
@@ -161,9 +171,18 @@ export async function createLangySession({
       createSkillExtension({
         skillsDir: config.skillsDir,
         disabledSkills: config.disabledSkills,
+        refuse: (name) => guidedSkillRefusal({ name, guided: turnContext.guided }),
       }),
       createQuestionExtension({ turnContext }),
-      createLocalWorkspaceExtension({ turnContext }),
+      createSayExtension({
+        refuse: (text) =>
+          closingLineRefusal({ text, calls: turnContext.calls }) ??
+          repeatedLineRefusal({ text, calls: turnContext.calls }),
+      }),
+      createSecretSnippetExtension(),
+      // Registers `bash` in place of pi's built-in: the extension's tool wins
+      // the name in the session's registry.
+      createLocalWorkspaceExtension({ turnContext, sandboxCwd: home }),
     ],
   });
   await resourceLoader.reload();

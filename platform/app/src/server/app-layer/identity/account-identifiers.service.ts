@@ -5,6 +5,7 @@ import {
   type IdentityFact,
   IdentityIdentifierAlreadyHeldError,
   IdentityIdentifierNotFoundError,
+  IdentityIdentifierNotVerifiableError,
   type MarkPrimaryCommandData,
   normalizeIdentifierValue,
 } from "@langwatch/identity";
@@ -272,6 +273,50 @@ export class AccountIdentifiersService {
     codeChallenge: string;
   }): Promise<void> {
     await this.sendConfirmationFor({ userId, identifierId, codeChallenge });
+  }
+
+  /**
+   * Send the confirmation link for the account's OWN address, the one the
+   * session is signed in as.
+   *
+   * The identifier is resolved here from the session's address, never taken
+   * from the caller, so the only address this can mail is the caller's own.
+   * It runs the same PKCE ceremony as any added address: the link alone
+   * confirms nothing, which is what keeps a pre-registered account from being
+   * confirmed by whoever holds the mailbox link.
+   */
+  async sendOwnAddressConfirmation({
+    userId,
+    email,
+    codeChallenge,
+  }: {
+    userId: string;
+    email: string;
+    codeChallenge: string;
+  }): Promise<{ identifierId: string }> {
+    const normalizedValue = normalizeIdentifierValue(email);
+    const heads = await this.heads.findHeads({ userId });
+    const own = Object.values(heads.identifiers).filter(
+      (head) => head.provider === "email" && head.value === normalizedValue,
+    );
+    const attached = own.find((head) => head.state === "ATTACHED");
+    if (!attached) {
+      if (own.some((head) => head.state !== "DETACHED")) {
+        throw new IdentityIdentifierNotVerifiableError(
+          `send_own_address_confirmation: ${normalizedValue} is not awaiting confirmation`,
+        );
+      }
+      throw new IdentityIdentifierNotFoundError(
+        `send_own_address_confirmation: no email identifier carries ${normalizedValue}`,
+      );
+    }
+
+    await this.sendConfirmationFor({
+      userId,
+      identifierId: attached.identifierId,
+      codeChallenge,
+    });
+    return { identifierId: attached.identifierId };
   }
 
   /**

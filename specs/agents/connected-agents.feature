@@ -84,6 +84,13 @@ Feature: Connected agents
     Then the identity key is "support-agent@production"
     And the row records no owner and no host label
 
+  @integration
+  Scenario: The registered frame reports the scope
+    Given a personal API key of user "u_1"
+    When a process registers an agent in "development"
+    Then the registered frame says the agent has scope "owner", with no user id on the wire
+    And an agent registered in "production" is reported with scope "shared"
+
   # ---------------------------------------------------------------------------
   # Owner-only refusal at scheduling
   # ---------------------------------------------------------------------------
@@ -150,6 +157,38 @@ Feature: Connected agents
     When a run targets "connected:support-agent"
     Then the run is refused with "agent_environment_unresolved"
     And the refusal names the environments that are online
+
+  @unit
+  Scenario: A name with no environment picks another person's personal agent only to refuse it as owner-only
+    Given "support-agent" registered in development as the personal agent of user "u_1", with its process connected
+    When a run with no actor, or with user "u_2" as its actor, targets "connected:support-agent"
+    Then the target resolves to that agent's id
+    And the run is refused with "agent_owner_only" naming user "u_1"
+
+  @unit
+  Scenario: A name with no environment prefers a shared online agent over another person's personal one
+    Given "support-agent" registered in development as the personal agent of user "u_1" and in staging as a shared agent, with a process connected in both
+    When a run with no actor targets "connected:support-agent"
+    Then the target resolves to the staging agent's id
+
+  @unit
+  Scenario: A name with no environment ignores another person's personal agent that is offline
+    Given "support-agent" registered in development as the personal agent of user "u_1", with no process connected
+    When a run with no actor targets "connected:support-agent"
+    Then the run is refused with "agent_environment_unresolved"
+
+  @unit
+  Scenario: A name and environment naming only another person's personal agent is refused as owner-only
+    Given "support-agent" registered in development as the personal agent of user "u_1"
+    When a run with no actor targets "connected:support-agent@development"
+    Then the target resolves to that agent's id
+    And the run is refused with "agent_owner_only" naming user "u_1"
+
+  @unit
+  Scenario: The unresolved refusal says a personal development agent is visible only to its owner
+    Given a run refused with "agent_environment_unresolved"
+    Then its remediation says an agent started in development with a personal key is visible only to its owner
+    And it names LANGWATCH_AGENT_ENVIRONMENT as the way to share it
 
   @unit
   Scenario: A name with no environment that matches no connected agent is read as an id
@@ -373,6 +412,31 @@ Feature: Connected agents
     When the call deadline passes
     Then the call fails with "agent_call_timeout"
     And the instance receives a cancel frame
+
+  # An instance that answers with something the schema refuses has answered:
+  # it will not answer again, so the call fails now rather than at the
+  # deadline, and the error names the field the platform could not read.
+
+  @unit
+  Scenario: A result frame the platform cannot read names the field it failed on
+    Given a result frame whose output is a dict of fields with no role
+    When the gateway reads the frame
+    Then it is an unreadable result for that call id
+    And the issue names "output.role"
+
+  @integration
+  Scenario: A result the platform cannot read fails the call at once
+    Given an instance holding a call
+    When it answers with an output that is a dict of fields with no role
+    Then the call fails with "agent_call_failed" before the deadline
+    And the error says the agent answered a result LangWatch cannot read, naming "output.role"
+
+  @integration
+  Scenario: An unreadable result for a call the instance does not hold is dropped
+    Given an instance holding a call
+    When it sends an unreadable result under another call id
+    Then the call it holds is still waiting
+    And its later answer is returned
 
   @unit
   Scenario: A call is refused when every instance is full

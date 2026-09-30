@@ -19,7 +19,7 @@
  * not replace the fresh answer already on screen.
  *
  * @see ../components/LangWatchQLDashboardWidget.tsx — the card this drives
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { useEffect, useRef, useState } from "react";

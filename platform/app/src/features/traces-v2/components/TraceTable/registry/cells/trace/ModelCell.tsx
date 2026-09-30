@@ -13,7 +13,7 @@ import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "~/components/modelProviders/iconsMap";
-import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
+import { useExplorerStore } from "~/features/traces-v2/stores/explorerStore";
 import type { TraceListItem } from "../../../../../types/trace";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
@@ -167,7 +167,7 @@ export function ModelsTooltip({
                     textAlign="left"
                     _hover={{ bg: "bg.muted" }}
                     onClick={() =>
-                      useFilterStore.getState().toggleFacet("model", m)
+                      useExplorerStore.getState().toggleFacet("model", m)
                     }
                     aria-label={`Filter by model "${m}"`}
                   >
@@ -224,7 +224,7 @@ function renderModel(row: TraceListItem, density: Density) {
   const chip = (
     <FilterChip
       onFilter={() =>
-        useFilterStore.getState().toggleFacet("model", rawPrimary)
+        useExplorerStore.getState().toggleFacet("model", rawPrimary)
       }
       filterLabel={`Filter by model "${rawPrimary}"`}
     >

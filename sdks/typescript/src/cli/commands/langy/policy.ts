@@ -10,6 +10,11 @@
  * used a blocklist, or trusted the model's own opinion of a command, was
  * bypassed.
  *
+ * Git is the one family that writes and still runs with no card, because the
+ * folder is a checkout with the developer's own identity and Langy works on a
+ * `langy/*` branch of it. That too is an allowlist: the subcommands in
+ * `ALLOWED_GIT_SUBCOMMANDS`, minus the forms `gitDestructiveForm` parses out.
+ *
  * @see specs/langy/langy-local-permissions.feature
  * @see dev/docs/adr/129-langy-local-control.md
  */
@@ -90,6 +95,8 @@ export const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "tr",
   "diff",
   "cmp",
+  "true",
+  "false",
 ]);
 
 /** The git subcommands that only read the repository. */
@@ -103,8 +110,17 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
   "blame",
   "remote",
   "rev-parse",
+  "rev-list",
   "describe",
   "tag",
+  "cat-file",
+  "ls-tree",
+  "show-ref",
+  "for-each-ref",
+  "merge-base",
+  "name-rev",
+  "shortlog",
+  "check-ignore",
 ]);
 
 /**
@@ -113,17 +129,22 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
  * The subcommand alone is not the answer: `git branch` lists the branches and
  * `git branch new-name` creates one, `git tag` lists the tags and `git tag v1`
  * writes one, `git remote show origin` reaches the network. Each subcommand
- * here reads in its bare form, when `bare` is true, and with the verbs named
- * here. Every other operand asks.
+ * here reads in its bare form, when `bare` is true, with the verbs named
+ * here, and with up to `refs` reference operands: `git symbolic-ref HEAD`
+ * prints where HEAD points and `git symbolic-ref HEAD refs/heads/main` moves
+ * it, `git config user.name` prints the value and `git config user.name x`
+ * sets it. Every other operand asks.
  */
 const GIT_OPERAND_RULES: ReadonlyMap<
   string,
-  { bare: boolean; verbs: ReadonlySet<string>; lists?: boolean }
+  { bare: boolean; verbs: ReadonlySet<string>; lists?: boolean; refs?: number }
 > = new Map([
   ["branch", { bare: true, verbs: new Set<string>(), lists: true }],
   ["tag", { bare: true, verbs: new Set<string>(), lists: true }],
   ["remote", { bare: true, verbs: new Set(["get-url"]) }],
   ["worktree", { bare: false, verbs: new Set(["list"]) }],
+  ["symbolic-ref", { bare: false, verbs: new Set<string>(), refs: 1 }],
+  ["config", { bare: false, verbs: new Set<string>(), lists: true, refs: 1 }],
 ]);
 
 /**
@@ -170,7 +191,237 @@ const GIT_WRITE_ARGUMENTS: ReadonlySet<string> = new Set([
   "set-url",
   "set-head",
   "set-branches",
+  "--unset",
+  "--unset-all",
+  "--add",
+  "--replace-all",
+  "--edit",
+  "-e",
+  "--remove-section",
+  "--rename-section",
 ]);
+
+/**
+ * The git subcommands that run with no card although they are not read-only:
+ * the ordinary writes, and the reads that reach a remote.
+ *
+ * Langy works on a `langy/*` branch of the developer's own checkout, and the
+ * commits carry the folder's git identity, which is the developer's own. So
+ * staging, committing, branching, fetching, pushing and rebasing are the
+ * writes a person expects an agent working in their repository to make, and a
+ * card for each of them was a click on every step of every run.
+ *
+ * The forms that throw work away, rewrite history another machine has already
+ * read, or change git outside the folder still ask, and `gitDestructiveForm`
+ * parses them out. A subcommand that is in neither set asks as well, so a git
+ * command this policy has never heard of is never assumed to be ordinary.
+ */
+export const ALLOWED_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
+  "add",
+  "branch",
+  "checkout",
+  "cherry-pick",
+  "clean",
+  "commit",
+  "config",
+  "fetch",
+  "gc",
+  "init",
+  "ls-remote",
+  "merge",
+  "mv",
+  "pull",
+  "push",
+  "rebase",
+  "reflog",
+  "remote",
+  "reset",
+  "restore",
+  "revert",
+  "rm",
+  "stash",
+  "switch",
+  "tag",
+  "update-ref",
+  "worktree",
+]);
+
+/** A git form that asks: what it does, and the pattern a grant for it carries. */
+export interface GitDestructiveForm {
+  effect: CommandEffect;
+  /** The pattern the session grant names, so it covers this form alone. */
+  pattern: string;
+}
+
+/** The `git push` options that make the remote take a history it does not have. */
+const GIT_PUSH_FORCE_OPTIONS: ReadonlySet<string> = new Set([
+  "-f",
+  "--force",
+  "--force-with-lease",
+  "--force-if-includes",
+]);
+
+/** The `git push` options that remove a branch from the remote. */
+const GIT_PUSH_DELETE_OPTIONS: ReadonlySet<string> = new Set(["-d", "--delete"]);
+
+/** The options that make `git clean` remove files. */
+const GIT_CLEAN_OPTIONS: ReadonlySet<string> = new Set([
+  "-f",
+  "--force",
+  "-x",
+  "-d",
+]);
+
+/** The options that overwrite the working tree with the index or a commit. */
+const GIT_FORCE_OPTIONS: ReadonlySet<string> = new Set(["-f", "--force"]);
+
+/** The `git config` scopes that reach outside the folder. */
+const GIT_CONFIG_OUTSIDE_SCOPES: ReadonlySet<string> = new Set([
+  "--global",
+  "--system",
+]);
+
+/**
+ * The git form this command is, when it is one that asks, and null otherwise.
+ *
+ * Decided by parsing and never by the model's opinion: each rule names the
+ * option or the verb that makes the command destructive. The pattern names
+ * that form rather than the whole subcommand, so allowing a force push for
+ * the session allows force pushes and not every push.
+ */
+export function gitDestructiveForm(args: string[]): GitDestructiveForm | null {
+  const words = args.filter((argument) => !argument.startsWith("-"));
+  const [subcommand, ...operands] = words;
+  if (subcommand === undefined) return null;
+
+  const option = (options: ReadonlySet<string>): string | undefined =>
+    args.find((argument) => carriesOption(argument, options));
+  const form = (effect: CommandEffect, marker: string): GitDestructiveForm => ({
+    effect,
+    pattern: `git ${subcommand} ${marker}`,
+  });
+
+  switch (subcommand) {
+    case "push": {
+      const forced =
+        option(GIT_PUSH_FORCE_OPTIONS) ??
+        operands.find((operand) => operand.startsWith("+"));
+      if (forced !== undefined) return form("rewrites_remote_history", forced);
+      const deleted =
+        option(GIT_PUSH_DELETE_OPTIONS) ??
+        operands.find((operand) => operand.startsWith(":"));
+      if (deleted !== undefined) return form("deletes_remote_branch", deleted);
+      return null;
+    }
+    case "reset": {
+      // A reset with a path moves the index and leaves the working tree alone;
+      // only `--hard` throws away what is written in the files.
+      const hard = args.find((argument) => argument === "--hard");
+      return hard === undefined ? null : form("discards_work", hard);
+    }
+    case "clean": {
+      const removing = option(GIT_CLEAN_OPTIONS);
+      return removing === undefined ? null : form("discards_work", removing);
+    }
+    case "checkout": {
+      const forced = option(GIT_FORCE_OPTIONS);
+      if (forced !== undefined) return form("discards_work", forced);
+      // `git checkout -- <path>` and `git checkout .` overwrite the file with
+      // the index; `git checkout -b langy/x origin/main` moves the branch.
+      const endOfOptions = args.indexOf("--");
+      if (endOfOptions !== -1 && args.length > endOfOptions + 1) {
+        return form("discards_work", "--");
+      }
+      const here = operands.find(
+        (operand) => operand === "." || operand === "./",
+      );
+      return here === undefined ? null : form("discards_work", here);
+    }
+    case "switch": {
+      const forced = option(
+        new Set([...GIT_FORCE_OPTIONS, "--discard-changes"]),
+      );
+      return forced === undefined ? null : form("discards_work", forced);
+    }
+    case "restore": {
+      // `--staged` restores the index alone. Without it the file on disk is
+      // overwritten, which is the one form of restore that loses work.
+      const staged = args.some(
+        (argument) =>
+          argument === "--staged" || carriesOption(argument, new Set(["-S"])),
+      );
+      const worktree = args.some(
+        (argument) =>
+          argument === "--worktree" || carriesOption(argument, new Set(["-W"])),
+      );
+      return staged && !worktree
+        ? null
+        : { effect: "discards_work", pattern: "git restore" };
+    }
+    case "branch": {
+      const dropped = option(new Set(["-D"]));
+      if (dropped !== undefined) return form("discards_work", dropped);
+      const deleted = option(new Set(["-d", "--delete"]));
+      const forced = option(GIT_FORCE_OPTIONS);
+      return deleted === undefined || forced === undefined
+        ? null
+        : form("discards_work", `${deleted} ${forced}`);
+    }
+    case "stash": {
+      const verb = operands[0];
+      return verb === "drop" || verb === "clear"
+        ? form("discards_work", verb)
+        : null;
+    }
+    case "worktree": {
+      const forced = option(GIT_FORCE_OPTIONS);
+      return operands[0] === "remove" && forced !== undefined
+        ? form("discards_work", `remove ${forced}`)
+        : null;
+    }
+    case "rm": {
+      const forced = option(GIT_FORCE_OPTIONS);
+      return forced === undefined ? null : form("discards_work", forced);
+    }
+    case "update-ref": {
+      const deleted = option(new Set(["-d", "--delete"]));
+      return deleted === undefined ? null : form("discards_work", deleted);
+    }
+    case "gc": {
+      const pruned = args.find(
+        (argument) => argument === "--prune=now" || argument === "--prune=all",
+      );
+      return pruned === undefined ? null : form("discards_work", pruned);
+    }
+    case "reflog": {
+      const verb = operands[0];
+      return verb === "expire" || verb === "delete"
+        ? form("discards_work", verb)
+        : null;
+    }
+    case "filter-branch":
+    case "filter-repo":
+      return { effect: "rewrites_history", pattern: `git ${subcommand}` };
+    case "config": {
+      const scope = option(GIT_CONFIG_OUTSIDE_SCOPES);
+      return scope === undefined ? null : form("changes_git_settings", scope);
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * True when a git command runs with no card although it is not read-only: an
+ * allowed subcommand in a form that is not destructive.
+ */
+export function gitRunsWithoutAsking(args: string[]): boolean {
+  const words = args.filter((argument) => !argument.startsWith("-"));
+  const subcommand = words[0];
+  if (subcommand === undefined) return false;
+  if (!ALLOWED_GIT_SUBCOMMANDS.has(subcommand)) return false;
+  return gitDestructiveForm(args) === null;
+}
 
 /**
  * The `gh` invocations that only read, written out in full.
@@ -364,6 +615,62 @@ export interface ParsedCommand {
 
 const OPERATORS = ["&&", "||", ";", "|", "&", "\n"];
 
+/** A here-document opened on the current line, read once the line ends. */
+interface PendingHeredoc {
+  delimiter: string;
+  /** `<<-` strips the tabs that indent the body and the delimiter. */
+  stripTabs: boolean;
+}
+
+/** Where a `<<` operator's delimiter word ends, and the word itself. */
+function readHeredocOpener(
+  command: string,
+  index: number,
+): { heredoc: PendingHeredoc; end: number } | null {
+  let cursor = index + 2;
+  const stripTabs = command[cursor] === "-";
+  if (stripTabs) cursor += 1;
+  while (cursor < command.length && (command[cursor] === " " || command[cursor] === "\t")) {
+    cursor += 1;
+  }
+  const quote = command[cursor];
+  let delimiter = "";
+  if (quote === "'" || quote === '"') {
+    const close = command.indexOf(quote, cursor + 1);
+    if (close === -1) return null;
+    delimiter = command.slice(cursor + 1, close);
+    cursor = close + 1;
+  } else {
+    while (cursor < command.length && !/[\s;&|<>()]/.test(command[cursor]!)) {
+      delimiter += command[cursor];
+      cursor += 1;
+    }
+  }
+  if (delimiter === "") return null;
+  return { heredoc: { delimiter, stripTabs }, end: cursor };
+}
+
+/**
+ * Where a here-document's body ends: the index just past its delimiter line,
+ * or the end of the command when the delimiter never comes.
+ */
+function readHeredocBody(
+  command: string,
+  start: number,
+  heredoc: PendingHeredoc,
+): number {
+  let cursor = start;
+  while (cursor < command.length) {
+    const newline = command.indexOf("\n", cursor);
+    const lineEnd = newline === -1 ? command.length : newline;
+    const line = command.slice(cursor, lineEnd);
+    const word = heredoc.stripTabs ? line.replace(/^\t+/, "") : line;
+    if (word === heredoc.delimiter) return lineEnd;
+    cursor = lineEnd + 1;
+  }
+  return command.length;
+}
+
 /**
  * Splits a command into its parts and their tokens.
  *
@@ -371,10 +678,18 @@ const OPERATORS = ["&&", "||", ";", "|", "&", "\n"];
  * single-quoted string is not a command. A substitution is reported rather
  * than parsed: what it expands to is not knowable here, so the whole command
  * asks.
+ *
+ * A here-document is the text the program reads from its standard input, so
+ * its lines are neither commands of the chain nor arguments of the program:
+ * `python - <<'PY'` followed by a script is one part with the tokens
+ * `python -`, and the script stays in the part's text for the card to show.
+ * Before this, every line of the script was a segment of its own, and the
+ * session grant named one pattern per line of python.
  */
 export function parseCommand(command: string): ParsedCommand {
   const parts: CommandPart[] = [];
   let hasSubstitution = false;
+  let heredocs: PendingHeredoc[] = [];
 
   let partStart = 0;
   let tokens: string[] = [];
@@ -471,6 +786,16 @@ export function parseCommand(command: string): ParsedCommand {
       continue;
     }
 
+    if (char === "<" && command[index + 1] === "<" && command[index + 2] !== "<") {
+      const opener = readHeredocOpener(command, index);
+      if (opener) {
+        endToken();
+        heredocs.push(opener.heredoc);
+        index = opener.end;
+        continue;
+      }
+    }
+
     if (char === ">" || char === "<") {
       endToken();
       hasRedirect = true;
@@ -488,6 +813,16 @@ export function parseCommand(command: string): ParsedCommand {
     }
 
     const operator = OPERATORS.find((entry) => command.startsWith(entry, index));
+    if (operator === "\n" && heredocs.length > 0) {
+      // The line ends and the bodies it announced follow, one after another.
+      let end = index + 1;
+      for (const heredoc of heredocs) end = readHeredocBody(command, end, heredoc);
+      heredocs = [];
+      endPart(end);
+      index = Math.min(end + 1, command.length);
+      partStart = index;
+      continue;
+    }
     if (operator) {
       endPart(index);
       index += operator.length;
@@ -549,6 +884,10 @@ export function grantName(name: string): string {
  * A quoted first argument is text the command prints or matches, so it never
  * becomes the pattern: `printf '\nAPI_KEY=x\n' >> .env.example` would
  * otherwise offer the whole literal on the button.
+ *
+ * A destructive git form carries the marker that makes it destructive, so
+ * allowing `git push --force` for the session allows force pushes and not
+ * every push. Ordinary git never reaches a card, so it never needs a grant.
  */
 export function grantPatternFor({
   tokens,
@@ -558,6 +897,10 @@ export function grantPatternFor({
   quoted?: boolean[];
 }): string {
   const name = grantName(tokens[0] ?? "");
+  if (name === "git") {
+    const destructive = gitDestructiveForm(tokens.slice(1));
+    if (destructive !== null) return destructive.pattern;
+  }
   const argument = tokens[1];
   if (argument === undefined || argument === "" || quoted[1] === true) {
     return `${name} *`;
@@ -644,6 +987,23 @@ function isReadOnlyPart(part: CommandPart): boolean {
 }
 
 /**
+ * True when this part runs with no card at all.
+ *
+ * Two classes run: a command from the read-only set, and a git command in a
+ * form that is not destructive. The second one writes, so `isReadOnlyPart`
+ * stays the narrower answer and this one is what the decision reads.
+ */
+export function runsWithoutACard(part: CommandPart): boolean {
+  if (isReadOnlyPart(part)) return true;
+  const [name, ...args] = part.tokens;
+  if (name !== "git") return false;
+  if (part.hasRedirect) return false;
+  if (args.some((argument) => WRITE_FLAGS.has(argument))) return false;
+  if (args.some((argument) => DIRECTORY_FLAGS.has(argument))) return false;
+  return gitRunsWithoutAsking(args);
+}
+
+/**
  * True when an argument carries one of these options, however it is written.
  *
  * A shell takes the value of a short option attached to it and lets short
@@ -687,6 +1047,7 @@ export function isReadOnlyGit(args: string[]): boolean {
       return true;
     }
     if (operands.length === 0) return rule.bare;
+    if (rule.refs !== undefined && operands.length <= rule.refs) return true;
     return operands.length <= 2 && rule.verbs.has(operands[0]!);
   }
   return READ_ONLY_GIT_SUBCOMMANDS.has(subcommand);
@@ -756,6 +1117,11 @@ export function envCommandStart(tokens: string[]): number | null {
  * built from these classes instead, so it says what the answer allows.
  */
 export type CommandEffect =
+  | "discards_work"
+  | "rewrites_history"
+  | "rewrites_remote_history"
+  | "deletes_remote_branch"
+  | "changes_git_settings"
   | "writes_files"
   | "changes_repository"
   | "reaches_network"
@@ -766,6 +1132,11 @@ export type CommandEffect =
 
 /** The clause each class contributes to the reason sentence. */
 const EFFECT_CLAUSES: Record<CommandEffect, string> = {
+  discards_work: "discards work in the git repository",
+  rewrites_history: "rewrites the history of the git repository",
+  rewrites_remote_history: "rewrites history on the remote",
+  deletes_remote_branch: "deletes a branch on the remote",
+  changes_git_settings: "changes git settings outside this folder",
   writes_files: "writes files in the folder",
   changes_repository: "changes the git repository",
   reaches_network: "reaches the network",
@@ -777,6 +1148,11 @@ const EFFECT_CLAUSES: Record<CommandEffect, string> = {
 
 /** The order the clauses read in, whatever order the segments run in. */
 const EFFECT_ORDER: readonly CommandEffect[] = [
+  "discards_work",
+  "rewrites_history",
+  "rewrites_remote_history",
+  "deletes_remote_branch",
+  "changes_git_settings",
   "writes_files",
   "changes_repository",
   "installs_packages",
@@ -793,6 +1169,7 @@ const GIT_NETWORK_SUBCOMMANDS: ReadonlySet<string> = new Set([
   "fetch",
   "clone",
   "submodule",
+  "ls-remote",
 ]);
 
 /** Commands whose whole purpose is a request to another machine. */
@@ -881,6 +1258,8 @@ export function effectOf(part: CommandPart): CommandEffect {
   }
 
   if (name === "git") {
+    const destructive = gitDestructiveForm(args);
+    if (destructive !== null) return destructive.effect;
     if (verb !== undefined && GIT_NETWORK_SUBCOMMANDS.has(verb)) {
       return "reaches_network";
     }
@@ -1077,6 +1456,19 @@ const TOOL_VERBS: Record<LocalToolCall["tool"], string> = {
   local_grep: "grep",
   local_find: "find",
   local_ls: "ls",
+  local_langwatch_env: "write",
+};
+
+/** The same verbs as the reason sentence reads them: "it is not written". */
+const TOOL_VERBS_DONE: Record<LocalToolCall["tool"], string> = {
+  local_read: "read",
+  local_write: "written",
+  local_edit: "edited",
+  local_bash: "run",
+  local_grep: "searched",
+  local_find: "listed",
+  local_ls: "listed",
+  local_langwatch_env: "written",
 };
 
 /** The paths one call touches, in the order they were written. */
@@ -1090,6 +1482,8 @@ function pathsOf(call: LocalToolCall): string[] {
     case "local_find":
     case "local_ls":
       return call.params.path === undefined ? [] : [call.params.path];
+    case "local_langwatch_env":
+      return [call.params.path ?? ".env"];
     case "local_bash":
       return [];
   }
@@ -1130,7 +1524,7 @@ function decideFileTool({
         summary: `${verb} ${target}`,
         pattern: `${call.tool} ${target}`,
         patterns: [`${call.tool} ${target}`],
-        reason: `${name} may hold secrets, so it is not read for you without an answer.`,
+        reason: `${name} may hold secrets, so it is not ${TOOL_VERBS_DONE[call.tool]} for you without an answer.`,
       };
     }
   }
@@ -1179,17 +1573,17 @@ function decideBash({
     };
   }
 
-  // A part that names a file which may hold secrets is never read-only, so
+  // A part that names a file which may hold secrets never runs on its own, so
   // the shell asks for the same answer a read of that file asks for.
-  const readsOnly = (part: CommandPart): boolean =>
+  const runsOnItsOwn = (part: CommandPart): boolean =>
     !parsed.hasSubstitution &&
-    isReadOnlyPart(part) &&
+    runsWithoutACard(part) &&
     secretFileRead(part) === null;
 
   const segments: CommandSegment[] = parsed.parts.map((part) => ({
     command: part.text,
     pattern: grantPatternFor({ tokens: part.tokens, quoted: part.quoted }),
-    readOnly: readsOnly(part),
+    readOnly: runsOnItsOwn(part),
   }));
 
   if (parsed.hasSubstitution) {
@@ -1204,18 +1598,18 @@ function decideBash({
     };
   }
 
-  const writing = parsed.parts.filter((part) => !readsOnly(part));
-  const unanswered = writing.filter(
+  const asking = parsed.parts.filter((part) => !runsOnItsOwn(part));
+  const unanswered = asking.filter(
     (part) => !grantsAllow({ tokens: part.tokens, quoted: part.quoted, grants }),
   );
   if (unanswered.length === 0) return { kind: "run" };
 
   // The answer covers every segment the card lists, not only the first one:
-  // a chain that stages, commits and pushes granted `git add` and ran the
-  // rest under it.
+  // a chain that checks and then publishes granted the check's pattern and
+  // ran the rest under it.
   const patterns = [
     ...new Set(
-      writing.map((part) =>
+      asking.map((part) =>
         grantPatternFor({ tokens: part.tokens, quoted: part.quoted }),
       ),
     ),
@@ -1233,7 +1627,7 @@ function decideBash({
     patterns,
     reason:
       secret === undefined || secret === null
-        ? reasonFor(writing)
+        ? reasonFor(asking)
         : `${secret} may hold secrets, so it is not read for you without an answer.`,
     segments,
   };

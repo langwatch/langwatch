@@ -4,6 +4,7 @@ import { useLangy } from "../LangyContext";
 import {
   datasetContextChip,
   mergeContextChips,
+  namedPageChips,
   traceContextChip,
 } from "../logic/langyContextChips";
 import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
@@ -98,6 +99,8 @@ export function useLangyPageContext(): {
       mergeContextChips([
         // Open drawer first — the most specific "what am I looking at" signal.
         ...drawerChips,
+        // A page that knows its resource's name outranks the route's bare id.
+        ...namedPageChips(pageContext),
         ...routeChips(pathname),
         onTraceExplorer ? selectionChip : null,
         // Always include the whole view. This carries the time range as well as

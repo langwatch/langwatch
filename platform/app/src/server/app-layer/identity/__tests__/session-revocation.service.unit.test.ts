@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   type CachedSession,
   type RevocableSession,
@@ -19,7 +20,7 @@ import {
  *
  * Driven through the ports with in-memory stores rather than a mocked Prisma
  * client: the decisions under test are the service's, and the queries behind
- * them belong to `PrismaSessionRevocationRecords`.
+ * them belong to `PrismaSessionRecords`.
  */
 
 interface SessionRow {
@@ -27,21 +28,27 @@ interface SessionRow {
   sessionToken: string;
   userId: string;
   identifierId: string | null;
+  expires: Date;
 }
 
 const sessionRow = ({
   id,
   userId = "sam",
   identifierId = null,
+  expired = false,
 }: {
   id: string;
   userId?: string;
   identifierId?: string | null;
+  expired?: boolean;
 }): SessionRow => ({
   id,
   sessionToken: `token-${id}`,
   userId,
   identifierId,
+  expires: new Date(
+    expired ? "2020-01-01T00:00:00.000Z" : "2027-01-01T00:00:00.000Z",
+  ),
 });
 
 const cached = (token: string): CachedSession => ({
@@ -58,10 +65,14 @@ const revocationOver = ({
   sessions = [],
   index = null,
   cacheUnreachable = false,
+  databaseUnreachable = false,
+  beforeDelete,
 }: {
   sessions?: readonly SessionRow[];
   index?: readonly CachedSession[] | null;
   cacheUnreachable?: boolean;
+  databaseUnreachable?: boolean;
+  beforeDelete?: () => Promise<void>;
 } = {}) => {
   const rows = new Map(sessions.map((session) => [session.id, session]));
   let storedIndex: readonly CachedSession[] | null = index;
@@ -107,15 +118,25 @@ const revocationOver = ({
       rowsOf(userId)
         .filter((row) => row.identifierId === identifierId)
         .map(
-          ({ id, sessionToken }): RevocableSession => ({ id, sessionToken }),
+          ({ id, sessionToken }): RevocableSession => ({
+            id,
+            sessionToken,
+          }),
         ),
     deleteAllForUser: async ({ userId }) =>
       remove((row) => row.userId === userId),
     deleteForUserExcept: async ({ userId, keepSessionId }) =>
       remove((row) => row.userId === userId && row.id !== keepSessionId),
-    deleteByIds: async ({ ids }) => remove((row) => ids.includes(row.id)),
-    deleteByToken: async ({ token }) =>
-      remove((row) => row.sessionToken === token),
+    deleteByIds: async ({ ids }) => {
+      if (databaseUnreachable) throw new Error("database unreachable");
+      await beforeDelete?.();
+      return remove((row) => ids.includes(row.id));
+    },
+    deleteByToken: async ({ token }) => {
+      if (databaseUnreachable) throw new Error("database unreachable");
+      await beforeDelete?.();
+      return remove((row) => row.sessionToken === token);
+    },
   };
 
   return {
@@ -125,6 +146,28 @@ const revocationOver = ({
     liveIndex: () => storedIndex,
   };
 };
+
+describe("caller-scoped session revocation", () => {
+  it("clears selected tokens, drops the whole index, and reports actual rows ended", async () => {
+    const stores = revocationOver({
+      sessions: [
+        sessionRow({ id: "selected" }),
+        sessionRow({ id: "survivor" }),
+      ],
+      index: [cached("token-selected"), cached("token-survivor")],
+    });
+
+    const result = await stores.service.revokeSessions({
+      userId: "sam",
+      sessions: [{ id: "selected", sessionToken: "token-selected" }],
+    });
+
+    expect(result).toEqual({ ended: 1 });
+    expect(stores.droppedTokens).toEqual(["token-selected"]);
+    expect(stores.liveIndex()).toBeNull();
+    expect(stores.liveSessionIds()).toEqual(["survivor"]);
+  });
+});
 
 describe("given a person with sessions in both stores", () => {
   describe("when every session is revoked and the cache lists them all", () => {
@@ -349,6 +392,31 @@ describe("given a person signed in through two different methods", () => {
     });
   });
 
+  describe("when a method's expired row still has a cached token", () => {
+    it("includes the expired row in the revocation sweep", async () => {
+      const stores = revocationOver({
+        sessions: [
+          sessionRow({
+            id: "expired",
+            identifierId: "id_passkey",
+            expired: true,
+          }),
+          sessionRow({ id: "live", identifierId: "id_password" }),
+        ],
+        index: [cached("token-expired")],
+      });
+
+      const result = await stores.service.revokeForIdentifier({
+        userId: "sam",
+        identifierId: "id_passkey",
+      });
+
+      expect(result).toEqual({ ended: 1 });
+      expect(stores.droppedTokens).toEqual(["token-expired"]);
+      expect(stores.liveSessionIds()).toEqual(["live"]);
+    });
+  });
+
   describe("when the sessions one method minted are revoked and it minted the only one", () => {
     it("drops the index rather than rewriting it empty", async () => {
       const stores = revocationOver({
@@ -410,6 +478,42 @@ describe("given a person signed in through two different methods", () => {
 });
 
 describe("given somebody signing out of the browser they are reading in", () => {
+  it("waits for database deletion before clearing a cache that could be refilled", async () => {
+    const deletion = Promise.withResolvers<void>();
+    const stores = revocationOver({
+      sessions: [sessionRow({ id: "here" })],
+      index: [cached("token-here")],
+      beforeDelete: () => deletion.promise,
+    });
+    const logout = stores.service.revokeOne({
+      token: "token-here",
+      userId: "sam",
+    });
+    await Promise.resolve();
+
+    expect(stores.liveSessionIds()).toEqual(["here"]);
+    expect(stores.droppedTokens).toEqual([]);
+    deletion.resolve();
+    await logout;
+    expect(stores.liveSessionIds()).toEqual([]);
+    expect(stores.droppedTokens).toEqual(["token-here"]);
+  });
+
+  it("clears cached access but reports a database deletion failure", async () => {
+    const stores = revocationOver({
+      sessions: [sessionRow({ id: "here" })],
+      index: [cached("token-here")],
+      databaseUnreachable: true,
+    });
+
+    await expect(
+      stores.service.revokeOne({ token: "token-here", userId: "sam" }),
+    ).rejects.toThrow("database unreachable");
+    expect(stores.liveSessionIds()).toEqual(["here"]);
+    expect(stores.droppedTokens).toEqual(["token-here"]);
+    expect(stores.liveIndex()).toBeNull();
+  });
+
   describe("when that one session is revoked", () => {
     it("deletes the row and clears both the cached session and the index", async () => {
       const stores = revocationOver({
@@ -441,15 +545,46 @@ describe("given somebody signing out of the browser they are reading in", () => 
   });
 
   describe("when that one session is revoked and the cache cannot be reached", () => {
-    it("still deletes the row", async () => {
+    /** @scenario "Logout reports a revocation failure instead of confirming success" */
+    it("deletes the row but reports the outstanding cache failure", async () => {
       const stores = revocationOver({
         sessions: [sessionRow({ id: "here" })],
         cacheUnreachable: true,
       });
 
-      await stores.service.revokeOne({ token: "token-here", userId: "sam" });
-
+      await expect(
+        stores.service.revokeOne({ token: "token-here", userId: "sam" }),
+      ).rejects.toThrow("cache unreachable");
       expect(stores.liveSessionIds()).toEqual([]);
     });
+  });
+});
+
+describe("selected and method session invalidation order", () => {
+  /** @scenario "Selected session revocation deletes rows before invalidating cached sessions" */
+  it.each([
+    "selected",
+    "method",
+  ])("waits for %s row deletion before dropping cache entries", async (kind) => {
+    const stores = revocationOver({
+      sessions: [sessionRow({ id: "selected", identifierId: "password" })],
+      beforeDelete: async () => {
+        expect(stores.liveSessionIds()).toEqual(["selected"]);
+        expect(stores.droppedTokens).toEqual([]);
+      },
+    });
+    if (kind === "selected") {
+      await stores.service.revokeSessions({
+        userId: "sam",
+        sessions: [{ id: "selected", sessionToken: "token-selected" }],
+      });
+    } else {
+      await stores.service.revokeForIdentifier({
+        userId: "sam",
+        identifierId: "password",
+      });
+    }
+    expect(stores.liveSessionIds()).toEqual([]);
+    expect(stores.droppedTokens).toEqual(["token-selected"]);
   });
 });

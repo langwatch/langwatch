@@ -10,6 +10,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import { prisma } from "~/server/db";
 import {
@@ -17,6 +18,8 @@ import {
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -227,7 +230,9 @@ describe("Feature: Personal usage REST API", () => {
     // The routes and workers under test take their ClickHouse repositories
     // from the App rather than resolving a client, so the fixture has to
     // provide one or they fail with "App not initialized".
+    resetAuthzGrantsCommandsForTests();
     installClickHouseTestApp({
+      eventSourcing: createAuthzTestEventSourcing(prisma),
       resolveClient: async () => getTestClickHouseClient(),
     });
     testOrganization = await prisma.organization.create({
@@ -296,15 +301,13 @@ describe("Feature: Personal usage REST API", () => {
     });
     otherUsersPersonalProjectId = otherPersonal.id;
 
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
     callerUserToken = (
       await ApiKeyService.create(prisma).create({
@@ -471,6 +474,9 @@ describe("Feature: Personal usage REST API", () => {
         .catch(() => {});
     }
     await prisma.apiKey
+      .deleteMany({ where: { organizationId: testOrganization.id } })
+      .catch(() => {});
+    await prisma.grant
       .deleteMany({ where: { organizationId: testOrganization.id } })
       .catch(() => {});
     await prisma.roleBinding

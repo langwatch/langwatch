@@ -42,10 +42,11 @@ func main() {
 	guards := []guard{
 		{name: "lean-checkout", run: ciguard.LeanCheckout},
 		{name: "go-version", run: ciguard.GoVersion},
+		{name: "pr-review-bot", run: ciguard.PRReviewBot},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature and specs/ci/go-version-consistency.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature and specs/ci/pr-review-bot.feature")
 		os.Exit(1)
 	}
 }

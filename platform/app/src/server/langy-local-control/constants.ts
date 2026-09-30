@@ -15,6 +15,9 @@ export const PRESENCE_HEARTBEAT_MS = 10_000;
 /** A folder not seen for this long reads offline. */
 export const PRESENCE_TTL_MS = 30_000;
 
+/** A connect turn owed to a folder waits this long for the turn before it to end. */
+export const CONNECT_TURN_OWED_TTL_MS = 6 * 60 * 60 * 1000;
+
 /** The first local call of a turn waits this long for the folder to appear. */
 export const CALL_OFFLINE_WAIT_MS = 5_000;
 

@@ -1,18 +1,15 @@
 import { ledgerActorFor } from "@langwatch/actor";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import type { Permission } from "~/server/api/rbac";
+import { checkPrincipalPermission } from "~/server/app-layer/authz/credential-permissions";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
   permissionFormatSchema,
-} from "~/server/rbac/custom-role-permissions";
-import {
-  checkRoleBindingPermission,
-  resolveLegacyCeiling,
-} from "~/server/rbac/role-binding-resolver";
+} from "~/server/app-layer/authz/custom-role-permissions";
 import { RoleRepository } from "~/server/role/repositories/role.repository";
 import { CUSTOM_ROLE_KIND } from "~/server/role/role-kind";
 import { assertPersonalTeamScopesOwnedBy } from "~/server/role-bindings/personal-team-scope";
@@ -808,37 +805,13 @@ export class ApiKeyService {
       }
       throw err;
     }
-    // Same legacy fallback as the raw-permission and builtin-role branches.
-    // This one used to call `checkRoleBindingPermission` bare, so a user whose
-    // access comes from legacy membership was refused here even though the
-    // branch beside it would have allowed the identical permission.
-    const legacy = await resolveLegacyCeiling({
+    await this.assertRawPermissionsWithinCeiling({
       prisma,
-      userId: ceilingUserId,
+      ceilingUserId,
       organizationId,
       scope,
+      permissions: perms,
     });
-
-    for (const perm of perms) {
-      const userHas =
-        (await checkRoleBindingPermission({
-          prisma,
-          principal: { type: "user", id: ceilingUserId },
-          organizationId,
-          scope,
-          permission: perm as Permission,
-          // One ADR-092 shadow comparison per permission would fan a single
-          // mint out into dozens of detached collects. The mint path's engine
-          // coverage comes from enforceApiKeyCeiling instead, which shadows
-          // the same question on every request the key goes on to make.
-        })) || legacy.grants(perm as Permission);
-      if (!userHas) {
-        throw new ApiKeyScopeViolationError(
-          `Cannot grant permission "${perm}" — exceeds your own access`,
-          { meta: { permission: perm, scope } },
-        );
-      }
-    }
   }
 
   private async assertRawPermissionsWithinCeiling({
@@ -854,30 +827,14 @@ export class ApiKeyService {
     scope: CreatorScope;
     permissions: string[];
   }): Promise<void> {
-    // Resolved once for the whole request, not per permission. The mint path
-    // that calls this (Langy's per-turn session key) passes ~23 permissions
-    // inside a 5-second interactive transaction, and langyApiKey.ts records
-    // what per-permission queries did to it once already: the fan-out starved
-    // the connection pool and aborted the transaction. Two queries, flat.
-    const legacy = await resolveLegacyCeiling({
-      prisma,
-      userId: ceilingUserId,
-      organizationId,
-      scope,
-    });
-
     for (const perm of permissions) {
-      const userHas =
-        (await checkRoleBindingPermission({
-          prisma,
-          principal: { type: "user", id: ceilingUserId },
-          organizationId,
-          scope,
-          permission: perm as Permission,
-          // Same reason as the custom-role loop above: the mint path's engine
-          // coverage comes from the per-request enforceApiKeyCeiling path,
-          // not from one shadow per candidate permission.
-        })) || legacy.grants(perm as Permission);
+      const userHas = await checkPrincipalPermission({
+        prisma,
+        principal: { type: "user", id: ceilingUserId },
+        organizationId,
+        scope,
+        permission: perm as Permission,
+      });
 
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
@@ -913,25 +870,13 @@ export class ApiKeyService {
             : "project:update"
           : "project:view";
 
-    const userHasPermission =
-      (await checkRoleBindingPermission({
-        prisma,
-        principal: { type: "user", id: ceilingUserId },
-        organizationId,
-        scope,
-        permission: representativePermission,
-      })) ||
-      // The builtin-role UI is the ordinary way a person creates a key, so
-      // leaving this branch bare meant the common path still refused a
-      // legacy-membership user while the Langy path had been fixed.
-      (
-        await resolveLegacyCeiling({
-          prisma,
-          userId: ceilingUserId,
-          organizationId,
-          scope,
-        })
-      ).grants(representativePermission);
+    const userHasPermission = await checkPrincipalPermission({
+      prisma,
+      principal: { type: "user", id: ceilingUserId },
+      organizationId,
+      scope,
+      permission: representativePermission,
+    });
 
     if (!userHasPermission) {
       throw new ApiKeyScopeViolationError(
@@ -1412,7 +1357,9 @@ export class ApiKeyService {
 
   async enrichBindingsWithNames({
     bindings,
+    organizationId,
   }: {
+    organizationId: string;
     bindings: Array<{
       id: string;
       role: string;
@@ -1436,7 +1383,10 @@ export class ApiKeyService {
       this.repo.findOrgsByIds([...orgIds]),
       this.repo.findTeamsByIds([...teamIds]),
       this.repo.findProjectsByIds([...projectIds]),
-      this.repo.findCustomRolesByIds([...customRoleIds]),
+      this.repo.findCustomRolesByIds({
+        ids: [...customRoleIds],
+        organizationId,
+      }),
     ]);
 
     const orgName = new Map(orgs.map((o) => [o.id, o.name]));
@@ -1456,24 +1406,12 @@ export class ApiKeyService {
   }
 
   async enrichApiKeyList({ apiKeys }: { apiKeys: ApiKeyWithBindings[] }) {
-    const customRoleIds = new Set<string>();
     const userIds = new Set<string>();
-    for (const k of apiKeys) {
-      for (const rb of k.roleBindings) {
-        if (rb.customRoleId) customRoleIds.add(rb.customRoleId);
-      }
-      if (k.userId) userIds.add(k.userId);
-      if (k.createdByUserId) userIds.add(k.createdByUserId);
+    for (const key of apiKeys) {
+      if (key.userId) userIds.add(key.userId);
+      if (key.createdByUserId) userIds.add(key.createdByUserId);
     }
-
-    const [customRoles, users] = await Promise.all([
-      this.repo.findCustomRolesByIds([...customRoleIds]),
-      this.repo.findUsersByIds([...userIds]),
-    ]);
-
-    return {
-      customRoles,
-      users,
-    };
+    const users = await this.repo.findUsersByIds([...userIds]);
+    return { users };
   }
 }

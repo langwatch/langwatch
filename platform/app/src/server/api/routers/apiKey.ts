@@ -9,7 +9,7 @@ import {
   API_KEY_PERMISSION_MODES,
   refineRestrictedPermissions,
 } from "~/server/api-key/restricted-permissions";
-import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+import { permissionFormatSchema } from "~/server/app-layer/authz/custom-role-permissions";
 
 function mapApiKeyHandledError(error: unknown): never {
   if (HandledError.isHandled(error)) {
@@ -101,7 +101,10 @@ export const apiKeyRouter = createTRPCRouter({
         activeProjectIds,
         projectName,
         customRoleName,
-      } = await apiKeyService.enrichBindingsWithNames({ bindings });
+      } = await apiKeyService.enrichBindingsWithNames({
+        bindings,
+        organizationId: input.organizationId,
+      });
 
       return bindings
         .filter(
@@ -192,6 +195,7 @@ export const apiKeyRouter = createTRPCRouter({
       const allBindings = apiKeys.flatMap((k) => k.roleBindings);
       const { orgName, teamName, projectName, customRoleName, customRoles } =
         await apiKeyService.enrichBindingsWithNames({
+          organizationId: input.organizationId,
           bindings: allBindings.map((rb) => ({
             id: rb.id,
             role: rb.role,

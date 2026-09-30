@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import {
   Boxes,
   Building2,
@@ -5,7 +6,6 @@ import {
   UserRound,
   Waypoints,
 } from "lucide-react";
-import type { Permission } from "~/server/api/rbac";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 
 /**

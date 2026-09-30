@@ -40,6 +40,21 @@ describe("error remediation registry", () => {
     });
   });
 
+  describe("when a connected agent's environment cannot be resolved", () => {
+    /** @scenario "The unresolved refusal says a personal development agent is visible only to its owner" */
+    it("says a personal development agent is visible only to its owner and how to share it", async () => {
+      const { remediation } = await import("../error-remediation");
+      const tips = remediation("agent_environment_unresolved").tips ?? [];
+
+      expect(
+        tips.some((tip) => tip.includes("visible only to its owner")),
+      ).toBe(true);
+      expect(
+        tips.some((tip) => tip.includes("LANGWATCH_AGENT_ENVIRONMENT")),
+      ).toBe(true);
+    });
+  });
+
   it("has no duplicate codes", () => {
     expect(new Set(REMEDIATION_CODES).size).toBe(REMEDIATION_CODES.length);
   });
