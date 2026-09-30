@@ -368,9 +368,10 @@ jobs:
 
           # Inputs that belong to everything. The graph hashes these globally
           # rather than as edges, so a change here is not "affected" in the
-          # per-project sense and must be handled by name.
+          # per-project sense and must be handled by name. The lockfile is not
+          # one: Nx diffs it per package (projectsAffectedByDependencyUpdates).
           if git diff --name-only "$BASE" HEAD | grep -qE \
-            '^(pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|packages/prisma-client/prisma/|\.github/)'; then
+            '^(pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|packages/prisma-client/prisma/|\.github/)'; then
             echo "apps=$ALL" >> "$GITHUB_OUTPUT"
             echo "narrowed=false" >> "$GITHUB_OUTPUT"
             echo "A global input changed — running all three applications." >> "$GITHUB_STEP_SUMMARY"
@@ -1112,13 +1113,16 @@ jobs:
           fi
 
       # Type-aware rules per project, only where a change reached (ADR-150).
-      # A global lint input changing, or a push, lints every project.
+      # A global lint input changing, or a push, lints every project. Nx diffs
+      # the lockfile per package, but oxlint is a root tool no project reaches,
+      # so a lockfile change that moves it still lints everything.
       - name: Oxlint type-aware, affected projects (blocking)
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
-            | grep -qE '^(\.oxlintrc\.jsonc|packages/oxlint-rules/|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|dev/nx/)'; then
+            | grep -qE '^(\.oxlintrc\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|dev/nx/)' \
+            && ! git diff "$BASE" HEAD -- pnpm-lock.yaml | grep -qE '^[-+].*oxlint'; then
             pnpm exec nx affected -t lint:types --base="$BASE" --head=HEAD
           else
             pnpm exec nx run-many -t lint:types
