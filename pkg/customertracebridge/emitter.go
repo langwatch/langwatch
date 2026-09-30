@@ -12,6 +12,7 @@ import (
 	"github.com/tidwall/gjson"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -66,6 +67,9 @@ type Emitter struct {
 	tp         *sdktrace.TracerProvider
 	tracer     trace.Tracer
 	propagator propagation.TextMapPropagator
+	router     *routerExporter
+	// origin is the langwatch.origin the Policy stamps, if any.
+	origin string
 }
 
 // dropFilterExporter omits spans the emitter marked with attrDrop (zero-cost,
@@ -154,6 +158,10 @@ type EmitterOptions struct {
 	// project (content gated by the tier), alongside the customer's own copy.
 	// The zero value leaves the leg off — the emitter behaves exactly as before.
 	Mirror MirrorConfig
+	// MetricPrefix names the customer-trace counters; empty keeps
+	// "langwatch.gateway". MeterProvider nil uses the global provider.
+	MetricPrefix  string
+	MeterProvider metric.MeterProvider
 }
 
 // MirrorConfig points the emitter's mirror leg at the mirror project (ADR-061).
@@ -184,9 +192,13 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 	// resource, THEN route by project id. Mirror sits inside drop (a dropped
 	// span is never mirrored) and outside scrub (both copies get the same
 	// resource treatment and reach the router together).
-	var inner sdktrace.SpanExporter = resourceScrubExporter{
-		inner: newRouterExporter(ctx, opts.Registry), policy: opts.Policy,
+	metricPrefix := opts.MetricPrefix
+	if metricPrefix == "" {
+		metricPrefix = defaultMetricPrefix
 	}
+	routerExp := newRouterExporterWith(ctx, opts.Registry,
+		routerMetrics{prefix: metricPrefix, provider: opts.MeterProvider})
+	var inner sdktrace.SpanExporter = resourceScrubExporter{inner: routerExp, policy: opts.Policy}
 	if opts.Mirror.armed() {
 		// Register the mirror project once so the router can deliver the mirror
 		// copy. A later per-request SetFromBundle for the mirror project's own
@@ -233,7 +245,18 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		tp:         tp,
 		tracer:     tp.Tracer(svcCtx.Service, trace.WithInstrumentationVersion(svcCtx.Version)),
 		propagator: propagation.TraceContext{},
+		router:     routerExp,
+		origin:     stampedOrigin(opts.Policy),
 	}, nil
+}
+
+func stampedOrigin(p Policy) string {
+	for _, kv := range p.Stamp {
+		if string(kv.Key) == otelsetup.AttrLangWatchOrigin {
+			return kv.Value.AsString()
+		}
+	}
+	return ""
 }
 
 // BeginSpan starts a customer-facing span that nests under the customer's
@@ -271,7 +294,11 @@ func (e *Emitter) EndSpan(ctx context.Context, params aitrace.Params) {
 	if span == nil {
 		return
 	}
+	e.endGenAISpan(ctx, span, params)
+}
 
+// endGenAISpan stamps a model call's outcome on span and ends it.
+func (e *Emitter) endGenAISpan(ctx context.Context, span trace.Span, params aitrace.Params) {
 	// When the request failed upstream, the provider's HTTP status + error
 	// class are stamped so the trace renders as an error instead of silently
 	// dropping (previously the span was never ended on error).
@@ -292,7 +319,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params aitrace.Params) {
 		span.SetStatus(codes.Error, params.UpstreamErrorType)
 	}
 
-	if isEmptyProbe(params, isError, output) || isOrphanLangyCall(ctx, params) {
+	if e.isEmptyProbe(params, isError, output) || isOrphanLangyCall(ctx, params) {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
@@ -456,12 +483,13 @@ func stampMirrorMarkers(ctx context.Context, span trace.Span, params aitrace.Par
 // seconds, not tokens), and embeddings. Audio tokens count as output here
 // even though they are carried out of the completion total: an audio-native
 // model answers entirely in audio tokens, so reading the completion field
-// alone would drop a real answer as an empty probe.
-func isEmptyProbe(params aitrace.Params, isError bool, output string) bool {
+// alone would drop a real answer as an empty probe. An evaluation's judge
+// often answers with a tool call only, so it is never a probe.
+func (e *Emitter) isEmptyProbe(params aitrace.Params, isError bool, output string) bool {
 	answeredTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
 	isProbeShape := params.RequestType == aitrace.RequestTypeChat ||
 		params.RequestType == aitrace.RequestTypeMessages
-	return !isError && isProbeShape && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == ""
+	return !isError && isProbeShape && e.origin != OriginEvaluation && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == ""
 }
 
 // isOrphanLangyCall reports a Langy model call that arrived WITHOUT the
