@@ -482,6 +482,62 @@ describe("given a password account whose address was never confirmed", () => {
     });
   });
 
+  describe("when the account is deactivated or another account holds its identity", () => {
+    /** @scenario "A deactivated or contested unconfirmed account is not linked" */
+    it.each([
+      "deactivated",
+      "address-held-elsewhere",
+      "subject-held-elsewhere",
+    ])("refuses the %s account and leaves it as it was", async (kind) => {
+      const { user, providerId } = await setUp({
+        label: kind,
+        state: "ACTIVE",
+        domainVerified: true,
+      });
+      const subject = `${kind}-${SUITE}`;
+      if (kind === "deactivated") {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { deactivatedAt: new Date() },
+        });
+      } else {
+        const other = await prisma.user.create({
+          data: { email: `other-${kind}-${SUITE}@${DOMAIN}`, name: "Other" },
+        });
+        userIds.push(other.id);
+        await prisma.identifier.create({
+          data: {
+            id: `${kind}-identifier-${SUITE}`,
+            userId: other.id,
+            provider: "oidc",
+            state: "VERIFIED",
+            value:
+              kind === "address-held-elsewhere"
+                ? user.email
+                : `unrelated-${SUITE}@${DOMAIN}`,
+            issuer: kind === "subject-held-elsewhere" ? IDP : null,
+            providerId: kind === "subject-held-elsewhere" ? providerId : null,
+            providerAccountId:
+              kind === "subject-held-elsewhere" ? subject : null,
+            attachedAt: new Date(),
+          },
+        });
+      }
+      await identityProviderAsserts({
+        email: user.email,
+        subject,
+        emailVerified: true,
+      });
+
+      const result = await signInThrough(providerId);
+
+      expect(result.error).toBe("OAuthAccountNotLinked");
+      expect(result.session).toBeNull();
+      expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+      expect(await addressConfirmed(user.id)).toBe(false);
+    });
+  });
+
   describe("when a person already bound to the connection signs in again", () => {
     /** @scenario "A person already bound to the connection keeps signing in with an unconfirmed address" */
     it.each([

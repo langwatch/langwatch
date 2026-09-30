@@ -63,6 +63,14 @@ Feature: Single sign-on links an unconfirmed local account on a verified domain,
     And the refusal is sso_existing_account_unconfirmed
 
   @integration @regression
+  Scenario: A deactivated or contested unconfirmed account is not linked
+    Given the connection is live and has verified the account's domain
+    And the account is deactivated, or another account holds a live identifier for the address or the subject
+    When the identity provider signs that address in and asserts it is verified
+    Then no single sign-on binding or session is created
+    And the account's address stays unconfirmed
+
+  @integration @regression
   Scenario: A person already bound to the connection keeps signing in with an unconfirmed address
     Given the account already holds this connection's single sign-on binding
     And its address is still unconfirmed
