@@ -336,6 +336,12 @@ export const CAPABILITY_CATALOG = {
     // The permission catalog is a reference table, not this org's roles.
     body: { byVerb: { permissions: "rows" } },
   },
+  grants: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "grant", plural: "grants" },
+    icon: "shieldCheck",
+  },
   "role-bindings": {
     surface: "organization",
     digestStrategy: "id-ref",
