@@ -78,6 +78,7 @@ export function DashboardWidgetInPlaceEditor({
   return (
     <DashboardWidgetEditDrawer
       open={open}
+      projectId={projectId}
       id={id}
       name={draftName}
       onNameChange={setDraftName}

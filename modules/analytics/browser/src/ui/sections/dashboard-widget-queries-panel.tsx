@@ -54,6 +54,7 @@ export function remapOpenValuesAfterRemoval(openValues: string[], removedIndex: 
 }
 
 interface DashboardWidgetQueriesPanelProps {
+  projectId: string;
   queries: DashboardWidgetQuery[];
   onChange: (queries: DashboardWidgetQuery[]) => void;
   lastRuns: Record<string, QueryLastRun>;
@@ -61,6 +62,7 @@ interface DashboardWidgetQueriesPanelProps {
 }
 
 export function DashboardWidgetQueriesPanel({
+  projectId,
   queries,
   onChange,
   lastRuns,
@@ -136,6 +138,7 @@ export function DashboardWidgetQueriesPanel({
               // Index, not name: a row mid-rename (typing toward a duplicate,
               // or briefly blank) must not remount and lose editor focus.
               key={index}
+              projectId={projectId}
               value={valueOf(index)}
               isOpen={openValues.includes(valueOf(index))}
               query={query}

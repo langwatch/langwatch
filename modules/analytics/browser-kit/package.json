@@ -25,6 +25,8 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@monaco-editor/react": "catalog:",
+    "monaco-editor": "catalog:",
     "numeral": "catalog:",
     "qs": "catalog:",
     "react-feather": "catalog:",

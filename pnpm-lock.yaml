@@ -4858,6 +4858,12 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@monaco-editor/react':
+        specifier: 'catalog:'
+        version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      monaco-editor:
+        specifier: 'catalog:'
+        version: 0.55.1
       numeral:
         specifier: 'catalog:'
         version: 2.0.6
