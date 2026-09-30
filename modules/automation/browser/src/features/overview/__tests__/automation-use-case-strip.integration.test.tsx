@@ -15,7 +15,7 @@ describe("AutomationUseCaseStrip", () => {
 
     expect(onOpen).toHaveBeenCalledWith({
       initialSource: "customGraph",
-      initialName: "Error spike alert",
+      initialName: "Error spike",
       initialAction: "SEND_SLACK_MESSAGE",
     });
 
@@ -23,7 +23,7 @@ describe("AutomationUseCaseStrip", () => {
 
     expect(onOpen).toHaveBeenLastCalledWith({
       initialSource: "customGraph",
-      initialName: "Traffic drop alert",
+      initialName: "Traffic drop",
       initialAction: "SEND_EMAIL",
     });
   });

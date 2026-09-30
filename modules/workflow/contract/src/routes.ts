@@ -141,12 +141,12 @@ export const projectRoutes = {
   },
   automations_alerts: {
     path: "/[project]/automations/alerts",
-    title: "Alerts",
+    title: "Automations",
     parent: "automations",
   },
   automations_schedules: {
     path: "/[project]/automations/schedules",
-    title: "Schedules",
+    title: "Reports",
     parent: "automations",
   },
   automations_activity: {

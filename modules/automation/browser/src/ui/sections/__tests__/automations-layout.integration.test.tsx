@@ -13,7 +13,7 @@ afterEach(cleanup);
 
 function renderLayout(host = fakeAutomationHost()) {
   return renderWithAutomationHost(
-    <AutomationsLayout basePath="/demo/automations" section="alerts">
+    <AutomationsLayout basePath="/demo/automations" section="reports">
       page content
     </AutomationsLayout>,
     { host },
@@ -29,7 +29,7 @@ describe("given the Automations workspace", () => {
       const nav = screen.getByRole("navigation", { name: "Automations navigation" });
       const links = Array.from(nav.querySelectorAll("a")).map((link) => link.textContent);
 
-      expect(links).toEqual(["Overview", "Automations", "Alerts", "Schedules"]);
+      expect(links).toEqual(["Overview", "Automations", "Reports"]);
     });
 
     it("puts the page's own content in the content column", () => {
@@ -42,12 +42,12 @@ describe("given the Automations workspace", () => {
       const host = fakeAutomationHost();
       renderLayout(host);
 
-      expect(screen.getByRole("link", { name: "Alerts" }).getAttribute("aria-current")).toBe(
+      expect(screen.getByRole("link", { name: "Reports" }).getAttribute("aria-current")).toBe(
         "page",
       );
-      fireEvent.click(screen.getByRole("link", { name: "Schedules" }));
+      fireEvent.click(screen.getByRole("link", { name: "Automations" }));
 
-      expect(host.recording.navigations).toEqual(["/demo/automations/schedules"]);
+      expect(host.recording.navigations).toEqual(["/demo/automations/automations"]);
     });
   });
 });

@@ -1,6 +1,5 @@
 import {
   Badge,
-  Box,
   Button,
   Code,
   Heading,
@@ -10,27 +9,35 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { parseAutomationFiltersWire } from "@langwatch/automation-contract";
+import {
+  isAutomationPauseReason,
+  parseAutomationFiltersWire,
+  RUNAWAY_PAUSE_EXPLANATION,
+} from "@langwatch/automation-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  type TimeInput,
-  differenceInMinutes,
-  differenceInSeconds,
-  toEpochMs,
-} from "@langwatch/time";
-import { useState } from "react";
+import { type NamedSlackConnection, slackApi } from "@langwatch/slack-browser-kit";
 import { Calendar, TrendingUp } from "react-feather";
 
 import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
 import { api } from "../../../../behavior/automation-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
 import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
-import { formatTimeAgo } from "../../../../model/relative-time.ts";
 import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
-import { type TriggerActionParams } from "../../../overview/index.ts";
+import { EmailList, type TriggerActionParams } from "../../../overview/index.ts";
+import {
+  slackDestinationLabel,
+  slackDestinationPresentation,
+} from "../../../overview/model/slack-destination-presentation.ts";
+import { matchesEveryTrace } from "../../model/matches-every-trace.ts";
+import { MatchesEveryTraceNotice } from "../elements/matches-every-trace-notice.tsx";
 import { CLIENT_PROVIDERS } from "./client-providers.ts";
 import { OPERATOR_LABELS, TIME_PERIOD_LABELS } from "./draft-model.ts";
+import { HistorySection } from "./history-section.tsx";
+import { MatchingTracesSection } from "./matching-traces-section.tsx";
+import { NextFiringSection } from "./next-firing-section.tsx";
+import { UnavailableAutomationDrawer } from "./unavailable-automation-drawer.tsx";
+import { WebhookDeliverySection } from "./webhook-delivery-section.tsx";
 
 interface ViewAutomationDrawerProps {
   automationId: string;
@@ -44,59 +51,50 @@ interface ViewAutomationDrawerProps {
   onEdit: (automationId: string) => void;
 }
 
-/**
- * How long an incident stayed open, as compact copy for the fire list
- * ("resolved after 15m"). Sub-minute incidents show seconds so a fast
- * recovery doesn't read as "resolved after 0m".
- */
-function formatDurationBetween(from: TimeInput, to: TimeInput): string {
-  const minutes = differenceInMinutes(to, from);
-  if (minutes < 1) return `${Math.max(differenceInSeconds(to, from), 1)}s`;
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
-}
-
 export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAutomationDrawerProps) {
   const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
 
   const triggerQuery = api.automation.getTriggerById.useQuery(
-    { triggerId: automationId, projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    { triggerId: automationId, projectId },
+    { enabled: !!projectId },
   );
-  const recentFiresQuery = api.automation.getRecentFires.useQuery(
-    { triggerId: automationId, projectId: project?.id ?? "", limit: 20 },
-    { enabled: !!project?.id },
-  );
-  // ADR-040 §6: the per-attempt delivery log, only for webhook automations.
-  const webhookDeliveriesQuery = api.automation.getWebhookDeliveries.useQuery(
-    { triggerId: automationId, projectId: project?.id ?? "", limit: 50 },
-    {
-      enabled: !!project?.id && triggerQuery.data?.action === "SEND_WEBHOOK",
-    },
-  );
-
-  const trigger = triggerQuery.data;
+  const trigger = triggerQuery.data ?? undefined;
   const isGraphAlert = !!trigger?.customGraphId;
   const isWebhook = trigger?.action === "SEND_WEBHOOK";
   const isSchedule = trigger?.triggerKind === "REPORT";
   const actionParams = (trigger?.actionParams ?? {}) as TriggerActionParams;
+  // Conditions can only be re-run when the subject IS a trace query (ADR-043):
+  // a graph alert watches a metric, and a legacy `filters` row has no query.
+  const traceQuery = isGraphAlert ? "" : (trigger?.filterQuery ?? "");
+  const isUnconditioned =
+    !!trigger &&
+    !isGraphAlert &&
+    !isSchedule &&
+    matchesEveryTrace({ filterQuery: trigger.filterQuery, filters: trigger.filters });
 
-  // Resolve the watched graph's JSON so the stored series key renders as its
-  // human label (falls back to the raw key when the graph is gone), and the
-  // dataset name so ADD_TO_DATASET destinations don't show a bare cuid.
+  // The watched graph names the stored series key; the dataset list names the
+  // ADD_TO_DATASET destination; the Slack connections name a Slack one.
   const graphQuery = api.graphs.getById.useQuery(
-    { projectId: project?.id ?? "", id: trigger?.customGraphId ?? "" },
-    { enabled: !!project?.id && !!trigger?.customGraphId, retry: false },
+    { projectId, id: trigger?.customGraphId ?? "" },
+    { enabled: !!projectId && !!trigger?.customGraphId, retry: false },
   );
   const datasetsQuery = api.dataset.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && trigger?.action === "ADD_TO_DATASET" },
+    { projectId },
+    { enabled: !!projectId && trigger?.action === "ADD_TO_DATASET" },
+  );
+  const slackConnectionsQuery = slackApi.slackIntegration.list.useQuery(
+    { projectId },
+    { enabled: !!projectId && trigger?.action === "SEND_SLACK_MESSAGE" },
   );
   const datasetName = actionParams.datasetId
     ? (datasetsQuery.data?.find((d) => d.id === actionParams.datasetId)?.name ?? null)
     : null;
+
+  // `null` is the server's settled "no such automation"; pending is undefined.
+  if (triggerQuery.error || triggerQuery.data === null) {
+    return <UnavailableAutomationDrawer error={triggerQuery.error} onClose={onClose} />;
+  }
 
   return (
     <Drawer.Root
@@ -114,11 +112,12 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
             {triggerQuery.isLoading ? (
               <Skeleton height="24px" width="200px" />
             ) : (
-              <Heading size="md">
-                {trigger?.name ?? kindLabelOf({ isGraphAlert, isSchedule })}
-              </Heading>
+              <Heading size="md">{trigger?.name ?? (isSchedule ? "Report" : "Automation")}</Heading>
             )}
-            {kindBadgeOf({ trigger, isGraphAlert, isSchedule })}
+            <HStack gap={2}>
+              {kindBadgeOf({ trigger, isGraphAlert, isSchedule })}
+              {pausedBadgeOf({ trigger })}
+            </HStack>
           </VStack>
         </Drawer.Header>
         <Drawer.Body>
@@ -138,9 +137,12 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
               <Text textStyle="xs" color="fg.muted" fontWeight="medium">
                 Destination
               </Text>
-              {destinationSummaryOf({ trigger, actionParams, datasetName }) ?? (
-                <Text textStyle="sm">None</Text>
-              )}
+              {destinationSummaryOf({
+                trigger,
+                actionParams,
+                datasetName,
+                slackConnections: slackConnectionsQuery.data?.connections,
+              }) ?? <Text textStyle="sm">None</Text>}
             </VStack>
 
             <VStack align="start" gap={1} width="full">
@@ -150,32 +152,31 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
               {conditionsSummaryOf({
                 trigger,
                 isGraphAlert,
+                isUnconditioned,
                 actionParams,
                 graph: graphQuery.data?.graph,
               })}
             </VStack>
 
-            <VStack align="start" gap={2} width="full">
-              <Text textStyle="xs" color="fg.muted" fontWeight="medium">
-                Recent fires
-              </Text>
-              {recentFiresBodyOf({
-                isLoading: recentFiresQuery.isLoading,
-                fires: recentFiresQuery.data ?? [],
-                isGraphAlert,
-              })}
-            </VStack>
+            {trigger ? (
+              <NextFiringSection automationId={automationId} projectId={projectId} />
+            ) : null}
+
+            {traceQuery ? <MatchingTracesSection projectId={projectId} query={traceQuery} /> : null}
+
+            {trigger ? (
+              <HistorySection
+                automationId={automationId}
+                projectId={projectId}
+                isGraphAlert={isGraphAlert}
+                canRunConditions={!!traceQuery}
+                isUnconditioned={isUnconditioned}
+                isReport={isSchedule}
+              />
+            ) : null}
 
             {isWebhook ? (
-              <VStack align="start" gap={2} width="full">
-                <Text textStyle="xs" color="fg.muted" fontWeight="medium">
-                  Recent deliveries
-                </Text>
-                {webhookDeliveriesBodyOf({
-                  isLoading: webhookDeliveriesQuery.isLoading,
-                  deliveries: webhookDeliveriesQuery.data ?? [],
-                })}
-              </VStack>
+              <WebhookDeliverySection automationId={automationId} projectId={projectId} />
             ) : null}
           </VStack>
         </Drawer.Body>
@@ -192,258 +193,28 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
   );
 }
 
-type RecentFire = RouterOutputs["automation"]["getRecentFires"][number];
-
-/**
- * Recent fires as a compact, honest list. No trace ids (`triggers:view`
- * is weaker than trace-content permission), so a same-minute burst
- * collapses into one "Fired N times" row; alerts stay per-incident.
- */
-function RecentFiresList({ fires, isGraphAlert }: { fires: RecentFire[]; isGraphAlert: boolean }) {
-  const rows = isGraphAlert
-    ? fires.map((fire) => {
-        const firedAt = toEpochMs(fire.createdAt);
-        const open = !fire.resolvedAt;
-        return {
-          key: fire.id,
-          dot: open ? "red.solid" : "green.solid",
-          label: open ? "Firing" : "Resolved",
-          detail: open
-            ? "still firing"
-            : `${formatTimeAgo(firedAt)} · lasted ${formatDurationBetween(
-                firedAt,
-                toEpochMs(fire.resolvedAt!),
-              )}`,
-          detailColor: open ? "red.fg" : "fg.muted",
-        };
-      })
-    : groupFiresByLabel(fires).map((g) => ({
-        key: g.key,
-        dot: "green.solid",
-        label: g.count === 1 ? "Fired once" : `Fired ${g.count} times`,
-        detail: g.label,
-        detailColor: "fg.muted",
-      }));
-
-  return (
-    <VStack
-      align="stretch"
-      gap={0}
-      width="full"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      overflow="hidden"
-    >
-      {rows.map((row) => (
-        <HStack
-          key={row.key}
-          gap={2.5}
-          paddingX={3}
-          paddingY={2}
-          borderBottomWidth="1px"
-          borderColor="border"
-          _last={{ borderBottomWidth: 0 }}
-        >
-          <Box boxSize={2} borderRadius="full" flexShrink={0} bg={row.dot} />
-          <Text textStyle="sm" flex="1" minWidth="0">
-            {row.label}
-          </Text>
-          <Text textStyle="xs" color={row.detailColor} flexShrink={0} whiteSpace="nowrap">
-            {row.detail}
-          </Text>
-        </HStack>
-      ))}
-    </VStack>
-  );
-}
-
-/** Collapse consecutive fires that share a relative-time label ("6 minutes
- *  ago") into one counted row. Input is newest-first, so equal labels are
- *  always adjacent. */
-function groupFiresByLabel(fires: RecentFire[]): { key: string; label: string; count: number }[] {
-  const groups: { key: string; label: string; count: number }[] = [];
-  for (const fire of fires) {
-    const label = formatTimeAgo(toEpochMs(fire.createdAt)) ?? "";
-    const last = groups[groups.length - 1];
-    if (last && last.label === label) last.count++;
-    else groups.push({ key: fire.id, label, count: 1 });
-  }
-  return groups;
-}
-
-type WebhookDelivery = RouterOutputs["automation"]["getWebhookDeliveries"][number];
-
-const OUTCOME_DOT: Record<WebhookDelivery["outcome"], string> = {
-  success: "green.solid",
-  retryable: "yellow.solid",
-  terminal: "red.solid",
-  pending: "gray.solid",
-};
-
-/**
- * The webhook delivery log (ADR-040 §6): attempts grouped by dispatch,
- * newest first. A failed attempt expands to a plain-language explanation
- * -- the log stores outcome facts only, never request or response content.
- */
-function WebhookDeliveriesList({ deliveries }: { deliveries: WebhookDelivery[] }) {
-  // Rows arrive newest-first. Group by dispatchId keeping first-seen order
-  // (newest fire on top); reverse each group so attempts read oldest→newest.
-  const groups: { dispatchId: string; attempts: WebhookDelivery[] }[] = [];
-  const byId = new Map<string, WebhookDelivery[]>();
-  for (const d of deliveries) {
-    let attempts = byId.get(d.dispatchId);
-    if (!attempts) {
-      attempts = [];
-      byId.set(d.dispatchId, attempts);
-      groups.push({ dispatchId: d.dispatchId, attempts });
-    }
-    attempts.push(d);
-  }
-  for (const g of groups) g.attempts.reverse();
-
-  return (
-    <VStack align="stretch" gap={2} width="full">
-      {groups.map((g) => (
-        <VStack
-          key={g.dispatchId}
-          align="stretch"
-          gap={0}
-          width="full"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          overflow="hidden"
-        >
-          {g.attempts.map((attempt, index) => (
-            <DeliveryAttemptRow
-              key={attempt.id}
-              attempt={attempt}
-              index={index}
-              total={g.attempts.length}
-            />
-          ))}
-        </VStack>
-      ))}
-    </VStack>
-  );
-}
-
-/** Plain-language guidance derived from the HTTP status bucket — what
- *  happened and what the operator can do about it. Transport failures carry
- *  their own self-explanatory error text instead. */
-function guidanceForStatus(status: number | null): string | undefined {
-  if (status === null) return undefined;
-  if (status === 429) return "The endpoint asked us to slow down. Delivery backs off and retries.";
-  if (status === 408 || status >= 500)
-    return "The endpoint had a server error. Delivery retries automatically.";
-  if (status >= 400)
-    return "The endpoint rejected the request. Check its authentication and the payload it expects.";
-  return undefined;
-}
-
-function DeliveryAttemptRow({
-  attempt,
-  index,
-  total,
-}: {
-  attempt: WebhookDelivery;
-  index: number;
-  total: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const statusText =
-    attempt.responseStatus != null
-      ? `HTTP ${attempt.responseStatus}`
-      : (attempt.error ?? "No response");
-  const guidance =
-    attempt.outcome === "success" ? undefined : guidanceForStatus(attempt.responseStatus);
-  const hasDetail = Boolean(attempt.error ?? guidance ?? attempt.response);
-
-  return (
-    <Box borderBottomWidth="1px" borderColor="border" _last={{ borderBottomWidth: 0 }}>
-      <HStack
-        as="button"
-        gap={2.5}
-        paddingX={3}
-        paddingY={2}
-        width="full"
-        textAlign="left"
-        cursor={hasDetail ? "pointer" : "default"}
-        onClick={() => hasDetail && setOpen((v) => !v)}
-      >
-        <Box boxSize={2} borderRadius="full" flexShrink={0} bg={OUTCOME_DOT[attempt.outcome]} />
-        <Text textStyle="sm" flex="1" minWidth="0">
-          {total > 1 ? `Attempt ${index + 1} · ` : ""}
-          {statusText}
-        </Text>
-        <Text textStyle="xs" color="fg.muted" flexShrink={0} whiteSpace="nowrap">
-          {attempt.latencyMs != null ? `${attempt.latencyMs}ms · ` : ""}
-          {formatTimeAgo(toEpochMs(attempt.firedAt))}
-        </Text>
-      </HStack>
-      {open && hasDetail ? (
-        <VStack align="stretch" gap={2} paddingX={3} paddingBottom={3}>
-          {attempt.error ? (
-            <Code fontSize="xs" width="full" whiteSpace="pre-wrap" wordBreak="break-word">
-              {attempt.error}
-            </Code>
-          ) : null}
-          {attempt.response?.body ? (
-            <Code fontSize="xs" width="full" whiteSpace="pre-wrap" wordBreak="break-word">
-              {attempt.response.body}
-            </Code>
-          ) : null}
-          {attempt.response?.headers ? (
-            <VStack align="stretch" gap={0.5}>
-              {Object.entries(attempt.response.headers).map(([name, value]) => (
-                <Code key={name} fontSize="xs" width="full" whiteSpace="pre-wrap">
-                  {name}: {value}
-                </Code>
-              ))}
-            </VStack>
-          ) : null}
-          {guidance ? (
-            <Text textStyle="xs" color="fg.muted">
-              {guidance}
-            </Text>
-          ) : null}
-        </VStack>
-      ) : null}
-    </Box>
-  );
-}
-
-type ViewedTrigger = RouterOutputs["automation"]["getTriggerById"];
+type ViewedTrigger = NonNullable<RouterOutputs["automation"]["getTriggerById"]>;
 
 /** Where the automation delivers, with any secret in it masked. */
 function destinationSummaryOf({
   trigger,
   actionParams,
   datasetName,
+  slackConnections,
 }: {
   trigger: ViewedTrigger | undefined;
   actionParams: TriggerActionParams;
   datasetName: string | null;
+  slackConnections: readonly NamedSlackConnection[] | undefined;
 }): React.ReactNode {
   if (!trigger) return null;
   switch (trigger.action) {
     case "SEND_SLACK_MESSAGE":
-      // The webhook URL carries a secret token — mask it and surface the
-      // full URL only on hover, mirroring the list page's Slack cell.
-      return actionParams.slackWebhook ? (
-        <Tooltip content={actionParams.slackWebhook}>
-          <Text textStyle="sm" lineClamp={1} width="fit-content" cursor="help">
-            Slack webhook
-          </Text>
-        </Tooltip>
-      ) : (
-        <Text textStyle="sm">Slack webhook</Text>
-      );
+      return <SlackDestination actionParams={actionParams} connections={slackConnections} />;
     case "SEND_EMAIL":
       return actionParams.members?.length ? (
-        <Text textStyle="sm" wordBreak="break-all">
-          {actionParams.members.join(", ")}
+        <Text textStyle="sm" overflowWrap="anywhere">
+          <EmailList emails={actionParams.members} />
         </Text>
       ) : null;
     case "SEND_WEBHOOK": {
@@ -472,15 +243,39 @@ function destinationSummaryOf({
   }
 }
 
+/** The Slack connection (and channel); a webhook URL only on hover (#6244, as the list). */
+function SlackDestination({
+  actionParams,
+  connections,
+}: {
+  actionParams: TriggerActionParams;
+  connections: readonly NamedSlackConnection[] | undefined;
+}) {
+  const destination = slackDestinationPresentation({ actionParams, connections });
+  const label = slackDestinationLabel(destination);
+  if (destination.kind === "webhook" && destination.tooltipUrl) {
+    return (
+      <Tooltip content={destination.tooltipUrl}>
+        <Text textStyle="sm" lineClamp={1} width="fit-content" cursor="help">
+          {label}
+        </Text>
+      </Tooltip>
+    );
+  }
+  return <Text textStyle="sm">{label}</Text>;
+}
+
 /** What the automation watches: a graph threshold, a search query, or trace filters. */
 function conditionsSummaryOf({
   trigger,
   isGraphAlert,
+  isUnconditioned,
   actionParams,
   graph,
 }: {
   trigger: ViewedTrigger | undefined;
   isGraphAlert: boolean;
+  isUnconditioned: boolean;
   actionParams: TriggerActionParams;
   graph: unknown;
 }): React.ReactNode {
@@ -501,8 +296,7 @@ function conditionsSummaryOf({
     );
   }
   if (trigger.filterQuery) {
-    // ADR-043: a trace-subject automation shows its search query, mirroring
-    // the automations page's "Acts on" cell.
+    // ADR-043: a trace-subject automation shows its search query, as the list's cell does.
     return (
       <Code size="sm" variant="surface" whiteSpace="pre-wrap" wordBreak="break-word">
         {trigger.filterQuery}
@@ -511,8 +305,11 @@ function conditionsSummaryOf({
   }
   const filters = parseAutomationFiltersWire(trigger.filters);
   if (Object.keys(filters).length > 0) {
-    return <FilterDisplay filters={JSON.stringify(filters)} hasBorder={true} />;
+    return (
+      <FilterDisplay filters={JSON.stringify(filters)} hasBorder={true} shouldClampValues={false} />
+    );
   }
+  if (isUnconditioned) return <MatchesEveryTraceNotice />;
   return (
     <Text textStyle="sm" color="fg.muted">
       No conditions
@@ -520,18 +317,7 @@ function conditionsSummaryOf({
   );
 }
 
-function kindLabelOf({
-  isGraphAlert,
-  isSchedule,
-}: {
-  isGraphAlert: boolean;
-  isSchedule: boolean;
-}): string {
-  if (isGraphAlert) return "Alert";
-  if (isSchedule) return "Schedule";
-  return "Automation";
-}
-
+/** What the row IS: after the merge two answers, not three (ADR-093 §1). */
 function kindBadgeOf({
   trigger,
   isGraphAlert,
@@ -541,60 +327,37 @@ function kindBadgeOf({
   isGraphAlert: boolean;
   isSchedule: boolean;
 }): React.ReactNode {
-  if (isGraphAlert) {
-    return (
-      <Badge colorPalette="purple" gap={1}>
-        <TrendingUp size={12} />
-        Alert
-      </Badge>
-    );
-  }
   if (isSchedule) {
     return (
       <Badge colorPalette="purple" gap={1}>
         <Calendar size={12} />
-        Schedule
+        Report
       </Badge>
     );
   }
-  if (trigger) return <Badge colorPalette="gray">Automation</Badge>;
+  if (isGraphAlert) {
+    return (
+      <Badge colorPalette="purple" gap={1}>
+        <TrendingUp size={12} />
+        Watches a graph
+      </Badge>
+    );
+  }
+  if (trigger) return <Badge colorPalette="gray">Watches a trace filter</Badge>;
   return null;
 }
 
-function recentFiresBodyOf({
-  isLoading,
-  fires,
-  isGraphAlert,
-}: {
-  isLoading: boolean;
-  fires: RecentFire[];
-  isGraphAlert: boolean;
-}): React.ReactNode {
-  if (isLoading) return <Skeleton height="60px" width="full" />;
-  if (fires.length === 0) {
-    return (
-      <Text textStyle="sm" color="fg.muted">
-        {isGraphAlert ? "This alert has not fired yet." : "This automation has not fired yet."}
-      </Text>
-    );
+/** Paused explains a silent automation first; `tabIndex` makes the runaway tooltip reachable. */
+function pausedBadgeOf({ trigger }: { trigger: ViewedTrigger | undefined }): React.ReactNode {
+  if (!trigger || trigger.active) return null;
+  if (!isAutomationPauseReason(trigger.pausedReason)) {
+    return <Badge colorPalette="red">Paused</Badge>;
   }
-  return <RecentFiresList fires={fires} isGraphAlert={isGraphAlert} />;
-}
-
-function webhookDeliveriesBodyOf({
-  isLoading,
-  deliveries,
-}: {
-  isLoading: boolean;
-  deliveries: WebhookDelivery[];
-}): React.ReactNode {
-  if (isLoading) return <Skeleton height="60px" width="full" />;
-  if (deliveries.length === 0) {
-    return (
-      <Text textStyle="sm" color="fg.muted">
-        No delivery attempts recorded yet.
-      </Text>
-    );
-  }
-  return <WebhookDeliveriesList deliveries={deliveries} />;
+  return (
+    <Tooltip content={RUNAWAY_PAUSE_EXPLANATION}>
+      <Badge colorPalette="red" tabIndex={0}>
+        Paused
+      </Badge>
+    </Tooltip>
+  );
 }

@@ -5,6 +5,7 @@
  */
 
 import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
+import type * as SlackKit from "@langwatch/slack-browser-kit";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -58,6 +59,13 @@ vi.mock("../../../behavior/automation-api.ts", () => {
   );
   return { api, automationApi: api };
 });
+
+vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<typeof SlackKit>()),
+  slackApi: {
+    slackIntegration: { list: { useQuery: () => ({ data: undefined, isLoading: false }) } },
+  },
+}));
 
 /**
  * Both editors, as anything the screen mounted would print. Stubbed
@@ -252,7 +260,7 @@ describe("AutomationsPage sections", () => {
       };
     };
 
-    for (const section of ["overview", "alerts", "schedules", "automations"] as const) {
+    for (const section of ["overview", "reports", "automations"] as const) {
       it(`prints the ${section} section`, () => {
         withData();
         expect(renderSection(section)).toMatchSnapshot();
@@ -261,7 +269,7 @@ describe("AutomationsPage sections", () => {
   });
 
   describe("given a project with no automations", () => {
-    for (const section of ["overview", "alerts", "schedules", "automations"] as const) {
+    for (const section of ["overview", "reports", "automations"] as const) {
       it(`prints the empty ${section} section`, () => {
         triggers.rows = [];
         expect(renderSection(section)).toMatchSnapshot();
