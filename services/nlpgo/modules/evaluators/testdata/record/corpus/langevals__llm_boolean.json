@@ -132,10 +132,9 @@
       "output": "Paris is the capital of France."
     },
     "settings": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "openai/claude-sonnet-4-5"
     },
     "env": {
-      "X_LITELLM_custom_llm_provider": "openai",
       "X_LITELLM_temperature": "0",
       "X_LITELLM_top_p": "0.9"
     }

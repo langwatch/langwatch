@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -197,7 +198,28 @@ func chatField(body map[string]any, field string) any {
 	if field == "n" && value == nil {
 		return float64(1)
 	}
+	if field == "tools" {
+		sortIntentEnum(value)
+	}
 	return value
+}
+
+// sortIntentEnum orders off_topic's intent enum: Python builds it from a set,
+// so it compares as a set. The one relaxation, and only for that field.
+func sortIntentEnum(tools any) {
+	list, _ := tools.([]any)
+	for _, tool := range list {
+		object, _ := tool.(map[string]any)
+		function, _ := object["function"].(map[string]any)
+		if function["name"] != "identify_intent" {
+			continue
+		}
+		parameters, _ := function["parameters"].(map[string]any)
+		properties, _ := parameters["properties"].(map[string]any)
+		intent, _ := properties["intent"].(map[string]any)
+		enum, _ := intent["enum"].([]any)
+		sort.Slice(enum, func(i, j int) bool { return fmt.Sprint(enum[i]) < fmt.Sprint(enum[j]) })
+	}
 }
 
 func (r *recordedLLM) answerEmbeddings(body []byte) (int, []byte) {

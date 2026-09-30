@@ -69,7 +69,7 @@ func TestEvaluateKeepsADefinedButUnportedEvaluatorNotFound(t *testing.T) {
 
 	_, err := service.Evaluate(t.Context(), contract.EvaluateRequest{
 		Tenant:    tenant("acme"),
-		Evaluator: "langevals/llm_score",
+		Evaluator: "langevals/pairwise_compare",
 		Entries:   []contract.Entry{{Input: text("hi")}},
 	})
 
