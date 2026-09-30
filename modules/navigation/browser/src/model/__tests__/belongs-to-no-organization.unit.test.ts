@@ -10,12 +10,14 @@ const resolved = {
 
 describe("belongsToNoOrganization", () => {
   describe("when the graph answered with no organizations", () => {
+    /** @scenario Belonging to no organization is something the graph said */
     it("says the reader belongs to none", () => {
       expect(belongsToNoOrganization({ ...resolved, organizations: [] })).toBe(true);
     });
   });
 
   describe("when the graph has not answered", () => {
+    /** @scenario A graph that never answered is not an account without organizations */
     it("does not mistake silence for an answer", () => {
       expect(belongsToNoOrganization({ ...resolved, organizations: void 0 })).toBe(false);
     });
