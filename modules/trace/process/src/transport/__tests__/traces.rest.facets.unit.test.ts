@@ -97,6 +97,7 @@ function mount(
 
 describe("GET /api/v1/traces/facets", () => {
   describe("when no field is named", () => {
+    /** @scenario "Without a field, the facets endpoint answers the whole discovery payload" */
     it("answers the tenant's discovery payload for the default window", async () => {
       const { send, readDiscover } = mount();
 
@@ -112,6 +113,7 @@ describe("GET /api/v1/traces/facets", () => {
   });
 
   describe("when a registry field is named", () => {
+    /** @scenario "With a field, the facets endpoint answers that field's values and counts" */
     it("pages that field's values and reports whether more remain", async () => {
       const { send, readFacetValues } = mount();
 
@@ -130,6 +132,7 @@ describe("GET /api/v1/traces/facets", () => {
   });
 
   describe("when the field names no facet with values to list", () => {
+    /** @scenario "An unknown field is refused rather than answered empty" */
     it("answers 422 naming the field", async () => {
       const { send, readFacetValues } = mount();
 
@@ -141,6 +144,7 @@ describe("GET /api/v1/traces/facets", () => {
   });
 
   describe("when the field is an attribute key and the caller cannot read captured content", () => {
+    /** @scenario "Attribute values are withheld where captured content is" */
     it("answers 403 rather than the values behind it", async () => {
       const { send, readFacetValues } = mount({
         resolveApiKeyProtections: vi.fn(async () => ({
@@ -160,12 +164,97 @@ describe("GET /api/v1/traces/facets", () => {
   });
 
   describe("given the route order against :traceId", () => {
+    /** @scenario "The facets route is not read as a trace id" */
     it("reads facets rather than treating the literal segment as a trace id", async () => {
       const { send, readDiscover } = mount();
 
       await send("/api/v1/traces/facets");
 
       expect(readDiscover).toHaveBeenCalled();
+    });
+  });
+
+  describe("when a prefix is sent", () => {
+    /** @scenario "A prefix narrows a field's values" */
+    it("hands the prefix to the reader with the field", async () => {
+      const { send, readFacetValues } = mount();
+
+      const response = await send("/api/v1/traces/facets?field=model&prefix=gpt");
+
+      expect(response.status).toBe(200);
+      expect(readFacetValues).toHaveBeenCalledWith(
+        expect.objectContaining({ facetKey: "model", prefix: "gpt" }),
+      );
+    });
+  });
+
+  describe("when the field is an attribute key and captured content is visible", () => {
+    /** @scenario "An attribute key is a field like any other" */
+    it("answers the values that attribute key holds", async () => {
+      const { send, readFacetValues } = mount();
+
+      const response = await send("/api/v1/traces/facets?field=trace.attribute.langwatch.user_id");
+
+      expect(response.status).toBe(200);
+      expect(readFacetValues).toHaveBeenCalledWith(
+        expect.objectContaining({ facetKey: "attribute.langwatch.user_id" }),
+      );
+    });
+  });
+
+  describe("when the window bounds arrive as epoch milliseconds", () => {
+    /** @scenario "A window bound is accepted as epoch milliseconds or as an ISO string" */
+    it("reads them as the instants an ISO string names", async () => {
+      const { send, readFacetValues } = mount();
+      const iso = "2026-03-01T00:00:00.000Z";
+      const ms = String(Date.parse(iso));
+
+      await send(`/api/v1/traces/facets?field=model&startDate=${ms}&endDate=${ms}`);
+      await send(`/api/v1/traces/facets?field=model&startDate=${iso}&endDate=${iso}`);
+
+      const [byMillis, byIso] = readFacetValues.mock.calls.map(([call]) => call.timeRange);
+      expect(byMillis).toEqual({ from: Date.parse(iso), to: Date.parse(iso) });
+      expect(byIso).toEqual(byMillis);
+    });
+  });
+
+  describe("when a window bound names a day that does not exist", () => {
+    /** @scenario "A window bound naming a day that does not exist is refused" */
+    it("refuses it rather than rolling it into March", async () => {
+      const { send, readFacetValues } = mount();
+
+      const response = await send("/api/v1/traces/facets?field=model&startDate=2026-02-30");
+
+      expect(response.status).toBe(422);
+      expect(readFacetValues).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a caller whose plan hides content older than a cutoff", () => {
+    const window = { from: 1_000, to: 9_000 };
+    const protections = { canSeeCapturedInput: true, canSeeCapturedOutput: true };
+    const visibilityCutoffMs = 5_000;
+
+    /** @scenario "A retention cutoff bounds the window an attribute facet reads" */
+    it("raises the floor of an attribute facet's window to the cutoff", () => {
+      expect(
+        TraceFacetValuesService.visibleWindow({
+          timeRange: window,
+          facetKey: "attribute.foo",
+          protections: { ...protections, visibilityCutoffMs },
+        }),
+      ).toEqual({ from: 5_000, to: 9_000 });
+    });
+
+    /** @scenario "A retention cutoff bounds the window an attribute facet reads" */
+    it("keeps the window a named facet asked for", () => {
+      expect(
+        TraceFacetValuesService.visibleWindow({
+          timeRange: window,
+          facetKey: "model",
+          protections: { ...protections, visibilityCutoffMs },
+        }),
+      ).toEqual(window);
     });
   });
 });
