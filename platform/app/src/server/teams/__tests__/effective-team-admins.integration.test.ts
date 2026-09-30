@@ -17,14 +17,19 @@ import {
 import { prisma } from "~/server/db";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import {
   computeEffectiveAdminUserIds,
   isUserAdminViaGroup,
 } from "../effective-team-admins";
+import { TeamService } from "../team.service";
+
+wireDefaultTestApp();
 
 describe("effective team admins through a group", () => {
   const ns = `team-group-admins-${nanoid(8)}`;
 
+  const teamSlug = `--test-team-${ns}`;
   let organizationId: string;
   let teamId: string;
   let memberUserId: string;
@@ -37,7 +42,7 @@ describe("effective team admins through a group", () => {
     organizationId = organization.id;
 
     const team = await prisma.team.create({
-      data: { name: "Shared Team", slug: `--test-team-${ns}`, organizationId },
+      data: { name: "Shared Team", slug: teamSlug, organizationId },
     });
     teamId = team.id;
 
@@ -110,6 +115,18 @@ describe("effective team admins through a group", () => {
 
       expect(admins.has(memberUserId)).toBe(true);
       expect(admins.has(developerUserId)).toBe(false);
+    });
+
+    it("lists the Member on the team and not the Developer", async () => {
+      const teams = await new TeamService({ prisma }).getTeamsWithRoleBindings({
+        organizationId,
+      });
+
+      const listed = (
+        teams.find((team) => team.slug === teamSlug)?.directMembers ?? []
+      ).map((m) => m.userId);
+      expect(listed).toContain(memberUserId);
+      expect(listed).not.toContain(developerUserId);
     });
 
     it("answers the same for one person asked directly", async () => {
