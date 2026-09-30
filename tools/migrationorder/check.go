@@ -27,6 +27,12 @@ type Input struct {
 	// Misplaced are migration entries present under a forbidden, non-canonical
 	// root at the branch head. Values are repository-relative paths.
 	Misplaced []string
+	// Released are the entries on release lines other than the base branch
+	// (origin/main for a PR into a long-running branch). A migration that has
+	// shipped there has run on real databases under that exact name, so a
+	// branch carrying it is porting history, not adding a migration, and it
+	// must keep the name.
+	Released []string
 }
 
 // Finding is one migration that is out of order, and how to fix it.
@@ -66,7 +72,7 @@ func Check(in Input) []Finding {
 	}
 
 	existing := map[string]bool{}
-	for _, entry := range slices.Concat(in.Base, in.MergeBase) {
+	for _, entry := range slices.Concat(in.Base, in.MergeBase, in.Released) {
 		existing[entry] = true
 	}
 

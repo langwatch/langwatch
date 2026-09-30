@@ -19,7 +19,10 @@ type Repo struct {
 // Ordering is judged against the tip of baseRef rather than the merge base: a
 // branch is stale exactly when the base branch has moved ahead of it, so the
 // merge base would be blind to the failure this check exists to catch.
-func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
+//
+// releasedRefs name release lines besides baseRef; their entries are history
+// (see Input.Released).
+func (r Repo) Inputs(ctx context.Context, baseRef string, releasedRefs ...string) ([]Input, error) {
 	mergeBase, err := r.git(ctx, "merge-base", baseRef, "HEAD")
 	if err != nil {
 		return nil, err
@@ -28,43 +31,74 @@ func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
 
 	inputs := make([]Input, 0, len(Sets))
 	for _, set := range Sets {
-		base, err := r.entriesAtAny(ctx, baseRef, set)
+		in, err := r.input(ctx, set, comparedRefs{base: baseRef, mergeBase: mergeBase, released: releasedRefs})
 		if err != nil {
 			return nil, err
 		}
-		head, err := r.entriesAt(ctx, "HEAD", set.Directory)
-		if err != nil {
-			return nil, err
-		}
-		forked, err := r.entriesAtAny(ctx, mergeBase, set)
-		if err != nil {
-			return nil, err
-		}
-		touched, err := r.touchedSince(ctx, baseRef, set.Directory)
-		if err != nil {
-			return nil, err
-		}
-		var misplaced []string
-		for _, directory := range set.ForbiddenDirectories {
-			entries, err := r.entriesAt(ctx, "HEAD", directory)
-			if err != nil {
-				return nil, err
-			}
-			for _, entry := range entries {
-				misplaced = append(misplaced, directory+"/"+entry)
-			}
-		}
-		inputs = append(inputs, Input{
-			Set:       set,
-			BaseRef:   baseRef,
-			Base:      base,
-			Head:      head,
-			MergeBase: forked,
-			Touched:   touched,
-			Misplaced: misplaced,
-		})
+		inputs = append(inputs, in)
 	}
 	return inputs, nil
+}
+
+// comparedRefs are the refs one check run reads a migration set at.
+type comparedRefs struct {
+	base      string
+	mergeBase string
+	released  []string
+}
+
+// input reads one migration set at every ref the check compares.
+func (r Repo) input(ctx context.Context, set Set, refs comparedRefs) (Input, error) {
+	in := Input{Set: set, BaseRef: refs.base}
+	var err error
+	if in.Base, err = r.entriesAtAny(ctx, refs.base, set); err != nil {
+		return Input{}, err
+	}
+	if in.Head, err = r.entriesAt(ctx, "HEAD", set.Directory); err != nil {
+		return Input{}, err
+	}
+	if in.MergeBase, err = r.entriesAtAny(ctx, refs.mergeBase, set); err != nil {
+		return Input{}, err
+	}
+	if in.Touched, err = r.touchedSince(ctx, refs.base, set.Directory); err != nil {
+		return Input{}, err
+	}
+	if in.Released, err = r.releasedEntries(ctx, set, refs.released); err != nil {
+		return Input{}, err
+	}
+	if in.Misplaced, err = r.misplacedEntries(ctx, set); err != nil {
+		return Input{}, err
+	}
+	return in, nil
+}
+
+// releasedEntries reads the set's entries on every release line.
+func (r Repo) releasedEntries(ctx context.Context, set Set, refs []string) ([]string, error) {
+	var released []string
+	for _, ref := range refs {
+		entries, err := r.entriesAtAny(ctx, ref, set)
+		if err != nil {
+			return nil, err
+		}
+		released = append(released, entries...)
+	}
+	return released, nil
+}
+
+// misplacedEntries lists the entries under the set's forbidden roots at HEAD,
+// as repository-relative paths.
+func (r Repo) misplacedEntries(ctx context.Context, set Set) ([]string, error) {
+	var misplaced []string
+	for _, directory := range set.ForbiddenDirectories {
+		entries, err := r.entriesAt(ctx, "HEAD", directory)
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			misplaced = append(misplaced, directory+"/"+entry)
+		}
+	}
+	return misplaced, nil
 }
 
 // entriesAtAny reads the set's entries at ref from its current directory and

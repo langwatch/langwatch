@@ -159,6 +159,50 @@ func TestRepoInputsFindsPrismaMigrationsInTheOldRoot(t *testing.T) {
 	}
 }
 
+func TestRepoInputsPortOfAMigrationReleasedOnMain(t *testing.T) {
+	// main released a migration from its old root. A long-running branch forked
+	// earlier and numbered its own migration above it; a PR into that branch
+	// ports main's migration under its exact name, because databases that ran
+	// the release already recorded it under that name.
+	const prismaDir = "packages/prisma-client/prisma/migrations"
+	root := initRepo(t)
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260901000000_shared/migration.sql")
+	gitIn(t, root, "checkout", "-q", "-b", "long-branch")
+	if err := os.MkdirAll(filepath.Join(root, filepath.Dir(filepath.FromSlash(prismaDir))), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, root, "mv", "platform/app/prisma/migrations", prismaDir)
+	gitIn(t, root, "commit", "-q", "-m", "move migrations")
+	commitMigrationAt(t, root, prismaDir, "20260929100100_branch_own/migration.sql")
+	gitIn(t, root, "checkout", "-q", "main")
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260928120001_released/migration.sql")
+	gitIn(t, root, "checkout", "-q", "long-branch")
+	gitIn(t, root, "checkout", "-q", "-b", "port")
+	commitMigrationAt(t, root, prismaDir, "20260928120001_released/migration.sql")
+
+	prismaFindings := func(released ...string) []migrationorder.Finding {
+		t.Helper()
+		inputs, err := migrationorder.Repo{Root: root}.Inputs(t.Context(), "long-branch", released...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		index := slices.IndexFunc(inputs, func(in migrationorder.Input) bool {
+			return in.Set.Name == "Prisma"
+		})
+		if index < 0 {
+			t.Fatalf("no Prisma input in %+v", inputs)
+		}
+		return migrationorder.Check(inputs[index])
+	}
+
+	if findings := prismaFindings(); len(findings) != 1 || findings[0].Entry != "20260928120001_released" {
+		t.Errorf("without the release line, want one finding for the port, got %+v", findings)
+	}
+	if findings := prismaFindings("main"); len(findings) != 0 {
+		t.Errorf("with main as a release line, the port is history, got findings %+v", findings)
+	}
+}
+
 func TestTopLevelEntries(t *testing.T) {
 	tests := []struct {
 		name      string

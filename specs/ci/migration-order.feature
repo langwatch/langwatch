@@ -56,6 +56,13 @@ Feature: Migration order check
     When the PR adds no migrations
     Then the check passes
 
+  Scenario: A PR into a long-running branch ports a migration main already released
+    Given the PR targets a branch other than main
+    And that branch's newest migration is numbered above one main has released
+    When the PR adds main's released migration under its exact name
+    Then the check passes, because main is read as a release line whose migrations are history
+    And a migration the PR adds that main never released is still judged against the branch
+
   Scenario: The comment goes away once the migration is renumbered
     Given a PR carries a migration-order comment
     When the author applies the rename and pushes
