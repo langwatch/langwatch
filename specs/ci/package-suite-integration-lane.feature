@@ -69,3 +69,17 @@ Feature: A package's integration suite runs in CI when it declares one
       Given PACKAGE_SUITES_SHARD is not "<index>/<total>"
       When the package suites job starts
       Then it fails instead of running every package on every shard
+
+  Rule: A pull request runs the suites its change reaches
+
+    @unit
+    Scenario: A pull request runs only the suites its change reaches
+      Given the affected job lists the projects a pull request reaches
+      When the package suites job runs
+      Then only the packages in that list are sharded and run
+
+    @unit
+    Scenario: Without an affected list every suite runs
+      Given a push to main, a merge group, a global input change or a failed affected step
+      When the package suites job runs
+      Then every discovered package is sharded and run

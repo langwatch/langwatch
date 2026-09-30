@@ -314,6 +314,8 @@ jobs:
       # non-empty set.
       apps: ${{ steps.guard.outputs.apps }}
       narrowed: ${{ steps.pick.outputs.narrowed }}
+      # Only on a narrowed pull request; empty means package-suites runs all.
+      projects: ${{ steps.pick.outputs.projects }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -415,6 +417,7 @@ jobs:
 
           echo "apps=$PICKED" >> "$GITHUB_OUTPUT"
           echo "narrowed=true" >> "$GITHUB_OUTPUT"
+          echo "projects=$RAW" >> "$GITHUB_OUTPUT"
 
       # continue-on-error above means a failed step still arrives here with
       # empty outputs. Nothing downstream may read an empty matrix, so the
@@ -859,7 +862,7 @@ jobs:
   # also calls, so the two lanes are exact complements and no file can go
   # missing from CI. See specs/ci/integration-test-lanes.feature.
   package-suites:
-    needs: changes
+    needs: [changes, affected]
     if: needs.changes.outputs.relevant == 'true'
     env:
       BUILD_TIME: "true"
@@ -994,6 +997,8 @@ jobs:
         env:
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          # A pull request runs the suites its change reaches; main runs all.
+          PACKAGE_SUITES_ONLY: ${{ needs.affected.outputs.projects }}
         run: node --experimental-strip-types .github/scripts/run-package-suites.ts
 
   lint:
