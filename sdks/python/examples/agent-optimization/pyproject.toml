@@ -13,3 +13,9 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+# Transitive-dependency security pins, so a re-resolution can't pull a
+# vulnerable version back in.
+constraint-dependencies = [
+    "pyjwt>=2.14.0",  # security: PyJWT advisories covering <=2.13.0 (#2492)
+]

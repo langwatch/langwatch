@@ -25,6 +25,7 @@ constraint-dependencies = [
     "tornado>=6.5.8",  # security: tornado advisories (#2159, #2173, #2233)
     "anyio>=4.14.2",  # security: anyio advisories (#2430, #2431)
     "httpx2>=2.12.0",  # security: httpx2 advisories (#2312, #2313, #2329)
+    "pyjwt>=2.14.0",  # security: PyJWT advisories covering <=2.13.0 (#2479)
 ]
 
 [tool.uv.sources]
