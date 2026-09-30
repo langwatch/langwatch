@@ -210,13 +210,17 @@ also avoids concurrent restores overwriting a running binary), and
 **The lockfile no longer busts every cache.** A `nx:run-script` target without
 an `externalDependencies` input hashes every external package, and
 `sharedGlobals` named `pnpm-lock.yaml` outright, so any lockfile change missed
-every task. Each target default now names its root-installed tool
-(`typescript`, `vitest`, `oxlint`, none for builds) and the lockfile is gone
-from `sharedGlobals`; the npm nodes a project reaches through its declared
-dependencies are still hashed. `pluginsConfig["@nx/js"]` sets
-`projectsAffectedByDependencyUpdates` to `auto`, so `affected` follows the
-packages a lockfile change touched, and keeps `analyzeSourceFiles` off, as it
-was.
+every task. `dev/nx/npm-deps-plugin.mjs` now gives each workspace member a
+`npmDeps` named input: every package it declares, plus the runtime
+dependencies of every workspace package it reaches, each named by the exact
+node Nx holds for the installed version (bare when hoisted or unique, else
+`name@version`; a bare name with several versions makes Nx pick one at random
+per run). Nx hashes each with its transitive closure. Every JS target default
+takes `npmDeps` plus its root-installed tool (`typescript`, `vitest`,
+`oxlint`), and the lockfile is gone from `sharedGlobals`. Nx hashes a pnpm v9
+node by name and version, so a republished tarball under the same version is
+not seen. `pluginsConfig["@nx/js"]` sets `projectsAffectedByDependencyUpdates`
+to `auto` and keeps `analyzeSourceFiles` off, as it was.
 
 ## References
 

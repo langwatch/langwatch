@@ -25,9 +25,7 @@
       {
         "runtime": "node --version"
       },
-      {
-        "externalDependencies": []
-      }
+      "npmDeps"
     ],
     "go": [
       "{workspaceRoot}/**/*.go",
@@ -62,15 +60,25 @@
       {
         "externalDependencies": []
       }
+    ],
+    "npmDeps": [
+      {
+        "externalDependencies": []
+      }
     ]
   },
-  "plugins": ["./dev/nx/lint-types-plugin.mjs", "./dev/nx/go-plugin.mjs"],
+  "plugins": [
+    "./dev/nx/lint-types-plugin.mjs",
+    "./dev/nx/go-plugin.mjs",
+    "./dev/nx/npm-deps-plugin.mjs"
+  ],
   "targetDefaults": {
     "typecheck": {
       "cache": true,
       "inputs": [
         "default",
         "^production",
+        "npmDeps",
         {
           "externalDependencies": ["typescript"]
         }
@@ -175,9 +183,7 @@
         "{projectRoot}/scripts/generate-table-catalogue.mjs",
         "{projectRoot}/package.json",
         "sharedGlobals",
-        {
-          "externalDependencies": []
-        }
+        "npmDeps"
       ],
       "outputs": ["{projectRoot}/src/generated", "{projectRoot}/src/table-catalogue.ts"]
     },
@@ -186,6 +192,7 @@
       "inputs": [
         "default",
         "^production",
+        "npmDeps",
         {
           "externalDependencies": ["vitest"]
         }
@@ -197,6 +204,7 @@
       "inputs": [
         "default",
         "^production",
+        "npmDeps",
         {
           "externalDependencies": ["vitest"]
         }
@@ -206,13 +214,7 @@
     "lint": [
       {
         "cache": true,
-        "inputs": [
-          "default",
-          "lintGlobals",
-          {
-            "externalDependencies": []
-          }
-        ],
+        "inputs": ["default", "lintGlobals", "npmDeps"],
         "outputs": []
       },
       {
@@ -228,6 +230,7 @@
         "default",
         "^production",
         "lintGlobals",
+        "npmDeps",
         {
           "externalDependencies": ["oxlint", "oxlint-tsgolint"]
         }
