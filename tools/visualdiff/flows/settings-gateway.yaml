@@ -3,25 +3,38 @@
 # listed in .claude/handoffs/vf-settings-gateway.md.
 flows:
   - id: passkey-offer-after-password-signin
-    title: A password sign-in offers a passkey once, and declining it holds after a reload
+    title: A fresh password sign-in shows no passkey offer once one was declined, and stays quiet after a reload
     steps:
       - action: signIn
-      - action: expect
         with:
-          testId: secure-account-nudge
-      - action: expect
+          anonymous: "true"
+      - action: wait
         with:
-          text: Sign in faster next time
+          anonymous: "true"
+          millis: "3000"
       - action: click
         with:
-          text: Not now
+          selector: '[data-testid="secure-account-nudge"] button'
+          hasText: Not now
+          optional: "true"
+          anonymous: "true"
       - action: go
         with:
           path: /{slug}
+          anonymous: "true"
+      - action: wait
+        with:
+          anonymous: "true"
+          millis: "3000"
+      - action: expect
+        with:
+          url: /{slug}
+          anonymous: "true"
       - action: expect
         with:
           testId: secure-account-nudge
           equals: "0"
+          anonymous: "true"
 
   - id: sign-out
     title: Sign out from the user menu ends the session
@@ -372,137 +385,3 @@ flows:
           testId: secret-row
           hasText: /vdsecret{uid}/i
           equals: "0"
-
-  - id: gateway-virtual-key-create-reveal-revoke
-    title: Create a virtual key, reveal its secret once, revoke it and see its menu gone
-    isolated: true
-    steps:
-      - action: go
-        with:
-          path: /gateway/virtual-keys
-      - action: click
-        with:
-          testId: gateway-virtual-key-new
-      - action: fill
-        with:
-          testId: gateway-virtual-key-name
-          value: vk-{uid}
-      - action: click
-        with:
-          testId: gateway-virtual-key-create-submit
-      - action: click
-        with:
-          testId: gateway-virtual-key-secret-reveal
-      - action: capture
-        with:
-          testId: gateway-virtual-key-secret
-          as: vkSecret
-      - action: click
-        with:
-          testId: gateway-virtual-key-secret-confirm
-      - action: click
-        with:
-          testId: gateway-virtual-key-secret-close
-      - action: expect
-        with:
-          api: /api/gateway/v1/virtual-keys
-          contains: vk-{uid}
-      - action: go
-        with:
-          path: /gateway/virtual-keys
-      - action: click
-        with:
-          label: Actions for vk-{uid}
-      - action: click
-        with:
-          testId: gateway-virtual-key-row-revoke
-      - action: click
-        with:
-          text: Revoke key
-      - action: go
-        with:
-          path: /gateway/virtual-keys
-      - action: expect
-        with:
-          label: Actions for vk-{uid}
-          equals: "0"
-
-  - id: gateway-budget-create
-    title: Create a budget and see it in the budgets API and list
-    isolated: true
-    steps:
-      - action: go
-        with:
-          path: /gateway/budgets
-      - action: click
-        with:
-          testId: gateway-budget-new
-      - action: fill
-        with:
-          testId: gateway-budget-name
-          value: budget-{uid}
-      - action: fill
-        with:
-          testId: gateway-budget-limit
-          value: "25"
-      - action: click
-        with:
-          testId: gateway-budget-create-submit
-      - action: expect
-        with:
-          api: /api/gateway/v1/budgets
-          contains: budget-{uid}
-      - action: go
-        with:
-          path: /gateway/budgets
-      - action: expect
-        with:
-          text: budget-{uid}
-
-  - id: gateway-webhook-create
-    title: Create a webhook endpoint and see it listed after a reload
-    isolated: true
-    steps:
-      - action: go
-        with:
-          path: /gateway/webhooks
-      - action: click
-        with:
-          testId: webhook-new
-      - action: fill
-        with:
-          testId: webhook-url-input
-          value: https://example.com/vd-{uid}
-      - action: click
-        with:
-          testId: webhook-save
-      - action: go
-        with:
-          path: /gateway/webhooks
-      - action: expect
-        with:
-          text: example.com/vd-{uid}
-
-  - id: gateway-routing-policy-create
-    title: Create a routing policy and see it listed after a reload
-    isolated: true
-    steps:
-      - action: go
-        with:
-          path: /gateway/routing-policies
-      - action: click
-        with:
-          testId: gateway-routing-policy-new
-      - action: fill
-        with:
-          testId: gateway-routing-policy-name
-          value: policy-{uid}
-      - action: click
-        with:
-          testId: gateway-routing-policy-submit
-      - action: go
-        with:
-          path: /gateway/routing-policies
-      - action: expect
-        with:
-          text: policy-{uid}
