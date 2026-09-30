@@ -26,6 +26,7 @@ import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-t
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
+  holdsSharedAccess,
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
@@ -327,6 +328,48 @@ async function planUserScopeBinding({
   };
 }
 
+/** The reason stamped on every row a move to the Developer seat deletes. */
+const DEVELOPER_SEAT_REVOKE_REASON = "seat changed to Developer";
+
+/**
+ * The member's PROJECT-scoped rows on shared projects: a project that is not
+ * personal, on a team that is not personal. The personal project is never in
+ * the set, whatever rows it carries.
+ */
+async function sharedProjectBindingIds({
+  tx,
+  organizationId,
+  userId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+}): Promise<string[]> {
+  const projectRows = await new GrantsAccessListingRepository(
+    tx,
+  ).findBindingRows({
+    organizationId,
+    where: {
+      principalType: "USER",
+      principalId: userId,
+      scopeType: RoleBindingScopeType.PROJECT,
+    },
+  });
+  if (projectRows.length === 0) return [];
+  const sharedProjects = await tx.project.findMany({
+    where: {
+      id: { in: projectRows.map((row) => row.scopeId) },
+      isPersonal: false,
+      team: { organizationId, isPersonal: false },
+    },
+    select: { id: true },
+  });
+  const sharedProjectIds = new Set(sharedProjects.map((p) => p.id));
+  return projectRows
+    .filter((row) => sharedProjectIds.has(row.scopeId))
+    .map((row) => row.id);
+}
+
 /**
  * What a scope-binding correction resolves to once the transaction has read
  * the rows: the ids that collapse away, and either the role change on the row
@@ -336,6 +379,12 @@ async function planUserScopeBinding({
  */
 type ScopeBindingPlan = {
   revokeIds: string[];
+  /**
+   * Why the rows in `revokeIds` go. Recorded on the ledger fact, and from
+   * there on the customer's audit page, so a deletion the seat decided is
+   * readable as one. Plans that collapse duplicate rows carry none.
+   */
+  revokeReason?: string;
   change?: {
     bindingId: string;
     role: TeamUserRole;
@@ -361,12 +410,21 @@ async function emitScopeBindingPlans({
   plans: ScopeBindingPlan[];
   actor: LedgerActor;
 }): Promise<void> {
-  const revokeIds = plans.flatMap((plan) => plan.revokeIds);
-  if (revokeIds.length > 0) {
+  // Revocations grouped by the reason they carry, so a seat-decided deletion
+  // is recorded as one and a duplicate collapse stays unlabelled.
+  const revokesByReason = new Map<string | undefined, string[]>();
+  for (const plan of plans) {
+    if (plan.revokeIds.length === 0) continue;
+    const ids = revokesByReason.get(plan.revokeReason) ?? [];
+    ids.push(...plan.revokeIds);
+    revokesByReason.set(plan.revokeReason, ids);
+  }
+  for (const [reason, bindingIds] of revokesByReason) {
     await writer.revokeBindings({
       organizationId,
-      bindingIds: revokeIds,
+      bindingIds,
       actor,
+      ...(reason ? { reason } : {}),
     });
   }
   for (const plan of plans) {
@@ -1189,8 +1247,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         data: { role },
       });
 
-      // Keep the ORGANIZATION-scoped grant in sync (skip EXTERNAL)
-      if (role !== OrganizationUserRole.EXTERNAL) {
+      // Keep the ORGANIZATION-scoped grant in sync. A Lite Member has none
+      // (access comes from their teams) and neither does a Developer
+      // (ADR-143: personal team only), so both seats revoke it instead.
+      if (
+        role !== OrganizationUserRole.EXTERNAL &&
+        holdsSharedAccess(role)
+      ) {
         plans.push(
           await planUserScopeBinding({
             tx,
@@ -1203,7 +1266,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }),
         );
       } else {
-        // EXTERNAL (Lite Member) users have no org-level grant
         const orgRows = await new GrantsAccessListingRepository(
           tx,
         ).findBindingRows({
@@ -1215,7 +1277,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             scopeId: organizationId,
           },
         });
-        plans.push({ revokeIds: orgRows.map((row) => row.id) });
+        plans.push({
+          revokeIds: orgRows.map((row) => row.id),
+          revokeReason:
+            role === OrganizationUserRole.DEVELOPER
+              ? DEVELOPER_SEAT_REVOKE_REASON
+              : undefined,
+        });
       }
 
       // Shared teams only, matching what the router resolved before it computed
@@ -1356,6 +1424,26 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
               : (teamRoleUpdate.customRoleId ?? null),
           }),
         );
+      }
+
+      // ADR-143: a Developer holds nothing shared. Every row on a shared team
+      // (the set read above) and every row on a shared project goes, and each
+      // deletion is recorded with the seat as its reason. The personal team
+      // and personal project are never in either set, so the workspace that
+      // is only theirs is untouched, with its traces and keys.
+      if (role === OrganizationUserRole.DEVELOPER) {
+        const sharedProjectRowIds = await sharedProjectBindingIds({
+          tx,
+          organizationId,
+          userId,
+        });
+        plans.push({
+          revokeIds: [
+            ...currentMemberships.map((row) => row.id),
+            ...sharedProjectRowIds,
+          ],
+          revokeReason: DEVELOPER_SEAT_REVOKE_REASON,
+        });
       }
 
       // The seat correction reaches everything the seat caps, and a member

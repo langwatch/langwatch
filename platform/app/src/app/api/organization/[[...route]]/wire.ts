@@ -167,19 +167,36 @@ export const inviteSchema = z.object({
 export const createInvitesSchema = z.object({
   invites: z
     .array(
-      z.object({
-        email: z.string().trim().min(1).email(),
-        role: z.nativeEnum(OrganizationUserRole),
-        teams: z
-          .array(
-            z.object({
-              teamId: z.string().min(1),
-              role: z.nativeEnum(TeamUserRole),
-              customRoleId: z.string().min(1).optional(),
-            }),
-          )
-          .min(1),
-      }),
+      z
+        .object({
+          email: z.string().trim().min(1).email(),
+          role: z.nativeEnum(OrganizationUserRole),
+          // Every seat but Developer is invited onto at least one team; a
+          // Developer (ADR-143) is invited onto none, and naming one is
+          // refused by the service with the seat's own code rather than as
+          // a shape error, because the shape is fine and the seat is not.
+          teams: z
+            .array(
+              z.object({
+                teamId: z.string().min(1),
+                role: z.nativeEnum(TeamUserRole),
+                customRoleId: z.string().min(1).optional(),
+              }),
+            )
+            .optional(),
+        })
+        .superRefine((invite, ctx) => {
+          if (holdsSharedAccess(invite.role) && !invite.teams?.length) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.too_small,
+              minimum: 1,
+              type: "array",
+              inclusive: true,
+              path: ["teams"],
+              message: "Array must contain at least 1 element(s)",
+            });
+          }
+        }),
     )
     .min(1)
     .max(50),

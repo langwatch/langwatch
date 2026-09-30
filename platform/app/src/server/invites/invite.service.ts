@@ -902,15 +902,21 @@ export class InviteService {
   }
 
   /**
-   * A Developer seat (ADR-143) is invited onto no team, so an invite for one
-   * resolves to an empty team list before either storage form is read. The
-   * seat assertion has already refused explicit assignments; this covers the
-   * legacy comma-separated form, which would otherwise imply a default role.
+   * A Developer seat (ADR-143) is invited onto no team. An invite for one
+   * that names a team, in either request form, is refused here with the
+   * seat's own code, before the resolver would otherwise read the teams and
+   * before the record's seat assertion sees an already-empty list. One that
+   * names none resolves to an empty team list.
    */
-  private resolveInviteTeamsForSeat(
-    invite: { role: OrganizationUserRole },
-  ): ResolvedInviteTeams | null {
+  private resolveInviteTeamsForSeat(invite: {
+    role: OrganizationUserRole;
+    teams?: unknown[];
+    teamIds?: string;
+  }): ResolvedInviteTeams | null {
     if (holdsSharedAccess(invite.role)) return null;
+    if ((invite.teams?.length ?? 0) > 0 || invite.teamIds?.trim()) {
+      throw new DeveloperSeatNoSharedAccessError();
+    }
     return { teamAssignments: [], teamIdsString: "" };
   }
 
