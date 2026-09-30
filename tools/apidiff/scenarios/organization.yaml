@@ -3567,7 +3567,7 @@
   endpoint: "GET /api/projects/{id}"
   auth: "restricted"
   request: {"path": "/api/projects/{projectId}"}
-  expect: {"status": 200}
+  expect: {"status": 403}
 
 - id: "project-update-renames"
   endpoint: "PATCH /api/projects/{id}"
