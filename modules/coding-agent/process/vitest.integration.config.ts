@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 // Lua staging; glob pattern prevents path rot vs literal paths.
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     include: ["src/**/*.integration.test.ts"],
     fileParallelism: false,
     pool: "forks",

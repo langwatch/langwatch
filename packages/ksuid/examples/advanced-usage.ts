@@ -8,7 +8,7 @@ import {
   getEnvironment,
   setInstance,
   getInstance,
-} from "../dist/index.js";
+} from "../src/index.ts";
 
 console.log("=== Advanced KSUID Usage ===");
 

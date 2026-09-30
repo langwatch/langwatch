@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 // Integration lane for .integration.test.ts; needs Postgres for real statistics.
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     include: ["src/**/*.integration.test.ts"],
     fileParallelism: false,
     pool: "forks",
