@@ -10,6 +10,7 @@ import type {
   CodingAgentSessionMetricSeriesRow,
   CodingAgentSessionRow,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import type { SessionContextUsage } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.types";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import {
@@ -43,6 +44,7 @@ const BRANCH_SESSION_COLUMNS = `
   UserId,
   GitBranch,
   GitBranches,
+  UsageByContext,
   Title,
   LastEventOccurredAt,
   ModelCalls,
@@ -127,6 +129,20 @@ interface ClickHouseWriteRecord {
   CacheCreationTokens: string;
   CostUsd: number;
   AgentReportedCostUsd: number;
+  // Array(Tuple(RepositoryHost, RepositoryOwner, RepositoryName, Branch,
+  // InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens, CostUsd));
+  // the UInt64 members ride as strings like every other UInt64 column.
+  UsageByContext: [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    number,
+  ][];
 
   ModelCallMs: string;
   ToolMs: string;
@@ -219,6 +235,7 @@ function toBranchSessionRow(
     userId: String(record.UserId ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
     gitBranches: asStringArray(record.GitBranches),
+    usageByContext: asContextUsageRows(record.UsageByContext),
     title: String(record.Title ?? ""),
   };
 }
@@ -262,6 +279,17 @@ function toRecord({
     RepositoryName: row.repositoryName,
     GitBranch: row.gitBranch,
     GitBranches: row.gitBranches,
+    UsageByContext: row.usageByContext.map((usage) => [
+      usage.repositoryHost,
+      usage.repositoryOwner,
+      usage.repositoryName,
+      usage.branch,
+      big(usage.inputTokens),
+      big(usage.outputTokens),
+      big(usage.cacheReadTokens),
+      big(usage.cacheCreationTokens),
+      usage.costUsd,
+    ]),
     GitWorktree: row.gitWorktree,
     Title: row.title,
     TitleSource: row.titleSource,
@@ -1043,6 +1071,25 @@ const asMetricSeriesRows = (
       })
     : [];
 
+/** Parse the `UsageByContext` Array(Tuple(...)), read as an array of arrays. */
+const asContextUsageRows = (value: unknown): SessionContextUsage[] =>
+  Array.isArray(value)
+    ? value.map((entry) => {
+        const tuple = entry as unknown[];
+        return {
+          repositoryHost: String(tuple[0] ?? ""),
+          repositoryOwner: String(tuple[1] ?? ""),
+          repositoryName: String(tuple[2] ?? ""),
+          branch: String(tuple[3] ?? ""),
+          inputTokens: asNumber(tuple[4]),
+          outputTokens: asNumber(tuple[5]),
+          cacheReadTokens: asNumber(tuple[6]),
+          cacheCreationTokens: asNumber(tuple[7]),
+          costUsd: asNumber(tuple[8]),
+        };
+      })
+    : [];
+
 const asNumberMap = (value: unknown): Record<string, number> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
     ? Object.fromEntries(
@@ -1173,6 +1220,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     repositoryName: String(record.RepositoryName ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
     gitBranches: asStringArray(record.GitBranches),
+    usageByContext: asContextUsageRows(record.UsageByContext),
     gitWorktree: String(record.GitWorktree ?? ""),
     title: String(record.Title ?? ""),
     titleSource: String(record.TitleSource ?? ""),

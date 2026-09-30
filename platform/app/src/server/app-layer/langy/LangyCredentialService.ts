@@ -7,6 +7,7 @@ import type { Session } from "~/server/auth";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { ensureGatewayV1BaseUrl } from "./gatewayBaseUrl";
 import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
@@ -77,22 +78,6 @@ export function resolveLangyMirrorTier(
 }
 
 /**
- * The Langy worker hands `gatewayBaseUrl` straight to the agent as
- * `OPENAI_BASE_URL`, so it must point at the gateway's OpenAI-compatible
- * surface — the `/v1` prefix under which `/responses` and `/chat/completions`
- * live. `LW_GATEWAY_BASE_URL` is shared with the Go gateway's control-plane
- * discovery and is set without `/v1` in some deployments (the SaaS dev
- * cluster shipped `http://langwatch-gateway:80`), which made the worker POST
- * to `/responses` → 404. Normalise here so Langy is correct regardless of how
- * the deployment spells the env. Idempotent: a value already ending in `/v1`
- * is returned unchanged.
- */
-export function ensureGatewayV1BaseUrl(baseUrl: string): string {
-  const trimmed = baseUrl.replace(/\/+$/, "");
-  return /\/v1$/.test(trimmed) ? trimmed : `${trimmed}/v1`;
-}
-
-/**
  * The origin the Langy worker calls back on — the relay frame push, the durable
  * finalize, the revoke, AND the MCP server's LANGWATCH_ENDPOINT all dial this.
  *
@@ -118,16 +103,17 @@ export function resolveWorkerCallbackUrl(
 }
 
 /**
- * The AI gateway base URL the worker dials (handed to it as OPENAI_BASE_URL). Same
- * container caveat as {@link resolveWorkerCallbackUrl}: `LANGY_WORKER_GATEWAY_URL`
- * (a `host.docker.internal` address haven injects for a containerized worker) wins
- * when present; otherwise the usual LW_GATEWAY_PUBLIC_URL / LW_GATEWAY_BASE_URL.
+ * The AI gateway base URL the worker dials (handed to it as OPENAI_BASE_URL).
+ * `LANGY_WORKER_GATEWAY_URL` (haven's address for a containerized worker) wins,
+ * then the in-cluster LW_GATEWAY_INTERNAL_URL: the worker runs beside the
+ * control plane, and the public URL may not resolve from inside the cluster.
  */
 export function resolveWorkerGatewayBaseUrl(
   env: Record<string, string | undefined> = process.env,
 ): string | undefined {
   return (
     env.LANGY_WORKER_GATEWAY_URL ??
+    env.LW_GATEWAY_INTERNAL_URL ??
     env.LW_GATEWAY_PUBLIC_URL ??
     env.LW_GATEWAY_BASE_URL
   );

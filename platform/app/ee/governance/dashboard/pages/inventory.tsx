@@ -104,6 +104,7 @@ import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import { useRegisterTourActions } from "~/features/guided-onboarding/tour/tourRegistry";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -1059,6 +1060,7 @@ function InventoryTabs({
 }) {
   return (
     <Tabs.Root
+      data-tour="gov-inventory"
       value={inventoryTab}
       onValueChange={({ value }) => selectInventoryTab(value)}
       variant="line"
@@ -1163,24 +1165,6 @@ function AddEnvironmentControl({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-/**
- * Register a tool, in one place.
- *
- * The header renders it and so does the Catalog pane's empty state, and they
- * must stay the same control: an empty pane offering a differently-worded
- * button is the defect the one-create-flow rule exists for. It opens the SAME
- * drawer the tool-catalog editor opens, rather than a second registration form
- * — a duplicate create flow over one registry is exactly how the two ended up
- * disagreeing about what a tool is.
- */
-function AddToolControl({ onAdd }: { onAdd: () => void }) {
-  return (
-    <PageLayout.HeaderButton onClick={onAdd} data-testid="add-tool">
-      <Plus size={14} /> Add tool
-    </PageLayout.HeaderButton>
-  );
-}
-
 /** The grid/list switch for the Catalog pane. Never a native select. */
 function CatalogLayoutControl({
   layout,
@@ -1235,6 +1219,14 @@ function InventoryHeaderActions({
   page: ReturnType<typeof useIngestionSourcesPage>;
   inventoryTab: InventoryTab;
 }) {
+  /* the guided tour ends on the Add source menu, opened through the action
+     this header lends it; the menu is otherwise the reader's to open */
+  const [addSourceOpen, setAddSourceOpen] = useState(false);
+  const tourActions = useMemo(
+    () => ({ openAddSourceMenu: () => setAddSourceOpen(true) }),
+    [],
+  );
+  useRegisterTourActions(tourActions);
   return (
     <HStack gap={2} flexShrink={0}>
       {inventoryTab === "catalog" && (
@@ -1248,18 +1240,16 @@ function InventoryHeaderActions({
         onToggle={page.sample.toggle}
         size="sm"
       />
-      {/* Each pane's own create, under its own name. Catalog adds a TOOL to
-          the registry; Sources connects a SOURCE. They were the same button
-          under two labels while the catalog was built from the source list,
-          which is precisely why a connector could end up listed as a tool. */}
-      {inventoryTab === "catalog" && page.canManageTools && (
-        <AddToolControl onAdd={page.startToolRegistration} />
-      )}
-      {inventoryTab === "sources" && page.canManage && (
+      {/* Connecting a source is the page's one create, on every pane: a
+          source is where what the inventory lists arrives from. */}
+      {page.canManage && (
         <AddSourceControl
           isEnterprise={page.isEnterprise}
           sourceCount={page.sourcesQuery.data?.length ?? 0}
           onAdd={page.startComposer}
+          tourId="gov-add-source"
+          open={addSourceOpen}
+          onOpenChange={setAddSourceOpen}
         />
       )}
       {inventoryTab === "environments" && (
@@ -1273,10 +1263,8 @@ function InventoryHeaderActions({
  * The Catalog pane, wired to the page's reads.
  *
  * Extracted for the same reason the sources pane is: the page's own body is a
- * layout, and a pane's props are not layout. The action beside the empty state
- * is the header's own control rendered a second time, which is why it is
- * passed rather than rebuilt, and the row menu is built here because the
- * mutations behind it belong to the page rather than to the pane.
+ * layout, and a pane's props are not layout. The row menu is built here
+ * because the mutations behind it belong to the page rather than to the pane.
  */
 function InventoryCatalogPane({
   page,
@@ -1318,7 +1306,6 @@ function InventoryCatalogPane({
       error={catalog.error}
       sampleActive={page.sample.active}
       layout={page.catalogLayout}
-      addToolAction={<AddToolControl onAdd={page.startToolRegistration} />}
       renderActions={page.sample.active ? undefined : renderActions}
     />
   );
@@ -1632,11 +1619,9 @@ function EditingSourceDrawer({
  * now lives in the page header, and the empty state renders this same
  * component rather than a button of its own.
  *
- * IT NO LONGER DOUBLES AS "ADD TOOL". While the Catalog pane was built from
- * the source list, one button under two labels was honest — the two panes were
- * two views of one object. They are not any more: the catalog lists what the
- * organization registered and this connects the pipe telemetry arrives on, so
- * the Catalog pane has its own control ({@link AddToolControl}).
+ * It is the page's one create, in the header on every pane. Registering a
+ * tool in the catalog is reached through the `?add=1` deep link the Overview
+ * page's chip carries, not through a second header control.
  *
  * The plan cap lives here rather than at either call site. It used to be
  * carried by the in-content control alone, so the header's own button would
@@ -1646,10 +1631,18 @@ function AddSourceControl({
   isEnterprise,
   sourceCount,
   onAdd,
+  tourId,
+  open,
+  onOpenChange,
 }: {
   isEnterprise: boolean;
   sourceCount: number;
   onAdd: (sourceType: SourceType) => void;
+  /** The `data-tour` target the guided tour spotlights, on the header's own. */
+  tourId?: string;
+  /** Controlled open state, so the tour can open the header's menu. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const atCap =
     !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
@@ -1667,8 +1660,10 @@ function AddSourceControl({
           : "A source is where this organization's AI usage is read from."
       }
       onPick={onAdd}
+      open={open}
+      onOpenChange={onOpenChange}
     >
-      <PageLayout.HeaderButton disabled={atCap}>
+      <PageLayout.HeaderButton disabled={atCap} data-tour={tourId}>
         <Plus size={14} /> Add source
       </PageLayout.HeaderButton>
     </AddIngestionSourceMenu>

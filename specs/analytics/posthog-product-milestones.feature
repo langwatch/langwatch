@@ -29,9 +29,10 @@ Feature: PostHog product milestones
 
   @unit
   Scenario: PostHog signed_up still fires when the SSO auto-add path runs
-    Given a new user whose email domain matches an organization with an ssoDomain
-    When the after-user-create hook runs
+    Given a new user whose authenticated SSO callback resolves to an active connection that proved the user's email domain and admits arrivals
+    When the after-user-create hook and the accepted account callback run
     Then exactly one "signed_up" PostHog event is tracked for that user id
+    And the user is added to the connection's organization as a MEMBER with its organization grant
 
   @unit
   Scenario: PostHog signed_up still fires when the email has no parsable domain

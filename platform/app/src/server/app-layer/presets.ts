@@ -24,11 +24,26 @@ import { IdentityErasureService } from "@ee/governance/services/identityErasure.
 import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
 import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
+import { PrismaScimSyncProjectionRepository } from "@ee/scim/scim-sync-projection.prisma.repository";
+import {
+  LocalDoorBreakGlassBinding,
+  RequiresLocalDoorAndBinding,
+} from "@ee/sso/break-glass-binding";
+import { AdminEmailPlatformOperators } from "@ee/sso/platform-operators";
+import { PrismaSsoConnectionProjectionRepository } from "@ee/sso/sso-connection-projection.prisma.repository";
+import {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+} from "@ee/sso/sso-connection-reads.prisma.repository";
+import { PrismaSsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.prisma.repository";
+import { SsoConnectionTeardownDispatcher } from "@ee/sso/sso-connection-teardown";
+import { LicenseDomainClaimAuthority } from "@ee/sso/sso-self-serve-adapters";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
+import { guidedKickoffStateFactsOf } from "~/features/guided-onboarding/kickoff";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import {
@@ -85,6 +100,8 @@ import {
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { withInstanceFacts } from "~/server/onboarding/guided-onboarding.instance";
+import { GuidedOnboardingService } from "~/server/onboarding/guided-onboarding.service";
 import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
@@ -93,6 +110,8 @@ import { createRunModelsResolver } from "~/server/scenarios/run-models.resolver"
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
+import { createConnectedBillingService } from "../../../ee/billing/connected/connectedBilling.prisma";
+import { PrismaConnectedBillingStore } from "../../../ee/billing/connected/connectedBillingStore.prisma";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
@@ -109,6 +128,7 @@ import {
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
+import { createLicenseRegistryService } from "../../../ee/licensing/registry/composition";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
@@ -243,12 +263,10 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
-import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
 import {
   EmailJoinRequestNotifier,
   JoinRequestLifecycleDispatcher,
 } from "./identity/join-request-adapters";
-import { AdminEmailPlatformOperators } from "./identity/platform-operators";
 import { EventLogIdentityRepository } from "./identity/repositories/identity-event-log.repository";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
@@ -258,13 +276,17 @@ import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-re
 import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
 import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
-import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
-import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
 import {
-  PrismaSsoConnectionReadRepository,
-  PrismaSsoConnectionStrandingRepository,
-} from "./identity/repositories/sso-connection-reads.prisma.repository";
-import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
+  joinMembership,
+  ssoBreakGlass,
+  ssoEngineProviderDerivation,
+} from "./identity/runtime";
+import { LoggingInstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
+import { createInstantEvalRunPortFromEnv } from "./instant-evals/run";
+import { ClickHouseInstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
+import { ClickHouseInstantEvalRunProjectionStore } from "./instant-evals/run/instant-eval-run.projection-store";
+import { ClickHouseInstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
+import { createInstantEvalSpendRecorderFromEnv } from "./instant-evals/spend";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -352,6 +374,7 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
+import { createSystemMigrationRedrive } from "./system-migrations/runtime";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -456,6 +479,21 @@ export function initializeDefaultApp(options?: {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+
+  // ADR-137: one runs store and one judgements store, handed to the
+  // pipeline's run port and to the App, so the run surface never resolves a
+  // client of its own. The spend recorder is the logging default until the
+  // gateway spend pipeline binds its own.
+  const instantEvalRuns = new ClickHouseInstantEvalRunRepository({
+    resolveClient: resolveClickHouseClient,
+  });
+  const instantEvalJudgments = new ClickHouseInstantEvalJudgmentsRepository(
+    resolveClickHouseClient,
+  );
+  // The spend spine when it is registered, a log line when it is not: the
+  // pipelines register after this container is built, so the choice is made
+  // per record rather than here.
+  const instantEvalSpend = createInstantEvalSpendRecorderFromEnv();
 
   // Clustering reads ClickHouse directly (its query has no repository yet), so
   // it takes the resolver as a parameter. Bound once here, then handed to both
@@ -752,10 +790,33 @@ export function initializeDefaultApp(options?: {
       // getApp().planProvider, but we're still inside initializeDefaultApp
       // so the App singleton isn't available yet.
       inviteApprover: InviteService.create(prisma, { planProvider }),
-      licensePurchaseHandler: { handle: handleLicensePurchase },
+      // A purchased license is recorded in the license registry, unlinked: a
+      // checkout names no customer organization on LangWatch Cloud (ADR-141).
+      licensePurchaseHandler: {
+        handle: (params) =>
+          handleLicensePurchase({
+            ...params,
+            recordLicense: async ({ licenseKey }) => {
+              await createLicenseRegistryService(prisma).record({
+                licenseKey,
+                source: "PURCHASE",
+              });
+            },
+          }),
+      },
       licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
       getPostHog: () => getPostHogInstance(),
+      // A finalized invoice of a connected self-hosted customer (ADR-141):
+      // a waiting renewal completes.
+      connectedBilling: {
+        accountFor: (stripeCustomerId) =>
+          new PrismaConnectedBillingStore(prisma).findAccountByCustomer(
+            stripeCustomerId,
+          ),
+        completeRenewalIfDue: (input) =>
+          createConnectedBillingService(prisma).completeRenewalIfDue(input),
+      },
     });
   }
 
@@ -855,6 +916,7 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const processStore = new PrismaProcessStore(prisma);
   const scimSyncProjectionRepository = new PrismaScimSyncProjectionRepository(
     prisma,
   );
@@ -959,7 +1021,7 @@ export function initializeDefaultApp(options?: {
         ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
         : new NullLangyAnalyticsEventRepository(),
     ),
-    processStore: new PrismaProcessStore(prisma),
+    processStore,
     authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     identityProjection: new PrismaIdentityProjectionRepository(
@@ -975,13 +1037,29 @@ export function initializeDefaultApp(options?: {
     identityLinkProposals: new EventLogIdentityRepository(),
     mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
     mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
+    // The engine's provider table is folded from the same events in the same
+    // apply (D09), so the STAGED command re-run projects exactly what the
+    // calling path projects — a fold that maintained it on one route and not
+    // the other would be two answers to "what is registered".
     ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
       prisma,
+      ssoEngineProviderDerivation,
     ),
     ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
+    ssoConnectionRegistrationSlots:
+      new PrismaSsoConnectionRegistrationRepository(prisma),
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
-    ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
+    // Activation's way-back-in precondition, as of D05: a named person who
+    // holds a live binding AND a local door for it to be a way in through.
+    // Composed here so the STAGED command re-run asks exactly what the
+    // calling path asks — a guard that answered differently on the queue
+    // would let a re-run activate what the live command refused.
+    ssoBreakGlassBindings: new RequiresLocalDoorAndBinding({
+      localDoor: new LocalDoorBreakGlassBinding(),
+      bindings: ssoBreakGlass(),
+    }),
     ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
+    ssoLicenseAuthority: new LicenseDomainClaimAuthority(),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read
     // are the same `ScimSyncState` rows, so composing them separately would
@@ -992,8 +1070,11 @@ export function initializeDefaultApp(options?: {
     joinRequestProjection: new PrismaJoinRequestProjectionRepository(prisma),
     joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
     joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
-      prisma,
-      new EmailJoinRequestNotifier(prisma),
+      new EmailJoinRequestNotifier(prisma, processStore),
+      joinMembership(),
+    ),
+    instantEvalRun: new ClickHouseInstantEvalRunProjectionStore(
+      instantEvalRuns,
     ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
@@ -1246,6 +1327,15 @@ export function initializeDefaultApp(options?: {
     : undefined;
   scheduler?.start();
 
+  // The system-migration re-drive: the boot preflight converges and stops, so
+  // without a cadence a tenant that parks an hour into a worker's life stays
+  // parked until the next deploy or an operator's click. Worker-only, gated on
+  // the state table, and driving the very same pass — see redrive.ts.
+  const systemMigrationRedrive = createSystemMigrationRedrive({
+    processRole: config.processRole,
+  });
+  systemMigrationRedrive.start();
+
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
@@ -1430,6 +1520,13 @@ export function initializeDefaultApp(options?: {
           }),
       },
     },
+    instantEvals: {
+      runPort: createInstantEvalRunPortFromEnv({
+        runs: instantEvalRuns,
+        judgments: instantEvalJudgments,
+        spend: instantEvalSpend,
+      }),
+    },
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
@@ -1576,6 +1673,14 @@ export function initializeDefaultApp(options?: {
   const langyTurns = LangyTurnService.create({
     conversations: langyConversations,
     credentials: LangyCredentialService.create(prisma),
+    guidedKickoffFacts: async ({ organizationId }) =>
+      guidedKickoffStateFactsOf(
+        withInstanceFacts(
+          await GuidedOnboardingService.create(prisma).getState({
+            organizationId,
+          }),
+        ),
+      ),
     // ADR-050 versioned prompts. Only consulted when LANGY_PROMPT_PROJECT_ID
     // names the project holding the rows; unset (the default) skips the
     // registry entirely and the in-repo text is used verbatim.
@@ -1857,6 +1962,10 @@ export function initializeDefaultApp(options?: {
     });
   }
   gracefulCloseables.push({
+    name: "system-migration-redrive",
+    close: () => systemMigrationRedrive.stop(),
+  });
+  gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
   });
@@ -1970,6 +2079,11 @@ export function initializeDefaultApp(options?: {
       ),
       topics,
       runPage: runClusteringPage,
+    },
+    instantEvals: {
+      runs: instantEvalRuns,
+      judgments: instantEvalJudgments,
+      spend: instantEvalSpend,
     },
     gateway: {
       budgets: gatewayBudgetRepository,
@@ -2353,6 +2467,17 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       webhookEvents: undefined,
     },
     filters: { options: new FilterService(null) },
+    instantEvals: {
+      runs: new ClickHouseInstantEvalRunRepository({
+        resolveClient: async () => {
+          throw new Error("ClickHouse is not available in the test app");
+        },
+      }),
+      judgments: new ClickHouseInstantEvalJudgmentsRepository(async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      }),
+      spend: new LoggingInstantEvalSpendRecorder(),
+    },
     clickhouse: {
       enabled: false,
       resolveClient: async () => {
@@ -2600,6 +2725,13 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         recordClusteringRunFailed: noop,
         recordTopics: noop,
       } as AppCommands["topicClustering"],
+      instantEvals: {
+        requestRun: noop,
+        recordPlanned: noop,
+        recordPageJudged: noop,
+        requestCancel: noop,
+        recordFinished: noop,
+      } as AppCommands["instantEvals"],
       ...createNoopEnterprisePipelineCommands(),
       billing: {
         reportUsageForMonth: noop,

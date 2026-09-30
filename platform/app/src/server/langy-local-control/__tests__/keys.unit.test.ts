@@ -33,7 +33,7 @@ describe("given the local control key family", () => {
         policyKey("conv_1"),
         controlRequestKey("lcr_1"),
         controlRequestClaimKey("lcr_1"),
-        userRequestsKey("proj_1", "user_1"),
+        userRequestsKey("user_1"),
         sessionKeyBindingKey("key_1"),
         callKey("lcall_1"),
         callResultKey("lcall_1"),
@@ -62,11 +62,9 @@ describe("given the local control key family", () => {
     });
   });
 
-  describe("when two users hold requests in one project", () => {
+  describe("when two users hold requests", () => {
     it("keeps each person's open requests under their own key", () => {
-      expect(userRequestsKey("proj_1", "user_a")).not.toEqual(
-        userRequestsKey("proj_1", "user_b"),
-      );
+      expect(userRequestsKey("user_a")).not.toEqual(userRequestsKey("user_b"));
     });
   });
 });

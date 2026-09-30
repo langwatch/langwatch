@@ -1,11 +1,6 @@
 /**
- * ADR-092 §1 — built-in roles declared as differences, not duplicate lists.
- * viewer is the base; member = viewer + additions; admin = member +
- * additions. The computed sets are parity-tested cell-for-cell against the
- * legacy bags in `server/api/rbac.ts` (roles-parity.unit.test.ts) — that
- * suite is the safety net the whole ADR-092 migration stands on.
- *
- * Client-safe: no Prisma, no env.
+ * Built-in roles share a viewer base. The complete permission matrix is
+ * checked against an independent compatibility fixture in roles-parity.unit.test.ts.
  */
 import { type AuthzPermission, permissionSatisfiedBy } from "./registry";
 
@@ -167,10 +162,14 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   // The organization's cost screen. Attached to ADMIN by default for the
   // same reason the rest of the governance family is: an admin has to be
   // able to open the screen before they can delegate it to anyone else.
-  // The rbac.ts mirror carries the identical entry — roles-parity pins them
-  // as a pair, and holding it in only one bag grants the permission to
-  // nobody at all.
   "governanceCost:view",
+  // The organization administrator IS the IT administrator on self-hosted:
+  // there is nobody else to hold single sign-on and directory sync, and a
+  // fresh install has no custom-role authoring surface to mint one. The
+  // license gates whether the capability exists; this only says who may use
+  // it where it does (D05, ADR-122).
+  "sso:view",
+  "sso:manage",
 ];
 
 const ORG_MEMBER: readonly AuthzPermission[] = [

@@ -1,7 +1,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import { resolveProjectPermission } from "../../rbac";
+import { resolveProjectPermission } from "~/server/app-layer/authz/permission-adapters";
 import { createInnerTRPCContext } from "../../trpc";
 import { projectRouter } from "../project";
 
@@ -31,28 +31,34 @@ vi.mock("nanoid", () => ({
 }));
 
 // Mock the permission resolver to always allow; use importOriginal so other rbac exports stay available to transitive imports
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
-    resolveTeamPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-    skipPermissionCheck: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-    skipPermissionCheckProjectCreation: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+      resolveTeamPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+      skipPermissionCheck: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+      skipPermissionCheckProjectCreation: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    };
+  },
+);
 
 // Mock the audit log to avoid database writes
 vi.mock("@ee/audit-log/auditLog", () => ({

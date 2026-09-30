@@ -147,6 +147,11 @@ function isKnownField(fieldName: string): boolean {
   return false;
 }
 
+/** `eval`, `eval.trace`, `eval.conversation`, `eval.llm`: an Instant Eval chip. */
+function isInstantEvalField(fieldName: string): boolean {
+  return fieldName === "eval" || fieldName.startsWith("eval.");
+}
+
 function tagClassName({
   fieldName,
   negated,
@@ -163,6 +168,7 @@ function tagClassName({
   if (SCENARIO_FIELDS.has(fieldName))
     return "filter-token filter-token-scenario";
   if (NUMERIC_FIELDS.has(fieldName)) return "filter-token filter-token-numeric";
+  if (isInstantEvalField(fieldName)) return "filter-token filter-token-eval";
   return "filter-token";
 }
 

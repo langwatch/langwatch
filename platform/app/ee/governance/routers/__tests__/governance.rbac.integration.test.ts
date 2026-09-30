@@ -45,6 +45,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 // The new requireEnterprisePlan middleware (Phase 4b-4/5) 403s every
@@ -108,14 +109,13 @@ describe("governance routers — RBAC enforcement", () => {
         role: TeamUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId: admin.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `gov-rbac-admin-${ns}`,
+      organizationId,
+      userId: admin.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Org MEMBER — bag has only `organization:view`, none of the
@@ -139,20 +139,20 @@ describe("governance routers — RBAC enforcement", () => {
         role: TeamUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId: member.id,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `gov-rbac-member-${ns}`,
+      organizationId,
+      userId: member.id,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
   });
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["roleBinding", { organizationId }],
+      ["grant", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["organizationUser", { organizationId }],
       ["team", { organizationId }],

@@ -52,6 +52,7 @@ import { prisma } from "~/server/db";
 import { getDefaultModelsSnapshot } from "~/server/modelProviders/modelDefaults.read";
 import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
 import { TeamService } from "~/server/teams/team.service";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
@@ -413,14 +414,12 @@ beforeAll(async () => {
   await prisma.organizationUser.create({
     data: { userId, organizationId, role: OrganizationUserRole.ADMIN },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId,
-      userId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organizationId,
   });
   await prisma.teamUser.create({
     data: { userId, teamId, role: TeamUserRole.ADMIN },
@@ -471,6 +470,7 @@ afterAll(async () => {
       "agent",
       { projectId: { in: [applicationProjectId, governanceProjectId] } },
     ],
+    ["grant", { organizationId }],
     ["roleBinding", { organizationId }],
     ["teamUser", { teamId }],
     ["organizationUser", { organizationId }],

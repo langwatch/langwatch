@@ -10,7 +10,12 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../../db";
@@ -101,6 +106,20 @@ describe("scenarios version procedures", () => {
     await prisma.teamUser.create({
       data: { userId: viewer.id, teamId: team.id, role: TeamUserRole.VIEWER },
     });
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: editor.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: team.id,
+    });
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: viewer.id,
+      role: TeamUserRole.VIEWER,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: team.id,
+    });
     viewerCaller = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: viewer.id }, expires: "1" },
@@ -125,6 +144,8 @@ describe("scenarios version procedures", () => {
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
       ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
       ["project", { id: { in: [projectId, otherProjectId] } }],
+      ["grant", { organizationId }],
+      ["roleBinding", { organizationId }],
       ["teamUser", { teamId }],
       ["organizationUser", { organizationId }],
       ["team", { id: teamId }],

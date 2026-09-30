@@ -49,6 +49,35 @@ describe("fallbackSuggestionsFor", () => {
     expect(explanation?.docUrl).toContain("/platform/model-providers");
   });
 
+  /** @scenario "An owner-only refusal tells the caller how to share the agent" */
+  it("tells a caller refused as owner-only who holds the agent and how to share it", () => {
+    const explanation = fallbackSuggestionsFor("agent_owner_only");
+
+    expect(
+      explanation?.suggestions.some((s) => s.includes("owner of the key")),
+    ).toBe(true);
+    expect(
+      explanation?.suggestions.some((s) =>
+        s.includes("LANGWATCH_AGENT_ENVIRONMENT"),
+      ),
+    ).toBe(true);
+    expect(explanation?.docUrl).toContain("/agent-testing/connect-your-agent");
+  });
+
+  /** @scenario "An unresolved environment refusal points at the agents list and the shared environment" */
+  it("points an unresolved environment at the agents list and the shared environment", () => {
+    const explanation = fallbackSuggestionsFor("agent_environment_unresolved");
+
+    expect(
+      explanation?.suggestions.some((s) => s.includes("langwatch agent list")),
+    ).toBe(true);
+    expect(
+      explanation?.suggestions.some((s) =>
+        s.includes("LANGWATCH_AGENT_ENVIRONMENT"),
+      ),
+    ).toBe(true);
+  });
+
   it("answers undefined for a code it does not know — no invented advice", () => {
     expect(fallbackSuggestionsFor("langy_turn_in_progress")).toBeUndefined();
     expect(fallbackSuggestionsFor("")).toBeUndefined();

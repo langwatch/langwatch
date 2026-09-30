@@ -26,6 +26,8 @@ vi.mock("posthog-js", () => ({
     group: mockGroup,
     reset: mockReset,
     capture: mockCapture,
+    register: vi.fn(),
+    unregister: vi.fn(),
   },
 }));
 

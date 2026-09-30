@@ -15,8 +15,8 @@ import {
   getColumnSizingKey,
   useColumnSizingStore,
 } from "../../stores/columnSizingStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { type LensConfig, useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { LensConfig } from "../../stores/viewSlice";
 import type { TraceListItem } from "../../types/trace";
 import { ADD_COLUMN_ID } from "./AddColumnHeader";
 import { RegistryRow } from "./registry";
@@ -66,7 +66,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   // render exactly `pageSize` placeholders so the loading state fills
   // the same vertical space the real page will occupy — no awkward
   // half-filled table while the request is in flight.
-  const pageSize = useFilterStore((s) => s.pageSize);
+  const pageSize = useExplorerStore((s) => s.pageSize);
   const effectiveTraces = useMemo(
     () => (isLoading ? buildTracePlaceholderRows(pageSize) : traces),
     [isLoading, pageSize, traces],
@@ -85,9 +85,9 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     handleKeyDown,
   } = useTraceLensKeyboard({ traces });
 
-  const sortFromStore = useViewStore((s) => s.sort);
-  const setSortInStore = useViewStore((s) => s.setSort);
-  const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
+  const sortFromStore = useExplorerStore((s) => s.sort);
+  const setSortInStore = useExplorerStore((s) => s.setSort);
+  const setVisibleColumns = useExplorerStore((s) => s.setVisibleColumns);
 
   const sizingKey = getColumnSizingKey(lens.id, "trace");
   const persistedSizing = useColumnSizingStore(

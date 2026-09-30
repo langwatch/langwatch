@@ -1,0 +1,1 @@
+The retriever caught the timeout and returned an empty list instead of raising — so every query for eighteen hours retrieved nothing and the model answered from its own guesses. We found it in the trace explorer by filtering on `spans:0` for the retrieval step, which turned up 4,112 conversations, about one in nine of that day's traffic.

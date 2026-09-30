@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
-  contents: read
+  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
   pull-requests: write
 
 concurrency:
@@ -14,14 +14,18 @@ concurrency:
 
 jobs:
   review:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false
+    # Dependabot PRs read a separate secret store, so the token check would fail.
+    if: |
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: langwatch/langwatch-pr-review-bot@main
+      - uses: langwatch/langwatch-pr-review-bot@c0619844c81526b93278fcbf4a1cbe69e2336f46 # main 2026-09-23
         with:
           slack_notify: "false"
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

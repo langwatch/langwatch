@@ -18,10 +18,16 @@ vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue({ user: { id: "user_1" } }),
 }));
 
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importActual) => {
+    const actual =
+      await importActual<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+  },
+);
 
 vi.mock("~/server/license-enforcement", async (importActual) => {
   const actual =

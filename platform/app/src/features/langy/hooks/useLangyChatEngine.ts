@@ -48,6 +48,7 @@ export function useLangyChatEngine({
     error,
     regenerate,
     clearError,
+    resumeStream,
   } = useChat({
     transport,
     onError: (error) => {
@@ -126,6 +127,12 @@ export function useLangyChatEngine({
     status,
     error,
     regenerate,
+    /**
+     * Reattach to a turn this tab did not dispatch (the transport's
+     * `getResumeTarget` names it). The stream then writes into a new
+     * assistant message, or into the last message when it already is one.
+     */
+    resumeStream,
     applyHistoryToEngine,
     resetEngine,
     /**

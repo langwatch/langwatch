@@ -1,5 +1,6 @@
 import type { SignInMethodPolicy } from "@langwatch/identity";
 import { describe, expect, it, vi } from "vitest";
+
 import { requestHooks } from "../config/request-hooks";
 
 /**
@@ -56,6 +57,14 @@ function hookOver({
     }),
     signInAfterPasswordReset: async () => {},
     addressRoutesToConnection: routesToConnection,
+    // Locks nobody, which is what every organization that has not set a
+    // threshold asks for — so these cases exercise the connection refusal
+    // and nothing else (GAC-09).
+    signInLockout: () => ({
+      refuseIfLockedOut: async () => {},
+      recordFailure: async () => {},
+      recordSuccess: async () => {},
+    }),
   });
   const before = hooks?.before;
   if (!before) throw new Error("no before hook was configured");
@@ -88,16 +97,15 @@ async function submit({
 
 describe("the credential boundary on a deployment that issues its own passwords", () => {
   describe("given an address an organization routes through its own provider", () => {
-    /** @scenario "An organization's own connection still refuses a local password" */
-    it("refuses a credential sign-in for it", async () => {
+    it("defers credential authorization until the password proves the user", async () => {
       const routesToConnection = vi.fn().mockResolvedValue(true);
 
       await expect(
         submit({ policy: issuesOwnPasswords, routesToConnection }),
-      ).resolves.toEqual({ refused: true });
-      expect(routesToConnection).toHaveBeenCalledWith({
-        email: "sam@acme.com",
+      ).resolves.toEqual({
+        refused: false,
       });
+      expect(routesToConnection).not.toHaveBeenCalled();
     });
 
     /** @scenario "An organization's own connection still refuses a local password" */
@@ -129,6 +137,7 @@ describe("the credential boundary on a deployment that issues its own passwords"
   });
 
   describe("given a deployment that does not issue its own passwords", () => {
+    /** @scenario "Instance federation leaves credential permission to the deployment policy" */
     it("never pays the connection lookup, because the policy already refused", async () => {
       const routesToConnection = vi.fn().mockResolvedValue(false);
 
@@ -158,7 +167,8 @@ describe("the credential boundary on a deployment that issues its own passwords"
         submit({
           policy: issuesOwnPasswords,
           routesToConnection,
-          body: {},
+          path: "/api/auth/reset-password",
+          body: { token: "already-issued", newPassword: "correct horse" },
         }),
       ).resolves.toEqual({ refused: false });
 

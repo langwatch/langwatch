@@ -22,8 +22,12 @@
  *     the query never reaches the database.
  *  4. Execute as the restricted identity, carrying the caller's tenant
  *     capability as the one setting the profile lets a query change.
- *  5. Shape the result, and run the advisory diagnostics (`./diagnostics.ts`)
- *     over the facts step 3 recorded and the rows step 4 returned.
+ *  5. Replace every app-function key the projection asked for with the value it
+ *     names (`./appFunctions/hydrate.ts`), reading through the tenant-scoped
+ *     trace services with the caller's own permissions. Nothing happens here
+ *     for a statement that called none.
+ *  6. Shape the result, and run the advisory diagnostics (`./diagnostics.ts`)
+ *     over the facts step 3 recorded and the rows steps 4 and 5 produced.
  *
  * ## Where the isolation actually lives
  *
@@ -49,17 +53,41 @@
  * @see ./provisioning/accessModel.ts — the isolation this composes over
  */
 
+import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
+import type { InstantEvalClassifier } from "~/server/app-layer/instant-evals/classifier/classifier";
+import {
+  instantEvalCostUsd,
+  instantEvalPriceUsd,
+} from "~/server/app-layer/instant-evals/classifier/pricing";
 import type { Protections } from "../../traces/protections";
+import {
+  callsEvalFunction,
+  statementMightCallEvalFunction,
+} from "./appFunctions/evalCatalog";
+import { hydrateLangWatchQLAppFunctions } from "./appFunctions/hydrate";
+import type {
+  LangWatchQLEvalUsage,
+  LangWatchQLHydrationResult,
+} from "./appFunctions/hydration/contract";
+import {
+  createLangWatchQLAppFunctionTraceSource,
+  type LangWatchQLAppFunctionTraceSource,
+} from "./appFunctions/traceSource";
 import { lwqlTenantCapabilitySet } from "./capability";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
 import {
   type LangWatchQLViewDefinition,
   lwqlAllowedTables,
   lwqlGatedColumns,
+  lwqlHeldPermissions,
   lwqlVisibleViews,
 } from "./catalog/types";
-import { type LangWatchQLDiagnostic, lwqlDiagnostics } from "./diagnostics";
+import {
+  type LangWatchQLAppFunctionDiagnosticsInput,
+  type LangWatchQLDiagnostic,
+  lwqlDiagnostics,
+} from "./diagnostics";
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLResultTooLargeError,
@@ -74,6 +102,10 @@ import {
   type LangWatchQLStatistics,
   lwqlConnectionFromEnv,
 } from "./executor";
+import {
+  createLangWatchQLInstantEvalSupport,
+  type LangWatchQLInstantEvalSupport,
+} from "./instantEvalSupport";
 import {
   assertLangWatchQLGranularityDeclaration,
   type LangWatchQLBudgetOverflowMode,
@@ -374,6 +406,16 @@ export interface LangWatchQLExecuteInput {
    * rather than quietly redraw.
    */
   readonly onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /**
+   * The caller's cancellation, where the surface has one.
+   *
+   * Only the judged path reads it, and it is the one path that needs it: a
+   * statement calling an eval function keeps spending money per row after the
+   * caller has gone, which no other LangWatchQL query does. The REST route
+   * passes the request's own signal, so a client that hangs up stops the
+   * judging rather than paying for the rest of it.
+   */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -412,7 +454,34 @@ export interface LangWatchQLServiceDependencies {
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];
-  readonly limits?: LangWatchQLResultLimits;
+  /**
+   * Result ceilings, each one falling back to its shipped value.
+   *
+   * Partial because the ceilings are independent of each other: a caller that
+   * wants a smaller row cap has no opinion on the hydration byte budget, and
+   * naming one should not silently drop the rest to `undefined`.
+   */
+  readonly limits?: Partial<LangWatchQLResultLimits>;
+  /**
+   * Where the app-function hydration stage reads traces from.
+   *
+   * A dependency for the same reason the clock below is one: the rules about
+   * caps, truncation and unresolved keys are worth a test that needs no
+   * datastore. Built on first use rather than in the constructor, so a
+   * deployment whose callers never write an app function never constructs a
+   * trace service.
+   */
+  readonly traceSource?: LangWatchQLAppFunctionTraceSource;
+  /**
+   * Everything an eval function needs: the project gate, the judge, the
+   * ceilings on one query, and where its cost is recorded.
+   *
+   * A dependency, and built on first use like the trace source, so a suite can
+   * drive the whole judged path against a fake classifier with no datastore —
+   * and a deployment whose callers never write an eval function never resolves
+   * a feature flag or opens a connection pool.
+   */
+  readonly instantEvals?: LangWatchQLInstantEvalSupport;
   /**
    * The clock the diagnostics ask "has this period finished yet" against.
    *
@@ -434,6 +503,22 @@ export class LangWatchQLService {
   private readonly views: readonly LangWatchQLViewDefinition[];
   private readonly limits: LangWatchQLResultLimits;
   private readonly now: () => Date;
+  private cachedTraceSource?: LangWatchQLAppFunctionTraceSource;
+  private cachedInstantEvals?: LangWatchQLInstantEvalSupport;
+
+  /**
+   * The database the views live in, and what an unqualified name resolves to.
+   *
+   * Published because a caller that WRITES a statement has to qualify its
+   * tables the way the schema publishes them, and the deployment is what
+   * decides the name: `analytics` in production, a per-suite database under
+   * test. Both the generated statement and the query reference read it off the
+   * service, which is what keeps them naming the same thing on a deployment
+   * where it differs.
+   */
+  get database(): string {
+    return this.deps.database;
+  }
 
   /**
    * Releases the transport the executor holds, where it holds one.
@@ -447,7 +532,7 @@ export class LangWatchQLService {
 
   constructor(private readonly deps: LangWatchQLServiceDependencies) {
     this.views = deps.views ?? LWQL_VIEW_CATALOG;
-    this.limits = deps.limits ?? DEFAULT_LWQL_RESULT_LIMITS;
+    this.limits = { ...DEFAULT_LWQL_RESULT_LIMITS, ...deps.limits };
     this.now = deps.now ?? (() => new Date());
   }
 
@@ -470,15 +555,19 @@ export class LangWatchQLService {
    * LangWatchQL identity can still describe what the API would expose. Answering
    * it does not disclose anything a caller could not read in the docs.
    */
-  describeSchema({
+  async describeSchema({
+    projectIds,
     protections,
   }: {
+    /** The scope whose eval-function availability is being described. */
+    projectIds: readonly string[];
     protections: Protections;
-  }): LangWatchQLSchema {
+  }): Promise<LangWatchQLSchema> {
     return describeLangWatchQLSchema({
       database: this.deps.database,
       protections,
       views: this.views,
+      instantEvalsEnabled: await this.instantEvals().isEnabled({ projectIds }),
     });
   }
 
@@ -512,6 +601,7 @@ export class LangWatchQLService {
     sql,
     parameters,
     timeWindow,
+    instantEvalsEnabled = false,
   }: {
     /** Logged with a refusal. The database, not this, decides the tenant. */
     readonly projectId: string;
@@ -520,6 +610,15 @@ export class LangWatchQLService {
     readonly parameters?: Readonly<Record<string, unknown>>;
     /** The period the surface is showing, when one is asking. */
     readonly timeWindow?: LangWatchQLTimeWindow;
+    /**
+     * Whether an eval function may be called.
+     *
+     * Resolved by {@link LangWatchQLService.execute}, which has the project and
+     * can await it. Defaulting to false is what makes the *save* path refuse a
+     * judged statement: saving a chart stores SQL somebody else will run later,
+     * and a gate resolved at save time would be the wrong caller's answer.
+     */
+    readonly instantEvalsEnabled?: boolean;
   }): ValidatedLangWatchQL {
     const validation = validateLangWatchQL({
       sql,
@@ -537,6 +636,10 @@ export class LangWatchQLService {
       // dataset must stay gated so that naming it unqualified — where no table
       // reference reveals which dataset it came from — is refused too.
       gatedColumns: lwqlGatedColumns({ protections, views: this.views }),
+      // The positive form of the same permissions, which is what an app
+      // function is gated on: it has no column for the withheld set to name.
+      heldPermissions: [...lwqlHeldPermissions(protections)],
+      instantEvalsEnabled,
       defaultDatabase: this.deps.database,
     });
 
@@ -600,25 +703,62 @@ export class LangWatchQLService {
    *   {@link LangWatchQLUnavailableError} when no LangWatchQL identity
    *   is provisioned.
    */
-  async execute({
-    projects,
-    protections,
-    sql,
-    parameters,
-    timeWindow,
-    granularitySeconds,
-    onBudgetOverflow,
-  }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async execute(
+    input: LangWatchQLExecuteInput,
+  ): Promise<LangWatchQLQueryResult> {
+    const { projects, protections, sql, parameters, timeWindow } = input;
     // Only logging reads this; the database resolves the tenant set itself.
     const scopeLabel =
       projects.map((project) => project.id).join(",") || "(none)";
+
+    // Resolved before validation, because whether an eval function may be
+    // called is part of what the validator decides — but only for a statement
+    // that names one. Resolving it costs a project read and a flag evaluation,
+    // and almost no statement judges anything.
+    const instantEvalsEnabled =
+      statementMightCallEvalFunction(sql) &&
+      (await this.instantEvals().isEnabled({
+        projectIds: projects.map((project) => project.id),
+      }));
+
     const validation = this.validate({
       projectId: scopeLabel,
       protections,
       sql,
+      instantEvalsEnabled,
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
     });
+    const hold = await this.reserveJudgingBudget({
+      projects,
+      validation,
+    });
+    try {
+      return await this.executeReserved({ input, validation, hold });
+    } finally {
+      await hold?.settle();
+    }
+  }
+
+  /** The half of {@link execute} that runs under the budget hold. */
+  private async executeReserved({
+    input: {
+      projects,
+      protections,
+      sql,
+      parameters,
+      timeWindow,
+      granularitySeconds,
+      onBudgetOverflow,
+      signal,
+    },
+    validation,
+    hold,
+  }: {
+    readonly input: LangWatchQLExecuteInput;
+    readonly validation: ValidatedLangWatchQL;
+    readonly hold: JudgingBudgetHold | null;
+  }): Promise<LangWatchQLQueryResult> {
     const granularity = resolveRunGranularityOrRefuseUnfilled({
       declared: validation.parameters,
       ...(parameters ? { parameters } : {}),
@@ -644,21 +784,43 @@ export class LangWatchQLService {
     return await this.executeValidated({
       executor,
       projects,
+      protections,
       sql,
       validation,
       granularity,
+      hold,
+      ...(signal ? { signal } : {}),
     });
   }
 
   /**
-   * Runs a statement that passed every gate as the restricted identity, and
-   * shapes what came back with the facts those gates recorded.
+   * The trace source the hydration stage reads through, built on first use.
    *
-   * Split from {@link execute} because it is the half of the order that has no
-   * more decisions to make — only the database call, the advisory diagnostics
-   * over its answer, and the result both of them describe.
+   * Lazy rather than constructed with the service: a deployment whose callers
+   * never write an app function never builds a trace service, and the endpoint
+   * suites that swap the executor several times a file do not pay for one
+   * either.
    */
-  private async executeValidated({
+  private traceSource(): LangWatchQLAppFunctionTraceSource {
+    return (this.cachedTraceSource ??=
+      this.deps.traceSource ?? createLangWatchQLAppFunctionTraceSource());
+  }
+
+  /** The Instant Evals dependency, built on first use. */
+  private instantEvals(): LangWatchQLInstantEvalSupport {
+    return (this.cachedInstantEvals ??=
+      this.deps.instantEvals ?? createLangWatchQLInstantEvalSupport());
+  }
+
+  /**
+   * Step 4: the database call, and the one ceiling that is checked on what it
+   * returned rather than on what the application then put in it.
+   *
+   * Split from {@link executeValidated} because it is the half with no
+   * decisions left in it — the statement is settled, the scope is settled, and
+   * what comes back is rows.
+   */
+  private async runStatement({
     executor,
     projects,
     sql,
@@ -670,18 +832,11 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
-  }): Promise<LangWatchQLQueryResult> {
-    // The resolved record plus the step this run was bucketed at, when the
-    // statement declares the parameter. Built unconditionally and omitted when
-    // empty, so an unparameterised query keeps the request shape it had.
-    const executionParameters = {
-      ...validation.boundParameters,
-      ...(granularity.granularitySeconds === undefined
-        ? {}
-        : {
-            [LWQL_PERIOD_GRANULARITY_PARAMETER]: granularity.granularitySeconds,
-          }),
-    };
+  }): Promise<Awaited<ReturnType<LangWatchQLExecutor["execute"]>>> {
+    const executionParameters = executionParametersFor({
+      validation,
+      granularity,
+    });
 
     const execution = await executor.execute({
       // The submitted statement, with one edit and no other: a default `LIMIT`
@@ -700,15 +855,203 @@ export class LangWatchQLService {
       tenantCapability: lwqlTenantCapabilitySet({
         secrets: projects.map((project) => project.lwqlKey),
       }),
+      usesAppFunctions: validation.appFunctions.length > 0,
     });
 
     // A finished result larger than the byte ceiling is refused outright rather
     // than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the
     // LIMIT above; this is the ceiling a query can still overshoot on width.
+    // Measured on what the database returned, which for an app-function query
+    // is a page of keys — the hydrated bytes have their own ceiling below.
     assertResultWithinByteCeiling({
       rows: execution.rows,
       maxResultBytes: this.limits.maxResultBytes,
+    });
+
+    return execution;
+  }
+
+  /**
+   * Steps 5a and 5b: turn the keys into values, then record what that cost.
+   *
+   * Hydration runs after the database and before the diagnostics, because the
+   * diagnostics describe the answer a caller receives and hydration is what
+   * decides what that is: the row count, the byte total, and the type of every
+   * hydrated column. A statement that called no app function skips it entirely
+   * and reads nothing.
+   *
+   * The bill comes after, because the number recorded is what the classifier
+   * reported it charged, which only exists once it has answered. A query that
+   * judged nothing records nothing.
+   */
+  private async hydrateAndBill({
+    projects,
+    protections,
+    validation,
+    execution,
+    hold,
+    signal,
+  }: {
+    readonly projects: readonly LangWatchQLCaller[];
+    readonly protections: Protections;
+    readonly validation: ValidatedLangWatchQL;
+    readonly execution: Awaited<ReturnType<LangWatchQLExecutor["execute"]>>;
+    readonly hold: JudgingBudgetHold | null;
+    readonly signal?: AbortSignal;
+  }): Promise<LangWatchQLHydrationResult> {
+    // Only a statement that judges something builds the classifier: a query
+    // that extracts a conversation and nothing else should not open a
+    // connection pool to a third party it will never call.
+    const judging = callsEvalFunction(validation.appFunctions)
+      ? this.instantEvals()
+      : null;
+    // The validator admits an eval call only for a single-project scope, which
+    // is what gives the bill below one owner. Reading it back here rather than
+    // threading it down keeps that invariant beside the charge it pays for.
+    const billedProject = projects.length === 1 ? projects[0] : undefined;
+
+    const hydration = await hydrateLangWatchQLAppFunctions({
+      projectIds: projects.map((project) => project.id),
+      protections,
+      calls: validation.appFunctions,
+      columns: execution.columns,
+      rows: execution.rows,
+      limits: this.limits,
+      traceSource: this.traceSource(),
+      ...(judging
+        ? {
+            instantEvals: {
+              classifier: judging.classifier(),
+              maxConcurrency: judging.maxConcurrency,
+              queryTokenBudget: judging.queryTokenBudget,
+            },
+          }
+        : {}),
+      ...(signal ? { signal } : {}),
+    });
+
+    if (judging && billedProject) {
+      const isRecorded = await recordInstantEvalSpend({
+        projectId: billedProject.id,
+        usage: hydration.evalUsage,
+        classifier: judging.classifier(),
+        recordSpend: judging.recordSpend,
+      });
+      // A spend that never reached the ledger is a spend the budget cannot
+      // see, so the hold stands in for it until it lapses.
+      if (!isRecorded) hold?.keep();
+    }
+    // Recorded first, refused second: the judgements made before the caller
+    // walked away were paid for, and a query that stops judging must still
+    // fail as cancelled rather than answer with null columns.
+    if (hydration.cancellation) {
+      throw signal?.reason instanceof Error
+        ? signal.reason
+        : new DOMException("The query was cancelled", "AbortError");
+    }
+    return hydration;
+  }
+
+  /**
+   * Holds the query's ceiling price against the free budget, or refuses a
+   * statement that judges once the organization has spent its allowance.
+   *
+   * Before the database runs, so the budget bounds what was spent rather than
+   * what will be billed: nothing reaches the classifier past it. The ceiling
+   * is the price of the whole query token budget, which is the most the query
+   * can spend; the hold is released once the spend it stood for is recorded,
+   * or when the query fails before judging. The scope is one project wherever
+   * an eval call was admitted, which is what the validator enforces and what
+   * gives the spend an owner.
+   */
+  private async reserveJudgingBudget({
+    projects,
+    validation,
+  }: {
+    readonly projects: readonly LangWatchQLCaller[];
+    readonly validation: ReturnType<LangWatchQLService["validate"]>;
+  }): Promise<JudgingBudgetHold | null> {
+    if (!callsEvalFunction(validation.appFunctions)) return null;
+    const judging = projects.length === 1 ? projects[0] : undefined;
+    if (!judging) return null;
+    const support = this.instantEvals();
+    const reservationId = `query:${randomUUID()}`;
+    const costUsd = instantEvalCostUsd({
+      inputTokens: support.queryTokenBudget,
+      pricing: support.classifier().pricing,
+    });
+    await support.reserveFreeBudget({
+      projectId: judging.id,
+      reservationId,
+      priceUsd: instantEvalPriceUsd({
+        costUsd,
+        pricing: support.classifier().pricing,
+      }),
+    });
+    let isKept = false;
+    return {
+      keep: () => {
+        isKept = true;
+      },
+      settle: async () => {
+        if (isKept) {
+          logger.warn(
+            { projectId: judging.id, reservationId },
+            "Instant Evals spend was not recorded; its hold on the free budget stays until it lapses",
+          );
+          return;
+        }
+        await support.releaseFreeBudget({
+          projectId: judging.id,
+          reservationId,
+        });
+      },
+    };
+  }
+
+  /**
+   * Runs a statement that passed every gate as the restricted identity, and
+   * shapes what came back with the facts those gates recorded.
+   *
+   * Split from {@link execute} because it is the half of the order that has no
+   * more decisions to make: the database call, the advisory diagnostics over
+   * its answer, and the result both of them describe.
+   */
+  private async executeValidated({
+    executor,
+    projects,
+    protections,
+    sql,
+    validation,
+    granularity,
+    hold,
+    signal,
+  }: {
+    readonly executor: LangWatchQLExecutor;
+    readonly projects: readonly LangWatchQLCaller[];
+    readonly protections: Protections;
+    readonly sql: string;
+    readonly validation: ValidatedLangWatchQL;
+    readonly granularity: LangWatchQLGranularityResolution;
+    readonly hold: JudgingBudgetHold | null;
+    readonly signal?: AbortSignal;
+  }): Promise<LangWatchQLQueryResult> {
+    const execution = await this.runStatement({
+      executor,
+      projects,
+      sql,
+      validation,
+      granularity,
+    });
+
+    const hydration = await this.hydrateAndBill({
+      projects,
+      protections,
+      validation,
+      execution,
+      hold,
+      ...(signal ? { signal } : {}),
     });
 
     // The facts the walk recorded, plus what actually came back. Both halves
@@ -718,29 +1061,39 @@ export class LangWatchQLService {
       validation,
       database: this.deps.database,
       views: this.views,
-      columns: execution.columns,
-      rows: execution.rows,
+      columns: hydration.columns,
+      rows: hydration.rows,
       now: this.now(),
+      ...appFunctionDiagnosticsInput({
+        validation,
+        hydration,
+        limits: this.limits,
+      }),
     });
 
-    logger.info(
-      {
-        projectIds: projects.map((project) => project.id),
-        tables: validation.tables,
-        rowsReturned: execution.statistics.rowsReturned,
-        rowsRead: execution.statistics.rowsRead,
-        elapsedMs: execution.statistics.elapsedMs,
-        diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
-        followsTimeWindow: validation.followsTimeWindow,
-        followsGranularity: granularity.followsGranularity,
-      },
-      "LangWatchQL executed",
-    );
+    logExecuted({
+      projects,
+      validation,
+      granularity,
+      statistics: execution.statistics,
+      rowsReturned: hydration.rows.length,
+      diagnostics,
+    });
 
     return {
-      columns: execution.columns,
-      rows: execution.rows,
-      statistics: execution.statistics,
+      columns: hydration.columns,
+      rows: hydration.rows,
+      statistics: {
+        ...execution.statistics,
+        // The database's own elapsed time plus what hydration spent reading
+        // and judging: a judged query that took three seconds must not report
+        // the sixty milliseconds ClickHouse saw of it.
+        elapsedMs:
+          execution.statistics.elapsedMs + hydrationMs(hydration.timings),
+        // Hydration can drop trailing rows at its own ceiling, so the count the
+        // caller is told has to be the count they received.
+        rowsReturned: hydration.rows.length,
+      },
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
       followsGranularity: granularity.followsGranularity,
@@ -752,6 +1105,98 @@ export class LangWatchQLService {
         : { coarsenedFromSeconds: granularity.coarsenedFromSeconds }),
     };
   }
+}
+
+/**
+ * The bound parameters plus the step this run was bucketed at, when the
+ * statement declares the parameter.
+ *
+ * Built unconditionally and omitted by the caller when empty, so an
+ * unparameterised query keeps the request shape it had.
+ */
+function executionParametersFor({
+  validation,
+  granularity,
+}: {
+  validation: ValidatedLangWatchQL;
+  granularity: LangWatchQLGranularityResolution;
+}): Record<string, unknown> {
+  return {
+    ...validation.boundParameters,
+    ...(granularity.granularitySeconds === undefined
+      ? {}
+      : {
+          [LWQL_PERIOD_GRANULARITY_PARAMETER]: granularity.granularitySeconds,
+        }),
+  };
+}
+
+/**
+ * What the hydration stage has to tell the diagnostics, or nothing at all.
+ *
+ * Omitted entirely for a statement that called no app function, so a query that
+ * existed before this feature earns exactly the diagnostics it earned before.
+ */
+function appFunctionDiagnosticsInput({
+  validation,
+  hydration,
+  limits,
+}: {
+  validation: ValidatedLangWatchQL;
+  hydration: LangWatchQLHydrationResult;
+  limits: LangWatchQLResultLimits;
+}): { appFunctions?: LangWatchQLAppFunctionDiagnosticsInput } {
+  if (validation.appFunctions.length === 0) return {};
+  return {
+    appFunctions: {
+      isTruncatedByBytes: hydration.isTruncatedByBytes,
+      maxHydratedBytes: limits.maxHydratedBytes,
+      rowsReturned: hydration.rows.length,
+      valueTruncations: hydration.valueTruncations,
+      unresolvedKeys: hydration.unresolvedKeys,
+      ...(hydration.evalUsage
+        ? { skippedJudgements: hydration.evalUsage.skipped }
+        : {}),
+    },
+  };
+}
+
+/** What the hydration stage spent, in wall-clock milliseconds, or nothing. */
+function hydrationMs(timings: LangWatchQLHydrationResult["timings"]): number {
+  if (!timings) return 0;
+  return timings.readMs + timings.computeMs + timings.judgeMs;
+}
+
+/** One line per executed statement, with what the caller actually received. */
+function logExecuted({
+  projects,
+  validation,
+  granularity,
+  statistics,
+  rowsReturned,
+  diagnostics,
+}: {
+  projects: readonly LangWatchQLCaller[];
+  validation: ValidatedLangWatchQL;
+  granularity: LangWatchQLGranularityResolution;
+  statistics: LangWatchQLStatistics;
+  rowsReturned: number;
+  diagnostics: readonly LangWatchQLDiagnostic[];
+}): void {
+  logger.info(
+    {
+      projectIds: projects.map((project) => project.id),
+      tables: validation.tables,
+      rowsReturned,
+      rowsRead: statistics.rowsRead,
+      elapsedMs: statistics.elapsedMs,
+      diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
+      followsTimeWindow: validation.followsTimeWindow,
+      followsGranularity: granularity.followsGranularity,
+      appFunctions: validation.appFunctions.map((call) => call.function),
+    },
+    "LangWatchQL executed",
+  );
 }
 
 /**
@@ -839,4 +1284,60 @@ export async function closeLangWatchQLService(): Promise<void> {
   const previous = cached;
   cached = null;
   await previous?.close();
+}
+
+/**
+ * Records what one query's judgements cost, or records nothing.
+ *
+ * Nothing when no eval function ran, and nothing when they ran but judged no
+ * text: a cost row of zero is a row a customer has to read and dismiss.
+ *
+ * Deliberately not allowed to fail the query. The judgements were made and the
+ * answer is correct; losing the cost row is an accounting problem to find in
+ * the logs, not a reason to refuse a caller a result they have already been
+ * charged for.
+ */
+async function recordInstantEvalSpend({
+  projectId,
+  usage,
+  classifier,
+  recordSpend,
+}: {
+  projectId: string;
+  usage: LangWatchQLEvalUsage | undefined;
+  classifier: InstantEvalClassifier;
+  recordSpend: LangWatchQLInstantEvalSupport["recordSpend"];
+}): Promise<boolean> {
+  if (!usage || usage.inputTokens <= 0) return true;
+  const costUsd = instantEvalCostUsd({
+    inputTokens: usage.inputTokens,
+    pricing: classifier.pricing,
+  });
+  try {
+    await recordSpend({
+      projectId,
+      inputTokens: usage.inputTokens,
+      requests: usage.requests,
+      costUsd,
+      priceUsd: instantEvalPriceUsd({ costUsd, pricing: classifier.pricing }),
+      occurredAt: new Date(),
+    });
+    return true;
+  } catch (error) {
+    logger.error(
+      { projectId, error },
+      "Instant Evals spend could not be recorded",
+    );
+    return false;
+  }
+}
+
+/**
+ * The hold a judged query takes on the free budget: released once its spend
+ * is on the ledger, kept when the record failed so the budget still counts
+ * what was judged.
+ */
+interface JudgingBudgetHold {
+  keep(): void;
+  settle(): Promise<void>;
 }

@@ -10,15 +10,13 @@ import {
 import type React from "react";
 import { useMemo } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { formatDuration } from "~/shared/format/time";
 import { useTraceSpanTree } from "../../../../../hooks/useTraceSpanTree";
 import type {
   TraceEvalResult,
   TraceListItem,
 } from "../../../../../types/trace";
-import {
-  formatDuration,
-  SPAN_TYPE_COLORS,
-} from "../../../../../utils/formatters";
+import { SPAN_TYPE_COLORS } from "../../../../../utils/formatters";
 import { Td, Tr } from "../../../TablePrimitives";
 import { evalChipColor, formatEvalScore } from "../../sharedChips";
 import type { AddonDef } from "../../types";

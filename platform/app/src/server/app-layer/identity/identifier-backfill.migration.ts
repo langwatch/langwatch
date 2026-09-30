@@ -3,6 +3,7 @@ import type {
   SystemMigration,
   TenantMigrationOutcome,
 } from "@langwatch/system-migrations";
+
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "./migration-name";
 
 /**
@@ -39,11 +40,8 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   // the legacy screens deleted, a user with no history is told there is no
   // account for their address.
   readonly runsAutomaticallyOnSelfHosted = true;
-  // Still soaking on cloud: the identity rollout is paced by enrollment, so
-  // deploying this changes nothing until an operator enrolls an
-  // organization. Flip it only once the rollout is finished and the
-  // remaining question is reaching tenants created since.
-  readonly enrolledAutomatically = false;
+  // Cloud startup includes every user without operator enrollment.
+  readonly enrolledAutomatically = true;
 
   constructor(
     private readonly backfill: Pick<IdentityBackfillService, "migrateUser">,

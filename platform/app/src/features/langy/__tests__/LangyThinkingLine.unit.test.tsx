@@ -8,11 +8,16 @@
  * scrollback.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LangyThinkingLine } from "../components/LangyThinkingLine";
-import { THINKING_STUCK_MS } from "../logic/langyThinkingLine";
+import { useCyclingVerb } from "~/features/traces-v2/components/ai/useCyclingVerb";
+import {
+  LangyThinkingLine,
+  THINKING_VERB_DWELL_MS,
+} from "../components/LangyThinkingLine";
+import { LANGY_THINKING_VERBS } from "../components/langyThinkingVerbs";
+import { TEXT_QUIET_MS, THINKING_STUCK_MS } from "../logic/langyThinkingLine";
 
 const REASONING_TEXT =
   "The p95 spike is confined to one window. Checking whether the slow traces share anything.";
@@ -68,13 +73,10 @@ describe("LangyThinkingLine", () => {
     });
   });
 
-  describe("given a running tool carries a long line", () => {
-    it("keeps the whole skill summary on one clamped status line", () => {
-      // The exact overflow case: the github skill's line is its title plus its
-      // full summary — "Using the GitHub skill — Open a real pull request …" —
-      // which used to run off the panel's right edge. It must still surface in
-      // full (clamped by the renderer), so the content path is exercised, not
-      // just the CSS.
+  describe("given a running skill tool", () => {
+    it("says a skill is loading, in the reader's words, on one status line", () => {
+      // The activity card names the skill and quotes its summary; the row
+      // under the transcript says only what the reader is waiting on.
       render(
         <ChakraProvider value={defaultSystem}>
           <LangyThinkingLine
@@ -102,8 +104,7 @@ describe("LangyThinkingLine", () => {
         </ChakraProvider>,
       );
       const status = screen.getByRole("status");
-      expect(status.textContent).toContain("Using the GitHub skill");
-      expect(status.textContent).toContain("Open a real pull request");
+      expect(status.textContent).toBe("Loading a skill");
       expect(screen.queryByRole("button")).toBeNull();
     });
   });
@@ -165,6 +166,84 @@ describe("LangyThinkingLine", () => {
         vi.advanceTimersByTime(THINKING_STUCK_MS + 2_000);
       });
       expect(orbState()).toBe("idle");
+    });
+  });
+
+  describe("given the reply's text is arriving", () => {
+    const withReply = (text: string) =>
+      [
+        { id: "u1", role: "user", parts: [{ type: "text", text: "go" }] },
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [
+            {
+              type: "tool-bash",
+              state: "output-available",
+              input: { command: "ls" },
+            },
+            { type: "text", text },
+          ],
+        },
+      ] as unknown as UIMessage[];
+    const row = (text: string) => (
+      <ChakraProvider value={defaultSystem}>
+        <LangyThinkingLine messages={withReply(text)} activityKey="k" />
+      </ChakraProvider>
+    );
+
+    /** @scenario "The activity row returns once the text has been quiet for a second" */
+    it("hides while tokens arrive and returns after one quiet second, with a spinner and a verb", () => {
+      const { rerender } = render(row("Here"));
+      // Text already on the message when the row mounts counts as quiet.
+      expect(screen.getByRole("status")).toBeDefined();
+
+      rerender(row("Here is"));
+      expect(screen.queryByRole("status")).toBeNull();
+
+      // Another delta inside the window keeps it hidden, and restarts it.
+      act(() => {
+        vi.advanceTimersByTime(TEXT_QUIET_MS - 100);
+      });
+      rerender(row("Here is the"));
+      act(() => {
+        vi.advanceTimersByTime(TEXT_QUIET_MS - 100);
+      });
+      expect(screen.queryByRole("status")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      const status = screen.getByRole("status");
+      expect(LANGY_THINKING_VERBS.map((verb) => `${verb}…`)).toContain(
+        status.textContent,
+      );
+      expect(
+        document.querySelector("[data-langy-activity-spinner]"),
+      ).not.toBeNull();
+    });
+
+    /** @scenario "The activity row cycles a verb while Langy works between steps" */
+    it("changes the verb every few seconds while the turn works", () => {
+      render(row("Done."));
+      expect(screen.getByRole("status").textContent).toBe("Thinking…");
+
+      // The crossfade waits for the exit animation, which jsdom never plays,
+      // so the rotation itself is read off the hook the row cycles with, at
+      // the row's own dwell.
+      const { result } = renderHook(() =>
+        useCyclingVerb(true, LANGY_THINKING_VERBS, THINKING_VERB_DWELL_MS),
+      );
+      expect(result.current).toBe("Thinking");
+      act(() => {
+        vi.advanceTimersByTime(THINKING_VERB_DWELL_MS);
+      });
+      expect(result.current).toBe("Crunching");
+      act(() => {
+        vi.advanceTimersByTime(THINKING_VERB_DWELL_MS);
+      });
+      expect(result.current).toBe("Thinking");
+      expect(THINKING_VERB_DWELL_MS).toBe(2_400);
     });
   });
 

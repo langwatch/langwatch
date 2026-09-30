@@ -8,9 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
+import { AttachmentCell, type AttachmentColumnType } from "./AttachmentCell";
 import { useDatasetTable } from "./DatasetTableContext";
 
 // Max characters to display before truncating (for rendering performance)
@@ -32,6 +32,12 @@ export const JSON_LIKE_TYPES: DatasetColumnType[] = [
   "annotations",
   "evaluations",
 ];
+
+/** Column types whose cell body is an attachment, not text. */
+const isAttachmentColumn = (
+  dataType: DatasetColumnType | undefined,
+): dataType is AttachmentColumnType =>
+  dataType === "image" || dataType === "file";
 
 /**
  * Validate and normalize a boolean value.
@@ -544,14 +550,15 @@ export function EditableCell({
                 : undefined
           }
         >
-          {dataType === "image" && value && getImageUrl(value) ? (
-            <ExternalImage
-              src={getImageUrl(value)!}
-              minWidth="24px"
-              minHeight="24px"
-              maxHeight="80px"
-              maxWidth="100%"
-              expandable
+          {isAttachmentColumn(dataType) ? (
+            <AttachmentCell
+              value={value}
+              columnType={dataType}
+              datasetId={datasetId}
+              fallbackText={displayValue.text}
+              fallbackTruncated={displayValue.truncated}
+              onChange={(next) => setCellValue(datasetId, row, columnId, next)}
+              onOpenEditor={() => setEditingCell({ row, columnId })}
             />
           ) : (
             <>

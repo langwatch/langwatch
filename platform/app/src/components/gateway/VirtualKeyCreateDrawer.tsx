@@ -9,12 +9,13 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
-
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { freeName } from "~/features/guided-onboarding/tour/freeName";
+import { useRegisterTourActions } from "~/features/guided-onboarding/tour/tourRegistry";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -146,8 +147,10 @@ export function VirtualKeyCreateDrawer({
 
   const utils = api.useUtils();
   const createMutation = api.virtualKeys.create.useMutation({
-    onSuccess: async () => {
-      await utils.virtualKeys.list.invalidate({ organizationId });
+    // The secret is handed over as soon as the create answers; the list
+    // refreshes behind it rather than holding the reveal.
+    onSuccess: () => {
+      void utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
   const orgProvidersQuery =
@@ -251,7 +254,13 @@ export function VirtualKeyCreateDrawer({
     return expiryIncompleteReason({ preset: expiration.preset, expiresAt });
   })();
 
-  const handleSubmit = async () => {
+  const recordReveal = api.onboarding.recordVirtualKeyReveal.useMutation();
+
+  const handleSubmit = async ({
+    revealOnce = false,
+  }: {
+    revealOnce?: boolean;
+  } = {}) => {
     if (cannotIssueReason) {
       toaster.create({ title: cannotIssueReason, type: "error" });
       return;
@@ -284,7 +293,27 @@ export function VirtualKeyCreateDrawer({
           modelsAllowed: access.modelsAllowed,
           ...(tags.length > 0 ? { metadata: { tags } } : {}),
         },
+        ...(revealOnce ? { revealOnce: true } : {}),
       });
+      // The tour's key is shown once more by Langy, through the secret
+      // snippet card, so the guided state keeps the reveal id the brief
+      // carries. The record is awaited and the state refreshed before the
+      // action settles, so the tour ends on a state that has it. A failure
+      // to record it costs the brief that line, never the key.
+      if (revealOnce && result.revealId && result.preview) {
+        await recordReveal
+          .mutateAsync({
+            organizationId,
+            name: result.virtualKey.name,
+            preview: result.preview,
+            revealId: result.revealId,
+          })
+          .then(
+            () =>
+              utils.onboarding.getGuidedState.invalidate({ organizationId }),
+            () => undefined,
+          );
+      }
       onCreated({
         id: result.virtualKey.id,
         name: result.virtualKey.name,
@@ -313,6 +342,44 @@ export function VirtualKeyCreateDrawer({
     }
   };
 
+  // The guided tour types the name and submits through the drawer's own
+  // state and submit, so the key it mints is a real one. The submit is read
+  // through a ref: the handlers register once, the submit closes over the
+  // latest form. The name it types is the first one the organization's
+  // listed keys do not carry yet, so a replay never mints a duplicate.
+  // Spec: specs/features/onboarding/guided-tour.feature
+  const submitRef = useRef(handleSubmit);
+  submitRef.current = handleSubmit;
+  const typingTimers = useRef<number[]>([]);
+  useEffect(
+    () => () => {
+      for (const t of typingTimers.current) clearTimeout(t);
+    },
+    [],
+  );
+  const tourActions = useMemo(
+    () => ({
+      typeVirtualKeyName: (wanted: string) => {
+        const listed = utils.virtualKeys.list.getData({ organizationId }) ?? [];
+        const typed = freeName({
+          wanted,
+          taken: listed.map((key) => key.name),
+        });
+        for (const t of typingTimers.current) clearTimeout(t);
+        typingTimers.current = [];
+        setName("");
+        for (let i = 1; i <= typed.length; i++) {
+          typingTimers.current.push(
+            window.setTimeout(() => setName(typed.slice(0, i)), i * 60),
+          );
+        }
+      },
+      submitVirtualKeyCreate: () => submitRef.current({ revealOnce: true }),
+    }),
+    [utils, organizationId],
+  );
+  useRegisterTourActions(tourActions);
+
   return (
     <Drawer.Root
       open={open}
@@ -336,6 +403,7 @@ export function VirtualKeyCreateDrawer({
                 />
               </Field.Label>
               <Input
+                data-tour="vk-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. codex-prod"
@@ -446,7 +514,8 @@ export function VirtualKeyCreateDrawer({
             ) : (
               <Button
                 colorPalette="orange"
-                onClick={handleSubmit}
+                data-tour="vk-create"
+                onClick={() => void handleSubmit()}
                 loading={createMutation.isPending}
               >
                 Create

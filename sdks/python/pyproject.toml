@@ -3,7 +3,7 @@ name = "langwatch"
 version = "1.4.0" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 license = { text = "MIT" }
 readme = "README.md"
 classifiers = [
@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
@@ -57,6 +58,9 @@ tests = [
     "pytest>=9.1.1,<10.0.0",
     "pytest-asyncio>=1.4.0,<1.5.0",
     "factory-boy>=3.3.0,<4.0.0",
+    # tomllib is stdlib from 3.11 on; the supported-versions test reads
+    # pyproject.toml and runs on 3.10 too.
+    "tomli>=2.0.0; python_version < '3.11'",
 ]
 
 [build-system]

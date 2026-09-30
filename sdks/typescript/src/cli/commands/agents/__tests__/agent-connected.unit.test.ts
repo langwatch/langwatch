@@ -36,7 +36,7 @@ import {
   type AgentResponse,
 } from "@/client-sdk/services/agents/agents-api.service";
 import { describeParameter, getAgentCommand } from "../get";
-import { agentOwnerLabel, agentStatusColor, agentStatusLabel, listAgentsCommand } from "../list";
+import { agentLastSeenLabel, agentOwnerLabel, agentStatusColor, agentStatusLabel, listAgentsCommand } from "../list";
 import { buildRelayBody, runAgentCommand } from "../run";
 import { testAgentCommand } from "../test";
 
@@ -105,8 +105,8 @@ beforeEach(() => {
 
 describe("listAgentsCommand()", () => {
   describe("when a connected agent and an HTTP agent are listed", () => {
-    /** @scenario "The list prints Name, Environment, Status, Type, ID, Owner and Updated" */
-    it("prints the seven columns, online for the connected one and blanks for the HTTP one", async () => {
+    /** @scenario "The list prints Name, Environment, Status, Last seen, Type, ID, Owner and Updated" */
+    it("prints the eight columns, online for the connected one and blanks for the HTTP one", async () => {
       service.list.mockResolvedValue({
         data: [connectedAgent(), httpAgent()],
         pagination: { page: 1, limit: 100, total: 2, totalPages: 1 },
@@ -116,13 +116,23 @@ describe("listAgentsCommand()", () => {
       result?.table?.();
 
       const output = printed();
-      for (const header of ["Name", "Environment", "Status", "Type", "ID", "Owner", "Updated"]) {
+      for (const header of ["Name", "Environment", "Status", "Last seen", "Type", "ID", "Owner", "Updated"]) {
         expect(output).toContain(header);
       }
       expect(output).toContain("production");
       expect(output).toContain("online");
       expect(agentStatusLabel(httpAgent())).toBe("");
       expect(agentOwnerLabel(httpAgent())).toBe("");
+    });
+
+    /** @scenario "The list prints when a connected agent was last seen" */
+    it("reads now while online, how long ago otherwise, and nothing for an HTTP agent", () => {
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+      expect(agentLastSeenLabel(connectedAgent({ status: "online", lastSeenAt: twoDaysAgo }))).toBe("now");
+      expect(agentLastSeenLabel(connectedAgent({ status: "offline", lastSeenAt: twoDaysAgo }))).toBe("2d ago");
+      expect(agentLastSeenLabel(connectedAgent({ status: "offline", lastSeenAt: null }))).toBe("");
+      expect(agentLastSeenLabel(httpAgent())).toBe("");
     });
 
     /** @scenario "The status colour follows the status, not the column width" */
@@ -159,6 +169,69 @@ describe("listAgentsCommand()", () => {
       expect(agentOwnerLabel(connectedAgent({ selectable: false }))).toBe(
         "owner only",
       );
+    });
+  });
+});
+
+describe("listAgentsCommand() with stale sibling rows", () => {
+  const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const siblings = () => [
+    connectedAgent({ id: "agent_live", environment: "development", status: "online", lastSeenAt: hoursAgo(0) }),
+    connectedAgent({ id: "agent_old", environment: "development", status: "offline", lastSeenAt: hoursAgo(72) }),
+    connectedAgent({ id: "agent_recent", environment: "development", status: "offline", lastSeenAt: hoursAgo(1) }),
+  ];
+
+  describe("when one name and environment has an online row, a recent offline row and a stale one", () => {
+    /** @scenario "Stale sibling rows of one name and environment are collapsed" */
+    it("lists the online and recent rows, hides the stale one and says so", async () => {
+      service.list.mockResolvedValue({
+        data: siblings(),
+        pagination: { page: 1, limit: 100, total: 3, totalPages: 1 },
+      });
+
+      const result = await listAgentsCommand();
+      result?.table?.();
+
+      const listed = (result?.data as { data: AgentResponse[] }).data.map((agent) => agent.id);
+      expect(listed).toEqual(["agent_live", "agent_recent"]);
+      const output = printed();
+      expect(output).toContain("agent_live");
+      expect(output).toContain("agent_recent");
+      expect(output).not.toContain("agent_old");
+      expect(output).toContain("1 stale row");
+      expect(output).toContain("--all");
+    });
+
+    /** @scenario "The collapsed listing counts the rows it ships" */
+    it("counts the rows it ships, and says how many it hid", async () => {
+      service.list.mockResolvedValue({
+        data: siblings(),
+        pagination: { page: 1, limit: 100, total: 3, totalPages: 1 },
+      });
+
+      const result = await listAgentsCommand();
+
+      const document = result?.data as {
+        pagination: { total: number };
+        hiddenStaleRows: number;
+      };
+      expect(document.pagination.total).toBe(2);
+      expect(document.hiddenStaleRows).toBe(1);
+    });
+
+    /** @scenario "The --all flag lists every row" */
+    it("lists every row under --all", async () => {
+      service.list.mockResolvedValue({
+        data: siblings(),
+        pagination: { page: 1, limit: 100, total: 3, totalPages: 1 },
+      });
+
+      const result = await listAgentsCommand({ all: true });
+      result?.table?.();
+
+      const listed = (result?.data as { data: AgentResponse[] }).data.map((agent) => agent.id);
+      expect(listed).toEqual(["agent_live", "agent_old", "agent_recent"]);
+      expect(printed()).not.toContain("stale row");
     });
   });
 });

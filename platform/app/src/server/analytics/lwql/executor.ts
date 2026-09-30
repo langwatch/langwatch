@@ -31,12 +31,12 @@
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { createLogger } from "@langwatch/observability";
 
 import {
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
   isClickHouseResultTooLargeError,
+  isClickHouseUnknownFunctionError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
@@ -47,6 +47,7 @@ import {
   lwqlDerivedConnectionFromEnv,
 } from "./connection";
 import {
+  LangWatchQLAppFunctionUnavailableError,
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
@@ -57,8 +58,6 @@ import {
   LWQL_MAX_RESULT_BYTES,
   LWQL_MAX_RESULT_ROWS,
 } from "./limits";
-
-const logger = createLogger("langwatch:analytics:lwql:executor");
 
 /** One column of a result, as the server typed it. */
 export interface LangWatchQLColumn {
@@ -90,6 +89,17 @@ export interface LangWatchQLExecutionRequest {
   readonly parameters?: Readonly<Record<string, unknown>>;
   /** The caller's tenant capability, sent as the one changeable setting. */
   readonly tenantCapability: string;
+  /**
+   * Whether this statement calls an app function.
+   *
+   * Only used to read `UNKNOWN_FUNCTION` correctly. The validator's allowlist
+   * also admits native ClickHouse functions, and the BYO contract pins no
+   * server version, so an older server can refuse a native-only query with the
+   * same error. Mapping that to "the extraction functions are not provisioned"
+   * would name the wrong cause and hand the caller an action that changes
+   * nothing.
+   */
+  readonly usesAppFunctions?: boolean;
 }
 
 /**
@@ -104,6 +114,27 @@ export interface LangWatchQLResultLimits {
   readonly maxRows: number;
   /** The hard JSON byte ceiling; a result past it is refused, never cut. */
   readonly maxResultBytes: number;
+  /**
+   * Byte budget for the result *after* the app-function hydration stage has
+   * replaced keys with values.
+   *
+   * A second, much larger ceiling rather than a raised `maxResultBytes`,
+   * because the two bound different things. The database returns a page of
+   * keys, which is small by construction; the application then puts a
+   * conversation or a whole trace in each of them, which is where a response
+   * reaches megabytes. Bounding only the first would let the second grow
+   * unbounded; bounding both with one number would refuse ordinary key-only
+   * queries to make room for hydrated ones.
+   */
+  readonly maxHydratedBytes: number;
+  /**
+   * Byte ceiling for a single hydrated value.
+   *
+   * One trace in a page of a hundred can be far larger than the rest. Cutting
+   * that cell and saying so costs the caller one value; letting it consume the
+   * whole result ceiling would cost them the ninety-nine rows after it.
+   */
+  readonly maxHydratedValueBytes: number;
 }
 
 /**
@@ -116,6 +147,8 @@ export interface LangWatchQLResultLimits {
 export const DEFAULT_LWQL_RESULT_LIMITS: LangWatchQLResultLimits = {
   maxRows: LWQL_MAX_RESULT_ROWS,
   maxResultBytes: LWQL_MAX_RESULT_BYTES,
+  maxHydratedBytes: 32_000_000,
+  maxHydratedValueBytes: 4_000_000,
 };
 
 /** A finished execution. Every row the database returned; the service bounds them. */
@@ -203,9 +236,11 @@ const LWQL_MAX_OPEN_CONNECTIONS = 10;
 function refusalFor({
   error,
   durationMs,
+  usesAppFunctions,
 }: {
   error: unknown;
   durationMs: number;
+  usesAppFunctions: boolean;
 }): unknown {
   // An unknown table/database or an access refusal cannot be the caller's SQL:
   // the validator only lets catalog-approved names reach this point. Both mean
@@ -239,6 +274,18 @@ function refusalFor({
       reasons: [toError(error)],
     });
   }
+  // An unknown function in a statement that calls one of ours cannot be the
+  // caller's either: the catalog is what the provisioning DDL is generated
+  // from, so the server is missing the projection UDFs this API declares,
+  // which is a deployment gap rather than anything a customer wrote. A
+  // statement that calls none falls through to the ordinary translation: there
+  // the unknown name is a native function this server is too old for, and
+  // saying "extraction functions unavailable" would misname it.
+  if (usesAppFunctions && isClickHouseUnknownFunctionError(error)) {
+    return new LangWatchQLAppFunctionUnavailableError({
+      reasons: [toError(error)],
+    });
+  }
   return translateClickHouseQueryError(error, durationMs);
 }
 
@@ -263,7 +310,7 @@ export function createLangWatchQLExecutor(
   });
 
   return {
-    async execute({ sql, parameters, tenantCapability }) {
+    async execute({ sql, parameters, tenantCapability, usesAppFunctions }) {
       const startedAt = Date.now();
       try {
         const resultSet = await client.query({
@@ -288,7 +335,11 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
-        throw refusalFor({ error, durationMs: Date.now() - startedAt });
+        throw refusalFor({
+          error,
+          durationMs: Date.now() - startedAt,
+          usesAppFunctions: usesAppFunctions === true,
+        });
       }
     },
 
@@ -302,64 +353,19 @@ export function createLangWatchQLExecutor(
  * Reads the restricted identity's connection from the environment, or reports
  * that this deployment has none.
  *
- * `null` rather than a throw, and rather than a default pointing at the
- * application's own ClickHouse: an unconfigured deployment must refuse LangWatchQL
- * queries, and a partially-configured one must refuse them too. Every field is
- * required for exactly that reason.
+ * The app owns the LangWatchQL access model on every distribution (issue
+ * #8258): `provisionLwql` converges it on the connection derived from the admin
+ * `CLICKHOUSE_URL`, so the query path must resolve that same connection or it
+ * would query a server holding none of the objects. This is that single
+ * derivation — {@link lwqlDerivedConnectionFromEnv} treats the per-field
+ * `LWQL_*` as overrides and refuses (null, logged) any that would split
+ * provisioning from querying.
  *
- * The two cases are indistinguishable to a caller and must not be to an
- * operator, so a partial configuration is logged with the names it is missing.
- * They are not read through the validated env module: the variables are
- * optional by design — most deployments provision no LangWatchQL identity — and an
- * optional entry there would not reject a misspelling either, while making them
- * required would refuse to boot every deployment that does not run this API.
+ * `null` rather than a throw: a deployment with no `LWQL_CLICKHOUSE_PASSWORD`
+ * simply is not running the API, and a partially-configured one must refuse
+ * every query too. The name is kept because the query path, the service, and
+ * the instant-eval row source all call it.
  */
 export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
-  // Self-provisioning (issue #6635) owns the target: `provisionLwql` creates
-  // the access model on the connection derived from the admin `CLICKHOUSE_URL`,
-  // so resolving a *different* connection here would query a server where none
-  // of it exists. Checked before `absent` rather than after: a deployment that
-  // sets all five explicitly *and* `LWQL_SELF_PROVISION` would otherwise fall
-  // through to the explicit values and split provisioning from querying.
-  // `lwqlDerivedConnectionFromEnv` treats the per-field `LWQL_*` as overrides
-  // and refuses outright on one that cannot be honoured.
-  if (process.env.LWQL_SELF_PROVISION === "true") {
-    return lwqlDerivedConnectionFromEnv();
-  }
-
-  const url = process.env.LWQL_CLICKHOUSE_URL;
-  const username = process.env.LWQL_CLICKHOUSE_USER;
-  const password = process.env.LWQL_CLICKHOUSE_PASSWORD;
-  const database = process.env.LWQL_DATABASE;
-  const tenantSetting = process.env.LWQL_TENANT_SETTING;
-
-  const required = [
-    ["LWQL_CLICKHOUSE_URL", url],
-    ["LWQL_CLICKHOUSE_USER", username],
-    ["LWQL_CLICKHOUSE_PASSWORD", password],
-    ["LWQL_DATABASE", database],
-    ["LWQL_TENANT_SETTING", tenantSetting],
-  ] as const;
-  const absent = required.filter(([, value]) => !value).map(([name]) => name);
-
-  if (absent.length > 0) {
-    // A deployment that set *some* of these meant to enable the API and got a
-    // silent refusal on every query instead, so name what is missing. One that
-    // set none is simply not running the API and says nothing. Variable names
-    // only, never their values — one of these is a password.
-    if (absent.length < required.length) {
-      logger.warn(
-        { absent },
-        "LangWatchQL is partially configured, so every query will be refused",
-      );
-    }
-    return null;
-  }
-  // Re-checked rather than asserted: `absent` is computed by a callback, which
-  // TypeScript cannot use to narrow these five, and reaching for `!` here would
-  // silently outlive someone editing the list above.
-  if (!url || !username || !password || !database || !tenantSetting)
-    return null;
-
-  return { url, username, password, database, tenantSetting };
+  return lwqlDerivedConnectionFromEnv();
 }

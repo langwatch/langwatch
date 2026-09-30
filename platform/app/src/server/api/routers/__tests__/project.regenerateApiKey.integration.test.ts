@@ -10,6 +10,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { TokenResolver } from "../../../api-key/token-resolver";
 import { prisma } from "../../../db";
@@ -208,6 +209,27 @@ describe("project.regenerateApiKey integration", () => {
         role: TeamUserRole.ADMIN,
       },
     });
+    for (const [userId, role] of [
+      [user.id, TeamUserRole.ADMIN],
+      [viewer.id, TeamUserRole.VIEWER],
+      [member.id, TeamUserRole.MEMBER],
+      [projectAdmin.id, TeamUserRole.ADMIN],
+    ] as const) {
+      await seedRoleBinding(prisma, {
+        organizationId: organization.id,
+        userId,
+        role,
+        scopeType: "TEAM",
+        scopeId: team.id,
+      });
+    }
+    await seedRoleBinding(prisma, {
+      organizationId: organization.id,
+      userId: user.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: "ORGANIZATION",
+      scopeId: organization.id,
+    });
     projectAdminCaller = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: projectAdmin.id }, expires: "1" },
@@ -216,6 +238,19 @@ describe("project.regenerateApiKey integration", () => {
   });
 
   afterAll(async () => {
+    const organizations = await prisma.organization.findMany({
+      where: { slug: { startsWith: `--test-org-${testNamespace}` } },
+      select: { id: true },
+    });
+    const organizationIds = organizations.map(
+      (organization) => organization.id,
+    );
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: organizationIds } },
+    });
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId: { in: organizationIds } },
+    });
     // Cleanup test data
     await prisma.project
       .deleteMany({

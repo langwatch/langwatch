@@ -18,6 +18,11 @@ const getServerAuthSession = vi.fn();
 const getBetterAuthSession = vi.fn();
 const impersonationStart = vi.fn();
 const impersonationStop = vi.fn();
+const handlerMocks = vi.hoisted(() => ({
+  defaultHandler: vi.fn(async () => ({ data: [] })),
+  getListHandler: vi.fn(async () => ({ data: [], total: 0 })),
+  getOneHandler: vi.fn(async () => ({ data: null })),
+}));
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
@@ -38,9 +43,9 @@ vi.mock("~/server/users/user.service", () => ({
 }));
 
 vi.mock("ra-data-simple-prisma", () => ({
-  defaultHandler: vi.fn(async () => ({ data: [] })),
-  getListHandler: vi.fn(async () => ({ data: [], total: 0 })),
-  getOneHandler: vi.fn(async () => ({ data: null })),
+  defaultHandler: handlerMocks.defaultHandler,
+  getListHandler: handlerMocks.getListHandler,
+  getOneHandler: handlerMocks.getOneHandler,
 }));
 
 vi.mock("../../impersonation.service", () => ({
@@ -255,6 +260,65 @@ describe("admin routes", () => {
 
       expect(JSON.stringify(body)).not.toContain("onerror");
       expect(body.fieldErrors.resource).toHaveLength(1);
+    });
+
+    it("rejects inherited object keys as resources", async () => {
+      for (const resource of ["__proto__", "constructor", "toString"]) {
+        const body = await bodyOf(
+          await post(
+            "/api/admin/user",
+            JSON.stringify({ resource, method: "getList" }),
+          ),
+        );
+
+        expect(body.error).toBe("validation_error");
+        expect(handlerMocks.getListHandler).not.toHaveBeenCalled();
+      }
+    });
+  });
+
+  describe("given an admin dispatching a resource request", () => {
+    beforeEach(signInAsAdmin);
+
+    it("normalizes the URL's plural organization resource for a list", async () => {
+      const response = await post(
+        "/api/admin/organizations",
+        JSON.stringify({ method: "getList" }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(handlerMocks.getListHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resource: "organization",
+          method: "getList",
+        }),
+        undefined,
+        expect.objectContaining({ select: expect.anything() }),
+      );
+    });
+
+    it("keeps organization detail reads on the safe getOne path", async () => {
+      const response = await post(
+        "/api/admin/organization",
+        JSON.stringify({ method: "getOne", params: { id: "org_1" } }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(handlerMocks.getOneHandler).toHaveBeenCalledTimes(1);
+      expect(handlerMocks.defaultHandler).not.toHaveBeenCalled();
+    });
+
+    it("forwards an unhandled method through the audited default handler", async () => {
+      const response = await post(
+        "/api/admin/team",
+        JSON.stringify({
+          method: "update",
+          params: { id: "team_1", data: {} },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(handlerMocks.defaultHandler).toHaveBeenCalledTimes(1);
     });
   });
 });

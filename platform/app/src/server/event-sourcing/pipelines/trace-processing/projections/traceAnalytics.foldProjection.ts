@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   enrichRagContextIds,
@@ -39,6 +40,7 @@ import {
   traceNameChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
+import { isStorableSpanReceived } from "../utils/storableSpanTime";
 import {
   liftCanonicalAttributesFromLogRecord,
   NON_BILLABLE_ATTR,
@@ -792,6 +794,8 @@ const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
   new CanonicalizeSpanAttributesService(),
 );
 
+const logger = createLogger("langwatch:trace-processing:trace-analytics-fold");
+
 const spanTimingService = new SpanTimingService();
 const spanStatusService = new SpanStatusService();
 const spanCostService = new SpanCostService();
@@ -1295,6 +1299,15 @@ export class TraceAnalyticsFoldProjection
     // boundary triggers in both folds at the same span.
     if (state.spanCount >= MAX_PROCESSED_SPANS) {
       return { ...state, spanCount: state.spanCount + 1 };
+    }
+
+    // Mirrors the trace-summary fold: a span whose own times cannot be stored
+    // throws inside normalization, permanently, so the trace's remaining spans
+    // would never fold. Leave the state untouched instead.
+    if (
+      !isStorableSpanReceived({ event, logger, consumer: "traceAnalyticsFold" })
+    ) {
+      return state;
     }
 
     const normalizedSpan =

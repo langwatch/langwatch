@@ -333,8 +333,52 @@ export interface LangWatchQLPostgresMapping {
    * Named separately from the exposed `TenantId` because the application's
    * schema calls it something else on every table, and the approved view is
    * what reconciles the two.
+   *
+   * Read on the last alias of {@link tenantPath} — the base relation itself
+   * when the path is empty or absent.
    */
   readonly tenantSourceColumn: string;
+  /**
+   * The join chain from {@link baseRelation} to the relation that carries the
+   * owning project, one hop per entry.
+   *
+   * Postgres tables are scoped at three levels and a table carrying no project
+   * column reaches one by joining upward. The org path is
+   * Organization -> Team -> Project rather than a direct hop because `Project`
+   * carries `teamId`, not `organizationId`: there is no column to join an
+   * org-scoped table straight onto a project, so it goes through the
+   * organization's teams' projects. Absent (or empty) means the base relation
+   * carries the project column itself, and the approved view reads
+   * {@link tenantSourceColumn} straight off it.
+   */
+  readonly tenantPath?: readonly {
+    /** Relation joined (application table name, e.g. "Team"). */
+    readonly relation: string;
+    /** Alias this hop's relation gets in the view body. */
+    readonly alias: string;
+    /**
+     * The equijoin: `<previous alias>.<from> = <alias>.<to>`. `from` is a
+     * column of the previous alias (the base relation for the first hop, the
+     * prior hop's relation afterwards); `to` is a column of this hop's relation.
+     */
+    readonly on: { readonly from: string; readonly to: string };
+  }[];
+  /**
+   * A visibility rule the application's own repository enforces in code
+   * (e.g. "only rows the caller owns or that are shared"), rendered into the
+   * approved view's WHERE clause because the reader role sees only the view —
+   * there is no other layer left to enforce it at.
+   *
+   * A boolean predicate over the base alias `"m"` (see
+   * `POSTGRES_BASE_ALIAS` in `../provisioning/postgresMapping.ts`), ANDed
+   * onto the view's join chain. May reference a sibling relation via the
+   * `{{schema}}` token (resolved to the deploying schema at provisioning
+   * time — see `postgresApprovedViewStatement`), since this predicate is
+   * written once, before any deployment's actual schema is known. Absent
+   * means the base relation's rows are visible to every project member the
+   * tenant predicate already admits.
+   */
+  readonly rowFilter?: string;
 }
 
 /**
@@ -413,9 +457,11 @@ export interface LangWatchQLViewDefinition {
    *
    * The source table partitions on a function of this column, so a query
    * without a predicate on it reads every partition the tenant has, including
-   * whatever has aged onto object storage.
+   * whatever has aged onto object storage. Absent for a view with no temporal
+   * column and no explicit override: it has nothing to prune on, and naming an
+   * opaque key here would advertise it as a time dimension it is not.
    */
-  readonly timeColumn: string;
+  readonly timeColumn?: string;
   /** How far behind the write path this view can be, for the schema endpoint. */
   readonly freshness: string;
   readonly dedup: LangWatchQLViewDedup;
@@ -678,7 +724,7 @@ export function lwqlGatedColumns({
   protections: Protections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly string[] {
-  const held = heldPermissions(protections);
+  const held = lwqlHeldPermissions(protections);
   const withheld = views.flatMap((view) =>
     view.columns
       .filter((column) =>
@@ -695,8 +741,17 @@ export function lwqlGatedColumns({
  * Fail-closed: only an explicit `true` counts, so the shape
  * `getUserProtectionsForProject` returns when the policy resolver is down
  * grants nothing.
+ *
+ * The positive twin of {@link lwqlGatedColumns}, and three callers need it. A
+ * gated *column* can be decided from the withheld set alone, because a column
+ * is in it or it is not; an app function has no column to look up, so the only
+ * question there is which permissions the caller holds. The query reference
+ * answers the same question one level up: whether a published EXAMPLE is
+ * runnable by this caller. Deriving either from the protections a second time
+ * is how they would come to disagree with the schema about who may read a cost
+ * column.
  */
-function heldPermissions(
+export function lwqlHeldPermissions(
   protections: Protections,
 ): ReadonlySet<FieldProtection> {
   const held = new Set<FieldProtection>();
@@ -726,7 +781,7 @@ export function lwqlVisibleViews({
   protections: Protections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly LangWatchQLViewDefinition[] {
-  const held = heldPermissions(protections);
+  const held = lwqlHeldPermissions(protections);
   return views.filter((view) =>
     view.columns.some((column) =>
       lwqlColumnGates({ view, column }).every((gate) => held.has(gate)),

@@ -24,6 +24,7 @@ import { recordingExecutor } from "../executor.testFakes";
 import {
   closeLangWatchQLService,
   LangWatchQLService,
+  type LangWatchQLServiceDependencies,
   setLangWatchQLService,
 } from "../lwql.service";
 import {
@@ -80,8 +81,31 @@ const BOUNDED_COUNT =
   "SELECT count() AS value FROM analytics.traces " +
   "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3)";
 
+/**
+ * Instant Evals, stated as off.
+ *
+ * None of the cases in this file judges anything, and stating it keeps them
+ * from resolving the real gate, which would read a project through Prisma and
+ * answer differently depending on the deployment's own configuration.
+ */
+const NO_INSTANT_EVALS: LangWatchQLServiceDependencies["instantEvals"] = {
+  isEnabled: async () => false,
+  classifier: () => {
+    throw new Error("no case in this file judges anything");
+  },
+  maxConcurrency: 1,
+  queryTokenBudget: 0,
+  reserveFreeBudget: async () => {},
+  releaseFreeBudget: async () => {},
+  recordSpend: async () => {},
+};
+
 function serviceWith(executor: LangWatchQLExecutor | null): LangWatchQLService {
-  return new LangWatchQLService({ executor, database: DATABASE });
+  return new LangWatchQLService({
+    executor,
+    database: DATABASE,
+    instantEvals: NO_INSTANT_EVALS,
+  });
 }
 
 /** The `code` of a thrown handled error, or the reason there is none. */
@@ -937,11 +961,13 @@ describe("given the LangWatchQL service", () => {
       ).toBe("lwql_unavailable");
     });
 
-    it("still describes the schema, which discloses nothing a caller could read", () => {
-      expect(
-        serviceWith(null).describeSchema({ protections: FULLY_PERMITTED })
-          .views,
-      ).toHaveLength(LWQL_VIEW_CATALOG.length);
+    it("still describes the schema, which discloses nothing a caller could read", async () => {
+      const schema = await serviceWith(null).describeSchema({
+        projectIds: [PROJECT.id],
+        protections: FULLY_PERMITTED,
+      });
+
+      expect(schema.views).toHaveLength(LWQL_VIEW_CATALOG.length);
     });
   });
 

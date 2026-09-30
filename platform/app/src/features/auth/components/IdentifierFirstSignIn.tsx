@@ -2,8 +2,9 @@ import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
+import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
-import { normalizeErrorCode, SignInError } from "~/pages/auth/error";
+import { SignInError } from "~/pages/auth/error";
 import { api } from "~/utils/api";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
@@ -19,7 +20,6 @@ import { signUpHref } from "../logic/carriedEmail";
 import type { AuthDepth } from "../logic/groundPalette";
 import { usePublishAuthStage } from "../logic/groundStage";
 import {
-  promotePendingMethod,
   readLastUsedMethodId,
   rememberPendingMethod,
 } from "../logic/lastUsedMethod";
@@ -158,10 +158,12 @@ export function IdentifierFirstSignIn() {
 
   useEffect(() => {
     if (!session) return;
-    // A session is the only proof a federated hand-off worked, and this is
-    // where the browser lands holding one.
+    // The promotion moved to the session fetch itself: a federated callback
+    // returns the browser to the app root, not here, so this effect was never
+    // the place a federated hand-off landed. Reading the badge after that
+    // promotion also makes this report name the method that just got the
+    // person in, rather than the one before it.
     report.signedIn(readLastUsedMethodId() ?? "unknown");
-    promotePendingMethod();
     replaceLocation(safeRedirectTarget(callbackUrl));
   }, [session, callbackUrl, report]);
 
@@ -327,6 +329,7 @@ export function IdentifierFirstSignIn() {
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
         loginHint={submittedIdentifier?.trim() || undefined}
+        autoStart={submittedIdentifier !== null}
       />
     );
   }
@@ -636,8 +639,11 @@ export function RoutedToConnection({
   loginHint,
   title = "Log in to LangWatch",
   footer,
+  autoStart = true,
 }: {
   decision: RoutingDecision;
+  /** A typed address is a sign-in gesture; opening the page alone is not. */
+  autoStart?: boolean;
   onContinue: (method: SignInMethod) => void;
   callbackUrl?: string;
   /** The address that routed here, handed to the provider as the OIDC
@@ -654,10 +660,14 @@ export function RoutedToConnection({
   const [waitIsVisible, setWaitIsVisible] = useState(false);
 
   useEffect(() => {
-    if (!method || dialed.current) return;
+    if (!autoStart || !method || dialed.current) return;
     dialed.current = true;
+    // Parked here as well as on the button, because this is the dial nobody
+    // presses: without it the people routed by their address, who sign in
+    // this way every day, are the ones the landing never badges.
+    rememberPendingMethod(method);
     void signIn(method.id, { callbackUrl, loginHint });
-  }, [method, callbackUrl, loginHint]);
+  }, [autoStart, method, callbackUrl, loginHint]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);
@@ -665,15 +675,16 @@ export function RoutedToConnection({
   }, []);
 
   if (!method) return null;
-  if (!waitIsVisible) return null;
+  if (autoStart && !waitIsVisible) return null;
 
   return (
     <AuthCard title={title}>
       <HStack gap={3}>
-        <Spinner size="sm" color="orange.500" />
+        {autoStart && <Spinner size="sm" color="orange.500" />}
         <Text data-testid="routed-to-connection">
-          Taking you to your organization's sign-in with{" "}
-          {signInMethodLabel(method)}.
+          {autoStart
+            ? `Taking you to your organization's sign-in with ${signInMethodLabel(method)}.`
+            : `Log in with ${signInMethodLabel(method)} to continue.`}
         </Text>
       </HStack>
       <AuthPrimaryButton onClick={() => onContinue(method)}>

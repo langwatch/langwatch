@@ -1,3 +1,4 @@
+import { grantFactToRow } from "@langwatch/authz-server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
@@ -24,35 +25,70 @@ import { LicenseEnforcementRepository } from "../license-enforcement.repository"
  */
 
 // Create mock Prisma client
-const createMockPrisma = () => ({
-  project: {
-    count: vi.fn().mockResolvedValue(0),
+const createMockPrisma = () => {
+  const roleBinding = {
     findMany: vi.fn().mockResolvedValue([]),
-  },
-  organizationUser: {
-    count: vi.fn().mockResolvedValue(0),
+  };
+  const customRole = {
     findMany: vi.fn().mockResolvedValue([]),
-  },
-  organizationInvite: {
-    findMany: vi.fn().mockResolvedValue([]),
-  },
-  team: {
-    count: vi.fn().mockResolvedValue(0),
-    findMany: vi.fn().mockResolvedValue([]),
-  },
-  teamUser: {
-    findMany: vi.fn().mockResolvedValue([]),
-  },
-  roleBinding: {
-    findMany: vi.fn().mockResolvedValue([]),
-  },
-  customRole: {
-    findMany: vi.fn().mockResolvedValue([]),
-  },
-  cost: {
-    aggregate: vi.fn().mockResolvedValue({ _sum: { amount: null } }),
-  },
-});
+  };
+  const grant = {
+    findMany: vi.fn().mockImplementation(async () => {
+      const bindings = await roleBinding.findMany();
+      return bindings.map(
+        (
+          binding: { userId: string; customRoleId: string | null },
+          index: number,
+        ) =>
+          grantFactToRow({
+            organizationId: "org-123",
+            grant: {
+              grantId: `grant-${index}`,
+              principal: { type: "user", id: binding.userId },
+              roleKey: binding.customRoleId
+                ? `custom:${binding.customRoleId}`
+                : "viewer",
+              legacyRole: binding.customRoleId ? "CUSTOM" : "VIEWER",
+              source: "migration",
+              scope: { type: "TEAM", id: "team-1" },
+              occurredAtMs: 1,
+            },
+          }),
+      );
+    }),
+  };
+  const role = {
+    findMany: vi.fn().mockImplementation(() => customRole.findMany()),
+  };
+
+  return {
+    project: {
+      count: vi.fn().mockResolvedValue(0),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    organizationUser: {
+      count: vi.fn().mockResolvedValue(0),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    organizationInvite: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    team: {
+      count: vi.fn().mockResolvedValue(0),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    teamUser: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    roleBinding,
+    customRole,
+    grant,
+    role,
+    cost: {
+      aggregate: vi.fn().mockResolvedValue({ _sum: { amount: null } }),
+    },
+  };
+};
 
 type MockPrisma = ReturnType<typeof createMockPrisma>;
 
@@ -89,6 +125,28 @@ describe("LicenseEnforcementRepository", () => {
       const result = await repository.getMemberCount(organizationId);
 
       expect(result).toBe(2);
+    });
+
+    /** @scenario A deactivated person does not hold a seat */
+    it("leaves a deactivated person out of the pool, as a disabled membership is", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      await repository.getMemberCount(organizationId);
+
+      // THE FILTER IS THE BEHAVIOUR. A mock cannot filter, so asserting on
+      // the returned count would pass whatever the query happened to ask
+      // for - including the query that billed for leavers.
+      expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            organizationId,
+            disabledAt: null,
+            user: { deactivatedAt: null },
+          },
+        }),
+      );
     });
 
     it("counts EXTERNAL role users with non-view custom role as full members (elevated from Lite Member)", async () => {
@@ -209,8 +267,18 @@ describe("LicenseEnforcementRepository", () => {
 
       const result = await repository.getMemberCount(organizationId);
 
-      // Expired invites should be filtered by query, not returned
       expect(result).toBe(0);
+      expect(mockPrisma.organizationInvite.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId,
+          status: "PENDING",
+          OR: [
+            { expiration: { gt: new Date("2024-03-15T12:00:00.000Z") } },
+            { expiration: null },
+          ],
+        },
+        select: { role: true, teamAssignments: true },
+      });
     });
 
     it("does not count EXTERNAL role users without team assignment as full members (they are Lite Member)", async () => {

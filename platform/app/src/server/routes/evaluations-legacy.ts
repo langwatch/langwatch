@@ -10,6 +10,7 @@
  * - src/pages/api/dataset/evaluate.ts
  */
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -34,7 +35,6 @@ import type { Workflow } from "~/optimization_studio/types/dsl";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
 import {
   createServiceApp,

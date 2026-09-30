@@ -1,0 +1,666 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the definition-driven access DDL > given fixed names, password hash and named collection > renders the whole shipped access model, snapshotted 1`] = `
+[
+  "CREATE SETTINGS PROFILE OR REPLACE langwatch_profile
+  SETTINGS custom_api_key_hash = '' CHANGEABLE_IN_READONLY,
+           readonly = 1 CONST,
+           max_execution_time = 10 CONST,
+           max_memory_usage = 1000000000 CONST,
+           max_threads = 4 CONST,
+           max_concurrent_queries_for_user = 10 CONST,
+           max_rows_to_read = 1000000000 CONST,
+           max_bytes_to_read = 10000000000 CONST,
+           read_overflow_mode = 'throw' CONST,
+           max_result_rows = 10000 CONST,
+           max_result_bytes = 8000000 CONST,
+           result_overflow_mode = 'throw' CONST",
+  "CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_hash BY 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' SETTINGS PROFILE langwatch_profile",
+  "CREATE ROW POLICY OR REPLACE lwql_api_key_tenant_map_self ON langwatch.lwql_api_key_tenant_map
+  USING has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE trace_summaries_tenant ON langwatch.trace_summaries
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE stored_spans_tenant ON langwatch.stored_spans
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE evaluation_runs_tenant ON langwatch.evaluation_runs
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE simulation_runs_tenant ON langwatch.simulation_runs
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE trace_analytics_tenant ON langwatch.trace_analytics
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE trace_analytics_rollup_tenant ON langwatch.trace_analytics_rollup
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE evaluation_analytics_tenant ON langwatch.evaluation_analytics
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE evaluation_analytics_rollup_tenant ON langwatch.evaluation_analytics_rollup
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE coding_agent_sessions_tenant ON langwatch.coding_agent_sessions
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE coding_agent_session_events_tenant ON langwatch.coding_agent_session_events
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE log_records_tenant ON langwatch.log_records
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE instant_eval_judgments_tenant ON langwatch.instant_eval_judgments
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE automation_audit_tenant ON langwatch.automation_audit
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE billable_events_tenant ON langwatch.billable_events
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE coding_agent_trace_sessions_tenant ON langwatch.coding_agent_trace_sessions
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE dspy_steps_tenant ON langwatch.dspy_steps
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE experiment_run_items_tenant ON langwatch.experiment_run_items
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE experiment_runs_tenant ON langwatch.experiment_runs
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_budget_ledger_events_tenant ON langwatch.gateway_budget_ledger_events
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_budget_scope_totals_tenant ON langwatch.gateway_budget_scope_totals
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_spend_tenant ON langwatch.gateway_spend
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE governance_cost_rollup_restatement_index_tenant ON langwatch.governance_cost_rollup_restatement_index
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE governance_cost_rollup_1d_tenant ON langwatch.governance_cost_rollup_1d
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE governance_kpis_tenant ON langwatch.governance_kpis
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE governance_ocsf_events_tenant ON langwatch.governance_ocsf_events
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE langy_messages_tenant ON langwatch.langy_messages
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE langy_analytics_events_tenant ON langwatch.langy_analytics_events
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE event_log_tenant ON langwatch.event_log
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE stored_log_records_tenant ON langwatch.stored_log_records
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE stored_metric_records_tenant ON langwatch.stored_metric_records
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE log_usage_estimates_tenant ON langwatch.log_usage_estimates
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE metric_usage_estimates_tenant ON langwatch.metric_usage_estimates
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE metric_data_points_tenant ON langwatch.metric_data_points
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE metric_time_rollups_tenant ON langwatch.metric_time_rollups
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE metric_series_tenant ON langwatch.metric_series
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE stored_objects_tenant ON langwatch.stored_objects
+  USING project_id IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE session_metric_series_tenant ON langwatch.session_metric_series
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE simulation_run_metrics_rollup_tenant ON langwatch.simulation_run_metrics_rollup
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE simulation_run_metrics_tenant ON langwatch.simulation_run_metrics
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE suite_runs_tenant ON langwatch.suite_runs
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE agents_pg_tenant ON langwatch.agents_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE ai_tool_entries_pg_tenant ON langwatch.ai_tool_entries_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE ai_tool_entry_departments_pg_tenant ON langwatch.ai_tool_entry_departments_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE ai_tool_entry_teams_pg_tenant ON langwatch.ai_tool_entry_teams_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE analytics_pg_tenant ON langwatch.analytics_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE annotation_queue_items_pg_tenant ON langwatch.annotation_queue_items_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE annotation_queue_scores_pg_tenant ON langwatch.annotation_queue_scores_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE annotation_queues_pg_tenant ON langwatch.annotation_queues_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE annotation_scores_pg_tenant ON langwatch.annotation_scores_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE annotations_pg_tenant ON langwatch.annotations_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE anomaly_alerts_pg_tenant ON langwatch.anomaly_alerts_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE anomaly_rules_pg_tenant ON langwatch.anomaly_rules_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE batch_evaluations_pg_tenant ON langwatch.batch_evaluations_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE costs_pg_tenant ON langwatch.costs_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE custom_graphs_pg_tenant ON langwatch.custom_graphs_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE custom_llm_model_costs_pg_tenant ON langwatch.custom_llm_model_costs_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE dashboards_pg_tenant ON langwatch.dashboards_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE data_privacy_policies_pg_tenant ON langwatch.data_privacy_policies_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE dataset_records_pg_tenant ON langwatch.dataset_records_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE datasets_pg_tenant ON langwatch.datasets_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE department_membership_histories_pg_tenant ON langwatch.department_membership_histories_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE departments_pg_tenant ON langwatch.departments_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE discovered_agents_pg_tenant ON langwatch.discovered_agents_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE discovered_persons_pg_tenant ON langwatch.discovered_persons_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE email_suppressions_pg_tenant ON langwatch.email_suppressions_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE erased_identifier_suppressions_pg_tenant ON langwatch.erased_identifier_suppressions_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE evaluators_pg_tenant ON langwatch.evaluators_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE experiment_versions_pg_tenant ON langwatch.experiment_versions_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE experiments_pg_tenant ON langwatch.experiments_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_budget_bucket_boundaries_pg_tenant ON langwatch.gateway_budget_bucket_boundaries_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_budget_ledgers_pg_tenant ON langwatch.gateway_budget_ledgers_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_budgets_pg_tenant ON langwatch.gateway_budgets_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_cache_rules_pg_tenant ON langwatch.gateway_cache_rules_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_change_events_pg_tenant ON langwatch.gateway_change_events_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_guardrails_pg_tenant ON langwatch.gateway_guardrails_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE gateway_realtime_sessions_pg_tenant ON langwatch.gateway_realtime_sessions_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE github_branch_pull_request_checks_pg_tenant ON langwatch.github_branch_pull_request_checks_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE github_installations_pg_tenant ON langwatch.github_installations_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE github_pull_requests_pg_tenant ON langwatch.github_pull_requests_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE governance_tenant_histories_pg_tenant ON langwatch.governance_tenant_histories_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE identity_match_suggestions_pg_tenant ON langwatch.identity_match_suggestions_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE identity_matches_pg_tenant ON langwatch.identity_matches_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE ingestion_pull_run_projections_pg_tenant ON langwatch.ingestion_pull_run_projections_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE ingestion_sources_pg_tenant ON langwatch.ingestion_sources_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE ingestion_templates_pg_tenant ON langwatch.ingestion_templates_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE langy_active_turns_pg_tenant ON langwatch.langy_active_turns_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE langy_conversation_projections_pg_tenant ON langwatch.langy_conversation_projections_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE langy_conversation_turn_projections_pg_tenant ON langwatch.langy_conversation_turn_projections_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE langy_message_projections_pg_tenant ON langwatch.langy_message_projections_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE langy_turn_requests_pg_tenant ON langwatch.langy_turn_requests_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE model_default_config_scopes_pg_tenant ON langwatch.model_default_config_scopes_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE model_default_configs_pg_tenant ON langwatch.model_default_configs_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE model_provider_scopes_pg_tenant ON langwatch.model_provider_scopes_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE model_providers_pg_tenant ON langwatch.model_providers_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE monitors_pg_tenant ON langwatch.monitors_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE notifications_pg_tenant ON langwatch.notifications_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE pinned_traces_pg_tenant ON langwatch.pinned_traces_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE process_manager_inboxes_pg_tenant ON langwatch.process_manager_inboxes_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE process_manager_instances_pg_tenant ON langwatch.process_manager_instances_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE process_manager_outbox_attempts_pg_tenant ON langwatch.process_manager_outbox_attempts_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE process_manager_outboxes_pg_tenant ON langwatch.process_manager_outboxes_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE projects_pg_tenant ON langwatch.projects_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE prompt_tag_assignments_pg_tenant ON langwatch.prompt_tag_assignments_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE prompt_tags_pg_tenant ON langwatch.prompt_tags_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE prompt_versions_pg_tenant ON langwatch.prompt_versions_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE prompts_pg_tenant ON langwatch.prompts_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE retention_policies_pg_tenant ON langwatch.retention_policies_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE routing_policies_pg_tenant ON langwatch.routing_policies_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE routing_policy_scopes_pg_tenant ON langwatch.routing_policy_scopes_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE saved_views_pg_tenant ON langwatch.saved_views_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE scenario_versions_pg_tenant ON langwatch.scenario_versions_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE scenarios_pg_tenant ON langwatch.scenarios_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE scheduled_jobs_pg_tenant ON langwatch.scheduled_jobs_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE share_links_pg_tenant ON langwatch.share_links_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE simulation_suites_pg_tenant ON langwatch.simulation_suites_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE topic_clustering_run_history_projections_pg_tenant ON langwatch.topic_clustering_run_history_projections_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE topic_clustering_run_projections_pg_tenant ON langwatch.topic_clustering_run_projections_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE topic_model_projections_pg_tenant ON langwatch.topic_model_projections_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE topics_pg_tenant ON langwatch.topics_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE trace_edit_overlays_pg_tenant ON langwatch.trace_edit_overlays_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE trigger_sents_pg_tenant ON langwatch.trigger_sents_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE triggers_pg_tenant ON langwatch.triggers_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE virtual_key_scopes_pg_tenant ON langwatch.virtual_key_scopes_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE virtual_keys_pg_tenant ON langwatch.virtual_keys_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE webhook_endpoint_deliveries_pg_tenant ON langwatch.webhook_endpoint_deliveries_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE workflow_versions_pg_tenant ON langwatch.workflow_versions_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE workflows_pg_tenant ON langwatch.workflows_pg
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.lwql_api_key_tenant_map TO langwatch_lwql",
+  "GRANT SELECT(\`Attributes\`, \`ComputedInput\`, \`ComputedOutput\`, \`ContainsErrorStatus\`, \`ContainsOKStatus\`, \`ContainsPrompt\`, \`LastUsedPromptId\`, \`LastUsedPromptVersionId\`, \`LastUsedPromptVersionNumber\`, \`Models\`, \`OccurredAt\`, \`SatisfactionScore\`, \`SelectedPromptId\`, \`SourceType\`, \`SpanCount\`, \`SubTopicId\`, \`TenantId\`, \`TimeToFirstTokenMs\`, \`TimeToLastTokenMs\`, \`TokensEstimated\`, \`TokensPerSecond\`, \`TopicId\`, \`TotalCompletionTokenCount\`, \`TotalCost\`, \`TotalDurationMs\`, \`TotalPromptTokenCount\`, \`TraceId\`, \`TraceName\`, \`UpdatedAt\`) ON langwatch.trace_summaries TO langwatch_lwql",
+  "GRANT SELECT(\`Cost\`, \`DurationMs\`, \`EndTime\`, \`NonBilledCost\`, \`ParentSpanId\`, \`ResourceAttributes\`, \`Sampled\`, \`ScopeName\`, \`ServiceName\`, \`SpanAttributes\`, \`SpanId\`, \`SpanKind\`, \`SpanName\`, \`StartTime\`, \`StatusCode\`, \`TenantId\`, \`TraceId\`) ON langwatch.stored_spans TO langwatch_lwql",
+  "GRANT SELECT(\`ArchivedAt\`, \`CompletedAt\`, \`Details\`, \`EvaluationId\`, \`EvaluatorId\`, \`EvaluatorName\`, \`EvaluatorType\`, \`Inputs\`, \`IsGuardrail\`, \`Label\`, \`Passed\`, \`ScheduledAt\`, \`Score\`, \`StartedAt\`, \`Status\`, \`TenantId\`, \`TraceId\`, \`UpdatedAt\`) ON langwatch.evaluation_runs TO langwatch_lwql",
+  "GRANT SELECT(\`ArchivedAt\`, \`BatchRunId\`, \`DurationMs\`, \`FinishedAt\`, \`InconclusiveCriteria\`, \`Messages.Content\`, \`Messages.Role\`, \`MetCriteria\`, \`Name\`, \`Reasoning\`, \`ScenarioId\`, \`ScenarioRunId\`, \`ScenarioSetId\`, \`StartedAt\`, \`Status\`, \`TenantId\`, \`TraceIds\`, \`UnmetCriteria\`, \`UpdatedAt\`, \`Verdict\`) ON langwatch.simulation_runs TO langwatch_lwql",
+  "GRANT SELECT(\`CacheReadTokens\`, \`CacheWriteTokens\`, \`CompletionTokens\`, \`ConversationId\`, \`CustomerId\`, \`HasError\`, \`Labels\`, \`Models\`, \`NonBilledCost\`, \`OccurredAt\`, \`Origin\`, \`PromptTokens\`, \`ReasoningTokens\`, \`SubTopicId\`, \`TenantId\`, \`TimeToFirstTokenMs\`, \`TokensPerSecond\`, \`TopicId\`, \`TotalCost\`, \`TotalDurationMs\`, \`TraceId\`, \`TraceName\`, \`UpdatedAt\`, \`UserId\`) ON langwatch.trace_analytics TO langwatch_lwql",
+  "GRANT SELECT(\`BucketStart\`, \`CacheReadTokensSum\`, \`CacheWriteTokensSum\`, \`CompletionTokensSum\`, \`CostSum\`, \`DurationSum\`, \`ErrorCount\`, \`Model\`, \`NonBilledCostSum\`, \`PromptTokensSum\`, \`ReasoningTokensSum\`, \`SpanCount\`, \`SpanType\`, \`TenantId\`, \`TraceCount\`) ON langwatch.trace_analytics_rollup TO langwatch_lwql",
+  "GRANT SELECT(\`BucketStart\`, \`CacheReadTokensSum\`, \`CacheWriteTokensSum\`, \`CompletionTokensSum\`, \`CostSum\`, \`Model\`, \`NonBilledCostSum\`, \`PromptTokensSum\`, \`ReasoningTokensSum\`, \`SpanCount\`, \`SpanType\`, \`TenantId\`) ON langwatch.trace_analytics_rollup TO langwatch_lwql",
+  "GRANT SELECT(\`Attributes\`, \`ConversationId\`, \`CustomerId\`, \`DurationMs\`, \`EvaluationId\`, \`EvaluatorName\`, \`EvaluatorType\`, \`IsGuardrail\`, \`Label\`, \`Model\`, \`NonBilledCost\`, \`OccurredAt\`, \`Origin\`, \`Passed\`, \`Score\`, \`Status\`, \`TenantId\`, \`TotalCost\`, \`TraceId\`, \`UpdatedAt\`, \`UserId\`) ON langwatch.evaluation_analytics TO langwatch_lwql",
+  "GRANT SELECT(\`BucketStart\`, \`CostSum\`, \`DurationSum\`, \`ErrorCount\`, \`EvalCount\`, \`EvaluatorType\`, \`FailCount\`, \`NonBilledCostSum\`, \`PassCount\`, \`ScoreCount\`, \`ScoreSum\`, \`SkippedCount\`, \`Status\`, \`TenantId\`) ON langwatch.evaluation_analytics_rollup TO langwatch_lwql",
+  "GRANT SELECT(\`ActiveTimeCliSec\`, \`ActiveTimeUserSec\`, \`Agent\`, \`AgentReportedCostUsd\`, \`AgentVersion\`, \`ApiErrors\`, \`AtMentions\`, \`Attempts\`, \`Auxiliary\`, \`BlockedOnUserMs\`, \`CacheCreationTokens\`, \`CacheReadTokens\`, \`CacheRebuildCount\`, \`Commits\`, \`CompactionTokensAfter\`, \`CompactionTokensBefore\`, \`CompactionTriggers\`, \`Compactions\`, \`CostUsd\`, \`EditsAccepted\`, \`EditsRejected\`, \`Entrypoint\`, \`ErrorTypes\`, \`FailedTools\`, \`FilesTouched\`, \`FinalRequestId\`, \`GitBranch\`, \`GitBranches\`, \`GitWorktree\`, \`HookMs\`, \`HooksBlocked\`, \`HooksCancelled\`, \`InputTokens\`, \`InternalErrors\`, \`IsFork\`, \`LanguagesEdited\`, \`LargestCacheRebuildTokens\`, \`LinesAdded\`, \`LinesRemoved\`, \`McpServers\`, \`McpTools\`, \`ModelCallMs\`, \`ModelCalls\`, \`Models\`, \`OutputTokens\`, \`ParentSessionId\`, \`PeakContextTokens\`, \`PermissionChanges\`, \`PermissionMode\`, \`PromptChars\`, \`Prompts\`, \`PullRequests\`, \`RateLimitEvents\`, \`RateLimited\`, \`RefusalCategories\`, \`Refusals\`, \`RepositoryHost\`, \`RepositoryName\`, \`RepositoryOwner\`, \`ResponseChars\`, \`RetriesExhausted\`, \`RetryMs\`, \`SessionId\`, \`SessionKeySource\`, \`Skills\`, \`SlashCommands\`, \`StartedAt\`, \`StopReason\`, \`SubAgentTypes\`, \`SubAgents\`, \`TenantId\`, \`TerminalType\`, \`Title\`, \`TitleSource\`, \`ToolCalls\`, \`ToolCounts\`, \`ToolDurationMs\`, \`ToolInputBytes\`, \`ToolMs\`, \`ToolResultBytes\`, \`ToolsAborted\`, \`ToolsDenied\`, \`TraceIds\`, \`Truncated\`, \`TtftMsTotal\`, \`TtftSamples\`, \`UpdatedAt\`, \`UserId\`) ON langwatch.coding_agent_sessions TO langwatch_lwql",
+  "GRANT SELECT(\`Agent\`, \`AgentType\`, \`Attempt\`, \`Branch\`, \`CacheCreationTokens\`, \`CacheReadTokens\`, \`CompactionTrigger\`, \`CostUsd\`, \`Decision\`, \`DecisionSource\`, \`DurationMs\`, \`ErrorType\`, \`EventKind\`, \`EventSequence\`, \`InputTokens\`, \`Model\`, \`OutputTokens\`, \`PostTokens\`, \`PreTokens\`, \`PrecomputeReuse\`, \`PromptChars\`, \`PromptId\`, \`QuerySource\`, \`RateLimitCarrier\`, \`RecordId\`, \`RepositoryHost\`, \`RepositoryName\`, \`RepositoryOwner\`, \`RequestId\`, \`RetryDurationMs\`, \`SessionId\`, \`SessionKeySource\`, \`SpanId\`, \`Speed\`, \`StatusCode\`, \`StopReason\`, \`Success\`, \`TenantId\`, \`TimeUnixMs\`, \`ToolInputBytes\`, \`ToolName\`, \`ToolResultBytes\`, \`TotalTokens\`, \`TraceId\`, \`TtftMs\`, \`UpdatedAt\`) ON langwatch.coding_agent_session_events TO langwatch_lwql",
+  "GRANT SELECT(\`SpanAttributes\`, \`SpanId\`, \`SpanName\`, \`StartTime\`, \`StatusCode\`, \`TenantId\`, \`TraceId\`) ON langwatch.stored_spans TO langwatch_lwql",
+  "GRANT SELECT(\`CreatedAt\`, \`Kind\`, \`Label\`, \`OccurredAt\`, \`Passed\`, \`Probabilities\`, \`Probability\`, \`QuestionId\`, \`RunId\`, \`Score\`, \`SpanId\`, \`Status\`, \`TenantId\`, \`ThreadId\`, \`TraceId\`, \`UpdatedAt\`) ON langwatch.instant_eval_judgments TO langwatch_lwql",
+  "GRANT SELECT(\`ActionClass\`, \`EventId\`, \`OccurredAt\`, \`ProjectedAt\`, \`TenantId\`, \`TraceId\`, \`TriggerId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.automation_audit TO langwatch_lwql",
+  "GRANT SELECT(\`CreatedAt\`, \`DeduplicationKey\`, \`DeduplicationKeyHash\`, \`EventId\`, \`EventTimestamp\`, \`EventType\`, \`OrganizationId\`, \`TenantId\`, \`UpdatedAt\`) ON langwatch.billable_events TO langwatch_lwql",
+  "GRANT SELECT(\`OccurredAt\`, \`SessionId\`, \`TenantId\`, \`TraceId\`, \`UpdatedAt\`, \`_retention_days\`) ON langwatch.coding_agent_trace_sessions TO langwatch_lwql",
+  "GRANT SELECT(\`CreatedAt\`, \`Examples\`, \`ExperimentId\`, \`Id\`, \`InsertedAt\`, \`Label\`, \`LlmCalls\`, \`LlmCallsTotal\`, \`LlmCallsTotalCost\`, \`LlmCallsTotalTokens\`, \`OptimizerName\`, \`OptimizerParameters\`, \`Predictors\`, \`RunId\`, \`Score\`, \`StepIndex\`, \`TenantId\`, \`UpdatedAt\`, \`WorkflowVersionId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.dspy_steps TO langwatch_lwql",
+  "GRANT SELECT(\`CarriedOver\`, \`CreatedAt\`, \`DatasetEntry\`, \`EvaluationCost\`, \`EvaluationDetails\`, \`EvaluationDurationMs\`, \`EvaluationInputs\`, \`EvaluationStatus\`, \`EvaluatorId\`, \`EvaluatorName\`, \`ExperimentId\`, \`Label\`, \`OccurredAt\`, \`Passed\`, \`Predicted\`, \`ProjectionId\`, \`ResultType\`, \`RowIndex\`, \`RunId\`, \`Score\`, \`TargetCost\`, \`TargetDomainError\`, \`TargetDurationMs\`, \`TargetError\`, \`TargetId\`, \`TenantId\`, \`TraceId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.experiment_run_items TO langwatch_lwql",
+  "GRANT SELECT(\`AvgScoreBps\`, \`CompletedCount\`, \`CreatedAt\`, \`ExperimentId\`, \`FailedCount\`, \`FinishedAt\`, \`GradedCount\`, \`LastEventOccurredAt\`, \`LastProcessedEventId\`, \`PassRateBps\`, \`PassedCount\`, \`Progress\`, \`ProjectionId\`, \`RunId\`, \`ScoreCount\`, \`StartedAt\`, \`StoppedAt\`, \`Targets\`, \`TenantId\`, \`Total\`, \`TotalCost\`, \`TotalDurationMs\`, \`TotalScoreSum\`, \`UpdatedAt\`, \`Version\`, \`WorkflowVersionId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.experiment_runs TO langwatch_lwql",
+  "GRANT SELECT(\`AmountNanoUSD\`, \`AmountUSD\`, \`BudgetId\`, \`CreatedAt\`, \`DurationMS\`, \`EventTimestamp\`, \`GatewayRequestId\`, \`Model\`, \`OccurredAt\`, \`ProviderCredentialId\`, \`ProviderKey\`, \`ProviderSlot\`, \`Scope\`, \`ScopeId\`, \`Status\`, \`TenantId\`, \`TokensCacheRead\`, \`TokensCacheWrite\`, \`TokensInput\`, \`TokensOutput\`, \`VirtualKeyId\`, \`Window\`) ON langwatch.gateway_budget_ledger_events TO langwatch_lwql",
+  "GRANT SELECT(\`BudgetId\`, \`PeriodStart\`, \`RequestCount\`, \`Scope\`, \`ScopeId\`, \`SpendNanoUSD\`, \`SpendUSD\`, \`TenantId\`, \`TokensCacheRead\`, \`TokensCacheWrite\`, \`TokensInput\`, \`TokensOutput\`, \`UpdatedAt\`, \`Window\`) ON langwatch.gateway_budget_scope_totals TO langwatch_lwql",
+  "GRANT SELECT(\`AudioMS\`, \`CharsInput\`, \`CostNanoUSD\`, \`CreatedAt\`, \`DurationMS\`, \`EndUserId\`, \`ErrorClass\`, \`EventTimestamp\`, \`GatewayRequestId\`, \`HttpStatus\`, \`ImageCount\`, \`Labels\`, \`LastEventOccurredAt\`, \`Metadata\`, \`MetadataMap\`, \`Model\`, \`NeedsReconciliation\`, \`OccurredAt\`, \`OrganizationId\`, \`PodId\`, \`PodSeq\`, \`PrincipalUserId\`, \`ProviderKey\`, \`RateVersion\`, \`RequestType\`, \`SettleReason\`, \`Status\`, \`TenantId\`, \`TokensCacheRead\`, \`TokensCacheWrite\`, \`TokensCacheWrite1h\`, \`TokensInput\`, \`TokensInputAudio\`, \`TokensInputImage\`, \`TokensOutput\`, \`TokensOutputAudio\`, \`TokensOutputImage\`, \`TokensReasoning\`, \`TraceId\`, \`Version\`, \`VirtualKeyId\`) ON langwatch.gateway_spend TO langwatch_lwql",
+  "GRANT SELECT(\`AgentId\`, \`CostSource\`, \`CurrencyCode\`, \`Day\`, \`EventTimestamp\`, \`IngestionSourceId\`, \`Model\`, \`Provider\`, \`RawActorId\`, \`RestatementKey\`, \`TenantId\`, \`_retention_days\`) ON langwatch.governance_cost_rollup_restatement_index TO langwatch_lwql",
+  "GRANT SELECT(\`AgentId\`, \`AmountNanoMinor\`, \`AmountNanoUsd\`, \`AppliedEventIds\`, \`CostSource\`, \`CreatedAt\`, \`CurrencyCode\`, \`Day\`, \`EventTimestamp\`, \`ExactOrEstimate\`, \`IngestionSourceId\`, \`LastEventOccurredAt\`, \`LastObservedAt\`, \`Model\`, \`OrganizationId\`, \`PreviousAmountNanoUsd\`, \`Provider\`, \`PulledItemsJson\`, \`RawActorId\`, \`RequestCount\`, \`RevisedAt\`, \`RevisionCount\`, \`TenantId\`, \`TokensCacheRead\`, \`TokensCacheWrite\`, \`TokensInput\`, \`TokensOutput\`, \`Version\`, \`_retention_days\`) ON langwatch.governance_cost_rollup_1d TO langwatch_lwql",
+  "GRANT SELECT(\`CompletionTokens\`, \`CreatedAt\`, \`HourBucket\`, \`LastEventOccurredAt\`, \`PromptTokens\`, \`SourceId\`, \`SourceType\`, \`SpendUsd\`, \`TenantId\`, \`TraceId\`) ON langwatch.governance_kpis TO langwatch_lwql",
+  "GRANT SELECT(\`ActionName\`, \`ActivityId\`, \`ActorEmail\`, \`ActorEnduserId\`, \`ActorUserId\`, \`AnomalyAlertId\`, \`CategoryUid\`, \`ClassUid\`, \`CreatedAt\`, \`EventId\`, \`EventTime\`, \`LastUpdatedAt\`, \`OcsfSchemaVersion\`, \`RawOcsfJson\`, \`SeverityId\`, \`SourceId\`, \`SourceType\`, \`TargetName\`, \`TenantId\`, \`TraceId\`, \`TypeUid\`) ON langwatch.governance_ocsf_events TO langwatch_lwql",
+  "GRANT SELECT(\`ConversationId\`, \`CreatedAt\`, \`MessageId\`, \`Parts\`, \`Role\`, \`TenantId\`, \`UpdatedAt\`) ON langwatch.langy_messages TO langwatch_lwql",
+  "GRANT SELECT(\`AcceptedAt\`, \`AggregateId\`, \`DurationMs\`, \`EventId\`, \`EventType\`, \`EventVersion\`, \`Model\`, \`OccurredAt\`, \`Outcome\`, \`ProjectedAt\`, \`Role\`, \`TenantId\`, \`ToolName\`, \`TurnId\`, \`UserId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.langy_analytics_events TO langwatch_lwql",
+  "GRANT SELECT(\`AggregateId\`, \`AggregateType\`, \`CreatedAt\`, \`EventId\`, \`EventOccurredAt\`, \`EventPayload\`, \`EventTimestamp\`, \`EventType\`, \`EventVersion\`, \`IdempotencyKey\`, \`ProcessingTraceparent\`, \`TenantId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.event_log TO langwatch_lwql",
+  "GRANT SELECT(\`Attributes\`, \`Body\`, \`CreatedAt\`, \`ProjectionId\`, \`ResourceAttributes\`, \`ScopeName\`, \`ScopeVersion\`, \`SeverityNumber\`, \`SeverityText\`, \`SpanId\`, \`TenantId\`, \`TimeUnixMs\`, \`TraceId\`, \`UpdatedAt\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.stored_log_records TO langwatch_lwql",
+  "GRANT SELECT(\`Attributes\`, \`CreatedAt\`, \`MetricName\`, \`MetricType\`, \`MetricUnit\`, \`ProjectionId\`, \`ResourceAttributes\`, \`SpanId\`, \`TenantId\`, \`TimeUnixMs\`, \`TraceId\`, \`UpdatedAt\`, \`Value\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.stored_metric_records TO langwatch_lwql",
+  "GRANT SELECT(\`AcceptedAt\`, \`AcceptedHour\`, \`CanonicalSourceBytes\`, \`DedupVersion\`, \`OrganizationId\`, \`ProviderKind\`, \`RecordId\`, \`TenantId\`, \`WrittenAt\`) ON langwatch.log_usage_estimates TO langwatch_lwql",
+  "GRANT SELECT(\`AcceptedAt\`, \`AttributeKeys\`, \`AttributesFlatJson\`, \`AttributesJson\`, \`BodyJson\`, \`BodyText\`, \`BodyType\`, \`CanonicalPayload\`, \`CorrelationSource\`, \`CorrelationSpanId\`, \`CorrelationTraceId\`, \`DedupVersion\`, \`DroppedAttributesCount\`, \`EventName\`, \`Flags\`, \`ObservedTimeUnixNano\`, \`OccurredAt\`, \`PiiRedactionLevel\`, \`ProviderConversationId\`, \`ProviderEventKind\`, \`ProviderEventSequence\`, \`ProviderKind\`, \`ProviderPromptId\`, \`ProviderSessionId\`, \`RecordId\`, \`ResourceAttributeKeys\`, \`ResourceAttributesFlatJson\`, \`ResourceAttributesJson\`, \`ResourceDroppedAttributesCount\`, \`ResourceSchemaUrl\`, \`ScopeAttributeKeys\`, \`ScopeAttributesJson\`, \`ScopeDroppedAttributesCount\`, \`ScopeName\`, \`ScopeSchemaUrl\`, \`ScopeVersion\`, \`SeverityNumber\`, \`SeverityText\`, \`TenantId\`, \`TimeUnixMs\`, \`TimeUnixNano\`, \`WireSpanId\`, \`WireTraceId\`, \`WrittenAt\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.log_records TO langwatch_lwql",
+  "GRANT SELECT(\`AcceptedAt\`, \`AcceptedHour\`, \`CanonicalSourceBytes\`, \`DedupVersion\`, \`MetricName\`, \`OrganizationId\`, \`PointId\`, \`SeriesId\`, \`TenantId\`, \`WrittenAt\`) ON langwatch.metric_usage_estimates TO langwatch_lwql",
+  "GRANT SELECT(\`AcceptedAt\`, \`AggregationTemporality\`, \`BucketCounts\`, \`CanonicalPayload\`, \`Count\`, \`DedupVersion\`, \`ExplicitBounds\`, \`ExponentialScale\`, \`ExponentialZeroThreshold\`, \`Flags\`, \`IsMonotonic\`, \`Max\`, \`MetricDescription\`, \`MetricKind\`, \`MetricName\`, \`MetricUnit\`, \`Min\`, \`NegativeBucketCounts\`, \`NegativeOffset\`, \`OccurredAt\`, \`PointAttributeKeys\`, \`PointAttributesJson\`, \`PointId\`, \`PositiveBucketCounts\`, \`PositiveOffset\`, \`ResourceAttributeKeys\`, \`ResourceAttributesJson\`, \`ResourceSchemaUrl\`, \`ScopeAttributeKeys\`, \`ScopeAttributesJson\`, \`ScopeName\`, \`ScopeSchemaUrl\`, \`ScopeVersion\`, \`SeriesId\`, \`StartTimeUnixNano\`, \`Sum\`, \`SummaryQuantilesJson\`, \`TenantId\`, \`TimeUnixMs\`, \`TimeUnixNano\`, \`ValueDouble\`, \`ValueInt\`, \`ValueType\`, \`WrittenAt\`, \`ZeroCount\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.metric_data_points TO langwatch_lwql",
+  "GRANT SELECT(\`AggregationTemporality\`, \`BucketCounts\`, \`BucketEnd\`, \`BucketStart\`, \`Count\`, \`ExplicitBounds\`, \`ExponentialScale\`, \`ExponentialZeroThreshold\`, \`GapCount\`, \`GaugeLast\`, \`IsMonotonic\`, \`Max\`, \`MetricKind\`, \`MetricName\`, \`MetricUnit\`, \`Min\`, \`NegativeBucketCounts\`, \`NegativeOffset\`, \`PositiveBucketCounts\`, \`PositiveOffset\`, \`ResetCount\`, \`SeriesId\`, \`SourcePointCount\`, \`Sum\`, \`TenantId\`, \`UpdatedAt\`, \`ZeroCount\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.metric_time_rollups TO langwatch_lwql",
+  "GRANT SELECT(\`AggregationTemporality\`, \`IsMonotonic\`, \`LastSeenAt\`, \`MetricDescription\`, \`MetricKind\`, \`MetricName\`, \`MetricUnit\`, \`PointAttributeKeys\`, \`PointAttributesJson\`, \`ResourceAttributeKeys\`, \`ResourceAttributesJson\`, \`ResourceSchemaUrl\`, \`ScopeAttributeKeys\`, \`ScopeAttributesJson\`, \`ScopeName\`, \`ScopeSchemaUrl\`, \`ScopeVersion\`, \`SeriesId\`, \`TenantId\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.metric_series TO langwatch_lwql",
+  "GRANT SELECT(\`created_at\`, \`id\`, \`inserted_at\`, \`media_type\`, \`owner_id\`, \`owner_kind\`, \`project_id\`, \`purpose\`, \`sha256\`, \`size_bytes\`, \`storage_uri\`) ON langwatch.stored_objects TO langwatch_lwql",
+  "GRANT SELECT(\`Agent\`, \`AsOf\`, \`Attributes\`, \`DataPointCount\`, \`MetricName\`, \`MetricUnit\`, \`SeriesId\`, \`SessionId\`, \`TenantId\`, \`UpdatedAt\`, \`Value\`, \`_retention_days\`) ON langwatch.session_metric_series TO langwatch_lwql",
+  "GRANT SELECT(\`OccurredAt\`, \`PartitionMonth\`, \`RoleCosts\`, \`RoleLatencies\`, \`ScenarioRunId\`, \`TenantId\`, \`TotalCost\`, \`TraceId\`) ON langwatch.simulation_run_metrics_rollup TO langwatch_lwql",
+  "GRANT SELECT(\`EventId\`, \`OccurredAt\`, \`RoleCosts\`, \`RoleLatencies\`, \`ScenarioRunId\`, \`TenantId\`, \`TotalCost\`, \`TraceId\`) ON langwatch.simulation_run_metrics TO langwatch_lwql",
+  "GRANT SELECT(\`BatchRunId\`, \`CompletedCount\`, \`CreatedAt\`, \`FailedCount\`, \`FinishedAt\`, \`GradedCount\`, \`LastEventOccurredAt\`, \`PassRateBps\`, \`PassedCount\`, \`Progress\`, \`ProjectionId\`, \`ScenarioSetId\`, \`StartedAt\`, \`StartedCount\`, \`Status\`, \`SuiteId\`, \`SuiteRunId\`, \`TenantId\`, \`Total\`, \`UpdatedAt\`, \`Version\`, \`_retention_days\`, \`_size_bytes\`) ON langwatch.suite_runs TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.agents_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ai_tool_entries_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ai_tool_entry_departments_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ai_tool_entry_teams_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.analytics_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotation_queue_items_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotation_queue_scores_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotation_queues_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotation_scores_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotations_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.anomaly_alerts_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.anomaly_rules_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.batch_evaluations_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.costs_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.custom_graphs_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.custom_llm_model_costs_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.dashboards_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.data_privacy_policies_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.dataset_records_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.datasets_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.department_membership_histories_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.departments_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.discovered_agents_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.discovered_persons_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.email_suppressions_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.erased_identifier_suppressions_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.evaluators_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.experiment_versions_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.experiments_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_budget_bucket_boundaries_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_budget_ledgers_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_budgets_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_cache_rules_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_change_events_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_guardrails_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_realtime_sessions_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.github_branch_pull_request_checks_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.github_installations_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.github_pull_requests_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.governance_tenant_histories_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.identity_match_suggestions_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.identity_matches_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ingestion_pull_run_projections_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ingestion_sources_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ingestion_templates_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_active_turns_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_conversation_projections_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_conversation_turn_projections_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_message_projections_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_turn_requests_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_default_config_scopes_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_default_configs_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_provider_scopes_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_providers_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.monitors_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.notifications_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.pinned_traces_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.process_manager_inboxes_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.process_manager_instances_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.process_manager_outbox_attempts_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.process_manager_outboxes_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.projects_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.prompt_tag_assignments_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.prompt_tags_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.prompt_versions_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.prompts_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.retention_policies_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.routing_policies_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.routing_policy_scopes_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.saved_views_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.scenario_versions_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.scenarios_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.scheduled_jobs_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.share_links_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.simulation_suites_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.topic_clustering_run_history_projections_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.topic_clustering_run_projections_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.topic_model_projections_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.topics_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_edit_overlays_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trigger_sents_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.triggers_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.virtual_key_scopes_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.virtual_keys_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.webhook_endpoint_deliveries_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.workflow_versions_pg TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.workflows_pg TO langwatch_lwql",
+  "GRANT SELECT(\`TenantId\`, \`CorrelationTraceId\`, \`EventName\`, \`ProviderSessionId\`, \`AttributesJson\`, \`TimeUnixMs\`) ON langwatch.log_records TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.traces TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.spans TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.evaluations TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.simulations TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_metrics TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_metrics_by_minute TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_usage_by_minute TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.evaluation_metrics TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.evaluation_metrics_by_minute TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.coding_sessions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.coding_session_events TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.coding_tool_results TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.judgments TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.automation_events TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.billing_events TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.coding_trace_sessions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.dspy_optimizer_steps TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.experiment_items TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.experiment_run_results TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_budget_ledger TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_budget_totals TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_request_spend TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.governance_cost_restatements TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.governance_daily_cost_rollup TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.governance_hourly_kpis TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.governance_security_events TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_conversation_messages TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_usage_events TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.legacy_event_log TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.legacy_log_records TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.legacy_metric_records TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.log_ingestion_usage TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.logs TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.metric_ingestion_usage TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.metric_points TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.metric_rollups TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.metric_series_definitions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.objects TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.session_metrics TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.simulation_metric_rollups TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.simulation_trace_metrics TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.test_suite_runs TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.agents TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ai_tool_entries TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ai_tool_entry_departments TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ai_tool_entry_teams TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.analytics TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotation_queue_items TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotation_queue_scores TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotation_queues TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotation_scores TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.annotations TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.anomaly_alerts TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.anomaly_rules TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.batch_evaluations TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.costs TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.custom_graphs TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.custom_llm_model_costs TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.dashboards TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.data_privacy_policies TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.dataset_records TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.datasets TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.department_membership_histories TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.departments TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.discovered_agents TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.discovered_persons TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.email_suppressions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.erased_identifier_suppressions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.evaluators TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.experiment_versions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.experiments TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_budget_bucket_boundaries TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_budget_ledgers TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_budgets TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_cache_rules TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_change_events TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_guardrails TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.gateway_realtime_sessions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.github_branch_pull_request_checks TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.github_installations TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.github_pull_requests TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.governance_tenant_histories TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.identity_match_suggestions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.identity_matches TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ingestion_pull_run_projections TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ingestion_sources TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.ingestion_templates TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_active_turns TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_conversation_projections TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_conversation_turn_projections TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_message_projections TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.langy_turn_requests TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_default_config_scopes TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_default_configs TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_provider_scopes TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.model_providers TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.monitors TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.notifications TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.pinned_traces TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.process_manager_inboxes TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.process_manager_instances TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.process_manager_outbox_attempts TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.process_manager_outboxes TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.projects TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.prompt_tag_assignments TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.prompt_tags TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.prompt_versions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.prompts TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.retention_policies TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.routing_policies TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.routing_policy_scopes TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.saved_views TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.scenario_versions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.scenarios TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.scheduled_jobs TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.share_links TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.simulation_suites TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.topic_clustering_run_history_projections TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.topic_clustering_run_projections TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.topic_model_projections TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.topics TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_edit_overlays TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trigger_sents TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.triggers TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.virtual_key_scopes TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.virtual_keys TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.webhook_endpoint_deliveries TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.workflow_versions TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.workflows TO langwatch_lwql",
+  "DROP NAMED COLLECTION IF EXISTS lwql_postgres",
+  "CREATE NAMED COLLECTION lwql_postgres AS host='pg.internal', port=5432, database='langwatch', user='lwql_ro', password='reader-secret'",
+]
+`;

@@ -22,12 +22,15 @@ import { splitApiKeyToken } from "~/server/api-key/api-key-token.utils";
 import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { app } from "../auth-cli";
 
 const suffix = nanoid(8);
@@ -90,7 +93,11 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+    resetAuthzGrantsCommandsForTests();
+    globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
 
     await prisma.organization.create({
       data: { id: ORG_ID, name: `IKP ${suffix}`, slug: `ikp-${suffix}` },
@@ -131,14 +138,12 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
     });
     // Project permissions resolve through RoleBindings, not the legacy
     // OrganizationUser.role, so the admin needs an explicit org-scoped one.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: ADMIN_ID,
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: ADMIN_ID,
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
 
     await prisma.team.create({
@@ -225,7 +230,11 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
       await redisConnection.del(`lwcli:access:${VIEWER_TOKEN}`);
       await redisConnection.del(`lwcli:access:${LEAVER_TOKEN}`);
     }
+    await resetApp();
+    resetAuthzGrantsCommandsForTests();
     const orgs = [ORG_ID, OTHER_ORG_ID];
+    await prisma.grant.deleteMany({ where: { organizationId: { in: orgs } } });
+    await prisma.role.deleteMany({ where: { organizationId: { in: orgs } } });
     await prisma.aiToolEntry.deleteMany({
       where: { organizationId: { in: orgs } },
     });
@@ -253,7 +262,6 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
       where: { id: { in: [ADMIN_ID, VIEWER_ID, LEAVER_ID] } },
     });
     await prisma.organization.deleteMany({ where: { id: { in: orgs } } });
-    await resetApp();
     await stopTestContainers();
   }, 60_000);
 

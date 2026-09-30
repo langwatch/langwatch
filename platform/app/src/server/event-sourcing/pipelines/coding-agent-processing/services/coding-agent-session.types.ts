@@ -58,6 +58,58 @@ export interface MetricSeriesFact {
   value: number;
 }
 
+/**
+ * What a session spent under one declared working context: the repository
+ * and branch a model call was stamped with, and the call's tokens and
+ * computed cost summed over every call stamped the same way. Never
+ * negative, never a share: the amounts are the calls' own.
+ */
+export interface SessionContextUsage {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+}
+
+/**
+ * How many working contexts one session's usage record holds. Wider than
+ * `MAX_SET` because a long-lived agent that declares a branch per pull
+ * request reaches fifty in weeks, and a context past the bound is usage the
+ * pull-request read can no longer place; each entry is a few short strings
+ * and five numbers.
+ *
+ * Both sides of the record need it: the fold stops opening contexts here, and
+ * the read recognises a record of exactly this size as saturated and stops
+ * trusting the gap between the counters and the record to be the session's
+ * pre-declaration usage.
+ */
+export const MAX_USAGE_CONTEXTS = 200;
+
+/**
+ * The key one context's usage is kept under. Repository fields are compared
+ * case-folded everywhere the usage is read, so they are folded here too, and
+ * a remote spelled two ways stays one context; a branch name is case
+ * sensitive and kept verbatim.
+ */
+export function contextUsageKey(context: {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
+}): string {
+  return [
+    context.repositoryHost.toLowerCase(),
+    context.repositoryOwner.toLowerCase(),
+    context.repositoryName.toLowerCase(),
+    context.branch,
+  ].join("\0");
+}
+
 export interface CodingAgentSessionData {
   // ── Identity, and the ids that reach the heavy data ───────────────────
   /** Which agent produced this. Generic; the adapter names it. */
@@ -200,6 +252,17 @@ export interface CodingAgentSessionData {
    * per model is the alarm that a price went stale — ours or theirs.
    */
   agentReportedCostUsd: number;
+  /**
+   * What the session spent under each working context it declared, keyed by
+   * `contextUsageKey`: the tokens and computed cost of every model call
+   * stamped with that repository and branch. Bounded, first seen first. The
+   * cumulative counters above stay the amount; this record says WHERE it
+   * went, which is what lets one session's cost split across the pull
+   * requests it drove (pull-request-linkage.feature). A call with no stamp
+   * charges no context, so the difference between the counters and this
+   * record's sum is what the session spent before it declared anything.
+   */
+  usageByContext: Record<string, SessionContextUsage>;
 
   // ── Time ──────────────────────────────────────────────────────────────
   /** Wall-clock inside model calls, and inside tools. */

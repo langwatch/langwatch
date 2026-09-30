@@ -488,3 +488,149 @@ export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError 
     this.name = "LangWatchQLGranularityRequiresTimeWindowError";
   }
 }
+
+/**
+ * The statement's app functions would need more distinct keys than one
+ * execution may hydrate.
+ *
+ * A refusal rather than a partial answer, and that is the whole decision. The
+ * alternative — hydrate the first thousand keys and leave the rest as raw ids —
+ * produces a result that looks complete, carries no marker a consumer could
+ * branch on, and is wrong. An analytics caller cannot detect that; they can
+ * detect a 422 naming the cap.
+ *
+ * Remediation is arithmetic: lower the `LIMIT`, aggregate to fewer keys, or
+ * page with a keyset predicate on the dataset's time column and trace id.
+ */
+export class LangWatchQLAppFunctionKeyCapError extends HandledError {
+  declare readonly code: "lwql_app_function_key_cap";
+
+  constructor({
+    keyKind,
+    cap,
+    distinct,
+    functions,
+  }: {
+    /** Which cap this is: `trace`, `thread` or `span`. */
+    readonly keyKind: string;
+    readonly cap: number;
+    /** How many distinct keys of that kind the result carried. */
+    readonly distinct: number;
+    /** The functions of that kind the statement called. Sorted by the caller. */
+    readonly functions: readonly string[];
+  }) {
+    super(
+      "lwql_app_function_key_cap",
+      "The query asks for more conversations, traces or spans than one run may read. Narrow it with a smaller LIMIT or a coarser grouping.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // Named consumer: the agent that wrote the SQL, which needs the number
+        // to lower its own LIMIT to, and the functions to know which call cost
+        // it. Nothing here is internal: the caps are published by the schema
+        // endpoint.
+        meta: { keyKind, cap, distinct, functions },
+        ...remediation("lwql_app_function_key_cap"),
+      },
+    );
+    this.name = "LangWatchQLAppFunctionKeyCapError";
+  }
+}
+
+/**
+ * The traces the statement's app functions named hold more bytes than one
+ * hydration may read.
+ *
+ * The key cap bounds how many traces a run names; this bounds what they weigh.
+ * A thousand keys under the cap can still name a thousand multi-megabyte
+ * traces, and reading them all before the result ceiling drops the rows would
+ * hold every one of them in memory first. So the reads are chunked and stop at
+ * the budget, and the refusal names it, for the same reason the key cap is a
+ * refusal rather than a partial answer.
+ */
+export class LangWatchQLAppFunctionReadBudgetError extends HandledError {
+  declare readonly code: "lwql_app_function_read_budget";
+
+  constructor({
+    budgetBytes,
+    readBytes,
+  }: {
+    /** The budget one hydration may read, in bytes. */
+    readonly budgetBytes: number;
+    /** How many bytes had been read when the budget was passed. */
+    readonly readBytes: number;
+  }) {
+    super(
+      "lwql_app_function_read_budget",
+      "The query asks for more trace content than one run may read. Narrow it with a smaller LIMIT or run it in pages.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // Named consumer: the agent that wrote the SQL, which needs the budget
+        // to size its pages by. Both numbers are about the caller's own data.
+        meta: { budgetBytes, readBytes },
+        ...remediation("lwql_app_function_read_budget"),
+      },
+    );
+    this.name = "LangWatchQLAppFunctionReadBudgetError";
+  }
+}
+
+/**
+ * The query ran, but the values its app functions asked for could not be read
+ * or computed.
+ *
+ * `platform` fault and a 503 on purpose: the statement passed every gate and
+ * the caller wrote nothing wrong, so this is a failure of ours — and the one
+ * thing it must never do is degrade into a result with null columns, which
+ * would read as "these conversations are empty".
+ */
+export class LangWatchQLAppFunctionHydrationFailedError extends HandledError {
+  declare readonly code: "lwql_app_function_hydration_failed";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "lwql_app_function_hydration_failed",
+      "The query ran, but the conversation or trace content it asked for could not be read.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("lwql_app_function_hydration_failed"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLAppFunctionHydrationFailedError";
+  }
+}
+
+/**
+ * The server does not hold the projection UDF behind an app function.
+ *
+ * ClickHouse answers UNKNOWN_FUNCTION (46), which cannot be the caller's SQL:
+ * the validator admits app-function names from the catalog alone, and the
+ * catalog is what the provisioning statements are generated from. So the
+ * deployment's app functions were never applied — a self-provisioning boot that
+ * degraded, or a server provisioned before this feature existed.
+ *
+ * A sibling of {@link LangWatchQLProvisioningIncompleteError} with its own code
+ * because the copy differs: that one is about a dataset's grants, and telling a
+ * caller their query "could not read one of its datasets" for a missing
+ * function sends whoever reads the log to the wrong place.
+ */
+export class LangWatchQLAppFunctionUnavailableError extends HandledError {
+  declare readonly code: "lwql_app_function_unavailable";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "lwql_app_function_unavailable",
+      "The functions this query uses are not available on this deployment yet.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("lwql_app_function_unavailable"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLAppFunctionUnavailableError";
+  }
+}

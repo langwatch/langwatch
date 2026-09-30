@@ -293,6 +293,27 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
+  describe("given an Instant Eval chip", () => {
+    /** @scenario "An eval chip is green, whatever its target" */
+    it.each([
+      'eval:"the user is annoyed"',
+      'eval.trace:"a"',
+      'eval.conversation:"b"',
+      'eval.llm:"c"',
+    ])("draws %s as an eval chip", (query) => {
+      const tokenSlots = buildDecorationPlan(query).slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokenSlots).toHaveLength(1);
+      expect(tokenSlots[0]?.className).toBe("filter-token filter-token-eval");
+    });
+
+    it("leaves a plain filter chip blue", () => {
+      const tokenSlots = buildDecorationPlan("status:error").slots;
+      expect(tokenSlots[0]?.className).toBe("filter-token");
+    });
+  });
+
   describe("operator matrix — comparison ops produce a single token", () => {
     it.each([
       ["greater-than", "cost:>5"],

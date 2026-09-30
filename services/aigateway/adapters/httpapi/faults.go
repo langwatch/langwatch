@@ -76,6 +76,14 @@ func faultForCode(code herr.Code) Fault {
 		domain.ErrProviderNotBound, domain.ErrModelNotRecognized,
 		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrMissingModel, domain.ErrNotFound,
 		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrKeyExpired,
+		// A refused license token is fixed from the install's side: send the
+		// instance id, renew the license, or ask for the binding to be reset.
+		domain.ErrConnectInstanceRequired, domain.ErrConnectLicenseNotRegistered,
+		domain.ErrConnectLicenseRevoked, domain.ErrConnectLicenseExpired,
+		domain.ErrConnectWrongInstance,
+		// The license is live; the service it asked for is outside the
+		// contract. Only the customer can widen that.
+		domain.ErrConnectServiceNotEntitled,
 		domain.ErrNoProviderConfigured,
 		domain.ErrEndUserRequired,
 		// The customer's own OpenAI sign-in died and only they can restore it,
