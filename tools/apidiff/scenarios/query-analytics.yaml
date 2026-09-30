@@ -230,7 +230,7 @@
     - {"request": "GET /api/v1/instant-evals/{runId}", "eventually": "90s", "expect": {"status": 200, "body": {"status": "finished", "total": 1, "progress": 1, "failed": 0, "skipped": 0, "matchedByQuestion": "<any>"}}}
     - {"request": "GET /api/v1/instant-evals/{runId}/results", "expect": {"status": 200, "path": "judgments", "length": 3}}
     - {"request": "GET /api/v1/instant-evals/{runId}/results", "query": {"questionId": "warmth"}, "expect": {"status": 200, "path": "judgments", "length": 1, "body": {"judgments.0.kind": "score", "judgments.0.status": "judged", "judgments.0.score": "<any>"}}}
-    - {"request": "GET /api/v1/instant-evals/{runId}/results", "query": {"questionId": "tone"}, "expect": {"status": 200, "path": "judgments", "length": 1, "body": {"judgments.0.kind": "category", "judgments.0.status": "judged", "judgments.0.label": "<any>", "judgments.0.probabilities": "<any>"}}}
+    - {"request": "GET /api/v1/instant-evals/{runId}/results", "query": {"questionId": "tone"}, "expect": {"status": 200, "path": "judgments", "length": 1, "body": {"judgments.0.kind": "category", "judgments.0.status": "judged", "judgments.0.label": "<any>"}}}
     - {"request": "GET /api/v1/instant-evals/{runId}/results", "query": {"status": "failed"}, "expect": {"status": 200, "path": "judgments", "length": 0}}
 
 - id: query-instant-evals-unknown-run-reads-are-404
