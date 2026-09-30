@@ -12,7 +12,7 @@ import {
   type AutomationServerConfig,
   type CreateTriggerCommand,
 } from "@langwatch/automation-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import { type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -264,6 +264,13 @@ describe("given a memory-tier worker settling a match end to end", () => {
         entitlement: planWithCeiling(10),
         dataset: createApiFixture<DatasetApi>({
           batchCreateRecords: async (input) => {
+            const columnName = input.entries
+              .flatMap((entry) => Object.keys(entry))
+              .find((key) => key !== "id" && key !== "question");
+            if (columnName) {
+              const refusal = { columnName, datasetName: "qa", validColumns: ["question"] };
+              throw new InvalidColumnError(refusal);
+            }
             appended.push(input);
             return [];
           },
@@ -280,7 +287,7 @@ describe("given a memory-tier worker settling a match end to end", () => {
         { slugOrId: "dataset-1", projectId: "project-1" },
       ]);
       const columns = appended[0]?.entries.map((entry) => Object.keys(entry));
-      expect(columns).toEqual([["id", "selected", "question"]]);
+      expect(columns).toEqual([["id", "question"]]);
       expect(await worker.lastRunAt()).toBeGreaterThan(0);
       await worker.runtime.stop();
     });

@@ -190,9 +190,9 @@ export class AutomationPersistActionService {
       mapping: parsed.data.datasetMapping.mapping,
       expansions: parsed.data.datasetMapping.expansions,
     });
+    // No `selected` flag, unlike main: batchCreateRecords refuses undefined columns.
     const datasetRecords = mappedEntries.map((entry, index) => ({
       id: `${input.trigger.id}-${input.traceId}-${index}`,
-      selected: true,
       ...sanitizeRecord(entry),
     }));
     await this.writer.addToDataset({
