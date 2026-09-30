@@ -225,6 +225,8 @@ cross-language wire and is documented as such (Alex, 2026-09-29).
 In module code a scope travels as a named parameter, never through `AsyncLocalStorage` (framework
 trace-context propagation in `packages/observability` is the exception; identity's birth
 ceremony threads its scope explicitly) (Alex, 2026-09-29).
+The caller's `Authorization` is such a parameter: `authorization` passes from route to `*Api` op to service to
+repository, never ambient (Alex, 2026-09-30; [ADR-166](adr/166-grant-scoped-data-access.md)).
 
 **An implementation never sees a raw client.** No prisma, no redis, no
 clickhouse in any `*Module` class. Raw clients cross into a module in exactly
@@ -1191,6 +1193,10 @@ refuses writes, other models and raw SQL, and logs each read at info with `{ mod
 action }` and no row data. Its live repository registry resolves it by requiring the
 `operatorReads` member (`operatorReads.into(handle, build)`); the memory twin needs none.
 Spec: `specs/server/operator-reads.feature`.
+Every store call carries an `Authorization` (Alex, 2026-09-30; [ADR-166](adr/166-grant-scoped-data-access.md)):
+`store.as(authorization, { reads })` adds the tenant and any shared condition to the query, Postgres accepts
+`own` grants only and ClickHouse span, trace and log reads accept `own` and `shared`; the guard's exceptions are
+a shrink-only baseline and Postgres RLS is deferred.
 
 **Main's byte intakes stay for now** (Alex, 2026-09-30). The user avatar and AI tool icon
 data URLs, the deprecated multipart dataset routes, bug-report transcripts and inline scenario
@@ -1573,6 +1579,9 @@ detects a crossing after its own debit lands and records it with `recordBudgetCr
 names). A subscriber there hands each fact to `WebhookApi.requestGatewayEventDelivery`, and webhook
 builds and delivers the envelope. A failed detection throws and the debit is re-driven. That is
 safe because the ledger insert skips any budget the request has already debited.
+Each destination kind owns its sending (Alex, 2026-09-30; [ADR-167](adr/167-outbound-delivery.md)):
+producers call the kind's `requestDelivery`; retry, dead-letter and redrive are the outbox's; SSRF
+and the outbound proxy are egress's.
 
 Group membership history is organization's fact, not authz's (Alex, 2026-09-30). Organization
 records a member added to a group, a member removed and a group deleted as events on its own
