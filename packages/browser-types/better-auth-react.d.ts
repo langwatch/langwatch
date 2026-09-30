@@ -50,7 +50,10 @@ export interface BetterAuthSignInApi {
 }
 
 export interface BetterAuthBrowserClient {
-  $fetch: (path: string) => Promise<{ data?: unknown; error?: unknown }>;
+  $fetch: (
+    path: string,
+    options?: { method?: string; body?: unknown },
+  ) => Promise<{ data?: unknown; error?: unknown }>;
   signIn: BetterAuthSignInApi;
   signOut: () => Promise<unknown>;
   getSession: () => Promise<BetterAuthResult>;

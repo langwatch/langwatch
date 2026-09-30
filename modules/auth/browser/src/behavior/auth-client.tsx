@@ -5,6 +5,7 @@ import { looksLikeSsoConnectionId } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
 import { type ReactElement, type ReactNode, useCallback, useEffect, useState } from "react";
+import { z } from "zod";
 
 /**
  * The passkey plugin is declared unconditionally, and the METHOD SET decides whether anyone is
@@ -14,6 +15,13 @@ import { type ReactElement, type ReactNode, useCallback, useEffect, useState } f
 const client = createAuthClient({ plugins: [passkeyClient()] });
 
 export const authClient = client;
+
+const ssoRefusalSchema = z.object({
+  message: z.string().optional(),
+  code: z.string().optional(),
+  status: z.number().optional(),
+});
+const ssoRedirectSchema = z.object({ url: z.string().optional() });
 
 interface CompatSession {
   user: {
@@ -182,17 +190,7 @@ function isTwoStepChallenge(data: unknown): boolean {
   );
 }
 
-export const signIn = async (
-  provider: string,
-  options?: {
-    email?: string;
-    password?: string;
-    callbackUrl?: string;
-    redirect?: boolean;
-    /** The address already typed, handed to the provider as the OIDC login hint. */
-    loginHint?: string;
-  },
-): Promise<
+type SignInResult =
   | {
       error?: string;
       code?: string;
@@ -207,69 +205,106 @@ export const signIn = async (
       /** A correct password still owes a second factor; no session exists yet. */
       twoStepRequired?: boolean;
     }
-  | undefined
-> => {
+  | undefined;
+
+async function signInWithPassword({
+  options,
+  callbackURL,
+  shouldRedirect,
+}: {
+  options: { email?: string; password?: string } | undefined;
+  callbackURL: string | undefined;
+  shouldRedirect: boolean;
+}): Promise<SignInResult> {
+  // The rate limiter's remaining window rides a response header, which the
+  // result object does not carry. Read on the way past rather than inferred
+  // from the status, so a screen either knows the real wait or knows it does
+  // not know.
+  let retryAfterSeconds: number | undefined;
+  const result = await client.signIn.email({
+    email: options?.email ?? "",
+    password: options?.password ?? "",
+    callbackURL,
+    fetchOptions: {
+      onError: (context: { response?: { headers?: Headers } }) => {
+        const header = context.response?.headers?.get("X-Retry-After");
+        const seconds = header === null ? Number.NaN : Number(header);
+        if (Number.isFinite(seconds) && seconds > 0) {
+          retryAfterSeconds = seconds;
+        }
+      },
+    },
+  });
+  if (result.error) {
+    // `code` is what the screens map to wording; `error` stays the message
+    // for callers that only ever read it.
+    return {
+      error: result.error.message ?? "CredentialsSignin",
+      code: result.error.code,
+      status: result.error.status,
+      retryAfterSeconds,
+      ok: false,
+    };
+  }
+  if (isTwoStepChallenge(result.data)) return { ok: false, twoStepRequired: true };
+  // NextAuth compat: the caller expects signIn to navigate on success.
+  // BetterAuth's signIn.email returns a JSON result and does NOT auto-
+  // redirect the browser — the caller has to do it.
+  if (shouldRedirect) {
+    navigate(callbackURL ?? "/");
+  }
+  return { ok: true };
+}
+
+async function signInWithSso({
+  providerId,
+  callbackURL,
+  shouldRedirect,
+}: {
+  providerId: string;
+  callbackURL: string | undefined;
+  shouldRedirect: boolean;
+}): Promise<SignInResult> {
+  const result = await client.$fetch("/sign-in/sso", {
+    method: "POST",
+    body: { providerId, callbackURL: callbackURL ?? "/" },
+  });
+  if (result.error) {
+    const refusal = ssoRefusalSchema.safeParse(result.error).data;
+    return {
+      error: refusal?.message ?? "OAuthSignin",
+      code: refusal?.code,
+      status: refusal?.status,
+      ok: false,
+    };
+  }
+  const redirectUrl = ssoRedirectSchema.safeParse(result.data).data?.url;
+  if (shouldRedirect && redirectUrl) navigate(redirectUrl);
+  return { ok: true };
+}
+
+export const signIn = async (
+  provider: string,
+  options?: {
+    email?: string;
+    password?: string;
+    callbackUrl?: string;
+    redirect?: boolean;
+    /** The address already typed, handed to the provider as the OIDC login hint. */
+    loginHint?: string;
+  },
+): Promise<SignInResult> => {
   // Same-origin guard on the post-login redirect target.
   const callbackURL = options?.callbackUrl ? safeRedirectTarget(options.callbackUrl) : undefined;
   const shouldRedirect = options?.redirect !== false;
 
   if (provider === "credentials" || provider === "email") {
-    // The rate limiter's remaining window rides a response header, which the
-    // result object does not carry. Read on the way past rather than inferred
-    // from the status, so a screen either knows the real wait or knows it does
-    // not know.
-    let retryAfterSeconds: number | undefined;
-    const result = await client.signIn.email({
-      email: options?.email ?? "",
-      password: options?.password ?? "",
-      callbackURL,
-      fetchOptions: {
-        onError: (context: { response?: { headers?: Headers } }) => {
-          const header = context.response?.headers?.get("X-Retry-After");
-          const seconds = header === null ? Number.NaN : Number(header);
-          if (Number.isFinite(seconds) && seconds > 0) {
-            retryAfterSeconds = seconds;
-          }
-        },
-      },
-    });
-    if (result.error) {
-      // `code` is what the screens map to wording; `error` stays the message
-      // for callers that only ever read it.
-      return {
-        error: result.error.message ?? "CredentialsSignin",
-        code: result.error.code,
-        status: result.error.status,
-        retryAfterSeconds,
-        ok: false,
-      };
-    }
-    if (isTwoStepChallenge(result.data)) return { ok: false, twoStepRequired: true };
-    // NextAuth compat: the caller expects signIn to navigate on success.
-    // BetterAuth's signIn.email returns a JSON result and does NOT auto-
-    // redirect the browser — the caller has to do it.
-    if (shouldRedirect) {
-      navigate(callbackURL ?? "/");
-    }
-    return { ok: true };
+    return signInWithPassword({ options, callbackURL, shouldRedirect });
   }
 
   // An organization's connection is registered with the SSO plugin, not as a social provider.
   if (looksLikeSsoConnectionId(provider)) {
-    const result = await client.$fetch<{ url?: string }>("/sign-in/sso", {
-      method: "POST",
-      body: { providerId: provider, callbackURL: callbackURL ?? "/" },
-    });
-    if (result.error) {
-      return {
-        error: result.error.message ?? "OAuthSignin",
-        code: result.error.code,
-        status: result.error.status,
-        ok: false,
-      };
-    }
-    if (shouldRedirect && result.data?.url) navigate(result.data.url);
-    return { ok: true };
+    return signInWithSso({ providerId: provider, callbackURL, shouldRedirect });
   }
 
   // Every other provider goes through signIn.social, social (google, github, gitlab, microsoft) and
