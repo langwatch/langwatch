@@ -54,7 +54,7 @@ async function appAt({
     dependencies: {
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
       modelProviders: createApiFixture<ModelProviderApi>(
-        { getForProject: async () => ({}) },
+        { getForProject: async () => ({}), getExecutionProviders: async () => ({}) },
         "ModelProviderApi",
       ),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
