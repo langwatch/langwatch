@@ -29,16 +29,22 @@ vi.mock("~/server/app-layer/app", async () => {
   return appPermissionsMock();
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 const isEnabledMock = vi.fn();
 vi.mock("~/server/featureFlag", async (importOriginal) => {

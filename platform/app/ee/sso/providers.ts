@@ -98,6 +98,20 @@ type SocialProviderEnv = Pick<
 >;
 
 /**
+ * What the social providers call out to while a sign-in is in flight.
+ */
+export interface SocialProviderDeps {
+  /**
+   * Called with the Microsoft id token claims before better-auth
+   * looks the account up, so an account stored under its pre-3.17 key can be
+   * moved onto the one the lookup asks for (`microsoft-account-rekey.ts`).
+   * A throw stops the sign-in: the callback fails and the user retries,
+   * rather than better-auth looking up an account still on its old key.
+   */
+  onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
+}
+
+/**
  * Builds BetterAuth's `socialProviders` map from environment configuration.
  * On a deployment that names ANY federated provider, a social provider
  * mounts when its client credentials are present — the credentials ARE the
@@ -126,6 +140,7 @@ type SocialProviderEnv = Pick<
  */
 export const buildSocialProviders = (
   e: SocialProviderEnv,
+  deps: SocialProviderDeps = {},
 ): NonNullable<BetterAuthOptions["socialProviders"]> => {
   const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
   if (!e.NEXTAUTH_PROVIDER || e.NEXTAUTH_PROVIDER === "email") {
@@ -177,19 +192,22 @@ export const buildSocialProviders = (
       clientId: e.AZURE_AD_CLIENT_ID,
       clientSecret: e.AZURE_AD_CLIENT_SECRET,
       tenantId: e.AZURE_AD_TENANT_ID,
-      mapProfileToUser: (profile) => ({
-        name: fallbackName(profile as Record<string, any>),
-        email:
-          (
-            profile as {
-              email?: string;
-              mail?: string;
-              userPrincipalName?: string;
-            }
-          ).email ??
-          (profile as { mail?: string }).mail ??
-          (profile as { userPrincipalName?: string }).userPrincipalName,
-      }),
+      mapProfileToUser: async (profile) => {
+        await deps.onMicrosoftProfile?.(profile as Record<string, unknown>);
+        return {
+          name: fallbackName(profile as Record<string, any>),
+          email:
+            (
+              profile as {
+                email?: string;
+                mail?: string;
+                userPrincipalName?: string;
+              }
+            ).email ??
+            (profile as { mail?: string }).mail ??
+            (profile as { userPrincipalName?: string }).userPrincipalName,
+        };
+      },
     };
   }
 

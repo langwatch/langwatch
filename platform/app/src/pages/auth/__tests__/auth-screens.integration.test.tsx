@@ -176,6 +176,29 @@ describe("given the identifier-first auth screens", () => {
 
   afterEach(() => cleanup());
 
+  /** @scenario "Signing out does not start another provider sign-in" */
+  it("stays on the signed-out page without consulting the sign-in router", async () => {
+    searchParamsRef.current = new URLSearchParams("signedOut=1");
+    routeMock.mockResolvedValue({
+      outcome: "redirect_to_connection",
+      connectionId: "sso-acme",
+      methodSet: [
+        { id: "sso-acme", kind: "federated", connectionId: "sso-acme" },
+      ],
+      reasonCode: "sole_connection",
+    });
+    renderPage(<SignIn />);
+    expect(
+      await screen.findByRole("heading", { name: "You’re signed out" }),
+    ).toBeInTheDocument();
+    expect(routeMock).not.toHaveBeenCalled();
+    expect(signInMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "Log in again" })).toHaveAttribute(
+      "href",
+      "/auth/signin",
+    );
+  });
+
   describe("when somebody who holds a password asks to reset it", () => {
     /** @scenario Reset follows the identifier, not the deployment mode */
     /** @scenario "Password reset follows the identifier" */

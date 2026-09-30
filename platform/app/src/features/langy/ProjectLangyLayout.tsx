@@ -1,13 +1,16 @@
 import { Box } from "@chakra-ui/react";
 import { memo, type ReactNode, useEffect } from "react";
 import { Outlet } from "react-router";
+import { GuidedOnboardingHost } from "~/features/guided-onboarding/tour/GuidedOnboardingHost";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { LangySidecar } from "./components/LangyPanel";
 import { useLangyConversationDeepLink } from "./hooks/useLangyConversationDeepLink";
 import { useLangyScopeReset } from "./hooks/useLangyScopeReset";
 import { useShowLangy } from "./hooks/useShowLangy";
 import { LangyProvider, useLangy } from "./LangyContext";
+import { LangyChatsImproveLangyContext } from "./langyDataUse";
 import {
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
@@ -63,7 +66,7 @@ export default function ProjectLangyLayout() {
  * the page behind the panel, the dashboard, everything. Opening the Langy
  * panel triggers exactly such a refetch, so opening history paid two full-app
  * render passes (profiled at ~700ms each) for data that resolves to the same
- * `project.id`. The memo compares the two scalars that actually matter and
+ * `project.id`. The memo compares the scalars that actually matter and
  * lets everything below bail out; navigation still flows, because the router
  * re-renders `<Outlet/>` through context, not through these props.
  */
@@ -75,13 +78,31 @@ const ProjectLangySubtree = memo(function ProjectLangySubtree({
   showLangy: boolean;
 }) {
   return (
-    <LangyProvider key={projectId}>
-      <LangyShiftedRoot showLangy={showLangy}>
-        <Outlet />
-      </LangyShiftedRoot>
-    </LangyProvider>
+    <LangyChatsImproveLangyProvider>
+      <LangyProvider key={projectId}>
+        <LangyShiftedRoot showLangy={showLangy}>
+          <Outlet />
+        </LangyShiftedRoot>
+      </LangyProvider>
+    </LangyChatsImproveLangyProvider>
   );
 });
+
+/**
+ * Resolves the LangWatch Cloud flag below the memo boundary above, so the
+ * public env query resolving re-renders only the composers that read it, not
+ * the routed page.
+ */
+function LangyChatsImproveLangyProvider({ children }: { children: ReactNode }) {
+  const publicEnv = usePublicEnv();
+  return (
+    <LangyChatsImproveLangyContext.Provider
+      value={publicEnv.data?.IS_SAAS === true}
+    >
+      {children}
+    </LangyChatsImproveLangyContext.Provider>
+  );
+}
 
 /**
  * Wraps the routed page in a box that reserves room on the right while the
@@ -134,6 +155,9 @@ function LangyShiftedRoot({
         {children}
       </Box>
       {showLangy && <LangySidecarConnected />}
+      {/* The guided onboarding tour and its handoff to the panel live wherever
+          the panel does. Spec: specs/features/onboarding/guided-tour.feature */}
+      {showLangy && <GuidedOnboardingHost />}
     </>
   );
 }

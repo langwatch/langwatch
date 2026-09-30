@@ -15,11 +15,15 @@ import type { FacetQueryContext } from "../facet-registry";
  * cross-tenant index is laid out — the multitenancy review in
  * `dev/docs/best_practices/clickhouse-queries.md` calls this out.
  */
-export function buildTimeWhere(timeColumn: string): string {
+export function buildTimeWhere(
+  timeColumn: string,
+  ctx?: Pick<FacetQueryContext, "traceScope">,
+): string {
   return [
     "TenantId = {tenantId:String}",
     `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
     `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
+    ...(ctx?.traceScope ? [ctx.traceScope.sql] : []),
   ].join(" AND ");
 }
 
@@ -54,6 +58,7 @@ export const KEY_DISCOVERY_SETTINGS: Record<string, string> = {
  */
 export function baseParams(ctx: FacetQueryContext): Record<string, unknown> {
   return {
+    ...ctx.traceScope?.params,
     tenantId: ctx.tenantId,
     timeFrom: ctx.timeRange.from,
     timeTo: ctx.timeRange.to,

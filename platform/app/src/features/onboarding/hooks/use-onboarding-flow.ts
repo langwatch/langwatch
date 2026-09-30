@@ -51,6 +51,19 @@ export const useOnboardingFlow = () => {
       organizationId: NOT_TARGETED,
     });
 
+  // The guided variant: Langy takes over after the tailor step. Read per
+  // user (the bucket is a sticky hash of the user id), before any
+  // organization exists. Loading reports disabled, and the first screen
+  // waits for it the same way it waits for the fork flag, so the variant
+  // is settled before the wizard's shape matters.
+  const { enabled: guided, isLoading: guidedLoading } = useFeatureFlag(
+    "experiment_onboarding_langy_guided",
+    {
+      projectId: NOT_TARGETED,
+      organizationId: NOT_TARGETED,
+    },
+  );
+
   // Flow configuration — recomputed when the intent changes (ADR-038 fork).
   // Safe mid-flow: intent only changes while ON the INTENT screen, whose
   // index exists in every config variant.
@@ -60,8 +73,9 @@ export const useOnboardingFlow = () => {
         isSaaS: Boolean(isSaaS),
         intent,
         intentForkEnabled,
+        guided,
       }),
-    [isSaaS, intent, intentForkEnabled],
+    [isSaaS, intent, intentForkEnabled, guided],
   );
 
   const canProceed = (currentScreenIndex: OnboardingScreenIndex) => {
@@ -73,7 +87,9 @@ export const useOnboardingFlow = () => {
         // the required INTENT screen. Resolution is one query; on error the
         // flag settles disabled and the pre-fork flow proceeds.
         return (
-          Boolean(organizationName?.trim() && agreement) && !intentForkLoading
+          Boolean(organizationName?.trim() && agreement) &&
+          !intentForkLoading &&
+          !guidedLoading
         );
 
       case OnboardingScreenIndex.INTENT:
@@ -84,6 +100,12 @@ export const useOnboardingFlow = () => {
 
         const showFields = usageStyle !== "For myself";
         if (!showFields) return true;
+
+        // The guided variant asks a company for its size and its deploy
+        // plan before Langy takes over; the phone number stays optional.
+        if (guided && (companySize === void 0 || solutionType === void 0)) {
+          return false;
+        }
 
         return !(phoneHasValue && !phoneIsValid);
       }
@@ -189,6 +211,9 @@ export const useOnboardingFlow = () => {
     direction,
     flow,
     isPublicEnvLoading: publicEnv.isLoading,
+    isSaaS: Boolean(isSaaS),
+    /** Which onboarding this user goes through, recorded on the organization. */
+    onboardingVariant: guided ? ("guided" as const) : ("classic" as const),
 
     // Navigation
     navigation,

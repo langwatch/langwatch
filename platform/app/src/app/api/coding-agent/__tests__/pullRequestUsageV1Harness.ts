@@ -9,7 +9,6 @@
  *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
   type Organization,
@@ -19,15 +18,30 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import {
   type CleanupEntry,
   cleanupTestRows,
 } from "~/test-utils/cleanupTestRows";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 export const USAGE_SPEC_PATH = "/api/v1/coding-agent/pull-request-usage";
 export const USAGE_PATH = `${USAGE_SPEC_PATH}?repository=acme/widgets&pullRequest=1`;
+
+export let authzTestEventSourcing:
+  | ReturnType<typeof createAuthzTestEventSourcing>
+  | undefined;
+
+export async function preparePullRequestUsageAuthz(): Promise<void> {
+  await resetApp();
+  authzTestEventSourcing = createAuthzTestEventSourcing(prisma);
+  globalForApp.__langwatch_app = createTestApp({
+    _eventSourcing: authzTestEventSourcing,
+  });
+}
 
 export const bearer = ({ token }: { token: string }) => ({
   Authorization: `Bearer ${token}`,
@@ -106,13 +120,10 @@ async function seedAdminUser({
       role: OrganizationUserRole.ADMIN,
     },
   });
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      userId: user.id,
-      ...orgAdminBinding(organizationId),
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId: user.id,
+    ...orgAdminBinding(organizationId),
   });
   return user.id;
 }
@@ -146,6 +157,7 @@ export async function seedPullRequestUsageV1Fixture({
 }: {
   ns: string;
 }): Promise<PullRequestUsageV1Fixture> {
+  await preparePullRequestUsageAuthz();
   const organization = await prisma.organization.create({
     data: { name: `pr-usage-v1-${ns}`, slug: `--test-org-v1-${ns}` },
   });
@@ -306,6 +318,7 @@ export async function cleanupPullRequestUsageV1Fixture(
     (organizationId) => [
       ["auditLog", { organizationId }],
       ["githubPullRequest", { organizationId }],
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["apiKey", { organizationId }],
       ["organizationUser", { organizationId }],

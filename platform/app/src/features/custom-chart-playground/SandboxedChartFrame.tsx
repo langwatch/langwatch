@@ -4,10 +4,17 @@
  * `sandbox="allow-scripts"` and NEVER `allow-same-origin`: the frame runs
  * author code with an opaque origin, no cookies, no parent DOM. All it can do
  * is talk over the transferred MessagePort.
+ *
+ * The bridge navigates the iframe to the frame document route (not an inline
+ * `srcdoc`), so a widget may import any package. The widget's own source
+ * no longer rides in the document; it is delivered over `lw:init`. Because the
+ * document is identical for every widget and every code change, changing
+ * `code` must remount the iframe (a fresh load, then a fresh `lw:init` with
+ * the new source) — hence the `codeGeneration` key below.
  */
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   ChartFrameDashboardContext,
@@ -22,7 +29,6 @@ import type {
   ChartFrameLogEntry,
 } from "./bridge/frameBridge";
 import { createFrameBridge } from "./bridge/frameBridge";
-import { buildSrcdoc } from "./buildSrcdoc";
 import {
   FRAME_RESTART_MAX_ATTEMPTS,
   useFrameAutoRestart,
@@ -73,6 +79,18 @@ export function SandboxedChartFrame({
   // A torn-down frame comes back on its own, with backoff; see the hook.
   const restart = useFrameAutoRestart({ onRestart: remount });
   const { noteTornDown, noteFrameMounted } = restart;
+
+  // The frame document is the same static route for every widget, so a change
+  // to `code` cannot reload the iframe on its own. Bump a generation counter
+  // when `code` changes (React's "adjust state during render" pattern — no
+  // extra commit) so the iframe key changes, remounting it for a fresh load
+  // and a fresh lw:init carrying the new source.
+  const [codeGeneration, setCodeGeneration] = useState(0);
+  const [renderedCode, setRenderedCode] = useState(code);
+  if (code !== renderedCode) {
+    setRenderedCode(code);
+    setCodeGeneration((n) => n + 1);
+  }
   // Fills the box the card gives it by default (a taller/wider card grows
   // the chart with it); a widget can still call LW.setHeight to size to its
   // own content instead, which is what onHeightChange below feeds.
@@ -81,11 +99,11 @@ export function SandboxedChartFrame({
     setHeight(maxHeight);
   }, [maxHeight]);
 
-  const srcdoc = useMemo(() => buildSrcdoc(code), [code]);
-
   // Callbacks live in refs so the bridge effect does not restart per render.
   const executeQueryRef = useRef(executeQuery);
   executeQueryRef.current = executeQuery;
+  const codeRef = useRef(code);
+  codeRef.current = code;
   const onLogRef = useRef(onLog);
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
@@ -95,10 +113,11 @@ export function SandboxedChartFrame({
   paramsRef.current = params;
   const bridgeRef = useRef<ReturnType<typeof createFrameBridge> | null>(null);
 
-  // generation and srcdoc re-key the frame; dashboardContext/params are
-  // deliberately not dependencies (initial values only — dashboardContext
+  // generation and codeGeneration re-key the frame; dashboardContext/params
+  // are deliberately not dependencies (initial values only — dashboardContext
   // updates travel as lw:dashboard-context-change; params has no live update
-  // path yet).
+  // path yet). The source is read fresh from a ref, so the remounted frame's
+  // lw:init carries the current code.
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
@@ -107,6 +126,7 @@ export function SandboxedChartFrame({
       executeQuery: (args) => executeQueryRef.current(args),
       dashboardContext: initialDashboardContextRef.current,
       params: paramsRef.current,
+      source: codeRef.current,
       onLog: (entry) => onLogRef.current(entry),
       onHeightChange: setHeight,
       onNavigate: (args) => onNavigateRef.current?.(args),
@@ -118,7 +138,7 @@ export function SandboxedChartFrame({
       bridgeRef.current = null;
       bridge.dispose();
     };
-  }, [generation, srcdoc, noteTornDown, noteFrameMounted]);
+  }, [generation, codeGeneration, noteTornDown, noteFrameMounted]);
 
   // Push dashboard context updates into the live frame without re-mounting it.
   useEffect(() => {
@@ -153,10 +173,9 @@ export function SandboxedChartFrame({
   return (
     <Box overflow="hidden">
       <iframe
-        key={generation}
+        key={`${generation}:${codeGeneration}`}
         ref={iframeRef}
         sandbox="allow-scripts"
-        srcDoc={srcdoc}
         title="Custom chart"
         style={{
           width: "100%",

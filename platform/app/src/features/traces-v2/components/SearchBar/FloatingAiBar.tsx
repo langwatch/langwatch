@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { AiQueryComposer } from "./AiQueryComposer";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
 import { FloatingAiErrorRow } from "./FloatingAiErrorRow";
@@ -50,7 +50,7 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
   const tip = useCyclingTip(!pending);
   // The floating bar covers the docked search bar's unified error banner,
   // so failures must render here — the tip row swaps to an error row.
-  const aiError = useFilterStore((s) => s.aiError);
+  const aiError = useExplorerStore((s) => s.aiError);
   if (typeof document === "undefined" || !rect) return null;
   return createPortal(
     <>

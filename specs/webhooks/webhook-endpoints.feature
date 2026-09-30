@@ -334,6 +334,16 @@ Feature: Webhook endpoints, signed outbound event delivery
       And the auto disable notification hook fires
 
     @integration
+    Scenario: Two failing attempts crossing the seventy two hour mark disable the endpoint once
+      Given an endpoint whose failure streak started more than seventy two hours ago
+      When two delivery attempts fail at the same moment
+      Then exactly one of them is told it disabled the endpoint
+      And the auto disable notification hook fires once
+      # The second flip waits on the first's row lock and re-reads the status
+      # as the first left it, rather than deciding on the row as it read it
+      # before the wait.
+
+    @integration
     Scenario: A success resets the failure streak
       Given an endpoint with a failure streak in progress
       When a delivery attempt succeeds

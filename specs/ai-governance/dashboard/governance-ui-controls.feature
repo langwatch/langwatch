@@ -273,7 +273,7 @@ Feature: The controls every AI Governance page renders the same way
 
   @integration
   Scenario: Primary page actions sit top-right in the page header
-    Given a governance page offering actions such as Add tool, Register agent, Add department, Run match pass or See sample data
+    Given a governance page offering actions such as Add source, Register agent, Add department, Run match pass or See sample data
     When the page renders
     Then those actions sit at the top right of the page header
     And each is rendered at the small size
@@ -334,11 +334,10 @@ Feature: The controls every AI Governance page renders the same way
     And every one of them is drawn at the same weight
     And at least one of them sits in the page header
     And no second control opens the same flow under a different label
-    # Scoped to ONE PANE, deliberately, because the label may name what the
-    # pane lists: the catalog says Add tool where the sources table says Add
-    # source, and those panes list different views of the same object. Quantify
-    # over panes instead and the rule reads as false on a page that is
-    # behaving correctly. Within one pane there is one word for it.
+    # Scoped to ONE PANE, deliberately, because a page may name its create
+    # after what a pane lists. Quantify over panes instead and the rule reads
+    # as false on a page that is behaving correctly. Within one pane there is
+    # one word for it.
     #
     # The grant is in the Given because the clause about the header is an
     # EXISTENCE claim. A reader without the permission sees no create control
@@ -375,7 +374,21 @@ Feature: The controls every AI Governance page renders the same way
   # action inside the Applications empty state. The surviving rule is one
   # create FLOW under one label, which an empty pane may repeat, not one create
   # BUTTON. The clause above now says that, and both pages behave that way:
-  # Agents repeats Register agent, Inventory repeats Add tool and Add source.
+  # Agents repeats Register agent, Inventory repeats Add source.
+
+  # A source is where what the inventory lists arrives from: the tools it
+  # reports, the environments they run in, the seats and the spend. The page
+  # header carried an "Add tool" beside "Add source" on the catalog pane, one
+  # create for the registry and one for the pipe, and only showed "Add source"
+  # on the Sources pane. Two creates on one page is a choice the reader should
+  # not have to make; the registry's drawer stays reachable through the deep
+  # link the Overview page's chip carries.
+  @integration
+  Scenario: The inventory header offers Add source on every tab and no Add tool
+    Given an admin who may manage sources on the Inventory page
+    When any of its tabs is in view, Catalog, Environments or Sources
+    Then the page header offers "Add source"
+    And no control on the page reads "Add tool"
 
   # THE DISTINCTION SURVIVED THE LOSS OF THE FILL, which is the only thing
   # worth checking when a treatment changes. This rule used to read "drawn

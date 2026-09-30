@@ -1,5 +1,8 @@
 import { filterContextChip } from "~/features/langy/hooks/useLangyFilterContext";
-import type { LangyAttachedContext } from "~/features/langy/stores/langyStore";
+import type {
+  LangyAttachedContext,
+  LangyContextChip,
+} from "~/features/langy/stores/langyStore";
 
 /**
  * The half-written question the ask button leaves in the composer.
@@ -23,14 +26,18 @@ export const SEARCH_HANDOFF_DRAFT = "Find traces where ";
  *   - A typed question is asked outright (`askLangy` opens the panel on a
  *     fresh conversation and auto-sends); with nothing typed the panel just
  *     opens, ready for the user to write.
- *   - The APPLIED search — the query driving the table — rides along as
- *     attached context, so "these traces" means what the user is looking at.
- *   - Unless the question IS the applied query (⌘⏎ on an already-applied
- *     filter): attaching it too would only echo the prompt back as a chip.
+ *   - The VIEW — time range, lens, sort, grouping and the applied search — rides
+ *     along as attached context, so the explicit route sends at least what the
+ *     passive page context sends and "these traces" means what is on screen.
+ *   - The APPLIED search — the query driving the table — rides along as its
+ *     own chip too, the one the agent applies as a filter.
+ *   - Unless the question IS the applied query (a submitted filter asked as a
+ *     question): attaching it too would only echo the prompt back as a chip.
  */
 export function handOffSearchToLangy({
   typedText,
   appliedQueryText,
+  viewContext,
   askLangy,
   openPanel,
   attachContext,
@@ -40,6 +47,8 @@ export function handOffSearchToLangy({
   typedText?: string;
   /** The applied filter query (the one the table is showing). */
   appliedQueryText: string;
+  /** The whole Trace Explorer view, from `useLangyTraceViewContext`. */
+  viewContext?: LangyContextChip | null;
   askLangy: (prompt: string) => void;
   openPanel: () => void;
   attachContext: (item: LangyAttachedContext) => void;
@@ -66,6 +75,13 @@ export function handOffSearchToLangy({
 
   // Attach AFTER the ask: `askLangy` resets conversation-scoped state, and the
   // attachment belongs to the conversation being started, not the previous one.
+  if (viewContext?.ref) {
+    attachContext({
+      type: viewContext.kind,
+      id: viewContext.ref,
+      label: viewContext.label,
+    });
+  }
   const chip = filterContextChip(appliedQueryText);
   if (chip?.ref && chip.ref !== prompt) {
     attachContext({ type: "filter", id: chip.ref, label: chip.label });

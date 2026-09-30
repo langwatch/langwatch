@@ -60,6 +60,7 @@ describe("the sign-in, sign-up, reset and passkey refusals", () => {
        * one field at a time.
        */
       /** @scenario The credential error boundary preserves one non-enumerating refusal */
+      /** @scenario A refused credential still refuses in one way */
       /** @scenario A wrong password says the password is wrong */
       it("answers one code, whatever the reason underneath was", async () => {
         const body = await translate({

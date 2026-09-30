@@ -74,7 +74,7 @@ function SecureAccountNudgeOffer({
     <Dialog.Root
       open
       onOpenChange={(details) => {
-        if (!details.open) answer.later();
+        if (!details.open) void answer.later();
       }}
       placement="center"
     >
@@ -211,22 +211,62 @@ function NudgeActions({
  * while a mutation settles reads as the click not having registered.
  */
 function useNudgeAnswer() {
-  const dismiss = api.user.dismissSecureAccountNudge.useMutation();
   const apiContext = api.useUtils();
+  // Settled here rather than at the call, because by the time the server
+  // answers there is nothing left to answer to: the cached offer is what
+  // renders this dialog, so writing the answer into it takes the component
+  // out of the tree, and a callback handed to `mutate` goes with it. One on
+  // the mutation survives, which is what makes the refresh below happen at
+  // all.
+  const dismiss = api.user.dismissSecureAccountNudge.useMutation({
+    // Sent so it outlives the document. Answering this dialog is very often
+    // the last thing somebody does on the page: "Set up two-step
+    // verification" navigates itself, and "Not now" is what people press
+    // before carrying on with whatever they came for. A request cancelled by
+    // that navigation never reaches the server, and the offer then returns
+    // over the next page.
+    trpc: { context: { keepalive: true } },
+    onSettled: () => {
+      void apiContext.user.secureAccountNudge.invalidate();
+    },
+  });
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
   const [isAnswered, setIsAnswered] = useState(false);
 
-  const later = () => {
+  const later = async () => {
     setIsAnswered(true);
+    // The account write goes out BEFORE anything is awaited, because it is the
+    // only part of this answer that survives a full page load, and answering
+    // is very often followed by one: "Set up two-step verification" navigates
+    // itself, and somebody who came here to do something else carries on doing
+    // it. Awaiting the cache work first put this request behind a refetch that
+    // could still be in flight, and a document that goes away in the meantime
+    // takes the queued request with it — the server is then never told, and
+    // the offer returns over the next page, which is the opposite of what
+    // "Not now" promised.
     dismiss.mutate({});
+    // Three things close this dialog and all three are needed. `isAnswered`
+    // closes it here and now. The write above closes it on the next document.
+    // The cached offer closes it on every page this one navigates to without
+    // a reload: the dialog is mounted on all of them and renders from that
+    // cache.
+    //
+    // Cancel before writing the cache: a mount refetch of this query can
+    // already be in flight, and its response would land after the write and
+    // put the offer back.
+    await apiContext.user.secureAccountNudge.cancel({});
+    apiContext.user.secureAccountNudge.setData({}, (previous) =>
+      previous ? { ...previous, offer: false } : previous,
+    );
   };
 
-  const setUpTwoStep = () => {
+  const setUpTwoStep = async () => {
     // Dismissed on the way, not on arrival: somebody who came here to set one
     // up has answered the question, and finding the dialog again behind the
-    // settings page would read as the product not listening.
-    later();
+    // settings page would read as the product not listening. Awaited, so the
+    // answer is in the cache before the page that reads it mounts.
+    await later();
     void navigate("/settings/security");
   };
 

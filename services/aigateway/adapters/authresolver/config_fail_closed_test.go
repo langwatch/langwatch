@@ -28,7 +28,7 @@ func TestResolve_ColdMiss_ConfigFetchFailure_FailsClosedAndCachesNothing(t *test
 	}
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 
-	_, err := svc.Resolve(context.Background(), "vk-lw-cold")
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: "vk-lw-cold"})
 	if err == nil {
 		t.Fatal("expected a failure when the config fetch fails on a cold miss")
 	}
@@ -41,7 +41,7 @@ func TestResolve_ColdMiss_ConfigFetchFailure_FailsClosedAndCachesNothing(t *test
 
 	// Control plane recovers: the retry succeeds and serves real credentials.
 	fetcher.cfgErr = nil
-	bundle, err := svc.Resolve(context.Background(), "vk-lw-cold")
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: "vk-lw-cold"})
 	if err != nil {
 		t.Fatalf("expected recovery once the config fetch works: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestResolve_ColdMiss_EmptyCredentialsFromControlPlane_IsCachedAndServed(t *
 	}
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 
-	bundle, err := svc.Resolve(context.Background(), "vk-lw-noprov")
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: "vk-lw-noprov"})
 	if err != nil {
 		t.Fatalf("a successfully fetched empty config is a valid resolution: %v", err)
 	}
@@ -81,10 +81,10 @@ func TestResolve_StaleEntry_ConfigFetchFailure_ServesStaleCredentials(t *testing
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 
 	rawKey := "vk-lw-stale"
-	h := hashKey(rawKey)
+	h := hashKey(domain.PresentedKey{Token: rawKey})
 	svc.storeL1(h, bundleWithCreds("vk_stale", time.Now().Add(-30*time.Second), "cred-old"), "")
 
-	bundle, err := svc.Resolve(context.Background(), rawKey)
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err != nil {
 		t.Fatalf("expected the stale bundle to serve: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestResolve_StaleEntryAtHardCap_ConfigFetchFailure_FailsRetryable(t *testin
 	rawKey := "vk-lw-capped"
 	seedExpiredEntry(t, svc, rawKey, "vk_capped", 30*time.Second)
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err == nil {
 		t.Fatal("expected a failure once the hard grace cap is exhausted")
 	}
@@ -143,10 +143,10 @@ func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
 
 	rawKey := "vk-lw-bg"
-	h := hashKey(rawKey)
+	h := hashKey(domain.PresentedKey{Token: rawKey})
 	svc.storeL1(h, bundleWithCreds("vk_bg", time.Now().Add(5*time.Minute), "cred-old"), "")
 
-	svc.refreshBackground(rawKey, h)
+	svc.refreshBackground(domain.PresentedKey{Token: rawKey}, h)
 
 	e, ok := svc.l1.Get(h)
 	if !ok {
@@ -158,7 +158,7 @@ func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 
 	// Control plane recovers: the next refresh replaces the entry for real.
 	fetcher.cfgErr = nil
-	svc.refreshBackground(rawKey, h)
+	svc.refreshBackground(domain.PresentedKey{Token: rawKey}, h)
 	e, ok = svc.l1.Get(h)
 	if !ok {
 		t.Fatal("expected the refreshed entry in L1")

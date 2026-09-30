@@ -179,6 +179,8 @@ export interface RoutingDecision {
   /** What the surface offers. On a redirect, the one method it redirects to. */
   methodSet: readonly SignInMethod[];
   reasonCode: SignInRoutingReasonCode;
+  /** True when an ACTIVE organization connection fell back to local methods. */
+  domainManaged?: true;
 }
 
 /**
@@ -281,16 +283,20 @@ function redirectOrFall({
   connection,
   policy,
   reasonCode,
+  domainManaged = false,
 }: {
   connection: RoutableConnection;
   policy: SignInMethodPolicy;
   reasonCode: SignInRoutingReasonCode;
+  domainManaged?: boolean;
 }): RoutingDecision {
   if (!policy.federationLicensed) {
-    return picker(policy.localMethods, "method_not_licensed");
+    const fallback = picker(policy.localMethods, "method_not_licensed");
+    return domainManaged ? { ...fallback, domainManaged: true } : fallback;
   }
   if (!connection.configured) {
-    return picker(policy.localMethods, "method_not_configured");
+    const fallback = picker(policy.localMethods, "method_not_configured");
+    return domainManaged ? { ...fallback, domainManaged: true } : fallback;
   }
   return {
     outcome: "redirect_to_connection",
@@ -357,6 +363,7 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
       connection: domainConnection,
       policy,
       reasonCode: "domain_routed",
+      domainManaged: true,
     });
   }
 
@@ -411,3 +418,13 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
   return picker(held, "account_methods");
 }
 
+/** Whether routing has established that an organization's domain owns this address. */
+export function isOrganizationManagedDecision(
+  decision: RoutingDecision,
+): boolean {
+  return (
+    decision.reasonCode === "domain_routed" ||
+    decision.reasonCode === "connection_suspended" ||
+    decision.domainManaged === true
+  );
+}

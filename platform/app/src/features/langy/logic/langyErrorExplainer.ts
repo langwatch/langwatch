@@ -218,6 +218,16 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
  * different fact from "Langy's reply failed" and carries a different next
  * step: wait out a rate limit, fix a credential, pick another model.
  *
+ * The last three are not status fallbacks but the providers' own rate limit
+ * discriminants, which the proxy files as the one reason under
+ * `llm_upstream_error` when the failure body carries them (llmproxy.go
+ * `decodeProviderErrorBody`): `rate_limit_exceeded` from OpenAI and Azure
+ * OpenAI, `rate_limit_error` from Anthropic, `RESOURCE_EXHAUSTED` from
+ * Google. A real 429 arrives this way far more often than as the bare
+ * `upstream_rate_limited`. A provider body with a code this list does not
+ * name stays on the generic card: promotion is by exact code, never by the
+ * presence of an upstream failure alone.
+ *
  * `llm_upstream_error` already writes one sentence per group, so promoting to
  * it reuses that copy rather than restating it here.
  */
@@ -233,6 +243,9 @@ const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
   "upstream_rate_limited",
   "upstream_unavailable",
   "upstream_http_error",
+  "rate_limit_exceeded",
+  "rate_limit_error",
+  "RESOURCE_EXHAUSTED",
 ]);
 
 /**

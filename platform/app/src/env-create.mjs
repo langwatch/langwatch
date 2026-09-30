@@ -119,6 +119,13 @@ const optionalIfBuildTime = (schema) => {
  * what makes the alignment stick, and it leaves every other `.env`-pinned value
  * untouched.
  *
+ * `LANGWATCH_ENDPOINT` follows the same rule. It is the address the app hands
+ * out as itself: the Langy worker's callback origin (frame relay, turn
+ * finalize, credential revoke, the MCP server), the scenario child processes,
+ * and every setup snippet the UI shows. Left at the committed 5560 on a
+ * checkout serving 5580, every Langy turn posts its result to a port that is
+ * not this stack and the conversation stalls on "Reconnecting to the agent".
+ *
  * Only a plain `http://localhost:<port>` is treated as stale. Anything else is
  * someone's deliberate setup: `127.0.0.1`, a proxy in front of a preview
  * environment, a tunnel, or haven's `app.<slug>.langwatch.localhost`. Same rule
@@ -141,7 +148,7 @@ export function alignDevAuthUrlsToPort(processEnv = process.env) {
   const target = `http://localhost:${port}`;
   const realigned = [];
 
-  for (const name of ["BASE_HOST", "NEXTAUTH_URL"]) {
+  for (const name of ["BASE_HOST", "NEXTAUTH_URL", "LANGWATCH_ENDPOINT"]) {
     const current = processEnv[name];
     if (!current || current === target) continue;
 
@@ -165,6 +172,39 @@ export function alignDevAuthUrlsToPort(processEnv = process.env) {
 /** @type {any} */
 let _env = null;
 
+/**
+ * ADR-139: a Connect endpoint carries the license token in an Authorization
+ * header, so it must be https. The one exception is a loopback host, where a
+ * developer runs both sides on one machine; the gateway's langwatch provider
+ * lane applies the same rule.
+ */
+const CONNECT_LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** @param {string} value */
+export const isAcceptableConnectEndpoint = (value) => {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol === "https:") return true;
+  return (
+    parsed.protocol === "http:" &&
+    CONNECT_LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())
+  );
+};
+
+/** @param {string} name the variable, named in the refusal */
+export const connectEndpointSchema = (name) =>
+  z
+    .string()
+    .url()
+    .refine(isAcceptableConnectEndpoint, {
+      message: `${name} must use https (http is accepted for a loopback host only)`,
+    })
+    .optional();
+
 export function createEnvConfig() {
   if (_env) return _env;
 
@@ -181,6 +221,10 @@ export function createEnvConfig() {
       DATABASE_URL: optionalIfBuildTime(z.string().url()),
       CLICKHOUSE_URL: z.string().url().optional(),
       NODE_ENV: z.enum(["development", "test", "production"]),
+      HIDE_DEV_INDICATOR: z
+        .enum(["0", "1", "false", "true"])
+        .default("false")
+        .transform((value) => ["1", "true"].includes(value)),
       ENVIRONMENT: z
         .string()
         .optional()
@@ -206,6 +250,32 @@ export function createEnvConfig() {
           process.env.VERCEL ? z.string().min(1) : z.string().url(),
         ),
       ),
+      /**
+       * Internal identity providers this installation may fetch OIDC
+       * discovery from, comma or whitespace separated. An issuer whose
+       * origin is not our own address and not on this list is refused
+       * before it is fetched, which is what stops a registration form
+       * being a server-side request forgery. Enterprises whose identity
+       * provider lives inside their own network list it here.
+       */
+      SSO_TRUSTED_IDP_ORIGINS: z.string().optional(),
+      /**
+       * Nameservers the single sign-on domain proof asks, in node's
+       * `setServers` shape (`127.0.0.1:15353`, `[::1]:15353`), comma or
+       * whitespace separated. LOCAL ONLY — ignored under
+       * `NODE_ENV=production`, where domain ownership must rest on real DNS.
+       * Set it in development so a reserved name like `acme.test`, which no
+       * public resolver will ever answer for, can be proved against the
+       * identity provider simulator's own nameserver.
+       */
+      SSO_DOMAIN_PROOF_DNS_SERVERS: z.string().optional(),
+      /**
+       * The identity provider simulator haven starts for this worktree.
+       * Trusted for discovery OUTSIDE production only — it signs whatever
+       * it is asked to, so a production installation trusting one would be
+       * trusting an oracle. Written by haven; nobody sets it by hand.
+       */
+      LANGWATCH_IDPSIM_URL: z.string().optional(),
       AUTH0_CLIENT_ID: z.string().optional(),
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
@@ -285,6 +355,38 @@ export function createEnvConfig() {
       LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
       LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
       LANGEVALS_ENDPOINT: z.string().optional(),
+
+      // Instant Evals: the classifier behind the LangWatchQL eval functions.
+      // The key is LangWatch's own, never a customer's. With none set the
+      // functions are published as unavailable and every judgement is skipped,
+      // which is what a self-hosted install with nothing configured gets.
+      JEV_API_KEY: z.string().optional(),
+      // HTTPS only: the classifier key travels in an Authorization header, so
+      // a plaintext origin would put it on the wire in the clear.
+      JEV_BASE_URL: z
+        .string()
+        .url()
+        .refine((value) => value.startsWith("https://"), {
+          message: "JEV_BASE_URL must use https",
+        })
+        .optional(),
+      JEV_MODEL: z.string().optional(),
+      INSTANT_EVAL_CLASSIFIER: z.enum(["jev", "null"]).optional(),
+      INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+      INSTANT_EVAL_TENANT_TOKENS_PER_SECOND: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+      INSTANT_EVAL_QUERY_TOKEN_BUDGET: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
       // Self-hosted langevals on a plain HTTP service has no such cap,
@@ -320,6 +422,24 @@ export function createEnvConfig() {
       // ADR-027: instance-level license, bootstraps + recovers SSO on
       // self-hosted deployments without requiring an in-DB org license.
       LANGWATCH_LICENSE_KEY: z.string().optional(),
+      // ADR-139: the escape hatch that switches LangWatch-hosted services and
+      // usage telemetry off for this install. What a deployment may call is
+      // otherwise decided by the license it holds, not by a variable: a
+      // license naming no hosted service reaches nothing. Set this and nothing
+      // below is read and no outbound call is made at all.
+      LANGWATCH_CONNECT_DISABLED: z.boolean().optional(),
+      // Both endpoints are origins, and both have a default in
+      // `ee/licensing/connect/install/connectConfig.ts`.
+      LANGWATCH_CONNECT_GATEWAY_ENDPOINT: connectEndpointSchema(
+        "LANGWATCH_CONNECT_GATEWAY_ENDPOINT",
+      ),
+      LANGWATCH_CONNECT_LICENSE_ENDPOINT: connectEndpointSchema(
+        "LANGWATCH_CONNECT_LICENSE_ENDPOINT",
+      ),
+      // Overrides the identity this install presents. The default is minted
+      // once and kept in this install's own database, so it survives restarts,
+      // backups and hostname changes.
+      LANGWATCH_CONNECT_INSTANCE_ID: z.string().optional(),
       // ADR-117 §7: the one flag covering the identifier-first router (D03)
       // and the screens that render its decisions (D13). Three-valued and
       // shipped `off`, because the front door is the highest-risk flip in the
@@ -664,6 +784,10 @@ export function createEnvConfig() {
       STRIPE_WEBHOOK_SECRET: z.string().optional(),
       STRIPE_LICENSE_PAYMENT_LINK_ID: z.string().optional(),
       STRIPE_LICENSE_PAYMENT_LINK_URL: z.string().optional(),
+      /// Bank details printed on the invoices of a customer that wires the
+      /// money instead of paying into a virtual bank account. Empty means the
+      /// invoice carries no footer.
+      LANGWATCH_BILLING_BANK_DETAILS: z.string().optional(),
       ADMIN_EMAILS: z.string().optional(),
       HUBSPOT_PORTAL_ID: z.string().optional(),
       HUBSPOT_REACHED_LIMIT_FORM_ID: z.string().optional(),
@@ -677,6 +801,9 @@ export function createEnvConfig() {
       SLACK_PLAN_LIMIT_CHANNEL: z.string().optional(),
       SLACK_CHANNEL_SIGNUPS: z.string().optional(),
       SLACK_CHANNEL_SUBSCRIPTIONS: z.string().optional(),
+      // Where self-hosted lead signals go (ADR-139). Falls back to
+      // SLACK_CHANNEL_SIGNUPS when unset, so a signal is never posted nowhere.
+      SLACK_CHANNEL_SELF_HOSTED: z.string().optional(),
       // Agent issue-report alerts (bot token of the LangWatch Agents Slack
       // app; alerts are skipped entirely when unset)
       SLACK_BUG_REPORTS_BOT_TOKEN: z.string().optional(),
@@ -692,6 +819,7 @@ export function createEnvConfig() {
       DATABASE_URL: process.env.DATABASE_URL,
       CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
       NODE_ENV: process.env.NODE_ENV,
+      HIDE_DEV_INDICATOR: process.env.HIDE_DEV_INDICATOR,
       ENVIRONMENT: process.env.ENVIRONMENT,
       BASE_HOST: process.env.BASE_HOST,
       NEXTAUTH_PROVIDER: resolveConfiguredAuthProvider(),
@@ -705,6 +833,9 @@ export function createEnvConfig() {
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
       GOVERNANCE_ERASURE_PSEUDONYM_SECRET:
         process.env.GOVERNANCE_ERASURE_PSEUDONYM_SECRET,
+      SSO_TRUSTED_IDP_ORIGINS: process.env.SSO_TRUSTED_IDP_ORIGINS,
+      SSO_DOMAIN_PROOF_DNS_SERVERS: process.env.SSO_DOMAIN_PROOF_DNS_SERVERS,
+      LANGWATCH_IDPSIM_URL: process.env.LANGWATCH_IDPSIM_URL,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,
@@ -728,6 +859,16 @@ export function createEnvConfig() {
         process.env.LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB,
       LANGWATCH_APP_REPLICAS: process.env.LANGWATCH_APP_REPLICAS,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
+      JEV_API_KEY: process.env.JEV_API_KEY,
+      JEV_BASE_URL: process.env.JEV_BASE_URL,
+      JEV_MODEL: process.env.JEV_MODEL,
+      INSTANT_EVAL_CLASSIFIER: process.env.INSTANT_EVAL_CLASSIFIER,
+      INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND:
+        process.env.INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND,
+      INSTANT_EVAL_TENANT_TOKENS_PER_SECOND:
+        process.env.INSTANT_EVAL_TENANT_TOKENS_PER_SECOND,
+      INSTANT_EVAL_QUERY_TOKEN_BUDGET:
+        process.env.INSTANT_EVAL_QUERY_TOKEN_BUDGET,
       LANGEVALS_STAGING_THRESHOLD_BYTES:
         process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
@@ -735,8 +876,18 @@ export function createEnvConfig() {
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
+      LANGWATCH_CONNECT_DISABLED:
+        process.env.LANGWATCH_CONNECT_DISABLED === "1" ||
+        process.env.LANGWATCH_CONNECT_DISABLED?.toLowerCase() === "true",
+      // Blank means unset, so a templated deployment line with no value keeps
+      // the default rather than failing the URL check.
+      LANGWATCH_CONNECT_GATEWAY_ENDPOINT:
+        process.env.LANGWATCH_CONNECT_GATEWAY_ENDPOINT || undefined,
+      LANGWATCH_CONNECT_LICENSE_ENDPOINT:
+        process.env.LANGWATCH_CONNECT_LICENSE_ENDPOINT || undefined,
+      LANGWATCH_CONNECT_INSTANCE_ID:
+        process.env.LANGWATCH_CONNECT_INSTANCE_ID || undefined,
       MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
-      PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
       LOCAL_PASSWORDS_ENABLED: process.env.LOCAL_PASSWORDS_ENABLED,
       SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
       SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
@@ -813,6 +964,7 @@ export function createEnvConfig() {
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
       CREDENTIALS_SECRET: process.env.CREDENTIALS_SECRET,
+      PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
       AZURE_AD_CLIENT_ID: process.env.AZURE_AD_CLIENT_ID,
       AZURE_AD_CLIENT_SECRET: process.env.AZURE_AD_CLIENT_SECRET,
       AZURE_AD_TENANT_ID: process.env.AZURE_AD_TENANT_ID,
@@ -858,6 +1010,8 @@ export function createEnvConfig() {
         process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       STRIPE_LICENSE_PAYMENT_LINK_URL:
         process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
+      LANGWATCH_BILLING_BANK_DETAILS:
+        process.env.LANGWATCH_BILLING_BANK_DETAILS,
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
       HUBSPOT_PORTAL_ID: process.env.HUBSPOT_PORTAL_ID,
       HUBSPOT_REACHED_LIMIT_FORM_ID: process.env.HUBSPOT_REACHED_LIMIT_FORM_ID,
@@ -869,6 +1023,7 @@ export function createEnvConfig() {
       SLACK_BUG_REPORTS_CHANNEL: process.env.SLACK_BUG_REPORTS_CHANNEL,
       SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
       SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
+      SLACK_CHANNEL_SELF_HOSTED: process.env.SLACK_CHANNEL_SELF_HOSTED,
       AUTH0_SCIM_WEBHOOK_SECRET: process.env.AUTH0_SCIM_WEBHOOK_SECRET,
     },
     /**

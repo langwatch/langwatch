@@ -74,6 +74,23 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
   return skills;
 }
 
+/** The SKILL.md of one installed skill, or undefined when it is not installed. */
+export function readSkillBody({
+  skillsDir,
+  name,
+}: {
+  skillsDir: string | undefined;
+  name: string;
+}): string | undefined {
+  const skill = listSkills(skillsDir).find((s) => s.name === name);
+  if (!skill) return undefined;
+  try {
+    return readFileSync(skill.filePath, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
 export function renderSkillInventory(skills: SkillEntry[]): string {
   if (skills.length === 0) return "No skills installed.";
   return ["Installed skills:", ...skills.map((s) => `- ${s.name}: ${s.description}`)].join("\n");
@@ -85,12 +102,22 @@ const skillParams = Type.Object({
   ),
 });
 
+/** A rule a load is checked against: the refusal to answer with, or nothing. */
+export type SkillRefusal = (name: string) => string | undefined;
+
 export function createSkillExtension({
   skillsDir,
   disabledSkills,
+  refuse,
 }: {
   skillsDir: string | undefined;
   disabledSkills?: string[];
+  /**
+   * Consulted with the name of an installed skill before it is read. A
+   * refusal is thrown, so the model reads the rule as the call's error and
+   * none of the skill's script reaches it.
+   */
+  refuse?: SkillRefusal;
 }): InlineExtension {
   const disabled = new Set(disabledSkills);
   // Filtered before the inventory line and the execute closure both read
@@ -108,7 +135,7 @@ export function createSkillExtension({
       pi.registerTool({
         name: SKILL_TOOL_NAME,
         label: "Skill",
-        description: `Load a skill's instructions by name, or call without a name to list every skill installed.${inventoryLine}`,
+        description: `Load a skill's instructions by name, or call without a name to list every skill installed.${inventoryLine} A skill whose own rule says it is not for this conversation is refused with the rule.`,
         parameters: skillParams,
         async execute(_toolCallId, params) {
           const name = typeof params.name === "string" ? params.name.trim() : "";
@@ -130,6 +157,8 @@ export function createSkillExtension({
               details: {},
             };
           }
+          const refused = refuse?.(skill.name);
+          if (refused !== undefined) throw new Error(refused);
           let markdown: string;
           try {
             markdown = readFileSync(skill.filePath, "utf8");

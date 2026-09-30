@@ -15,10 +15,40 @@ clickhouse:
     # Set cluster name if your external ClickHouse is replicated:
     # cluster: "my_cluster"
 
-# LangWatchQL (lwql.enabled, default true) self-provisions its access model
-# via app SQL DDL on this path — the chart cannot render config into a server
-# it does not own. Your ClickHouse must already have: custom_settings_prefixes
-# including "custom_", and the app's administrative user granted
-# access_management + named_collection_control. See "LangWatchQL (LWQL) — BYO
-# ClickHouse prerequisites" in ../../README.md, and ADR-101
-# (../../../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md).
+# LangWatchQL (lwql.enabled, default true) with a bring-your-own ClickHouse.
+# The chart cannot write your server's config files, so the app provisions the
+# access model with SQL DDL instead of the rendered delivery it uses on
+# chart-managed ClickHouse. Select that with LWQL_ACCESS_MODEL_MODE=sql (the
+# chart-managed default is "rendered").
+#
+# Prerequisites for sql mode: your ClickHouse must already have
+# custom_settings_prefixes including "custom_",
+# access_control_improvements.settings_constraints_replace_previous set to true,
+# and the app's administrative user granted access_management +
+# named_collection_control. See "LangWatchQL (LWQL) prerequisites"
+# (../../README.md#langwatchql-lwql-prerequisites), and ADR-142
+# (../../../../dev/docs/adr/142-the-app-owns-the-lwql-access-model.md).
+#
+# AC9 — sql mode is fail-closed on clusters: before any access statement the app
+# reads system.user_directories and system.clusters. If access storage is NOT
+# replicated and the server belongs to a cluster with more than one host, it
+# ABORTS (the DDL would land on only the one host the app connects to, exactly
+# the bug this epic fixes). This example targets a SINGLE external node, so it
+# acknowledges single-node scope with LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true.
+#
+#   ⚠ Do NOT set LWQL_ACCESS_MODEL_SQL_SINGLE_NODE on a MULTI-node BYO cluster.
+#     Point the app at replicated (<replicated>) access storage instead, or the
+#     access model will exist on one host only. ClickHouse Cloud and self-managed
+#     <replicated> access storage pass the check without this flag.
+app:
+  extraEnvs:
+    - name: LWQL_ACCESS_MODEL_MODE
+      value: "sql"
+    - name: LWQL_ACCESS_MODEL_SQL_SINGLE_NODE
+      value: "true"
+workers:
+  extraEnvs:
+    - name: LWQL_ACCESS_MODEL_MODE
+      value: "sql"
+    - name: LWQL_ACCESS_MODEL_SQL_SINGLE_NODE
+      value: "true"

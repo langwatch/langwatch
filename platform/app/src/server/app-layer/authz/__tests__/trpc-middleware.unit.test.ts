@@ -44,7 +44,7 @@ const resolveTeamPermission = vi.fn();
 const hasOrganizationPermission = vi.fn();
 const resolveProjectPermissionAny = vi.fn();
 
-vi.mock("~/server/api/rbac", () => ({
+vi.mock("~/server/app-layer/authz/permission-adapters", () => ({
   resolveProjectPermission: (...args: unknown[]) =>
     resolveProjectPermission(...args),
   resolveTeamPermission: (...args: unknown[]) => resolveTeamPermission(...args),

@@ -12,7 +12,7 @@
  * ceiling that forced the change, rather than asserting a bare number the
  * member has no way to check.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import {

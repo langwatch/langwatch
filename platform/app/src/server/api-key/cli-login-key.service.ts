@@ -1,14 +1,12 @@
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
-import { isRegistryPermission } from "@langwatch/authz";
+import { isRegistryPermission, permissionGrantTiers } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { RoleBindingScopeType } from "~/generated/prisma/client";
 import {
   batchTeamsPermissions,
-  isOrgExclusivePermission,
   type Permission,
-} from "~/server/api/rbac";
+} from "~/server/app-layer/authz/permission-adapters";
 import { ApiKeyService, type CustomRoleBindingInput } from "./api-key.service";
 import { defaultCliKeyPermissions } from "./cli-key-defaults";
 import { ApiKeyAlreadyRevokedError, ApiKeyNotFoundError } from "./errors";
@@ -255,7 +253,7 @@ export class CliLoginKeyService {
       };
     }
 
-    const teamIdsOfUser = await this.teamsTheUserCanScopeTo({
+    const teamIdsOfUser = await this.candidateTeamIds({
       userId,
       organizationId,
     });
@@ -267,7 +265,10 @@ export class CliLoginKeyService {
         organizationId,
         teamIds: teamIdsOfUser,
         permissions: defaults.filter(
-          (permission) => !isOrgExclusivePermission(permission),
+          (permission) =>
+            !permissionGrantTiers(permission).every(
+              (tier) => tier === "organization",
+            ),
         ),
       },
     );
@@ -284,38 +285,18 @@ export class CliLoginKeyService {
     };
   }
 
-  /**
-   * The teams whose scope this user's key may carry.
-   *
-   * Team-scoped role bindings carry only a scopeId (no relation to Team by
-   * design), so membership is the union of TeamUser rows and TEAM-scoped
-   * bindings, resolved against the team table in one pass.
-   */
-  private async teamsTheUserCanScopeTo({
+  /** Candidate teams are narrowed by the grants engine before becoming key scopes. */
+  private async candidateTeamIds({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
   }): Promise<string[]> {
-    const boundTeamIds = await this.prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        userId,
-        scopeType: RoleBindingScopeType.TEAM,
-      },
-      select: { scopeId: true },
-    });
     const teams = await this.prisma.team.findMany({
       where: {
         organizationId,
         archivedAt: null,
-        OR: [
-          { members: { some: { userId } } },
-          ...(boundTeamIds.length > 0
-            ? [{ id: { in: boundTeamIds.map((binding) => binding.scopeId) } }]
-            : []),
-        ],
         // Another member's personal workspace is never a scope for this
         // user's key, whatever membership rows exist.
         NOT: { isPersonal: true, ownerUserId: { not: userId } },
@@ -714,7 +695,10 @@ function filterToGrantable({
   );
   if (hasOrgBinding) return permissions;
   const filtered = permissions.filter(
-    (permission) => !isOrgExclusivePermission(permission as Permission),
+    (permission) =>
+      !permissionGrantTiers(permission as Permission).every(
+        (tier) => tier === "organization",
+      ),
   );
   if (filtered.length !== permissions.length) {
     logger.debug(

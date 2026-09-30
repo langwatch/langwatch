@@ -852,6 +852,57 @@ export class GatewaySpendEventsRepository {
     return { rows, nextCursor };
   }
 
+  /**
+   * The charged cost of every request of one request type across the given
+   * tenants, as integer nano-USD.
+   *
+   * Confirmed rows only: a settled row's cost is unknown rather than zero, and
+   * a failed row of this kind does not exist, because a judgement that failed
+   * is never recorded as spend. The window is optional, and absent it is the
+   * whole ledger, which is what a lifetime budget reads. When given, it bounds
+   * `OccurredAt` so the month partitions prune.
+   */
+  async sumCostNanoUsdByRequestType({
+    tenantIds,
+    requestType,
+    fromMs,
+    toMs,
+  }: {
+    tenantIds: string[];
+    requestType: string;
+    fromMs?: number;
+    toMs?: number;
+  }): Promise<number> {
+    if (tenantIds.length === 0) return 0;
+    const client = await this.resolveClient(tenantIds[0]!);
+    const params: Record<string, unknown> = { tenantIds, requestType };
+    const clauses: string[] = [];
+    if (fromMs !== undefined) {
+      clauses.push(
+        "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})",
+      );
+      params.fromMs = fromMs;
+    }
+    if (toMs !== undefined) {
+      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+      params.toMs = toMs;
+    }
+    const result = await client.query({
+      query: `
+        SELECT sum(CostNanoUSD) AS CostNanoUSD
+        FROM ${TABLE} FINAL
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND RequestType = {requestType:String}
+          AND Status = 'confirmed'
+          ${clauses.join("\n          ")}
+      `,
+      query_params: params,
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<Record<string, unknown>>;
+    return parseSummedNanoUsd(rows[0]?.CostNanoUSD ?? 0);
+  }
+
   async readEndUserSpend({
     tenantIds,
     endUserId,

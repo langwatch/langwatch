@@ -1,11 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import {
-  type LensConfig,
-  setLensSyncBridge,
-  useViewStore,
-} from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
+import { type LensConfig, setLensSyncBridge } from "../stores/viewSlice";
 
 /** Discriminator stored on each SavedView row so the traces v2 lens
  * persistence doesn't collide with the v1 filter views — rows left behind by
@@ -161,7 +158,7 @@ export function useLensSync(): void {
   // Hydrate the store from server data. Fires once on initial query
   // resolution and on every subsequent refetch — `setUserLenses`
   // replaces the user-lens slice wholesale (preserves built-ins).
-  const setUserLenses = useViewStore((s) => s.setUserLenses);
+  const setUserLenses = useExplorerStore((s) => s.setUserLenses);
   useEffect(() => {
     const rows = lensesQuery.data;
     if (!rows) return;

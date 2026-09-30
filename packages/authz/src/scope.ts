@@ -56,7 +56,7 @@ export function scopeChain(scope: AuthzScopeRef): ScopeChainLink[] {
  * rather than enumerated members. Two v1 proxies, both documented for the
  * C5 storage pass to replace with direct membership probes: group audiences
  * are visible only through group-derived bindings, and team/project
- * audiences through a binding (or legacy row) at that scope.
+ * audiences through a binding at that scope.
  */
 export function audienceMatches({
   audience,
@@ -84,12 +84,9 @@ export function audienceMatches({
     case "organization":
       return grants.isOrgMember && grants.organizationId === audience.id;
     case "team":
-      return (
-        grants.bindings.some(
-          (binding) =>
-            binding.scopeType === "TEAM" && binding.scopeId === audience.id,
-        ) ||
-        grants.legacyTeamMemberships.some((row) => row.teamId === audience.id)
+      return grants.bindings.some(
+        (binding) =>
+          binding.scopeType === "TEAM" && binding.scopeId === audience.id,
       );
     case "project":
       return grants.bindings.some(

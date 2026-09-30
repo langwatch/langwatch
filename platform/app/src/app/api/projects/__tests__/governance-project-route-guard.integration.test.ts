@@ -16,7 +16,6 @@
  */
 
 import { PROJECT_KIND } from "@ee/governance/services/governanceProject.service";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -25,13 +24,17 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
-wireDefaultTestApp();
+wireDefaultTestApp(() => ({
+  projects: new ProjectService(new PrismaProjectRepository(prisma)),
+}));
 
 describe("Feature: the governance project is refused by the generic project routes", () => {
   const ns = `gov-guard-${nanoid(8)}`;
@@ -79,15 +82,12 @@ describe("Feature: the governance project is refused by the generic project rout
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        userId: adminId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: adminId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     const governanceProject = await prisma.project.create({
@@ -140,6 +140,7 @@ describe("Feature: the governance project is refused by the generic project rout
   afterAll(async () => {
     if (!organizationId) return;
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["apiKey", { organizationId }],
       ["customRole", { organizationId }],

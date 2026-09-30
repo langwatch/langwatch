@@ -180,9 +180,38 @@ $actual"
   fi
 }
 
+# Earlier charts rendered NEXTAUTH_PROVIDER ahead of app.extraEnvs, so an
+# operator's own NEXTAUTH_PROVIDER there won. AUTH_PROVIDER outranks it in the
+# app, so rendering one from the default values key would switch such an
+# install to email mode on upgrade.
+# @scenario "A provider selected in extraEnvs survives the upgrade"
+test_provider_in_extra_envs_is_not_overridden() {
+  local name flags actual selected
+  for name in NEXTAUTH_PROVIDER AUTH_PROVIDER; do
+    flags="$BASE \
+      --set app.extraEnvs[0].name=$name \
+      --set app.extraEnvs[0].value=okta"
+    actual=$(sso_env_of "$flags")
+    selected=$(env_value_of "$flags" "$name")
+    if [[ "$name" == "NEXTAUTH_PROVIDER" && -n "$actual" ]]; then
+      fail "extraEnvs $name" \
+        "expected the chart to render no AUTH_PROVIDER of its own, got:
+$actual"
+    fi
+    if [[ "$name" == "AUTH_PROVIDER" && "$actual" != "AUTH_PROVIDER" ]]; then
+      fail "extraEnvs $name" "expected a single AUTH_PROVIDER entry, got:
+$actual"
+    fi
+    if [[ "$selected" != "okta" ]]; then
+      fail "extraEnvs $name value" "$name is '$selected', expected 'okta'"
+    fi
+  done
+}
+
 test_provider_env_reaches_the_container
 test_client_secret_can_come_from_a_secret_reference
 test_unconfigured_providers_emit_nothing
+test_provider_in_extra_envs_is_not_overridden
 
 if ((failures > 0)); then
   echo

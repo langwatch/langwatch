@@ -101,6 +101,30 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // delete/update/truncate on the table.
   /^src\/server\/storage\.ts$/,
   /^src\/server\/datasets\/dataset-storage\.ts$/,
+  // lwql/catalog/types.ts mentions "stored_objects" only as an example of a
+  // table with a snake_case tenant column, in a JSDoc comment. Audited: no
+  // query, delete, update, or truncate on the table.
+  /^src\/server\/analytics\/lwql\/catalog\/types\.ts$/,
+  // lwql/catalog/defineDatasetFromTable.ts mentions "stored_objects" only as
+  // an example table name in a comment about column-casing conventions.
+  // Audited: no query, delete, update, or truncate on the table.
+  /^src\/server\/analytics\/lwql\/catalog\/defineDatasetFromTable\.ts$/,
+  // lwql/catalog/lwqlViews.ts names "stored_objects" as the source table of
+  // the read-only "objects" LWQL view (its explicit catalog entry). Audited: a
+  // read-only SELECT-only view declaration; no delete/update/truncate.
+  /^src\/server\/analytics\/lwql\/catalog\/lwqlViews\.ts$/,
+  // lwql/provisioning/catalogStatements.ts references "stored_objects" only
+  // in a comment explaining the tenantColumn override below. Audited: it
+  // provisions read-only ClickHouse grants/views, no delete/update/truncate.
+  /^src\/server\/analytics\/lwql\/provisioning\/catalogStatements\.ts$/,
+  // lwqlClickHouseHarness.ts references "stored_objects" only in a comment
+  // about per-table tenant column naming, for the LWQL integration test
+  // harness. Audited: test scaffolding, no delete/update/truncate.
+  /^src\/server\/analytics\/lwql\/__tests__\/lwqlClickHouseHarness\.ts$/,
+  // catalog/overrides/coding.ts declares the read-only "objects" LWQL view
+  // over stored_objects, with tenantColumn "project_id". Audited: a
+  // read-only SELECT-only view definition; no delete/update/truncate.
+  /^src\/server\/analytics\/lwql\/catalog\/overrides\/coding\.ts$/,
 ];
 
 function isAllowlisted(rel: string): boolean {

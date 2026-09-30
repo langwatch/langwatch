@@ -36,25 +36,30 @@ interface PasswordOffer {
 /**
  * Which offer this section makes, or none at all.
  *
- * Two deployments hold a password, and they hold it in different places. On a
- * credentials deployment it is ours, so an account can have none and setting a
- * first one is a real offer. On an Auth0 deployment it is Auth0's, and only an
- * account with a database identity there has one — for somebody who has only
- * ever clicked Google there is nothing here to set, and offering it would be
- * an offer we cannot honour. Anywhere else authenticates people entirely
- * elsewhere, and this section would be about nothing.
+ * A password is offered wherever this deployment issues its own — the server's
+ * own `isEmailPasswordEnabled`, surfaced as `EMAIL_PASSWORD_ENABLED`. That
+ * covers a self-hosted install even behind an enterprise IdP, which is what
+ * lets a passkey-only admin set the password break-glass requires; keying off
+ * the provider alone hid the offer and stranded them (ADR-027).
+ *
+ * On an Auth0 deployment the password is Auth0's, and only an account with a
+ * database identity there has one — for somebody who has only ever clicked
+ * Google there is nothing here to set. Anywhere else authenticates people
+ * entirely elsewhere, and this section would be about nothing.
  */
 function passwordOffer({
   provider,
+  emailPasswordEnabled,
   accounts,
   hasPasswordAnswer,
 }: {
   provider: string | undefined;
+  emailPasswordEnabled: boolean | undefined;
   accounts: readonly LinkedAccount[];
   hasPasswordAnswer: boolean | undefined;
 }): PasswordOffer | null {
   const account = accounts.find(isCredentialAccount) ?? null;
-  if (provider === "email") {
+  if (provider === "email" || emailPasswordEnabled) {
     // Assumed held until the answer arrives: "Change password" is what almost
     // every account wants, and flickering "Set a password" in front of
     // somebody who has one reads as their password having been lost.
@@ -167,6 +172,7 @@ export function PasswordSection() {
 
   const offer = passwordOffer({
     provider: publicEnv.data?.NEXTAUTH_PROVIDER,
+    emailPasswordEnabled: publicEnv.data?.EMAIL_PASSWORD_ENABLED,
     accounts: accounts.data ?? [],
     hasPasswordAnswer: passwordStatus.data?.hasPassword,
   });

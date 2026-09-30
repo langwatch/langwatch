@@ -42,7 +42,7 @@ vi.mock("~/server/db", () => ({
 
 // Permission enforcement is covered by rbac.secrets.test.ts; this suite is
 // about what a correctly-permissioned caller may still not touch.
-vi.mock("../../rbac", () => ({
+vi.mock("~/server/app-layer/authz/permission-adapters", () => ({
   resolveProjectPermission: vi
     .fn()
     .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),

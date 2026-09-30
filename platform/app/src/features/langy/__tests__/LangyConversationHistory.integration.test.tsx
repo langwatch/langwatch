@@ -4,6 +4,7 @@
  * Integration tests for LangyPanel conversation history, the turn failures it
  * must not swallow, and stopping a turn.
  * Specs: specs/langy/langy-baseline.feature,
+ *        specs/langy/langy-navigation-persistence.feature,
  *        specs/langy/langy-stop-and-resume.feature
  *
  * Boundary mocks: useOrganizationTeamProject (project context),
@@ -23,6 +24,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ChatTransport, UIMessage } from "ai";
 import {
   afterEach,
   beforeEach,
@@ -106,6 +108,10 @@ const spies = {
         turnId: string;
       }) => void
     >(),
+  // The two turn mutations, as the panel's transport calls them at send time.
+  continueMutation:
+    vi.fn<(input: { projectId: string; conversationId: string }) => void>(),
+  createMutation: vi.fn<(input: { projectId: string }) => void>(),
 };
 
 // Invalidation channel: utils.langy.list.invalidate() bumps a version every
@@ -157,6 +163,9 @@ const chatRef = {
     parts: Array<{ type: string; text: string }>;
   }>,
   sendMessage: vi.fn(),
+  // What the panel handed useChat, for the test that drives a real send
+  // through the panel's own transport.
+  chatOptions: null as unknown,
   stop: vi.fn(),
   status: "ready" as "ready" | "submitted" | "streaming" | "error",
   setMessages: vi.fn(),
@@ -166,16 +175,19 @@ const chatRef = {
 };
 
 vi.mock("@ai-sdk/react", () => ({
-  useChat: () => ({
-    messages: chatRef.messages,
-    sendMessage: chatRef.sendMessage,
-    stop: chatRef.stop,
-    status: chatRef.status,
-    setMessages: chatRef.setMessages,
-    error: chatRef.error,
-    clearError: chatRef.clearError,
-    regenerate: chatRef.regenerate,
-  }),
+  useChat: (options: unknown) => {
+    chatRef.chatOptions = options;
+    return {
+      messages: chatRef.messages,
+      sendMessage: chatRef.sendMessage,
+      stop: chatRef.stop,
+      status: chatRef.status,
+      setMessages: chatRef.setMessages,
+      error: chatRef.error,
+      clearError: chatRef.clearError,
+      regenerate: chatRef.regenerate,
+    };
+  },
 }));
 
 vi.mock("ai", () => ({
@@ -560,7 +572,36 @@ vi.mock("~/utils/api", async () => {
     },
   };
 
-  return { api: withFallback(explicitApi) };
+  // The transport's own client. The turn mutations answer with ids and the
+  // stream subscription stays silent, so a send is observed at the mutation
+  // the transport chose and the conversation id it carried.
+  const trpcClient = {
+    langy: {
+      continueConversation: {
+        mutate: async (input: {
+          projectId: string;
+          conversationId: string;
+        }) => {
+          spies.continueMutation(input);
+          return {
+            conversationId: input.conversationId,
+            turnId: "turn-continued",
+          };
+        },
+      },
+      createConversation: {
+        mutate: async (input: { projectId: string }) => {
+          spies.createMutation(input);
+          return { conversationId: "conv-created", turnId: "turn-created" };
+        },
+      },
+      onTurnStream: {
+        subscribe: () => ({ unsubscribe: () => undefined }),
+      },
+    },
+  };
+
+  return { api: withFallback(explicitApi), trpcClient };
 });
 
 import { toaster } from "~/components/ui/toaster";
@@ -708,6 +749,8 @@ beforeEach(() => {
   spies.deleteMutation.mockReset();
   spies.listInvalidate.mockReset();
   spies.stopMutation.mockReset();
+  spies.continueMutation.mockReset();
+  spies.createMutation.mockReset();
   scenarioRef.current = {
     conversations: [],
     messagesById: {},
@@ -867,6 +910,50 @@ describe("LangyPanel conversation history", () => {
           const passed = lastCall?.[0] as UIMessageLike[] | undefined;
           expect(passed?.[0]?.parts?.[0]?.text).toBe("hello from older");
         });
+      });
+
+      /** @scenario "A message typed into a reopened conversation continues it" */
+      it("sends a typed message into that conversation, never a new one", async () => {
+        installScenario({ conversations, messagesById });
+        renderPanel();
+        await openHistory();
+        chatRef.setMessages.mockClear();
+        await openRecentOption(/Older chat/i);
+        await waitFor(() => {
+          expect(chatRef.setMessages).toHaveBeenCalled();
+        });
+        // The send runs through the panel's own transport, the way useChat
+        // drives it, so the conversation id is the one the transport reads
+        // at send time and not the one the test would pass.
+        chatRef.sendMessage.mockImplementation(
+          async (message: { role: string; parts: unknown[] }) => {
+            const { transport } = chatRef.chatOptions as {
+              transport: ChatTransport<UIMessage>;
+            };
+            await transport.sendMessages({
+              trigger: "submit-message",
+              chatId: "chat",
+              messageId: "m-typed",
+              messages: [{ id: "m-typed", ...message } as UIMessage],
+              abortSignal: new AbortController().signal,
+            });
+          },
+        );
+        const field = await screen.findByPlaceholderText(
+          "Ask Langy or describe what you want…",
+        );
+        await userEvent.type(field, "Go ahead.");
+        fireEvent.keyDown(field, { key: "Enter" });
+
+        await waitFor(() => {
+          expect(spies.continueMutation).toHaveBeenCalledWith(
+            expect.objectContaining({
+              projectId: "project-demo",
+              conversationId: "conv-old",
+            }),
+          );
+        });
+        expect(spies.createMutation).not.toHaveBeenCalled();
       });
     });
 

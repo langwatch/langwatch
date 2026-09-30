@@ -76,7 +76,12 @@ const credentialAccountsOver = ({
 } = {}) => {
   const rows: AccountRow[] = accounts.map((row) => ({ ...row }));
   const askedForAddress: string[] = [];
-  const openedAccounts: { name: string; email: string; hash: string }[] = [];
+  const openedAccounts: {
+    name: string;
+    email: string;
+    hash: string;
+    addressConfirmed: boolean;
+  }[] = [];
   const attachedIdentifiers: { userId: string; accountId: string }[] = [];
   const revokedFor: { userId: string; keepSessionId: string }[] = [];
   const countedSignUps: string[] = [];
@@ -130,8 +135,18 @@ const credentialAccountsOver = ({
       twoStepEnabled,
       nudgeDismissedAt,
     }),
-    createCredentialUser: async ({ name, email, passwordHash }) => {
-      openedAccounts.push({ name, email, hash: passwordHash });
+    createCredentialUser: async ({
+      name,
+      email,
+      passwordHash,
+      addressConfirmed,
+    }) => {
+      openedAccounts.push({
+        name,
+        email,
+        hash: passwordHash,
+        addressConfirmed,
+      });
       const account = accountRow({
         id: `minted-${++minted}`,
         userId: "newcomer",
@@ -199,6 +214,7 @@ describe("CredentialAccountService", () => {
         name: "Joel",
         email: "joel.during@example.com",
         password: "correct horse battery staple",
+        addressConfirmed: true,
       });
 
       // The one case-insensitive comparison lives behind this port, so a
@@ -217,6 +233,7 @@ describe("CredentialAccountService", () => {
           name: "Alice",
           email: "sam@acme.com",
           password: "correct horse battery staple",
+          addressConfirmed: true,
         }),
       ).rejects.toMatchObject({ code: "email_already_registered" });
 
@@ -231,11 +248,41 @@ describe("CredentialAccountService", () => {
         name: "Sam",
         email: "sam@acme.com",
         password: "correct horse battery staple",
+        addressConfirmed: true,
       });
 
       expect(openedAccounts[0]?.hash).toBe(
         "hashed:correct horse battery staple",
       );
+    });
+
+    it("opens the account confirmed when a confirmed proof was spent", async () => {
+      const { service, openedAccounts } = credentialAccountsOver();
+
+      await service.register({
+        name: "Sam",
+        email: "sam@acme.com",
+        password: "correct horse battery staple",
+        addressConfirmed: true,
+      });
+
+      expect(openedAccounts[0]?.addressConfirmed).toBe(true);
+    });
+
+    /** @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed" */
+    it("opens the account unconfirmed when no address was proven", async () => {
+      const { service, openedAccounts, countedSignUps } =
+        credentialAccountsOver();
+
+      await service.register({
+        name: "Sam",
+        email: "sam@acme.com",
+        password: "correct horse battery staple",
+        addressConfirmed: false,
+      });
+
+      expect(openedAccounts[0]?.addressConfirmed).toBe(false);
+      expect(countedSignUps).toEqual(["newcomer"]);
     });
 
     it("writes the address as the name nobody has been asked for", async () => {
@@ -245,6 +292,7 @@ describe("CredentialAccountService", () => {
         name: null,
         email: "sam@acme.com",
         password: "correct horse battery staple",
+        addressConfirmed: true,
       });
 
       expect(openedAccounts[0]?.name).toBe("sam@acme.com");
@@ -258,6 +306,7 @@ describe("CredentialAccountService", () => {
         name: "Sam",
         email: "sam@acme.com",
         password: "correct horse battery staple",
+        addressConfirmed: true,
       });
 
       // The front door routes on the identifier projection, and the backfill
@@ -276,6 +325,7 @@ describe("CredentialAccountService", () => {
         name: "Sam",
         email: "sam@acme.com",
         password: "correct horse battery staple",
+        addressConfirmed: true,
       });
 
       expect(countedSignUps).toEqual(["newcomer"]);

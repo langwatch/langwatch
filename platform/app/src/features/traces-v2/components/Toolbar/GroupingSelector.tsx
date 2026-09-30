@@ -10,8 +10,8 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "../../../../components/ui/menu";
-import type { GroupingMode } from "../../stores/viewStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { GroupingMode } from "../../stores/viewSlice";
 
 const GROUPING_OPTIONS: Record<GroupingMode, string> = {
   flat: "Flat",
@@ -24,8 +24,8 @@ const GROUPING_OPTIONS: Record<GroupingMode, string> = {
 export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
   compact = false,
 }) => {
-  const grouping = useViewStore((s) => s.grouping);
-  const setGrouping = useViewStore((s) => s.setGrouping);
+  const grouping = useExplorerStore((s) => s.grouping);
+  const setGrouping = useExplorerStore((s) => s.setGrouping);
 
   return (
     <MenuRoot>

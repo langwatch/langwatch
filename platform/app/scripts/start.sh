@@ -37,10 +37,15 @@ if [[ "$NODE_ENV" = "development" ]]; then
   # with `override: true` after this runs, which would put the committed 5560
   # back, so the app realigns again on the other side of that load in
   # `alignDevAuthUrlsToPort` (src/env-create.mjs). Keep the two in step.
+  #
+  # LANGWATCH_ENDPOINT is the address the app hands out as itself (the Langy
+  # worker callback, scenario child processes, setup snippets), so it follows
+  # the same port for the same reason.
   if [ -n "$PORT" ]; then
     export BASE_HOST="http://localhost:${PORT}"
     export NEXTAUTH_URL="http://localhost:${PORT}"
-    echo "  ✓ BASE_HOST=NEXTAUTH_URL=${BASE_HOST} (auto-aligned to PORT=${PORT})"
+    export LANGWATCH_ENDPOINT="http://localhost:${PORT}"
+    echo "  ✓ BASE_HOST=NEXTAUTH_URL=LANGWATCH_ENDPOINT=${BASE_HOST} (auto-aligned to PORT=${PORT})"
   fi
 
   # AI Gateway port + URL auto-derivation. Default layout:

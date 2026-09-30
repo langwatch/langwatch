@@ -2,6 +2,7 @@ import {
   type ReportTraceRow,
   reportSnippet,
 } from "@langwatch/automations/templating/templateContext";
+import { tracePath } from "~/app/api/shared/trace-platform-url";
 import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 
 /**
@@ -24,7 +25,7 @@ export function toReportTraceRow({
 }): ReportTraceRow {
   return {
     traceId: item.traceId,
-    url: `${projectUrl}/traces/${item.traceId}`,
+    url: `${projectUrl}${tracePath({ traceId: item.traceId, occurredAtMs: item.timestamp })}`,
     timestamp: new Date(item.timestamp).toISOString(),
     input: reportSnippet(item.input),
     output: reportSnippet(item.output),

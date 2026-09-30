@@ -1,3 +1,10 @@
+import { OffboardIncompleteError } from "@langwatch/authz-server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { env } from "~/env.mjs";
+import type { PrismaClient, User } from "~/generated/prisma/client";
+
+import { ScimService } from "../scim.service";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What changes when `SCIM_V2_GRANTS` is on (D08).
@@ -9,15 +16,13 @@
  *   - marking somebody inactive takes that identical path, so `active: false`
  *     stops being a flag that revokes nothing;
  *   - membership carries the role the directory's mapping asserts rather than
- *     an unconditional MEMBER.
+ *     an unconditional MEMBER, while the canonical group binding remains the
+ *     only access fact on the grants path (no duplicate direct USER grant).
  *
- * With the flag off, every one of them is the previous behaviour, unchanged.
+ * With the flag off, every one of them is the previous compatibility behaviour,
+ * unchanged, including its direct USER organization grant reconciliation.
  */
-import { OffboardIncompleteError } from "@langwatch/authz-server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { env } from "~/env.mjs";
-import type { PrismaClient, User } from "~/generated/prisma/client";
-import { ScimService } from "../scim.service";
+import { resourceStore } from "./scim-user-resource.fixture";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
@@ -70,13 +75,17 @@ function buildUser(overrides: Partial<User> = {}): User {
 }
 
 function createMockPrisma() {
-  return {
+  const mock = {
+    scimUserResource: resourceStore(),
     user: {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue(buildUser()),
+      findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue(buildUser()),
       update: vi.fn().mockResolvedValue(buildUser()),
     },
     organizationUser: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUnique: vi.fn().mockResolvedValue({ userId: USER }),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
@@ -84,6 +93,35 @@ function createMockPrisma() {
       delete: vi.fn().mockResolvedValue({}),
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
+    groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
+    group: { findMany: vi.fn().mockResolvedValue([]) },
+    ssoConnection: {
+      findFirst: vi.fn(
+        async ({ where }: { where: { id: string; organizationId: string } }) =>
+          where.id === "conn-okta" && where.organizationId === ORGANIZATION
+            ? { replacesConnectionId: null, migrationPhase: null }
+            : null,
+      ),
+      findMany: vi.fn(
+        async ({
+          where,
+        }: {
+          where: { id: { in: string[] }; organizationId: string };
+        }) =>
+          where.organizationId === ORGANIZATION
+            ? where.id.in
+                .filter((id) => id === "conn-entra")
+                .map((id) => ({ id }))
+            : [],
+      ),
+    },
+    scimDirectoryUser: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     scimExternalId: {
       findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
@@ -94,10 +132,14 @@ function createMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
-  } as unknown as PrismaClient;
+    $transaction: vi.fn(),
+  };
+  mock.$transaction.mockImplementation((operation: unknown) => {
+    if (typeof operation === "function") return operation(mock);
+    if (Array.isArray(operation)) return Promise.all(operation);
+    throw new Error("unexpected transaction input");
+  });
+  return mock as unknown as PrismaClient;
 }
 
 function createGrants() {
@@ -167,7 +209,11 @@ describe("ScimService, on the grants write path", () => {
       });
 
       expect(prisma.scimExternalId.deleteMany).toHaveBeenCalledWith({
-        where: { connectionId: CONNECTION, userId: USER },
+        where: {
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          userId: USER,
+        },
       });
     });
   });
@@ -246,14 +292,14 @@ describe("ScimService, on the grants write path", () => {
           }),
         ).rejects.toMatchObject({ code: "offboard_incomplete" });
 
-        // `deactivatedAt` is only ever written AFTER a proved-empty removal.
+        // A failed removal leaves both the shared account and tenant resource unchanged.
         expect(prisma.user.update).not.toHaveBeenCalled();
       });
     });
   });
 
   describe("when somebody is pushed active again", () => {
-    it("lifts the sign-in block and restores no access", async () => {
+    it("reactivates the directory resource and restores no access", async () => {
       await service.updateUser({
         id: USER,
         organizationId: ORGANIZATION,
@@ -264,10 +310,12 @@ describe("ScimService, on the grants write path", () => {
         },
       });
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: USER },
-        data: { deactivatedAt: null },
-      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.scimUserResource.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({ active: true }),
+        }),
+      );
       expect(ledger.attachBindings).not.toHaveBeenCalled();
     });
 
@@ -279,11 +327,27 @@ describe("ScimService, on the grants write path", () => {
      * asks for.
      */
     describe("given the deprovision already removed their membership", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
+        await prisma.scimUserResource.upsert({
+          where: {
+            organizationId_userId: {
+              organizationId: ORGANIZATION,
+              userId: USER,
+            },
+          },
+          create: {
+            organizationId: ORGANIZATION,
+            userId: USER,
+            userName: "alice@acme.com",
+            name: "Alice",
+            active: false,
+          },
+          update: { active: false },
+        });
         prisma.organizationUser.findUnique = vi.fn().mockResolvedValue(null);
-        prisma.scimExternalId.findFirst = vi
+        prisma.scimDirectoryUser.findUnique = vi
           .fn()
-          .mockResolvedValue({ externalId: "u-1" });
+          .mockResolvedValue({ connectionId: CONNECTION, userId: USER });
         prisma.user.findUnique = vi
           .fn()
           .mockResolvedValue(buildUser({ deactivatedAt: new Date() }));
@@ -292,7 +356,7 @@ describe("ScimService, on the grants write path", () => {
       // Not bound to "Coming back restores nothing on its own": that scenario
       // is tagged @integration, and asserting on a mocked Prisma proves the
       // CALLS were not made, not that nothing resolves in a real database.
-      it("lets them sign in again and gives them nothing in the organization", async () => {
+      it("reactivates only the tenant resource and gives them nothing in the organization", async () => {
         const result = await service.updateUser({
           id: USER,
           organizationId: ORGANIZATION,
@@ -304,16 +368,18 @@ describe("ScimService, on the grants write path", () => {
         });
 
         expect(result).toMatchObject({ id: USER });
-        expect(prisma.user.update).toHaveBeenCalledWith({
-          where: { id: USER },
-          data: { deactivatedAt: null },
-        });
+        expect(prisma.user.update).not.toHaveBeenCalled();
+        expect(prisma.scimUserResource.upsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            update: expect.objectContaining({ active: true }),
+          }),
+        );
         // Nothing is put back: no membership, no grant, no role.
         expect(prisma.organizationUser.create).not.toHaveBeenCalled();
         expect(ledger.attachBindings).not.toHaveBeenCalled();
       });
 
-      it("still answers not found for a push that is not a reactivation", async () => {
+      it("updates an inactive resource profile without restoring access", async () => {
         const result = await service.updateUser({
           id: USER,
           organizationId: ORGANIZATION,
@@ -326,12 +392,18 @@ describe("ScimService, on the grants write path", () => {
           },
         });
 
-        expect(result).toMatchObject({ status: "404" });
+        expect(result).toMatchObject({
+          id: USER,
+          active: false,
+          userName: "alice@acme.com",
+        });
+        expect(prisma.organizationUser.create).not.toHaveBeenCalled();
         expect(prisma.user.update).not.toHaveBeenCalled();
       });
 
       it("still answers not found once the connection has forgotten them", async () => {
-        prisma.scimExternalId.findFirst = vi.fn().mockResolvedValue(null);
+        prisma.scimDirectoryUser.findUnique = vi.fn().mockResolvedValue(null);
+        prisma.scimUserResource.findUnique = vi.fn().mockResolvedValue(null);
 
         const result = await service.updateUser({
           id: USER,
@@ -411,7 +483,12 @@ describe("ScimService, on the grants write path", () => {
             externalId: "u-1",
           },
         },
-        create: { connectionId: CONNECTION, externalId: "u-1", userId: USER },
+        create: {
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          externalId: "u-1",
+          userId: USER,
+        },
         update: { userId: USER },
       });
     });
@@ -447,9 +524,38 @@ describe("ScimService, on the grants write path", () => {
       prisma.organizationUser.findUnique = vi.fn().mockResolvedValue(null);
       prisma.user.create = vi.fn().mockResolvedValue(buildUser());
       // One mapped group carrying ADMIN at the organization.
-      prisma.roleBinding.findMany = vi
+      prisma.groupMembership.findMany = vi
         .fn()
-        .mockResolvedValueOnce([{ role: "ADMIN" }])
+        .mockResolvedValue([{ groupId: "group-1" }]);
+      prisma.group.findMany = vi
+        .fn()
+        .mockResolvedValue([
+          { id: "group-1", name: "Administrators", scimSource: CONNECTION },
+        ]);
+      prisma.grant.findMany = vi
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            id: "group-grant-1",
+            organizationId: ORGANIZATION,
+            principalType: "GROUP",
+            principalId: "group-1",
+            roleKey: "admin",
+            legacyRole: null,
+            source: "migration",
+            scopeType: "ORGANIZATION",
+            scopeId: ORGANIZATION,
+            token: null,
+            permission: null,
+            resourceKind: null,
+            projectId: null,
+            createdByUserId: null,
+            expiresAt: null,
+            maxViews: null,
+            occurredAt: new Date("2024-01-01T00:00:00Z"),
+            updatedAt: new Date("2024-01-01T00:00:00Z"),
+          },
+        ])
         .mockResolvedValue([]);
     });
 
@@ -469,12 +575,63 @@ describe("ScimService, on the grants write path", () => {
         prisma.organizationUser.create as ReturnType<typeof vi.fn>
       ).mock.calls[0]![0];
       expect(created.data.role).toBe("ADMIN");
+      expect(prisma.groupMembership.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: USER,
+          group: { organizationId: ORGANIZATION, scimSource: { not: null } },
+        },
+        select: { groupId: true },
+      });
+      expect(prisma.roleBinding.findMany).not.toHaveBeenCalled();
+      // The group binding is already the canonical access fact. The grants path
+      // must not mint a second direct USER organization grant.
+      expect(ledger.attachBindings).not.toHaveBeenCalled();
+    });
+
+    it("recognizes a canonical grant even when the compatibility row is absent", async () => {
+      prisma.grant.findMany = vi.fn().mockResolvedValue([
+        {
+          id: "grant-1",
+          organizationId: ORGANIZATION,
+          principalType: "USER",
+          principalId: USER,
+          roleKey: "admin",
+          legacyRole: null,
+          source: "migration",
+          scopeType: "ORGANIZATION",
+          scopeId: ORGANIZATION,
+          token: null,
+          permission: null,
+          resourceKind: null,
+          projectId: null,
+          createdByUserId: null,
+          expiresAt: null,
+          maxViews: null,
+          occurredAt: new Date("2024-01-01T00:00:00Z"),
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+          revokedAt: null,
+          revokedReason: null,
+        },
+      ]);
+
+      await service.createUser({
+        organizationId: ORGANIZATION,
+        connectionId: CONNECTION,
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "alice@acme.com",
+          externalId: "u-1",
+        },
+      });
+
+      expect(ledger.attachBindings).not.toHaveBeenCalled();
     });
   });
 
   describe("when a push aims at somebody another connection provisioned", () => {
     it("refuses and changes nothing about them", async () => {
-      prisma.scimExternalId.findMany = vi
+      prisma.scimDirectoryUser.findMany = vi
         .fn()
         .mockResolvedValue([{ connectionId: "conn-entra" }]);
 
@@ -525,17 +682,18 @@ describe("ScimService, with the grants flag off", () => {
       connectionId: CONNECTION,
     });
 
-    expect(ledger.offboardMember).toHaveBeenCalledWith({
+    expect(ledger.revokeBindingsWhere).toHaveBeenCalledWith({
       organizationId: ORGANIZATION,
-      userId: USER,
-      revokedGrantIds: [],
+      where: { userId: USER },
       actor: { type: "system", id: "system:scim" },
+      reason: "offboarded by the identity provider",
     });
     expect(prisma.organizationUser.delete).toHaveBeenCalled();
     expect(grants.offboard).not.toHaveBeenCalled();
   });
 
-  it("leaves a push marking somebody inactive as the flag it was", async () => {
+  /** @scenario A leaver loses their access however membership is being written */
+  it("revokes through the previous write path, as a deletion with the flag off does", async () => {
     await service.updateUser({
       id: USER,
       organizationId: ORGANIZATION,
@@ -546,10 +704,31 @@ describe("ScimService, with the grants flag off", () => {
       },
     });
 
+    // The SERVICE and its empty proof are what the flag turns off, and they
+    // stay off. This is the half the previous title claimed was the whole.
     expect(grants.offboard).not.toHaveBeenCalled();
-    expect(prisma.user.update).toHaveBeenCalledWith({
-      where: { id: USER },
-      data: { deactivatedAt: expect.any(Date) },
+
+    // The REVOCATION is not what the flag turns off. Without this branch a
+    // push marking somebody inactive left the membership row, the role grant
+    // and the seat exactly where they were, and the change list - which reads
+    // revoked grants - recorded nothing, so a leaver was invisible on the
+    // audit surface on the path real directories actually use.
+    expect(ledger.revokeBindingsWhere).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION,
+      where: { userId: USER },
+      actor: { type: "system", id: "system:scim" },
+      reason: "offboarded by the identity provider",
+    });
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.scimUserResource.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ active: false }),
+      }),
+    );
+
+    expect(prisma.organizationUser.deleteMany).toHaveBeenCalledWith({
+      where: { userId: USER, organizationId: ORGANIZATION },
     });
   });
 

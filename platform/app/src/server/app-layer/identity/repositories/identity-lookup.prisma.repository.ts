@@ -1,3 +1,5 @@
+import { rowToConnection } from "@ee/sso/sso-connection-projection.prisma.repository";
+import { qualifySsoDomainOwnership } from "@langwatch/identity";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
@@ -26,11 +28,23 @@ export interface IdentityLookupReadsRepository {
     userIds: readonly string[];
   }): Promise<readonly LookupMembershipRow[]>;
 
+  findOrganizationNames(input: {
+    organizationIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>>;
+
   findSessions(input: { userId: string }): Promise<readonly LookupSessionRow[]>;
 
   findInvitations(input: {
     email: string;
   }): Promise<readonly LookupInvitationRow[]>;
+
+  findClaimsAwaitingReview(input: {
+    domains: readonly string[];
+  }): Promise<readonly LookupDomainClaimRow[]>;
+
+  findClaimQueue(input: {
+    limit: number;
+  }): Promise<readonly LookupDomainClaimRow[]>;
 
   findConnectionForDomain(input: {
     domain: string;
@@ -102,12 +116,23 @@ export interface LookupInvitationRow {
   createdAtMs: number;
 }
 
+export interface LookupDomainClaimRow {
+  connectionId: string;
+  organizationId: string;
+  organizationName: string | null;
+  domain: string;
+  /** When the connection last moved, which for a CLAIMED one is the claim. */
+  waitingSinceMs: number;
+}
+
 export interface LookupConnectionRow {
   connectionId: string;
   organizationId: string;
   organizationName: string | null;
   state: string;
   providerId: string;
+  ownershipProof: "QUALIFIED" | "UNKNOWN" | "LAPSED";
+  routeKind: "legacy-configuration" | "connection";
 }
 
 /** How many rows a single-address lookup will read before it stops. A
@@ -171,21 +196,50 @@ export class PrismaIdentityLookupRepository
     userIds: readonly string[];
   }): Promise<readonly LookupMembershipRow[]> {
     if (userIds.length === 0) return [];
-    const rows = await this.prisma.organizationUser.findMany({
-      where: { userId: { in: [...userIds] } },
+    // READ THROUGH `Organization`, NOT `OrganizationUser`. A top-level
+    // `organizationUser` read carrying only a `userId` is refused outright by
+    // the ADR-021 partition guard, and it is refused with a PLAIN `Error` —
+    // which is how the same shape became a 401 for every user on the
+    // installation (defect 2) and a 500 on every page load (defect 3).
+    //
+    // Answering "which organizations is this person in" genuinely needs to
+    // cross organizations, so the fix is not a scope to add: it is to ask the
+    // question of the model the guard governs by relation instead. The rows
+    // that come back are identical, disabled memberships included, because an
+    // operator looking somebody up has to see those too.
+    const organizations = await this.prisma.organization.findMany({
+      where: { members: { some: { userId: { in: [...userIds] } } } },
       select: {
-        userId: true,
-        organizationId: true,
-        role: true,
-        organization: { select: { name: true } },
+        id: true,
+        name: true,
+        members: {
+          where: { userId: { in: [...userIds] } },
+          select: { userId: true, role: true },
+        },
       },
     });
-    return rows.map((row) => ({
-      userId: row.userId,
-      organizationId: row.organizationId,
-      organizationName: row.organization?.name ?? null,
-      role: row.role,
-    }));
+    return organizations.flatMap((organization) =>
+      organization.members.map((member) => ({
+        userId: member.userId,
+        organizationId: organization.id,
+        organizationName: organization.name,
+        role: member.role,
+      })),
+    );
+  }
+
+  async findOrganizationNames({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>> {
+    const unique = [...new Set(organizationIds)];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.organization.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, name: true },
+    });
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 
   async findSessions({
@@ -242,23 +296,48 @@ export class PrismaIdentityLookupRepository
     }));
   }
 
+  async findClaimsAwaitingReview({
+    domains,
+  }: {
+    domains: readonly string[];
+  }): Promise<readonly LookupDomainClaimRow[]> {
+    if (domains.length === 0) return [];
+    const rows = await this.prisma.ssoConnection.findMany({
+      where: { claimedDomains: { hasSome: [...domains] } },
+      select: CLAIM_SELECT,
+      orderBy: { updatedAt: "asc" },
+    });
+    return rows.flatMap((row) => toClaimRows(row, domains));
+  }
+
+  async findClaimQueue({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<readonly LookupDomainClaimRow[]> {
+    const rows = await this.prisma.ssoConnection.findMany({
+      where: { NOT: { claimedDomains: { isEmpty: true } } },
+      select: CLAIM_SELECT,
+      // Longest wait first: the queue is read top-down, and the claim that
+      // has waited longest is the one a customer is chasing.
+      orderBy: { updatedAt: "asc" },
+      take: limit,
+    });
+    return rows.flatMap((row) => toClaimRows(row, null));
+  }
+
   async findConnectionForDomain({
     domain,
   }: {
     domain: string;
   }): Promise<LookupConnectionRow | null> {
     const row = await this.prisma.ssoConnection.findFirst({
-      // Every state, like the routing port: a paused connection still owns
-      // its domain, and saying so is the whole point of this panel.
+      // Every state, like the routing port: this reports configuration and
+      // separately qualifies whether the connection proves ownership.
       where: { verifiedDomains: { has: domain } },
-      select: {
-        id: true,
-        organizationId: true,
-        state: true,
-        providerId: true,
-      },
     });
     if (!row) return null;
+    const connection = rowToConnection(row);
     const organization = await this.prisma.organization.findUnique({
       where: { id: row.organizationId },
       select: { name: true },
@@ -268,7 +347,15 @@ export class PrismaIdentityLookupRepository
       organizationId: row.organizationId,
       organizationName: organization?.name ?? null,
       state: row.state,
-      providerId: row.providerId,
+      providerId: connection.idpMetadata.providerId,
+      ownershipProof: qualifySsoDomainOwnership({
+        state: connection,
+        domain,
+      }).status,
+      routeKind:
+        connection.source === "legacy-grandfathered"
+          ? "legacy-configuration"
+          : "connection",
     };
   }
 
@@ -316,6 +403,37 @@ function addressOf(args: unknown): string | null {
 
 /** The prefix every act on this surface is recorded under. */
 export const IDENTITY_LOOKUP_AUDIT_PREFIX = "identityLookup.";
+
+const CLAIM_SELECT = {
+  id: true,
+  organizationId: true,
+  claimedDomains: true,
+  updatedAt: true,
+} as const;
+
+interface ClaimRowShape {
+  id: string;
+  organizationId: string;
+  claimedDomains: string[];
+  updatedAt: Date;
+}
+
+function toClaimRows(
+  row: ClaimRowShape,
+  domains: readonly string[] | null,
+): LookupDomainClaimRow[] {
+  return row.claimedDomains
+    .filter((domain) => domains === null || domains.includes(domain))
+    .map((domain) => ({
+      connectionId: row.id,
+      organizationId: row.organizationId,
+      // Resolved by the service, which already batches organization names
+      // for the people panel; a per-row join here would be one query each.
+      organizationName: null,
+      domain,
+      waitingSinceMs: row.updatedAt.getTime(),
+    }));
+}
 
 interface IdentifierRowShape {
   id: string;

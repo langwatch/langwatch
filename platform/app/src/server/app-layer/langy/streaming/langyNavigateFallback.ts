@@ -21,7 +21,10 @@
  * relay stream.
  */
 import { agentPlatformUrl } from "~/app/api/agents/agent-platform-url";
-import { platformUrl } from "~/app/api/shared/platform-url";
+import {
+  organizationPlatformUrl,
+  platformUrl,
+} from "~/app/api/shared/platform-url";
 import { scenarioRunPlatformUrl } from "~/app/api/simulation-runs/scenario-run-platform-url";
 import { AgentService } from "~/server/agents/agent.service";
 import { getApp } from "~/server/app-layer/app";
@@ -30,34 +33,17 @@ import { DatasetService } from "~/server/datasets/dataset.service";
 import { prisma } from "~/server/db";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import { PromptService } from "~/server/prompt-config/prompt.service";
-import { readTestingInterface } from "~/server/suites/platform-path";
+import { ScenarioService } from "~/server/scenarios/scenario.service";
+import {
+  readTestingInterface,
+  scenarioEditorPath,
+} from "~/server/suites/platform-path";
+import {
+  NAVIGATE_ORGANIZATION_PAGES,
+  NAVIGATE_PROJECT_PAGES,
+} from "./langyNavigatePages";
 
 type UrlForProjectSlug = (projectSlug: string) => string;
-
-/**
- * Page destinations `langwatch navigate open <page>` can name directly: the
- * project's own top-level pages, for "take me to the prompts page" asks that
- * name no single resource. Static paths under the project slug, so no lookup
- * beyond the project itself is needed and tenancy holds by construction. The
- * keys are the canonical names AGENTS.md documents; anything else still goes
- * through the id-prefix table below (page names contain no underscore, so the
- * two namespaces cannot collide).
- */
-const NAVIGATE_PAGES: Record<string, string> = {
-  prompts: "/prompts",
-  datasets: "/datasets",
-  evaluations: "/evaluations",
-  "online-evaluations": "/online-evaluations",
-  evaluators: "/evaluators",
-  traces: "/traces",
-  simulations: "/simulations",
-  experiments: "/experiments",
-  workflows: "/workflows",
-  agents: "/agents",
-  analytics: "/analytics",
-  annotations: "/annotations",
-  automations: "/automations",
-};
 
 /**
  * Look one id up with the project's own access; on a hit, return how to build
@@ -93,7 +79,7 @@ const evaluatorPath = (evaluatorId: string): string =>
  * remembered link, mapped to its tenancy-scoped lookup and the platform's own
  * address for the resource: the same paths the REST APIs hand out as
  * `platformUrl` (datasets, workflows/studio, monitors, evaluators, agents,
- * scenario runs) or the app's own drawer deep links (prompts). Order is not
+ * scenarios, scenario runs) or the app's own drawer deep links (prompts). Order is not
  * significant: no prefix here is a prefix of another. (`prompt_version_` ids
  * fall into `prompt_` and miss the prompt lookup, correctly dropping.)
  */
@@ -107,6 +93,20 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
     const ui = await readTestingInterface({ projectId });
     return (projectSlug) =>
       scenarioRunPlatformUrl({ projectSlug, scenarioRunId: resourceId, ui });
+  },
+
+  scenario_: async ({ projectId, resourceId }) => {
+    const scenario = await ScenarioService.create(prisma).getById({
+      id: resourceId,
+      projectId,
+    });
+    if (!scenario) return null;
+    const ui = await readTestingInterface({ projectId });
+    return (projectSlug) =>
+      platformUrl({
+        projectSlug,
+        path: scenarioEditorPath({ ui, scenarioId: resourceId }),
+      });
   },
 
   prompt_: async ({ projectId, resourceId }) => {
@@ -201,6 +201,10 @@ const NAVIGATE_RESOLVERS: Record<string, NavigateResolver> = {
  * project slug. Page names are matched case-insensitively (they are words the
  * agent types); id prefixes are matched on the raw string, because an id is
  * case-sensitive and lowercasing one would resolve an id that does not exist.
+ *
+ * A project page goes under the slug (`langyNavigatePages.ts`); an
+ * organization page is built at the top level and takes no slug, since the
+ * pages beside the project pages are not inside one.
  */
 async function resolveUrlBuilder({
   projectId,
@@ -209,10 +213,15 @@ async function resolveUrlBuilder({
   projectId: string;
   resourceId: string;
 }): Promise<((projectSlug: string) => string) | null> {
-  const pagePath = NAVIGATE_PAGES[resourceId.toLowerCase()];
-  if (pagePath) {
+  const pageName = resourceId.toLowerCase();
+  const projectPage = NAVIGATE_PROJECT_PAGES[pageName];
+  if (projectPage) {
     return (projectSlug: string) =>
-      platformUrl({ projectSlug, path: pagePath });
+      platformUrl({ projectSlug, path: projectPage });
+  }
+  const organizationPage = NAVIGATE_ORGANIZATION_PAGES[pageName];
+  if (organizationPage) {
+    return () => organizationPlatformUrl({ path: organizationPage });
   }
   const resolver = Object.entries(NAVIGATE_RESOLVERS).find(([prefix]) =>
     resourceId.startsWith(prefix),
