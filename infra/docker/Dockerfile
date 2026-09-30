@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # ── Stage 1: build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
-RUN npm install -g pnpm@10.34.5
+RUN npm install -g pnpm@12.6.0
 
 # Install Goose migration tool (copied to runtime stage later)
 ARG GOOSE_SHA256_ARM64=dfafe0254b0058cabf016234a500df5ada1623ed034e9473cee9fe4ed07ca090
@@ -190,7 +190,7 @@ RUN CI=true pnpm prune --prod
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
 RUN apk --no-cache add curl openssl bash
-RUN npm install -g pnpm@10.34.5
+RUN npm install -g pnpm@12.6.0
 
 COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 # The scenario SDK opens a voice worker's quick tunnel with a bare `cloudflared` spawn, so the

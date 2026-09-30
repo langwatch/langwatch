@@ -62,7 +62,7 @@ runs:
     - name: Setup pnpm
       uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       with:
-        version: 10.34.5
+        version: 12.6.0
 
     - name: Setup Node
       uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6

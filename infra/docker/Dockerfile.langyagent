@@ -103,7 +103,7 @@ WORKDIR /src
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g pnpm@10.34.5 \
+    && npm install -g pnpm@12.6.0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Since ADR-076 the repo is a SINGLE pnpm workspace, so the lockfile and

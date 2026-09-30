@@ -3,7 +3,7 @@ FROM node:24-alpine
 # node-pty requires native compilation tools
 RUN apk add --no-cache python3 make g++
 
-RUN corepack enable && corepack prepare pnpm@10 --activate
+RUN corepack enable && corepack prepare pnpm@12.6.0 --activate
 
 WORKDIR /app
 
