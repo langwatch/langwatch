@@ -726,6 +726,11 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored by the automation service, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // Same shape: `reason` is the sentence naming WHICH piece of the alert
+        // is missing ("State the severity this alert fires at."), which the
+        // generic line cannot do. Authored in the automation contract's
+        // errors, never relayed.
+        graph_alert_incomplete: new Set(["reason"]),
         // The filter parser's own line about the author's query ("Invalid
         // filter syntax", "Too many filter conditions"). It names WHERE the
         // query went wrong, which the generic sentence cannot. Ours, and

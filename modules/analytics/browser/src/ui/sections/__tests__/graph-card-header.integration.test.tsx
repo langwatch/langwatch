@@ -62,11 +62,11 @@ describe("GraphCardHeader", () => {
   });
 
   describe("given no trigger is configured", () => {
-    describe("when the Add alert button is clicked", () => {
+    describe("when the Add automation button is clicked", () => {
       it("opens automation's drawer prefilled with this graph and its first series", () => {
         const host = renderHeader();
 
-        fireEvent.click(screen.getByRole("button", { name: /Add alert/ }));
+        fireEvent.click(screen.getByRole("button", { name: /Add automation/ }));
 
         expect(host.alertAuthorings).toEqual([
           { graphId: "graph_123", seriesName: "0/latency/p95" },
@@ -82,7 +82,7 @@ describe("GraphCardHeader", () => {
           trigger: { id: "trigger_1", active: true, alertType: "WARNING" },
         });
 
-        fireEvent.click(screen.getByRole("button", { name: "Edit alert" }));
+        fireEvent.click(screen.getByRole("button", { name: "Edit automation" }));
 
         expect(host.alertAuthorings).toEqual([
           { graphId: "graph_123", automationId: "trigger_1", seriesName: "0/latency/p95" },

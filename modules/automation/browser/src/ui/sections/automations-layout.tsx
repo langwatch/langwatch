@@ -1,6 +1,7 @@
 /**
  * The automations screen frame and tab navigation (overview, automations,
- * alerts, schedules), on the design system's shared section rail.
+ * reports), on the design system's shared section rail. The retired alerts
+ * path renders the automations tab, so that tab is the one highlighted.
  */
 
 import { Box } from "@chakra-ui/react";
@@ -9,14 +10,14 @@ import {
   type SectionNavigationLink,
 } from "@langwatch/design-system/section-navigation-frame";
 import type { LucideIcon } from "lucide-react";
-import { Calendar, Eye, TrendingUp, Zap } from "lucide-react";
+import { Calendar, Eye, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAutomationHost } from "../../model/automation-host.ts";
 
-export type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
+export type AutomationSection = "overview" | "automations" | "reports";
 
-/** The four tabs, in the order the page has always listed them. */
+/** The three tabs; reports keep the "/schedules" path they shipped under. */
 export const AUTOMATION_SECTIONS: readonly {
   section: AutomationSection;
   label: string;
@@ -26,8 +27,7 @@ export const AUTOMATION_SECTIONS: readonly {
 }[] = [
   { section: "overview", label: "Overview", suffix: "", icon: Eye },
   { section: "automations", label: "Automations", suffix: "/automations", icon: Zap },
-  { section: "alerts", label: "Alerts", suffix: "/alerts", icon: TrendingUp },
-  { section: "schedules", label: "Schedules", suffix: "/schedules", icon: Calendar },
+  { section: "reports", label: "Reports", suffix: "/schedules", icon: Calendar },
 ];
 
 export function AutomationsLayout({

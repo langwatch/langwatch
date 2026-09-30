@@ -83,6 +83,8 @@ const alertActionParamsSchema = z
   .object({
     members: z.array(z.string()).optional(),
     seriesName: z.string().optional(),
+    slackIntegrationId: z.string().optional(),
+    slackChannelId: z.string().optional(),
   })
   .strict();
 

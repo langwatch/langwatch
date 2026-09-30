@@ -59,6 +59,7 @@ const send = (path: string, timeoutMs?: number) =>
 describe("sendHttpDestination against a real receiver", () => {
   describe("when the receiver redirects toward another address", () => {
     /** @scenario "A redirect is refused rather than followed" */
+    /** @scenario "Redirects are not followed" */
     it("refuses the hop permanently without contacting the address it named", async () => {
       seenPaths.length = 0;
 
@@ -91,6 +92,7 @@ describe("sendHttpDestination against a real receiver", () => {
 
   describe("when the receiver accepts the connection and never answers", () => {
     /** @scenario "A slow receiver is abandoned at the timeout, retryably" */
+    /** @scenario "An endpoint that never answers is retried, not waited on" */
     it("gives up inside the request timeout rather than riding undici's default", async () => {
       const timeoutMs = 500;
       const startedAt = Date.now();

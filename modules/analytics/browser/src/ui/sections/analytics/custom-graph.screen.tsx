@@ -677,9 +677,9 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
-    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2 —
-    // the chart-card `Add alert` bell opens `automation` drawer with
-    // `prefilledGraphId`). This graph mutation is graph-shape only.
+    // Automation-writing moved to the automations drawer (ADR-034 Phase 5.2
+    // — the chart-card `Add automation` bell opens the `automation` drawer
+    // with `prefilledGraphId`). This graph mutation is graph-shape only.
 
     addNewGraph.mutate(
       {
@@ -692,6 +692,9 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
+          // Every picker offering "which graph?" (the automation drawer's among them) reads
+          // the full list; without this the new graph is absent until a page reload.
+          void trpc.graphs.getAll.invalidate();
           // Navigate back to the same page we came from
           host.navigate(reportsPath({ projectSlug: project?.slug, dashboardId }));
         },
@@ -718,6 +721,8 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
+          // A rename changes how the graph reads in every list offering it.
+          void trpc.graphs.getAll.invalidate();
           // Navigate back to the same dashboard we came from
           host.navigate(reportsPath({ projectSlug: project?.slug, dashboardId }));
         },

@@ -472,6 +472,7 @@ export type UiEvaluatorTracesMappingProps = {
   targetFields: string[];
   traceMapping?: MappingState;
   setTraceMapping?: (mapping: MappingState) => void;
+  disableExpansions?: boolean;
 };
 
 /** What an evaluator editor hands experiment's comparison evaluator form. */

@@ -26,6 +26,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../automation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -90,6 +93,12 @@
     },
     {
       "path": "../../secret/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../slack/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../../slack/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

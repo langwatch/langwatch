@@ -1,16 +1,17 @@
 /**
- * Builds the PostgreSQL-resident half of the LangWatchQL catalog opt-*in* from the Prisma
- * manifest, one named model per {@link defineCatalogModel} call, exactly as
- * {@link ./lwql-dataset-derivation.rules.ts#defineCatalogTable} does for the ClickHouse half.
+ * Builds the PostgreSQL-resident half of the LangWatchQL catalog from a catalogue table (which
+ * columns, under which names and gates) and the model's Prisma manifest entry (types, tenant
+ * scope, descriptions), one {@link defineCatalogModel} call per view.
  */
+
+import type { AuthzPermission } from "@langwatch/authz-contract";
 
 import type {
   LangWatchQLColumnUnit,
   LangWatchQLViewColumn,
   LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
-import { defaultColumnGates } from "./lwql-dataset-derivation.rules.ts";
-import type { FieldProtection } from "./lwql-field-protection.rules.ts";
+import type { LwqlAccess, LwqlColumnEntry, LwqlTableCatalogue } from "./lwql-catalogue.rules.ts";
 import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "./lwql-prisma-manifest.rules.ts";
 import type { PrismaField, PrismaManifest, PrismaModel } from "./lwql-prisma-schema.rules.ts";
 import {
@@ -30,7 +31,7 @@ const TENANT_COLUMN = "TenantId";
 /** The three direct tenant columns, narrowest first. */
 const TENANT_COLUMNS = ["projectId", "teamId", "organizationId"] as const;
 
-/** A derived view, plus the record of every column the safe defaults stripped. */
+/** A derived view, plus every column its catalogue table omits and why. */
 export interface DerivedPostgresView extends LangWatchQLViewDefinition {
   readonly skipColumns: Readonly<Record<string, string>>;
 }
@@ -52,15 +53,8 @@ export interface TenantScope {
 
 /** Everything one model's override can set, all optional. */
 export interface PostgresDatasetOverride {
-  readonly name?: string;
   readonly description?: string;
   readonly grain?: string;
-  /** Renames: `{ exposedName: sourceColumn }`, winning over the default name. */
-  readonly aliases?: Readonly<Record<string, string>>;
-  /** Extra source columns to strip, each mapped to the reason it is omitted. */
-  readonly skipColumns?: Readonly<Record<string, string>>;
-  /** Per-column gates, keyed by exposed name; `[]` lifts a default gate. */
-  readonly columnGates?: Readonly<Record<string, readonly FieldProtection[]>>;
   readonly columnUnits?: Readonly<Record<string, LangWatchQLColumnUnit>>;
   readonly descriptions?: Readonly<Record<string, string>>;
   readonly timeColumn?: string;
@@ -68,74 +62,10 @@ export interface PostgresDatasetOverride {
   /** Reaches a tenant through a parent model when this one has no tenant column. */
   readonly tenantVia?: { readonly parent: string; readonly foreignKey: string };
   /**
-   * Re-admits a column the safe defaults would strip, each mapped to the reason
-   * it is safe to expose. A re-admit without a non-empty reason is refused.
-   */
-  readonly reAdmit?: Readonly<Record<string, string>>;
-  /**
    * A visibility rule the application's own repository enforces in code — copied verbatim onto
    * {@link LangWatchQLPostgresMapping.rowFilter}.
    */
   readonly rowFilter?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Naming
-// ---------------------------------------------------------------------------
-
-/** Splits a model name into words, keeping acronyms whole (`LLM`, `S3`). */
-function splitWords(modelName: string): string[] {
-  return modelName
-    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-    .toLowerCase()
-    .split("_");
-}
-
-/** English-plural of the final word, enough for the model names we carry. */
-function pluralize(word: string): string {
-  if (word.endsWith("s")) return word;
-  if (/[^aeiou]y$/.test(word)) return `${word.slice(0, -1)}ies`;
-  if (/(s|x|z|ch|sh)$/.test(word)) return `${word}es`;
-  return `${word}s`;
-}
-
-/**
- * The view name a model gets: acronym-aware `snake_case`, last word pluralised
- * (`CustomLLMModelCost` → `custom_llm_model_costs`, `Topic` → `topics`,
- * `RoutingPolicy` → `routing_policies`, `Analytics` → `analytics`).
- */
-export function postgresDatasetName(modelName: string): string {
-  const words = splitWords(modelName);
-  const last = words.length - 1;
-  words[last] = pluralize(words[last]!);
-  return words.join("_");
-}
-
-/** One field name in PascalCase, preserving internal capitals and digits. */
-function pascalCase(name: string): string {
-  return name
-    .split("_")
-    .map((segment) => (segment.length > 0 ? segment[0]!.toUpperCase() + segment.slice(1) : segment))
-    .join("");
-}
-
-/**
- * The name a column is exposed under: the primary key `id` becomes `<Model>Id` (`Topic.id` →
- * `TopicId`), and every other field is PascalCased (`embeddings_model` → `EmbeddingsModel`,
- * `p95Distance` → `P95Distance`).
- */
-export function exposedColumnName({
-  modelName,
-  fieldName,
-  primaryKey,
-}: {
-  modelName: string;
-  fieldName: string;
-  primaryKey: readonly string[];
-}): string {
-  if (fieldName === "id" && primaryKey.includes("id")) return `${modelName}Id`;
-  return pascalCase(fieldName);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,28 +138,6 @@ export function detectDefaultStripReason(name: string): string | undefined {
   }
   if (lower.includes("email")) return "person email, never exposed";
   return undefined;
-}
-
-/** Postgres String columns whose value is a categorical label, not free text. */
-const POSTGRES_LABEL_NAME = /(Provider|Host|Role|Scope|Action)$/;
-
-/**
- * The gates a Postgres column gets before any override, widening {@link
- * ./defineDatasetFromTable#defaultColumnGates} for the two label shapes Prisma flattens into a
- * plain `String`:
- */
-function postgresColumnGates({
-  field,
-  exposedName,
-  type,
-}: {
-  field: PrismaField;
-  exposedName: string;
-  type: string;
-}): readonly FieldProtection[] {
-  if (field.kind === "enum") return [];
-  if (POSTGRES_LABEL_NAME.test(exposedName)) return [];
-  return defaultColumnGates({ name: exposedName, type });
 }
 
 /** The unit a column measures in, by the same rules the catalog guard checks. */
@@ -421,101 +329,129 @@ function parentTenantScope(
 // Column build
 // ---------------------------------------------------------------------------
 
-/** A source field resolved to how it is exposed, or why it is not. */
-interface ResolvedColumn {
-  readonly column?: LangWatchQLViewColumn;
-  readonly skip?: { readonly source: string; readonly reason: string };
+/** What the builder reads of a catalogue table; a test may name a model the manifest lacks. */
+export type PostgresCatalogueTable = Pick<LwqlTableCatalogue, "columns"> &
+  Readonly<{ sourceTable: string }>;
+
+type GatedEntry = Exclude<LwqlColumnEntry, "inherit" | "omit">;
+
+/** A column entry's gates: content as-is, then its permissions; a gate list is allOf. */
+function entryGates({
+  view,
+  name,
+  entry,
+}: {
+  view: string;
+  name: string;
+  entry: GatedEntry;
+}): LangWatchQLViewColumn["gates"] {
+  const permissions = accessPermissions(entry.access);
+  if (entry.access !== undefined && "anyOf" in entry.access && permissions.length > 1) {
+    throw new Error(
+      `lwql postgres catalog: view "${view}" column "${name}" declares anyOf; a gate list is allOf`,
+    );
+  }
+  const gates: LangWatchQLViewColumn["gates"][number][] = [];
+  const content = entry.content;
+  if (typeof content === "string") gates.push(content);
+  else if (content !== undefined) gates.push(...content);
+  gates.push(...permissions);
+  return gates;
 }
 
-function deriveColumn({
+/** Every permission an access names, whether it asks for all of them or any. */
+function accessPermissions(access: LwqlAccess | undefined): readonly AuthzPermission[] {
+  if (access === undefined) return [];
+  return "allOf" in access ? access.allOf : access.anyOf;
+}
+
+/** The non-relation field a catalogue entry names, refused when the model has none. */
+function entryField({
+  view,
   model,
-  field,
-  scope,
-  override,
-  aliasByColumn,
+  fieldName,
 }: {
+  view: string;
   model: PrismaModel;
-  field: PrismaField;
-  scope: TenantScope;
-  override: PostgresDatasetOverride;
-  aliasByColumn: ReadonlyMap<string, string>;
-}): ResolvedColumn | null {
-  if (field.kind === "relation") return null;
-  if (field.name === scope.consumedField) return null;
-
-  const source = field.columnName;
-  const type = toClickHouseType(field);
-  const exposedName =
-    aliasByColumn.get(source) ??
-    exposedColumnName({
-      modelName: model.name,
-      fieldName: field.name,
-      primaryKey: model.primaryKey,
-    });
-
-  const reason = deriveColumnSkipReason({
-    source,
-    type,
-    exposedName,
-    field,
-    override,
-  });
-  if (reason !== undefined) return { skip: { source, reason } };
-
-  return {
-    // `type` is non-null here: `deriveColumnSkipReason` returns the binary reason
-    // when it is null, so a null would have short-circuited above.
-    column: buildColumn({ source, type: type!, exposedName, field, override }),
-  };
+  fieldName: string;
+}): PrismaField {
+  const field = model.fields.find(
+    (candidate) => candidate.kind !== "relation" && candidate.name === fieldName,
+  );
+  if (field === undefined) {
+    throw new Error(
+      `lwql postgres catalog: view "${view}" names "${fieldName}", which is not a column of ` +
+        `${model.name}`,
+    );
+  }
+  return field;
 }
 
-/**
- * The reason a resolved column is stripped, or `undefined` when it is exposed: a manual
- * `skipColumns` entry, an unqueryable binary type, a name colliding with the real `TenantId` (an
- * internal `tenantId`, never the owning project), or a safe-default strip with no re-admit.
- */
-function deriveColumnSkipReason({
-  source,
-  type,
-  exposedName,
-  field,
-  override,
-}: {
-  source: string;
-  type: string | null;
-  exposedName: string;
-  field: PrismaField;
-  override: PostgresDatasetOverride;
-}): string | undefined {
-  const manualSkip = override.skipColumns?.[source];
-  if (manualSkip !== undefined) return manualSkip;
-  if (type === null) return "binary column, not queryable";
-  if (exposedName === TENANT_COLUMN) {
-    return "internal tenant id (process-manager/migration plumbing), not the owning project";
+/** Every reason a field may never be exposed: binary, the tenant column, a secret or an email. */
+function exposureRefusals({ field, scope }: { field: PrismaField; scope: TenantScope }): string[] {
+  const refusals: string[] = [];
+  if (toClickHouseType(field) === null) refusals.push("binary column, not queryable");
+  if (field.name === scope.consumedField) {
+    refusals.push("the tenant column, exposed only as TenantId");
   }
   const stripReason = detectDefaultStripReason(field.name);
-  const reAdmit = override.reAdmit?.[exposedName];
-  if (stripReason !== undefined && reAdmit === undefined) return stripReason;
-  return undefined;
+  if (stripReason !== undefined) refusals.push(stripReason);
+  return refusals;
 }
 
-/** An exposed column, with its override-refined description, gates and unit. */
-function buildColumn({
-  source,
-  type,
-  exposedName,
-  field,
+/** The field `TenantId` must name as its source: the consumed tenant column, or the parent key. */
+function getTenantSourceField({
+  model,
+  scope,
   override,
 }: {
-  source: string;
-  type: string;
+  model: PrismaModel;
+  scope: TenantScope;
+  override: PostgresDatasetOverride;
+}): string {
+  if (scope.consumedField !== undefined) return scope.consumedField;
+  const foreignKey = override.tenantVia?.foreignKey;
+  const field = foreignKey === undefined ? undefined : pickFieldByColumn(model, foreignKey);
+  if (field === undefined) {
+    throw new Error(`lwql postgres catalog: model "${model.name}" has no tenant field`);
+  }
+  return field.name;
+}
+
+/** Refuses a `TenantId` entry that is gated or reads anything but the tenant's own field. */
+function assertTenantEntry({
+  view,
+  expected,
+  entry,
+}: {
+  view: string;
+  expected: string;
+  entry: LwqlColumnEntry;
+}): void {
+  const plain =
+    typeof entry === "object" && entry.access === undefined && entry.content === undefined;
+  if (!plain || entry.source !== expected) {
+    throw new Error(
+      `lwql postgres catalog: view "${view}" must declare TenantId as { source: "${expected}" }`,
+    );
+  }
+}
+
+/** An exposed column, with its override-refined description and unit. */
+function buildColumn({
+  exposedName,
+  field,
+  type,
+  gates,
+  override,
+}: {
   exposedName: string;
   field: PrismaField;
+  type: string;
+  gates: LangWatchQLViewColumn["gates"];
   override: PostgresDatasetOverride;
 }): LangWatchQLViewColumn {
   const description = override.descriptions?.[exposedName] ?? columnDescription(field, exposedName);
-  const gates =
-    override.columnGates?.[exposedName] ?? postgresColumnGates({ field, exposedName, type });
   const unit = override.columnUnits?.[exposedName] ?? inferColumnUnit(exposedName, description);
 
   return {
@@ -523,34 +459,9 @@ function buildColumn({
     type,
     description,
     gates,
-    sourceColumns: [source],
+    sourceColumns: [field.columnName],
     ...(unit ? { unit } : {}),
   };
-}
-
-/** The exposed name a primary-key field resolves to (alias- and tenant-aware). */
-function exposedKeyName({
-  model,
-  keyField,
-  scope,
-  aliasByColumn,
-}: {
-  model: PrismaModel;
-  keyField: string;
-  scope: TenantScope;
-  aliasByColumn: ReadonlyMap<string, string>;
-}): string {
-  const field = model.fields.find((entry) => entry.name === keyField);
-  const source = field?.columnName ?? keyField;
-  if (field && field.name === scope.consumedField) return TENANT_COLUMN;
-  return (
-    aliasByColumn.get(source) ??
-    exposedColumnName({
-      modelName: model.name,
-      fieldName: keyField,
-      primaryKey: model.primaryKey,
-    })
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -591,127 +502,6 @@ function defaultDescription(model: PrismaModel, grain: string): string {
   const sanitized = sanitizeDescription(model.documentation);
   if (sanitized.length > 0) return sanitized;
   return `Rows of the ${model.name} table, ${grain}.`;
-}
-
-/** An override's `{ exposedName: source }` aliases, keyed the way build reads. */
-function aliasMap(override: PostgresDatasetOverride): ReadonlyMap<string, string> {
-  const aliasByColumn = new Map<string, string>();
-  for (const [exposed, source] of Object.entries(override.aliases ?? {})) {
-    aliasByColumn.set(source, exposed);
-  }
-  return aliasByColumn;
-}
-
-/** The `TenantId` column plus every exposed field, and the columns stripped. */
-function buildColumns({
-  model,
-  scope,
-  override,
-  aliasByColumn,
-}: {
-  model: PrismaModel;
-  scope: TenantScope;
-  override: PostgresDatasetOverride;
-  aliasByColumn: ReadonlyMap<string, string>;
-}): { columns: LangWatchQLViewColumn[]; skipColumns: Record<string, string> } {
-  const columns: LangWatchQLViewColumn[] = [tenantColumn(scope)];
-  const skipColumns: Record<string, string> = {};
-  for (const field of model.fields) {
-    const resolved = deriveColumn({
-      model,
-      field,
-      scope,
-      override,
-      aliasByColumn,
-    });
-    if (!resolved) continue;
-    if (resolved.skip) skipColumns[resolved.skip.source] = resolved.skip.reason;
-    if (resolved.column) columns.push(resolved.column);
-  }
-  return { columns, skipColumns };
-}
-
-/** The dedup key: the exposed primary key, `TenantId` first when it fans out. */
-function deriveKeyColumns({
-  model,
-  scope,
-  aliasByColumn,
-  isFannedOut,
-}: {
-  model: PrismaModel;
-  scope: TenantScope;
-  aliasByColumn: ReadonlyMap<string, string>;
-  isFannedOut: boolean;
-}): string[] {
-  const pkExposed = model.primaryKey.map((keyField) =>
-    exposedKeyName({ model, keyField, scope, aliasByColumn }),
-  );
-  return [...(isFannedOut ? [TENANT_COLUMN] : []), ...pkExposed].filter(
-    (key, index, all) => all.indexOf(key) === index,
-  );
-}
-
-/**
- * Scope resolves before columns build: {@link deriveColumn} needs `scope.consumedField` to leave
- * the field the tenant path already consumes out of the exposed columns, so a
- * project/team/organization id is never exposed twice under two names.
- */
-function deriveModel({
-  model,
-  override,
-  context,
-}: {
-  model: PrismaModel;
-  override: PostgresDatasetOverride;
-  context: TenantResolveContext;
-}): DerivedPostgresView {
-  const scope = resolveTenantScope(model, override, context);
-  const isFannedOut = scope.kind !== "project";
-  const aliasByColumn = aliasMap(override);
-
-  const { columns, skipColumns } = buildColumns({
-    model,
-    scope,
-    override,
-    aliasByColumn,
-  });
-  const keyColumns = deriveKeyColumns({
-    model,
-    scope,
-    aliasByColumn,
-    isFannedOut,
-  });
-
-  const name = override.name ?? postgresDatasetName(model.name);
-  const grain = override.grain ?? defaultGrain({ isFannedOut, scope, keyColumns });
-  const exposedNames = new Set(columns.map((column) => column.name));
-  const timeColumn = override.timeColumn ?? pickDefaultTimeColumn({ columns });
-  const joinKeys = override.joinKeys ?? defaultJoinKeys(columns);
-
-  assertOverride({ name, model, override, exposedNames });
-
-  return {
-    name,
-    sourceTable: `${name}_pg`,
-    postgres: {
-      baseRelation: model.tableName,
-      approvedView: `lwql_${name}`,
-      tenantSourceColumn: scope.column,
-      ...(scope.tenantPath.length > 0 ? { tenantPath: scope.tenantPath } : {}),
-      ...(override.rowFilter !== undefined ? { rowFilter: override.rowFilter } : {}),
-    },
-    description: viewDescription(model, override, grain),
-    gates: [],
-    grain,
-    joinKeys,
-    // Absent when the model has no temporal column and no explicit override, so
-    // a view never advertises an opaque key as its time dimension.
-    ...(timeColumn !== undefined ? { timeColumn } : {}),
-    freshness: LIVE_FRESHNESS,
-    dedup: { keyColumns },
-    columns,
-    skipColumns,
-  };
 }
 
 /** The grain sentence: a fan-out row appears once per project, a plain one not. */
@@ -761,22 +551,134 @@ function defaultJoinKeys(columns: readonly LangWatchQLViewColumn[]): readonly st
   ].filter((key, index, all) => all.indexOf(key) === index);
 }
 
-/** Refuses an override annotation naming a column the view does not expose. */
-function assertOverride({
+/** `TenantId` first, then every exposed entry in declaration order, and the columns omitted. */
+function buildColumns({
   name,
   model,
+  table,
+  scope,
   override,
-  exposedNames,
 }: {
   name: string;
   model: PrismaModel;
+  table: PostgresCatalogueTable;
+  scope: TenantScope;
   override: PostgresDatasetOverride;
-  exposedNames: ReadonlySet<string>;
-}): void {
-  assertReAdmitReasons(name, override);
+}): { columns: LangWatchQLViewColumn[]; skipColumns: Record<string, string> } {
+  const columns: LangWatchQLViewColumn[] = [tenantColumn(scope)];
+  const skipColumns: Record<string, string> = {};
+  const expectedTenant = getTenantSourceField({ model, scope, override });
+  let declaresTenant = false;
+  for (const [exposedName, entry] of Object.entries(table.columns)) {
+    if (exposedName === TENANT_COLUMN) {
+      assertTenantEntry({ view: name, expected: expectedTenant, entry });
+      declaresTenant = true;
+      continue;
+    }
+    if (entry === "omit") {
+      const field = entryField({ view: name, model, fieldName: exposedName });
+      const [reason = "omitted by the catalogue"] = exposureRefusals({ field, scope });
+      skipColumns[field.columnName] = reason;
+      continue;
+    }
+    const gated: GatedEntry = entry === "inherit" ? {} : entry;
+    const field = entryField({ view: name, model, fieldName: gated.source ?? exposedName });
+    const type = toClickHouseType(field);
+    const refusals = exposureRefusals({ field, scope });
+    if (type === null || refusals.length > 0) {
+      throw new Error(
+        `lwql postgres catalog: view "${name}" exposes "${exposedName}": ${refusals.join("; ")}`,
+      );
+    }
+    const gates = entryGates({ view: name, name: exposedName, entry: gated });
+    columns.push(buildColumn({ exposedName, field, type, gates, override }));
+  }
+  if (!declaresTenant) {
+    throw new Error(`lwql postgres catalog: view "${name}" declares no TenantId entry`);
+  }
+  return { columns, skipColumns };
+}
+
+/** The name a primary-key field is exposed under, refused when the catalogue omits it. */
+function exposedKeyName({
+  name,
+  table,
+  scope,
+  keyField,
+}: {
+  name: string;
+  table: PostgresCatalogueTable;
+  scope: TenantScope;
+  keyField: string;
+}): string {
+  if (keyField === scope.consumedField) return TENANT_COLUMN;
+  const exposed = Object.entries(table.columns).find(
+    ([exposedName, entry]) =>
+      exposedName !== TENANT_COLUMN &&
+      entry !== "omit" &&
+      (entry === "inherit" ? exposedName : (entry.source ?? exposedName)) === keyField,
+  );
+  if (exposed === undefined) {
+    throw new Error(`lwql postgres catalog: view "${name}" omits its primary key "${keyField}"`);
+  }
+  return exposed[0];
+}
+
+/**
+ * Scope resolves before columns build: the tenant path consumes one field, which the catalogue
+ * names only as `TenantId`'s source, so a project/team/organization id is never exposed twice.
+ */
+function deriveModel({
+  name,
+  model,
+  table,
+  override,
+  context,
+}: {
+  name: string;
+  model: PrismaModel;
+  table: PostgresCatalogueTable;
+  override: PostgresDatasetOverride;
+  context: TenantResolveContext;
+}): DerivedPostgresView {
+  const scope = resolveTenantScope(model, override, context);
+  const isFannedOut = scope.kind !== "project";
+  const { columns, skipColumns } = buildColumns({ name, model, table, scope, override });
+  const keyColumns = [
+    ...(isFannedOut ? [TENANT_COLUMN] : []),
+    ...model.primaryKey.map((keyField) => exposedKeyName({ name, table, scope, keyField })),
+  ].filter((key, index, all) => all.indexOf(key) === index);
+
+  const grain = override.grain ?? defaultGrain({ isFannedOut, scope, keyColumns });
+  const exposedNames = new Set(columns.map((column) => column.name));
+  const timeColumn = override.timeColumn ?? pickDefaultTimeColumn({ columns });
+  const joinKeys = override.joinKeys ?? defaultJoinKeys(columns);
+
   assertAnnotationsExposed(name, override, exposedNames);
-  assertSkipColumnsExist(name, model, override);
   assertRowFilterReferencesBaseAlias(name, override);
+
+  return {
+    name,
+    sourceTable: `${name}_pg`,
+    postgres: {
+      baseRelation: model.tableName,
+      approvedView: `lwql_${name}`,
+      tenantSourceColumn: scope.column,
+      ...(scope.tenantPath.length > 0 ? { tenantPath: scope.tenantPath } : {}),
+      ...(override.rowFilter !== undefined ? { rowFilter: override.rowFilter } : {}),
+    },
+    description: viewDescription(model, override, grain),
+    gates: [],
+    grain,
+    joinKeys,
+    // Absent when the model has no temporal column and no explicit override, so
+    // a view never advertises an opaque key as its time dimension.
+    ...(timeColumn !== undefined ? { timeColumn } : {}),
+    freshness: LIVE_FRESHNESS,
+    dedup: { keyColumns },
+    columns,
+    skipColumns,
+  };
 }
 
 /** A `rowFilter` that never reads `"m".` filters nothing — refused. */
@@ -789,34 +691,6 @@ function assertRowFilterReferencesBaseAlias(name: string, override: PostgresData
   }
 }
 
-/** Every `skipColumns` key names a real source column, or the view is refused. */
-function assertSkipColumnsExist(
-  name: string,
-  model: PrismaModel,
-  override: PostgresDatasetOverride,
-): void {
-  const sourceColumns = new Set(
-    model.fields.filter((field) => field.kind !== "relation").map((field) => field.columnName),
-  );
-  for (const column of Object.keys(override.skipColumns ?? {})) {
-    if (!sourceColumns.has(column)) {
-      throw new Error(
-        `lwql postgres catalog: view "${name}" skipColumns names "${column}", ` +
-          `which is not a source column of ${model.name}`,
-      );
-    }
-  }
-}
-
-/** Every `reAdmit` entry carries a non-empty reason, or the view is refused. */
-function assertReAdmitReasons(name: string, override: PostgresDatasetOverride): void {
-  for (const [column, reason] of Object.entries(override.reAdmit ?? {})) {
-    if (reason.trim().length === 0) {
-      throw new Error(`lwql postgres catalog: view "${name}" re-admits "${column}" with no reason`);
-    }
-  }
-}
-
 /** Every override annotation names an exposed column, or the view is refused. */
 function assertAnnotationsExposed(
   name: string,
@@ -824,10 +698,8 @@ function assertAnnotationsExposed(
   exposedNames: ReadonlySet<string>,
 ): void {
   for (const [kind, entries] of [
-    ["columnGates", override.columnGates] as const,
     ["columnUnits", override.columnUnits] as const,
     ["descriptions", override.descriptions] as const,
-    ["reAdmit", override.reAdmit] as const,
   ]) {
     for (const key of Object.keys(entries ?? {})) {
       if (!exposedNames.has(key)) {
@@ -844,21 +716,24 @@ function assertAnnotationsExposed(
 // Entry point
 // ---------------------------------------------------------------------------
 
-/** One catalog entry, built opt-*in* from a named Prisma model and its override. */
+/** One catalog view, built from its catalogue table and the model's override. */
 export function defineCatalogModel({
-  model,
-  override = {},
+  name,
+  table,
   overrides = {},
+  override = overrides[table.sourceTable] ?? {},
   manifest = LWQL_PRISMA_MANIFEST,
 }: {
-  /** The Prisma model name to build a view for. */
-  readonly model: string;
-  /** This model's own refinements. */
-  readonly override?: PostgresDatasetOverride;
+  /** The view name a statement uses: the catalogue key. */
+  readonly name: string;
+  readonly table: PostgresCatalogueTable;
   /** Every model's overrides, so a `tenantVia` parent chain resolves. */
   readonly overrides?: Readonly<Record<string, PostgresDatasetOverride>>;
+  /** This model's own refinements; defaults to its entry in `overrides`. */
+  readonly override?: PostgresDatasetOverride;
   readonly manifest?: PrismaManifest;
 }): DerivedPostgresView {
   const context: TenantResolveContext = { manifest, overrides };
-  return deriveModel({ model: prismaManifestModel(manifest, model), override, context });
+  const model = prismaManifestModel(manifest, table.sourceTable);
+  return deriveModel({ name, model, table, override, context });
 }

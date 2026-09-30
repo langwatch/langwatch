@@ -1,11 +1,14 @@
 import { Box, Button, Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import {
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
   type SavedTriggerRow,
-  isReservedWebhookHeader,
   findWebhookUrlProblemMessage,
+  isJsonWebhookContentType,
+  isReservedWebhookHeader,
   WEBHOOK_HEADER_VALUE_KEPT,
   WEBHOOK_METHODS,
   type WebhookActionParams,
+  webhookActionParamsSchema,
   type WebhookMethod,
   type WebhookPreview,
   defaultsForSourceKind,
@@ -21,14 +24,17 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../../../../model/provider-types.ts";
-import { VariableInfoIcon, LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor/index.ts";
+import {
+  VariableInfoIcon,
+  LIQUID_JSON_LANGUAGE_ID,
+  LIQUID_LANGUAGE_ID,
+} from "../../../liquid-editor/index.ts";
+import { HighlightedBodyPreview } from "../elements/highlighted-body-preview.tsx";
 import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
 import { FieldHeader, LiquidEditor } from "./template-authoring.tsx";
 
-/**
- * A template field, mirroring the Slack provider's `FieldDraft`: empty + `usingDefault` means the
- * framework default envelope applies.
- */
+/** A template field, mirroring the Slack provider's `FieldDraft`: empty +
+ *  `usingDefault` means the framework default envelope applies. */
 interface FieldDraft {
   value: string;
   usingDefault: boolean;
@@ -39,11 +45,9 @@ interface HeaderRow {
   id: string;
   name: string;
   value: string;
-  /**
-   * True when the value is a saved secret the server kept back (ADR-040 §3): the input shows a
-   * masked placeholder, and the save sends the kept sentinel so the stored value survives. Typing
-   * or renaming clears it.
-   */
+  /** True when the value is a saved secret the server kept back (ADR-040 §3):
+   *  the input shows a masked placeholder, and the save sends the kept
+   *  sentinel so the stored value survives. Typing or renaming clears it. */
   kept: boolean;
 }
 
@@ -59,11 +63,9 @@ function newHeaderRow(partial?: { name?: string; value?: string; kept?: boolean 
   };
 }
 
-/**
- * A single stored secret, following the header rows' discipline (ADR-040 §3): `kept` means the
- * server held the saved value back, so the input stays empty behind a masked placeholder and the
- * save echoes the kept sentinel.
- */
+/** A single stored secret, following the header rows' discipline (ADR-040 §3):
+ *  `kept` means the server held the saved value back, so the input stays empty
+ *  behind a masked placeholder and the save echoes the kept sentinel. */
 interface SecretDraft {
   value: string;
   kept: boolean;
@@ -75,6 +77,11 @@ export interface WebhookSlice {
   headers: HeaderRow[];
   signingSecret: SecretDraft;
   template: FieldDraft;
+  /** The Content-Type the delivery announces. A JSON type gets the checked,
+   *  re-serialized treatment with the framework default envelope; any other
+   *  type is sent exactly as it renders. Shown as a fixed first row of the
+   *  headers editor — it is a header, just not a secret one. */
+  contentType: string;
 }
 
 const EMPTY_FIELD: FieldDraft = { value: "", usingDefault: true };
@@ -87,11 +94,26 @@ function initialSlice(): WebhookSlice {
     headers: [],
     signingSecret: EMPTY_SECRET,
     template: EMPTY_FIELD,
+    contentType: DEFAULT_WEBHOOK_CONTENT_TYPE,
   };
 }
 
+/** Blank means the default everywhere: validation, preview, save and test fire. */
+function effectiveContentType(slice: WebhookSlice): string {
+  return slice.contentType.trim() || DEFAULT_WEBHOOK_CONTENT_TYPE;
+}
+
+/** The contract's own verdict on the Content-Type, as its messages; empty when it is admissible. */
+function contentTypeProblems(slice: WebhookSlice): string[] {
+  const parsed = webhookActionParamsSchema.shape.contentType.safeParse(effectiveContentType(slice));
+  return parsed.success ? [] : parsed.error.issues.map((issue) => issue.message);
+}
+
 function isComplete(slice: WebhookSlice): boolean {
-  return findWebhookUrlProblemMessage(slice.url.trim()) === null;
+  return (
+    findWebhookUrlProblemMessage(slice.url.trim()) === null &&
+    contentTypeProblems(slice).length === 0
+  );
 }
 
 function summary(slice: WebhookSlice, identity: SummaryIdentity): string {
@@ -129,6 +151,10 @@ function fromTriggerRow(row: SavedTriggerRow): WebhookSlice {
       value: params.bodyTemplate ?? "",
       usingDefault: params.bodyTemplate == null,
     },
+    contentType:
+      typeof params.contentType === "string" && params.contentType.trim() !== ""
+        ? params.contentType
+        : DEFAULT_WEBHOOK_CONTENT_TYPE,
   };
 }
 
@@ -149,10 +175,8 @@ function bodyTemplateOf(slice: WebhookSlice): string | null {
   return template.trim().length > 0 ? template : null;
 }
 
-/**
- * The sentinel for an untouched saved secret, the typed value for a new one, and null for an empty
- * field, which turns signing off.
- */
+/** The sentinel for an untouched saved secret, the typed value for a new one,
+ *  and null for an empty field, which turns signing off. */
 function signingSecretOf(slice: WebhookSlice): string | null {
   if (slice.signingSecret.kept) return WEBHOOK_HEADER_VALUE_KEPT;
   const typed = slice.signingSecret.value.trim();
@@ -165,6 +189,7 @@ function toActionParams(slice: WebhookSlice): WebhookActionParams {
     method: slice.method,
     headers: headersRecord(slice.headers),
     bodyTemplate: bodyTemplateOf(slice),
+    contentType: effectiveContentType(slice),
     signingSecret: signingSecretOf(slice),
   };
 }
@@ -177,14 +202,13 @@ function testFireTarget(slice: WebhookSlice) {
       method: slice.method,
       headers: headersRecord(slice.headers),
       bodyTemplate: bodyTemplateOf(slice),
+      contentType: effectiveContentType(slice),
     },
   };
 }
 
-/**
- * The webhook's body lives inside `actionParams` (ADR-040 §1), not in the four legacy Trigger
- * template columns — so this contributes nothing.
- */
+/** The webhook's body lives inside `actionParams` (ADR-040 §1), not in the
+ *  four legacy Trigger template columns — so this contributes nothing. */
 function templatesFromSlice(_slice: WebhookSlice) {
   return {
     emailSubjectTemplate: null,
@@ -224,6 +248,40 @@ function LastTestResult({ attempt }: { attempt: ConfigFormCtx["lastTestAttempt"]
   );
 }
 
+/** Content-Type is a header like any other to the receiver, but not to the
+ *  editor: custom header values are secrets (encrypted, never echoed back),
+ *  while the declared type must round-trip — and it also decides how the body
+ *  is treated and highlighted. So it gets a fixed, always-present first row
+ *  instead of a removable secret one. */
+function ContentTypeRow({
+  slice,
+  onChange,
+}: {
+  slice: WebhookSlice;
+  onChange: (next: WebhookSlice) => void;
+}) {
+  const [problem] = contentTypeProblems(slice);
+  return (
+    <>
+      <HStack gap={2}>
+        <Input size="sm" flex="1" value="Content-Type" readOnly disabled />
+        <Input
+          size="sm"
+          flex="2"
+          data-testid="webhook-content-type"
+          aria-label="Content-Type value"
+          value={slice.contentType}
+          placeholder={DEFAULT_WEBHOOK_CONTENT_TYPE}
+          onChange={(e) => onChange({ ...slice, contentType: e.target.value })}
+        />
+        {/* Spacer keeping the value column aligned with the removable rows. */}
+        <Box width="8" flexShrink={0} />
+      </HStack>
+      {problem ? <Field.ErrorText>{problem}</Field.ErrorText> : null}
+    </>
+  );
+}
+
 function HeadersEditor({
   slice,
   onChange,
@@ -242,9 +300,10 @@ function HeadersEditor({
     });
 
   return (
-    <Field.Root>
+    <Field.Root invalid={contentTypeProblems(slice).length > 0}>
       <Field.Label>Headers</Field.Label>
       <VStack align="stretch" gap={2} width="full">
+        <ContentTypeRow slice={slice} onChange={onChange} />
         {slice.headers.map((row, index) => {
           const reserved = row.name.trim() !== "" && isReservedWebhookHeader(row.name);
           return (
@@ -310,8 +369,9 @@ function HeadersEditor({
         </Button>
       </VStack>
       <Field.HelperText>
-        Sent with every request, for example an Authorization header your endpoint expects. Values
-        are stored encrypted and never shown again.
+        Sent with every request. Content-Type also decides how the body is treated: application/json
+        is checked before it sends, anything else is sent exactly as you write it. Other header
+        values, for example an Authorization header, are stored encrypted and never shown again.
       </Field.HelperText>
     </Field.Root>
   );
@@ -366,15 +426,17 @@ function SigningSecretField({
 
 const METHOD_ITEMS = WEBHOOK_METHODS.map((m) => ({ value: m, label: m }));
 
-function WebhookConfigForm({
-  slice,
-  onChange,
-  ctx,
-}: ConfigFormProps<WebhookSlice, WebhookPreview>) {
-  const urlProblem =
-    slice.url.trim() === "" ? null : findWebhookUrlProblemMessage(slice.url.trim());
+/**
+ * The body the endpoint receives and a preview of the next fire; both follow the declared
+ * Content-Type. Only a JSON type keeps the framework default and its reset: an empty non-JSON
+ * body sends nothing.
+ */
+function BodyEditor({ slice, onChange, ctx }: ConfigFormProps<WebhookSlice, WebhookPreview>) {
+  const isJson = isJsonWebhookContentType(effectiveContentType(slice));
   const defaults = defaultsForSourceKind(ctx.sourceKind);
-  const templateValue = slice.template.value || defaults.webhookBody;
+  const templateValue = isJson
+    ? slice.template.value || defaults.webhookBody
+    : slice.template.value;
   const variables = useMemo(
     () => filterVariablesForCadence(ctx.variables, ctx.cadenceMode),
     [ctx.variables, ctx.cadenceMode],
@@ -382,21 +444,102 @@ function WebhookConfigForm({
   const preview = ctx.preview;
 
   return (
+    <VStack align="stretch" gap={2}>
+      {isJson ? (
+        <FieldHeader
+          label="Body"
+          usingDefault={slice.template.usingDefault}
+          onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
+          trailing={<VariableInfoIcon variables={variables} />}
+        />
+      ) : (
+        <HStack gap={2}>
+          <Text textStyle="sm" fontWeight="semibold">
+            Body
+          </Text>
+          <VariableInfoIcon variables={variables} />
+        </HStack>
+      )}
+      <Text textStyle="xs" color="fg.muted">
+        Write the body your endpoint receives. Values in braces fill in from your trace or metric
+        when the request sends.
+      </Text>
+      <Box data-testid="webhook-body-editor">
+        <LiquidEditor
+          variables={variables}
+          height="280px"
+          language={isJson ? LIQUID_JSON_LANGUAGE_ID : LIQUID_LANGUAGE_ID}
+          value={templateValue}
+          onChange={(value) => onChange({ ...slice, template: { value, usingDefault: false } })}
+        />
+      </Box>
+      {preview ? <BodyPreview preview={preview} contentType={effectiveContentType(slice)} /> : null}
+    </VStack>
+  );
+}
+
+/** What the next fire would post, shown under the editor, highlighted for the
+ *  declared Content-Type when we have a grammar for it. */
+function BodyPreview({ preview, contentType }: { preview: WebhookPreview; contentType: string }) {
+  const isJson = isJsonWebhookContentType(contentType);
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      bg="bg.subtle"
+      padding={3}
+      data-testid="webhook-preview"
+    >
+      <Text textStyle="xs" fontWeight="medium" color="fg.muted" mb={1}>
+        {preview.payload.method} {preview.payload.url || "(no URL yet)"}
+      </Text>
+      <HighlightedBodyPreview
+        body={isJson ? formatPreviewBody(preview.payload.body) : preview.payload.body}
+        contentType={contentType}
+      />
+      {preview.errors.length > 0 ? (
+        <Text textStyle="xs" color="fg.error" mt={1}>
+          {preview.errors[0]}
+          {isJson
+            ? ": the default body will be sent instead."
+            : ": an empty body will be sent instead."}
+        </Text>
+      ) : null}
+    </Box>
+  );
+}
+
+/** Why the test fire is held, or nothing when the config is complete. */
+function testFireHint(slice: WebhookSlice): string | undefined {
+  if (isComplete(slice)) return undefined;
+  if (findWebhookUrlProblemMessage(slice.url.trim()) !== null) return "Add a valid https URL first";
+  return "Fix the Content-Type header first";
+}
+
+function WebhookConfigForm({
+  slice,
+  onChange,
+  ctx,
+}: ConfigFormProps<WebhookSlice, WebhookPreview>) {
+  const urlProblem =
+    slice.url.trim() === "" ? null : findWebhookUrlProblemMessage(slice.url.trim());
+  const complete = isComplete(slice);
+
+  return (
     <VStack align="stretch" gap={4}>
       <Field.Root invalid={!!urlProblem}>
         <Field.Label>Endpoint URL</Field.Label>
         <Input
+          data-testid="automation-webhook-url-input"
           value={slice.url}
           onChange={(e) => onChange({ ...slice, url: e.target.value })}
           placeholder="https://example.com/hooks/langwatch"
-          data-testid="automation-webhook-url-input"
         />
         {urlProblem ? (
           <Field.ErrorText>{urlProblem}</Field.ErrorText>
         ) : (
-          <Field.HelperText>
-            An https endpoint you control. The request body is JSON.
-          </Field.HelperText>
+          <Field.HelperText>An https endpoint you control.</Field.HelperText>
         )}
       </Field.Root>
       <Field.Root>
@@ -418,60 +561,12 @@ function WebhookConfigForm({
         <AutomationTestFireButton
           onTestFire={ctx.onTestFire}
           loading={ctx.testFireLoading}
-          disabled={!isComplete(slice)}
-          hint={isComplete(slice) ? undefined : "Add a valid https URL first"}
+          disabled={!complete}
+          hint={testFireHint(slice)}
         />
         <LastTestResult attempt={ctx.lastTestAttempt} />
       </VStack>
-      <FieldHeader
-        label="JSON body"
-        usingDefault={slice.template.usingDefault}
-        onReset={() => onChange({ ...slice, template: EMPTY_FIELD })}
-        trailing={<VariableInfoIcon variables={variables} />}
-      />
-      <VStack align="stretch" gap={2}>
-        <Text textStyle="xs" color="fg.muted">
-          Write the JSON your endpoint receives. Values in braces fill in from your trace or alert
-          when the request sends.
-        </Text>
-        <Box data-testid="webhook-body-editor">
-          <LiquidEditor
-            variables={variables}
-            height="280px"
-            language={LIQUID_JSON_LANGUAGE_ID}
-            value={templateValue}
-            onChange={(value) => onChange({ ...slice, template: { value, usingDefault: false } })}
-          />
-        </Box>
-        {preview ? (
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            bg="bg.subtle"
-            padding={3}
-            data-testid="webhook-preview"
-          >
-            <Text textStyle="xs" fontWeight="medium" color="fg.muted" mb={1}>
-              {preview.payload.method} {preview.payload.url || "(no URL yet)"}
-            </Text>
-            <Text
-              as="pre"
-              textStyle="xs"
-              fontFamily="mono"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-            >
-              {formatPreviewBody(preview.payload.body)}
-            </Text>
-            {preview.errors.length > 0 ? (
-              <Text textStyle="xs" color="fg.error" mt={1}>
-                {preview.errors[0]}: the default body will be sent instead.
-              </Text>
-            ) : null}
-          </Box>
-        ) : null}
-      </VStack>
+      <BodyEditor slice={slice} onChange={onChange} ctx={ctx} />
     </VStack>
   );
 }

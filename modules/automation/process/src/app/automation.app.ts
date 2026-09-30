@@ -20,6 +20,13 @@ import {
   type AutomationApiToggleTriggerInput,
   type AutomationApiUpdateTriggerFiltersInput,
   type AutomationApiUpsertInput,
+  type AutomationApiFireHistoryInput,
+  type AutomationApiTriggerScope,
+  type NextFiring,
+  type TriggerLatestEvaluation,
+  type AutomationRestCreateInput,
+  type AutomationRestUpdateInput,
+  type TriggerFirePage,
   type AutomationAction,
   type AutomationAuthor,
   type AutomationEvaluationActivityContext,
@@ -52,8 +59,8 @@ import {
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
 import {
   MonitorApi,
@@ -63,6 +70,8 @@ import {
 import { NotificationService } from "@langwatch/notification-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
+import { SlackApi } from "@langwatch/slack-contract";
+import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
@@ -74,6 +83,7 @@ import {
   type AutomationsPipeline,
 } from "../eventing/automation.pipeline.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
+import { SlackConnectionMigration } from "../migrations/legacy-import.slack-connection.migration.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
@@ -82,6 +92,7 @@ import { AutomationAuthoringService } from "../services/automation-authoring.ser
 import { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "../services/automation-evaluation-trigger-filter.service.ts";
 import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
+import { AutomationPublicApiService } from "../services/automation-public-api.service.ts";
 import {
   AutomationRulesService,
   type AutomationProjectIdentity,
@@ -89,7 +100,7 @@ import {
 import { AutomationRunawayMetricsOtelService } from "../services/automation-runaway-metrics-otel.service.ts";
 import { AutomationRunawayService } from "../services/automation-runaway.service.ts";
 import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
-import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
+import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
 import { AutomationTriggerMatchDispatcherService } from "../services/automation-trigger-match-dispatcher.service.ts";
@@ -97,7 +108,11 @@ import type { AutomationWebhookStoredParams } from "../services/automation-webho
 import { AutomationService } from "../services/automation.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
 import { ReportScheduleService } from "../services/report-schedule.service.ts";
+import { SlackConnectionMigrationService } from "../services/slack-connection-migration.service.ts";
+import { SlackDestinationService } from "../services/slack-destination.service.ts";
+import { TriggerFilterValidationService } from "../services/trigger-filter-validation.service.ts";
 import { AutomationGraphService } from "../services/trigger-graph.service.ts";
+import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
   type UnsubscribeTokenVerifier,
@@ -161,8 +176,6 @@ export interface AutomationProviderSecrets {
   ): Promise<unknown>;
   /** Stored params with every secret stripped, for a row on its way out. */
   redactActionParamsFor(action: AutomationAction, params: unknown): unknown;
-  /** The stored Slack bot token in the clear, or nothing when none is stored. */
-  findDecryptedSlackBotToken(actionParams: unknown): string | null;
   /** The stored webhook header values in the clear, by header name. */
   decryptWebhookHeaders(stored: AutomationWebhookStoredParams): Record<string, string>;
   /** The stored webhook signing secrets in the clear, newest first. */
@@ -214,7 +227,9 @@ export type AutomationInfrastructure = Readonly<{
   clock: AutomationClock;
   notifier: AutomationGraphNotifier;
   logger: AutomationLogger;
-  slackTokens: AutomationSlackBotTokenDecryptor;
+  slackDestinations: SlackDestinationService;
+  /** Points a Slack save at a connection and moves its claim (ARCHITECTURE.md §3). */
+  slackConnections: AutomationSlackConnectionService;
   dispatchErrors: AutomationDispatchError;
   heartbeat: AutomationHeartbeat;
   runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals;
@@ -238,7 +253,8 @@ const UNSUBSCRIBE_CONFIRM_MAX = 10;
 type AutomationDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
   monitors: typeof MonitorApi;
-  featureFlags: typeof FeatureFlagApi;
+  /** Whether an id a condition keys by is an evaluator's, which a condition cannot select by. */
+  evaluators: typeof EvaluatorApi;
   entitlement: typeof EntitlementApi;
   projects: typeof ProjectApi;
   /** The SAME trail every other completed mutation on this process is recorded on. */
@@ -253,6 +269,8 @@ type AutomationDependencies = Readonly<{
   authorization: typeof AuthzApi;
   /** Where every mail automation sends goes out; notification writes the envelope. */
   notifications: typeof NotificationService;
+  /** The Slack connections a Slack automation delivers through and claims. */
+  slack: typeof SlackApi;
 }>;
 
 /** Peers only `create` composes (settlement's and mail's); `fromInfrastructure` never sees them. */
@@ -261,7 +279,8 @@ type AutomationSettlementPeer =
   | "datasets"
   | "annotations"
   | "authorization"
-  | "notifications";
+  | "notifications"
+  | "slack";
 
 /** {@link AutomationDependencies}, resolved to the peer Apps `fromInfrastructure` itself reads. */
 type AutomationRuntimeDependencies = Omit<
@@ -282,6 +301,8 @@ interface AutomationAppCollaborators {
   monitors: MonitorApiContract;
   rules: AutomationRulesService;
   authoring: AutomationAuthoringService;
+  publicApi: AutomationPublicApiService;
+  latestEvaluations: TriggerLatestEvaluationService;
   audit: AutomationAuditSink;
   limits: AutomationCallCounter;
   publicBaseUrl: string | undefined;
@@ -296,7 +317,7 @@ export class AutomationApp implements AutomationApi {
   static readonly dependencies = {
     analytics: AnalyticsApi,
     monitors: MonitorApi,
-    featureFlags: FeatureFlagApi,
+    evaluators: EvaluatorApi,
     entitlement: EntitlementApi,
     projects: ProjectApi,
     auditLog: AuditLogApi,
@@ -307,6 +328,8 @@ export class AutomationApp implements AutomationApi {
     authorization: AuthzApi,
     /** Where every mail automation sends goes out; notification owns the gateway. */
     notifications: NotificationService,
+    /** The Slack connections a Slack automation delivers through and claims. */
+    slack: SlackApi,
   };
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
@@ -320,8 +343,13 @@ export class AutomationApp implements AutomationApi {
    */
   static create(setup: AutomationSetup): Promise<AutomationApp> {
     return setup.secrets.into(AutomationApp.secrets.unsubscribe, (unsubscribeSigningSecret) => {
+      const { slack, projects } = setup.dependencies;
+      const crypto = setup.members.encryption;
+      const slackConnections = AutomationSlackConnectionService.create({ slack, projects, crypto });
       const infrastructure = buildAutomationInfrastructure({
         members: setup.members,
+        slackDestinations: SlackDestinationService.create({ slack, crypto }),
+        slackConnections,
         notifications: setup.dependencies.notifications,
         auditLog: setup.dependencies.auditLog,
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
@@ -345,9 +373,18 @@ export class AutomationApp implements AutomationApi {
         analytics: setup.dependencies.analytics,
         traces: setup.dependencies.traces,
         delivery: infrastructure.delivery,
-        crypto: setup.members.encryption,
+        slackDestinations: infrastructure.slackDestinations,
         suppression: automation.#automation,
         baseHost: setup.members.publicBaseUrl ?? "",
+      });
+      automation.#migration = SlackConnectionMigration.create({
+        pass: SlackConnectionMigrationService.create({
+          triggers: setup.repositories.triggers,
+          projects,
+          slack,
+          slackConnections,
+          crypto,
+        }),
       });
       return automation;
     });
@@ -377,6 +414,8 @@ export class AutomationApp implements AutomationApi {
       }),
       delivery: infrastructure.delivery,
       emailCaps: infrastructure.emailCaps,
+      slackDestinations: infrastructure.slackDestinations,
+      slackConnections: infrastructure.slackConnections,
       crypto: members.encryption,
       baseHost: members.publicBaseUrl ?? "",
       observability: AutomationSettlementObservabilityService.create({
@@ -437,6 +476,10 @@ export class AutomationApp implements AutomationApi {
       },
       slots: members.persistCaps,
     });
+    const latestEvaluations = TriggerLatestEvaluationService.create({
+      repository: repositories.latestEvaluations,
+      logger: members.logger,
+    });
     const graph = AutomationGraphService.create({
       triggers: repositories.triggers,
       customGraphs: repositories.customGraphs,
@@ -445,8 +488,10 @@ export class AutomationApp implements AutomationApi {
       notifier: members.notifier,
       triggerSent: repositories.graphTriggerSent,
       logger: members.logger,
-      slackTokens: members.slackTokens,
+      slackDestinations: members.slackDestinations,
+      slackConnections: members.slackConnections,
       dispatchErrors: members.dispatchErrors,
+      latestEvaluations,
       runaway: members.runaway,
       clock: members.clock,
       baseHost: members.publicBaseUrl ?? "",
@@ -472,14 +517,18 @@ export class AutomationApp implements AutomationApi {
         delivery: members.testFire,
       }),
       persistCaps,
+      slackConnections: members.slackConnections,
     });
     const rules = AutomationRulesService.create({
       automation,
       projects: dependencies.projects,
-      featureFlags: dependencies.featureFlags,
     });
 
     const triggerMatches = AutomationTriggerMatchDispatcherService.create();
+    const filterValidation = TriggerFilterValidationService.create({
+      evaluators: dependencies.evaluators,
+      monitors: dependencies.monitors,
+    });
 
     return new AutomationApp({
       automation,
@@ -490,9 +539,26 @@ export class AutomationApp implements AutomationApi {
         monitors: dependencies.monitors,
         providers: members.providers,
         slackChannels: members.slackChannels,
+        slackDestinations: members.slackDestinations,
+        slackConnections: members.slackConnections,
         traceFilters: members.traceFilters,
         limits: members.limits,
+        filterValidation,
+        logger: members.logger,
       }),
+      publicApi: AutomationPublicApiService.create({
+        automation,
+        rules,
+        providers: members.providers,
+        slackConnections: members.slackConnections,
+        slackDestinations: members.slackDestinations,
+        filterValidation,
+        history: repositories.history,
+        traceFilters: members.traceFilters,
+        limits: members.limits,
+        logger: members.logger,
+      }),
+      latestEvaluations,
       monitors: dependencies.monitors,
       audit: members.audit,
       limits: members.limits,
@@ -515,8 +581,11 @@ export class AutomationApp implements AutomationApi {
   }
 
   #automation: AutomationService;
+  #migration: SlackConnectionMigration | undefined;
   #rules: AutomationRulesService;
   #authoring: AutomationAuthoringService;
+  #publicApi: AutomationPublicApiService;
+  readonly #latestEvaluations: TriggerLatestEvaluationService;
   #monitors: MonitorApiContract;
   #audit: AutomationAuditSink;
   #limits: AutomationCallCounter;
@@ -532,6 +601,8 @@ export class AutomationApp implements AutomationApi {
     this.#automation = collaborators.automation;
     this.#rules = collaborators.rules;
     this.#authoring = collaborators.authoring;
+    this.#publicApi = collaborators.publicApi;
+    this.#latestEvaluations = collaborators.latestEvaluations;
     this.#monitors = collaborators.monitors;
     this.#audit = collaborators.audit;
     this.#limits = collaborators.limits;
@@ -724,6 +795,16 @@ export class AutomationApp implements AutomationApi {
     return this.#automation.getReportSchedules(input);
   }
 
+  registeredMigrations(): readonly SystemMigration[] {
+    if (!this.#migration) {
+      throw new Error(
+        "This AutomationApp was composed from already-built services, so it holds no migration: " +
+          "compose it through AutomationApp.create to answer its registered migrations.",
+      );
+    }
+    return [this.#migration];
+  }
+
   /** The Slack conversations a bot token can see, for the channel picker. */
   listSlackChannels(input: AutomationApiListSlackChannelsInput): Promise<SlackChannelListing> {
     return this.#authoring.listSlackChannels(input);
@@ -780,6 +861,59 @@ export class AutomationApp implements AutomationApi {
    * scheduled-report entry, always both. A calendar entry left behind keeps
    * waking the scheduler forever. Idempotent for one that was never a report.
    */
+  getPublicTrigger(input: { projectId: string; triggerId: string }): Promise<Trigger> {
+    return this.#publicApi.getRedactedById(input);
+  }
+
+  deletePublicTrigger(input: { projectId: string; triggerId: string }): Promise<void> {
+    return this.#publicApi.deleteById(input);
+  }
+
+  createPublicTrigger(input: {
+    projectId: string;
+    actorId: string;
+    input: AutomationRestCreateInput;
+  }): Promise<Trigger> {
+    return this.#publicApi.create(input);
+  }
+
+  updatePublicTrigger(input: {
+    projectId: string;
+    triggerId: string;
+    actorId: string;
+    input: AutomationRestUpdateInput;
+  }): Promise<Trigger> {
+    return this.#publicApi.update(input);
+  }
+
+  setPublicTriggerActive(input: {
+    projectId: string;
+    triggerId: string;
+    active: boolean;
+  }): Promise<Trigger> {
+    return this.#publicApi.setActive(input);
+  }
+
+  getFireHistory(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
+    return this.#publicApi.getFireHistory(input);
+  }
+
+  findLatestEvaluation(input: AutomationApiTriggerScope): Promise<TriggerLatestEvaluation[]> {
+    return this.#latestEvaluations.findByTriggerId(input);
+  }
+
+  getNextFiring(input: AutomationApiTriggerScope): Promise<NextFiring> {
+    return this.#automation.getNextFiring(input);
+  }
+
+  listFireHistoryPage(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
+    return this.#automation.listFireHistoryPage(input);
+  }
+
+  testFireStoredTrigger(input: { projectId: string; triggerId: string }): Promise<TestFireResult> {
+    return this.#publicApi.testFire(input);
+  }
+
   async delete(input: { triggerId: string; projectId: string }): Promise<void> {
     await this.#automation.softDeleteById(input);
     await this.#automation.removeReportSchedule({
@@ -858,11 +992,6 @@ export class AutomationApp implements AutomationApi {
   /** The template draft an author is about to save. Throws on a bad template. */
   validateTemplateDraft(draft: TestFireTemplateDraft): void {
     this.#automation.validateTemplateDraft(draft);
-  }
-
-  /** Refuses the webhook delivery channel unless the project has it (ADR-040 §7). */
-  assertWebhookChannelEnabled(input: { projectId: string; userId: string }): Promise<void> {
-    return this.#rules.assertWebhookChannelEnabled(input);
   }
 
   // -- the project an automation belongs to ----------------------------------

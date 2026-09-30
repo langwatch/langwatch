@@ -247,6 +247,7 @@ export async function startUi(): Promise<void> {
   const transport = createUiFeatureApiClient({
     fetch: sessionVersionFetch({ watch: sessionVersions }),
     unbatchedPaths: unbatchedCachePaths({ plan: cachePlan }),
+    isDevelopment: config.process.mode === "development",
   });
   const rootCapabilities = await loadUiRootCapabilities();
   const installed = await createUi({ document, mount: "root" })

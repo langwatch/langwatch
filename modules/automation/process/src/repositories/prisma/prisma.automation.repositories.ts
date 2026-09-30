@@ -18,6 +18,7 @@ import { PrismaEmailSuppressionNameRepository } from "./prisma.email-suppression
 import { PrismaEmailSuppressionRepository } from "./prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "./prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerFireHistoryRepository } from "./prisma.trigger-fire-history.repository.ts";
+import { PrismaTriggerLatestEvaluationRepository } from "./prisma.trigger-latest-evaluation.repository.ts";
 import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
 import { PrismaWebhookDeliveryRepository } from "./prisma.webhook-delivery.repository.ts";
 
@@ -38,6 +39,7 @@ export class PostgresAutomationRepositories {
     return {
       triggers: PrismaTriggerRepository.create(database, clock),
       history: PrismaTriggerFireHistoryRepository.create(database),
+      latestEvaluations: PrismaTriggerLatestEvaluationRepository.create(database),
       suppressions: PrismaEmailSuppressionRepository.create(database),
       names: PrismaEmailSuppressionNameRepository.create(database),
       customGraphs: PrismaCustomGraphRepository.create(database),

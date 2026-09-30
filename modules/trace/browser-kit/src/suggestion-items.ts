@@ -54,25 +54,34 @@ export function rankByMatch<T extends { keys: string[] }>(
 }
 
 /**
- * Build the field-mode suggestion list as a flat array — sectioning is a concern of the
- * renderer (`SuggestionDropdown`).
+ * F13/#6716: `tokensEstimated` is a qualifier on `tokens`, not a second field to
+ * offer. The fold is presentational: the raw filter still parses; "estimated" finds `tokens`.
  */
+const FOLDED_QUALIFIER_FIELDS: ReadonlySet<string> = new Set(["tokensEstimated"]);
+const QUALIFIER_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
+  tokens: ["estimated"],
+};
+
+/** The field-mode suggestion list as a flat array; the renderer does the sectioning. */
 export function getFieldSuggestions(query: string): SuggestionItem[] {
-  const fieldItems = FIELD_NAMES.map((name) => {
-    const meta = SEARCH_FIELDS[name];
-    const label = meta?.label ?? name;
-    return {
-      item: {
-        value: name,
-        label,
-        field: name,
-        group: meta?.group ?? null,
-      } satisfies SuggestionItem,
-      // Match the typed query against both the human label and the raw
-      // field id, so `status`, `Status`, and `stat` all hit.
-      keys: [label, name],
-    };
-  });
+  const fieldItems = FIELD_NAMES.filter((name) => !FOLDED_QUALIFIER_FIELDS.has(name)).map(
+    (name) => {
+      const meta = SEARCH_FIELDS[name];
+      const label = meta?.label ?? name;
+      return {
+        item: {
+          value: name,
+          label,
+          field: name,
+          group: meta?.group ?? null,
+        } satisfies SuggestionItem,
+        // Match the typed query against both the human label and the raw
+        // field id, so `status`, `Status`, and `stat` all hit. A folded field's
+        // synonyms (e.g. `tokens` answering to "estimated") extend this too.
+        keys: [label, name, ...(QUALIFIER_SYNONYMS[name] ?? [])],
+      };
+    },
+  );
   const prefixItems = DYNAMIC_PREFIXES.map((p) => ({
     item: {
       // Accept value is the raw prefix; the user types the key after.

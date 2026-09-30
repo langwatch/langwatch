@@ -1,146 +1,105 @@
-/**
- * What happens to a Slack bot token between the form and the database:
- * a customer credential, encrypted on the way in, never handed back out,
- * and kept as-is when an author edits without retyping it.
- */
-import {
-  MissingSlackBotTokenError,
-  SLACK_BOT_TOKEN_KEPT,
-  type SlackActionParams,
-} from "@langwatch/automation-contract";
+/** Slack params at rest and on read. @see specs/automations/slack-connections.feature */
 import { describe, expect, it } from "vitest";
 
-import {
-  AutomationSlackSecretsService,
-  type AutomationSecretCrypto,
-} from "../automation-slack-secrets.service.ts";
+import { readableSlackActionParams } from "../../rules/automation-slack-read.rules.ts";
+import { AutomationSlackSecretsService } from "../automation-slack-secrets.service.ts";
 
-/**
- * A stand-in cipher. It hex-encodes rather than wrapping, so a test asserting
- * the plaintext is absent from the stored row cannot pass on a fake whose
- * ciphertext still spells it out.
- */
-function reversingCrypto(): AutomationSecretCrypto & { encrypted: string[] } {
-  const encrypted: string[] = [];
+// Built at runtime so no fixture reads as a real credential.
+const BOT_TOKEN = ["xoxb", "fake", "token"].join("-");
+const WEBHOOK_URL = ["https://hooks.slack.com", "services", "fake"].join("/");
 
-  return {
-    encrypted,
-    encrypt(value: string): string {
-      encrypted.push(value);
-      return Buffer.from(value, "utf8").toString("hex");
-    },
-    decrypt(value: string): string {
-      return Buffer.from(value, "hex").toString("utf8");
-    },
-  };
-}
+const service = AutomationSlackSecretsService.create({
+  encrypt: (value) => `enc(${value})`,
+  decrypt: (value) => value.replace(/^enc\(/, "").replace(/\)$/, ""),
+});
 
-const BOT: SlackActionParams = {
-  slackDelivery: "bot",
-  slackChannelId: "C123",
-  slackBotToken: "xoxb-plaintext",
-};
-
-describe("AutomationSlackSecretsService", () => {
-  describe("given a Slack automation saved with a bot token", () => {
-    describe("when the parameters are persisted", () => {
-      /** @scenario "The bot token is protected at rest" */
-      it("stores the ciphertext, never the token the author typed", () => {
-        const crypto = reversingCrypto();
-
-        const persisted = AutomationSlackSecretsService.create(crypto).persist({ incoming: BOT });
-
-        expect(crypto.encrypted).toEqual(["xoxb-plaintext"]);
-        expect(persisted.slackBotToken).toBe(Buffer.from("xoxb-plaintext", "utf8").toString("hex"));
-        expect(JSON.stringify(persisted)).not.toContain("xoxb-plaintext");
+describe("AutomationSlackSecretsService.persist", () => {
+  describe("when the params point at a connection", () => {
+    it("stores only the id, the method and a bot connection's channel", () => {
+      const stored = service.persist({
+        incoming: {
+          slackIntegrationId: "conn-1",
+          slackDelivery: "bot",
+          slackChannelId: " C1 ",
+          slackBotToken: BOT_TOKEN,
+          slackWebhook: WEBHOOK_URL,
+        },
       });
-    });
 
-    describe("when the automation is read back for the browser", () => {
-      /** @scenario "The bot token is protected at rest" */
-      it("returns the fact a token is set, and no token", () => {
-        const adapter = AutomationSlackSecretsService.create(reversingCrypto());
-
-        const redacted = adapter.redact(adapter.persist({ incoming: BOT }));
-
-        expect(redacted).not.toHaveProperty("slackBotToken");
-        expect(redacted).toMatchObject({ slackBotTokenSet: true, slackChannelId: "C123" });
-        expect(JSON.stringify(redacted)).not.toContain("xoxb");
-      });
-    });
-
-    describe("when the author edits it and leaves the token blank", () => {
-      /** @scenario "Editing a bot automation without re-entering the token" */
-      it("keeps the stored token rather than encrypting an empty string", () => {
-        const crypto = reversingCrypto();
-        const adapter = AutomationSlackSecretsService.create(crypto);
-        const existing = adapter.persist({ incoming: BOT });
-        crypto.encrypted.length = 0;
-
-        const kept = adapter.persist({
-          incoming: { slackDelivery: "bot", slackChannelId: "C123" },
-          existing,
-        });
-        const sentinel = adapter.persist({
-          incoming: {
-            slackDelivery: "bot",
-            slackChannelId: "C123",
-            slackBotToken: SLACK_BOT_TOKEN_KEPT,
-          },
-          existing,
-        });
-
-        expect(kept.slackBotToken).toBe(existing.slackBotToken);
-        expect(sentinel.slackBotToken).toBe(existing.slackBotToken);
-        expect(crypto.encrypted).toEqual([]);
-        expect(adapter.findDecryptedToken(kept)).toBe("xoxb-plaintext");
+      expect(stored).toEqual({
+        slackIntegrationId: "conn-1",
+        slackDelivery: "bot",
+        slackChannelId: "C1",
       });
     });
   });
 
-  describe("given a new Slack automation set to the bot connection", () => {
-    describe("when it carries no token at all", () => {
-      /** @scenario "A bot automation is incomplete without a token and channel" */
-      it("refuses the save by name", () => {
-        const adapter = AutomationSlackSecretsService.create(reversingCrypto());
-        const incoming: SlackActionParams = { slackDelivery: "bot", slackChannelId: "C123" };
+  describe("when the params name no connection", () => {
+    /** @scenario "A save with no connection stores no secret" */
+    /** @scenario "The bot token is protected at rest" */
+    it("keeps no bot token, webhook URL or token-set flag", () => {
+      for (const incoming of [
+        { slackDelivery: "bot" as const, slackChannelId: "C1", slackBotToken: BOT_TOKEN },
+        { slackDelivery: "webhook" as const, slackWebhook: WEBHOOK_URL },
+        { slackDelivery: "bot" as const, slackChannelId: "C1", slackBotTokenSet: true },
+      ]) {
+        const stored = service.persist({ incoming });
 
-        expect(adapter.tokenMissing({ incoming })).toBe(true);
-        expect(() => adapter.assertToken(incoming, null)).toThrow(MissingSlackBotTokenError);
-      });
+        expect(stored).not.toHaveProperty("slackBotToken");
+        expect(stored).not.toHaveProperty("slackWebhook");
+        expect(stored).not.toHaveProperty("slackBotTokenSet");
+      }
+    });
+  });
+});
 
-      /** @scenario "A bot automation is incomplete without a token and channel" */
-      it("accepts it once a token is present, whether typed now or already stored", () => {
-        const adapter = AutomationSlackSecretsService.create(reversingCrypto());
-        const existing = adapter.persist({ incoming: BOT });
+describe("readableSlackActionParams", () => {
+  /** @scenario "Reading an automation returns only its connection, method and channel" */
+  /** @scenario "The bot token is protected at rest" */
+  it("returns only the connection, method and channel of a row not yet migrated", () => {
+    const read = readableSlackActionParams({
+      slackIntegrationId: "conn-1",
+      slackDelivery: "bot",
+      slackChannelId: "C1",
+      slackBotToken: `enc(${BOT_TOKEN})`,
+      slackWebhook: WEBHOOK_URL,
+      slackBotTokenSet: true,
+    });
 
-        expect(() => adapter.assertToken(BOT, null)).not.toThrow();
-        expect(() =>
-          adapter.assertToken({ slackDelivery: "bot", slackChannelId: "C123" }, existing),
-        ).not.toThrow();
-      });
+    expect(read).toEqual({
+      slackIntegrationId: "conn-1",
+      slackDelivery: "bot",
+      slackChannelId: "C1",
+    });
+    expect(JSON.stringify(read)).not.toContain("fake");
+  });
+
+  /** @scenario "Reading an automation returns only its connection, method and channel" */
+  it("returns the rule a graph alert or report fires by as stored", () => {
+    const rule = { threshold: 3, operator: "gt", timePeriod: 60 };
+
+    expect(
+      readableSlackActionParams({ ...rule, slackDelivery: "webhook", slackWebhook: WEBHOOK_URL }),
+    ).toEqual({ ...rule, slackDelivery: "webhook" });
+  });
+
+  it("reads a legacy row saved before the delivery method existed as a webhook", () => {
+    expect(readableSlackActionParams({ slackWebhook: WEBHOOK_URL })).toEqual({
+      slackDelivery: "webhook",
     });
   });
 
-  describe("given a webhook automation", () => {
-    describe("when the parameters are persisted", () => {
-      /** @scenario "An automation delivers through an incoming webhook" */
-      it("keeps only the webhook url, with no bot token to protect", () => {
-        const crypto = reversingCrypto();
+  it("returns nothing for params that are not an object", () => {
+    expect(readableSlackActionParams(null)).toEqual({});
+  });
+});
 
-        const persisted = AutomationSlackSecretsService.create(crypto).persist({
-          incoming: {
-            slackDelivery: "webhook",
-            slackWebhook: " https://hooks.slack.test/T/B/X ",
-          },
-        });
+describe("AutomationSlackSecretsService.findDecryptedToken", () => {
+  it("decrypts the stored token", () => {
+    expect(service.findDecryptedToken({ slackBotToken: `enc(${BOT_TOKEN})` })).toBe(BOT_TOKEN);
+  });
 
-        expect(persisted).toEqual({
-          slackDelivery: "webhook",
-          slackWebhook: "https://hooks.slack.test/T/B/X",
-        });
-        expect(crypto.encrypted).toEqual([]);
-      });
-    });
+  it("returns nothing when no token is stored", () => {
+    expect(service.findDecryptedToken({})).toBeNull();
   });
 });

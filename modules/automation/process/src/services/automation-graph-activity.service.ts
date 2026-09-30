@@ -19,10 +19,11 @@ import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-s
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
-import { type AutomationSlackBotTokenDecryptor } from "./automation-slack-secrets.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import { GraphAlertDispatchService } from "./graph-alert-dispatch.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
+import type { SlackDestinationService } from "./slack-destination.service.ts";
+import type { TriggerLatestEvaluationService } from "./trigger-latest-evaluation.service.ts";
 
 /**
  * Graph-alert dispatch: re-evaluate automations and send notifications via chosen
@@ -41,10 +42,11 @@ export class AutomationGraphActivityService implements AutomationGraphActivity {
     /** The process's outbound transports: mail, Slack, webhook. */
     delivery: AutomationNotificationDelivery;
     webhooks: AutomationWebhookProvider;
-    slackTokens: AutomationSlackBotTokenDecryptor;
+    slackDestinations: SlackDestinationService;
     emailCaps: AutomationEmailCapService;
     logger: AutomationLogger;
     dispatchErrors: AutomationDispatchError;
+    latestEvaluations: Pick<TriggerLatestEvaluationService, "record">;
     baseHost: string;
     emailHourlyCap: number;
     tenantDailyCap: number;
@@ -67,8 +69,9 @@ export class AutomationGraphActivityService implements AutomationGraphActivity {
           tenantDailyCap: input.tenantDailyCap,
         }),
         logger: input.logger,
-        slackTokens: input.slackTokens,
+        slackDestinations: input.slackDestinations,
         dispatchErrors: input.dispatchErrors,
+        latestEvaluations: input.latestEvaluations,
         clock: input.clock,
         baseHost: input.baseHost,
       }),

@@ -7,7 +7,7 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { commandValidationError } from "../../utils/errorOutput.ts";
-import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
@@ -55,8 +55,7 @@ export const createGraphCommand = async (
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create graph" });
+      await failSpinnerFromResponse({ spinner, response, action: "create graph" });
       process.exit(1);
     }
 

@@ -71,6 +71,7 @@
     "@langwatch/scenario-process": "workspace:*",
     "@langwatch/secret-process": "workspace:*",
     "@langwatch/share-process": "workspace:*",
+    "@langwatch/slack-process": "workspace:*",
     "@langwatch/stored-object-process": "workspace:*",
     "@langwatch/suite-process": "workspace:*",
     "@langwatch/topic-process": "workspace:*",

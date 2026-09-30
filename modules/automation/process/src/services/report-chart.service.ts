@@ -2,8 +2,18 @@ import type {
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
-import type { CustomGraph, ReportChart, ReportSource } from "@langwatch/automation-contract";
-import { customGraphInputSchema, type CustomGraphInput } from "@langwatch/dashboard-contract";
+import {
+  ReportIncompleteError,
+  type CustomGraph,
+  type ReportChart,
+  type ReportSource,
+} from "@langwatch/automation-contract";
+import {
+  customGraphInputSchema,
+  resolveGraphTimeScale,
+  withGroupedPipeline,
+  type CustomGraphInput,
+} from "@langwatch/dashboard-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
@@ -20,6 +30,8 @@ const logger = createLogger("langwatch:automation:report-chart");
 
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Axis label for one time bucket. The TEMPLATE cannot do this — it has no idea whether a bucket
@@ -121,7 +133,12 @@ export class ReportChartService {
     const charts = await mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
       buildChart({ deps, graph, projectId, from, to }),
     );
-    return charts.flat();
+    const delivered = charts.flat();
+    // Graphs existed but none could be read: a report that could not be built, not an empty
+    // period. Throwing sends the fire through the scheduler's bounded retry (ADR-044).
+    if (graphs.length > 0 && delivered.length === 0) throw new ReportIncompleteError();
+
+    return delivered;
   }
 }
 
@@ -174,13 +191,22 @@ async function buildChart({
     );
     return [];
   }
-  const graphData = parsed.data;
+  // The same compensation the analytics screen applies before querying; without it a summary,
+  // pie or donut panel that renders on screen reads empty buckets in a report (#6716).
+  const graphData = withGroupedPipeline(parsed.data);
   const type = chartTypeOf(graphData.graphType);
   const seriesInputs = seriesInputsOf(graphData);
   const empty = emptyChartOf({ graph, type });
   if (seriesInputs.length === 0) {
     return [empty];
   }
+
+  // The labels below describe the resolution actually queried, not the stored setting.
+  const timeScale = resolveGraphTimeScale({
+    graphType: graphData.graphType,
+    timeScale: graphData.timeScale ?? 60,
+    daysDifference: (to - from) / DAY_MS,
+  });
 
   const timeseries = await deps.getTimeseries({
     projectId,
@@ -189,7 +215,7 @@ async function buildChart({
     filters: (graph.filters ?? {}) as AnalyticsTimeseriesInput["filters"],
     series: seriesInputs,
     groupBy: graphData.groupBy,
-    timeScale: graphData.timeScale ?? 60,
+    timeScale,
     // A report renders in the project's own frame; the scheduler already fires
     // in the report's timezone, so the buckets only need to be stable.
     timeZone: "UTC",
@@ -205,7 +231,6 @@ async function buildChart({
     return [pieChartOf({ empty, buckets, bucketKeys, seriesInputs, graphData })];
   }
 
-  const timeScale = graphData.timeScale ?? 60;
   const categories = buckets.map((bucket) => formatBucketLabel({ date: bucket.date, timeScale }));
 
   return [trendChartOf({ empty, buckets, bucketKeys, seriesInputs, graphData, categories })];

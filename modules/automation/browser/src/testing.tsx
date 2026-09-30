@@ -3,6 +3,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";
+import type { SlackConnectionSaved } from "@langwatch/slack-browser-kit";
 import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
@@ -36,6 +37,12 @@ export type AutomationDatasetHandover = {
   returned: () => void;
 };
 
+/** One request to create a Slack connection without leaving the automation. */
+export type AutomationSlackConnectionHandover = {
+  created: (saved: SlackConnectionSaved) => void;
+  returned: () => void;
+};
+
 export type AutomationHostRecording = {
   navigations: string[];
   queries: { next: AutomationQuery; replace: boolean }[];
@@ -45,12 +52,15 @@ export type AutomationHostRecording = {
    * only WHICH overlay a click asked for, and with what.
    */
   drawerOpens: RecordedAutomationDrawerOpen[];
+  /** How many times a section closed the drawer stack. */
+  drawerCloses: number;
   /**
    * The dataset hand-overs a section asked for, with handlers attached. A
    * sub-flow only means something once one of its two endings happens, so
    * the double records the request and lets the test choose the ending.
    */
   datasetHandovers: AutomationDatasetHandover[];
+  slackConnectionHandovers: AutomationSlackConnectionHandover[];
   successes: AutomationSuccessNotice[];
   failures: AutomationFailureNotice[];
 };
@@ -83,6 +93,8 @@ export type FakeAutomationHostOptions = {
   team?: AutomationTeam | null;
   project?: AutomationProject | null;
   appBaseUrl?: string;
+  /** Whether the installation can send email; defaults to true. */
+  hasEmailProvider?: boolean;
   /** Path parameters the screen was opened with, for example `{ project: "web-app" }`. */
   params?: Readonly<Record<string, string | undefined>>;
   /** The query string the screen opens on. */
@@ -99,7 +111,9 @@ export class FakeAutomationHost extends AutomationHost {
         navigations: [],
         queries: [],
         drawerOpens: [],
+        drawerCloses: 0,
         datasetHandovers: [],
+        slackConnectionHandovers: [],
         successes: [],
         failures: [],
       },
@@ -202,6 +216,10 @@ export class FakeAutomationHost extends AutomationHost {
     return this.options.appBaseUrl ?? DEFAULT_APP_BASE_URL;
   }
 
+  hasEmailProvider(): boolean {
+    return this.options.hasEmailProvider ?? true;
+  }
+
   route(): AutomationRouteReading {
     return this.routeReading;
   }
@@ -225,8 +243,16 @@ export class FakeAutomationHost extends AutomationHost {
     });
   }
 
+  closeDrawer(): void {
+    this.recording.drawerCloses += 1;
+  }
+
   createDataset(handover: AutomationDatasetHandover): void {
     this.recording.datasetHandovers.push(handover);
+  }
+
+  createSlackConnection(handover: AutomationSlackConnectionHandover): void {
+    this.recording.slackConnectionHandovers.push(handover);
   }
 
   succeeded(notice: AutomationSuccessNotice): void {

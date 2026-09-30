@@ -1,26 +1,25 @@
 /**
  * @vitest-environment jsdom
- *
- * Tests email notification defaults: preview-only until author opens 'Customize wording'.
- * Monaco stubbed in jsdom; editors tested via wrapper test ids.
+ * Email notification defaults: preview-only until the author opens 'Customize wording'.
+ * Monaco is stubbed in jsdom; the editors are asserted through their wrapper test ids.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   ALERT_TRIGGER_DEFAULTS,
   REPORT_TRIGGER_DEFAULTS,
   TRACE_TRIGGER_DEFAULTS,
 } from "@langwatch/automation-contract";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ConfigFormCtx } from "../../../model/provider-types.ts";
+import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 /**
  * The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that one export as a
- * textarea carrying its `value`, so a test can read back the template the editor was seeded with —
- * the template an author's first keystroke would persist. Everything else in the module stays real.
+ * textarea carrying its `value`, so a test can read back the template the editor was seeded
+ * with: what an author's first keystroke would persist. Everything else in the module stays real.
  */
 vi.mock("../ui/sections/template-authoring.tsx", async (original) => {
   const actual = await original<typeof templateAuthoringModule>();
@@ -46,10 +45,6 @@ import type { EmailPreview } from "@langwatch/automation-contract";
 
 import emailClient, { type EmailSlice } from "../ui/sections/email.client.tsx";
 import type * as templateAuthoringModule from "../ui/sections/template-authoring.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function makeCtx(
   overrides: Partial<ConfigFormCtx<EmailPreview>> = {},
@@ -84,8 +79,13 @@ function Harness({ ctx }: { ctx: ConfigFormCtx<EmailPreview> }) {
   return <Form slice={slice} ctx={ctx} onChange={setSlice} />;
 }
 
-const renderForm = (ctx: ConfigFormCtx<EmailPreview> = makeCtx()) =>
-  render(<Harness ctx={ctx} />, { wrapper: Wrapper });
+const renderForm = (
+  ctx: ConfigFormCtx<EmailPreview> = makeCtx(),
+  { hasEmailProvider = true }: { hasEmailProvider?: boolean } = {},
+) =>
+  renderWithAutomationHost(<Harness ctx={ctx} />, {
+    host: fakeAutomationHost({ hasEmailProvider }),
+  });
 
 describe("EmailConfigForm authoring tiers", () => {
   afterEach(() => cleanup());
@@ -176,6 +176,36 @@ describe("EmailConfigForm default wording", () => {
       renderForm(makeCtx());
 
       expect(screen.queryByText(/cadence/i)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("EmailConfigForm on an installation without email", () => {
+  afterEach(() => cleanup());
+
+  describe("given no email provider is configured", () => {
+    /** @scenario "Email delivery setup warns when the installation cannot send email" */
+    it("warns that this installation cannot send email", () => {
+      renderForm(makeCtx(), { hasEmailProvider: false });
+
+      expect(screen.getByTestId("email-provider-missing")).toHaveTextContent(/cannot send email/i);
+    });
+
+    it("still lets the automation be saved once it has a recipient", () => {
+      expect(
+        emailClient.isComplete({
+          ...emailClient.initialSlice(),
+          members: ["someone@example.com"],
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given an email provider is configured", () => {
+    it("shows no warning", () => {
+      renderForm();
+
+      expect(screen.queryByTestId("email-provider-missing")).not.toBeInTheDocument();
     });
   });
 });

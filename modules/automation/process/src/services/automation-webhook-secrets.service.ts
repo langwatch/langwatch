@@ -1,4 +1,5 @@
 import {
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
   WEBHOOK_HEADER_VALUE_KEPT,
   InvalidActionParamsError,
   type WebhookActionParams,
@@ -18,6 +19,7 @@ export type AutomationWebhookStoredParams = {
   url: string;
   method: WebhookActionParams["method"];
   bodyTemplate: string | null;
+  contentType?: string;
   headersEncrypted?: string;
   headers?: Record<string, string>;
   signingSecretEncrypted?: string;
@@ -55,6 +57,7 @@ const webhookStoredActionParamsSchema = z
     url: z.string().url(),
     method: webhookMethodSchema.default("POST"),
     bodyTemplate: z.string().nullable().default(null),
+    contentType: z.string().default(DEFAULT_WEBHOOK_CONTENT_TYPE),
     headersEncrypted: z.string().optional(),
     headers: z.record(z.string(), z.string()).optional(),
     signingSecretEncrypted: z.string().optional(),
@@ -150,13 +153,10 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
     existing?: WebhookStoredActionParams | null;
     crypto: AutomationWebhookSecretCrypto;
   }): WebhookStoredActionParams {
-    const hasKept = Object.values(incoming.headers).includes(WEBHOOK_HEADER_VALUE_KEPT);
-    if (hasKept && existing?.url !== incoming.url) {
-      throw new InvalidActionParamsError(
-        "Re-enter webhook header values after changing the destination URL.",
-        "url",
-      );
-    }
+    AutomationWebhookSecretsService.assertKeptSecretsStayWithTheirDestination({
+      incoming,
+      existing,
+    });
     const saved = existing ? AutomationWebhookSecretsService.decryptHeaders(existing, crypto) : {};
     const resolved: Record<string, string> = {};
     for (const [name, value] of Object.entries(incoming.headers)) {
@@ -174,6 +174,30 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
         : {}),
       ...AutomationWebhookSecretsService.persistSigningSecret({ incoming, existing, crypto }),
     };
+  }
+
+  /** A saved header value or signing secret authenticates against the URL it was
+   *  issued for, so a changed URL has to arrive with fresh values. */
+  private static assertKeptSecretsStayWithTheirDestination({
+    incoming,
+    existing,
+  }: {
+    incoming: WebhookActionParams;
+    existing?: WebhookStoredActionParams | null;
+  }): void {
+    if (existing?.url === incoming.url) return;
+    if (Object.values(incoming.headers).includes(WEBHOOK_HEADER_VALUE_KEPT)) {
+      throw new InvalidActionParamsError(
+        "Re-enter webhook header values after changing the destination URL.",
+        "url",
+      );
+    }
+    if (incoming.signingSecret === WEBHOOK_HEADER_VALUE_KEPT) {
+      throw new InvalidActionParamsError(
+        "Re-enter the signing secret after changing the destination URL.",
+        "signingSecret",
+      );
+    }
   }
 
   private static keepRotationWindow(

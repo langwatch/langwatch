@@ -1,16 +1,18 @@
 /**
- * Verify column gates in dataset overrides match the manifest columns and
- * expected gating rules.
+ * Verify the catalogue gates the columns it must, and the dataset overrides name real columns
+ * and dedup as their engines require.
  */
 
 import { describe, expect, it } from "vitest";
 
 import { AUDIT_OVERRIDES } from "../lwql-audit-overrides.rules.ts";
+import type { LwqlCatalogue } from "../lwql-catalogue.rules.ts";
 import columnsManifest from "../lwql-columns-manifest.generated.json" with { type: "json" };
 import { EXPERIMENTS_OVERRIDES } from "../lwql-experiments-overrides.rules.ts";
 import { GATEWAY_OVERRIDES } from "../lwql-gateway-overrides.rules.ts";
 import { GOVERNANCE_OVERRIDES } from "../lwql-governance-overrides.rules.ts";
 import { METRICS_OVERRIDES } from "../lwql-metrics-overrides.rules.ts";
+import { LWQL_CLICKHOUSE_CATALOGUE } from "../lwql-view-catalog.rules.ts";
 
 const ALL_OVERRIDES = {
   ...EXPERIMENTS_OVERRIDES,
@@ -20,105 +22,31 @@ const ALL_OVERRIDES = {
   ...GOVERNANCE_OVERRIDES,
 };
 
-/** Narrows an optional override lookup to defined, failing loudly if absent. */
-function overrideFor<T>(overrides: Record<string, T | undefined>, name: string): T {
-  const override = overrides[name];
-  if (!override) {
-    throw new Error(`expected override "${name}" to exist`);
-  }
-  return override;
-}
-
 describe("Dataset overrides", () => {
-  describe("given the column gates", () => {
-    it("experiment_run_items.Predicted is gated output", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_run_items");
-      expect(override.columnGates?.Predicted).toEqual(["output"]);
-    });
-
-    it("experiment_run_items.TargetError is gated output", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_run_items");
-      expect(override.columnGates?.TargetError).toEqual(["output"]);
-    });
-
-    it("experiment_run_items.EvaluationDetails is gated output", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_run_items");
-      expect(override.columnGates?.EvaluationDetails).toEqual(["output"]);
-    });
-
-    it("experiment_run_items.EvaluationInputs is gated input", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_run_items");
-      expect(override.columnGates?.EvaluationInputs).toEqual(["input"]);
-    });
-
-    it("experiment_run_items.DatasetEntry is gated input", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_run_items");
-      expect(override.columnGates?.DatasetEntry).toEqual(["input"]);
-    });
-
-    it("experiment_run_items.TargetCost is gated costs", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_run_items");
-      expect(override.columnGates?.TargetCost).toEqual(["costs"]);
-    });
-
-    it("experiment_run_items.EvaluationCost is gated costs", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_run_items");
-      expect(override.columnGates?.EvaluationCost).toEqual(["costs"]);
-    });
-
-    it("experiment_runs.TotalCost is gated costs", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_runs");
-      expect(override.columnGates?.TotalCost).toEqual(["costs"]);
-    });
-
-    it("dspy_steps.Predictors is gated output", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
-      expect(override.columnGates?.Predictors).toEqual(["output"]);
-    });
-
-    it("dspy_steps.Examples is gated output", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
-      expect(override.columnGates?.Examples).toEqual(["output"]);
-    });
-
-    it("dspy_steps.LlmCalls is gated output", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
-      expect(override.columnGates?.LlmCalls).toEqual(["output"]);
-    });
-
-    it("dspy_steps.OptimizerParameters is gated output", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
-      expect(override.columnGates?.OptimizerParameters).toEqual(["output"]);
-    });
-
-    it("dspy_steps.LlmCallsTotalCost is gated costs", () => {
-      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
-      expect(override.columnGates?.LlmCallsTotalCost).toEqual(["costs"]);
-    });
-
-    it("gateway_spend.CostNanoUSD is gated costs", () => {
-      const override = overrideFor(GATEWAY_OVERRIDES, "gateway_spend");
-      expect(override.columnGates?.CostNanoUSD).toEqual(["costs"]);
-    });
-
-    it("gateway_budget_ledger_events.AmountUSD is gated costs", () => {
-      const override = overrideFor(GATEWAY_OVERRIDES, "gateway_budget_ledger_events");
-      expect(override.columnGates?.AmountUSD).toEqual(["costs"]);
-    });
-
-    it("gateway_budget_ledger_events.AmountNanoUSD is gated costs", () => {
-      const override = overrideFor(GATEWAY_OVERRIDES, "gateway_budget_ledger_events");
-      expect(override.columnGates?.AmountNanoUSD).toEqual(["costs"]);
-    });
-
-    it("governance_cost_rollup_1d.AmountNanoMinor is gated costs", () => {
-      const override = overrideFor(GOVERNANCE_OVERRIDES, "governance_cost_rollup_1d");
-      expect(override.columnGates?.AmountNanoMinor).toEqual(["costs"]);
-    });
-
-    it("governance_ocsf_events.RawOcsfJson is gated output", () => {
-      const override = overrideFor(GOVERNANCE_OVERRIDES, "governance_ocsf_events");
-      expect(override.columnGates?.RawOcsfJson).toEqual(["output"]);
+  describe("given the catalogue's column gates", () => {
+    const COST = { access: { allOf: ["cost:view"] } };
+    it.each([
+      ["experiment_items", "Predicted", { content: "output" }],
+      ["experiment_items", "TargetError", { content: "output" }],
+      ["experiment_items", "EvaluationDetails", { content: "output" }],
+      ["experiment_items", "EvaluationInputs", { content: "input" }],
+      ["experiment_items", "DatasetEntry", { content: "input" }],
+      ["experiment_items", "TargetCost", COST],
+      ["experiment_items", "EvaluationCost", COST],
+      ["experiment_run_results", "TotalCost", COST],
+      ["dspy_optimizer_steps", "Predictors", { content: "output" }],
+      ["dspy_optimizer_steps", "Examples", { content: "output" }],
+      ["dspy_optimizer_steps", "LlmCalls", { content: "output" }],
+      ["dspy_optimizer_steps", "OptimizerParameters", { content: "output" }],
+      ["dspy_optimizer_steps", "LlmCallsTotalCost", COST],
+      ["gateway_request_spend", "CostNanoUSD", COST],
+      ["gateway_budget_ledger", "AmountUSD", COST],
+      ["gateway_budget_ledger", "AmountNanoUSD", COST],
+      ["governance_daily_cost_rollup", "AmountNanoMinor", COST],
+      ["governance_security_events", "RawOcsfJson", { content: "output" }],
+    ])("%s.%s is gated", (view, column, entry) => {
+      const catalogue: LwqlCatalogue = LWQL_CLICKHOUSE_CATALOGUE;
+      expect(catalogue[view]?.columns[column]).toEqual(entry);
     });
   });
 
@@ -154,22 +82,6 @@ describe("Dataset overrides", () => {
           manifestTableNames.has(table),
           `table "${table}" referenced in overrides but not in manifest`,
         ).toBe(true);
-      }
-    });
-
-    it("all override column gates reference existing columns", () => {
-      const tablesByName = new Map(columnsManifest.tables.map((t) => [t.name, t]));
-      for (const [tableName, override] of Object.entries(ALL_OVERRIDES)) {
-        if (!override.columnGates) continue;
-        const table = tablesByName.get(tableName);
-        if (!table) continue;
-        const columnNames = new Set(table.columns.map((c) => c.name));
-        for (const columnName of Object.keys(override.columnGates)) {
-          expect(
-            columnNames.has(columnName),
-            `override for "${tableName}": columnGates names "${columnName}", which does not exist in the table`,
-          ).toBe(true);
-        }
       }
     });
 

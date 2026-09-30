@@ -5,14 +5,12 @@
  */
 import {
   AutomationNotInProjectError,
-  AutomationWebhookNotEnabledError,
   GraphNotInProjectError,
   hasActionableTriggerFilters,
   ProjectNotFoundError,
   TriggerFiltersRequiredError,
   type Trigger,
 } from "@langwatch/automation-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { AutomationService } from "./automation.service.ts";
@@ -27,7 +25,6 @@ export interface AutomationProjectIdentity {
 export interface AutomationRulesCollaborators {
   automation: AutomationService;
   projects: ProjectApi;
-  featureFlags: FeatureFlagApi;
 }
 
 export class AutomationRulesService {
@@ -92,21 +89,6 @@ export class AutomationRulesService {
     if ((input.existing.filterQuery ?? "").trim() !== "") return;
 
     throw new TriggerFiltersRequiredError();
-  }
-
-  /**
-   * Refuses the webhook delivery channel unless it is switched on for the
-   * project (ADR-040 §7). The picker is flag-gated client-side and both writing
-   * doors gate it too, so the flag cannot be bypassed by calling the API.
-   */
-  async assertWebhookChannelEnabled(input: { projectId: string; userId: string }): Promise<void> {
-    const allowed = await this.collaborators.featureFlags.isEnabled("release_webhook_automations", {
-      kind: "project",
-      userId: input.userId,
-      projectId: input.projectId,
-    });
-
-    if (!allowed) throw new AutomationWebhookNotEnabledError(input.projectId);
   }
 
   /** The project's name and slug, as a rendered notification quotes them. */

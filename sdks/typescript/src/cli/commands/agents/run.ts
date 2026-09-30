@@ -12,7 +12,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
-import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
@@ -228,8 +228,7 @@ const runWorkflowAgent = async ({
     );
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner: runSpinner, error: new Error(message), action: "run agent" });
+      await failSpinnerFromResponse({ spinner: runSpinner, response, action: "run agent" });
       process.exit(1);
     }
 

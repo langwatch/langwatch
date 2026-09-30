@@ -18,7 +18,6 @@ export { SlackWebhookClientChannel } from "./channels/slack/slack.webhook-client
 export {
   AutomationSlackProvider,
   AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
 } from "./services/automation-slack-secrets.service.ts";
 export type { AutomationSecretCrypto } from "./services/automation-slack-secrets.service.ts";
 export {
@@ -110,7 +109,7 @@ export {
   AutomationHeartbeat,
   AutomationDispatchError,
 } from "./app/automation.members.ts";
-export { AutomationSlackBotTokenDecryptor } from "./services/automation-slack-secrets.service.ts";
+export { SlackDestinationService } from "./services/slack-destination.service.ts";
 export type { AutomationGraphDelivery } from "./app/automation.members.ts";
 export {
   AutomationRunawayRepository,

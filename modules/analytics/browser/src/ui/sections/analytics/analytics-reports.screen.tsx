@@ -125,7 +125,9 @@ function ReportsContent() {
       { projectId, id: graphId },
       {
         onSuccess: () => {
-          void graphsQuery.refetch();
+          // Every graphs.getAll key, not just this dashboard's: the automation composer
+          // reads the list keyed by {projectId} alone and kept offering a deleted graph.
+          void utils.graphs.getAll.invalidate();
         },
         onError: (error) => {
           showErrorToast({ error, fallbackTitle: "Couldn't delete this graph" });

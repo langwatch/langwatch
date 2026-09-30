@@ -18,6 +18,9 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
+      "path": "../../analytics/filters/tsconfig.build.json"
+    },
+    {
       "path": "../../annotation/contract/tsconfig.build.json"
     },
     {
@@ -48,10 +51,10 @@
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/eventing/tsconfig.build.json"
+      "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
-      "path": "../../feature-flag/contract/tsconfig.build.json"
+      "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
@@ -91,6 +94,12 @@
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../slack/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/system-migrations/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

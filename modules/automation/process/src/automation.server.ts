@@ -47,6 +47,7 @@ import { AutomationMatchRecordMetricsService } from "./services/automation-match
 import { type AutomationSecretCrypto } from "./services/automation-slack-secrets.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "./services/automation-trace-trigger-catalogue.service.ts";
 import { AutomationEmailCapService } from "./services/email-cap.service.ts";
+import type { SlackDestinationService } from "./services/slack-destination.service.ts";
 import {
   TriggerNoReplyService,
   TriggerNoReplyWarning,
@@ -152,6 +153,8 @@ export function createAutomationGraphActivity(input: {
   delivery: AutomationNotificationDelivery;
   /** Reads the Slack bot tokens and webhook secrets this deployment wrote. */
   crypto: AutomationSecretCrypto;
+  /** Where every Slack delivery goes, over `SlackApi` (ARCHITECTURE.md §3). */
+  slackDestinations: SlackDestinationService;
   emailCaps: AutomationEmailCapService;
   logger: AutomationLogger;
   /** How the process's queue tells a permanent failure from a retryable one. */

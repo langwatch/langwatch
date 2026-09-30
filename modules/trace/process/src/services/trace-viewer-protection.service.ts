@@ -123,6 +123,9 @@ export class TraceViewerProtectionService {
 
     const restricted = policy.customAttributes.filter((rule) => rule.disposition === "restrict");
     const anonymous = input.publiclyShared || input.userId === undefined;
+    const groupIds = anonymous
+      ? []
+      : await this.groupIdsFor({ policy, projectId: input.projectId, userId: input.userId });
     const categories = Object.fromEntries(
       CONTENT_CATEGORIES.map((category) => {
         const resolved = policy.categories[category];
@@ -137,7 +140,7 @@ export class TraceViewerProtectionService {
                   isMemberRole: isMember,
                   isViewer: isMember && !isAdmin,
                   isProjectOwner,
-                  groupIds: [],
+                  groupIds,
                 }),
             restrictVisibleTo: formatRestrictLabel(resolved),
           },
@@ -179,6 +182,43 @@ export class TraceViewerProtectionService {
         "project owner resolution failed; treating the viewer as not the owner (fail-closed)",
       );
       return false;
+    }
+  }
+
+  /**
+   * The member's groups in the organization, read only when a content audience names a group.
+   * Fail-closed: a read that throws answers no groups, which can only narrow what they see.
+   */
+  private async groupIdsFor({
+    policy,
+    projectId,
+    userId,
+  }: {
+    policy: ResolvedDataPrivacy;
+    projectId: string;
+    userId: string | undefined;
+  }): Promise<string[]> {
+    const namesGroup = CONTENT_CATEGORIES.some(
+      (category) => policy.categories[category].audience.groupIds.length > 0,
+    );
+    if (userId === undefined || !namesGroup) return [];
+    try {
+      const project = await this.options.projects.findWithTeam(projectId);
+      const organizationId = project?.team?.organizationId;
+      if (!organizationId) return [];
+      const breakdown = await this.options.authz.getAccessBreakdown({
+        organizationId,
+        userId,
+        userName: null,
+        userEmail: null,
+      });
+      return breakdown.groups.map((group) => group.id);
+    } catch (error) {
+      this.logger.error(
+        { projectId, error },
+        "group membership read failed; content audiences by group stay closed (fail-closed)",
+      );
+      return [];
     }
   }
 

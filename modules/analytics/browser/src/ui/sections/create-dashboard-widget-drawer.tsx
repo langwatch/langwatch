@@ -62,6 +62,7 @@ export function CreateDashboardWidgetDrawer({
   return (
     <DashboardWidgetEditDrawer
       open={open}
+      projectId={projectId}
       name={draftName}
       onNameChange={setDraftName}
       code={draftCode}

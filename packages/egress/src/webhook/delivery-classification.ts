@@ -73,6 +73,7 @@ export function assertWebhookDelivered({
       `Webhook for trigger "${triggerName}" received HTTP ${status}` +
       (snippet ? `: ${snippet}` : ""),
     retryable,
+    customerMessage: `The endpoint answered HTTP ${status}.`,
     // Honour the receiver's backpressure on a retryable status; the queue folds
     // it into its backoff as a floor.
     retryAfterMs: retryable ? result.retryAfterMs : undefined,

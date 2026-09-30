@@ -55,7 +55,10 @@ export type AutomationPreviewTrace = {
   traceId: string;
   name: string;
   timestamp: number;
+  durationMs: number;
   status: "ok" | "error" | "warning";
+  input?: string | null;
+  output?: string | null;
 };
 
 export type AutomationSlackChannel = {

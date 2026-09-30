@@ -102,6 +102,9 @@ Trace's query language and content dispatchers are `modules/trace/query-language
 portable and framework-free, which trace's process, the server and any browser import; they sit in
 neither the contract nor a kit (Alex, 2026-09-29). Trace and analytics read the same trace data: that
 relationship is an open design item, and neither side takes an exemption meanwhile (Alex, 2026-09-29).
+Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
+(`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
+terms; analytics' browser-kit and automation's process import it (Alex, 2026-09-30).
 
 ---
 
@@ -129,6 +132,22 @@ Entitlement keeps plans and features only; every other module checks a limit or 
 `UsageApi`, and no trace-usage or billing-usage cycle forms (Alex, 2026-09-29).
 Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` stay listed in the
 peer-cycle baseline until usage lands.
+Slack is a module of its own (Alex, 2026-09-30; supersedes ADR-093 §5a on ownership). `modules/slack`
+owns the Slack connection subjects: the `SlackIntegration` table, its repositories and services,
+`SlackApi` (main's list, create, update and delete of a connection, plus the reads delivery needs), the
+`slackIntegration` tRPC namespace, `/api/slack-connections`, the `slackConnection` drawer and
+`slack-browser-kit`, which automation, integration and langy render. Automation reads a connection only
+through `SlackApi` and keeps its own delivery.
+A connection in use is claimed, not counted (Alex, 2026-09-30). Slack owns `slack_connection_claim`;
+automation claims a connection through `SlackApi.claimConnection` when it saves a trigger on it and
+releases it through `releaseConnection` when the trigger moves off it, pauses or is deleted.
+`deleteSlackConnection` refuses while any claim exists (409 `slack_connection_in_use`, naming the
+claimants), and the connection's dependent count is its claim count. Slack never reads automation's
+triggers.
+`modules/integration` owns `/settings/integrations` (Alex, 2026-09-30). Its browser renders both cards:
+the GitHub card, which reads github through `GithubHostApi` and a client derived from github's contract,
+and the Slack card, over `slack-browser-kit`. Github lends no card and keeps no UI on the page;
+integration has no kit, since nothing outside it would use one.
 
 ```
 modules/trace/
@@ -213,6 +232,7 @@ document, is the authority on filenames):
   classes and not in a new slot (Alex, 2026-09-28).
 - Ids: a new record's id is a KSUID with its resource prefix; ids minted before (nanoid, uuid) keep
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
+  The prefix is the owning subject's name without hyphens: `slackintegration` (Alex, 2026-09-30).
 - No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
   `domain/`.
 
@@ -373,19 +393,23 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    reaching in. Closed to values only: an `import type` / `export type` of a browser package
    crosses, because types are erased (Alex, 2026-09-27).
 2. **A kit is a leaf.** It may import contracts (any module's),
-   `design-system`, `browser-host` and `@langwatch/api/web` (its client's
-   derivation). It may not import its own module's browser package (the rule
-   that broke the nine cyclic web pairs), any other `*-browser`, or another kit.
-3. **A kit owns its module's client, store and UI for one concept** (Alex,
-   2026-09-29). It derives its client from its own contract, and the owner's
-   browser package imports that client and store from the kit rather than
-   holding a second copy; consumers render the kit. It never calls a peer's
+   `design-system` and `browser-host`, and nothing else in `@langwatch/*`. It may not import its own
+   module's browser package (the rule that broke the nine cyclic web pairs), any other `*-browser`,
+   or another kit. It may import a module's portable library (§2), which is no kit (Alex, 2026-09-30).
+   **Amended 2026-09-30** to match the `browser-kit-dependencies` policy, which outranks this record:
+   `@langwatch/api/web` is not a kit dependency. A kit component that needs data takes it as props
+   and each consumer fetches its own: analytics' `LwqlEditor` takes `schema` and `markers`.
+3. **A kit owns its module's store and UI for one concept** (Alex, 2026-09-29;
+   its client clause withdrawn 2026-09-30, the linter wins). It holds no client: its
+   components take data as props and each consumer derives its own client from the
+   owner's contract; the owner's browser package imports the store from the kit
+   rather than holding a second copy, and consumers render the kit. It never calls a peer's
    procedure and never reads a `*HostApi`; a component that needs either stays
-   in its owner (rule 7). Rule 2 keeps it a leaf. The case: identity's kit holds
-   identity's `twoStepVerification` client and the requirement UI (user,
-   organization and ops render it), while the passkey, two-step and
-   sign-in-method ceremonies call auth's endpoints and so live in auth's kit
-   (Alex, 2026-09-29).
+   in its owner (rule 7). Rule 2 keeps it a leaf. The case: identity's kit holds the
+   two-step requirement UI (user, organization and ops render it, each through its
+   own client), while the passkey, two-step and sign-in-method ceremonies call
+   auth's endpoints and so live in auth (Alex, 2026-09-29). Kits that still hold a
+   client (identity, user, stored-object) are findings of rule 2, moved as touched.
 4. **A kit is a package, not a subpath** — a subpath is invisible to the
    dependency graph, so it cannot break a cycle or be budgeted. A package
    makes every cross-module browser edge a visible, lintable manifest line.
@@ -435,6 +459,30 @@ decides it, and no layer, projection or screen re-derives another's answer.
 LangWatch support" (SaaS) or "contact your administrator" (self-hosted), never why. A reader holding
 the permission that could fix it may be told what is missing, through a read only that permission
 answers: the explanation is never in public config or in any page's HTML for everyone.
+
+**The LangWatchQL catalogue names who may read** (Alex, 2026-09-30; ADR-082 amended). Analytics'
+`LWQL_CATALOG` is `defineLwqlCatalog({ <view>: defineTableCatalogue({ sourceTable, access, columns }) })`.
+The row type is looked up from `sourceTable`, never passed, so completeness is checked against the
+stored table. `access` is `{ allOf }` or `{ anyOf }` over authz permissions, never empty. Every stored
+column has an entry, or the catalogue fails to compile: `"inherit"` (its own name, table access only),
+`"omit"` (exposed nowhere, never a `source`) or `{ source?, access?, content? }`. Keys are exposed
+names and `source` names the stored column. `content` is `"input"`, `"output"` or both, decided by
+data-privacy's policy, never by authz; a cost column carries `access: { allOf: ["cost:view"] }`. The
+database's column grants derive from the same catalogue and stay the backstop.
+
+It resolves per principal and scope through `AuthzApi` (`resolveAccessibleCatalog`, no new operation);
+the project as principal holds everything. As before, a table the caller may not read is hidden and
+refused with `TABLE_NOT_ALLOWED`; a column is listed unavailable with its gate and refused with
+`GATED_COLUMN`. Privacy group audiences apply: group ids come from `AuthzApi.getAccessBreakdown`, read
+only when an audience names a group, and a failed read means no groups. A key spanning projects fails
+closed: a table is refused if any of its projects lacks it. Filtering per project within one statement
+is a tracked gap (`@unimplemented` in `specs/lwql/catalogue-grants.feature`).
+
+**Authority fails closed, tooling fails open** (Alex, 2026-09-30). A failed authz check is a plain 500
+with no rows, never a partial answer. The LWQL editor still edits without a schema (grammar only), a
+failed validation clears its markers, and Run always asks the server. Its markers come from the
+`analytics.lwql.validate` query (Alex, 2026-09-30), the server's own validator, which never executes;
+the browser never validates.
 
 The shell's lent services (session, navigation, storage, toasts, drawers) are **host
 services**, not capabilities (§16). Enforcement is prose for now; a lint rule follows once email is
@@ -1099,6 +1147,11 @@ the meta tag.
 process boots; notification answers every send by skipping it with one log line naming what was
 not sent, and the browser learns it from public config's `capabilities.email`, so a self-hosted
 install shows that email is not configured instead of silently dropping it.
+One send refuses instead of skipping: a test fire of an email automation on an install with no mail
+provider throws `EmailProviderNotConfiguredError` (`email_provider_not_configured`), and the authoring
+drawer disables the email channel with the tooltip "Email is not configured. Ask an admin to set up a
+mail provider.", read from the deployment's `hasEmailProvider`. That tooltip is the ruled exception to §3.5's "off is
+opaque" (Alex, 2026-09-30).
 Email is a capability notification answers from its own config and secrets, never a config leaf
 guess: a SendGrid-only install has it. Notification owns mail outright and there is no mail member
 (§3.3; Alex, 2026-09-29). Where it is off, password reset by email is disabled
@@ -1175,13 +1228,14 @@ so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provi
 both schemas under the same migration lock, before serve, and the access-config render runs from
 env alone in its Helm job (Alex, 2026-09-28).
 
-**In-place system migrations belong to their subject; the runner belongs to ops.** Identity and
-authz each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
+**In-place system migrations belong to their subject; the runner belongs to ops.** Identity,
+authz and automation each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
 identity's user-rooted `userMigrations()` beside it), and ops composes the migrations page,
 enrolment, the targeted run and the pass over its own `SystemMigration*` tables and Redis lease,
 never importing a peer's process package. The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
-(Alex, 2026-09-28).
+(Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
+no manual task (Alex, 2026-09-30).
 
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.

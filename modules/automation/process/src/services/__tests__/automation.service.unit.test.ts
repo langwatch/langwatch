@@ -1,18 +1,22 @@
-import type {
-  EmailSuppression,
-  Trigger,
-  TriggerFire,
-  TriggerFireStats,
-  TriggerSummary,
-  WebhookDeliveryInput,
-  WebhookDeliveryRow,
+import {
+  TriggerNotFoundError,
+  type EmailSuppression,
+  type Trigger,
+  type TriggerFire,
+  type TriggerFirePage,
+  type TriggerFireStats,
+  type TriggerSummary,
+  type WebhookDeliveryInput,
+  type WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
-import { TriggerNotFoundError } from "@langwatch/automation-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { createAutomationTestRuntime } from "../../__tests__/testing.ts";
+import {
+  createAutomationTestRuntime,
+  createTestSlackConnections,
+} from "../../__tests__/testing.ts";
 import type { AutomationClock } from "../../app/automation.members.ts";
 import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { EmailSuppressionNameRepository } from "../../repositories/email-suppression-name.repository.ts";
@@ -158,6 +162,12 @@ class Triggers extends TriggerRepository {
   isSendClaimed() {
     return Promise.resolve(false);
   }
+  findSlackTriggers(): Promise<Trigger[]> {
+    return Promise.resolve([]);
+  }
+  replaceActionParamsIfUnchanged(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
   findClaimedTraceIds() {
     return Promise.resolve(new Set<string>());
   }
@@ -192,6 +202,9 @@ class Triggers extends TriggerRepository {
   }
 }
 class Fires extends TriggerFireHistoryRepository {
+  listPageByTriggerId(): Promise<TriggerFirePage> {
+    return Promise.resolve({ fires: [], nextCursor: null });
+  }
   stats: TriggerFireStats[] = [];
   fires: TriggerFire[] = [];
   create = vi.fn(
@@ -250,9 +263,11 @@ const makeService = (
       triggerSent: new EmptyGraphTriggerSent(),
       notifier: runtime.notifier,
       logger: runtime.logger,
-      slackTokens: runtime.slackTokens,
+      slackDestinations: runtime.slackDestinations,
+      slackConnections: createTestSlackConnections(),
       dispatchErrors: runtime.dispatchErrors,
       runaway: runtime.runaway,
+      latestEvaluations: { record: async () => undefined },
       clock,
       baseHost: runtime.baseHost,
     });
@@ -297,6 +312,7 @@ const makeService = (
       graph,
       templates,
       persistCaps,
+      slackConnections: createTestSlackConnections(),
     });
   })();
 

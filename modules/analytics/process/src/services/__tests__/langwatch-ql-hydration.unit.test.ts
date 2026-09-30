@@ -12,6 +12,7 @@ import {
   type LangWatchQLTraceSource,
 } from "../langwatch-ql-hydration-read.service.ts";
 import { LangWatchQLHydrationService } from "../langwatch-ql-hydration.service.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 function trace({ id, threadId = "thread-a" }: { id: string; threadId?: string }): Trace {
   return {
@@ -62,7 +63,10 @@ function hydrationService({
   };
 }
 
-const caller = { project: { id: "project-1", lwqlKey: "key" }, protections: {} };
+const caller = {
+  project: { id: "project-1", lwqlKey: "key" },
+  protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+};
 
 describe("LangWatchQLHydrationService.hydrate", () => {
   /** @scenario "A statement that calls no app function records an empty plan" */
@@ -79,7 +83,7 @@ describe("LangWatchQLHydrationService.hydrate", () => {
 
     const result = await service.hydrate({
       projectIds: ["project-1"],
-      protections: {},
+      protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       calls: [],
       columns: [{ name: "ConversationId", type: "String" }],
       rows,
@@ -95,7 +99,7 @@ describe("LangWatchQLHydrationService.hydrate", () => {
 
     const result = await service.hydrate({
       projectIds: ["project-1"],
-      protections: {},
+      protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
       calls: [{ column: "transcript", function: "conversation", options: [] }],
       columns: [{ name: "transcript", type: "String" }],
       rows: [{ transcript: "thread-a" }],
@@ -137,7 +141,7 @@ describe("LangWatchQLHydrationService.hydrate", () => {
     await expect(
       service.hydrate({
         projectIds: ["project-1"],
-        protections: {},
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
         calls: [{ column: "transcript", function: "conversation", options: [] }],
         columns: [{ name: "transcript", type: "String" }],
         rows: Array.from({ length: 5_000 }, (_, index) => ({ transcript: `thread-${index}` })),

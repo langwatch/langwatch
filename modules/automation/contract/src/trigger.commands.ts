@@ -24,6 +24,8 @@ export const createTriggerCommandSchema = z
     slackTemplate: z.string().nullable().optional(),
     emailSubjectTemplate: z.string().nullable().optional(),
     emailBodyTemplate: z.string().nullable().optional(),
+    /** Who a Slack secret typed on this create is stored as a connection for. */
+    actorId: z.string().min(1).optional(),
   })
   .strict();
 export type CreateTriggerCommand = z.infer<typeof createTriggerCommandSchema>;

@@ -20,12 +20,9 @@ import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigge
 import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
-import {
-  AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
-} from "../../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
+import { SlackDestinationService } from "../../services/slack-destination.service.ts";
 import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.subscriber.ts";
 
 /**
@@ -95,15 +92,17 @@ describe("createGraphTriggerActivityHandler", () => {
           analytics: breachingAnalytics(),
           delivery,
           webhooks: AutomationWebhookSecretsService.create(crypto),
-          slackTokens: AutomationSlackBotTokenDecryptorService.create(
-            AutomationSlackSecretsService.create(crypto),
-          ),
+          slackDestinations: SlackDestinationService.create({
+            slack: { findUsableSlackSecret: async () => [] },
+            crypto: crypto,
+          }),
           emailCaps: AutomationEmailCapService.create({
             store: MemoryAutomationEmailCapRepository.create(),
             fallback: MemoryAutomationEmailCapRepository.create(),
           }),
           logger: new SilentLogger(),
           dispatchErrors: new TestDispatchErrors(),
+          latestEvaluations: { record: async () => undefined },
           baseHost: "https://app.langwatch.test",
           emailHourlyCap: 100,
           tenantDailyCap: 10_000,

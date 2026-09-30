@@ -292,7 +292,7 @@ export const useDrawerParams = () => {
  * orderings — needed for lens routes like `/traces#conversations`, where naive
  * concatenation parks query params after the hash, invisible to `location.search`.
  */
-function splitAsPath(asPath: string): {
+export function splitAsPath(asPath: string): {
   path: string;
   queryString: string;
   hash: string;

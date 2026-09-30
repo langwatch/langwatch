@@ -19,12 +19,15 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/slack-browser-kit": "workspace:*",
+    "@langwatch/slack-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
@@ -35,6 +38,7 @@
     "react-icons": "catalog:",
     "react-markdown": "catalog:",
     "remark-gfm": "catalog:",
+    "zod": "catalog:",
     "zustand": "catalog:"
   },
   "devDependencies": {

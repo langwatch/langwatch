@@ -30,6 +30,14 @@ describe("automation trigger policies", () => {
     ).toEqual(now);
   });
 
+  it("degrades a stored cadence this build does not know to immediate, never NaN", () => {
+    const now = Temporal.Instant.from("2026-05-29T12:02:17.456Z");
+    // wrong-typed input: a cadence stored by a newer build
+    const cadence = "someday_digest" as "5min_digest";
+
+    expect(computeScheduledFor({ action: "SEND_SLACK_MESSAGE", cadence, now })).toEqual(now);
+  });
+
   it("treats nested empty filter values as vacuous", () => {
     expect(
       hasActionableTriggerFilters({

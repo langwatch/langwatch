@@ -3,7 +3,9 @@ import { z } from "zod";
 import { automationFilterValueSchema, automationFiltersSchema } from "./automation-filters.ts";
 import { MAX_TRACE_DEBOUNCE_MS, MIN_TRACE_DEBOUNCE_MS } from "./cadences.ts";
 import { graphAlertActionParamsSchema } from "./graph-alert.ts";
+import { DEFAULT_WEBHOOK_CONTENT_TYPE } from "./providers/webhook.ts";
 import { reportActionParamsSchema } from "./report.ts";
+import { triggerFireRowSchema } from "./trigger.queries.ts";
 import {
   alertTypeSchema,
   notificationCadenceSchema,
@@ -55,6 +57,9 @@ export const automationApiActionParamsSchema = z.object({
   // carry it or a hostile client can forge audit attribution
   // (builder5015-002 / applyr-002).
   members: z.string().array().optional(),
+  // The named connection a Slack automation delivers through (ARCHITECTURE.md §3).
+  // When set, the legacy secret fields below are ignored and never stored.
+  slackIntegrationId: z.string().optional(),
   slackWebhook: z.string().optional(),
   // ADR-041 Slack bot delivery. `slackBotToken` arrives as plaintext (or the
   // "kept" sentinel / blank on edit) and is encrypted server-side before
@@ -75,6 +80,7 @@ export const automationApiActionParamsSchema = z.object({
   method: z.enum(["POST", "PUT", "PATCH"]).optional(),
   headers: z.record(z.string(), z.string()).optional(),
   bodyTemplate: z.string().nullable().optional(),
+  contentType: z.string().optional(),
 });
 export type AutomationApiActionParams = z.infer<typeof automationApiActionParamsSchema>;
 
@@ -93,6 +99,8 @@ export const automationApiCreateInputSchema = z.object({
     // createdByUserId is server-stamped — do not accept from wire
     // (builder5015-002 / applyr-002).
     members: z.string().array().optional(),
+    slackIntegrationId: z.string().optional(),
+    slackChannelId: z.string().optional(),
     slackWebhook: z.string().optional(),
     datasetId: z.string().optional(),
     datasetMapping: z
@@ -144,10 +152,10 @@ export const automationApiToggleTriggerInputSchema = z.object({
 });
 export type AutomationApiToggleTriggerInput = z.infer<typeof automationApiToggleTriggerInputSchema>;
 
+/** The channels a connection's bot can see; a webhook connection lists nothing (`no_token`). */
 export const automationApiListSlackChannelsInputSchema = z.object({
   projectId: z.string(),
-  botToken: z.string().nullable().default(null),
-  automationId: z.string().optional(),
+  slackIntegrationId: z.string(),
 });
 export type AutomationApiListSlackChannelsInput = z.infer<
   typeof automationApiListSlackChannelsInputSchema
@@ -178,6 +186,14 @@ export const automationApiTestFireInputSchema = z.object({
       method: z.enum(["POST", "PUT", "PATCH"]).default("POST"),
       headers: z.record(z.string(), z.string()).default({}),
       bodyTemplate: z.string().nullable().default(null),
+      /** Stripped of CR/LF so a typed value cannot smuggle a second header; stripping can
+       *  empty it, and an empty value would ship a blank header, so that reads as JSON. */
+      contentType: z
+        .string()
+        .default(DEFAULT_WEBHOOK_CONTENT_TYPE)
+        .transform(
+          (value) => value.replace(/[\r\n\0]+/g, " ").trim() || DEFAULT_WEBHOOK_CONTENT_TYPE,
+        ),
     })
     .nullable()
     .default(null),
@@ -194,6 +210,10 @@ export const automationApiTestFireInputSchema = z.object({
   /** The saved automation being edited, so a kept (un-retyped) bot token
    *  can be loaded + decrypted for the test fire. */
   automationId: z.string().optional(),
+  /** The draft's Slack connection. Wins over `webhook` and
+   *  `botDestination.botToken`; a bot connection still needs
+   *  `botDestination.channelId`. */
+  slackIntegrationId: z.string().optional(),
   // Present when the draft is a custom-graph alert: the test message
   // then renders the alert-shaped example context + alert defaults,
   // matching what a real fire sends. Detail fields only shape the
@@ -247,3 +267,68 @@ export const automationApiUpsertInputSchema = z.object({
   traceDebounceMs: automationApiTraceDebounceMsSchema.optional(),
 });
 export type AutomationApiUpsertInput = z.infer<typeof automationApiUpsertInputSchema>;
+
+/** Where a fire-history page resumes: the `(createdAt, id)` of the last fire of the page before. */
+export const triggerFireCursorSchema = z.object({ createdAt: z.date(), id: z.string().min(1) });
+export type TriggerFireCursor = z.infer<typeof triggerFireCursorSchema>;
+
+/** One page of a trigger's fires, newest first. Metadata only: no trace ids, no trace content. */
+export const triggerFirePageSchema = z.object({
+  fires: z.array(triggerFireRowSchema),
+  nextCursor: triggerFireCursorSchema.nullable(),
+});
+export type TriggerFirePage = z.infer<typeof triggerFirePageSchema>;
+
+/** One page of one automation's fires, resuming after `cursor` when one is given. */
+export const automationApiFireHistoryInputSchema = z.object({
+  projectId: z.string(),
+  triggerId: z.string(),
+  limit: z.number().int().min(1).max(100),
+  cursor: triggerFireCursorSchema.nullable(),
+});
+export type AutomationApiFireHistoryInput = z.infer<typeof automationApiFireHistoryInputSchema>;
+
+/** The view's page of fires: main's tRPC bounds (at most 50, 20 by default), cursor optional. */
+export const automationApiFireHistoryTrpcInputSchema = z.object({
+  projectId: z.string(),
+  triggerId: z.string(),
+  limit: z.number().int().min(1).max(50).default(20),
+  cursor: z.object({ createdAt: z.coerce.date(), id: z.string().min(1) }).nullish(),
+});
+
+/**
+ * What an alert's latest check observed and decided; metadata only, no trace ids.
+ * Verdict and skip code read as plain strings, so a value a newer writer stored
+ * survives the read and the view degrades it to a plain "checked".
+ */
+export const triggerLatestEvaluationSchema = z.object({
+  triggerId: z.string(),
+  projectId: z.string(),
+  evaluatedAt: z.date(),
+  verdict: z.string(),
+  observedValue: z.number().nullable(),
+  threshold: z.number().nullable(),
+  operator: z.string().nullable(),
+  timePeriodMinutes: z.number().int().nullable(),
+  skipCode: z.string().nullable(),
+});
+export type TriggerLatestEvaluation = z.infer<typeof triggerLatestEvaluationSchema>;
+
+/** When an automation acts next: one answer per kind, paused answered first for all. */
+export const nextFiringSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("paused"),
+    subject: z.enum(["schedule", "alert", "automation"]),
+    /** Set when the platform paused it, null when a person switched it off. */
+    pausedReason: z.string().nullable(),
+  }),
+  z.object({ kind: z.literal("schedule"), nextRunAt: z.date().nullable() }),
+  z.object({
+    kind: z.literal("digest"),
+    cadence: notificationCadenceSchema,
+    windowClosesAt: z.date(),
+  }),
+  z.object({ kind: z.literal("immediate"), traceDebounceMs: z.number() }),
+  z.object({ kind: z.literal("alert"), sweepIntervalMs: z.number() }),
+]);
+export type NextFiring = z.infer<typeof nextFiringSchema>;

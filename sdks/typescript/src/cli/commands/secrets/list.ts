@@ -6,7 +6,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { resolveCredentials } from "../../utils/apiKey.ts";
-import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import { formatTable } from "../../utils/formatting.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { createSpinner } from "../../utils/spinner.ts";
@@ -41,8 +41,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
     );
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch secrets" });
+      await failSpinnerFromResponse({ spinner, response, action: "fetch secrets" });
       process.exit(1);
     }
 

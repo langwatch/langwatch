@@ -11,7 +11,11 @@ import {
 } from "@chakra-ui/react";
 import { getGroup, getMetric } from "@langwatch/analytics-browser-kit";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
-import type { CustomGraphInput } from "@langwatch/dashboard-contract";
+import {
+  resolveGraphTimeScale,
+  withGroupedPipeline,
+  type CustomGraphInput,
+} from "@langwatch/dashboard-contract";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
 import { nowInstant } from "@langwatch/time";
@@ -57,13 +61,13 @@ import {
   type DataPointClickParams,
   drillDownQuery,
   drillsDownByDefault,
-  graphTimeScale,
   isBarGraph,
   seriesColorIndex,
 } from "../../model/custom-graph-drill-down.ts";
 import { describeError } from "../../model/describe-error.ts";
 import { monitorPeriodLabel, summarizeMonitor } from "../../model/monitor-summary.ts";
 import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name.ts";
+import { resolveSeriesValueFormat } from "../../model/series-value-format.ts";
 import { ChartErrorState } from "../elements/chart-error-state.tsx";
 import { ChartTooltip } from "../elements/chart-tooltip.tsx";
 import { Delayed } from "../elements/delayed.tsx";
@@ -242,28 +246,6 @@ function useDataPointClick({
     if (onDataPointClick) return onDataPointClick;
     return byDefault ? drillDown : undefined;
   }, [onDataPointClick, byDefault, drillDown]);
-}
-
-/** Pie and donut charts without a pipeline get one: grouped buckets are only filled with one. */
-function withDefaultPipeline(input: CustomGraphInput): CustomGraphInput {
-  const isCircular = input.graphType === "pie" || input.graphType === "donnut";
-  const needsDefaultPipeline = isCircular && input.groupBy && !input.series.some((s) => s.pipeline);
-  if (!needsDefaultPipeline) return input;
-
-  const addPipeline = (series: Series): Series =>
-    ({
-      metric: series.metric,
-      aggregation: series.aggregation,
-      key: series.key,
-      subkey: series.subkey,
-      filters: series.filters,
-      asPercent: series.asPercent,
-      name: series.name,
-      colorSet: series.colorSet,
-      pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
-    }) satisfies Series;
-
-  return { ...input, series: input.series.map(addPipeline) };
 }
 
 /** The charted read, and the one-bucket read a monitor card headlines. */
@@ -445,8 +427,13 @@ function formatWith(format: ValueFormat, value: number) {
 }
 
 function valueFormatOf(series: Series): string | ((value: number) => string) {
-  if (series.aggregation === "cardinality") return "0a";
-  return getMetric(series.metric)?.format ?? "0a";
+  return (
+    resolveSeriesValueFormat({
+      isPercent: series.asPercent,
+      aggregation: series.aggregation,
+      metricFormat: getMetric(series.metric)?.format,
+    }) ?? "0a"
+  );
 }
 
 function yAxisValueFormatOf(series: Series[]): ValueFormat {
@@ -468,7 +455,11 @@ function tooltipFormatterOf({
     const seriesKey = typeof payloadKey === "string" ? payloadKey : dataKey;
     const { series } = getSeries(seriesByKey, seriesKey);
     const metric = series?.metric && getMetric(series.metric);
-    const effectiveFormat = series?.aggregation === "cardinality" ? "0a" : metric?.format;
+    const effectiveFormat = resolveSeriesValueFormat({
+      isPercent: series?.asPercent,
+      aggregation: series?.aggregation,
+      metricFormat: metric ? metric.format : undefined,
+    });
     return formatWith(effectiveFormat, Number(value));
   };
 }
@@ -990,12 +981,18 @@ const CustomGraph_ = React.memo(
     // Unique prefix for SVG gradient ids to avoid collisions across charts
     const uniqueId = useId();
     const handleDataPointClick = useDataPointClick({ input, onDataPointClick });
+    // Compensations the stored graph JSON does not carry, shared with the scheduled-report
+    // renderer so a panel on screen is not blank in a report email (#6716).
     const timeScale = useMemo(
       () =>
-        graphTimeScale({ graphType: input.graphType, timeScale: input.timeScale, daysDifference }),
+        resolveGraphTimeScale({
+          graphType: input.graphType,
+          timeScale: input.timeScale,
+          daysDifference,
+        }),
       [input.graphType, input.timeScale, daysDifference],
     );
-    const queryInput = useMemo(() => withDefaultPipeline(input), [input]);
+    const queryInput = useMemo(() => withGroupedPipeline(input), [input]);
     const { timeseries, monitorSummaryTimeseries, filterParams } = useGraphTimeseries({
       input,
       queryInput,
@@ -1229,9 +1226,19 @@ const shapeDataForSummary = ({
       // Sum all values across all time periods for summary charts
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
-      // Count aggregations should use integer format regardless of metric's default
-      const isCardinalitySeries = series?.aggregation === "cardinality";
-      const formatOverride = isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
+      // The resolver owns the precedence (percentage over cardinality over the metric's own
+      // format), so summary totals never disagree with the axis and tooltip paths.
+      const formatOverride = metric
+        ? {
+            ...metric,
+            format:
+              resolveSeriesValueFormat({
+                isPercent: series?.asPercent,
+                aggregation: series?.aggregation,
+                metricFormat: metric.format,
+              }) ?? metric.format,
+          }
+        : metric;
 
       const directedMetric = series?.increaseIs
         ? { ...formatOverride, increaseIs: series.increaseIs }

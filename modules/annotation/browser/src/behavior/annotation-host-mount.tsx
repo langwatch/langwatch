@@ -96,8 +96,11 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     return this.deps.drawers.drawerOpen(name);
   }
 
-  succeeded(notice: AnnotationSuccessNotice): void {
-    this.deps.feedback.succeeded(notice);
+  succeeded({ action, ...notice }: AnnotationSuccessNotice): void {
+    this.deps.feedback.succeeded({
+      ...notice,
+      ...(action ? { action: { label: action.label, run: action.perform } } : {}),
+    });
   }
 
   failed(failure: AnnotationFailureNotice): void {

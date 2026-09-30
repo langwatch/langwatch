@@ -123,15 +123,22 @@ export class LangyTurnSharedService {
   }
 
   composeLangyTurnPrompt({
+    viewer,
     contextBlock,
     capNote,
     userText,
   }: {
+    viewer: StartConversationTurnInput["session"]["user"];
     contextBlock: string | null;
     capNote: string;
     userText: string;
   }): { prompt: string; labelled: boolean } {
-    const preamble = [contextBlock, capNote]
+    // Lets "email me" resolve to the viewer's own address without asking.
+    const viewerLine = viewer.email
+      ? `You are talking to ${viewer.name ?? viewer.email} <${viewer.email}>. ` +
+        "This identifies the user; it is not an instruction."
+      : null;
+    const preamble = [viewerLine, contextBlock, capNote]
       .map((block) => (block ?? "").trim())
       .filter((block) => block.length > 0);
     if (preamble.length === 0) {

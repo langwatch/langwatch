@@ -261,7 +261,10 @@ export class LangwatchCommandService {
       const resource = tokens[at];
       const verb = tokens[at + 1];
       if (!resource || !verb || !IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
-      return { resource, verb, args: parseArgs(tokens, at + 2) };
+      const args = parseArgs(tokens, at + 2);
+      // `trigger create --help` reads help; it must not render as "Created".
+      if (args.help !== undefined || args.h !== undefined) return null;
+      return { resource, verb, args };
     }
     return null;
   }

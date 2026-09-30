@@ -35,6 +35,15 @@ describe("given a browser that installs automation", () => {
     });
   });
 
+  describe("when an address names the drawer the API used to hand out", () => {
+    /** @scenario "A link issued before the drawer changed still opens the automation" */
+    it("answers with the automation authoring drawer", async () => {
+      const loaded = await installedDrawerLoaders([automationWeb]).editAutomationFilter?.();
+
+      expect(loaded).toEqual({ default: RegisteredAutomationDrawer });
+    });
+  });
+
   describe("when an address names the viewer, as a row's View action writes it", () => {
     it("answers with the viewer the host closes and edits", async () => {
       const loaded = await installedDrawerLoaders([automationWeb]).viewAutomation?.();

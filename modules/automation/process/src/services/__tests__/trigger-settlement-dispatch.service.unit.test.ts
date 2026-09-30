@@ -8,6 +8,7 @@ import {
   settlementTrace,
   settlementTrigger,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
+import { AutomationTraceRecordUnavailableError } from "../../repositories/automation-settlement-read.repository.ts";
 
 const loggerWarn = vi.hoisted(() => vi.fn());
 
@@ -48,6 +49,7 @@ describe("AutomationSettlementDispatchService", () => {
     loggerWarn.mockClear();
   });
 
+  /** @scenario "The worker publishes the settlement overflow series" */
   it("records overflow only when the durable intent executes", async () => {
     const fixture = createSettlementFixture(datasetTrigger());
 
@@ -68,6 +70,7 @@ describe("AutomationSettlementDispatchService", () => {
     );
   });
 
+  /** @scenario "A saved custom email template is rendered in the delivered notification" */
   it("confirms, renders, sends, and claims only eligible notification candidates", async () => {
     const fixture = createSettlementFixture(emailTrigger());
     fixture.traces.summaries.set("trace-filtered", settlementSummary("trace-filtered"));
@@ -100,6 +103,28 @@ describe("AutomationSettlementDispatchService", () => {
     ]);
   });
 
+  describe("given a process that composed no full-record trace read", () => {
+    /** @scenario "A trace whose full record this process cannot read still notifies" */
+    it("sends the digest from the settled fold state alone", async () => {
+      const fixture = createSettlementFixture(emailTrigger());
+      fixture.traces.recordErrors.set(
+        "trace-1",
+        new AutomationTraceRecordUnavailableError("no full-record read composed"),
+      );
+
+      await fixture.service.notifyDigest(
+        { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
+        settlementContext(),
+      );
+
+      expect(fixture.delivery.emails).toHaveLength(1);
+      expect(fixture.delivery.emails[0]?.html).toContain("Matched 1 trace");
+      expect(fixture.automation.claims).toEqual([
+        { triggerId: "trigger-1", traceId: "trace-1", projectId: "project-1" },
+      ]);
+    });
+  });
+
   it("keeps tenant email cap claims distinct for triggers sharing a digest", async () => {
     const fixture = createSettlementFixture(emailTrigger("trigger-a"));
 
@@ -121,6 +146,47 @@ describe("AutomationSettlementDispatchService", () => {
     expect(dailyClaims[0]).toContain("trigger-a");
     expect(dailyClaims[1]).toContain("trigger-b");
     expect(dailyClaims[0]).not.toBe(dailyClaims[1]);
+  });
+
+  /** @scenario "A saved custom Slack template is rendered in the delivered notification" */
+  it("renders a saved Slack template into the webhook message it delivers", async () => {
+    const fixture = createSettlementFixture(
+      settlementTrigger("SEND_SLACK_MESSAGE", {
+        actionParams: { slackWebhook: "https://hooks.slack.com/services/T1/B1/secret" },
+        templates: {
+          slackTemplateType: "string",
+          slackTemplate: "Saved: {{ trigger.name }}",
+          emailSubjectTemplate: null,
+          emailBodyTemplate: null,
+        },
+      }),
+    );
+
+    await fixture.service.notifyDigest(
+      { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
+      settlementContext(),
+    );
+
+    expect(fixture.delivery.legacySlackWebhooks).toHaveLength(0);
+    expect(fixture.delivery.slackWebhooks).toHaveLength(1);
+    expect(fixture.delivery.slackWebhooks[0]).toMatchObject({
+      payload: { text: "Saved: Settlement test" },
+    });
+  });
+
+  /** @scenario "A trigger with no custom templates delivers the framework default" */
+  it("delivers the framework default email when no template is saved", async () => {
+    const fixture = createSettlementFixture(
+      settlementTrigger("SEND_EMAIL", { actionParams: { members: ["ops@example.com"] } }),
+    );
+
+    await fixture.service.notifyDigest(
+      { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
+      settlementContext(),
+    );
+
+    expect(fixture.delivery.emails).toHaveLength(0);
+    expect(fixture.delivery.legacyEmails).toHaveLength(1);
   });
 
   it("suppresses a notification already claimed in an earlier settlement window", async () => {
@@ -394,6 +460,7 @@ describe("AutomationSettlementDispatchService", () => {
     expect(fixture.automation.claims.at(-1)?.traceId).toBe("trace-2");
   });
 
+  /** @scenario "Every attempt of one fire carries the same event id" */
   it("keeps webhook event ids stable across retries of the same outbox message", async () => {
     const trigger = settlementTrigger("SEND_WEBHOOK", {
       actionParams: {

@@ -136,9 +136,9 @@ describe("given the default gate classifier", () => {
     expect(defaultColumnGates({ name: "BodyText", type: "Nullable(String)" })).toEqual(["output"]);
   });
 
-  it("gates a money column costs, whatever its type", () => {
+  it("gates a money column cost:view, whatever its type", () => {
     expect(defaultColumnGates({ name: "TargetCost", type: "Nullable(Float64)" })).toEqual([
-      "costs",
+      "cost:view",
     ]);
   });
 
@@ -160,7 +160,7 @@ describe("given the built ClickHouse catalog over the committed manifest", () =>
     // next (EventName says which, not the column) — see
     // ../overrides/observability.ts's REQUEST_OR_RESPONSE_CONTENT.
     ["log_records", "BodyText", ["input", "output"]],
-    ["experiment_run_items", "TargetCost", ["costs"]],
+    ["experiment_run_items", "TargetCost", ["cost:view"]],
     ["metric_series", "SeriesId", []],
   ] as const)("classifies %s.%s as %j", (sourceTable, columnName, expectedGates) => {
     const view = bySource.get(sourceTable);

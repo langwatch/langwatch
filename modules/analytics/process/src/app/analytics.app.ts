@@ -41,6 +41,8 @@ import {
   type AnalyticsEvaluationRollupAppendBatchInput,
   type AnalyticsEvaluationRollupAppendInput,
   type AnalyticsEvaluationRow,
+  type LangWatchQLTimeWindow,
+  type LangWatchQLValidationResult,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
@@ -105,6 +107,7 @@ import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
+import { LangWatchQLValidationReportService } from "../services/langwatch-ql-validation-report.service.ts";
 import { WorkbenchProtectionsService } from "../services/workbench-protections.service.ts";
 import {
   convergeLwqlAccessModel,
@@ -504,11 +507,16 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
   #protections: WorkbenchProtectionsService;
+  #validationReport: LangWatchQLValidationReportService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
     this.#protections = WorkbenchProtectionsService.create(dependencies);
+    this.#validationReport = LangWatchQLValidationReportService.create({
+      langWatchQL: dependencies.langWatchQL,
+      protections: this.#protections,
+    });
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
     this.#hydration = LangWatchQLHydrationService.create({
@@ -809,6 +817,17 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  /** A member's statement judged for the editor's markers; never executed. */
+  diagnoseLangWatchQL(input: {
+    projectId: string;
+    userId: string;
+    sql: string;
+    parameters?: Readonly<Record<string, unknown>>;
+    timeWindow?: LangWatchQLTimeWindow;
+  }): Promise<LangWatchQLValidationResult> {
+    return this.#validationReport.report(input);
   }
 
   /** The judged columns a hydration plan asks for, read off this catalogue. */

@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import {
   EMAIL_RX,
   type EmailActionParams,
@@ -11,6 +11,7 @@ import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { api } from "../../../../behavior/automation-api.ts";
+import { useAutomationHost } from "../../../../model/automation-host.ts";
 import type {
   ConfigFormProps,
   NotifyClientDef,
@@ -96,6 +97,7 @@ function templatesFromSlice(slice: EmailSlice) {
  * accepts arbitrary addresses validated against `EMAIL_RX`.
  */
 function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, EmailPreview>) {
+  const cannotSendEmail = !useAutomationHost().hasEmailProvider();
   const teamWithMembers = api.team.getTeamWithMembers.useQuery(
     { slug: ctx.teamSlug ?? "", organizationId: ctx.organizationId ?? "" },
     { enabled: !!ctx.teamSlug && !!ctx.organizationId },
@@ -170,6 +172,22 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, E
 
   return (
     <VStack align="stretch" gap={4}>
+      {cannotSendEmail ? (
+        <Alert.Root
+          status="warning"
+          size="sm"
+          variant="subtle"
+          data-testid="email-provider-missing"
+        >
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description textStyle="xs">
+              This installation cannot send email yet. You can save this automation, but no email
+              goes out until an administrator sets up an email provider.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      ) : null}
       <Field.Root>
         <Field.Label>Recipients</Field.Label>
         <VStack align="stretch" gap={1}>
@@ -259,14 +277,6 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, E
         ) : null}
       </Box>
 
-      {/* Try the real message straight from the recipients section. */}
-      <AutomationTestFireButton
-        onTestFire={ctx.onTestFire}
-        loading={ctx.testFireLoading}
-        disabled={!isComplete(slice)}
-        hint={isComplete(slice) ? undefined : "Add a recipient first"}
-      />
-
       <VStack align="stretch" gap={2}>
         <Text textStyle="sm" fontWeight="semibold">
           Message
@@ -319,6 +329,13 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, E
           previewHeight="520px"
         />
       ) : null}
+      {/* After the message: a test fire renders whatever is configured above. */}
+      <AutomationTestFireButton
+        onTestFire={ctx.onTestFire}
+        loading={ctx.testFireLoading}
+        disabled={!isComplete(slice)}
+        hint={isComplete(slice) ? undefined : "Add a recipient first"}
+      />
     </VStack>
   );
 }

@@ -94,7 +94,7 @@ async function sample(rows: number, judged: readonly InstantEvalJudgment[]) {
   const { service, judgments, textSource } = harness(judged);
   const result = await service.getSample({
     caller: CALLER,
-    protections: { canSeeCosts: true },
+    protections: { catalogue: { permissions: [] }, canSeeCosts: true },
     projectId: "project-1",
     runId: "instanteval_1",
     row: ROW,
@@ -160,7 +160,7 @@ describe("sampling a run", () => {
 
     await service.getSample({
       caller: CALLER,
-      protections: {},
+      protections: { catalogue: { permissions: [] } },
       projectId: "project-1",
       runId: "instanteval_1",
       row: instantEvalRunRow({ questions: [QUESTION], startedAt: STARTED, finishedAt: finished }),

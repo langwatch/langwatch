@@ -12,7 +12,7 @@ import type {
   AutomationDispatchError,
   AutomationGraphNotifier,
   AutomationLogger,
-  AutomationSlackBotTokenDecryptor,
+  SlackDestinationService,
   AutomationClock,
   AutomationRunawaySignals,
 } from "../app/automation.members.ts";
@@ -21,9 +21,11 @@ import type { AutomationRunawayRepository } from "../repositories/automation-run
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
 import { RunawayContainmentService } from "./runaway-containment.service.ts";
+import type { TriggerLatestEvaluationService } from "./trigger-latest-evaluation.service.ts";
 
 /** Private graph-alert collaborator, assembled once with Automation's service. */
 export class AutomationGraphService {
@@ -41,8 +43,10 @@ export class AutomationGraphService {
     triggerSent: GraphTriggerSentRepository;
     notifier: AutomationGraphNotifier;
     logger: AutomationLogger;
-    slackTokens: AutomationSlackBotTokenDecryptor;
+    slackDestinations: SlackDestinationService;
+    slackConnections: Pick<AutomationSlackConnectionService, "updateConnectionClaim">;
     dispatchErrors: AutomationDispatchError;
+    latestEvaluations: Pick<TriggerLatestEvaluationService, "record">;
     runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals;
     clock: AutomationClock;
     baseHost: string;
@@ -56,8 +60,9 @@ export class AutomationGraphService {
         triggerSent: input.triggerSent,
         notifier: input.notifier,
         logger: input.logger,
-        slackTokens: input.slackTokens,
+        slackDestinations: input.slackDestinations,
         dispatchErrors: input.dispatchErrors,
+        latestEvaluations: input.latestEvaluations,
         clock: input.clock,
         baseHost: input.baseHost,
       }),
@@ -71,6 +76,7 @@ export class AutomationGraphService {
         runaway: input.runaway,
         clock: input.clock,
         triggers: input.triggers,
+        slackConnections: input.slackConnections,
       }),
     );
   }

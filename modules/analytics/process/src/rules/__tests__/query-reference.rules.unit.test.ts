@@ -15,12 +15,14 @@ import { DYNAMIC_PREFIXES, SEARCH_FIELDS, TRACE_FILTER_EXAMPLES } from "@langwat
 import { describe, expect, it } from "vitest";
 
 import { validateLangWatchQL } from "../../langwatch-ql/__tests__/lwql-validate.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { DEFAULT_LWQL_DATABASE } from "../../services/langwatch-ql.service.ts";
 import { LWQL_EXAMPLE_DATABASE, LWQL_EXAMPLES } from "../langwatch-ql-examples.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 import { buildQueryReference } from "../query-reference.rules.ts";
 
 const EVERYTHING_HELD: LangWatchQLProtections = {
+  catalogue: EVERY_CATALOGUE_PERMISSION,
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
@@ -217,7 +219,12 @@ describe("the query reference", () => {
 
   it("withholds exactly the cost and content examples from a caller who holds neither", () => {
     const withheld = build({
-      protections: { canSeeCosts: false, canSeeCapturedInput: false, canSeeCapturedOutput: false },
+      protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
+        canSeeCosts: false,
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+      },
     });
 
     expect(withheld.examples.filter((example) => !example.available).map((e) => e.id)).toEqual([

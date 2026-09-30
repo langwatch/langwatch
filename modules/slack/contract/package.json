@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/slack-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable shapes and callable API of a project's Slack connections.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

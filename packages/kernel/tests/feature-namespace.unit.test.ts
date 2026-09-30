@@ -31,6 +31,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   "hosted-mcp": "hosted-mcps",
   identity: "identities",
   "instant-eval": "instant-evals",
+  integration: "integrations",
   langy: "langy",
   log: "logs",
   metric: "metrics",
@@ -68,6 +69,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   saas: "saas",
   scim: "scim",
   "demo-data": "demo-data",
+  slack: "slack",
   sso: "sso",
   webhook: "webhooks",
 } as const satisfies { [F in ModuleName]: PublicNamespace<F> };

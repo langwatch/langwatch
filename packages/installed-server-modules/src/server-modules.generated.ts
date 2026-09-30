@@ -53,6 +53,7 @@ import { scenarioServer } from "@langwatch/scenario-process";
 import { scimServer } from "@langwatch/enterprise-scim-process";
 import { secretServer } from "@langwatch/secret-process";
 import { shareServer } from "@langwatch/share-process";
+import { slackServer } from "@langwatch/slack-process";
 import { ssoServer } from "@langwatch/enterprise-sso-process";
 import { storedObjectServer } from "@langwatch/stored-object-process";
 import { suiteServer } from "@langwatch/suite-process";
@@ -116,6 +117,7 @@ export const serverModules = [
   scimServer,
   secretServer,
   shareServer,
+  slackServer,
   ssoServer,
   storedObjectServer,
   suiteServer,

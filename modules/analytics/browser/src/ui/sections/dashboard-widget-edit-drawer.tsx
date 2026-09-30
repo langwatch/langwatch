@@ -7,7 +7,7 @@
 import { Box, Button, Spacer, Tabs } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
@@ -22,6 +22,8 @@ import { EditableWidgetName } from "./editable-widget-name.tsx";
 
 interface DashboardWidgetEditDrawerProps {
   open: boolean;
+  /** The project the queries' SQL editor reads its schema for. */
+  projectId: string;
   /** The live chart preview, already built by the card — null while closed. */
   chart: ReactNode;
   /** Omitted before the first Save — a widget that doesn't exist yet has no id. */
@@ -44,6 +46,7 @@ interface DashboardWidgetEditDrawerProps {
 
 export function DashboardWidgetEditDrawer({
   open,
+  projectId,
   chart,
   id,
   name,
@@ -83,6 +86,7 @@ export function DashboardWidgetEditDrawer({
             </Box>
           )}
           <WidgetEditTabs
+            projectId={projectId}
             activeTab={activeTab}
             onTabChange={onTabChange}
             code={code}
@@ -119,6 +123,7 @@ export function DashboardWidgetEditDrawer({
 
 /** The Code / Queries tab switcher and its two full-height panels. */
 function WidgetEditTabs({
+  projectId,
   activeTab,
   onTabChange,
   code,
@@ -128,6 +133,7 @@ function WidgetEditTabs({
   lastRuns,
   onRun,
 }: {
+  projectId: string;
   activeTab: "code" | "queries";
   onTabChange: (tab: "code" | "queries") => void;
   code: string;
@@ -137,6 +143,14 @@ function WidgetEditTabs({
   lastRuns: Record<string, QueryLastRun>;
   onRun: (query: DashboardWidgetQuery) => Promise<void>;
 }) {
+  const queryColumns = useMemo(
+    () =>
+      queries.flatMap((query) => {
+        const columns = lastRuns[query.name]?.result?.columns;
+        return columns ? [{ name: query.name, columns }] : [];
+      }),
+    [queries, lastRuns],
+  );
   return (
     <Tabs.Root
       value={activeTab}
@@ -182,7 +196,11 @@ function WidgetEditTabs({
           borderRadius="md"
           overflow="hidden"
         >
-          <DashboardWidgetCodeEditor language="typescript" value={code} onChange={onCodeChange} />
+          <DashboardWidgetCodeEditor
+            value={code}
+            onChange={onCodeChange}
+            queryColumns={queryColumns}
+          />
         </Box>
       </Tabs.Content>
 
@@ -195,6 +213,7 @@ function WidgetEditTabs({
         paddingTop={3}
       >
         <DashboardWidgetQueriesPanel
+          projectId={projectId}
           queries={queries}
           onChange={onQueriesChange}
           lastRuns={lastRuns}

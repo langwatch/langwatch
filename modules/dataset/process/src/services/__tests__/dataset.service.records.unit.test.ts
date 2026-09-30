@@ -113,8 +113,8 @@ function service(overrides: { columnTypes?: DatasetColumns } = {}) {
 describe("DatasetService", () => {
   describe("given a dataset being renamed", () => {
     describe("when the new name slugifies differently", () => {
-      /** @scenario "Update a dataset name regenerates the slug" */
-      it("writes the slug the new name produces, not the one the row had", async () => {
+      /** @scenario "Saving a rename from the UI keeps the slug" */
+      it("writes the slug the row already had, not one the new name produces", async () => {
         const { service: subject, update } = service();
 
         await subject.upsertDataset({
@@ -128,7 +128,7 @@ describe("DatasetService", () => {
           expect.objectContaining({
             id: "dataset-1",
             name: "Renamed Dataset",
-            slug: "renamed-dataset",
+            slug: "feedback",
           }),
         );
       });

@@ -5,6 +5,7 @@ vi.mock("../../webhook/http-destination.ts", () => ({ sendHttpDestination: vi.fn
 
 import { sendHttpDestination } from "../../webhook/http-destination.ts";
 import { verifyWebhookSignature, WEBHOOK_SIGNATURE_HEADER } from "../../webhook/signature.ts";
+import { describeTransportFailure } from "../../webhook/transport-failure.ts";
 import { InMemoryWebhookDispatchRateLimiterService } from "../in-memory.webhook-dispatch-rate-limiter.service.ts";
 import {
   WebhookDispatchRateLimiter,
@@ -204,6 +205,7 @@ describe("WebhookEgressService", () => {
 
   describe("given a scope that has reached its hourly dispatch cap", () => {
     /** @scenario "The hourly dispatch cap backs a flood off rather than dropping it" */
+    /** @scenario "A project cannot flood an endpoint" */
     it("backs off retryably with the time the window resets in, contacting nobody", async () => {
       transportResolves();
       const limiter = new ScriptedRateLimiter({
@@ -267,6 +269,7 @@ describe("WebhookEgressService", () => {
 
   describe("given a destination the address policy refuses", () => {
     /** @scenario "A send refuses a fenced address before it opens a connection" */
+    /** @scenario "Requests to private or internal addresses are blocked" */
     it.each([
       "https://127.0.0.1/hook",
       "https://10.0.0.5/hook",
@@ -287,6 +290,184 @@ describe("WebhookEgressService", () => {
       expect(error.retryable).toBe(false);
       expect(mockedSend).not.toHaveBeenCalled();
       expect(limiter.calls).toEqual([]);
+    });
+  });
+});
+
+/**
+ * `content-type` is reserved: a customer cannot set it, so it always describes
+ * the body sent. The automations channel states it (JSON or plain text); the
+ * webhook endpoints platform passes nothing and keeps JSON.
+ */
+describe("WebhookEgressService content type", () => {
+  describe("when the caller states nothing", () => {
+    it("sends the JSON type every delivery carried before the parameter existed", async () => {
+      transportResolves();
+
+      await serviceWith(allowing()).send(base);
+
+      expect(sentHeaders()["Content-Type"]).toBe("application/json");
+    });
+  });
+
+  describe("when a customer header tries to claim content-type", () => {
+    it("strips it, so the header always describes the body actually sent", async () => {
+      transportResolves();
+
+      await serviceWith(allowing()).send({
+        ...base,
+        headers: { "content-type": "application/xml" },
+      });
+
+      expect(sentHeaders()["Content-Type"]).toBe("application/json");
+      expect(sentHeaders()["content-type"]).toBeUndefined();
+    });
+  });
+
+  describe("when the caller states a plain-text body", () => {
+    it("announces it as text, so the receiver does not try to parse JSON", async () => {
+      transportResolves();
+
+      await serviceWith(allowing()).send({
+        ...base,
+        body: "plain words",
+        contentType: "text/plain; charset=utf-8",
+      });
+
+      expect(sentHeaders()["Content-Type"]).toBe("text/plain; charset=utf-8");
+    });
+
+    it("signs the body it sends, unchanged by the type", async () => {
+      transportResolves();
+      const nowMs = Date.now();
+
+      await serviceWith(allowing(), () => nowMs).send({
+        ...base,
+        body: "plain words",
+        contentType: "text/plain; charset=utf-8",
+        signingSecrets: ["whsec_automations"],
+      });
+
+      expect(
+        verifyWebhookSignature({
+          secret: "whsec_automations",
+          body: "plain words",
+          header: sentHeaders()[WEBHOOK_SIGNATURE_HEADER] ?? "",
+          nowSeconds: Math.floor(nowMs / 1000),
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("when a customer header tries to override it", () => {
+    it("drops the customer header and keeps the derived type", async () => {
+      transportResolves();
+
+      await serviceWith(allowing()).send({
+        ...base,
+        headers: { "Content-Type": "application/xml" },
+        contentType: "text/plain; charset=utf-8",
+      });
+
+      expect(sentHeaders()["Content-Type"]).toBe("text/plain; charset=utf-8");
+    });
+  });
+});
+
+function transportFailure({ cause }: { cause: Error }): DispatchError {
+  return new DispatchError({
+    message: `Webhook for trigger "Timeout watcher": HTTP request failed — ${cause.message}`,
+    retryable: true,
+    cause,
+  });
+}
+
+async function testFire(): Promise<DispatchError> {
+  const error = await serviceWith(allowing())
+    .send({
+      url: "https://hooks.example.com/in",
+      body: "{}",
+      triggerName: "Timeout watcher",
+      testFire: true,
+    })
+    .catch((err: unknown) => err);
+  if (!(error instanceof DispatchError)) {
+    throw new Error("expected the test fire to raise a DispatchError");
+  }
+  return error;
+}
+
+describe("WebhookEgressService transport failures", () => {
+  describe("when the endpoint cannot be reached", () => {
+    /** @scenario "A test that cannot reach the endpoint names the transport failure" */
+    it.each([
+      {
+        cause: new Error("Could not resolve hostname: hooks.example.com"),
+        named: /hostname could not be resolved/,
+      },
+      {
+        cause: new Error("Connection refused - is the server running at 203.0.113.9:443?"),
+        named: /refused the connection/,
+      },
+      {
+        cause: new Error(
+          "Connection failed to 203.0.113.9:443: The operation was aborted due to timeout",
+        ),
+        named: /did not answer in time/,
+      },
+      {
+        cause: new Error("TLS certificate error for hooks.example.com: certificate has expired"),
+        named: /TLS certificate could not be verified/,
+      },
+    ])("names the failure for $cause.message", async ({ cause, named }) => {
+      mockedSend.mockRejectedValue(transportFailure({ cause }));
+
+      const error = await testFire();
+
+      expect(error.customerMessage).toMatch(named);
+      expect(error.customerMessage).not.toMatch(/example\.com|203\.0\.113/);
+      expect(error.retryable).toBe(true);
+    });
+  });
+
+  describe("when the failure says nothing recognisable", () => {
+    it("says the endpoint could not be reached", async () => {
+      mockedSend.mockRejectedValue(transportFailure({ cause: new Error("kaboom") }));
+
+      const error = await testFire();
+
+      expect(error.customerMessage).toBe("The endpoint could not be reached.");
+    });
+  });
+
+  describe("when the failure already carries customer copy", () => {
+    it("keeps it rather than renaming the failure", async () => {
+      mockedSend.mockRejectedValue(
+        new DispatchError({ message: "internal", retryable: false, customerMessage: "Kept." }),
+      );
+
+      const error = await testFire();
+
+      expect(error.customerMessage).toBe("Kept.");
+    });
+  });
+});
+
+describe("describeTransportFailure", () => {
+  describe("given only the trigger name mentions a timeout", () => {
+    it("reads the cause, not the label", () => {
+      expect(describeTransportFailure({ error: new Error("ECONNRESET") })).toMatch(
+        /closed the connection/,
+      );
+    });
+  });
+
+  describe("given an undici error whose code sits on its cause", () => {
+    it("reads the code from the cause", () => {
+      const error = new TypeError("fetch failed", {
+        cause: Object.assign(new Error("connect"), { code: "ECONNREFUSED" }),
+      });
+      expect(describeTransportFailure({ error })).toMatch(/refused the connection/);
     });
   });
 });

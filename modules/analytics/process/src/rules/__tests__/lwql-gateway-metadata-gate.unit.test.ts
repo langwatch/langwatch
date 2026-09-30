@@ -2,15 +2,20 @@
 import { describe, expect, it } from "vitest";
 
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { GATEWAY_OVERRIDES } from "../lwql-gateway-overrides.rules.ts";
-import { LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
+import {
+  LWQL_CLICKHOUSE_CATALOGUE,
+  LWQL_VIEW_CATALOG,
+  pickLwqlViewByName,
+} from "../lwql-view-catalog.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 describe("given the gateway_request_spend view", () => {
   describe("when its metadata map is exposed", () => {
-    it("declares the MetadataMap gate as output in the override", () => {
-      expect(GATEWAY_OVERRIDES.gateway_spend?.columnGates?.MetadataMap).toEqual(["output"]);
+    it("declares the MetadataMap column output content in the catalogue", () => {
+      expect(LWQL_CLICKHOUSE_CATALOGUE.gateway_request_spend.columns.MetadataMap).toEqual({
+        content: "output",
+      });
     });
 
     it("carries the output gate on the built column", () => {

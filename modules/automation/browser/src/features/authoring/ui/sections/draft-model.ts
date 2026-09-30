@@ -47,6 +47,7 @@ export const buildTestFirePayload = model.buildTestFirePayload;
 export const actionParamsFromDraft = model.actionParamsFromDraft;
 export const filtersAreSet = model.filtersAreSet;
 export const subjectIsSet = model.subjectIsSet;
+export const subjectIsValid = model.subjectIsValid;
 export const filterQueryIsSet = model.filterQueryIsSet;
 export const cadenceIsSet = model.cadenceIsSet;
 export const conditionsAreSet = model.conditionsAreSet;

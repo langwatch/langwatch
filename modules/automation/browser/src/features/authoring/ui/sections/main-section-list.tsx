@@ -1,7 +1,6 @@
 import { VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
-import { AutomationTypePicker, type AutomationSource } from "../blocks/automation-type-picker.tsx";
 import { AutomationSeveritySection } from "../blocks/severity-section.tsx";
 import { AutomationNameField } from "../elements/name-field.tsx";
 import { useConfigComplete, useDraft } from "./automation-selectors.ts";
@@ -11,8 +10,8 @@ import { DeliveryPicker } from "./delivery-picker.tsx";
 import { SubjectSection } from "./subject-section.tsx";
 
 /** The collapsible facets, in ADR-043 order. Name sits above as a plain field;
- *  Severity self-hides for non-alerts. */
-type FacetKey = "type" | "subject" | "cadence" | "severity" | "delivery";
+ *  Severity self-hides for anything that is not graph-watching. */
+type FacetKey = "subject" | "cadence" | "severity" | "delivery";
 
 /** The noun the Name field's placeholder uses, one per source preset. */
 function automationNoun(source: string): string {
@@ -22,20 +21,16 @@ function automationNoun(source: string): string {
 }
 
 /**
- * Main pane: collapsible facets in ADR-043 order. Type drives visibility of later facets.
+ * The schedule composer: Name, Subject, Cadence, Severity, Delivery (ADR-043 order).
+ * Automations author through the wizard (ADR-093 §4); a schedule arrives with its kind
+ * decided by its entry point, so there is no type picker (ADR-093 §1 deletes it).
  */
 export function MainSectionList({
   isEdit,
-  sourceLocked,
   prefilledGraphId,
-  webhookEnabled,
 }: {
   isEdit: boolean;
-  /** The Type facet can't change (editing a saved alert, or opened from a
-   *  specific chart). */
-  sourceLocked: boolean;
   prefilledGraphId?: string;
-  webhookEnabled: boolean;
 }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
@@ -66,17 +61,6 @@ export function MainSectionList({
         noun={automationNoun(draft.source)}
         onChange={(value) => dispatch({ type: "SET_NAME", value })}
       />
-      <AutomationTypePicker
-        source={draft.source as AutomationSource}
-        sourceLocked={sourceLocked}
-        accordion={facetProps("type")}
-        onChange={(source) => {
-          dispatch({ type: "SET_SOURCE", value: source });
-          if (source === "customGraph" && draft.alertType === null) {
-            dispatch({ type: "SET_ALERT_TYPE", value: "WARNING" });
-          }
-        }}
-      />
       <SubjectSection prefilledGraphId={prefilledGraphId} accordion={facetProps("subject")} />
       <CadenceSection isEdit={isEdit} accordion={facetProps("cadence")} />
       <AutomationSeveritySection
@@ -89,8 +73,6 @@ export function MainSectionList({
         value={draft.action}
         onChange={(value) => dispatch({ type: "SET_ACTION", value })}
         source={draft.source}
-        webhookEnabled={webhookEnabled}
-        preserveHiddenWebhook={isEdit}
         accordion={facetProps("delivery")}
       />
     </VStack>

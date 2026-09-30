@@ -169,6 +169,7 @@
               },
               "features/querying-your-data",
               "features/automations",
+              "features/topic-clustering",
               "features/embedded-analytics"
             ]
           },
@@ -1088,6 +1089,7 @@
               "api-reference/datasets/create-attachments",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",
+              "api-reference/datasets/get-entries",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
               "api-reference/datasets/update-dataset",
@@ -1359,11 +1361,16 @@
             "group": "Triggers",
             "pages": [
               "api-reference/triggers/overview",
+              "api-reference/triggers/list-slack-connections",
               "api-reference/triggers/list-triggers",
               "api-reference/triggers/create-a-slack-alert-trigger",
               "api-reference/triggers/create-triggers",
               "api-reference/triggers/get-triggers",
+              "api-reference/triggers/get-fires",
               "api-reference/triggers/update-triggers",
+              "api-reference/triggers/action-disable",
+              "api-reference/triggers/action-enable",
+              "api-reference/triggers/action-test-fire",
               "api-reference/triggers/delete-triggers"
             ]
           },

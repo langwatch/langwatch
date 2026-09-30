@@ -72,6 +72,38 @@ describe("sendHttpDestination", () => {
       await expect(send()).resolves.toMatchObject({ status: 200, body: "ok-body" });
     });
 
+    /** @scenario "A failed attempt keeps the receiver's response for debugging" */
+    it("keeps the name but redacts the value of a credential-bearing response header", async () => {
+      fetchResolves(401, "nope", {
+        "WWW-Authenticate": 'Bearer realm="x", nonce="secret-nonce"',
+        "x-request-id": "req-1",
+      });
+
+      const result = await send();
+
+      // The name is the debugging signal; the value can be a live credential,
+      // and the delivery log shows stored headers to every drawer reader.
+      expect(result.responseHeaders).toMatchObject({
+        "www-authenticate": "[redacted]",
+        "x-request-id": "req-1",
+      });
+    });
+
+    /** @scenario "A failed attempt keeps the receiver's response for debugging" */
+    it("redacts a legacy Set-Cookie2 value the same as Set-Cookie", async () => {
+      fetchResolves(401, "nope", {
+        "Set-Cookie2": 'session="live-session-value"; Version="1"',
+        "x-request-id": "req-2",
+      });
+
+      const result = await send();
+
+      expect(result.responseHeaders).toMatchObject({
+        "set-cookie2": "[redacted]",
+        "x-request-id": "req-2",
+      });
+    });
+
     /** @scenario "The response body is read only as far as the cap and then cancelled" */
     it("caps an oversized response body at sixty-four kibibytes", async () => {
       fetchResolves(200, "x".repeat(100_000));

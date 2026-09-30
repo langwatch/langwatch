@@ -409,7 +409,7 @@ describe("the mounted dataset REST family", () => {
       const renamed = {
         ...dataset,
         name: "New Name",
-        slug: "new-name",
+        slug: "old-name",
         columnTypes: [{ name: "question", type: "string" }],
       };
       const { send, stub } = mount({ upsertDataset: vi.fn(async () => renamed) as never });
@@ -428,7 +428,7 @@ describe("the mounted dataset REST family", () => {
       });
       await expect(response.json()).resolves.toMatchObject({
         name: "New Name",
-        slug: "new-name",
+        slug: "old-name",
         columnTypes: [{ name: "question", type: "string" }],
       });
     });
@@ -444,7 +444,7 @@ describe("the mounted dataset REST family", () => {
       );
     });
 
-    /** @scenario "Update a dataset fails when new slug conflicts" */
+    /** @scenario "Update a dataset fails when the new name collides with another dataset's slug" */
     it("answers 409 when the new name collides with another dataset", async () => {
       const { send } = mount({
         upsertDataset: vi.fn(async () => {
@@ -540,6 +540,46 @@ describe("the mounted dataset REST family", () => {
       });
 
       expect((await send("GET", "/api/dataset/ghost/records")).status).toBe(404);
+    });
+  });
+
+  describe("when a dataset's entries are paged through the legacy path", () => {
+    /** @scenario "List entries through the legacy GET /:slug/entries path" */
+    it("answers the same page GET /:slugOrId/records does", async () => {
+      const { send, stub } = mount({
+        listRecords: vi.fn(async () => ({
+          data: [{ id: "rec-11", entry: { input: "input-11" } }],
+          pagination: { page: 2, limit: 10, total: 100, totalPages: 10 },
+        })) as never,
+      });
+
+      const entries = await send("GET", "/api/dataset/my-dataset/entries?page=2&limit=10");
+      const records = await send("GET", "/api/dataset/my-dataset/records?page=2&limit=10");
+
+      expect(entries.status).toBe(200);
+      expect(stub.listRecords).toHaveBeenNthCalledWith(1, {
+        slugOrId: "my-dataset",
+        projectId: "project-1",
+        page: 2,
+        limit: 10,
+      });
+      const body = await entries.json();
+      expect(body).toMatchObject({ pagination: { page: 2, limit: 10, total: 100 } });
+      expect(body).toEqual(await records.json());
+    });
+
+    /** @scenario "List entries for non-existent dataset returns 404" */
+    it("answers 404 for a dataset that does not exist", async () => {
+      const { send } = mount({
+        listRecords: vi.fn(async () => {
+          throw new DatasetNotFoundError("no such dataset");
+        }) as never,
+      });
+
+      const response = await send("GET", "/api/dataset/ghost/entries");
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({ code: "dataset_not_found" });
     });
   });
 

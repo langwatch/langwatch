@@ -28,6 +28,7 @@ export interface WebhookDeliveryTransport {
     headers?: Record<string, string>;
     signingSecrets?: readonly string[];
     body: string;
+    contentType?: string;
     triggerName: string;
     projectId: string;
     eventId: string;
@@ -45,6 +46,8 @@ export interface WebhookDeliveryRequest {
   headers?: Record<string, string>;
   signingSecrets?: readonly string[];
   body: string;
+  /** What that body is, sent as `Content-Type`; absent leaves the sender's JSON default. */
+  contentType?: string;
   triggerName: string;
 }
 
@@ -79,6 +82,7 @@ async function deliverWebhook({
   headers,
   signingSecrets,
   body,
+  contentType,
   triggerName,
 }: WebhookDeliveryRequest & { transport: WebhookDeliveryTransport }): Promise<WebhookSendResult> {
   const startedAt = nowInstant().epochMilliseconds;
@@ -103,6 +107,7 @@ async function deliverWebhook({
       headers,
       signingSecrets,
       body,
+      contentType,
       triggerName,
       projectId,
       eventId,

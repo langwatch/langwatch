@@ -45,6 +45,18 @@ describe("given a tool frame from the live stream", () => {
     });
   });
 
+  describe("when a stored call was named a create but only read help", () => {
+    it("replays as the shell call it was, never as 'Created'", () => {
+      const input = { command: "langwatch trigger create --help --format json" };
+      expect(effectiveToolName("langwatch.trigger.create", input)).toBe("bash");
+    });
+
+    it("keeps a stored real create as the create", () => {
+      const input = { command: "langwatch trigger create x --action SEND_EMAIL" };
+      expect(effectiveToolName("langwatch.trigger.create", input)).toBe("langwatch.trigger.create");
+    });
+  });
+
   describe("when the agent shells out to the LangWatch CLI", () => {
     const command = "langwatch trace search --format json";
 

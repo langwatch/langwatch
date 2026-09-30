@@ -665,6 +665,66 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // Named Slack connections (ADR-021, ADR-093 section 5a), many per scope. A
+  // query is bounded by a row id, the organizationId anchor (bare, or inside
+  // the per-scope secretFingerprint compound unique), or a
+  // (scopeType, scopeId) predicate. No projectId column.
+  SlackIntegration: {
+    validateWhere: (where) => {
+      const reason = "requires a row id, organizationId, or scope predicate in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          hasInList(c.organizationId) ||
+          hasScopePredicate(c) ||
+          typeof clauseField(
+            c.organizationId_scopeType_scopeId_secretFingerprint,
+            "organizationId",
+          ) === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = createRecords(data);
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // A connection's claims (ARCHITECTURE.md §3). A query is bounded by the
+  // organizationId anchor or the full (connectionId, claimantId) id, bare or
+  // as the compound key an upsert names.
+  SlackConnectionClaim: {
+    validateWhere: (where) => {
+      const reason = "requires organizationId or (connectionId, claimantId) in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.organizationId === "string" ||
+          (typeof c.connectionId === "string" && typeof c.claimantId === "string") ||
+          typeof clauseField(c.connectionId_claimantId, "claimantId") === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = createRecords(data);
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   // Org-anchored webhook platform (no projectId column): every query must be
   // bounded by the organization or a row id; the cross-org delivery sweep and
   // the retention prune use the raw-SQL tenancy opt-out instead.

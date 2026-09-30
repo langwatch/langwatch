@@ -180,6 +180,9 @@
       "path": "../../modules/share/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/slack/process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/stored-object/process/tsconfig.build.json"
     },
     {

@@ -1,6 +1,7 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
 
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { strictestLangWatchQLProtections } from "../langwatch-ql-query-scope.rules.ts";
 
 describe("strictestLangWatchQLProtections", () => {
@@ -8,14 +9,30 @@ describe("strictestLangWatchQLProtections", () => {
   it("offers a category only when every project grants it", () => {
     expect(
       strictestLangWatchQLProtections([
-        { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true },
-        { canSeeCosts: true, canSeeCapturedInput: false, canSeeCapturedOutput: null },
+        {
+          catalogue: EVERY_CATALOGUE_PERMISSION,
+          canSeeCosts: true,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        },
+        {
+          catalogue: EVERY_CATALOGUE_PERMISSION,
+          canSeeCosts: true,
+          canSeeCapturedInput: false,
+          canSeeCapturedOutput: null,
+        },
       ]),
-    ).toEqual({ canSeeCosts: true, canSeeCapturedInput: false, canSeeCapturedOutput: false });
+    ).toEqual({
+      catalogue: EVERY_CATALOGUE_PERMISSION,
+      canSeeCosts: true,
+      canSeeCapturedInput: false,
+      canSeeCapturedOutput: false,
+    });
   });
 
   it("offers nothing for an empty readable set", () => {
     expect(strictestLangWatchQLProtections([])).toEqual({
+      catalogue: { permissions: [] },
       canSeeCosts: false,
       canSeeCapturedInput: false,
       canSeeCapturedOutput: false,

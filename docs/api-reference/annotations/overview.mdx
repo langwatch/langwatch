@@ -19,3 +19,7 @@ To make a call to the Annotations API, you will need to pass through your LangWa
 - `PATCH /api/v1/annotations/:id` - Update a single annotation
 - `GET /api/v1/annotations/trace/:id` - Get the annotations for a single trace
 - `POST /api/v1/annotations/trace/:id` - Create annotations for traces to support domain labeling, evaluation scoring, and agent testing workflows.
+
+#### Annotation queues
+
+Annotation queues have no REST endpoints yet. To send traces to a queue from code, create an automation with the `ADD_TO_ANNOTATION_QUEUE` action ([Triggers API](/api-reference/triggers/overview)); to read queues and their items, query the `annotation_queues` and `annotation_queue_items` views with [LangWatchQL](/api-reference/query/overview). See [Annotation queues](/annotations/queues#from-code).

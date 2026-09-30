@@ -6,6 +6,7 @@
 
 import {
   useUiCapabilities,
+  useUiDeployment,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
@@ -16,6 +17,7 @@ import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
+import type { SlackConnectionSaved } from "@langwatch/slack-browser-kit";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -74,7 +76,9 @@ class CapabilityAutomationHost extends AutomationHost {
       feedback: UiFeedback;
       openRegisteredDrawer: ReturnType<typeof useDrawer>["openDrawer"];
       goBackDrawer: ReturnType<typeof useDrawer>["goBack"];
+      closeRegisteredDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
       organizations: readonly AutomationOrganizationGraph[];
+      hasEmailProvider: boolean;
     },
   ) {
     super();
@@ -144,6 +148,10 @@ class CapabilityAutomationHost extends AutomationHost {
     });
   }
 
+  closeDrawer(): void {
+    this.members.closeRegisteredDrawer();
+  }
+
   /** The one sub-flow this family runs: the dataset module's own drawer, hands over and returns. */
   createDataset(handover: {
     created: (dataset: AutomationDatasetCreation) => void;
@@ -159,9 +167,27 @@ class CapabilityAutomationHost extends AutomationHost {
     });
   }
 
+  /** Slack's connection drawer, handed over and returned like the dataset drawer. */
+  createSlackConnection(handover: {
+    created: (saved: SlackConnectionSaved) => void;
+    returned: () => void;
+  }): void {
+    this.members.openRegisteredDrawer("slackConnection", {
+      onSuccess: (saved: SlackConnectionSaved) => handover.created(saved),
+      onClose: () => {
+        handover.returned();
+        this.members.goBackDrawer();
+      },
+    });
+  }
+
   /** No deployment-address capability exists yet; recorded gap, see the handoff. */
   appBaseUrl(): string {
     return "";
+  }
+
+  hasEmailProvider(): boolean {
+    return this.members.hasEmailProvider;
   }
 
   succeeded(notice: AutomationSuccessNotice): void {
@@ -189,7 +215,8 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
   const { session, navigation, route, feedback } = useUiCapabilities();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();
-  const { openDrawer: openRegisteredDrawer, goBack } = useDrawer();
+  const { openDrawer: openRegisteredDrawer, goBack, closeDrawer } = useDrawer();
+  const deployment = useUiDeployment();
 
   const hostScope = useMemo<AutomationScope>(
     () => ({ organizationId, teamId: scopeHost?.team()?.id ?? null, projectId }),
@@ -214,7 +241,9 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
         feedback,
         openRegisteredDrawer,
         goBackDrawer: goBack,
+        closeRegisteredDrawer: closeDrawer,
         organizations,
+        hasEmailProvider: deployment.hasEmailProvider,
       }),
     [
       hostScope,
@@ -225,7 +254,9 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
       feedback,
       openRegisteredDrawer,
       goBack,
+      closeDrawer,
       organizations,
+      deployment.hasEmailProvider,
     ],
   );
 

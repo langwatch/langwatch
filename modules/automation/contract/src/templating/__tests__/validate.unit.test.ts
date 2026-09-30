@@ -4,6 +4,7 @@ import { validateLiquid } from "../validate.ts";
 
 describe("validateLiquid", () => {
   describe("when the template is well-formed", () => {
+    /** @scenario "A syntactically valid template passes validation" */
     it("passes", () => {
       const result = validateLiquid(
         "Hi {{ project.name }}{% for m in matches %}{{ m.trace.url }}{% endfor %}",
@@ -14,6 +15,7 @@ describe("validateLiquid", () => {
   });
 
   describe("when the template has unbalanced tags", () => {
+    /** @scenario "A syntactically invalid template is rejected" */
     it("fails with an error message", () => {
       const result = validateLiquid("{% for m in matches %}{{ m }}");
       expect(result.valid).toBe(false);

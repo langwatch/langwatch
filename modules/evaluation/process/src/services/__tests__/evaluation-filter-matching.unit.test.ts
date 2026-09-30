@@ -296,6 +296,7 @@ describe("EvaluationFilterMatchingService.matchesEvaluationFilters", () => {
     });
 
     /** @scenario "A verdict on an errored run never satisfies a trigger's evaluation filter" */
+    /** @scenario "A legacy evaluation filter only counts an evaluation that ran" */
     it("does not fire on a false verdict attached to an errored run (provider timeout is not a quality regression)", () => {
       const evals = [makeEval({ evaluatorId: "eval-abc", status: "error", passed: false })];
       const filters: TriggerFilters = {

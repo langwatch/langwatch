@@ -2,7 +2,7 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
@@ -12,6 +12,10 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
+import {
+  createTestSlackConnections,
+  createTestSlackDestinations,
+} from "../../__tests__/testing.ts";
 import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
@@ -151,18 +155,6 @@ export function createCanonicalAutomationApp(): {
     replicate: vi.fn(),
     performanceForProject: vi.fn(),
   });
-  const featureFlags = createApiFixture<FeatureFlagApi>({
-    isEnabled: vi.fn(),
-    resolveFrontendFlags: vi.fn(),
-    resolvePublicAnonymousFlags: vi.fn(),
-    resolveExperimentCatalogue: vi.fn(),
-    setUserExperimentEnrolment: vi.fn(),
-    setExperimentTenantPolicy: vi.fn(),
-    listOperatorCatalogue: vi.fn(),
-    setEnabled: vi.fn(),
-    setRules: vi.fn(),
-    clearStoredFlag: vi.fn(),
-  });
   const members: AutomationInfrastructure = {
     verifier,
     clock,
@@ -170,7 +162,8 @@ export function createCanonicalAutomationApp(): {
     logger,
     runaway,
     testFire,
-    slackTokens: { findDecryptedToken: vi.fn() },
+    slackDestinations: createTestSlackDestinations(),
+    slackConnections: createTestSlackConnections(),
     dispatchErrors: { isTerminal: vi.fn(), createTerminal: vi.fn() },
     heartbeat: { findClickHouseClient: vi.fn() },
     persistCaps: MemoryAutomationPersistCapRepository.create(),
@@ -180,7 +173,6 @@ export function createCanonicalAutomationApp(): {
       ),
       persistActionParamsFor: vi.fn(async (_action, args) => args.incoming),
       redactActionParamsFor: vi.fn((_action, params) => params),
-      findDecryptedSlackBotToken: vi.fn(() => null),
       decryptWebhookHeaders: vi.fn(() => ({})),
       decryptWebhookSigningSecrets: vi.fn(() => []),
     },
@@ -205,7 +197,7 @@ export function createCanonicalAutomationApp(): {
       dependencies: {
         analytics,
         monitors,
-        featureFlags,
+        evaluators: createApiFixture<EvaluatorApi>({ findById: vi.fn(async () => undefined) }),
         projects,
         entitlement: {
           getActivePlan: vi.fn<EntitlementApiContract["getActivePlan"]>(),

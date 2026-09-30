@@ -147,12 +147,33 @@ export type GraphTriggerEvaluationStatus =
   | "skipped"
   | "not_delivered";
 
+/** Why an alert check was skipped without a verdict: stable codes the view maps to copy. */
+export const evaluationSkipCodeSchema = z.enum([
+  "subject_missing",
+  "incomplete_configuration",
+  "result_too_large",
+  "series_percentage_unsupported",
+  "inactive",
+]);
+export type EvaluationSkipCode = z.infer<typeof evaluationSkipCodeSchema>;
+
+/** The condition a check ran against, recorded beside the value it observed. */
+export type GraphTriggerEvaluationCondition = {
+  threshold: number;
+  operator: string;
+  timePeriodMinutes: number;
+};
+
 export type GraphTriggerEvaluationResult = {
   triggerId: string;
   projectId: string;
   reason: GraphTriggerEvaluationReason;
   status: GraphTriggerEvaluationStatus;
   detail?: string;
+  /** The stable counterpart to `detail` on a skip; what the recorded evaluation stores. */
+  skipCode?: EvaluationSkipCode;
+  /** Set on a skip that came after the condition was read, so the record keeps it. */
+  condition?: GraphTriggerEvaluationCondition;
   value?: number;
   didSend?: boolean;
   renderErrors?: string[];

@@ -14,8 +14,10 @@ import { MemoryDatasetRepository } from "../../repositories/memory/memory.datase
 import { DatasetService } from "../dataset.service.ts";
 
 function service(): DatasetService {
-  const database = MemoryDatasetDatabase.create();
+  return serviceOver({ database: MemoryDatasetDatabase.create() });
+}
 
+function serviceOver({ database }: { database: MemoryDatasetDatabase }): DatasetService {
   return DatasetService.create({
     repository: MemoryDatasetRepository.create({ database }),
     records: MemoryDatasetRecordRepository.create({ database }),
@@ -78,18 +80,26 @@ describe("DatasetService operations the transports call", () => {
   });
 
   describe("when a dataset is deleted from the list", () => {
+    /** @scenario "Undoing an archive restores the slug the dataset kept" */
     it("archives it, and restores it when the caller undoes", async () => {
-      const datasets = service();
+      const database = MemoryDatasetDatabase.create();
+      const { id } = await MemoryDatasetRepository.create({ database }).create({
+        projectId: "p",
+        name: "One",
+        slug: "one",
+        columnTypes: [],
+      });
+      const datasets = serviceOver({ database });
       const archive = vi
         .spyOn(datasets, "archiveDataset")
-        .mockResolvedValue({ id: "d", archived: true });
+        .mockResolvedValue({ id, archived: true });
       const restore = vi.spyOn(datasets, "restoreDataset").mockResolvedValue({ success: true });
 
-      await datasets.archiveOrRestoreDataset({ projectId: "p", datasetId: "d" });
-      await datasets.archiveOrRestoreDataset({ projectId: "p", datasetId: "d", undo: true });
+      await datasets.archiveOrRestoreDataset({ projectId: "p", datasetId: id });
+      await datasets.archiveOrRestoreDataset({ projectId: "p", datasetId: id, undo: true });
 
-      expect(archive).toHaveBeenCalledWith({ slugOrId: "d", projectId: "p" });
-      expect(restore).toHaveBeenCalledWith({ datasetId: "d", projectId: "p" });
+      expect(archive).toHaveBeenCalledWith({ slugOrId: id, projectId: "p" });
+      expect(restore).toHaveBeenCalledWith({ datasetId: id, projectId: "p" });
     });
   });
 });

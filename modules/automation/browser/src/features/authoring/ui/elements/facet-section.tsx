@@ -1,4 +1,4 @@
-import { Box, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Spacer, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, ChevronDown, HelpCircle } from "lucide-react";
 import type { ReactNode } from "react";
@@ -14,6 +14,7 @@ export interface FacetAccordionProps {
 
 /**
  * Facet panel: title, optional help and control, fields. Accordion mode with completion indicator.
+ * One neutral border whatever the completion: the header's check is the only completion signal.
  */
 export function FacetSection({
   title,
@@ -34,7 +35,7 @@ export function FacetSection({
   accordion?: FacetAccordionProps;
   /** One-line preview shown when collapsed. */
   summary?: string;
-  /** Drives the completion check + border accent. */
+  /** Drives the completion check. */
   complete?: boolean;
 }) {
   const titleRow = (
@@ -49,7 +50,8 @@ export function FacetSection({
       ) : null}
       {complete ? (
         <Box as="span" color="green.solid" display="inline-flex">
-          <Check size={14} />
+          <Check size={14} aria-hidden="true" />
+          <VisuallyHidden>Answered</VisuallyHidden>
         </Box>
       ) : null}
     </HStack>
@@ -75,19 +77,11 @@ export function FacetSection({
     <Box
       borderRadius="md"
       border="1px solid"
-      colorPalette="green"
-      borderColor={complete ? "colorPalette.solid" : "border"}
+      borderColor="border"
       bg="bg"
+      _hover={{ borderColor: "border.emphasized" }}
     >
-      <HStack
-        gap={2}
-        align="center"
-        padding={3}
-        borderRadius="md"
-        _hover={{
-          borderColor: complete ? "colorPalette.emphasized" : "orange.400",
-        }}
-      >
+      <HStack gap={2} align="center" padding={3} borderRadius="md">
         <chakra.button
           type="button"
           aria-expanded={open}

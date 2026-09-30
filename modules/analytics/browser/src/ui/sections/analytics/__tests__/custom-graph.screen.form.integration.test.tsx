@@ -19,7 +19,12 @@ const { created } = vi.hoisted(() => {
 
 vi.mock("../../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
-    useUtils: () => ({ graphs: { getById: { invalidate: async () => undefined } } }),
+    useUtils: () => ({
+      graphs: {
+        getById: { invalidate: async () => undefined },
+        getAll: { invalidate: async () => undefined },
+      },
+    }),
     graphs: {
       create: {
         useMutation: () => ({

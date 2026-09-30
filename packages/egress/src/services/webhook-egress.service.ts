@@ -5,6 +5,7 @@ import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "@langwatch/automation-contract";
+import { DispatchError, isDispatchError } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
 import type { EgressTlsPolicy } from "../ssrf/fenced-fetch.ts";
@@ -17,6 +18,7 @@ import {
 import { assertDispatchBudget } from "../webhook/dispatch-budget.ts";
 import { sendHttpDestination } from "../webhook/http-destination.ts";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../webhook/signature.ts";
+import { describeTransportFailure } from "../webhook/transport-failure.ts";
 import { assertWebhookUrlAllowed, webhookUrlValidator } from "../webhook/url-policy.ts";
 import type { WebhookDispatchRateLimiter } from "./webhook-dispatch-rate-limiter.service.ts";
 
@@ -32,8 +34,14 @@ export interface WebhookSendInput {
    * (defence in depth over the save-time sanitize).
    */
   headers?: Record<string, string>;
-  /** The rendered JSON body. */
+  /** The rendered body. */
   body: string;
+  /**
+   * What that body is, sent as `Content-Type`. The automations channel derives
+   * it from the body format; webhook endpoints (always JSON) leave it alone.
+   * Reserved as a raw header, so a customer header never contradicts the body.
+   */
+  contentType?: string;
   /** Woven into DispatchError messages and delivery logs. */
   triggerName: string;
   /**
@@ -82,6 +90,7 @@ export interface WebhookSendInput {
 function buildWebhookHeaders({
   headers,
   body,
+  contentType,
   eventId,
   dispatchIdHeader,
   signingSecrets,
@@ -91,6 +100,7 @@ function buildWebhookHeaders({
 }: {
   headers: Record<string, string>;
   body: string;
+  contentType: string;
   eventId: string;
   dispatchIdHeader: string;
   signingSecrets?: readonly string[];
@@ -106,7 +116,7 @@ function buildWebhookHeaders({
   );
   return {
     ...sanitizeWebhookHeaders(resolvedHeaders),
-    "Content-Type": "application/json",
+    "Content-Type": contentType,
     [dispatchIdHeader]: eventId,
     ...(signingSecrets && signingSecrets.length > 0
       ? {
@@ -157,6 +167,7 @@ export class WebhookEgressService {
     method = "POST",
     headers = {},
     body,
+    contentType = "application/json",
     triggerName,
     testFire = false,
     projectId,
@@ -186,6 +197,7 @@ export class WebhookEgressService {
       headers: buildWebhookHeaders({
         headers,
         body,
+        contentType,
         eventId: resolvedEventId,
         dispatchIdHeader,
         signingSecrets,
@@ -197,7 +209,21 @@ export class WebhookEgressService {
       contextLabel: label,
       validateUrl: webhookUrlValidator(allowInsecureLocal),
       tls: this.tls,
+    }).catch((error: unknown) => {
+      throw withTransportFailureNamed({ error });
     });
     return { ...response, eventId: resolvedEventId };
   }
+}
+
+/** The author supplied this endpoint, so a failure to reach it is named. */
+function withTransportFailureNamed({ error }: { error: unknown }): unknown {
+  if (!isDispatchError(error) || error.customerMessage) return error;
+  return new DispatchError({
+    message: error.message,
+    retryable: error.retryable,
+    cause: error.cause,
+    retryAfterMs: error.retryAfterMs,
+    customerMessage: describeTransportFailure({ error: error.cause }),
+  });
 }

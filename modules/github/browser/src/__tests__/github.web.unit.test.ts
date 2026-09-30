@@ -24,13 +24,4 @@ describe("given a browser that installs github", () => {
       expect(installed.modules).toContain(githubWeb);
     });
   });
-
-  describe("when a screen the declaration names is asked for", () => {
-    it("answers with a component", async () => {
-      const screen = githubWeb.installation.screens["pages/settings/integrations"];
-      const loaded = await screen?.load?.();
-
-      expect(loaded).toHaveProperty("default");
-    });
-  });
 });

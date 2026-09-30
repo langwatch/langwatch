@@ -30,6 +30,9 @@
       "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/system-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     }
   ]

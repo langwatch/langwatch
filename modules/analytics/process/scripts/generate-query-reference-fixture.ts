@@ -8,7 +8,8 @@ import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
-import { LWQL_VIEW_CATALOG } from "../src/rules/lwql-view-catalog.rules.ts";
+import { cataloguePermissions } from "../src/rules/lwql-catalogue.rules.ts";
+import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../src/rules/lwql-view-catalog.rules.ts";
 import { buildQueryReference } from "../src/rules/query-reference.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../src/services/langwatch-ql-executor.service.ts";
 import { LangWatchQLSchemaService } from "../src/services/langwatch-ql-schema.service.ts";
@@ -28,6 +29,7 @@ const EVERYTHING = {
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,
+  catalogue: { permissions: cataloguePermissions({ catalog: LWQL_CATALOG }) },
 };
 
 const DATABASE = "analytics";

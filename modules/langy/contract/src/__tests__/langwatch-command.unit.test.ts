@@ -2,6 +2,13 @@ import { isSoleLangwatchInvocation, parseLangwatchCommand } from "@langwatch/lan
 import { describe, expect, it } from "vitest";
 
 describe("parseLangwatchCommand", () => {
+  describe("given a help request for a write verb", () => {
+    it("names no capability, so it never renders as the write", () => {
+      expect(parseLangwatchCommand("langwatch trigger create --help --format json")).toBeNull();
+      expect(parseLangwatchCommand("langwatch slack-connection create -h")).toBeNull();
+    });
+  });
+
   describe("given a plain CLI invocation", () => {
     it("reads the resource and the verb", () => {
       expect(parseLangwatchCommand("langwatch trace search --format json")).toMatchObject({

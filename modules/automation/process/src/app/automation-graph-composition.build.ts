@@ -13,6 +13,10 @@ import {
   type GraphTriggerSentDatabase,
 } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import {
+  PrismaTriggerLatestEvaluationRepository,
+  type TriggerLatestEvaluationDatabase,
+} from "../repositories/prisma/prisma.trigger-latest-evaluation.repository.ts";
+import {
   PrismaTriggerRepository,
   type TriggerDatabase,
 } from "../repositories/prisma/prisma.trigger.repository.ts";
@@ -22,13 +26,11 @@ import {
 } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationGraphActivityService } from "../services/automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
-import {
-  AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
-  type AutomationSecretCrypto,
-} from "../services/automation-slack-secrets.service.ts";
+import type { AutomationSecretCrypto } from "../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
 import type { AutomationEmailCapService } from "../services/email-cap.service.ts";
+import type { SlackDestinationService } from "../services/slack-destination.service.ts";
+import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
 import type {
   AutomationClock,
   AutomationDispatchError,
@@ -42,7 +44,8 @@ export type AutomationGraphActivityDatabase = TriggerDatabase &
   CustomGraphDatabase &
   GraphTriggerSentDatabase &
   EmailSuppressionDatabase &
-  WebhookDeliveryDatabase;
+  WebhookDeliveryDatabase &
+  TriggerLatestEvaluationDatabase;
 
 /** Graph delivery's Automation persistence, over its Prisma repositories. */
 export function composeAutomationGraphDelivery(input: {
@@ -67,6 +70,8 @@ export function composeAutomationGraphActivity(input: {
   delivery: AutomationNotificationDelivery;
   /** Reads the Slack bot tokens and webhook secrets this deployment wrote. */
   crypto: AutomationSecretCrypto;
+  /** Where every Slack delivery goes, over `SlackApi` (ARCHITECTURE.md §3). */
+  slackDestinations: SlackDestinationService;
   emailCaps: AutomationEmailCapService;
   logger: AutomationLogger;
   /** How the process's queue tells a permanent failure from a retryable one. */
@@ -92,12 +97,14 @@ export function composeAutomationGraphActivity(input: {
     analytics: input.analytics,
     delivery: input.delivery,
     webhooks: AutomationWebhookSecretsService.create(input.crypto),
-    slackTokens: AutomationSlackBotTokenDecryptorService.create(
-      AutomationSlackSecretsService.create(input.crypto),
-    ),
+    slackDestinations: input.slackDestinations,
     emailCaps: input.emailCaps,
     logger: input.logger,
     dispatchErrors: input.dispatchErrors,
+    latestEvaluations: TriggerLatestEvaluationService.create({
+      repository: PrismaTriggerLatestEvaluationRepository.create(input.prisma),
+      logger: input.logger,
+    }),
     baseHost: input.baseHost,
     emailHourlyCap: input.emailHourlyCap,
     tenantDailyCap: input.tenantDailyCap,

@@ -21,6 +21,7 @@
   "dependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:",

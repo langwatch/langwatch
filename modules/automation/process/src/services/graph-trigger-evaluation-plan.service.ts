@@ -1,5 +1,10 @@
 import { parseSeriesIndex } from "@langwatch/automation-contract";
-import type { GraphTriggerEvaluationResult, Trigger } from "@langwatch/automation-contract";
+import type {
+  EvaluationSkipCode,
+  GraphTriggerEvaluationCondition,
+  GraphTriggerEvaluationResult,
+  Trigger,
+} from "@langwatch/automation-contract";
 import { type Instant } from "@langwatch/time";
 
 import type {
@@ -33,7 +38,12 @@ export class GraphTriggerEvaluationPlanService {
       projectId: request.projectId,
     });
     if (!graph) {
-      return this.skip(request, "graph not found");
+      return this.skip({
+        request,
+        detail: "graph not found",
+        skipCode: "subject_missing",
+        condition: this.condition(ready.params),
+      });
     }
 
     return this.createGraphPlan(request, ready, graph);
@@ -41,24 +51,36 @@ export class GraphTriggerEvaluationPlanService {
 
   private validateTrigger(request: GraphEvaluationRequest, trigger: Trigger | null) {
     if (!trigger) {
-      return this.skip(request, "trigger missing");
+      return this.skip({ request, detail: "trigger missing", skipCode: "subject_missing" });
     }
 
     if (!trigger.active) {
-      return this.skip(request, "trigger inactive");
+      return this.skip({ request, detail: "trigger inactive", skipCode: "inactive" });
     }
 
     if (!trigger.customGraphId) {
-      return this.skip(request, "trigger has no customGraphId");
+      return this.skip({
+        request,
+        detail: "trigger has no customGraphId",
+        skipCode: "subject_missing",
+      });
     }
 
     const params = (trigger.actionParams ?? {}) as GraphActionParams;
     if (params.threshold === void 0 || params.operator === void 0 || params.timePeriod === void 0) {
-      return this.skip(request, "missing threshold / operator / timePeriod");
+      return this.skip({
+        request,
+        detail: "missing threshold / operator / timePeriod",
+        skipCode: "incomplete_configuration",
+      });
     }
 
     if (!params.seriesName) {
-      return this.skip(request, "missing seriesName");
+      return this.skip({
+        request,
+        detail: "missing seriesName",
+        skipCode: "incomplete_configuration",
+      });
     }
 
     return { trigger, customGraphId: trigger.customGraphId, params };
@@ -74,11 +96,22 @@ export class GraphTriggerEvaluationPlanService {
     customGraph: GraphEvaluationPlan["customGraph"],
   ): GraphEvaluationPlan | GraphTriggerEvaluationResult {
     const graph = customGraph.graph as StoredGraphConfig | null;
+    const condition = this.condition(trigger.params);
     if (!graph?.series?.length) {
-      return this.skip(request, "graph has no series");
+      return this.skip({
+        request,
+        detail: "graph has no series",
+        skipCode: "incomplete_configuration",
+        condition,
+      });
     }
 
-    const series = this.series(request, graph, trigger.params.seriesName!);
+    const series = this.series({
+      request,
+      graph,
+      seriesName: trigger.params.seriesName!,
+      condition,
+    });
     if ("status" in series) {
       return series;
     }
@@ -109,15 +142,35 @@ export class GraphTriggerEvaluationPlanService {
     };
   }
 
-  private series(request: GraphEvaluationRequest, graph: StoredGraphConfig, seriesName: string) {
+  private series({
+    request,
+    graph,
+    seriesName,
+    condition,
+  }: {
+    request: GraphEvaluationRequest;
+    graph: StoredGraphConfig;
+    seriesName: string;
+    condition: GraphTriggerEvaluationCondition;
+  }) {
     const index = parseSeriesIndex(seriesName);
     if (Number.isNaN(index) || index < 0 || index >= graph.series.length) {
-      return this.skip(request, `series index ${index} not in graph`);
+      return this.skip({
+        request,
+        detail: `series index ${index} not in graph`,
+        skipCode: "incomplete_configuration",
+        condition,
+      });
     }
 
     const series = graph.series[index];
     if (!series?.name || !series.metric || !series.aggregation) {
-      return this.skip(request, "invalid series configuration");
+      return this.skip({
+        request,
+        detail: "invalid series configuration",
+        skipCode: "incomplete_configuration",
+        condition,
+      });
     }
 
     return series;
@@ -150,7 +203,26 @@ export class GraphTriggerEvaluationPlanService {
     };
   }
 
-  private skip(request: GraphEvaluationRequest, detail: string): GraphTriggerEvaluationResult {
-    return skippedGraphEvaluation({ ...request, detail });
+  /** The condition, known once the trigger validated: every later skip records it. */
+  private condition(params: GraphActionParams): GraphTriggerEvaluationCondition {
+    return {
+      threshold: params.threshold!,
+      operator: params.operator!,
+      timePeriodMinutes: params.timePeriod!,
+    };
+  }
+
+  private skip({
+    request,
+    detail,
+    skipCode,
+    condition,
+  }: {
+    request: GraphEvaluationRequest;
+    detail: string;
+    skipCode: EvaluationSkipCode;
+    condition?: GraphTriggerEvaluationCondition;
+  }): GraphTriggerEvaluationResult {
+    return skippedGraphEvaluation({ ...request, detail, skipCode, condition });
   }
 }

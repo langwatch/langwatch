@@ -112,7 +112,10 @@ export function AddParticipants({
             )}
           </Select.ValueText>
         </Select.Trigger>
-        <Select.Content maxHeight="300px" portalled={false}>
+        {/* #6716: portalled (the default) so the listbox stays clickable inside
+            the stacked Configuration drawer; `portalled={false}` left it
+            under the drawer body. */}
+        <Select.Content maxHeight="300px">
           <Box
             maxH="250px"
             overflowY="auto"

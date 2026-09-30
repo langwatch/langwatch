@@ -10,6 +10,7 @@ import type { EmailSuppressionNameRepository } from "./email-suppression-name.re
 import type { EmailSuppressionRepository } from "./email-suppression.repository.ts";
 import type { GraphTriggerSentRepository } from "./graph-trigger-sent.repository.ts";
 import type { TriggerFireHistoryRepository } from "./trigger-fire-history.repository.ts";
+import type { TriggerLatestEvaluationRepository } from "./trigger-latest-evaluation.repository.ts";
 import type { TriggerRepository } from "./trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "./webhook-delivery.repository.ts";
 
@@ -21,6 +22,8 @@ import type { WebhookDeliveryRepository } from "./webhook-delivery.repository.ts
 export interface AutomationRepositories {
   readonly triggers: TriggerRepository;
   readonly history: TriggerFireHistoryRepository;
+  /** Each alert's latest-evaluation snapshot. */
+  readonly latestEvaluations: TriggerLatestEvaluationRepository;
   readonly suppressions: EmailSuppressionRepository;
   readonly names: EmailSuppressionNameRepository;
   readonly customGraphs: CustomGraphRepository;

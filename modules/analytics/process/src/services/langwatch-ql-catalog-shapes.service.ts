@@ -6,10 +6,8 @@
 
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 
-import {
-  heldFieldProtections,
-  type FieldProtection,
-} from "../rules/lwql-field-protection.rules.ts";
+import { isAccessHeld, type LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
+import { heldLwqlGates, type LwqlGate } from "../rules/lwql-gate.rules.ts";
 
 /**
  * What a column's numbers are measured in.
@@ -41,7 +39,7 @@ export interface LangWatchQLViewColumn {
   /**
    * Permissions a caller must hold to reference this column, all of them.
    */
-  readonly gates: readonly FieldProtection[];
+  readonly gates: readonly LwqlGate[];
   /**
    * Columns of the source table this one reads.
    */
@@ -189,7 +187,7 @@ export interface LangWatchQLViewDefinition {
   /**
    * Permissions a caller must hold to reach the dataset at all.
    */
-  readonly gates: readonly FieldProtection[];
+  readonly gates: readonly LwqlGate[];
   /** What one row of the view is, after deduplication. */
   readonly grain: string;
   /**
@@ -244,8 +242,8 @@ export class LangWatchQLCatalogShapesService {
   private constructor() {}
 
   /** The content permissions this caller holds. */
-  heldPermissions(protections: LangWatchQLProtections): ReadonlySet<FieldProtection> {
-    return heldFieldProtections(protections);
+  heldPermissions(protections: LangWatchQLProtections): ReadonlySet<LwqlGate> {
+    return heldLwqlGates(protections);
   }
 
   /**
@@ -266,7 +264,7 @@ export class LangWatchQLCatalogShapesService {
   }: {
     view: LangWatchQLViewDefinition;
     column: LangWatchQLViewColumn;
-  }): readonly FieldProtection[] {
+  }): readonly LwqlGate[] {
     if (view.gates.length === 0) {
       return column.gates;
     }
@@ -417,7 +415,7 @@ export class LangWatchQLCatalogShapesService {
     protections: LangWatchQLProtections;
     views: readonly LangWatchQLViewDefinition[];
   }): readonly string[] {
-    const held = heldFieldProtections(protections);
+    const held = heldLwqlGates(protections);
     const withheld = views.flatMap((view) =>
       view.columns
         .filter((column) => this.columnGates({ view, column }).some((gate) => !held.has(gate)))
@@ -428,22 +426,30 @@ export class LangWatchQLCatalogShapesService {
   }
 
   /**
-   * The datasets a caller can reach, in catalog order.
+   * The datasets a caller can reach, in catalog order: their catalogue table's access is held,
+   * and at least one column is readable. A view the catalogue does not declare is never reached.
    */
   visibleViews({
     protections,
     views,
+    catalog,
   }: {
     protections: LangWatchQLProtections;
     views: readonly LangWatchQLViewDefinition[];
+    catalog: LwqlCatalogue;
   }): readonly LangWatchQLViewDefinition[] {
-    const held = heldFieldProtections(protections);
+    const held = heldLwqlGates(protections);
+    const granted = new Set(protections.catalogue.permissions);
 
-    return views.filter((view) =>
-      view.columns.some((column) =>
+    return views.filter((view) => {
+      const table = catalog[view.name];
+      if (table === undefined || !isAccessHeld({ access: table.access, held: granted })) {
+        return false;
+      }
+      return view.columns.some((column) =>
         this.columnGates({ view, column }).every((gate) => held.has(gate)),
-      ),
-    );
+      );
+    });
   }
 
   /** Every column of every view that carries captured content, sorted. */

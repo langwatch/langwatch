@@ -27,7 +27,7 @@ export function ConfigurationSecondaryDrawer({
   if (!draft.action) {
     return (
       <SecondaryDrawerShell open={open} title="Setup" onClose={onDone} onDone={onDone}>
-        Choose a type first.
+        Choose where this automation delivers first.
       </SecondaryDrawerShell>
     );
   }

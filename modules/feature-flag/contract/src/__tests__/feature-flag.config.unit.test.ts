@@ -51,7 +51,7 @@ describe("feature flag server configuration", () => {
 
   describe("given a flag with no legacy alias declared", () => {
     it("has no legacy leaf for it", () => {
-      expect(Object.keys(read({}).legacy)).not.toContain("release_webhook_automations");
+      expect(Object.keys(read({}).legacy)).not.toContain("experiment_onboarding_langy_guided");
     });
   });
 });

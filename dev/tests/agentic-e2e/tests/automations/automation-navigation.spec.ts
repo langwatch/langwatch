@@ -8,8 +8,12 @@ test("automation overview keeps activity and setup guidance", async ({ page }, t
 
   await page.goto(basePath);
   await expect(page.locator("h1", { hasText: "Overview" })).toBeVisible();
-  await expect(page.locator(`a[href="${basePath}/alerts"]`)).toBeVisible();
-  await expect(page.getByRole("link", { name: "Overview", exact: true })).toBeVisible();
+  // Automations and alerts are one list now (ADR-093 §1), so there is no
+  // Alerts tab to navigate to.
+  await expect(page.locator(`a[href="${basePath}/alerts"]`)).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Overview", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Recent activity")).toBeVisible();
   await expect(page.getByText("Error spike")).toBeVisible();
   await expect(page.getByText("Traffic drop")).toBeVisible();
@@ -21,19 +25,27 @@ test("automation overview keeps activity and setup guidance", async ({ page }, t
   await expect(page.locator(`a[href="${basePath}"]`, { hasText: "Automations" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("automations.png") });
 
-  await page.getByRole("link", { name: "Alerts", exact: true }).last().click();
+  // A link issued before the merge still lands somewhere useful: the old
+  // alerts path resolves to the one automations page (the path carries no
+  // row identity — that lives in the drawer parameters).
+  await page.goto(`${basePath}/alerts`);
+  // The retired path renders the merged table in place rather than
+  // redirecting, so the URL must survive too.
   await expect(page).toHaveURL(`${basePath}/alerts`);
-  await expect(page.locator("h1", { hasText: "Alerts" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "New alert" })).toHaveCount(1);
-  await expect(page.getByText("Error spike")).toBeVisible();
-  await expect(page.getByText("Traffic drop")).toBeVisible();
-  await expect(page.getByText("Cost spike")).toBeVisible();
+  await expect(page.locator("h1", { hasText: "Automations" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "New automation" }),
+  ).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("alerts.png") });
 
-  await page.getByRole("link", { name: "Schedules", exact: true }).click();
+  // The tab is called Reports; the path it shipped under keeps answering, so
+  // no existing link breaks.
+  await page.getByRole("link", { name: "Reports", exact: true }).click();
   await expect(page).toHaveURL(`${basePath}/schedules`);
-  await expect(page.locator("h1", { hasText: "Schedules" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "New schedule" })).toHaveCount(1);
+  await expect(page.locator("h1", { hasText: "Reports" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "New report" })).toHaveCount(
+    1,
+  );
   await page.screenshot({ path: testInfo.outputPath("schedules.png") });
 
   await page.getByRole("link", { name: "Automations", exact: true }).last().click();

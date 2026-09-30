@@ -1,4 +1,5 @@
-import type { FilterField } from "../../../model/filters/types.ts";
+import type { FilterField } from "@langwatch/analytics-filters";
+
 import type { FilterParam } from "../use-filter-params.ts";
 
 export const filterOutEmptyFilters = (
