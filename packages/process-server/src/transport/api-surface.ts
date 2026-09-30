@@ -56,6 +56,7 @@ import {
   ModelProviderDisabledError,
 } from "@langwatch/model-provider-contract";
 import type { Logger } from "@langwatch/observability";
+import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { z } from "zod";
@@ -203,7 +204,7 @@ class ApiSurface {
       audit: restAudit(peers.app(AuditLogApi)),
       idempotency,
       rateLimiter,
-      facts: this.#restFacts(),
+      facts: this.#restFacts(peers.find(OpsApi)),
     });
   }
 
@@ -377,7 +378,7 @@ class ApiSurface {
     return { id: caller.userId, email: caller.email, impersonator: caller.impersonator };
   }
 
-  #restFacts(): readonly RestTransportMiddlewareBinding[] {
+  #restFacts(ops: OpsApi | undefined): readonly RestTransportMiddlewareBinding[] {
     return [
       bindRestMiddleware(
         unsubscribeCallerAddress,
@@ -400,7 +401,12 @@ class ApiSurface {
         return { projectId: credential.project.id };
       }),
 
-      bindRestMiddleware(adminActor, (context) => this.#adminActor(context.req.raw)),
+      // Main's hidden 404 for anyone not on the staff list, answered before the body is read.
+      bindRestMiddleware(adminActor, async (context) => {
+        const operator = await this.#adminActor(context.req.raw);
+        if (ops?.operatorScope(operator).kind !== "platform") throw new AdminSurfaceHiddenError();
+        return operator;
+      }),
       bindRestMiddleware(adminAuthSession, async (context) => {
         const caller = await this.sessions.read(context.req.raw);
 

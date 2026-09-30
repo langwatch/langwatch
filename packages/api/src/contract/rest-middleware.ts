@@ -9,12 +9,14 @@ import type { z } from "zod";
 export interface RestTransportMiddleware<Schema extends z.ZodType = z.ZodType> {
   readonly name: string;
   readonly schema: Schema;
-  readonly source?: "headers";
+  /** Unset: read off the credential alone, so a public route resolves it before the body (§8). */
+  readonly source?: "headers" | "input";
 }
 
 export function defineRestMiddleware<Schema extends z.ZodType>(
   name: string,
   schema: Schema,
+  options?: { source: "input" },
 ): RestTransportMiddleware<Schema> {
-  return Object.freeze({ name, schema });
+  return Object.freeze({ name, schema, ...options });
 }

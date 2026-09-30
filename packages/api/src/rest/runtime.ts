@@ -601,7 +601,9 @@ function routeStack<Api>({
       : []),
     // The door answers before the cap drains a byte (main's order), unless it signs over the
     // body: then the capped bytes are read once, exactly as sent, and it verifies those.
-    ...(doorReadsBody(route) ? [...cap, ...raw, door] : [door, ...cap, ...raw]),
+    ...(doorReadsBody(route)
+      ? [...cap, ...raw, door]
+      : [door, ...credentialFacts({ route, facts }), ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -663,6 +665,39 @@ function authenticateMiddleware({
 
     await next();
   };
+}
+
+/** A public route's facts read off the credential alone, resolved before the body (§8). */
+const earlyFacts = new WeakMap<Context, ReadonlyMap<string, unknown>>();
+
+/**
+ * Credential, then body, then what the body names (Alex, 2026-09-30): a public route's
+ * credential facts refuse before its body is capped, parsed or validated. A guarded route's
+ * facts stay after its authorisation, which reads the parsed input.
+ */
+function credentialFacts({
+  route,
+  facts,
+}: {
+  route: RestTransportRoute<unknown>;
+  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+}): MiddlewareHandler[] {
+  const early = (route.middleware ?? []).filter((fact) => fact.source === undefined);
+
+  if (route.access?.kind !== "public" || early.length === 0) return [];
+
+  return [
+    async (context, next) => {
+      const resolved = new Map<string, unknown>();
+
+      for (const fact of early) {
+        resolved.set(fact.name, await resolveBoundFact({ route, fact, facts, context }));
+      }
+
+      earlyFacts.set(context, resolved);
+      await next();
+    },
+  ];
 }
 
 /** @see authenticateMiddleware, which every non-public route's stack runs first. */
@@ -1653,20 +1688,40 @@ async function resolveFacts({
       continue;
     }
 
-    const binding = facts.get(fact.name);
+    const early = earlyFacts.get(context);
 
-    if (!binding) {
-      throw new Error(`REST ${route.operation} declares the fact "${fact.name}" and none is bound`);
-    }
-
-    const parsed = fact.schema.safeParse(await binding.resolve(context));
-
-    if (!parsed.success) throw parsed.error;
-
-    resolved.push(parsed.data);
+    resolved.push(
+      early?.has(fact.name)
+        ? early.get(fact.name)
+        : await resolveBoundFact({ route, fact, facts, context }),
+    );
   }
 
   return resolved;
+}
+
+async function resolveBoundFact({
+  route,
+  fact,
+  facts,
+  context,
+}: {
+  route: RestTransportRoute<unknown>;
+  fact: RestTransportMiddleware;
+  facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
+  context: Context;
+}): Promise<unknown> {
+  const binding = facts.get(fact.name);
+
+  if (!binding) {
+    throw new Error(`REST ${route.operation} declares the fact "${fact.name}" and none is bound`);
+  }
+
+  const parsed = fact.schema.safeParse(await binding.resolve(context));
+
+  if (!parsed.success) throw parsed.error;
+
+  return parsed.data;
 }
 
 function normalizedActor(actor: Actor | null): (Actor & { id: string }) | null {

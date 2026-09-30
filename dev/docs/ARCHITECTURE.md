@@ -1287,6 +1287,9 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
 - The exception is a hidden family, whose 404 comes before the credential or the body: instance-admin with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
+- REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's
+  credential facts), then the body is parsed and validated, then any authorisation that reads the parsed input.
+  A fact that reads the input is declared `source: "input"` and resolves after the validators (Alex, 2026-09-30).
 - `GET /api/checkup` keeps the branch's `organization:view` guard; main answers any project key. The drift is
   accepted, since the checkup reads organisation-wide state (Alex, 2026-09-30).
 - REST authenticates with API keys only and tRPC with the session (Alex, 2026-09-30); `/api/files` and
