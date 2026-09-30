@@ -112,6 +112,9 @@
       "path": "../../slack/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/system-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {

@@ -66,7 +66,8 @@
     "hono": "catalog:",
     "hono-openapi": "catalog:",
     "nanoid": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@langwatch/system-migrations": "workspace:*"
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",

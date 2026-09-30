@@ -1190,13 +1190,14 @@ so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provi
 both schemas under the same migration lock, before serve, and the access-config render runs from
 env alone in its Helm job (Alex, 2026-09-28).
 
-**In-place system migrations belong to their subject; the runner belongs to ops.** Identity and
-authz each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
+**In-place system migrations belong to their subject; the runner belongs to ops.** Identity,
+authz and automation each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
 identity's user-rooted `userMigrations()` beside it), and ops composes the migrations page,
 enrolment, the targeted run and the pass over its own `SystemMigration*` tables and Redis lease,
 never importing a peer's process package. The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
-(Alex, 2026-09-28).
+(Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
+no manual task (Alex, 2026-09-30).
 
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.

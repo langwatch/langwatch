@@ -6240,6 +6240,9 @@ importers:
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
+      '@langwatch/system-migrations':
+        specifier: workspace:*
+        version: link:../../../packages/system-migrations
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -6358,6 +6361,9 @@ importers:
       '@langwatch/slack-contract':
         specifier: workspace:*
         version: link:../../slack/contract
+      '@langwatch/system-migrations':
+        specifier: workspace:*
+        version: link:../../../packages/system-migrations
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
