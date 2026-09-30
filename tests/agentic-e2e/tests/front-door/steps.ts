@@ -32,13 +32,12 @@ import { confirmAddressOf, findSignUpVerificationToken } from "./db";
 export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
 
 /**
- * The headers every direct call to a better-auth endpoint needs. better-auth's
- * origin check (`api/middlewares/origin-check`) refuses any cookie-bearing
- * POST whose `Origin` (or `Referer`) is missing or untrusted, and Playwright's
- * `page.request` sends neither on its own — so a bare `page.request.post(
- * "/api/auth/...")` from a signed-in context is a silent 403, not a sign-out.
- * The app's own tRPC endpoints do not run this check, which is why
- * `user.register` and the onboarding calls below need nothing extra.
+ * The headers every direct call to an origin-gated endpoint needs: the
+ * `/api/auth/*` routes, plus the sign-up procedures `auth.requestSignUpVerification`
+ * and `user.register`. Each refuses a POST whose `Origin` (or `Referer`) is
+ * missing or does not match the app, and Playwright's `page.request` sends
+ * neither on its own, so a bare `page.request.post(...)` there is a 403. The
+ * onboarding calls below do not run this check and need nothing extra.
  */
 export function betterAuthRequestHeaders(): Record<string, string> {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:5570";
@@ -158,7 +157,7 @@ export async function requestSignUpAddressProof(
 ): Promise<string> {
   const response = await request.post(
     "/api/trpc/auth.requestSignUpVerification?batch=1",
-    { data: { "0": { json: { email } } } },
+    { headers: betterAuthRequestHeaders(), data: { "0": { json: { email } } } },
   );
   const body: unknown = await response.json().catch(() => null);
   const parsed = signUpVerificationBodySchema.safeParse(body);
@@ -205,6 +204,7 @@ export async function registerConfirmedAccount(
 ): Promise<void> {
   const addressProof = await requestSignUpAddressProof(request, email);
   const response = await request.post("/api/trpc/user.register?batch=1", {
+    headers: betterAuthRequestHeaders(),
     data: {
       "0": {
         json: { addressProof, email, password, ...(name ? { name } : {}) },
