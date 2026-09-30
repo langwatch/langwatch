@@ -165,9 +165,18 @@ Feature: Reading a trace the way the drawer reads it
     When the bounded digest is built
     Then the span tree is returned
     And spans are expanded into it while the budget allows
-    And a span that errored is expanded before a model call
+    And a span that errored is expanded before a tool call
+    And a tool call is expanded before a model call
     And a model call is expanded before a slower span of another kind
     And the result is reported as truncated
+
+  # A tool result is where a judge's evidence sits, and it is small: a
+  # model call repeats the history it read, so it goes after the tools.
+  @unit
+  Scenario: A tool result is kept before a model call when both do not fit
+    Given a trace with a slow model call and a quick tool call
+    When the spans are ranked for expansion
+    Then the tool call is expanded first
 
   @unit
   Scenario: A structure too large for the budget is cut

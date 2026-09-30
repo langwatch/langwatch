@@ -35,6 +35,7 @@ import {
   extractParentTraceForNlpgo,
 } from "../rules/evaluation-causality.rules.ts";
 import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts";
+import { evaluationRenderBudget } from "../rules/evaluation-render-budget.rules.ts";
 import { hasThreadMappings } from "../rules/evaluation-thread-mapping-service.rules.ts";
 import { type EvaluatorInstallEnvironment } from "../rules/evaluator-availability-service.rules.ts";
 import { EvaluationDataService } from "./evaluation-data.service.ts";
@@ -188,6 +189,8 @@ export class EvaluationExecutionService implements EvaluationExecution {
       return { kind: "skipped", details: "Trace has no thread_id for thread-based evaluation" };
     }
 
+    const normalizedSettings = settings && typeof settings === "object" ? settings : undefined;
+
     // 4. Build evaluation data
     const data = await this.evaluationData.buildDataForEvaluation({
       evaluatorType,
@@ -196,10 +199,10 @@ export class EvaluationExecutionService implements EvaluationExecution {
       isThreadLevel,
       projectId,
       protections,
+      renderBudgetTokens: evaluationRenderBudget({ settings: normalizedSettings }),
     });
 
     // 5. Execute evaluation
-    const normalizedSettings = settings && typeof settings === "object" ? settings : undefined;
 
     // Compute parent causality depth from the trace's spans; nlpgo
     // increments and stamps the result on every span it emits.

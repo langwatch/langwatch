@@ -326,7 +326,7 @@ func readModulePath(root string) (string, error) {
 		return "", fmt.Errorf("read pkg/go.mod: %w", err)
 	}
 	match := modulePattern.FindSubmatch(raw)
-	if match == nil || !strings.HasSuffix(string(match[1]), "/pkg") {
+	if len(match) < 2 || !strings.HasSuffix(string(match[1]), "/pkg") {
 		return "", fmt.Errorf("no module path ending in /pkg in %s", goMod)
 	}
 	return strings.TrimSuffix(string(match[1]), "/pkg"), nil

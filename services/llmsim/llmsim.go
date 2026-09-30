@@ -85,7 +85,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
@@ -215,6 +215,7 @@ func (s *Server) rng(h http.Header, req request) *mrand.Rand {
 	default:
 		sum = sha256.Sum256([]byte(seed))
 	}
+	//nolint:gosec // G404: seeded math/rand is the point, a simulator must replay the same answer for a seed
 	return mrand.New(mrand.NewPCG(binary.LittleEndian.Uint64(sum[:8]), binary.LittleEndian.Uint64(sum[8:16])))
 }
 

@@ -40745,7 +40745,7 @@ A target is one of `traces`, `threads` or `llm-spans`. It sets what one judged r
 
 | Target      | One row is       | What the judge reads                                                                                                | Pick it for                                                                                                       |
 | ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `traces`    | One trace        | A digest of the trace's spans, 8,000 tokens at most: the failed spans, the model calls, then the slowest            | Questions about what the agent did on one turn: tools called, errors, tests run                                   |
+| `traces`    | One trace        | A digest of the trace's spans, 8,000 tokens at most: failed spans, tool calls, model calls, then the slowest         | Questions about what the agent did on one turn: tools called, errors, tests run                                   |
 | `threads`   | One conversation | The whole thread with the agent's work on each turn: model calls, tool calls with arguments and results, retrievals | Questions about how a conversation went or what the agent did across it: tone, resolution, tools called           |
 | `llm-spans` | One LLM call     | The input and output messages of that call                                                                          | Questions about one prompt: whether the model was asked two things at once, whether it followed the system prompt |
 
@@ -40894,7 +40894,7 @@ The text to judge is one of these functions over the row's key:
 | `conversation(ConversationId)`                                     | The thread as the chat view shows it: the system prompt once, then each turn's user message and reply, with one line naming the tools the turn used. Best for questions about what was said                                                                  |
 | `conversation_bounded(ConversationId, max_tokens, until_trace_id)` | The same transcript under a token budget: every turn shortened before any is dropped, opening and closing turns kept. Pass `''` as `until_trace_id` to read the whole thread, or a trace id to stop there, so a judgement reads only what the agent had seen |
 | `llm_readable_thread(ConversationId, max_tokens)`                  | The thread with the agent's work between each user message and reply: model calls with token counts, tool calls with arguments and results, retrievals. Best for questions about what the agent did, and the safe default                                    |
-| `llm_readable_trace(TraceId, max_tokens)`                          | The trace as a span digest, cut to the budget by keeping the structure and expanding the failed spans, then the model calls, then the slowest                                                                                                                |
+| `llm_readable_trace(TraceId, max_tokens)`                          | The trace as a span digest, cut to the budget by keeping the structure and expanding the failed spans, then the tool calls, then the model calls, then the slowest                                                                                                  |
 | `llm_messages(TraceId)`                                            | The chat messages of the trace's main LLM call, as JSON `{input, output}`                                                                                                                                                                                    |
 | `llm_input_messages(TraceId)`                                      | The request side only: the history the model was given on this turn                                                                                                                                                                                          |
 | `llm_output_messages(TraceId)`                                     | The response side only: everything the agent did from the last request on, tool calls included                                                                                                                                                               |
@@ -46456,7 +46456,9 @@ Pick **LLM as Judge**, then **LLM-as-a-Judge Boolean Evaluator**.
 <Step title="Configure the evaluator">
 Name the evaluator, pick the judge model and write the criteria in **Prompt**, for example: the reply passes only when it answers the customer's question and stays on the topic of the customer's order. A built-in evaluator such as PII Detection shows its own options here instead, for example the entity types to flag.
 
-Under **Variables**, map the evaluator's fields to the trace. `input` maps to the trace input and `output` to the trace output by default. Click **Create Evaluator**.
+Under **Variables**, map the evaluator's fields to the trace. For an LLM-as-judge evaluator, `input` maps to **Full Trace (AI-Readable)** (`formatted_trace`) by default: every span of the trace, tool calls with their arguments and results included, so the judge can check what the agent did as well as what it replied. `output` maps to the trace output.
+
+Other evaluators map `input` to the trace input and `output` to the trace output. Click **Create Evaluator**.
 
 </Step>
 
@@ -46486,9 +46488,13 @@ Click **Create Online Evaluation**. The monitor is active as soon as it is creat
 
 A trace is one request and response. A thread is the whole conversation, grouped by the `thread_id` you send in the trace metadata. Some checks only make sense on the conversation: whether the user's problem was resolved, whether the assistant stayed consistent across turns, whether the tone drifted.
 
-Pick **Thread Level** in the drawer. The evaluator's variables now map to the **Current Thread** source, whose `traces` field holds every trace in the thread with its input and output.
+Pick **Thread Level** in the drawer. The evaluator's variables now map to the **Current Thread** source. An LLM-as-judge evaluator's `input` maps to **Full Thread (AI-Readable)** by default; other evaluators map it to the `traces` field, which holds every trace in the thread with its input and output.
 
-The **Full Thread (AI-Readable)** field (`formatted_traces`) holds the thread as one text: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), cut to 64,000 tokens. It is the same rendering as the [`llm_readable_thread`](/api-reference/query/extraction-functions#which-thread-function-to-use) query function.
+The **Full Thread (AI-Readable)** field (`formatted_traces`) holds the thread as one text: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals). It is the same rendering as the [`llm_readable_thread`](/api-reference/query/extraction-functions#which-thread-function-to-use) query function.
+
+The thread is rendered under half of the evaluator's max tokens setting: 64,000 tokens at the default of 128,000, less when the judge model's context window is smaller. A long thread shortens every turn before it drops one.
+
+An LLM-as-judge evaluator always runs on long content. When the text is still longer than the evaluator's max tokens setting or the model's context window, the judge reads its opening and its ending with a marker naming how many tokens were left out of the middle, and the result details say so.
 
 <Frame>
   <img
@@ -70519,7 +70525,7 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(conversation(ConversationId), 'Did the agent refuse the request?') AS refused
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
 FROM analytics.trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId

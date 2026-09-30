@@ -113,7 +113,7 @@ func NewServer(cfg Config) (*Server, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("creating %s: %w", cfg.DataDir, err)
 	}
-	if err := os.Chmod(cfg.DataDir, 0o700); err != nil {
+	if err := os.Chmod(cfg.DataDir, 0o700); err != nil { //nolint:gosec // G302: a directory needs its owner execute bit to be traversed
 		return nil, fmt.Errorf("restricting %s: %w", cfg.DataDir, err)
 	}
 	s := &Server{cfg: cfg, now: time.Now, console: newConsole(embeddedConsole()), log: newRequestLog()}
@@ -141,7 +141,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
@@ -385,8 +385,8 @@ func (s *Server) writeSidecar(target string, raw []byte) error {
 		return err
 	}
 	defer func() { _ = os.Remove(tmp.Name()) }()
-	_, err = tmp.Write(raw)
-	if err = errors.Join(err, tmp.Close()); err != nil {
+	_, writeErr := tmp.Write(raw)
+	if err := errors.Join(writeErr, tmp.Close()); err != nil {
 		return err
 	}
 	return os.Rename(tmp.Name(), target)

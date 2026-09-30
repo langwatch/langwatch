@@ -69,13 +69,23 @@ describe("the token estimate behind the budget", () => {
 describe("rankSpansForExpansion", () => {
   describe("given a trace mixing an error, a model call and a slow tool", () => {
     /** @scenario "A digest over the budget becomes the structure plus the spans worth reading" */
-    it("ranks the error first, then the model call, then by duration", () => {
+    it("ranks the error first, then the tool call, then the model call, then by duration", () => {
       expect(rankSpansForExpansion(trace).map((s) => s.span_id)).toEqual([
         "boom",
-        "model",
         "slow",
+        "model",
         "root",
       ]);
+    });
+
+    /** @scenario "A tool result is kept before a model call when both do not fit" */
+    it("expands a quick tool call before a slow model call", () => {
+      const spans = [
+        span({ spanId: "model", name: "model-call", type: "llm", finishedAt: 9_000 }),
+        span({ spanId: "quote", name: "get_quote", type: "tool", finishedAt: 5 }),
+      ];
+
+      expect(rankSpansForExpansion(spans).map((s) => s.span_id)).toEqual(["quote", "model"]);
     });
 
     it("keeps the trace's own order between spans that tie", () => {
@@ -123,11 +133,11 @@ describe("formatSpansDigestBounded", () => {
       expect(withExpansions.estimatedTokens).toBeLessThanOrEqual(1_200);
       // Ranked first, so it is the body a reader gets when only some fit.
       expect(withExpansions.text).toContain("boom payload");
-      // The next in rank gets what is left, cut in the middle.
-      expect(withExpansions.text).toContain("model payload");
+      // The next in rank, the tool call, gets what is left, cut in the middle.
+      expect(withExpansions.text).toContain("slow payload");
       expect(withExpansions.text).toMatch(/tokens omitted from the middle/);
       // Everything ranked below them waits for a budget that fits them.
-      expect(withExpansions.text).not.toContain("slow payload");
+      expect(withExpansions.text).not.toContain("model payload");
       expect(withExpansions.text).not.toContain("root payload");
     });
   });

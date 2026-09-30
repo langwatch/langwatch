@@ -1,9 +1,9 @@
 import type { Span } from "@langwatch/trace-contract";
 
 /**
- * The order spans are worth expanding in: what failed, then what the model
- * did, then what took the longest. Ties keep the trace's own order, so two
- * identical traces produce identical output.
+ * The order spans are worth expanding in: what failed, then the tool calls
+ * (small, and where a judge's evidence sits), then what the model did, then
+ * what took the longest. Ties keep the trace's own order.
  */
 export function rankSpansForExpansion(spans: Span[]): Span[] {
   return spans
@@ -20,8 +20,9 @@ export function rankSpansForExpansion(spans: Span[]): Span[] {
 
 function spanPriority(span: Span): number {
   if (span.error) return 0;
-  if (span.type === "llm") return 1;
-  return 2;
+  if (span.type === "tool") return 1;
+  if (span.type === "llm") return 2;
+  return 3;
 }
 
 function spanDurationMs(span: Span): number {
