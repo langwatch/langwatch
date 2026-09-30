@@ -13,15 +13,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 // loopbackFetcher allows the httptest server (127.0.0.1) past the SSRF guard,
 // which otherwise refuses loopback addresses.
 func loopbackFetcher() *attachmentFetcher {
-	return newAttachmentFetcher(httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}})
+	return newAttachmentFetcher(ssrf.Options{AllowedHosts: []string{"127.0.0.1"}})
 }
 
 // Minimal magic-byte prefixes so http.DetectContentType classifies the bodies
@@ -129,7 +129,7 @@ func TestRewriteDetectsTypeFromResponseNotExtension(t *testing.T) {
 func TestRewriteLeavesDataURLImagesWithoutFetching(t *testing.T) {
 	// A data URL is not an http(s) URL, so it is never matched for fetching and
 	// passes through untouched regardless of the SSRF policy.
-	f := newAttachmentFetcher(httpblock.SSRFOptions{})
+	f := newAttachmentFetcher(ssrf.Options{})
 	dataURL := "data:image/png;base64,iVBORw0KGgo="
 
 	// As a string (no http URL, so nothing to fetch).
@@ -702,7 +702,7 @@ func TestEngineExecute_AppliesTheRequestAttachmentLimitPerRun(t *testing.T) {
 	srv := sizedImageServer(t, testMiB+1, false)
 	eng := New(Options{
 		LLM:  &fakeLLMClient{resp: &app.LLMResponse{Content: "a cat"}},
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}},
+		SSRF: ssrf.Options{AllowedHosts: []string{"127.0.0.1"}},
 	})
 	run := func(maxAttachmentBytes int64) *ExecuteResult {
 		res, err := eng.Execute(context.Background(), ExecuteRequest{

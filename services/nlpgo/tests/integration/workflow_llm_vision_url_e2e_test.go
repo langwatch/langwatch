@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
@@ -63,7 +64,7 @@ func setupVisionStack(t *testing.T) *stack {
 		LLM:  llm,
 		// Allow the loopback image server; production fetches still bind to the
 		// default private/loopback ban.
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}},
+		SSRF: ssrf.Options{AllowedHosts: []string{"127.0.0.1"}},
 	})
 
 	executor := liveExecutorAdapter{eng: eng}

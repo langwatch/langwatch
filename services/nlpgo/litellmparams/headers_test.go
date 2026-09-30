@@ -1,4 +1,4 @@
-package gatewayproxy_test
+package litellmparams_test
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayproxy"
+	"github.com/langwatch/langwatch/services/nlpgo/litellmparams"
 )
 
 func mkHeader(kv ...string) http.Header {
@@ -18,7 +18,7 @@ func mkHeader(kv ...string) http.Header {
 }
 
 func TestParseCredentialFromHeaders_OpenAI(t *testing.T) {
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "openai/gpt-5-mini",
 		"x-litellm-api_key", "sk-test-123",
 		"x-litellm-organization", "org-xyz",
@@ -41,7 +41,7 @@ func TestParseCredentialFromHeaders_OpenAI(t *testing.T) {
 }
 
 func TestParseCredentialFromHeaders_Anthropic(t *testing.T) {
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "anthropic/claude-sonnet-4-20250514",
 		"x-litellm-api_key", "sk-ant-test",
 	))
@@ -57,7 +57,7 @@ func TestParseCredentialFromHeaders_Anthropic(t *testing.T) {
 }
 
 func TestParseCredentialFromHeaders_Azure_PicksUpAllKnobs(t *testing.T) {
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "azure/my-deployment",
 		"x-litellm-api_key", "azk-secret",
 		"x-litellm-api_base", "https://acme.openai.azure.com",
@@ -93,7 +93,7 @@ func TestParseCredentialFromHeaders_Azure_PicksUpAllKnobs(t *testing.T) {
 // must self-map the requested model so this path resolves like the sibling
 // dispatcheradapter path. Regression: #5760.
 func TestParseCredentialFromHeaders_Azure_BuildsDeploymentMap(t *testing.T) {
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "azure/gpt-5-mini",
 		"x-litellm-api_key", "azk-secret",
 		"x-litellm-api_base", "https://acme.openai.azure.com",
@@ -109,7 +109,7 @@ func TestParseCredentialFromHeaders_Azure_BuildsDeploymentMap(t *testing.T) {
 // An explicit x-litellm-deployment (the Azure deployment name differs from the
 // model id) is captured into Extra and wins in the deployment map.
 func TestParseCredentialFromHeaders_Azure_HonorsExplicitDeploymentHeader(t *testing.T) {
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "azure/gpt-5.4",
 		"x-litellm-api_key", "azk-secret",
 		"x-litellm-api_base", "https://acme.openai.azure.com",
@@ -127,7 +127,7 @@ func TestParseCredentialFromHeaders_Azure_HonorsExplicitDeploymentHeader(t *test
 }
 
 func TestParseCredentialFromHeaders_Bedrock_NoApiKeyButAWSExtras(t *testing.T) {
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "bedrock/anthropic.claude-3-sonnet-20240229-v1:0",
 		"x-litellm-aws_access_key_id", "AKIA-x",
 		"x-litellm-aws_secret_access_key", "secret-x",
@@ -159,7 +159,7 @@ func TestParseCredentialFromHeaders_Bedrock_NoApiKeyButAWSExtras(t *testing.T) {
 }
 
 func TestParseCredentialFromHeaders_VertexAI_InlineSAJSON(t *testing.T) {
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "vertex_ai/gemini-2.0-flash",
 		"x-litellm-vertex_credentials", `{"type":"service_account","project_id":"acme"}`,
 		"x-litellm-vertex_project", "acme-vertex",
@@ -180,7 +180,7 @@ func TestParseCredentialFromHeaders_VertexAI_InlineSAJSON(t *testing.T) {
 }
 
 func TestParseCredentialFromHeaders_Gemini_PlainAPIKey(t *testing.T) {
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "gemini/gemini-2.0-flash",
 		"x-litellm-api_key", "AIza-test",
 	))
@@ -207,7 +207,7 @@ func TestParseCredentialFromHeaders_APIKeyOnlyProviders(t *testing.T) {
 	}
 	for model, want := range cases {
 		t.Run(model, func(t *testing.T) {
-			cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+			cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 				"x-litellm-model", model,
 				"x-litellm-api_key", "sk-key",
 			))
@@ -228,7 +228,7 @@ func TestParseCredentialFromHeaders_CustomLLMProviderHeaderTakesPrecedence(t *te
 	// Some clients send a bare model name + the explicit custom_llm_provider
 	// to point the dispatcher at a specific backend. We honor the explicit
 	// header even when the model has no provider prefix.
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "claude-sonnet-4-20250514",
 		"x-litellm-custom_llm_provider", "anthropic",
 		"x-litellm-api_key", "sk-ant-test",
@@ -242,7 +242,7 @@ func TestParseCredentialFromHeaders_CustomLLMProviderHeaderTakesPrecedence(t *te
 }
 
 func TestParseCredentialFromHeaders_MissingProvider_ReturnsTypedError(t *testing.T) {
-	_, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	_, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		// model has no provider prefix; no custom_llm_provider header
 		"x-litellm-model", "gpt-5-mini",
 		"x-litellm-api_key", "sk-test",
@@ -250,14 +250,14 @@ func TestParseCredentialFromHeaders_MissingProvider_ReturnsTypedError(t *testing
 	if err == nil {
 		t.Fatalf("err = nil, want missing-provider error")
 	}
-	if !errors.Is(err, gatewayproxy.ErrMissingProvider) {
+	if !errors.Is(err, litellmparams.ErrMissingProvider) {
 		t.Errorf("err = %v, want ErrMissingProvider", err)
 	}
 }
 
 func TestParseCredentialFromHeaders_AzureAIAlias(t *testing.T) {
 	// "azure_ai" is a TS-side alias for "azure"; both must resolve to ProviderAzure.
-	cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+	cred, err := litellmparams.ParseCredentialFromHeaders(mkHeader(
 		"x-litellm-model", "azure_ai/gpt-5-mini",
 		"x-litellm-api_key", "k",
 		"x-litellm-api_base", "https://acme.openai.azure.com",
@@ -280,7 +280,7 @@ func TestBareModel_StripsProviderPrefix(t *testing.T) {
 		"no-prefix-here":                                  "no-prefix-here",
 	}
 	for in, want := range cases {
-		if got := gatewayproxy.BareModel(in); got != want {
+		if got := litellmparams.BareModel(in); got != want {
 			t.Errorf("BareModel(%q) = %q, want %q", in, got, want)
 		}
 	}
