@@ -297,3 +297,17 @@ describe("a handled refusal that names how long to wait", () => {
     await expect(response.json()).resolves.toEqual(canonicalErrorFor(new RateLimitedError()).body);
   });
 });
+
+describe("a schema failure thrown past the route's own validation", () => {
+  /** @scenario "A schema failure a service throws is a handled 422, never a 500" */
+  it("answers the 422 validation error with the failing field", () => {
+    const parsed = z.object({ name: z.string().max(3) }).safeParse({ name: "too long" });
+    if (parsed.success) throw new Error("the fixture must fail its schema");
+
+    const { status, body } = canonicalErrorFor(parsed.error);
+
+    expect(status).toBe(422);
+    expect(body).toMatchObject({ code: "validation_error" });
+    expect(JSON.stringify(body)).toContain("name");
+  });
+});

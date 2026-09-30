@@ -109,3 +109,11 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Given a route that names its project in its query
       When an authenticated caller sends it
       Then the permission is asked at the project the parsed query named
+
+  Rule: A schema failure a service throws is the caller's fault
+
+    @integration
+    Scenario: A schema failure a service throws is a handled 422, never a 500
+      Given a service that parses its input with a schema and throws the bare schema failure
+      When the REST boundary renders the error
+      Then it is the 422 validation error naming the failing field, and nothing is logged as a 500

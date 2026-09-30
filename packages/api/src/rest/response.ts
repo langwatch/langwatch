@@ -1,6 +1,11 @@
 import type { Actor } from "@langwatch/actor";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { HandledError, type SerializedReason } from "@langwatch/handled-error";
+import {
+  HandledError,
+  isZodLikeError,
+  type SerializedReason,
+  ValidationError,
+} from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import { nowInstant, toEpochMs } from "@langwatch/time";
@@ -729,6 +734,8 @@ export function canonicalErrorFor(
   const traceIds = { traceId: trace?.traceId, spanId: trace?.spanId };
 
   if (HandledError.isHandled(error)) return handledErrorEnvelope(error, traceIds);
+  if (isZodLikeError(error))
+    return handledErrorEnvelope(ValidationError.fromZodError(error), traceIds);
 
   if (isStatusCarryingError(error)) {
     const { status } = error;
