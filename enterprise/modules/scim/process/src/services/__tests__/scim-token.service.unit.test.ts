@@ -68,6 +68,7 @@ function service(
 
 describe("ScimService token operations", () => {
   describe("when a token is minted", () => {
+    /** @scenario "A new directory provisioning token belongs to one connection" */
     it("binds it to exactly one connection, on the row and on the history", async () => {
       const repository = scimRepositoryFixture({
         createToken: vi.fn(async () => ({ id: "token_1" })),
@@ -103,6 +104,7 @@ describe("ScimService token operations", () => {
       });
     });
 
+    /** @scenario "A new directory provisioning token belongs to one connection" */
     it("hands the value back once and writes it nowhere", async () => {
       const repository = scimRepositoryFixture({
         createToken: vi.fn(async () => ({ id: "token_1" })),
