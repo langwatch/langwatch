@@ -20,7 +20,7 @@ Each one delivers through one action: `SEND_SLACK_MESSAGE`, `SEND_EMAIL`, `SEND_
 
 ## Prerequisites
 
-Read the reference once before the first create, and the command's own help:
+Read the reference once before the first create, and the command's own help. Only read the docs pages this skill names; never guess a docs path:
 
 ```bash
 langwatch docs api-reference/triggers/overview
@@ -95,7 +95,7 @@ langwatch trigger fires <id> --format json     # what it has done, newest first
 
 ## Verify
 
-A write only succeeded if its result names what it wrote. After a create or update, read it back with `langwatch trigger get <id> --format json` and confirm the kind, condition, destination and active state are the ones the user asked for.
+A write only succeeded if its result names what it wrote. The create or update result is the automation as stored: confirm from it that the kind, condition, destination and active state are the ones the user asked for. Run `langwatch trigger get <id> --format json` only when that result did not name them; the panel already shows the created automation, so a read-back just repeats the card.
 
 ## Common Mistakes
 
