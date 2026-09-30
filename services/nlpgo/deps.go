@@ -2,9 +2,15 @@ package nlpgo
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -12,6 +18,11 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/pkg/profiling"
+	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
+	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators"
+	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/gateway"
+	evalhttp "github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/http"
+	evalrpc "github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/transport/rpc"
 )
 
 // configureNLPGoOTel installs nlpgo's OTel provider in multi-tenant
@@ -76,6 +87,8 @@ type Deps struct {
 	// no-op, so an unconfigured deployment carries an inert struct rather
 	// than a nil check at every use.
 	Profiler profiling.Profiler
+	// Evaluators serves /go/evaluators; nil leaves the route unmounted.
+	Evaluators http.Handler
 }
 
 // NewDeps wires every adapter from the validated Config.
@@ -113,4 +126,71 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Health:   probes,
 		Profiler: profiler,
 	}, nil
+}
+
+// EvaluatorsOptions is what NewEvaluatorsHandler builds the runtime from.
+type EvaluatorsOptions struct {
+	Config     Config
+	Deps       *Deps
+	Dispatcher *dispatcher.Dispatcher
+}
+
+// NewEvaluatorsHandler builds the evaluator runtime and its transport. disp is
+// the studio's dispatcher, so the egress policy is the same. The returned
+// shutdown flushes the customer trace and the module's ops provider.
+func NewEvaluatorsHandler(ctx context.Context, opts EvaluatorsOptions) (http.Handler, func(context.Context) error, error) {
+	cfg, deps, disp := opts.Config, opts.Deps, opts.Dispatcher
+	opsProvider, err := newEvaluatorsOpsTracerProvider(ctx, cfg, deps.NodeID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("evaluators ops tracer: %w", err)
+	}
+	customerTrace, err := evalhttp.NewCustomerTrace(ctx, evalhttp.CustomerTraceOptions{
+		Endpoint: strings.TrimSpace(cfg.LangWatchEndpoint),
+		Logger:   deps.Logger,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("evaluators customer trace: %w", err)
+	}
+	module := evaluators.New(evaluators.Deps{
+		Config:        cfg.Evaluators,
+		LLM:           gateway.New(gateway.Options{Dispatcher: disp, Logger: deps.Logger}),
+		CustomerTrace: customerTrace,
+		OpsTracer:     opsProvider.Tracer("langwatch.nlpgo.evaluators"),
+		Logger:        deps.Logger.Named("evaluators"),
+	})
+	handler := evalrpc.NewHandler(evalrpc.HandlerDeps{
+		API:            module,
+		InternalSecret: cfg.EvaluatorsInternalSecret,
+		MaxBodyBytes:   cfg.Evaluators.MaxBodyBytes,
+	})
+	shutdown := func(ctx context.Context) error {
+		return errors.Join(customerTrace.Shutdown(ctx), opsProvider.Shutdown(ctx))
+	}
+	return handler, shutdown, nil
+}
+
+// newEvaluatorsOpsTracerProvider is the evaluators module's own provider on
+// the internal collector: never the multi-tenant one, whose unkeyed spans
+// fall back by routing rules the module must not depend on (plan §6.2).
+func newEvaluatorsOpsTracerProvider(ctx context.Context, cfg Config, nodeID string) (*sdktrace.TracerProvider, error) {
+	info := contexts.MustGetServiceInfo(ctx)
+	options := []sdktrace.TracerProviderOption{sdktrace.WithResource(resource.NewSchemaless(
+		attribute.String("service.name", info.Service),
+		attribute.String("service.version", info.Version),
+		attribute.String("deployment.environment.name", cfg.Environment),
+		attribute.String("node.id", nodeID),
+		attribute.String(otelsetup.AttrLangWatchOrigin, otelsetup.OriginPlatformInternal),
+	))}
+	endpoint, headers := cfg.OTel.PrimaryOTLP()
+	if endpoint != "" {
+		exporter, err := otlptracehttp.New(ctx,
+			otlptracehttp.WithEndpointURL(strings.TrimRight(endpoint, "/")+"/v1/traces"),
+			otlptracehttp.WithHeaders(headers),
+		)
+		if err != nil {
+			return nil, err
+		}
+		options = append(options, sdktrace.WithBatcher(exporter))
+	}
+	return sdktrace.NewTracerProvider(options...), nil
 }

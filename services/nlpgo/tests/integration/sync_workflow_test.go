@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
@@ -56,7 +57,7 @@ func setupStack(t *testing.T) *stack {
 	host, _, _ := net.SplitHostPort(upstream.Listener.Addr().String())
 
 	httpExec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF: ssrf.Options{AllowedHosts: []string{host}},
 	})
 	codeExec, err := codeblock.New(codeblock.Options{})
 	require.NoError(t, err)

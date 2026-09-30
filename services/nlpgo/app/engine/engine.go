@@ -20,6 +20,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/sdks/go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
@@ -59,7 +60,7 @@ type Options struct {
 	HTTP *httpblock.Executor
 	// SSRF mirrors the HTTP block's destination policy so remote prompt
 	// attachments are fetched under the same private/loopback/metadata ban.
-	SSRF             httpblock.SSRFOptions
+	SSRF             ssrf.Options
 	Code             *codeblock.Executor
 	LLM              app.LLMClient
 	Evaluator        *evaluatorblock.Executor
@@ -706,7 +707,7 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		// the author to debug an endpoint which is running and was never
 		// dialed. The code has copy of its own saying the address is not
 		// permitted.
-		if errors.Is(err, httpblock.ErrSSRFBlocked) {
+		if errors.Is(err, ssrf.ErrBlocked) {
 			return nil, &NodeError{Type: "ssrf_blocked", Message: msg}
 		}
 		return nil, &NodeError{Type: "http_error", Message: msg}

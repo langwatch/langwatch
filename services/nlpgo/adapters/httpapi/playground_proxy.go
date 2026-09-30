@@ -1,7 +1,7 @@
 // playground_proxy.go owns the inbound shape for /go/proxy/v1/*: read
 // the OpenAI-shape body + x-litellm-* headers, route to the right
 // dispatcher request type, stream the response back. This file is the
-// HTTP-layer counterpart to gatewayproxy/headers.go (which owns the
+// HTTP-layer counterpart to pkg/litellmparams/headers.go (which owns the
 // header → domain.Credential mapping).
 package httpapi
 
@@ -20,9 +20,8 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayproxy"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	nlpgodomain "github.com/langwatch/langwatch/services/nlpgo/domain"
+	"github.com/langwatch/langwatch/services/nlpgo/litellmparams"
 )
 
 // playgroundProxyRequest is the abstracted shape we hand to the
@@ -72,7 +71,7 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		cred, err := gatewayproxy.ParseCredentialFromHeaders(r.Header)
+		cred, err := litellmparams.ParseCredentialFromHeaders(r.Header)
 		if err != nil {
 			writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 				"reason": "missing_provider",
@@ -97,7 +96,7 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 			}, err))
 			return
 		}
-		bareModel := gatewayproxy.BareModel(model)
+		bareModel := litellmparams.BareModel(model)
 
 		// Rewrite body.model to the BARE id before dispatch. The TS
 		// callsites (Vercel AI SDK in modelProviders/utils.ts, the
@@ -126,12 +125,12 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		// supported with this model. Use 'max_completion_tokens'
 		// instead.") and pin temperature to 1.0. The internal
 		// runSignature path already runs the same migration via
-		// litellm.ApplyReasoningOverrides; the playground proxy was
+		// litellmparams.ApplyReasoningOverrides; the playground proxy was
 		// raw-forwarding bodies authored by Vercel AI SDK / playground
 		// callers that emit `max_tokens`. Mirror the executor here so
 		// /go/proxy/v1/chat/completions doesn't 400 on Studio Monaco
 		// code-completion / playground / model.factory.ts traffic.
-		if litellm.IsReasoningModel(bareModel) {
+		if litellmparams.IsReasoningModel(bareModel) {
 			body, err = applyReasoningOverridesToBody(body, bareModel)
 			if err != nil {
 				writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
@@ -231,7 +230,7 @@ func rewriteBodyModel(body []byte, newModel string) ([]byte, error) {
 // applyReasoningOverridesToBody migrates max_tokens → max_completion_tokens
 // and pins temperature to 1.0 for OpenAI reasoning-class models, mirroring
 // the in-process llmexecutor path. The actual rewrite logic lives in
-// litellm.ApplyReasoningOverrides (translator.go) — this is the
+// litellmparams.ApplyReasoningOverrides (translator.go) — this is the
 // raw-bytes-in / raw-bytes-out wrapper for the playground proxy.
 func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) {
 	if len(body) == 0 {
@@ -241,7 +240,7 @@ func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) 
 	if err := json.Unmarshal(body, &generic); err != nil {
 		return nil, err
 	}
-	litellm.ApplyReasoningOverrides(modelID, generic)
+	litellmparams.ApplyReasoningOverrides(modelID, generic)
 	return json.Marshal(generic)
 }
 

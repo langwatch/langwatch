@@ -1,10 +1,10 @@
-// Package litellm translates the legacy `litellm_params` shape produced by
-// the LangWatch app into the wire format the AI Gateway accepts. It also
+// Package litellmparams translates the legacy `litellm_params` shape produced
+// by the LangWatch app into the credentials the AI Gateway accepts. It also
 // owns model-id rewrites (dot→dash, alias expansion, custom→openai prefix
 // at the gateway boundary) and reasoning-model behavior overrides.
 //
 // See specs/nlp-go/_shared/contract.md §9 and ash-domain-map.md.
-package litellm
+package litellmparams
 
 import (
 	"regexp"

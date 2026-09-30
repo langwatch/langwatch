@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
@@ -37,7 +38,7 @@ func silentServer(t *testing.T) (url string, host string) {
 func silentExecutor(t *testing.T, host string, ceiling time.Duration) *httpblock.Executor {
 	t.Helper()
 	return httpblock.New(httpblock.Options{
-		SSRF:           httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		SSRF:           ssrf.Options{AllowedHosts: []string{host}},
 		DefaultTimeout: ceiling,
 	})
 }
