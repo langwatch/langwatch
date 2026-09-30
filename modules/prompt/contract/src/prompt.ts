@@ -126,6 +126,8 @@ export const promptTagSchema = z
     name: z.string().min(1),
     createdById: z.string().nullable().optional(),
     createdAt: z.date(),
+    updatedAt: z.date().optional(),
+    updatedById: z.string().nullable().optional(),
   })
   .strict();
 export type PromptTag = z.infer<typeof promptTagSchema>;

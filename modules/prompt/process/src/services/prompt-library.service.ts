@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   PromptAddressInvalidError,
@@ -111,8 +112,10 @@ export class PromptLibraryService {
 
       return answered;
     } catch (error: unknown) {
-      restLogger.error({ projectId: data.projectId, error }, "Error creating prompt");
-      throw PromptTagUnprocessableError.fromRestRefusal(error);
+      const refusal = PromptTagUnprocessableError.fromRestRefusal(error);
+      if (!(refusal instanceof HandledError))
+        restLogger.error({ projectId: data.projectId, error }, "Error creating prompt");
+      throw refusal;
     }
   }
 
@@ -143,8 +146,10 @@ export class PromptLibraryService {
 
       return answered;
     } catch (error: unknown) {
-      restLogger.error({ projectId, promptId: id, error }, "Error updating prompt");
-      throw PromptTagUnprocessableError.fromRestRefusal(error);
+      const refusal = PromptTagUnprocessableError.fromRestRefusal(error);
+      if (!(refusal instanceof HandledError))
+        restLogger.error({ projectId, promptId: id, error }, "Error updating prompt");
+      throw refusal;
     }
   }
 
@@ -167,8 +172,10 @@ export class PromptLibraryService {
 
       return syncResult;
     } catch (error: unknown) {
-      restLogger.error({ projectId, promptId: id, error }, "Error syncing prompt");
-      throw PromptTagUnprocessableError.fromRestRefusal(error);
+      const refusal = PromptTagUnprocessableError.fromRestRefusal(error);
+      if (!(refusal instanceof HandledError))
+        restLogger.error({ projectId, promptId: id, error }, "Error syncing prompt");
+      throw refusal;
     }
   }
 

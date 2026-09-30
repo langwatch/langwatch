@@ -1,4 +1,4 @@
-import { Box, chakra, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
+import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
 import { VersionBadge } from "@langwatch/prompt-browser-kit";
 import { useState, type MouseEvent } from "react";
 import { LuX } from "react-icons/lu";
@@ -77,12 +77,11 @@ export function PromptBrowserTab({
         )}
       </HStack>
       {showsCloseButton && (
-        <chakra.button
-          type="button"
+        <Box
+          // A <button> here would nest inside the tab trigger's own <button>.
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- nested in a <button>
+          role="button"
           display="flex"
-          background="transparent"
-          border="none"
-          padding={0}
           cursor="pointer"
           aria-label={`Close ${name}`}
           borderRadius="3px"
@@ -95,7 +94,7 @@ export function PromptBrowserTab({
           marginRight={-1}
         >
           <LuX width="18px" />
-        </chakra.button>
+        </Box>
       )}
     </HStack>
   );
