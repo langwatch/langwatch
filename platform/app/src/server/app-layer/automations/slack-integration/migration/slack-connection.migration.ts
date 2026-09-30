@@ -22,12 +22,8 @@ export class SlackConnectionMigration implements SystemMigration {
   }: {
     tenantId: string;
   }): Promise<TenantMigrationOutcome> {
-    const teams = await prisma.team.findMany({
-      where: { organizationId: tenantId },
-      select: { id: true },
-    });
     const projects = await prisma.project.findMany({
-      where: { teamId: { in: teams.map((team) => team.id) } },
+      where: { team: { organizationId: tenantId } },
       select: { id: true },
     });
     const outcome = await migrateOrganization({
@@ -35,13 +31,11 @@ export class SlackConnectionMigration implements SystemMigration {
       projectIds: projects.map((project) => project.id),
       apply: true,
     });
-    return {
-      status: "finalized",
-      report: {
-        linked: outcome.linkedIds.length,
-        cleared: outcome.clearedIds.length,
-        skipped: outcome.skipped.length,
-      },
-    };
+    const linked = outcome.linkedIds.length;
+    const cleared = outcome.clearedIds.length;
+    const report = { linked, cleared, skipped: outcome.skipped.length };
+    // Wrote something: re-plan next pass to catch rows changed mid-run.
+    if (linked + cleared > 0) return { status: "migrated", report };
+    return { status: "finalized", report };
   }
 }
