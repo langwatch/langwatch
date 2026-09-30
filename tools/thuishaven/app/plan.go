@@ -63,6 +63,60 @@ func goCombinedShell(repoRoot string, services []string, shouldWatch bool) strin
 	return fmt.Sprintf("make -C %q %s svc=combined args=%q", repoRoot, target, strings.Join(services, " "))
 }
 
+// SimulatorsInGoFile is the dev-tagged file that links the simulators into the
+// checkout's mono-binary. A checkout without it (older, or monolith) has no
+// simulator of its own, so Haven runs its bundled copies instead.
+const SimulatorsInGoFile = "cmd/service/combined_dev.go"
+
+// goLaneHostsSimulators reports whether the checkout's go lane can host them.
+func goLaneHostsSimulators(repoRoot string) bool {
+	_, err := os.Stat(filepath.Join(repoRoot, SimulatorsInGoFile))
+	return err == nil
+}
+
+// idpEnv is idpsim's own configuration, wherever it runs. The issuer/metadata
+// URLs it publishes must be the routed hostname, not loopback: the browser
+// follows them during a login. Its nameserver answers whatever it is asked, so
+// it binds loopback rather than the wildcard it defaults to.
+func (o *Orchestrator) idpEnv(st domain.Stack) []string {
+	env := []string{"IDPSIM_DATA_DIR=" + filepath.Join(o.cfg.Home, "idp", st.Slug)}
+	for _, svc := range st.Services {
+		if svc.Name != domain.IdPService {
+			continue
+		}
+		if svc.URL != "" {
+			env = append(env, "IDPSIM_BASE_URL="+svc.URL)
+		}
+		if svc.DNSPort != 0 {
+			env = append(env, fmt.Sprintf("IDPSIM_DNS_ADDR=127.0.0.1:%d", svc.DNSPort))
+		}
+	}
+	return env
+}
+
+// mailEnv is mailsim's own configuration, wherever it runs. Messages persist
+// per slug (MAILSIM_DATA_DIR) and are pruned only with the worktree's state.
+func (o *Orchestrator) mailEnv(st domain.Stack) []string {
+	var httpPort, smtpPort int
+	var mailURL string
+	for _, svc := range st.Services {
+		if svc.Name == domain.MailService {
+			httpPort, smtpPort, mailURL = svc.Port, svc.SMTPPort, svc.URL
+		}
+	}
+	mailDataDir := filepath.Join(o.cfg.Home, "mail", st.Slug)
+	_ = os.MkdirAll(mailDataDir, 0o755)
+	env := []string{
+		fmt.Sprintf("MAILSIM_HTTP_ADDR=:%d", httpPort),
+		fmt.Sprintf("MAILSIM_SMTP_ADDR=:%d", smtpPort),
+		"MAILSIM_DATA_DIR=" + mailDataDir,
+	}
+	if mailURL != "" {
+		env = append(env, "MAILSIM_BASE_URL="+mailURL)
+	}
+	return env
+}
+
 // planChildren turns a resolved stack into the supervised process set, layering
 // the overlay env (hostname URLs + ports) onto each child and giving each Go
 // service its SERVER_ADDR.
@@ -164,7 +218,8 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	// One Go lane, hosting whichever data-plane services this stack selected.
 	// Each still binds the port haven allocated for its hostname: SERVER_ADDR
 	// cannot answer for two listeners in one process, so each has its own
-	// address variable.
+	// address variable. A checkout whose dev build links the simulators hosts
+	// them there too; any other runs Haven's bundled copies as their own lanes.
 	var goServices []string
 	goEnv := append(append([]string{}, base...), domain.LaneEnv(GoLane))
 	if opts.Selection.Gateway {
@@ -175,6 +230,52 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		goServices = append(goServices, "nlpgo")
 		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", NLPAddrEnv, port("nlp")))
 	}
+	simsInGo := !st.Layout.IsMonolith() && goLaneHostsSimulators(opts.RepoRoot)
+	var simulators []Child
+	if opts.Selection.IDP {
+		idpEnv := o.idpEnv(st)
+		if simsInGo {
+			goServices = append(goServices, "idpsim")
+			goEnv = append(append(goEnv, idpEnv...), fmt.Sprintf("%s=:%d", IDPAddrEnv, port("idp")))
+		} else {
+			simulators = append(simulators, Child{
+				Name: "idp", Dir: opts.RepoRoot, Color: palette[6], LogPath: logPath("idp"),
+				Shell: o.simulatorShell("idp"),
+				Env: append(append(append([]string{}, base...), idpEnv...),
+					fmt.Sprintf("SERVER_ADDR=:%d", port("idp")), domain.LaneEnv("idp")),
+			})
+		}
+	}
+	if opts.Selection.Mail {
+		mailEnv := o.mailEnv(st)
+		if simsInGo {
+			goServices = append(goServices, "mailsim")
+			goEnv = append(goEnv, mailEnv...)
+		} else {
+			simulators = append(simulators, Child{
+				Name: "mail", Dir: opts.RepoRoot, Color: palette[7], LogPath: logPath("mail"),
+				Shell: o.simulatorShell("mail"),
+				Env:   append(append(append([]string{}, base...), domain.LaneEnv("mail")), mailEnv...),
+			})
+		}
+	}
+	hostSimulator := func(selected bool, binary string, env func() []string, child func() Child) {
+		if !selected {
+			return
+		}
+		if simsInGo {
+			goServices = append(goServices, binary)
+			goEnv = append(goEnv, env()...)
+			return
+		}
+		simulators = append(simulators, child())
+	}
+	hostSimulator(opts.Selection.Storage, "storagesim",
+		func() []string { return o.storageEnv(st) }, func() Child { return o.storageChild(st, opts.RepoRoot, base) })
+	hostSimulator(opts.Selection.Voice, "voicesim",
+		func() []string { return voiceEnv(st) }, func() Child { return o.voiceChild(st, opts.RepoRoot, base) })
+	hostSimulator(opts.Selection.LLM, "llmsim",
+		func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, opts.RepoRoot, base) })
 	if st.Layout.IsMonolith() {
 		out = append(out, mono.goChildren()...)
 	} else if len(goServices) > 0 {
@@ -184,69 +285,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			Env:   goEnv,
 		})
 	}
-	if opts.Selection.IDP {
-		idpEnv := append(append([]string{}, base...),
-			"IDPSIM_DATA_DIR="+filepath.Join(o.cfg.Home, "idp", st.Slug),
-			fmt.Sprintf("SERVER_ADDR=:%d", port("idp")), domain.LaneEnv("idp"))
-		// The issuer/metadata URLs the simulator publishes must be the routed
-		// hostname, not loopback — the browser follows them during a login.
-		for _, svc := range st.Services {
-			if svc.Name == "idp" {
-				if svc.URL != "" {
-					idpEnv = append(idpEnv, "IDPSIM_BASE_URL="+svc.URL)
-				}
-				// Bound to loopback rather than the wildcard the simulator
-				// defaults to: this nameserver answers whatever it is asked
-				// about, so it should be reachable from this machine and
-				// nowhere else.
-				if svc.DNSPort != 0 {
-					idpEnv = append(idpEnv, fmt.Sprintf("IDPSIM_DNS_ADDR=127.0.0.1:%d", svc.DNSPort))
-				}
-			}
-		}
-		out = append(out, Child{
-			Name: "idp", Dir: opts.RepoRoot, Color: palette[6], LogPath: logPath("idp"),
-			Shell: o.simulatorShell("idp"),
-			Env:   idpEnv,
-		})
-	}
-	if opts.Selection.Mail {
-		var httpPort, smtpPort int
-		var mailURL string
-		for _, svc := range st.Services {
-			if svc.Name == domain.MailService {
-				httpPort, smtpPort, mailURL = svc.Port, svc.SMTPPort, svc.URL
-			}
-		}
-		// Messages survive a restart (MAILSIM_DATA_DIR persists them as files) and
-		// are pruned only when the worktree's own state is — never shared across
-		// worktrees, mirroring langyagent's per-slug state dir below.
-		mailDataDir := filepath.Join(o.cfg.Home, "mail", st.Slug)
-		_ = os.MkdirAll(mailDataDir, 0o755)
-		mailEnv := append(append([]string{}, base...),
-			domain.LaneEnv("mail"),
-			fmt.Sprintf("MAILSIM_HTTP_ADDR=:%d", httpPort),
-			fmt.Sprintf("MAILSIM_SMTP_ADDR=:%d", smtpPort),
-			"MAILSIM_DATA_DIR="+mailDataDir,
-		)
-		if mailURL != "" {
-			mailEnv = append(mailEnv, "MAILSIM_BASE_URL="+mailURL)
-		}
-		out = append(out, Child{
-			Name: "mail", Dir: opts.RepoRoot, Color: palette[7], LogPath: logPath("mail"),
-			Shell: o.simulatorShell("mail"),
-			Env:   mailEnv,
-		})
-	}
-	if opts.Selection.Storage {
-		out = append(out, o.storageChild(st, opts.RepoRoot, base))
-	}
-	if opts.Selection.Voice {
-		out = append(out, o.voiceChild(st, opts.RepoRoot, base))
-	}
-	if opts.Selection.LLM {
-		out = append(out, o.llmChild(st, opts.RepoRoot, base))
-	}
+	out = append(out, simulators...)
 	// The two developer tools. Neither is a Node LANE — nothing in the product
 	// degrades without them — so they are planned like the Go services: only
 	// when the worktree has selected them, and never counted among the three.
@@ -348,6 +387,7 @@ const (
 const (
 	GatewayAddrEnv = "LANGWATCH_GO_AIGATEWAY_ADDR"
 	NLPAddrEnv     = "LANGWATCH_GO_NLPGO_ADDR"
+	IDPAddrEnv     = "LANGWATCH_GO_IDPSIM_ADDR"
 )
 
 // The two developer tools a stack can optionally supervise, by workspace

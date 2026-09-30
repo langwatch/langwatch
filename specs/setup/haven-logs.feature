@@ -59,6 +59,14 @@ Feature: haven logs
     And naming a service that does not exist lists api and worker among the choices
     And a capture written when the lane was called "backend" is still found
 
+  # In a checkout whose dev build links the simulators they run in the go lane
+  # and write no capture of their own; their names still find their lines.
+  Scenario: A simulator hosted in the go lane is still read by its own name
+    Given the go lane wrote lines from the AI Gateway and the mail sink
+    When the developer runs "haven logs mail"
+    Then only the mail sink's lines appear, labelled mail
+    And naming a service that does not exist lists every simulator among the choices
+
   Scenario: The api lane is still readable whole
     When the developer runs "haven logs"
     Then the api lane's lines appear under the lane's own name

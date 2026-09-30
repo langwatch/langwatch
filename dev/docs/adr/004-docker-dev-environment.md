@@ -417,6 +417,21 @@ is started.
   are refused by name; `+gateway` / `-nlp` still choose which services the `go`
   lane hosts, and a `go` lane hosting neither is not started at all.
 
+### Addendum: the simulators join the `go` lane (2026-09-30)
+
+A dev build of the mono-binary (`-tags dev`: `make service`, `make
+service-watch`, the Nx `service` target) links the five simulators, idpsim,
+mailsim, storagesim, voicesim and llmsim (`cmd/service/combined_dev.go`), so
+`service combined` hosts them beside aigateway and nlpgo, and haven runs every
+Go service but langyagent in one process. idpsim binds
+`LANGWATCH_GO_IDPSIM_ADDR`; the others keep their own address variables
+(`MAILSIM_HTTP_ADDR`/`MAILSIM_SMTP_ADDR`, `STORAGESIM_ADDR`, `VOICESIM_ADDR`,
+`LLMSIM_ADDR`). The release images build `./cmd/service` untagged, so no
+simulator is linked or selectable there. A checkout without that file, and the
+monolith layout, keep Haven's bundled `haven simulator` lanes. `haven logs
+idp|mail|storage|voice|llm` read the sims' lines out of the `go` capture;
+`haven restart go` bounces them.
+
 ## Amendment: the boot sequence — prepare once, quietly, under a lock (2026-09-07)
 
 A haven stack printed its boot three times over. `haven up` migrated both

@@ -115,6 +115,7 @@ Feature: haven up viewer tabs
     Scenario: A go line lands under gateway or nlp by its service field
       Given the go lane wrote a structured line whose service is "langwatch-service-nlpgo"
       Then the line is under nlp
+      And a line from a simulator ("langwatch-service-<name>sim") is under idp, mail, storage, voice or llm
 
     @unit
     Scenario: An unstructured line stays with its lane's default application

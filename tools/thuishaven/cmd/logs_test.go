@@ -376,3 +376,25 @@ func TestHalfSelectionFindsACaptureWrittenUnderTheOldLaneName(t *testing.T) {
 		t.Fatalf("lines = %v, want the worker's line out of the old capture", lines)
 	}
 }
+
+// @scenario "A simulator hosted in the go lane is still read by its own name"
+func TestSelectLogServicesFindsTheSimulatorsInTheGoLane(t *testing.T) {
+	dir := t.TempDir()
+	base := time.Date(2026, 9, 30, 10, 0, 0, 0, time.UTC)
+	writeLog(t, dir,
+		"go",
+		stamp(base)+` {"level":"info","service":"langwatch-service-aigateway","msg":"listening"}`,
+		stamp(base.Add(time.Second))+` {"level":"info","service":"langwatch-service-mailsim","msg":"mailsim catching mail"}`,
+	)
+	sources, err := selectLogServices(dir, []string{"mail"})
+	if err != nil {
+		t.Fatalf("selectLogServices: %v", err)
+	}
+	lines, _, _ := readLogTails(dir, sources)
+	if len(lines) != 1 || !strings.Contains(lines[0].text, "mailsim") || lines[0].service != "mail" {
+		t.Fatalf("lines = %v, want only mailsim's line, labelled mail", lines)
+	}
+	if _, err := selectLogServices(dir, []string{"nope"}); err == nil || !strings.Contains(err.Error(), "idp") {
+		t.Errorf("error = %v, want idp listed as selectable beside the go lane", err)
+	}
+}

@@ -59,6 +59,11 @@ func apiLaneFile(available map[string]bool) string {
 	return ""
 }
 
+// goLaneSimulators are the simulators a go.work checkout's go lane hosts beside
+// the data plane (cmd/service/combined_dev.go). There they have no capture of
+// their own, so `haven logs idp` reads the go lane's lines that idpsim wrote.
+var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm"}
+
 // logSource is one selected view: a capture file, the CLI name its lines are
 // labeled with, and — for one application of a shared lane — the application a
 // line must belong to. viewer.RouteLine decides that, so this command and the
@@ -207,6 +212,9 @@ func resolveLogSource(name string, available map[string]bool) (logSource, bool) 
 	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) {
 		return logSource{file: file, label: name, app: name}, true
 	}
+	if available["go"] && slices.Contains(goLaneSimulators, name) {
+		return logSource{file: "go", label: name, app: name}, true
+	}
 	file := cliToFileService(name)
 	if !available[file] {
 		return logSource{}, false
@@ -226,6 +234,13 @@ func logSelectableNames(available []string) []string {
 			continue
 		}
 		out = append(out, fileToCLIService(s))
+	}
+	if slices.Contains(available, "go") {
+		for _, sim := range goLaneSimulators {
+			if !slices.Contains(out, sim) {
+				out = append(out, sim)
+			}
+		}
 	}
 	return out
 }

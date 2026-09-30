@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// @scenario "Simulator lanes run Haven's bundled code in every checkout"
+// @scenario "Simulator lanes run Haven's bundled code in a checkout that does not link them"
 func TestSimulatorLanesUseTheHavenExecutable(t *testing.T) {
 	repo := t.TempDir()
 	home := t.TempDir()

@@ -32,8 +32,14 @@ const maxTenants = 100
 
 // LoadConfig reads idpsim's configuration from the environment.
 func LoadConfig() (Config, error) {
+	return LoadConfigAt(envOr("SERVER_ADDR", ":5565"))
+}
+
+// LoadConfigAt is LoadConfig listening on addr instead of SERVER_ADDR, for a
+// host that allocates the port itself (the combined dev process).
+func LoadConfigAt(addr string) (Config, error) {
 	cfg := Config{
-		Addr:    envOr("SERVER_ADDR", ":5565"),
+		Addr:    addr,
 		Tenants: 3,
 		DNSAddr: envOr("IDPSIM_DNS_ADDR", ":15353"),
 		DataDir: os.Getenv("IDPSIM_DATA_DIR"),

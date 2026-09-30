@@ -3,8 +3,8 @@ Feature: Haven carries its development simulators
   when a developer starts a stack from an older checkout.
 
   @unit @regression
-  Scenario: Simulator lanes run Haven's bundled code in every checkout
-    Given a checkout without simulator source or a service Makefile
+  Scenario: Simulator lanes run Haven's bundled code in a checkout that does not link them
+    Given a checkout without simulator source or a service Makefile, or a monolith checkout
     When Haven plans mail and identity providers with or without Go source watching
     Then both run as supervised children of the Haven executable
     And they retain their stack's ports, URLs, logs and inbox storage
