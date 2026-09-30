@@ -1,6 +1,6 @@
 /**
- * What a browser installs when it installs authz: the Roles settings page,
- * whose assignments tab /settings/role-bindings now redirects to.
+ * What a browser installs when it installs authz: the Roles & access settings
+ * page, whose Access tab /settings/role-bindings now redirects to.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
@@ -24,7 +24,7 @@ export const authzWeb = defineWebModule("authz")
     "pages/settings/roles": {
       path: "/settings/roles",
       within: "settings",
-      label: "Roles",
+      label: "Roles & access",
       requires: "organization:manage",
       load: () => import("./ui/sections/roles.screen.tsx"),
     },

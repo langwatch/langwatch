@@ -21,7 +21,7 @@ export default function RolesScreen() {
     return (
       <>
         <PageLayout.Header>
-          <PageLayout.Heading>Roles</PageLayout.Heading>
+          <PageLayout.Heading>Roles &amp; access</PageLayout.Heading>
         </PageLayout.Header>
         <VStack gap={6} width="full" align="start" paddingTop={4}>
           <Alert.Root status="info">

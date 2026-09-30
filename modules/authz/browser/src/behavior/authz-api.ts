@@ -4,7 +4,18 @@
  */
 
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
-import type { AuthzManagedOrganizationBinding, AuthzPermission } from "@langwatch/authz-contract";
+import type {
+  AuthzChangeGrantRoleInput,
+  AuthzCreateGrantInput,
+  AuthzListGrantsInput,
+  AuthzManagedOrganizationBinding,
+  AuthzOwnStanding,
+  AuthzPermission,
+  AuthzRevokeGrantByIdInput,
+  Grant,
+  GrantPage,
+  GrantRevoked,
+} from "@langwatch/authz-contract";
 import type { Role } from "@langwatch/role-contract";
 
 /** One organization, the tenant key every procedure on these surfaces takes. */
@@ -53,6 +64,23 @@ export type AuthzApiMap = {
     delete: { mutation: { input: RoleScope; output: { success: true } } };
   };
 
+  /** Grants, the Access tab's list and writes; the session is the caller, never the input. */
+  authz: {
+    effectivePermissions: {
+      query: { input: { organizationId?: string; projectId?: string }; output: AuthzOwnStanding };
+    };
+    listGrants: { query: { input: AuthzListGrantsInput; output: GrantPage } };
+    createGrant: {
+      mutation: { input: Omit<AuthzCreateGrantInput, "caller" | "actor">; output: Grant };
+    };
+    changeGrantRole: {
+      mutation: { input: Omit<AuthzChangeGrantRoleInput, "caller" | "actor">; output: Grant };
+    };
+    revokeGrant: {
+      mutation: { input: Omit<AuthzRevokeGrantByIdInput, "actor">; output: GrantRevoked };
+    };
+  };
+
   roleBinding: {
     /**
      * Every role binding in the organization — audit-grade RBAC data, which is
@@ -69,6 +97,13 @@ export type AuthzApiMap = {
      * The workspace graph the shell already reads, narrowed to what the role
      * preview's scope picker offers; the same key, so no second request.
      */
+    getAllOrganizationMembers: {
+      query: {
+        input: OrganizationScope;
+        output: { id: string; name: string | null; email: string | null }[];
+      };
+    };
+
     getAll: {
       query: {
         input: { isDemo?: boolean };
@@ -78,6 +113,13 @@ export type AuthzApiMap = {
           teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
         }[];
       };
+    };
+  };
+
+  /** Who a grant can name: the organization's members and its groups. */
+  group: {
+    listAll: {
+      query: { input: OrganizationScope; output: { id: string; name: string }[] };
     };
   };
 
