@@ -36,6 +36,7 @@ import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
 import { sessionRevocation } from "../../identity/runtime";
 import {
   CannotRemoveSelfAsLastAdminError,
+  DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
   TeamMembershipNotFoundError,
@@ -1262,9 +1263,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             teamRole: teamRoleUpdate.role as TeamRoleValue,
           })
         ) {
-          throw new LiteMemberViewerOnlyError(
-            await teamNameFor({ tx, teamId }),
-          );
+          const teamName = await teamNameFor({ tx, teamId });
+          if (role === OrganizationUserRole.DEVELOPER) {
+            throw new DeveloperSeatNoSharedAccessError(teamName);
+          }
+          throw new LiteMemberViewerOnlyError(teamName);
         }
 
         const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
@@ -1485,6 +1488,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
           throw new LiteMemberViewerOnlyError(team.name);
         }
+        if (orgMembership?.role === OrganizationUserRole.DEVELOPER) {
+          throw new DeveloperSeatNoSharedAccessError(team.name);
+        }
 
         const [targetUserBinding] = await new GrantsAccessListingRepository(
           tx,
@@ -1558,6 +1564,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         });
 
+        if (orgMembership?.role === OrganizationUserRole.DEVELOPER) {
+          throw new DeveloperSeatNoSharedAccessError(team.name);
+        }
         if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
           if (
             !isTeamRoleAllowedForOrganizationRole({

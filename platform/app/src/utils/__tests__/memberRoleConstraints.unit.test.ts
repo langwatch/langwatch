@@ -67,6 +67,31 @@ describe("memberRoleConstraints", () => {
     });
   });
 
+  describe("when the seat is Developer", () => {
+    /** @scenario A Developer cannot be given a role on a shared team */
+    it("allows no team role at all, whatever the role", () => {
+      for (const teamRole of [
+        TeamUserRole.ADMIN,
+        TeamUserRole.MEMBER,
+        TeamUserRole.VIEWER,
+        "custom:cr-1" as TeamRoleValue,
+      ]) {
+        expect(
+          isTeamRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.DEVELOPER,
+            teamRole,
+          }),
+        ).toBe(false);
+        expect(
+          isBindingRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.DEVELOPER,
+            role: teamRole,
+          }),
+        ).toBe(false);
+      }
+    });
+  });
+
   describe("isBindingRoleAllowedForOrganizationRole()", () => {
     describe("when organization role is Lite Member", () => {
       it("allows only Viewer", () => {

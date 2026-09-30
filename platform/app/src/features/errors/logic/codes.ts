@@ -151,6 +151,7 @@ export const APP_ERROR_CODES = [
   "dataset_not_ready",
   "dataset_stale_columns",
   "dataset_too_large_to_search",
+  "developer_seat_no_shared_access",
   "developer_seat_restricted",
   "dspy_step_not_found",
   "duplicate_invite",

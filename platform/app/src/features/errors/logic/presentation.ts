@@ -3170,6 +3170,16 @@ const presentations = {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
   },
+  developer_seat_no_shared_access: {
+    // Not a field to correct: the seat sets the ceiling. The scope can be a
+    // team, a project or the organization, so the copy names the seat.
+    title: "A Developer seat has no shared access",
+    describe: (error) => {
+      const scopeName = str(error, "scopeName", "");
+      const scope = scopeName ? ` on "${scopeName}"` : "";
+      return `A Developer seat works in its own project only, so no role can be given${scope}. Move them to a Member seat to give them shared access.`;
+    },
+  },
   developer_seat_restricted: {
     // A Developer seat reaches its own project only (ADR-143). No admin can
     // grant a role here, so the copy names the seat rather than a permission.

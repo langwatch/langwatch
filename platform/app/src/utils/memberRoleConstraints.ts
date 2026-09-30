@@ -45,11 +45,20 @@ export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
   return "Lite Member";
 }
 
+/**
+ * Whether a member holding this organization role may hold this role on a
+ * SHARED team. A Developer (ADR-143) may hold none: their personal team is
+ * the only team they are ever on, and it is never offered here.
+ */
 export function isTeamRoleAllowedForOrganizationRole(params: {
   organizationRole: OrganizationUserRole;
   teamRole: TeamRoleValue;
 }): boolean {
   const { organizationRole, teamRole } = params;
+
+  if (organizationRole === OrganizationUserRole.DEVELOPER) {
+    return false;
+  }
 
   if (organizationRole === OrganizationUserRole.EXTERNAL) {
     return teamRole === TeamUserRole.VIEWER;
@@ -76,6 +85,8 @@ export function isBindingRoleAllowedForOrganizationRole(params: {
   role: TeamRoleValue;
 }): boolean {
   const { organizationRole, role } = params;
+  // A Developer holds no stored row on anything shared, whatever the role.
+  if (organizationRole === OrganizationUserRole.DEVELOPER) return false;
   if (organizationRole !== OrganizationUserRole.EXTERNAL) return true;
   return isTeamRoleAllowedForOrganizationRole({
     organizationRole,
