@@ -1322,16 +1322,17 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
+      # Before the first nx call, so prepare's tasks read and fill it too.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: build
+
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built
 
       # apps/api and apps/worker declare no build — they run from source through
       # node. What is built here is the browser bundle the API process serves,
       # plus every workspace dependency that has a build of its own.
-      - uses: ./.github/actions/nx-cache
-        with:
-          suffix: build
-
       - name: Build
         run: pnpm run build:types && pnpm exec nx run @langwatch/ui:build --outputStyle=static
 

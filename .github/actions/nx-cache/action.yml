@@ -2,7 +2,8 @@
 # restoring any older cache is safe: a stale entry is simply never looked up.
 # The key rotates with the commit so every run saves what it added; the suffix
 # keeps jobs that fill different entries (the prepare steps, the build) from
-# racing to save one key. Locally Nx shares ~/.nx between worktrees (ADR-150).
+# racing to save one key. The index (a SQLite file) travels with the cache: Nx
+# ignores artefacts it has no index rows for. Locally Nx shares ~/.nx (ADR-150).
 name: nx-cache
 description: Restore and save the Nx task cache under a key that rotates with the commit.
 
@@ -15,15 +16,23 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Point Nx at a cacheable directory
+    - name: Point Nx at cacheable directories
       shell: bash
-      run: echo "NX_CACHE_DIRECTORY=$GITHUB_WORKSPACE/.nx/cache" >> "$GITHUB_ENV"
+      run: |
+        echo "NX_CACHE_DIRECTORY=$GITHUB_WORKSPACE/.nx/cache" >> "$GITHUB_ENV"
+        echo "NX_WORKSPACE_DATA_DIRECTORY=$GITHUB_WORKSPACE/.nx/workspace-data" >> "$GITHUB_ENV"
 
     - name: Restore the Nx cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: .nx/cache
+        path: |
+          .nx/cache
+          .nx/workspace-data/*.db*
         key: ${{ runner.os }}-nx-${{ inputs.suffix }}-${{ github.sha }}
         restore-keys: |
           ${{ runner.os }}-nx-${{ inputs.suffix }}-
           ${{ runner.os }}-nx-
+
+    - name: Adopt the restored cache index
+      shell: bash
+      run: bash .github/scripts/adopt-nx-cache-index.sh .nx/workspace-data
