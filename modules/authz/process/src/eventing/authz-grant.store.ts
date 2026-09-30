@@ -780,11 +780,12 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       check: async () => {
         const row = (await liveRoles(this.options.database).findFirst({
           where: { id: roleId, organizationId },
-          select: { name: true, permissions: true },
-        })) as { name: string; permissions: unknown } | null;
+          select: { name: true, description: true, permissions: true },
+        })) as { name: string; description?: string | null; permissions: unknown } | null;
         return (
           row != null &&
           row.name === name &&
+          (row.description ?? null) === (description || null) &&
           samePermissions({
             stored: row.permissions,
             wanted: permissions,

@@ -14,6 +14,7 @@ function setup() {
   const database = {
     apiKey: delegate(),
     customRole: delegate(),
+    grant: delegate(),
     group: delegate(),
     groupMembership: delegate(),
     organization: delegate(),
@@ -32,6 +33,7 @@ function setup() {
 describe("PrismaAuthzBindingRepository", () => {
   it("finds a binding only inside the named organization", async () => {
     const { database, repository } = setup();
+    database.grant.findFirst.mockResolvedValue({ id: "binding-1" });
 
     await repository.findBinding({
       organizationId: "org-1",
@@ -41,6 +43,31 @@ describe("PrismaAuthzBindingRepository", () => {
     expect(database.roleBinding.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "binding-1", organizationId: "org-1" },
+      }),
+    );
+  });
+
+  /** @scenario "Deleting a role binding twice answers not found the second time" */
+  it("reads a binding whose grant is revoked as missing, though its compat row remains", async () => {
+    const { database, repository } = setup();
+    database.roleBinding.findFirst.mockResolvedValue({
+      id: "binding-1",
+      organizationId: "org-1",
+      userId: null,
+      groupId: "group-1",
+      apiKeyId: null,
+      role: "VIEWER",
+      customRoleId: null,
+      scopeType: "PROJECT",
+      scopeId: "project-1",
+    });
+
+    const found = await repository.findBinding({ organizationId: "org-1", bindingId: "binding-1" });
+
+    expect(found).toBeNull();
+    expect(database.grant.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "binding-1", organizationId: "org-1", revokedAt: null },
       }),
     );
   });

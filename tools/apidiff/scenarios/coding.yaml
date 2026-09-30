@@ -182,45 +182,45 @@
   expect: {"status": [400, 401, 403]}
 
 - id: coding-pr-usage-v1-unmapped-pull-request-is-not-found
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo-{uid}", "pullRequest": 7}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo-{uid}", "pullRequest": 7}}
   expect: {"status": 404}
 
 - id: coding-pr-usage-v1-unmapped-host-is-not-found
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1, "host": "ghe-{uid}.example.com"}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1, "host": "ghe-{uid}.example.com"}}
   expect: {"status": 404}
 
 - id: coding-pr-usage-v1-refuses-no-key
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: none
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
   expect: {"status": 401}
 
 - id: coding-pr-usage-v1-refuses-project-key
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: project
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": 1}}
   expect: {"status": [401, 403]}
 
 - id: coding-pr-usage-v1-rejects-bad-repository
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "no-slash", "pullRequest": 1}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "no-slash", "pullRequest": 1}}
   expect: {"status": [400, 422]}
 
 - id: coding-pr-usage-v1-rejects-missing-pull-request
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo"}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo"}}
   expect: {"status": [400, 422]}
 
 - id: coding-pr-usage-v1-rejects-negative-pull-request
-  endpoint: GET /api/coding-agent/pull-request-usage
+  endpoint: GET /api/v1/coding-agent/pull-request-usage
   auth: org
-  request: {"path": "/api/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": -3}}
+  request: {"path": "/api/v1/coding-agent/pull-request-usage", "query": {"repository": "vd-org/vd-repo", "pullRequest": -3}}
   expect: {"status": [400, 422]}
 
 - id: github-install-refuses-no-session
