@@ -124,6 +124,7 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
     describe("when a valid specification renders as a chart", () => {
       /** @scenario "The chart renders under a CSP that forbids eval" */
       /** @scenario "A categorical LangWatchQL result renders as a chart in a real browser" */
+      /** @scenario "The chart renders under CSP without eval" */
       it("draws through Vega's expression interpreter, while the same specification with the interpreter disabled is refused", async () => {
         // The control differs from the shipped path by exactly one option, and
         // this is the shipped value of it.
