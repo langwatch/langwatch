@@ -3,7 +3,7 @@
 Patterns to follow when extending `platform/app/src/features/analytics-query/`.
 See [ADR-085](../adr/085-lwql-chart-runtime-without-eval.md) for why the
 chart runtime avoids `eval`, and
-`specs/analytics/lwql-workbench.feature` for the behavioral contract.
+`specs/lwql/workbench.feature` for the behavioral contract.
 
 ## Request state: draft / submitted / outcome
 
@@ -165,6 +165,6 @@ boundary fails this test, not silently ships a bigger bundle.
 
 - [ADR-085](../adr/085-lwql-chart-runtime-without-eval.md) — why the chart
   runtime runs without `eval`
-- `specs/analytics/lwql-workbench.feature` — full behavioral contract
+- `specs/lwql/workbench.feature` — full behavioral contract
 - `error-handling.md` — the code-keyed error registry this surface builds on
 - `platform/app/src/features/analytics-query/` — the feature directory

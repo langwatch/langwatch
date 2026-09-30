@@ -30,7 +30,10 @@ Feature: Data retention regression safety
     Given a project has traces stored across all retention-managed tables
     When the admin applies 91-day retention to existing trace data
     Then every retention-managed traces table receives the same project-scoped update
-    And the event log receives the same project-scoped update as other tables
+    And the event log receives that update too, but only for the rows classified
+      under the traces category
+    And identity and authorization events in the event log keep their
+      indefinite retention regardless of the update
 
   @regression @unit
   Scenario: Manual pin survives unsharing an auto-shared trace

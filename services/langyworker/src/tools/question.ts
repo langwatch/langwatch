@@ -76,10 +76,81 @@ function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
   });
 }
 
+/**
+ * What the model reads after the answers, so the go is in the tool result
+ * itself, whichever skill asked: a reply that only speaks after an answer
+ * ends the turn with the work undone.
+ */
+export const ANSWERED_CONTINUE_LINE =
+  "The user has answered. Continue with the work that follows this answer in this turn.";
+
+/**
+ * A line as it is compared to an option label: the list marker, the quotes
+ * around it and the punctuation after it off, whitespace and case folded.
+ */
+function foldLabel(text: string): string {
+  return text
+    .trim()
+    .replace(/^(?:\d+[.)]|[-*•])\s+/, "")
+    .replace(/^["'“”‘’]+|["'“”‘’.!?:;,]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * The question text without the option labels written out at its end. The
+ * card draws the options as buttons under the text, so a text that ends with
+ * the same labels as a numbered, bulleted or bare list reads them twice; the
+ * line that introduced the list ("Options, in this order:") goes with them.
+ * Labels mid-text are left alone, and so is a text that is nothing but the
+ * labels.
+ */
+export function dropRepeatedOptions(question: string, labels: readonly string[]): string {
+  const folded = new Set(labels.map(foldLabel).filter((label) => label.length > 0));
+  if (folded.size === 0) return question;
+  const lines = question.split("\n");
+  let matched = 0;
+  let cut = lines.length;
+  for (let index = lines.length - 1; index >= 0; index--) {
+    const line = (lines[index] ?? "").trim();
+    if (line === "") continue;
+    if (!folded.has(foldLabel(line))) break;
+    matched += 1;
+    cut = index;
+  }
+  if (matched === 0) return question;
+  const kept = lines.slice(0, cut);
+  const dropTrailingBlanks = () => {
+    while (kept.length > 0 && (kept[kept.length - 1] ?? "").trim() === "") kept.pop();
+  };
+  dropTrailingBlanks();
+  if (/:\s*$/.test(kept[kept.length - 1] ?? "")) kept.pop();
+  dropTrailingBlanks();
+  const text = kept.join("\n");
+  return text.trim() === "" ? question : text;
+}
+
+/** The questions as the card gets them: each text without its options repeated at the end. */
+export function withoutRepeatedOptions(questions: unknown): unknown {
+  if (!Array.isArray(questions)) return questions;
+  return questions.map((entry) => {
+    if (typeof entry !== "object" || entry === null) return entry;
+    const { question, options } = entry as { question?: unknown; options?: unknown };
+    if (typeof question !== "string" || !Array.isArray(options)) return entry;
+    const labels = options
+      .map((option) =>
+        typeof option === "object" && option !== null ? (option as { label?: unknown }).label : undefined,
+      )
+      .filter((label): label is string => typeof label === "string");
+    return { ...entry, question: dropRepeatedOptions(question, labels) };
+  });
+}
+
 /** The answers as the model reads them. */
 export function renderAnswers(answers: QuestionAnswer[]): string {
   if (answers.length === 0) return NO_ANSWER_PUSHBACK;
-  return answers
+  const rendered = answers
     .map((answer) => {
       const parts: string[] = [];
       if (answer.selected.length > 0) parts.push(answer.selected.join(", "));
@@ -87,6 +158,7 @@ export function renderAnswers(answers: QuestionAnswer[]): string {
       return `Q: ${answer.question}\nA: ${parts.length > 0 ? parts.join("; ") : "no option picked"}`;
     })
     .join("\n\n");
+  return `${rendered}\n\n${ANSWERED_CONTINUE_LINE}`;
 }
 
 export async function askQuestions({
@@ -109,7 +181,7 @@ export async function askQuestions({
     body: {
       ...callIds({ turnContext, ...(toolCallId ? { toolCallId } : {}) }),
       kind: "question",
-      questions,
+      questions: withoutRepeatedOptions(questions),
     },
     signal,
     timeoutMs: REQUEST_TIMEOUT_MS,
@@ -159,6 +231,12 @@ const questionParams = Type.Object({
           description: Type.Optional(
             Type.String({ description: "One line about what this answer means." }),
           ),
+          quiet: Type.Optional(
+            Type.Boolean({
+              description:
+                "Show this answer as a quiet link under the main options, for the way out rather than the way forward. It is still a real answer.",
+            }),
+          ),
         }),
         { description: "One to eight options. The options are the answers." },
       ),
@@ -167,6 +245,12 @@ const questionParams = Type.Object({
       ),
       allowOther: Type.Optional(
         Type.Boolean({ description: "Let the user write their own answer." }),
+      ),
+      bare: Type.Optional(
+        Type.Boolean({
+          description:
+            "Draw the question field as ordinary reply prose (markdown) above the options, with no title and no frame. Use it when the question is the whole of what you have to say, so put every word of it in the question field and say nothing before the call.",
+        }),
       ),
     }),
     { description: "One to four questions. Ask one question at a time when you can." },

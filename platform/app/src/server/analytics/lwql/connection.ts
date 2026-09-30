@@ -11,7 +11,7 @@
  *
  * @see ./executor.ts — builds the client from this connection
  * @see ./provisioning/selfProvisioning.ts — the deploy path that converges it
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -74,7 +74,7 @@ function disagreesWithDerivedServer({
   if (explicitOrigin === derivedOrigin) return false;
   logger.error(
     { derivedOrigin },
-    "LWQL_SELF_PROVISION cannot target a ClickHouse other than CLICKHOUSE_URL's own: provisioning would create the access model on one server while queries ran against another. Unset LWQL_CLICKHOUSE_URL, or configure the five LWQL_* variables explicitly without LWQL_SELF_PROVISION",
+    "LangWatchQL: LWQL_CLICKHOUSE_URL cannot name a ClickHouse other than CLICKHOUSE_URL's own — provisioning would create the access model on one server while queries ran against another. Unset LWQL_CLICKHOUSE_URL so it derives from CLICKHOUSE_URL",
   );
   return true;
 }
@@ -94,7 +94,7 @@ function derivedAdminTarget({
   const adminUrl = env.CLICKHOUSE_URL;
   if (!adminUrl) {
     logger.warn(
-      "LWQL_SELF_PROVISION is true but CLICKHOUSE_URL is not set — LangWatchQL stays unconfigured and every query will be refused",
+      "LangWatchQL: CLICKHOUSE_URL is not set — LangWatchQL stays unconfigured and every query will be refused",
     );
     return null;
   }
@@ -103,21 +103,21 @@ function derivedAdminTarget({
     parsed = new URL(adminUrl);
   } catch {
     logger.warn(
-      "LWQL_SELF_PROVISION is true but CLICKHOUSE_URL is not a parseable URL — LangWatchQL stays unconfigured and every query will be refused",
+      "LangWatchQL: CLICKHOUSE_URL is not a parseable URL — LangWatchQL stays unconfigured and every query will be refused",
     );
     return null;
   }
   const database = parsed.pathname.replace(/^\//, "");
   if (!database) {
     logger.warn(
-      "LWQL_SELF_PROVISION is true but CLICKHOUSE_URL names no database in its path — LangWatchQL stays unconfigured and every query will be refused",
+      "LangWatchQL: CLICKHOUSE_URL names no database in its path — LangWatchQL stays unconfigured and every query will be refused",
     );
     return null;
   }
   if (env.LWQL_DATABASE && env.LWQL_DATABASE !== database) {
     logger.error(
       { lwqlDatabase: env.LWQL_DATABASE, adminDatabase: database },
-      "LWQL_SELF_PROVISION cannot target a database other than CLICKHOUSE_URL's own: the key-map row policies and the key-map backfill would disagree. Unset LWQL_DATABASE, or configure the five LWQL_* variables explicitly without LWQL_SELF_PROVISION",
+      "LangWatchQL: LWQL_DATABASE cannot name a database other than CLICKHOUSE_URL's own — the key-map row policies and the key-map backfill would disagree. Unset LWQL_DATABASE so it derives from CLICKHOUSE_URL",
     );
     return null;
   }
@@ -134,28 +134,26 @@ function derivedAdminTarget({
 }
 
 /**
- * Derives the restricted ClickHouse connection from the admin URL under
- * `LWQL_SELF_PROVISION`, or reports that this deployment has none.
+ * Derives the restricted ClickHouse connection from the admin `CLICKHOUSE_URL`
+ * whenever a `LWQL_CLICKHOUSE_PASSWORD` is present, or reports that this
+ * deployment has none.
  *
- * The LangWatchQL database is the admin URL's own database, exactly as the
- * cloud deploys it: the views live beside the fact tables, and the key-map row
+ * The LangWatchQL database is the admin URL's own database, on every
+ * distribution: the views live beside the fact tables, and the key-map row
  * policies reference the same database the migration created the table in. An
  * explicit `LWQL_DATABASE` or `LWQL_CLICKHOUSE_URL` naming a *different* target
  * is refused (null, logged) rather than honoured — the backfill would write one
  * key map while every row policy reads another, which is a silent
- * all-queries-refused outage, the exact class of misconfiguration
- * self-provisioning exists to remove.
+ * all-queries-refused outage, the exact class of misconfiguration the
+ * app-owned access model exists to remove.
  */
 export function lwqlDerivedConnectionFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): LangWatchQLConnection | null {
-  if (env.LWQL_SELF_PROVISION !== "true") return null;
-
   const password = env.LWQL_CLICKHOUSE_PASSWORD;
   if (!password) {
-    logger.warn(
-      "LWQL_SELF_PROVISION is true but LWQL_CLICKHOUSE_PASSWORD is not set — LangWatchQL stays unconfigured and every query will be refused",
-    );
+    // No password means this deployment is simply not running LangWatchQL —
+    // silent, not a warning, exactly like an unset optional feature.
     return null;
   }
 

@@ -463,6 +463,93 @@ Feature: Internal feature flag system for system-level kill switches
       Then the saved rule still carries both conditions, because dropping one
            would widen the rollout to that organization's whole history
 
+  Rule: A rollout can name the email domain of the signed-in user
+
+    # The team QAs a flag in production by signing up with fresh accounts at
+    # its own email domain. A rule names the domain instead of ids that do
+    # not exist yet, and matches every signed-in user at that domain while
+    # every other user keeps exactly the value they had.
+
+    @unit
+    Scenario: an email domain rule enables the flag for a user at that domain
+      Given a flag that is off by default
+      And a rule naming the domain "acme.com", with enabled true
+      When the flag is read for a signed-in user whose email is at acme.com
+      Then the flag resolves enabled from the rule
+
+    @unit
+    Scenario: a user at another domain sees no change
+      Given the same flag and rule
+      When the flag is read for a user whose email is at another domain
+      Then the rule does not match
+      And the read falls through to the row-level default
+
+    @unit
+    Scenario: the domain comparison ignores the case of the email
+      Given a rule naming the domain "acme.com"
+      When the flag is read for a user whose email is at "Acme.COM"
+      Then the rule matches
+
+    @unit
+    Scenario: a subdomain only matches when it is listed
+      Given a rule naming the domain "acme.com"
+      When the flag is read for a user whose email is at "eu.acme.com"
+      Then the rule does not match
+
+    @unit
+    Scenario: a rule may name several domains
+      Given a rule naming the domains "acme.com" and "acme.io"
+      When the flag is read for a user at either domain
+      Then the rule matches
+      And a user at a third domain does not match
+
+    @unit
+    Scenario: a read with no user email matches no email domain rule
+      Given a flag whose only rule names a domain
+      When the flag is read from a surface with no signed-in user, such as a
+           job or an API key
+      Then the rule does not match, because a domain rule fails closed rather
+           than reaching every caller whose email is unknown
+
+    @unit
+    Scenario: an email domain rule combines with the other conditions
+      Given a rule naming both an organization and a domain
+      When the flag is read for a user at that domain in another organization
+      Then the rule does not match
+      And it matches for a user at that domain in the named organization
+
+    @unit
+    Scenario: an operator cannot save an email domain rule that cannot match
+      Given an operator writes an email domain rule from the Ops UI
+      When a domain is blank, padded, carries an @ or is not lowercase
+      Then the write is rejected with a message naming the expected form
+
+    @unit
+    Scenario: the ops page reads and writes an email domain rule
+      Given a stored rule enabling the flag for users at "acme.com" and "acme.io"
+      When the rule is opened in the targeting rules dialog
+      Then it shows as an "Email domain" rule with both domains
+      And saving it back stores the same domains, lowercased and without the @
+
+    @unit
+    Scenario: the note under the toggle names the domains a rule switched the flag on for
+      Given a flag whose toggle reads off and a rule enabling it for users at "acme.com"
+      When the flag list is rendered
+      Then the note under the toggle reads "Enabled for users at acme.com"
+
+    @unit
+    Scenario: the session's email reaches the store on a flag read
+      Given a flag read made on behalf of a signed-in user
+      When the feature flag service resolves it
+      Then the store evaluates the rules against that user's email
+
+    @integration
+    Scenario: the frontend flag procedure resolves an email domain rule for the signed-in user
+      Given a stored rule enabling a flag for users at "acme.com"
+      When a signed-in user at acme.com reads the flag with no project and no organization
+      Then the flag resolves enabled
+      And a signed-in user at another domain reads it disabled
+
   Rule: Self-hosted parity
 
     Scenario: Flipping a kill switch works the same self-hosted as on a shared install

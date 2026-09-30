@@ -101,6 +101,12 @@ import { RequestValidationError } from "./validation";
 
 const logger = createLogger("langwatch:api:idempotency");
 
+/**
+ * The client a fenced receipt write runs on. A transaction client is accepted
+ * so a test can hold one write open while another parks on its row lock.
+ */
+type ReceiptClient = PrismaClient | Prisma.TransactionClient;
+
 /** The header a caller sends to make a create replayable. */
 export const IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
@@ -364,12 +370,15 @@ function startClaimHeartbeat({
   claimId: string;
 }): ClaimHeartbeat {
   const timer = setInterval(() => {
-    prisma.idempotencyReceipt
-      .updateMany({
-        where: { id: receiptId, claimId },
-        data: { heartbeatAt: new Date() },
-      })
-      .then(({ count }) => {
+    prisma.$executeRaw`
+      -- @tenancy: a receipt is addressed by its own id, resolved from the
+      -- (scopeId, key) pair the caller holds.
+      UPDATE "IdempotencyReceipt"
+         SET "heartbeatAt" = ${new Date()}
+       WHERE "id" = ${receiptId}
+         AND "claimId" = ${claimId}
+    `
+      .then((count) => {
         if (count > 0) return;
         // The claim is somebody else's now. Warn once and stop, rather than
         // writing nothing every interval for the rest of the handler.
@@ -399,24 +408,31 @@ function startClaimHeartbeat({
  * resource it just created is one the replacing request is about to create a
  * second copy of. Nothing here can undo that, and overwriting the new claim's
  * row would only hide it, so it is logged as the loud signal instead.
+ *
+ * Written as SQL with the fence against the table, for the reason given on
+ * {@link takeOverClaim}: this is the write a takeover can park behind.
  */
-async function finalizeClaim({
+export async function finalizeClaim({
   prisma,
   receiptId,
   claimId,
   status,
   serializedBody,
 }: {
-  prisma: PrismaClient;
+  prisma: ReceiptClient;
   receiptId: string;
   claimId: string;
   status: number;
   serializedBody: string;
 }): Promise<void> {
-  const { count } = await prisma.idempotencyReceipt.updateMany({
-    where: { id: receiptId, claimId },
-    data: { responseStatus: status, responseBody: encrypt(serializedBody) },
-  });
+  const count = await prisma.$executeRaw`
+    -- @tenancy: addressed by receipt id, fenced on the claim this request holds.
+    UPDATE "IdempotencyReceipt"
+       SET "responseStatus" = ${status},
+           "responseBody" = ${encrypt(serializedBody)}
+     WHERE "id" = ${receiptId}
+       AND "claimId" = ${claimId}
+  `;
 
   if (count === 0) {
     logger.error(
@@ -567,25 +583,40 @@ export function isClaimAbandoned({
  * that displaced it. The `claimId` in the predicate is what makes two requests
  * racing to take the same silent claim over resolve to one winner, and the
  * loser is sent back to re-read a row that is now beating again.
+ *
+ * Stated as SQL rather than through `updateMany`, which does not hold under
+ * concurrency. Prisma compiles `updateMany` to
+ * `UPDATE ... WHERE id IN (SELECT id FROM ... WHERE <conditions>)`. When two
+ * statements meet on the same row the second waits for the first to commit
+ * and then re-checks its WHERE clause against the row as it now stands, which
+ * for that shape is only the subquery, and the subquery still runs on the
+ * statement's own older snapshot: both are told yes, and both run the handler
+ * the key was sent to run once. With the conditions against the table the
+ * re-check sees the new claim and the second updates nothing. The same holds
+ * for a takeover parked behind the original's finalize, which is why that
+ * write and the heartbeat take the same shape.
  */
-async function takeOverClaim({
+export async function takeOverClaim({
   prisma,
   existing,
   now,
 }: {
-  prisma: PrismaClient;
+  prisma: ReceiptClient;
   existing: IdempotencyReceipt;
   now: Date;
 }): Promise<ExistingVerdict> {
   const claimId = nanoid();
-  const { count } = await prisma.idempotencyReceipt.updateMany({
-    where: { id: existing.id, claimId: existing.claimId, responseStatus: null },
-    data: {
-      claimId,
-      heartbeatAt: now,
-      expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS),
-    },
-  });
+  const count = await prisma.$executeRaw`
+    -- @tenancy: a receipt is addressed by its own id, resolved from the
+    -- (scopeId, key) pair the caller holds.
+    UPDATE "IdempotencyReceipt"
+       SET "claimId" = ${claimId},
+           "heartbeatAt" = ${now},
+           "expiresAt" = ${new Date(now.getTime() + RECEIPT_TTL_MS)}
+     WHERE "id" = ${existing.id}
+       AND "claimId" = ${existing.claimId}
+       AND "responseStatus" IS NULL
+  `;
 
   if (count === 0) return { kind: "retry" };
 

@@ -9,6 +9,7 @@ import {
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
+import { flushConnectSpend } from "../ee/licensing/connect/connectSpend.runtime";
 import { resolveAppPackageRoot } from "./server/appPackageRoot";
 
 /**
@@ -77,6 +78,14 @@ import type { Hono } from "hono";
 import { register } from "prom-client";
 import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
+import {
+  type LwqlReconvergenceWatch,
+  lwqlAccessModelMode,
+  lwqlAccessModelOwner,
+  lwqlSelfProvisionInputs,
+  selfProvisionAll,
+  startLwqlReconvergenceWatch,
+} from "./server/analytics/lwql/provisioning";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
 import {
@@ -85,6 +94,12 @@ import {
 } from "./server/app-layer/presets";
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
+import {
+  buildChartFrameHeaders,
+  buildChartFrameHtml,
+  CHART_FRAME_PATH,
+  generateChartFrameNonce,
+} from "./server/chartSandboxFrame";
 import { ConnectGateway } from "./server/connected-agents/connect.gateway";
 import { closeLongPollTransport } from "./server/connected-agents/long-poll.process";
 import {
@@ -147,6 +162,63 @@ export const metricsMiddleware = promBundle({
     return normalizeMetricsPath(req.url?.split("?")[0] ?? "/");
   },
 });
+
+/**
+ * Serves the chart sandbox frame document with its own CSP (a fresh nonce per
+ * response). Replaces the app-wide policy and X-Frame-Options for this
+ * response only. See specs/analytics/custom-chart-sandbox-imports.feature.
+ */
+function serveChartFrame(req: IncomingMessage, res: ServerResponse): void {
+  // Drop the app-wide policy first so it cannot linger under a different
+  // header name. In dev the app emits Content-Security-Policy-Report-Only
+  // (a distinct header from Content-Security-Policy), which setHeader
+  // below would NOT overwrite — it would stay on the response and spew
+  // violation reports for exactly the CDN scripts this route allows.
+  res.removeHeader("Content-Security-Policy-Report-Only");
+  res.removeHeader("Content-Security-Policy");
+  const nonce = generateChartFrameNonce();
+  for (const [key, value] of Object.entries(
+    buildChartFrameHeaders({ nonce }),
+  )) {
+    res.setHeader(key, value);
+  }
+  res.statusCode = 200;
+  if (req.method === "HEAD") {
+    res.end();
+  } else {
+    res.end(buildChartFrameHtml({ nonce }));
+  }
+}
+
+// The active watch handle, so the graceful-shutdown handler can cancel a pending
+// poll. Null until the app server arms it (never armed by the worker process).
+let lwqlReconvergenceWatch: LwqlReconvergenceWatch | null = null;
+
+/**
+ * Arms the server-side LangWatchQL reconvergence watch. The deploy task
+ * (`provisionLwql`) is short-lived — it returns and exits — so it cannot wait out
+ * the helm-upgrade window where the previous ClickHouse pod still serves the
+ * config-store access model and the app-owned DDL is skipped (495). From the
+ * long-running app server this watch polls a stateless ownership probe
+ * (`lwqlAccessModelOwner`) and re-provisions once a probe reports the model is
+ * neither config-store-owned nor present in the SQL store — never on a probe
+ * error alone. Only the app server arms it (never the standalone worker
+ * process), and only when LangWatchQL is configured and provisioning is not
+ * explicitly skipped. Its timers are unref'd, so a pending poll never holds
+ * shutdown open, and the handle above lets shutdown cancel it.
+ */
+function armLwqlReconvergenceWatch(): void {
+  const lwqlInputs = lwqlSelfProvisionInputs();
+  if (!lwqlInputs || process.env.SKIP_LWQL_PROVISION === "true") return;
+  // Rendered mode ships the access model as per-pod config, so there is no
+  // config-store→SQL-store handover window to wait out and nothing to
+  // reconverge — the watch is only meaningful in `sql` mode (#8258).
+  if (lwqlAccessModelMode() !== "sql") return;
+  lwqlReconvergenceWatch = startLwqlReconvergenceWatch({
+    probe: lwqlAccessModelOwner,
+    converge: () => selfProvisionAll(lwqlInputs),
+  });
+}
 
 export const startApp = async (dir = resolveAppPackageRoot()) => {
   const dev = process.env.NODE_ENV !== "production";
@@ -255,6 +327,11 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     assetOrigin: assetBaseOrigin(getAssetBase()),
   });
 
+  // The chart sandbox frame document and its own headers carry a fresh nonce
+  // per request (so they can't be built once) — see
+  // server/chartSandboxFrame.ts and
+  // specs/analytics/custom-chart-sandbox-imports.feature.
+
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
   // first boot (cached in `.dev-certs/` so subsequent boots reuse).
@@ -280,6 +357,21 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {
         res.setHeader(key, value);
+      }
+
+      // Chart sandbox frame document: its own permissive CSP replaces the
+      // app-wide one (and X-Frame-Options) for this response, so a widget may
+      // import any https origin. Safe because the frame document always runs at
+      // an opaque origin — the embedding iframe is sandbox="allow-scripts" with
+      // no allow-same-origin, and the frame CSP carries `sandbox allow-scripts`
+      // so a direct top-level navigation is sandboxed too. See
+      // specs/analytics/custom-chart-sandbox-imports.feature.
+      if (
+        (req.method === "GET" || req.method === "HEAD") &&
+        pathname === CHART_FRAME_PATH
+      ) {
+        serveChartFrame(req, res);
+        return;
       }
 
       // MCP routes — intercept before everything
@@ -452,6 +544,10 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     );
   });
 
+  // Close the chart-upgrade window from the long-running server — the short-lived
+  // deploy task cannot (see armLwqlReconvergenceWatch).
+  armLwqlReconvergenceWatch();
+
   // Assigned by the in-process worker boot below. Declared here so the
   // shutdown handler can drain it, and so the boot can run *after* the signal
   // handlers are installed (a SIGTERM while workers are still booting hits
@@ -466,60 +562,70 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // however long the queue was told it had. The http drain grace comes from
   // the same place for the same reason — see createHttpServerClosePhase.
 
-  installShutdownHandlers((signal) => ({
-    signal,
-    logger,
-    phases: [
-      // Politely tell WS clients to reconnect *before* tearing down the
-      // socket — gives them tRPC's staggered reconnect path instead of a
-      // hard TCP RST and a thundering herd on the next pod.
-      {
-        name: "websockets",
-        run: async () => {
-          wsHandle.broadcastReconnectNotification();
-          await wsHandle.close();
+  installShutdownHandlers((signal) => {
+    // Cancel any pending reconvergence poll before draining workers and tearing
+    // down the App its converge would touch. Its timers are unref'd, so this
+    // only keeps a converge from racing shutdown; it never blocks it.
+    lwqlReconvergenceWatch?.stop();
+    return {
+      signal,
+      logger,
+      phases: [
+        // Politely tell WS clients to reconnect *before* tearing down the
+        // socket — gives them tRPC's staggered reconnect path instead of a
+        // hard TCP RST and a thundering herd on the next pod.
+        {
+          name: "websockets",
+          run: async () => {
+            wsHandle.broadcastReconnectNotification();
+            await wsHandle.close();
+          },
         },
-      },
-      createHttpServerClosePhase({
-        server,
-        closeSessions: () => mcpHandler.closeAllSessions(),
-        logger,
-      }),
-      // Connected agent sockets close after the HTTP drain, with 1012 so the
-      // SDKs reconnect at once to the next pod. A call in flight outlives any
-      // drain budget, so this phase comes after the drain, not inside it.
-      {
-        name: "connected-agents",
-        run: async () => {
-          await connectGateway.close();
-          await closeLongPollTransport();
-          await closeConnectedAgentRuntime();
-          // The shared folders close the same way and for the same reason: a
-          // local command in flight outlives any drain budget.
-          await localControlGateway.close();
-          await closeLocalControlRuntime();
+        createHttpServerClosePhase({
+          server,
+          closeSessions: () => mcpHandler.closeAllSessions(),
+          logger,
+        }),
+        // Connected agent sockets close after the HTTP drain, with 1012 so the
+        // SDKs reconnect at once to the next pod. A call in flight outlives any
+        // drain budget, so this phase comes after the drain, not inside it.
+        {
+          name: "connected-agents",
+          run: async () => {
+            await connectGateway.close();
+            await closeLongPollTransport();
+            await closeConnectedAgentRuntime();
+            // The shared folders close the same way and for the same reason: a
+            // local command in flight outlives any drain budget.
+            await localControlGateway.close();
+            await closeLocalControlRuntime();
+          },
         },
-      },
-      // Drain in-process workers (if any) before closing the shared App below,
-      // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
-      // away.
-      {
-        name: "in-process-workers",
-        run: async () => await workerHandle?.shutdown(),
-      },
-      // Carries the queue drain when this process hosts the worker stack, so
-      // it gets the whole budget rather than the default per-phase ceiling;
-      // App.close bounds it from the inside.
-      {
-        name: "app",
-        // See workers.ts: below the watchdog on purpose, so this bound can
-        // actually fire before the process deadline does.
-        timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
-        run: async () => await getApp().close({ terminating: true }),
-      },
-      { name: "posthog", run: async () => await shutdownPostHog() },
-    ],
-  }));
+        // Hosted-service spend is summed in memory for a few seconds. Written
+        // after the HTTP drain, so the last calls are in it, and before the App
+        // closes, because the write goes through its event pipeline.
+        { name: "connect-spend", run: async () => await flushConnectSpend() },
+        // Drain in-process workers (if any) before closing the shared App below,
+        // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
+        // away.
+        {
+          name: "in-process-workers",
+          run: async () => await workerHandle?.shutdown(),
+        },
+        // Carries the queue drain when this process hosts the worker stack, so
+        // it gets the whole budget rather than the default per-phase ceiling;
+        // App.close bounds it from the inside.
+        {
+          name: "app",
+          // See workers.ts: below the watchdog on purpose, so this bound can
+          // actually fire before the process deadline does.
+          timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
+          run: async () => await getApp().close({ terminating: true }),
+        },
+        { name: "posthog", run: async () => await shutdownPostHog() },
+      ],
+    };
+  });
 
   process.on("uncaughtException", (err) => {
     logger.fatal({ error: err }, "uncaught exception detected");

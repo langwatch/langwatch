@@ -203,7 +203,17 @@ beforeAll(async () => {
   };
   chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
   service = new GatewayBudgetService(prisma, undefined, undefined, chRepo);
-  const deps: PulledUsageLedgerProcessDeps = { budgetCHRepository: chRepo };
+  // The withdrawal half is not exercised here — this file is about what the
+  // LEDGER holds — so its two deps are stubbed rather than wired. A stub that
+  // threw would be the honest choice if anything below could reach them, and
+  // nothing can: `runWritePulledUsage` is the only runner this file drives.
+  const deps: PulledUsageLedgerProcessDeps = {
+    budgetCHRepository: chRepo,
+    sendRetractPulledUsage: async () => {
+      throw new Error("unreachable: this suite drives the ledger writer only");
+    },
+    retractionEnabled: async () => false,
+  };
   writePulledUsage = runWritePulledUsage(deps);
 }, 180_000);
 
@@ -384,6 +394,7 @@ describe("given a connected provider source that pulls usage on a schedule", () 
 
   describe("given a team that is already at its spending limit", () => {
     /** @scenario "Pulled cost never blocks spending" */
+    /** @scenario "A homed pulled row still never counts against spending limits" */
     it("records the pulled cost, does not trip the limit with it, and still allows the team's gateway requests", async () => {
       // The team is at $0.99 of a $1 limit through the gateway.
       await writeGatewayDebit(NEARLY_SPENT_NANO);

@@ -619,6 +619,8 @@ export interface TimeseriesQueryInput {
   traceIds?: string[];
   /** Invert the filter conditions (NOT wrap), matching the UI's negate toggle. */
   negateFilters?: boolean;
+  /** Trace origins left out of the count, ANDed after the filters, never negated. */
+  excludeOrigins?: string[];
 }
 
 /**
@@ -864,6 +866,16 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   if (input.traceIds && input.traceIds.length > 0) {
     filterConditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
     allTranslationParams.traceIds = input.traceIds;
+  }
+  // The caller's own origin exclusion (the home figures leaving out Langy's
+  // turns). Like the trace scope it is not part of the user's selection, so
+  // it sits outside the NOT wrap. An unstamped trace reads as '' here and is
+  // never excluded.
+  if (input.excludeOrigins && input.excludeOrigins.length > 0) {
+    filterConditions.push(
+      `ifNull(${ts}.Attributes['langwatch.origin'], '') NOT IN ({excludeOrigins:Array(String)})`,
+    );
+    allTranslationParams.excludeOrigins = input.excludeOrigins;
   }
   const filterWhere =
     filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : "";

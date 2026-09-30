@@ -5,7 +5,7 @@ import type React from "react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { filterContextChip } from "~/features/langy/hooks/useLangyFilterContext";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { AiPromptInput } from "../ai/AiPromptInput";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
 import type { FloatRect } from "./useFloatRect";
@@ -47,7 +47,7 @@ export const FloatingLangyBar: React.FC<FloatingLangyBarProps> = ({
   const [prompt, setPrompt] = useState("");
   // Show what will ride along, so "these traces" is never a surprise: the
   // applied search travels with the question as context on the panel.
-  const queryText = useFilterStore((s) => s.queryText);
+  const queryText = useExplorerStore((s) => s.queryText);
   const ridingAlong = filterContextChip(queryText);
 
   if (typeof document === "undefined" || !rect) return null;

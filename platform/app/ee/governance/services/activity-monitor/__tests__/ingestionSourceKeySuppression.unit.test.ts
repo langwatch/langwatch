@@ -30,7 +30,7 @@ vi.mock("@ee/governance/services/governanceProject.service", () => ({
 
 import { IngestionSourceService } from "../ingestionSource.service";
 
-function createServiceForCreate() {
+function createServiceForCreate(history: Record<string, unknown>[] = []) {
   const captured: { data?: Record<string, unknown> } = {};
   const prisma = {
     ingestionSource: {
@@ -41,7 +41,15 @@ function createServiceForCreate() {
       }),
       findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue(null),
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: vi
+        .fn()
+        .mockImplementation(({ where }) =>
+          Promise.resolve(
+            history.filter(
+              (row) => where.archivedAt !== null || row.archivedAt === null,
+            ),
+          ),
+        ),
       update: vi.fn().mockResolvedValue(null),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
@@ -66,6 +74,39 @@ function createServiceForRotate(existing: Record<string, unknown>) {
 
 describe("pull-source key suppression (#7616)", () => {
   describe("when createSource is called", () => {
+    /** @scenario "A replacement Azure source restates the original bill" */
+    it("reuses the archived Azure source's billing identity", async () => {
+      const subscription = "00000000-0000-4000-8000-000000000001";
+      const { service, captured } = createServiceForCreate([
+        {
+          id: "src_original",
+          archivedAt: new Date(),
+          parserConfig: { azureSubscriptionId: subscription },
+        },
+      ]);
+      await service.createSource({
+        organizationId: "org_1",
+        sourceType: "copilot_studio_dataverse",
+        name: "Replacement",
+        actorUserId: "user_1",
+        pullConfig: {
+          adapter: "copilot_studio_dataverse",
+          environmentUrl: "https://orgacme01.crm4.dynamics.com",
+          azureSubscriptionId: subscription,
+          credentials: {
+            tenantId: "tenant",
+            clientId: "client",
+            clientSecret: "secret",
+            billingClientId: "billing",
+            billingClientSecret: "billing-secret",
+          },
+        },
+      });
+      expect(captured.data?.parserConfig).toMatchObject({
+        _azureBillSourceId: "src_original",
+      });
+    });
+
     /** @scenario "The rotate-secret button is hidden for non-push sources on the list" */
     /** @scenario "The rotate-secret button is hidden for non-push sources on the detail page" */
     it("pull type → empty sentinel hash, null secret", async () => {

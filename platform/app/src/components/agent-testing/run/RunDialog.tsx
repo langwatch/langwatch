@@ -232,9 +232,7 @@ function RunDialogCallBody({
           transport={voiceCall.transport}
           agentId={voiceCall.agentId}
           agentRowId={voiceCall.agentRowId}
-          {...(voiceCall.scenarioId
-            ? { scenarioId: voiceCall.scenarioId }
-            : {})}
+          scenarioId={voiceCall.scenarioId}
         />
       </VStack>
     </Dialog.Body>

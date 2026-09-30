@@ -502,9 +502,16 @@ describe("createLangyChatTransport", () => {
       return opts;
     }
 
+    /** A chunk as these tests read it back. */
+    type CollectedChunk = {
+      type: string;
+      id?: string;
+      providerMetadata?: Record<string, Record<string, unknown>>;
+    };
+
     /** Read every chunk the transport enqueues, until the stream closes. */
-    function collect(stream: ReadableStream<{ type: string; id?: string }>) {
-      const chunks: Array<{ type: string; id?: string }> = [];
+    function collect(stream: ReadableStream<CollectedChunk>) {
+      const chunks: CollectedChunk[] = [];
       const reader = stream.getReader();
       const done = (async () => {
         for (;;) {
@@ -610,6 +617,38 @@ describe("createLangyChatTransport", () => {
         "text-end",
         "finish",
       ]);
+    });
+
+    it("marks a settled call that ran in the developer's shared folder", async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = (await transport.sendMessages(
+        options(),
+      )) as unknown as ReadableStream<CollectedChunk>;
+      const { chunks, done } = collect(stream);
+      const { onData } = streamHandlers();
+
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "start",
+        input: {},
+      });
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "end",
+        output: "ok",
+        local: true,
+      });
+      onData({ type: "end" });
+      await done;
+
+      const settled = chunks.find(
+        (chunk) => chunk.type === "tool-output-available",
+      );
+      expect(settled?.providerMetadata).toEqual({ langwatch: { local: true } });
     });
 
     it("opens no paragraph at all for a turn that only ran tools", async () => {

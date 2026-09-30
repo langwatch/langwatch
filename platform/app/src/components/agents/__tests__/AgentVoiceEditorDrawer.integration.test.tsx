@@ -19,6 +19,7 @@ vi.mock("../voice/TalkToItPanel", () => ({
   TalkToItPanel: (props: { onAgentCreated?: (agentRowId: string) => void }) =>
     props.onAgentCreated ? (
       <button
+        type="button"
         data-testid="mock-panel-created-row"
         onClick={() => props.onAgentCreated?.("agent_row_created")}
       >
@@ -148,6 +149,23 @@ const ELEVENLABS_KEYED_PROVIDER = {
   customKeys: { ELEVENLABS_API_KEY: "***" },
 };
 
+const TWILIO_KEYED_PROVIDER = {
+  provider: "twilio",
+  enabled: true,
+  customKeys: {
+    TWILIO_ACCOUNT_SID: "AC123",
+    TWILIO_AUTH_TOKEN: "***",
+    TWILIO_FROM_NUMBER: "+14155550000",
+  },
+};
+
+const TWILIO_SYSTEM_ROW_MISSING_KEYS = {
+  provider: "twilio",
+  enabled: true,
+  isSystem: true,
+  customKeys: null,
+};
+
 // -- Tests --
 
 describe("AgentVoiceEditorDrawer", () => {
@@ -176,6 +194,102 @@ describe("AgentVoiceEditorDrawer", () => {
       expect(
         screen.queryByTestId("voice-agent-name-input"),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a Twilio provider gates the Phone number option", () => {
+    /** @scenario "The Phone number option is always listed, disabled and marked Unavailable without a Twilio provider" */
+    it("lists the option disabled with a hint when no Twilio provider, and enables it once one exists", async () => {
+      mockProviders = [];
+      const { unmount } = renderVoiceDrawer();
+      await screen.findByTestId("voice-agent-transport-select");
+      const disabledOption = screen.getByRole("option", {
+        name: /Phone number/,
+      }) as HTMLOptionElement;
+      expect(disabledOption).toBeDisabled();
+      expect(disabledOption.textContent).toContain("(Unavailable)");
+      expect(screen.getByTestId("voice-agent-phone-hint")).toBeInTheDocument();
+      const link = screen.getByTestId("voice-agent-model-providers-link");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/settings/model-providers");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link.getAttribute("rel")).toContain("noopener");
+      unmount();
+
+      mockProviders = [TWILIO_KEYED_PROVIDER];
+      renderVoiceDrawer();
+      await screen.findByTestId("voice-agent-transport-select");
+      const enabledOption = screen.getByRole("option", {
+        name: "Phone number",
+      }) as HTMLOptionElement;
+      expect(enabledOption).not.toBeDisabled();
+      expect(enabledOption.textContent).not.toContain("(Unavailable)");
+      expect(
+        screen.queryByTestId("voice-agent-phone-hint"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the option disabled when the only Twilio row is an env-fed system row missing the other two keys", async () => {
+      mockProviders = [TWILIO_SYSTEM_ROW_MISSING_KEYS];
+      renderVoiceDrawer();
+      await screen.findByTestId("voice-agent-transport-select");
+      const option = screen.getByRole("option", {
+        name: /Phone number/,
+      }) as HTMLOptionElement;
+      expect(option).toBeDisabled();
+      expect(option.textContent).toContain("(Unavailable)");
+      expect(screen.getByTestId("voice-agent-phone-hint")).toBeInTheDocument();
+    });
+
+    it("still renders an existing phone target's fields when no Twilio provider", async () => {
+      mockProviders = [];
+      mockAgentById = {
+        id: "agent_phone",
+        name: "Hotline",
+        config: { transport: "phone", phoneNumber: "+14155550123" },
+      };
+      renderVoiceDrawer({ agentId: "agent_phone" });
+      const input = (await screen.findByTestId(
+        "voice-agent-phone-input",
+      )) as HTMLInputElement;
+      expect(input.value).toBe("+14155550123");
+      const option = screen.getByRole("option", {
+        name: "Phone number",
+      }) as HTMLOptionElement;
+      expect(option).toBeInTheDocument();
+      expect(option).not.toBeDisabled();
+    });
+
+    it("never persists the typed phone number in the sessionStorage draft", async () => {
+      mockProviders = [TWILIO_KEYED_PROVIDER];
+      const user = userEvent.setup();
+      renderVoiceDrawer();
+      await user.type(
+        await screen.findByTestId("voice-agent-name-input"),
+        "Hotline draft",
+      );
+      await user.selectOptions(
+        screen.getByTestId("voice-agent-transport-select"),
+        "phone",
+      );
+      await user.type(
+        await screen.findByTestId("voice-agent-phone-input"),
+        "+14155550123",
+      );
+
+      await waitFor(() => {
+        expect(
+          sessionStorage.getItem("voice-agent-draft:test-project"),
+        ).not.toBeNull();
+      });
+      const stored = JSON.parse(
+        sessionStorage.getItem("voice-agent-draft:test-project") ?? "{}",
+      ) as Record<string, unknown>;
+      // The sensitive field is stripped; the rest of the draft still persists.
+      expect(stored).not.toHaveProperty("phoneNumber");
+      expect(JSON.stringify(stored)).not.toContain("+14155550123");
+      expect(stored.name).toBe("Hotline draft");
+      expect(stored.transport).toBe("phone");
     });
   });
 
@@ -332,6 +446,25 @@ describe("AgentVoiceEditorDrawer", () => {
     });
   });
 
+  describe("given a saved phone target", () => {
+    /** @scenario "A phone target's drawer explains why Talk to it is off" */
+    it("disables Talk to it with the phone-has-no-browser-call tooltip", async () => {
+      mockAgentById = {
+        id: "agent_phone",
+        name: "Hotline",
+        config: { transport: "phone", phoneNumber: "+14155550123" },
+      };
+      mockProviders = [ELEVENLABS_KEYED_PROVIDER];
+      renderVoiceDrawer({ agentId: "agent_phone" });
+      const talk = await screen.findByTestId("voice-agent-talk");
+      expect(talk).toBeDisabled();
+      expect(talk).toHaveAttribute(
+        "title",
+        "Browser calls are not available for phone targets. Call it from a scenario run.",
+      );
+    });
+  });
+
   describe("when the saved agent's project has no ElevenLabs key", () => {
     /** @scenario "Talk to it is disabled when the project has no ElevenLabs key" */
     it("disables Talk to it with the tooltip 'Add an ElevenLabs key first'", async () => {
@@ -345,6 +478,76 @@ describe("AgentVoiceEditorDrawer", () => {
       const talk = await screen.findByTestId("voice-agent-talk");
       expect(talk).toBeDisabled();
       expect(talk).toHaveAttribute("title", "Add an ElevenLabs key first");
+    });
+  });
+
+  describe("given the Call direction radio group on a phone target", () => {
+    it("selects Inbound when the saved config has callDirection: inbound", async () => {
+      mockAgentById = {
+        id: "agent_phone_inbound",
+        name: "Hotline",
+        config: {
+          transport: "phone",
+          phoneNumber: "+14155550123",
+          callDirection: "inbound",
+        },
+      };
+      mockProviders = [TWILIO_KEYED_PROVIDER];
+      renderVoiceDrawer({ agentId: "agent_phone_inbound" });
+
+      await screen.findByTestId("voice-agent-call-direction");
+      expect(screen.getByRole("radio", { name: /Inbound/ })).toBeChecked();
+      expect(screen.getByRole("radio", { name: /Outbound/ })).not.toBeChecked();
+    });
+
+    it("selects Outbound when the saved config has no callDirection", async () => {
+      mockAgentById = {
+        id: "agent_phone_no_direction",
+        name: "Hotline",
+        config: { transport: "phone", phoneNumber: "+14155550123" },
+      };
+      mockProviders = [TWILIO_KEYED_PROVIDER];
+      renderVoiceDrawer({ agentId: "agent_phone_no_direction" });
+
+      await screen.findByTestId("voice-agent-call-direction");
+      expect(screen.getByRole("radio", { name: /Outbound/ })).toBeChecked();
+      expect(screen.getByRole("radio", { name: /Inbound/ })).not.toBeChecked();
+    });
+
+    it("saves callDirection: inbound and no isAgentSpeaksFirst key after choosing Inbound", async () => {
+      const user = userEvent.setup();
+      mockAgentById = {
+        id: "agent_phone_switch",
+        name: "Hotline",
+        config: { transport: "phone", phoneNumber: "+14155550123" },
+      };
+      mockProviders = [TWILIO_KEYED_PROVIDER];
+      renderVoiceDrawer({ agentId: "agent_phone_switch" });
+
+      await user.click(await screen.findByRole("radio", { name: /Inbound/ }));
+      await user.click(screen.getByTestId("save-agent-button"));
+
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "agent_phone_switch",
+          config: expect.objectContaining({ callDirection: "inbound" }),
+        }),
+      );
+      const savedConfig = updateMock.mock.calls[0]?.[0]?.config as Record<
+        string,
+        unknown
+      >;
+      expect(savedConfig).not.toHaveProperty("isAgentSpeaksFirst");
+    });
+
+    it("does not render the radio group for the ElevenLabs transport", async () => {
+      mockProviders = [ELEVENLABS_KEYED_PROVIDER];
+      renderVoiceDrawer();
+
+      await screen.findByTestId("voice-agent-name-input");
+      expect(
+        screen.queryByTestId("voice-agent-call-direction"),
+      ).not.toBeInTheDocument();
     });
   });
 });

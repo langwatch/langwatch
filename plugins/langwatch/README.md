@@ -23,10 +23,31 @@ never writes to the session's output and never fails a session.
 `langwatch` CLI: search, fetch a trace, print a coding-agent transcript, list a
 session's events.
 
-The hook script (`scripts/session-context.mjs`) is bundled into the plugin as a
-single file with no dependencies. It does not call the globally installed
-`langwatch` CLI, so upgrading, downgrading or removing that CLI cannot change
-what an installed plugin does.
+## How the hooks run
+
+The plugin carries no hook logic. Its hooks run `scripts/launch.mjs`, and the
+launcher runs the installed `langwatch` CLI: `langwatch ingest hook
+claude-code` for the session context, `langwatch ingest guidance claude-code`
+for the guidance the session reads at start. A fix to either command reaches
+you with the next CLI release (`npm install -g langwatch`), with no plugin
+update needed.
+
+The launcher looks for the CLI in two places, in order:
+
+1. The node binary and entry script the CLI recorded about itself in
+   `~/.langwatch/config.json` the last time you ran `langwatch login`,
+   `langwatch claude` or `langwatch instrument`. This is what still finds the
+   CLI when Claude Code was started from a desktop app whose PATH has no
+   version manager on it. A recorded path that no longer exists is skipped.
+2. `langwatch` on PATH.
+
+With no CLI anywhere, the launcher exits zero and tells the session once that
+the CLI is not installed and how to install it.
+
+Both CLI commands accept and ignore arguments they do not know and always exit
+zero, and the launcher exits zero whatever the CLI did, so any version of the
+plugin runs with any version of the CLI and a hook is never why a session
+broke.
 
 ## Install
 
@@ -50,6 +71,7 @@ The hook posts to whichever control plane the CLI is signed in to, using the
 ingest key stored in `~/.langwatch/config.json`. Without one, it stays quiet.
 
 ```bash
+npm install -g langwatch
 langwatch login
 ```
 

@@ -28,6 +28,7 @@ import type { Trace } from "~/server/tracer/types";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { applyOverlayToTrace } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
@@ -1276,7 +1277,7 @@ describe("Annotation CRUD", () => {
 
   describe("given an annotator who may create annotations but not update them", () => {
     const createOnlyTraceId = "test-trace-annotation-create-only";
-    const customRoleName = "Suggestion author (annotation integration test)";
+    const customRoleName = `Suggestion author ${nanoid(8)}`;
     let createOnlyCaller: ReturnType<typeof appRouter.createCaller>;
     let createOnlyUserId: string;
     let createOnlyOrganizationId: string;
@@ -1298,29 +1299,10 @@ describe("Annotation CRUD", () => {
       });
       createOnlyUserId = user.id;
 
-      const customRole = await prisma.customRole.upsert({
-        where: {
-          organizationId_name: {
-            organizationId: createOnlyOrganizationId,
-            name: customRoleName,
-          },
-        },
-        update: {
-          permissions: [
-            "traces:view",
-            "annotations:view",
-            "annotations:create",
-          ],
-        },
-        create: {
-          organizationId: createOnlyOrganizationId,
-          name: customRoleName,
-          permissions: [
-            "traces:view",
-            "annotations:view",
-            "annotations:create",
-          ],
-        },
+      const customRole = await seedCustomRole(prisma, {
+        organizationId: createOnlyOrganizationId,
+        name: customRoleName,
+        permissions: ["traces:view", "annotations:view", "annotations:create"],
       });
 
       await prisma.organizationUser.upsert({
@@ -1350,15 +1332,23 @@ describe("Annotation CRUD", () => {
           },
         ],
       ]);
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: createOnlyOrganizationId,
-          userId: createOnlyUserId,
-          role: TeamUserRole.CUSTOM,
-          customRoleId: customRole.id,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: project.teamId,
-        },
+      await cleanupTestRows(prisma, [
+        [
+          "grant",
+          {
+            organizationId: createOnlyOrganizationId,
+            principalType: "USER",
+            principalId: createOnlyUserId,
+          },
+        ],
+      ]);
+      await seedRoleBinding(prisma, {
+        organizationId: createOnlyOrganizationId,
+        userId: createOnlyUserId,
+        role: TeamUserRole.CUSTOM,
+        customRoleId: customRole.id,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: project.teamId,
       });
 
       createOnlyCaller = appRouter.createCaller(
@@ -1371,6 +1361,18 @@ describe("Annotation CRUD", () => {
     afterAll(async () => {
       await cleanupTestRows(prisma, [
         ["annotation", { projectId, userId: createOnlyUserId }],
+        [
+          "grant",
+          {
+            organizationId: createOnlyOrganizationId,
+            principalType: "USER",
+            principalId: createOnlyUserId,
+          },
+        ],
+        [
+          "role",
+          { organizationId: createOnlyOrganizationId, name: customRoleName },
+        ],
         [
           "roleBinding",
           {

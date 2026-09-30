@@ -12,7 +12,7 @@
  * without rendering. The side effects (issuing the request, aborting it) live
  * in `./lwqlRequestController`, which is the only thing that calls this.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";

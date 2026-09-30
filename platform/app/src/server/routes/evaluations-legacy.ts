@@ -10,6 +10,7 @@
  * - src/pages/api/dataset/evaluate.ts
  */
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -34,7 +35,6 @@ import type { Workflow } from "~/optimization_studio/types/dsl";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
 import {
   createServiceApp,
@@ -59,6 +59,7 @@ import {
   evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
+import { pickGenerationParams } from "~/server/evaluations/generationParams";
 import {
   type CustomEvaluatorDefinition,
   getEvaluatorDefaultSettings,
@@ -1312,7 +1313,16 @@ async function handleEvaluatorCall(
       );
     }
 
-    settings = evaluatorSettingSchema?.parse(finalSettings);
+    // The generated settings schema declares only the evaluator's own fields,
+    // so its parse drops the generation parameters the model editor saved
+    // next to them. Put those back so the route dispatches the same judge
+    // configuration a scenario run does.
+    settings = evaluatorSettingSchema
+      ? {
+          ...pickGenerationParams(finalSettings),
+          ...evaluatorSettingSchema.parse(finalSettings),
+        }
+      : undefined;
   } catch (error) {
     const message =
       error instanceof ZodErrorClass

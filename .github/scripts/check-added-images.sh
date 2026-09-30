@@ -22,7 +22,9 @@ set -euo pipefail
 BASE_REF="${1:?usage: check-added-images.sh <base-ref>}"
 
 # Where images legitimately live. Anything added outside these fails the check.
+# .github/readme/ holds the README cover art and the sources it is rendered from.
 ALLOWED_PREFIXES=(
+  ".github/readme/"
   "docs/images/"
   "docs/media/"
   "platform/app/public/"

@@ -80,6 +80,22 @@ describe("buildSecurityHeaders", () => {
     });
   });
 
+  describe("given the chart sandbox ships its own frame policy", () => {
+    describe("when the app's production headers are built", () => {
+      /** @scenario "The app's own policy is unchanged by the sandbox" */
+      it("does not admit unpkg.com or esm.sh into the app's script-src", () => {
+        const csp = buildSecurityHeaders({ dev: false, environment: {} })[
+          "Content-Security-Policy"
+        ];
+        const scriptSrc = csp
+          ?.split("; ")
+          .find((d) => d.startsWith("script-src "));
+
+        expect(scriptSrc).not.toMatch(/unpkg\.com|esm\.sh/);
+      });
+    });
+  });
+
   describe("given a content-hashed asset CDN (ADR-086)", () => {
     const CDN = "https://cdn.langwatch.ai";
     const FETCH_DIRECTIVES = [

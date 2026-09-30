@@ -1,5 +1,6 @@
 import type { CollectedBinding } from "@langwatch/authz";
 import { describe, expect, it, vi } from "vitest";
+
 import { AuthzCollectorService } from "../authz-collector.service";
 import type { AuthzReadRepository } from "../authz-read.repository";
 import { AuthzService } from "../authz.service";
@@ -10,11 +11,10 @@ const ORG = "org-1";
 const key = { type: "apiKey", id: "key-1" } as const;
 
 const binding = (
-  role: CollectedBinding["role"],
+  roleKey: CollectedBinding["roleKey"],
   projectId: string,
 ): CollectedBinding => ({
-  role,
-  customRoleId: null,
+  roleKey,
   scopeType: "PROJECT",
   scopeId: projectId,
   viaGroupId: null,
@@ -37,8 +37,8 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
         findApiKeyBindings: vi
           .fn()
           .mockResolvedValue([
-            binding("ADMIN", "proj-0"),
-            binding("VIEWER", "proj-1"),
+            binding("admin", "proj-0"),
+            binding("viewer", "proj-1"),
           ]),
       });
 
@@ -105,7 +105,9 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
         projects,
       });
 
-      expect(single.projects).toEqual(multi.byPermission.get("cost:view")?.projects);
+      expect(single.projects).toEqual(
+        multi.byPermission.get("cost:view")?.projects,
+      );
     });
   });
 
@@ -115,13 +117,13 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
         findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
         findApiKeyBindings: vi
           .fn()
-          .mockResolvedValue([binding("ADMIN", "proj-0")]),
+          .mockResolvedValue([binding("admin", "proj-0")]),
         findOrganizationMembership: vi
           .fn()
           .mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi
           .fn()
-          .mockResolvedValue([binding("VIEWER", "proj-0")]),
+          .mockResolvedValue([binding("viewer", "proj-0")]),
       });
 
     it("caps every batched decision at the owner's grants", async () => {
@@ -140,9 +142,7 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
       expect(byPermission.get("traces:view")?.projects.get("proj-0")).toBe(
         true,
       );
-      expect(byPermission.get("cost:view")?.projects.get("proj-0")).toBe(
-        false,
-      );
+      expect(byPermission.get("cost:view")?.projects.get("proj-0")).toBe(false);
     });
 
     it("collects the owner's grants once, off the same pass", async () => {

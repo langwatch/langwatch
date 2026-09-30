@@ -30,8 +30,8 @@ import {
   MenuRoot,
   MenuSeparator,
 } from "../../../../components/ui/menu";
-import type { LensConfig } from "../../stores/viewStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { LensConfig } from "../../stores/viewSlice";
 import { LensNameDialog } from "./LensNameDialog";
 
 interface LensTabProps {
@@ -53,9 +53,9 @@ export const LensTab: React.FC<LensTabProps> = ({
   errorCount,
   hidden,
 }) => {
-  const renameLens = useViewStore((s) => s.renameLens);
-  const revertLens = useViewStore((s) => s.revertLens);
-  const canDelete = useViewStore((s) => s.allLenses.length > 1);
+  const renameLens = useExplorerStore((s) => s.renameLens);
+  const revertLens = useExplorerStore((s) => s.revertLens);
+  const canDelete = useExplorerStore((s) => s.allLenses.length > 1);
 
   const [isRenaming, setIsRenaming] = useState(false);
 
@@ -167,8 +167,8 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
   lensId,
   lensName,
 }) => {
-  const revertLens = useViewStore((s) => s.revertLens);
-  const createLens = useViewStore((s) => s.createLens);
+  const revertLens = useExplorerStore((s) => s.revertLens);
+  const createLens = useExplorerStore((s) => s.createLens);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
@@ -344,13 +344,13 @@ const BuiltInLensMenuItems: React.FC<{
   lensId: string;
   canDelete: boolean;
 }> = ({ lensId, canDelete }) => {
-  const isDraft = useViewStore((s) => s.isDraft(lensId));
-  const lensName = useViewStore(
+  const isDraft = useExplorerStore((s) => s.isDraft(lensId));
+  const lensName = useExplorerStore(
     (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
   );
-  const revertLens = useViewStore((s) => s.revertLens);
-  const createLens = useViewStore((s) => s.createLens);
-  const deleteLens = useViewStore((s) => s.deleteLens);
+  const revertLens = useExplorerStore((s) => s.revertLens);
+  const createLens = useExplorerStore((s) => s.createLens);
+  const deleteLens = useExplorerStore((s) => s.deleteLens);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   // "All" is the table's home base — if a user could dismiss it
@@ -404,13 +404,13 @@ const UserLensMenuItems: React.FC<{
   isDraft: boolean;
   onRename: () => void;
 }> = ({ lensId, isDraft, onRename }) => {
-  const lensName = useViewStore(
+  const lensName = useExplorerStore(
     (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
   );
-  const revertLens = useViewStore((s) => s.revertLens);
-  const createLens = useViewStore((s) => s.createLens);
-  const duplicateLens = useViewStore((s) => s.duplicateLens);
-  const deleteLens = useViewStore((s) => s.deleteLens);
+  const revertLens = useExplorerStore((s) => s.revertLens);
+  const createLens = useExplorerStore((s) => s.createLens);
+  const duplicateLens = useExplorerStore((s) => s.duplicateLens);
+  const deleteLens = useExplorerStore((s) => s.deleteLens);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   return (

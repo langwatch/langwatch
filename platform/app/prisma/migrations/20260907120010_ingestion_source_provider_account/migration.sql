@@ -1,0 +1,28 @@
+-- The account a connection reads, as the provider itself named it.
+--
+-- Read once per save and compared so two connections cannot report one
+-- account's spend twice. Nullable: every connection that predates the guard
+-- has none, and the source types that name what they read in their own config
+-- (Azure by subscription, Power Platform by environment) never carry one.
+ALTER TABLE "IngestionSource" ADD COLUMN "providerAccountId" TEXT;
+
+-- Down
+--
+-- The up step is purely additive: one nullable column, no backfill, no
+-- constraint, no index. So the reversal is the drop below and nothing else,
+-- and it loses only the account each connection was confirmed against. Nothing
+-- is derived from it that cannot be asked for again: the account is read from
+-- the provider on every save, so the next save of each connection restores its
+-- value.
+--
+-- What the drop DOES give up until then is the duplicate guard. With the
+-- column gone, nothing records which account a connection reads, so two
+-- connections onto one account stop being refused and both count the same
+-- spend. Re-applying and re-saving each connection is what closes that again.
+--
+-- Left commented, like the sibling migrations that carry a Down block. Prisma
+-- runs no down step, so an executable one here would be a statement nobody
+-- calls; this is the script an operator runs by hand, kept next to the up it
+-- undoes.
+--
+-- ALTER TABLE "IngestionSource" DROP COLUMN "providerAccountId";

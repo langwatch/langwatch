@@ -122,6 +122,67 @@ Feature: `langwatch instrument <tool>` writes telemetry wiring without launching
       And the message names both ways forward: `langwatch login --device`
         for the personal scope, or --key with a project ingest key
 
+  Rule: an endpoint that carries the key in the clear is named, not refused
+
+    The endpoint this command settles on is the one every wire that carries
+    the ingest key uses: the tool's own OTel exporter posts that bearer to it
+    on every span batch, and the session context hook posts its record beside
+    them. So the scheme is worth saying once, here, where the endpoint is
+    chosen, rather than at each thing that later sends to it.
+
+    It is a warning and never a refusal. A self-hosted deployment on a private
+    network over plain http is a real setup, and refusing it would take its
+    telemetry while protecting nothing. Loopback is exempt outright: a key that
+    never leaves the machine is not exposed by the scheme, and local
+    development is why plain http is reachable at all.
+
+    @unit @cli-wrappers @instrument
+    Scenario: A plain http endpoint to another host warns and still wires
+      When the user runs `langwatch instrument codex --key <ingest-key> --endpoint http://lw.acme.dev`
+      Then the output says the ingest key will travel unencrypted to that host
+      And the tool is wired anyway, with no flag needed to allow it
+
+    @unit @cli-wrappers @instrument
+    Scenario: An https endpoint is wired without a word about the scheme
+      When the user runs `langwatch instrument codex --key <ingest-key> --endpoint https://lw.acme.dev`
+      Then nothing is said about the key travelling unencrypted
+
+    @unit @cli-wrappers @instrument
+    Scenario: A loopback endpoint over http is not worth warning about
+      When the user instruments against an http endpoint on localhost
+      Then nothing is said about the key travelling unencrypted
+
+  Rule: wiring a local instance says so, because the file it writes is global
+
+    The file this command writes is the tool's own global one
+    (`~/.claude/settings.json`, `~/.codex/config.toml`), and the CLI config it
+    reads is `~/.langwatch/config.json`. Pointed at a local instance, all of
+    them stop pointing at production for every session on the machine, not just
+    the one doing QA, and the next `langwatch ingest context` posts to a port
+    that is only up while the dev server is.
+
+    A warning and never a refusal: QA against a local instance is the reason
+    the command accepts one. A shell that already exports
+    `LANGWATCH_CLI_CONFIG` has its own config file, so it hears nothing.
+
+    @unit @cli-wrappers @instrument
+    Scenario: Instrumenting against a local instance names the isolation env vars
+      When the user instruments a tool against an endpoint on localhost
+      Then the output says the machine's global config now points at a local instance
+      And it names LANGWATCH_CLI_CONFIG, CLAUDE_CONFIG_DIR and CODEX_HOME as the way to isolate a QA shell
+      And the tool is wired anyway
+
+    @unit @cli-wrappers @instrument
+    Scenario: A shell that already relocated the CLI config hears nothing
+      Given LANGWATCH_CLI_CONFIG points at a scratch config file
+      When the user instruments a tool against an endpoint on localhost
+      Then nothing is said about the machine's global config
+
+    @unit @cli-wrappers @instrument
+    Scenario: A remote endpoint is not a local instance
+      When the user runs `langwatch instrument codex --key <ingest-key> --endpoint https://lw.acme.dev`
+      Then nothing is said about the machine's global config
+
   Rule: the per-tool direct-OTLP policy governs this command too
 
     Every target this command writes is the direct-OTLP path, so the same

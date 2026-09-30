@@ -3,8 +3,10 @@ import { carryLangyConversation } from "~/features/langy/logic/langyConversation
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { belongsToNoOrganization } from "./logic/belongsToNoOrganization";
 import { readLastVisitedProduct } from "./logic/productMemory";
 import { resolveLandingDestination } from "./logic/resolveLandingDestination";
+import { resolveOrglessDestination } from "./logic/resolveOrglessDestination";
 import type { ProductId } from "./products";
 import { useLlmOpsProjectSlug } from "./useLlmOpsProjectSlug";
 import { useReachableProducts } from "./useReachableProducts";
@@ -48,6 +50,18 @@ function toResolvedHome(query: {
   };
 }
 
+/**
+ * What `/` has to draw, for the one case where it cannot redirect.
+ *
+ * Every other outcome is a destination, and a destination that has not been
+ * decided yet is a loading screen. A refused graph is neither: it will never
+ * decide, so a page that keeps waiting for it waits forever.
+ */
+export interface LandingRedirect {
+  /** The refusal the workspace read came back with. Absent until one does. */
+  workspaceError: unknown;
+}
+
 interface LandingInput {
   resolved: ResolvedHome;
   isReachableLoading: boolean;
@@ -62,6 +76,13 @@ interface LandingInput {
    */
   projectHomeSlug: string | null;
   isOrgless: boolean;
+  /**
+   * Whether this session was opened by a test sign-in through a connection
+   * that is not live yet — answered by the server, never by the query string.
+   * `isPending` holds the redirect while the question is still out, rather
+   * than racing it to the bootstrap screen.
+   */
+  testArrival: { isPending: boolean; isTestArrival: boolean };
 }
 
 /**
@@ -107,10 +128,11 @@ function fallbackDestination({
   resolved,
   projectSlug,
   isOrgless,
+  testArrival,
 }: LandingInput): string | null {
   if (resolved.hasError && projectSlug) return `/${projectSlug}`;
-  if (isOrgless) return "/onboarding/welcome";
-  return null;
+  if (!isOrgless) return null;
+  return resolveOrglessDestination(testArrival);
 }
 
 /**
@@ -147,8 +169,8 @@ function useReplaceOnce(): (destination: string | null) => void {
  * Specs: specs/ai-gateway/governance/persona-home-resolver.feature
  *        specs/navigation/navigation-v2-landing.feature
  */
-export function useLandingRedirect(): void {
-  const { project, organization, organizations, isLoading } =
+export function useLandingRedirect(): LandingRedirect {
+  const { project, organization, organizations, isLoading, workspaceError } =
     useOrganizationTeamProject({ redirectToOnboarding: false });
   const resolved = api.governance.resolveHome.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -158,6 +180,22 @@ export function useLandingRedirect(): void {
     useReachableProducts({ enabled: true });
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
   const replaceOnce = useReplaceOnce();
+  // One reading of "belongs to nobody", shared by the redirect and by the
+  // question below it. An unanswered organization graph is not an empty one:
+  // reading the first as the second is what briefly put a member with
+  // organizations on the bootstrap screen, and it would also have asked the
+  // test-arrival question of people it cannot be true of.
+  const isOrgless = belongsToNoOrganization({
+    isWorkspaceResolving: isLoading,
+    organization,
+    organizations,
+  });
+  // Asked only of the people it can be true of, which is the dead end itself:
+  // everybody with an organization is already past this branch.
+  const testArrival = api.identity.myTestArrival.useQuery(
+    {},
+    { enabled: isOrgless, staleTime: 60_000, retry: false },
+  );
 
   useEffect(() => {
     replaceOnce(
@@ -175,8 +213,14 @@ export function useLandingRedirect(): void {
             : null,
           projectSlug: project?.slug ?? null,
           projectHomeSlug: llmOpsProjectSlug,
-          isOrgless:
-            !isLoading && !organization && (organizations?.length ?? 0) === 0,
+          isOrgless,
+          testArrival: {
+            // A failed read must not hold the redirect forever; it falls
+            // through to the bootstrap screen, which is what this branch did
+            // before the question existed.
+            isPending: isOrgless && testArrival.isLoading,
+            isTestArrival: testArrival.data != null,
+          },
         }),
         search: window.location.search,
       }),
@@ -188,9 +232,14 @@ export function useLandingRedirect(): void {
     organization,
     organizations,
     isLoading,
+    isOrgless,
+    testArrival.data,
+    testArrival.isLoading,
     replaceOnce,
     isReachableLoading,
     reachableProducts,
     llmOpsProjectSlug,
   ]);
+
+  return { workspaceError };
 }

@@ -35,6 +35,22 @@ func localToolEndFrame(t *testing.T, name, command string) frames.Frame {
 	return f
 }
 
+// The shell named `bash`, delegated to the developer's folder while one is
+// connected: the frame carries the worker's local marker instead of a local_
+// name.
+func folderBashEndFrame(t *testing.T, command string) frames.Frame {
+	t.Helper()
+	input, err := json.Marshal(map[string]string{"command": command})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := frames.ToolEndLocal("call-1", "bash", input, false, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
 func toolStartFrameFor(t *testing.T, command string) frames.Frame {
 	t.Helper()
 	input, err := json.Marshal(map[string]string{"command": command})
@@ -67,6 +83,43 @@ func TestGithubGate_LocalToolNeverTrips(t *testing.T) {
 		}
 		if canceled {
 			t.Error("the gate canceled a stream it had no business stopping")
+		}
+	})
+}
+
+// The same push through the shell named `bash`: while a folder is connected
+// the worker delegates it to the developer's machine and marks the frame, and
+// the gate reads where the command ran, not what the tool is called. Without
+// the marker the same frame is a sandbox push and trips as it always did.
+func TestGithubGate_FolderBashNeverTrips(t *testing.T) {
+	t.Run("when the bash frame carries the local marker", func(t *testing.T) {
+		canceled := false
+		gate := newGithubGate(false, func() { canceled = true })
+
+		gate.Observe(folderBashEndFrame(t,
+			"git push -u origin HEAD && gh pr create --base main --title tracing --body-file .langwatch/pr-body.md"))
+
+		if _, _, tripped := gate.Tripped(); tripped {
+			t.Fatal("the gate tripped on a bash command that ran in the developer's folder")
+		}
+		if canceled {
+			t.Error("the gate canceled a stream it had no business stopping")
+		}
+	})
+
+	t.Run("and still trips on the same bash frame with no marker", func(t *testing.T) {
+		canceled := false
+		gate := newGithubGate(false, func() { canceled = true })
+
+		gate.Observe(toolEndFrame(t,
+			"git push -u origin HEAD && gh pr create --base main --title tracing --body-file .langwatch/pr-body.md", false, ""))
+
+		_, code, tripped := gate.Tripped()
+		if !tripped || code != codeGithubNotConnected {
+			t.Fatalf("a sandbox push with no credential must trip not-connected, got tripped=%v code=%q", tripped, code)
+		}
+		if !canceled {
+			t.Error("the gate must cancel the stream when it trips")
 		}
 	})
 }

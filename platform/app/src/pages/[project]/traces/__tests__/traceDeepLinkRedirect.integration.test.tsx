@@ -40,6 +40,29 @@ describe("canonical trace deep-link redirect", () => {
     });
   });
 
+  describe("when the short link carries the trace's start time", () => {
+    /** @scenario "The short link forwards the timestamp to the drawer" */
+    it("forwards it to the drawer as the partition hint", () => {
+      mockQuery = { project: "acme", trace: "trace-1", t: "1714476000000" };
+
+      render(<TraceDeepLinkRedirect />);
+
+      expect(mockReplace).toHaveBeenCalledWith(
+        "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1&drawer.t=1714476000000",
+      );
+    });
+
+    it("drops a value that is not a positive whole number", () => {
+      mockQuery = { project: "acme", trace: "trace-1", t: "yesterday" };
+
+      render(<TraceDeepLinkRedirect />);
+
+      expect(mockReplace).toHaveBeenCalledWith(
+        "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1",
+      );
+    });
+  });
+
   describe("when the link is malformed", () => {
     /** @scenario "A malformed trace link lands on not-found instead of a blank page" */
     it("redirects to not-found when the trace id is missing", () => {

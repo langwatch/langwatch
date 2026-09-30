@@ -9,13 +9,35 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
 import type { CallRecord } from "./call-record";
 import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport";
+import { phoneTransport } from "./transports/phone.transport";
 
-/** The provider key and host a runner reads a conversation back with. Never
- *  reaches the browser — a runner keeps it and returns only the signed URL. */
-export interface VoiceTransportCredential {
-  apiKey: string;
-  baseUrl: string;
-}
+/**
+ * The provider credential a runner reads a conversation back with, or dials a
+ * phone target with. Never reaches the browser — a runner keeps it and returns
+ * only the signed URL (ElevenLabs) or drives the call itself (Twilio).
+ *
+ * A discriminated union rather than one flat shape: ElevenLabs signs a session
+ * with an API key and host, Twilio dials from an account with a from-number, so
+ * the two carry materially different fields. Each runner narrows on `kind` at
+ * the top of its methods, so a credential built for the wrong transport fails
+ * in that runner rather than being read as the shape it is not.
+ */
+export type VoiceTransportCredential =
+  | { kind: "elevenlabs"; apiKey: string; baseUrl: string }
+  | {
+      kind: "twilio";
+      accountSid: string;
+      authToken: string;
+      fromNumber: string;
+    };
+
+/** The ElevenLabs branch of {@link VoiceTransportCredential}, narrowed for
+ *  callers that only ever handle ElevenLabs conversations (recording
+ *  playback has no meaning for a phone target). */
+export type ElevenLabsCredential = Extract<
+  VoiceTransportCredential,
+  { kind: "elevenlabs" }
+>;
 
 /** What a minted browser session needs to open the call, minus the id and
  *  limit the service adds. The signed URL is short-lived and safe to hand out;
@@ -25,6 +47,16 @@ export interface VoiceSessionConnect {
 }
 
 export interface VoiceTransportRunner {
+  /**
+   * Guard that runs before any credential lookup in the browser-driven mint
+   * and record flow, so a transport with no browser call fails with its own
+   * typed error rather than the generic
+   * {@link VoiceTransportRunner.missingKeyMessage} key-missing error. Left
+   * unimplemented by transports the browser can call; the phone runner throws
+   * here because a phone target has no browser call. It does NOT gate the
+   * headless scenario dial, which goes straight to {@link createAgentAdapter}.
+   */
+  assertAvailable?(): void;
   /** Build the SDK agent adapter the pool child drives for this transport. */
   createAgentAdapter(input: {
     agentId: string;
@@ -68,4 +100,5 @@ export const voiceTransportRegistry: Record<
   VoiceTransportRunner
 > = {
   elevenlabs_convai: elevenLabsConvaiTransport,
+  phone: phoneTransport,
 };

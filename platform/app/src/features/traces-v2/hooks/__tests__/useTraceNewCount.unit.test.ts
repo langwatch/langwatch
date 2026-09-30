@@ -79,8 +79,8 @@ vi.mock("~/hooks/usePageVisibility", () => ({
   usePageVisibility: () => true,
 }));
 
-vi.mock("../../stores/filterStore", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
+vi.mock("../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
     selector({
       debouncedTimeRange: stores.debouncedTimeRange,
       debouncedQueryText: stores.debouncedQueryText,
@@ -101,6 +101,19 @@ vi.mock("../../stores/sseStatusStore", () => ({
 
 vi.mock("../useTraceListRefresh", () => ({
   useTraceListRefresh: () => ({ refresh: vi.fn(), isRefreshing: false }),
+}));
+
+const pulse = vi.hoisted(() => vi.fn());
+vi.mock("../../stores/refreshUIStore", () => ({
+  useRefreshUIStore: (selector: (s: unknown) => unknown) => selector({ pulse }),
+}));
+
+/** The runs behind the query's eval chips, swapped to move the query identity. */
+const instantEvalRuns = vi.hoisted(() => ({
+  current: undefined as Record<string, unknown> | undefined,
+}));
+vi.mock("../useInstantEvalRuns", () => ({
+  useInstantEvalRuns: () => ({ chips: [], evalRuns: instantEvalRuns.current }),
 }));
 
 const lastCall = (): QueryCall => {
@@ -125,6 +138,7 @@ describe("useTraceNewCount", () => {
     stores.sseConnectionState = "disconnected";
     stores.fastPollRequestedAt = 0;
     stores.liveUpdatesMode = "live";
+    instantEvalRuns.current = undefined;
     vi.clearAllMocks();
   });
 
@@ -213,6 +227,37 @@ describe("useTraceNewCount", () => {
       });
 
       expect(lastOptions().refetchInterval).toBe(5000);
+    });
+  });
+
+  describe("when a run registers behind an eval chip", () => {
+    /** @scenario "A registered run resets the new-count baseline" */
+    it("resets the baseline, so the next count is not compared against another context", () => {
+      const { rerender } = renderHook(() => useTraceNewCount());
+
+      act(() => {
+        queryResult.data = { count: 0 };
+        queryResult.dataUpdatedAt = 1_000;
+        rerender();
+      });
+
+      act(() => {
+        instantEvalRuns.current = {
+          key1: { question: "annoyed", target: "traces", runId: "run-1" },
+        };
+        rerender();
+      });
+      expect(lastCall().input).toMatchObject({
+        evalRuns: { key1: { runId: "run-1" } },
+      });
+
+      act(() => {
+        queryResult.data = { count: 5 };
+        queryResult.dataUpdatedAt = 2_000;
+        rerender();
+      });
+
+      expect(pulse).not.toHaveBeenCalled();
     });
   });
 });

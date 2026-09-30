@@ -1,9 +1,26 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { tryGetAppMock } = vi.hoisted(() => ({
+  tryGetAppMock: vi.fn(),
+}));
+
+vi.mock("../app-layer/app", () => ({ tryGetApp: tryGetAppMock }));
+
 import { _resetMemoryRateLimitStore, rateLimit } from "../rateLimit";
+import { rateLimitExceededTotal } from "../rateLimit.metrics";
+
+async function exceededCount(scope: string): Promise<number> {
+  const metric = await rateLimitExceededTotal.get();
+  return metric.values.find((v) => v.labels.scope === scope)?.value ?? 0;
+}
 
 describe("rateLimit (in-memory fallback)", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
+    tryGetAppMock.mockReset();
+    tryGetAppMock.mockReturnValue(undefined);
     _resetMemoryRateLimitStore();
+    rateLimitExceededTotal.reset();
   });
 
   describe("when called within a single window", () => {
@@ -124,6 +141,99 @@ describe("rateLimit (in-memory fallback)", () => {
       const { _getMemoryStoreSize } = await import("../rateLimit");
       const size = _getMemoryStoreSize();
       expect(size).toBeLessThan(1100);
+    });
+  });
+
+  describe("when Redis is available but a command fails", () => {
+    it.each([
+      "incr",
+      "expire",
+      "ttl",
+    ] as const)("falls through to the in-memory limiter after %s rejects", async (failingCommand) => {
+      vi.spyOn(Date, "now").mockReturnValue(1_000);
+      const incr = vi.fn().mockResolvedValue(1);
+      const expire = vi.fn().mockResolvedValue(1);
+      const ttl = vi.fn().mockResolvedValue(60);
+
+      if (failingCommand === "incr") {
+        incr.mockRejectedValue(new Error("redis incr unavailable"));
+      } else if (failingCommand === "expire") {
+        expire.mockRejectedValue(new Error("redis expire unavailable"));
+      } else {
+        ttl.mockRejectedValue(new Error("redis ttl unavailable"));
+      }
+
+      tryGetAppMock.mockReturnValue({ redis: { incr, expire, ttl } });
+      const options = {
+        key: `redis-failure:${failingCommand}`,
+        windowSeconds: 60,
+        max: 1,
+      };
+
+      const first = await rateLimit(options);
+      const second = await rateLimit(options);
+
+      expect(first).toEqual({
+        allowed: true,
+        remaining: 0,
+        resetAt: 61_000,
+      });
+      expect(second).toEqual({
+        allowed: false,
+        remaining: 0,
+        resetAt: 61_000,
+      });
+    });
+  });
+
+  describe("rate_limit_exceeded_total metric", () => {
+    describe("when a call is allowed", () => {
+      /** @scenario "An allowed call leaves the counter unmoved" */
+      it("does not move the counter", async () => {
+        await rateLimit({
+          key: "auth.route:metric-allowed",
+          windowSeconds: 60,
+          max: 3,
+        });
+
+        expect(await exceededCount("auth.route")).toBe(0);
+      });
+    });
+
+    describe("when a call is denied", () => {
+      /** @scenario "A denied call increments the counter for its scope" */
+      it("increments the counter, labelled by the scope before the first ':'", async () => {
+        const opts = {
+          key: "auth.route:metric-denied",
+          windowSeconds: 60,
+          max: 1,
+        };
+        await rateLimit(opts);
+        const denied = await rateLimit(opts);
+
+        expect(denied.allowed).toBe(false);
+        expect(await exceededCount("auth.route")).toBe(1);
+      });
+    });
+
+    describe("when the Redis path denies the call", () => {
+      /** @scenario "The Redis-backed path counts denials the same way as the in-memory path" */
+      it("increments the counter the same way as the in-memory path", async () => {
+        vi.spyOn(Date, "now").mockReturnValue(1_000);
+        const incr = vi.fn().mockResolvedValue(2);
+        const expire = vi.fn().mockResolvedValue(1);
+        const ttl = vi.fn().mockResolvedValue(60);
+        tryGetAppMock.mockReturnValue({ redis: { incr, expire, ttl } });
+
+        const result = await rateLimit({
+          key: "auth.redis-route:metric-denied",
+          windowSeconds: 60,
+          max: 1,
+        });
+
+        expect(result.allowed).toBe(false);
+        expect(await exceededCount("auth.redis-route")).toBe(1);
+      });
     });
   });
 });

@@ -106,6 +106,18 @@ Feature: Organization role awareness across the platform
     When the user manages a team in "acme"
     Then the action is allowed
 
+  # The server already answers this way on both of its paths: an
+  # ORGANIZATION-scoped ADMIN binding grants everything, custom team role or
+  # not. The browser refusing what the server allows only hides buttons and
+  # pages the user could reach by URL.
+  @integration
+  Scenario: An org admin holding a custom team role keeps admin access in the browser
+    Given a user who is an ADMIN in organization "acme"
+    And the user holds a custom role on the project's team that grants only analytics viewing
+    When the browser checks a team-scoped permission the custom role omits
+    Then the check is allowed, because the server allows an org admin everything
+    But the same custom role still restricts a user who is only a MEMBER
+
   # ============================================================================
   # Frontend knows the user's role
   # ============================================================================

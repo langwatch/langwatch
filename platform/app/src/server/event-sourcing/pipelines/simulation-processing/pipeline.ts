@@ -8,6 +8,7 @@ import {
   MessageSnapshotCommand,
   QueueRunCommand,
   RecordAgentInstanceCommand,
+  RecordCutAtLimitCommand,
   RecordEvaluationsCommand,
   StartRunCommand,
   TextMessageEndCommand,
@@ -36,6 +37,10 @@ import {
   createScenarioEvaluationsSubscriber,
   type ScenarioEvaluationsSubscriberDeps,
 } from "./subscribers/scenarioEvaluations.subscriber";
+import {
+  createScenarioRunMilestonesSubscriber,
+  type ScenarioRunMilestonesSubscriberDeps,
+} from "./subscribers/scenarioRunMilestones.subscriber";
 import {
   createSnapshotUpdateBroadcastSubscriber,
   type SnapshotUpdateBroadcastSubscriberDeps,
@@ -67,6 +72,7 @@ export interface SimulationProcessingPipelineDeps {
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
   /** Queues the evaluators attached to a finished run's suite and plan. */
   scenarioEvaluations: ScenarioEvaluationsSubscriberDeps;
+  scenarioRunMilestones: ScenarioRunMilestonesSubscriberDeps;
   customerIoSimulationSync?: CustomerIoSimulationSyncSubscriberDeps;
 }
 
@@ -101,6 +107,8 @@ export interface SimulationProcessingPipelineDeps {
  *   results of a finished run and the verdict after the gate
  * - recordAgentInstance: Emits SimulationRunAgentInstanceRecordedEvent with
  *   the connected agent instance that served the run
+ * - recordCutAtLimit: Emits SimulationRunCutAtLimitRecordedEvent when the run
+ *   was ended at the maximum call duration (AC28)
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
  * - computeRunMetrics: Computes cost/latency metrics from traces (ECST + pull)
  */
@@ -142,6 +150,10 @@ function createSimulationProcessingBuilder(
       "scenarioEvaluations",
       createScenarioEvaluationsSubscriber(deps.scenarioEvaluations),
     )
+    .withSubscriber(
+      "scenarioRunMilestones",
+      createScenarioRunMilestonesSubscriber(deps.scenarioRunMilestones),
+    )
     .withProcessManager(
       SIMULATION_RUN_EXECUTION_PROCESS_NAME,
       simulationRunExecutionPM(deps.simulationRunExecution),
@@ -173,6 +185,7 @@ export function createSimulationProcessingPipeline(
       deps.recordEvaluationsCommand,
     )
     .withCommand("recordAgentInstance", RecordAgentInstanceCommand)
+    .withCommand("recordCutAtLimit", RecordCutAtLimitCommand)
     .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
     .withCommandInstance(

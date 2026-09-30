@@ -205,6 +205,67 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
         expect(matcher(data, "", "env")).toBeNull();
       });
     });
+
+    // ClickHouse reads three separate attribute keys for one metadata key and
+    // ORs them (clickhouse/filter-conditions.ts). customMetadata cannot stand
+    // in for that: extractCustomMetadata drops standard resource prefixes and
+    // collapses several forms of one key down to the highest-priority one.
+    describe("when the trace carries raw attributes", () => {
+      it("reads a bare OTEL resource attribute customMetadata excludes", () => {
+        const data = makeTraceData({
+          customMetadata: null,
+          attributes: { "service.name": "coaching-api" },
+        });
+        expect(matcher(data, "", "service.name")).toBe("coaching-api");
+      });
+
+      it("returns every distinct form of the key so any one can match", () => {
+        const data = makeTraceData({
+          customMetadata: { env: "canonical" },
+          attributes: {
+            "metadata.env": "canonical",
+            "langwatch.metadata.env": "legacy-rest",
+            env: "bare",
+          },
+        });
+        expect(matcher(data, "", "env")).toEqual([
+          "canonical",
+          "legacy-rest",
+          "bare",
+        ]);
+      });
+
+      it("returns null when no form of the key is present", () => {
+        const data = makeTraceData({
+          customMetadata: null,
+          attributes: { "service.name": "coaching-api" },
+        });
+        expect(matcher(data, "", "env")).toBeNull();
+      });
+    });
+
+    // The return shape is load-bearing, not an implementation detail.
+    // `matches_regex` tests an array's JSON encoding alongside its elements, so
+    // wrapping a lone value in a list widens what an anchored pattern can hit
+    // and drifts from the other three rules, which read the value itself. A
+    // test that only checks whether a filter matched passes either way and
+    // pins nothing, so assert the shape directly.
+    describe("when every form of the key holds the same value", () => {
+      it("collapses them to a plain string rather than a list", () => {
+        const data = makeTraceData({
+          customMetadata: { env: "production" },
+          attributes: {
+            "metadata.env": "production",
+            env: "production",
+          },
+        });
+
+        const resolved = matcher(data, "", "env");
+
+        expect(resolved).toBe("production");
+        expect(Array.isArray(resolved)).toBe(false);
+      });
+    });
   });
 
   describe("spans.type matcher", () => {

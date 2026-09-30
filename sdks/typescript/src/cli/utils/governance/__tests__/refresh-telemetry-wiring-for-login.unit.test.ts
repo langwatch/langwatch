@@ -10,7 +10,9 @@ import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+	codexGatewayBlockBaseUrl,
 	codexOtelBlockEndpoint,
+	writeCodexGatewayBlock,
 	writeCodexOtelBlock,
 } from "../../codex-config-toml";
 import { appSettingsTargetFor, installAppEnv } from "../app-settings";
@@ -22,7 +24,10 @@ import {
 	rcPath,
 	toolMarkers,
 } from "../shell-rc";
-import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
+import {
+	keptWiringLines,
+	refreshTelemetryWiringForLogin,
+} from "../telemetry-refresh";
 import { runningCodeRestartNotice } from "../running-code";
 
 vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
@@ -190,6 +195,24 @@ describe("refreshTelemetryWiringForLogin", () => {
 				expect(result.labels.some((l) => l.includes("gemini"))).toBe(true);
 				expect(result.labels.some((l) => l.includes("codex"))).toBe(false);
 			});
+
+			/** @scenario "A codex pinned to a project still gets the guidance on login" */
+			it("still writes the declare guidance for a pinned codex", async () => {
+				const cfg = baseCfg({
+					tool_project_keys: { codex: { secret: "sk-lw-project-pin" } },
+				});
+				const agentsMd = path.join(temp.home, ".codex", "AGENTS.md");
+				expect(fs.existsSync(agentsMd)).toBe(false);
+
+				await refreshTelemetryWiringForLogin(cfg);
+
+				// The guidance names no endpoint and no key, so the pin has no
+				// reason to withhold it; the wiring the pin does own is untouched.
+				expect(fs.readFileSync(agentsMd, "utf8")).toContain(
+					"langwatch ingest context",
+				);
+				expect(codexOtelBlockEndpoint()).toBe(`${STALE_ENDPOINT}/v1/traces`);
+			});
 		});
 
 		describe("when the org policy forbids direct OTLP for a tool", () => {
@@ -326,6 +349,205 @@ describe("refreshTelemetryWiringForLogin", () => {
 
 			expect(result.labels).toEqual([]);
 			expect(fs.readFileSync(target.path, "utf8")).toBe(before);
+		});
+	});
+
+	describe("given claude and codex wiring that reports to another instance", () => {
+		const codexConfig = () => path.join(temp.home, ".codex", "config.toml");
+		const wireAt = (endpoint: string) => {
+			installAppEnv(
+				appSettingsTargetFor("claude")!,
+				buildOtelEnvBlock("claude", endpoint, STALE_TOKEN),
+			);
+			writeCodexOtelBlock(
+				{ baseEndpoint: endpoint, ingestionToken: STALE_TOKEN },
+				{ persistAuthHeader: true },
+			);
+		};
+		const wiringBytes = () => ({
+			claude: fs.readFileSync(appSettingsTargetFor("claude")!.path, "utf8"),
+			codex: fs.readFileSync(codexConfig(), "utf8"),
+		});
+
+		beforeEach(() => {
+			vi.mocked(cliApi.listIngestionKeys).mockResolvedValue([]);
+			vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
+				token: CURRENT_TOKEN,
+				prefix: "ik-lw-test",
+				endpoint: CURRENT_ENDPOINT,
+			});
+		});
+
+		describe("when the login lives in a config file of its own", () => {
+			/** @scenario "A login kept in its own config file never touches the home's wiring" */
+			it("mints nothing, writes nothing and reports the tools it left alone", async () => {
+				wireAt(STALE_ENDPOINT);
+				const before = wiringBytes();
+				process.env.LANGWATCH_CLI_CONFIG = path.join(
+					temp.cwd,
+					"throwaway",
+					"config.json",
+				);
+
+				const result = await refreshTelemetryWiringForLogin(baseCfg());
+
+				expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+				expect(cliApi.listIngestionKeys).not.toHaveBeenCalled();
+				expect(wiringBytes()).toEqual(before);
+				expect(result.labels).toEqual([]);
+				expect(result.kept).toEqual({
+					tools: ["claude", "codex"],
+					reason: "isolated_config",
+				});
+			});
+		});
+
+		describe("when LANGWATCH_CLI_CONFIG names the home's default config file", () => {
+			/** @scenario "LANGWATCH_CLI_CONFIG naming the home's default file is the machine's login" */
+			it("refreshes the wiring as the machine's login", async () => {
+				wireAt(STALE_ENDPOINT);
+				process.env.LANGWATCH_CLI_CONFIG = path.join(
+					temp.home,
+					".langwatch",
+					"config.json",
+				);
+
+				const result = await refreshTelemetryWiringForLogin(baseCfg());
+
+				const claudeEnv = JSON.parse(wiringBytes().claude).env;
+				expect(claudeEnv.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
+				expect(result.kept).toBeUndefined();
+			});
+		});
+
+		describe("when the login is on this machine", () => {
+			const localCfg = () =>
+				baseCfg({
+					control_plane_url: "http://localhost:5620",
+					gateway_url: "http://localhost:5563",
+				});
+
+			/** @scenario "A login on this machine does not take over wiring that reports elsewhere" */
+			it("leaves wiring that reports to a deployment elsewhere", async () => {
+				wireAt(STALE_ENDPOINT);
+				const before = wiringBytes();
+
+				const result = await refreshTelemetryWiringForLogin(localCfg());
+
+				expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+				expect(wiringBytes()).toEqual(before);
+				expect(result.labels).toEqual([]);
+				expect(result.kept).toEqual({
+					tools: ["claude", "codex"],
+					reason: "loopback_login",
+				});
+			});
+
+			/** @scenario "A login on this machine still refreshes wiring that already reports to this machine" */
+			it("refreshes wiring that reports to another port of this machine", async () => {
+				wireAt("http://127.0.0.1:5580/api/otel");
+				vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
+					token: CURRENT_TOKEN,
+					prefix: "ik-lw-test",
+					endpoint: "http://localhost:5620/api/otel",
+				});
+
+				const result = await refreshTelemetryWiringForLogin(localCfg());
+
+				const claudeEnv = JSON.parse(wiringBytes().claude).env;
+				expect(claudeEnv.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+					"http://localhost:5620/api/otel",
+				);
+				expect(claudeEnv.OTEL_EXPORTER_OTLP_HEADERS).toContain(CURRENT_TOKEN);
+				expect(codexOtelBlockEndpoint()).toBe(
+					"http://localhost:5620/api/otel/v1/traces",
+				);
+				expect(result.kept).toBeUndefined();
+			});
+
+			describe("given a tool wired through a shell function", () => {
+				const wireGeminiAt = (endpoint: string) =>
+					persistBlockToRc(
+						"zsh",
+						buildScopedToolFunction(
+							"gemini",
+							buildOtelEnvBlock("gemini", endpoint, STALE_TOKEN),
+							"zsh",
+						),
+						toolMarkers("gemini"),
+					);
+
+				/** @scenario "A host that only starts with localhost is not this machine" */
+				it("leaves a function that reports to localhost.acme.test", async () => {
+					wireGeminiAt("https://localhost.acme.test/api/otel");
+					const before = fs.readFileSync(rcPath("zsh"), "utf8");
+
+					const result = await refreshTelemetryWiringForLogin(localCfg());
+
+					expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+					expect(fs.readFileSync(rcPath("zsh"), "utf8")).toBe(before);
+					expect(result.kept).toEqual({
+						tools: ["gemini"],
+						reason: "loopback_login",
+					});
+				});
+
+				/** @scenario "A shell function that reports to this machine is refreshed by a login on this machine" */
+				it("refreshes a function that reports to another port of this machine", async () => {
+					wireGeminiAt("http://[::1]:5580/api/otel");
+					vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
+						token: CURRENT_TOKEN,
+						prefix: "ik-lw-test",
+						endpoint: "http://localhost:5620/api/otel",
+					});
+
+					const result = await refreshTelemetryWiringForLogin(localCfg());
+
+					const zshrc = fs.readFileSync(rcPath("zsh"), "utf8");
+					expect(zshrc).toContain("http://localhost:5620/api/otel");
+					expect(zshrc).not.toContain("[::1]:5580");
+					expect(result.kept).toBeUndefined();
+				});
+			});
+
+			/** @scenario "A login on this machine leaves a codex gateway block that routes elsewhere" */
+			it("leaves a codex gateway block whose base_url is elsewhere", async () => {
+				writeCodexGatewayBlock({ gatewayUrl: "https://gateway.acme.test" });
+				const before = fs.readFileSync(codexConfig(), "utf8");
+
+				const result = await refreshTelemetryWiringForLogin(localCfg());
+
+				expect(fs.readFileSync(codexConfig(), "utf8")).toBe(before);
+				expect(codexGatewayBlockBaseUrl()).toContain("gateway.acme.test");
+				expect(result.kept).toEqual({
+					tools: ["codex"],
+					reason: "loopback_login",
+				});
+			});
+		});
+	});
+
+	describe("when the login words the wiring it left alone", () => {
+		/** @scenario "The login says which wiring it left alone and how to move it" */
+		it("names the tools, the reason and the command that moves one over", () => {
+			const lines = keptWiringLines({
+				tools: ["claude", "codex"],
+				reason: "loopback_login",
+			});
+
+			expect(lines[0]).toContain("claude, codex");
+			expect(lines[0]).toContain("reports to another LangWatch");
+			expect(lines[1]).toContain("langwatch claude");
+		});
+
+		it("names LANGWATCH_CLI_CONFIG for a login in its own config file", () => {
+			const lines = keptWiringLines({
+				tools: ["codex"],
+				reason: "isolated_config",
+			});
+
+			expect(lines).toHaveLength(1);
+			expect(lines[0]).toContain("LANGWATCH_CLI_CONFIG");
 		});
 	});
 });
