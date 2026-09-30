@@ -53,10 +53,9 @@ helpers stay, because `./testing` exports reach them). This is the
 property that matters here — because tests import dependency source directly,
 a cache keyed only on the package's own files would replay a stale pass after
 a dependency changed underneath it. `typecheck` declares its emitted files as
-globs (amended 2026-09-30, see "cache correctness") and no `dependsOn`
-(amended 2026-09-30): each package's `tsc -b` builds the references it reads
-itself, and the workspace graph has cycles that `^typecheck` turned into a
-refused task graph. Parallel tasks may rebuild a shared reference at once.
+globs and depends on `^typecheck` (both amended 2026-09-30, see "cache
+correctness"), so a shared reference is built once, before its dependents,
+rather than by several parallel `tsc -b` at once.
 
 `test:integration` is left uncached deliberately. Those suites read Postgres,
 ClickHouse and Redis, and their result is a function of datastore state that no
@@ -84,8 +83,10 @@ covers them. `lint:changed` and CI's PR step run `nx affected` (`--files` from t
 working copy and branch, or `--base`); a changed-only run misses a finding that
 only appears when an unrelated file changes and no input above names it.
 
-`lint:types` takes the same inputs and no `dependsOn`, because workspace imports
-resolve to source through `exports` and tsgolint reads no emitted `.d.ts`. The
+`lint:types` takes the same inputs and no `^typecheck`: workspace imports resolve
+to source through `exports` and tsgolint follows project references to their source,
+so a dependency's emitted `.d.ts` is never read (measured: a corrupted
+`packages/time/dist/index.d.ts` left `egress`'s findings unchanged). The
 root `lint` is not type-aware. The architecture enforcer's own `lint` script reads
 the whole tree, so it is never cached: its own project's files cannot describe
 its result.
@@ -273,6 +274,11 @@ the `dist/index.js` its `build` wrote. `typecheck` outputs are globs over what
 leave the rest alone). The seven projects with both targets whose emits differ
 from those defaults (the SDK, `mail`, `ksuid`, the apps, `langyworker`) have
 filtered entries naming each target's files.
+
+**The graph stays acyclic, devDependencies included.** Nx draws an edge for
+every workspace dependency, devDependencies too, and refuses a task graph with a
+cycle. The `cycles` policy counts devDependencies for the same reason, so the
+cycle that once made `^typecheck` unusable fails lint rather than Nx.
 
 ## References
 

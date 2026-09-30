@@ -36,6 +36,7 @@ function featurePackage({
   role,
   name = `@langwatch/${feature}-${role}`,
   dependencies = {},
+  devDependencies = {},
   exports = { ".": "./src/index.ts" },
   source = "export const value = true;",
   enterprise = false,
@@ -46,6 +47,7 @@ function featurePackage({
   role: "contract" | "process" | "browser";
   name?: string;
   dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
   exports?: Record<string, unknown>;
   source?: string;
   enterprise?: boolean;
@@ -145,6 +147,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
       type: "module",
       exports,
       dependencies: role === "contract" ? { zod: "^4.4.3", ...dependencies } : dependencies,
+      devDependencies,
     }),
   );
   write(
@@ -1019,5 +1022,20 @@ describe("Prisma client containment", () => {
 
     expect(refusal?.message).toContain("has no declarations to read");
     expect(refusal?.allowed).toContain("pnpm typecheck");
+  });
+
+  /** @scenario A cycle through a devDependency is a package cycle */
+  it("counts devDependencies as cycle edges", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { "@langwatch/workflow-contract": "workspace:*" },
+    });
+    featurePackage({
+      feature: "workflow",
+      role: "contract",
+      devDependencies: { "@langwatch/agent-contract": "workspace:*" },
+    });
+    expect(policies()).toContain("package-cycle");
   });
 });
