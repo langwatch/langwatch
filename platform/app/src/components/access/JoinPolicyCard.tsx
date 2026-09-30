@@ -338,7 +338,10 @@ export function JoinPolicyCard({
         </VStack>
       )}
 
-      {selected !== "off" && (
+      {/* A live connection admits people whatever the domain door says, and
+          they land on this seat too, so the choice stays offered while the
+          door is shut as long as that other door is open. */}
+      {(selected !== "off" || ssoLive) && (
         <JoinerSeatOptions seat={seat} saving={saving} onSelect={setSeat} />
       )}
 
@@ -349,8 +352,8 @@ export function JoinPolicyCard({
           twice. */}
       {ssoLive && (
         <Text color="fg.subtle" fontSize="11.5px">
-          People signing in through your identity provider are answered by the
-          connection's own setting, on{" "}
+          Whether people signing in through your identity provider are admitted
+          is the connection's own setting, on{" "}
           <Link
             href="/settings/authentication/provider"
             colorPalette="orange"
@@ -358,7 +361,7 @@ export function JoinPolicyCard({
           >
             Identity provider
           </Link>
-          .
+          . Those admitted land on the seat chosen above.
         </Text>
       )}
     </SettingsCard>

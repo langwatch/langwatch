@@ -36,10 +36,12 @@ function renderCard({
   domainJoin = "off",
   joinDomains = [] as string[],
   joinerRole = "MEMBER" as JoinerRole,
+  ssoLive = false,
 }: {
   domainJoin?: DomainJoinSetting;
   joinDomains?: string[];
   joinerRole?: JoinerRole;
+  ssoLive?: boolean;
 } = {}) {
   const onSave = vi.fn();
   render(
@@ -50,6 +52,7 @@ function renderCard({
         joinerRole={joinerRole}
         saving={false}
         onSave={onSave}
+        ssoLive={ssoLive}
       />
     </ChakraProvider>,
   );
@@ -197,6 +200,14 @@ describe("given the seat newcomers receive (ADR-143)", () => {
       renderCard({ domainJoin: "off" });
 
       expect(screen.queryByText("Seat for people who join")).toBeNull();
+    });
+
+    /** @scenario The joiner seat setting lands SSO joiners as Developers */
+    it("still asks the seat question while a connection admits people", () => {
+      renderCard({ domainJoin: "off", ssoLive: true });
+
+      expect(screen.getByText("Seat for people who join")).toBeTruthy();
+      expect(screen.getByTestId("joiner-seat-DEVELOPER")).toBeTruthy();
     });
   });
 });
