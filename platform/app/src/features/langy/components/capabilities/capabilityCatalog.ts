@@ -310,6 +310,12 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "automation", plural: "automations" },
   },
+  // Read-only for Langy; the list never carries a secret.
+  "slack-connection": {
+    surface: "automations",
+    digestStrategy: "reduced",
+    noun: { singular: "Slack connection", plural: "Slack connections" },
+  },
   projects: {
     surface: "projects",
     digestStrategy: "id-ref",

@@ -3862,7 +3862,7 @@ const presentations = {
     // `resource_limit_exceeded`, whose fix is upgrading with us.
     title: "You've reached your OpenAI plan's limit",
     describe: () =>
-      "Codex runs on your OpenAI account, and it has no allowance left for now. Wait for it to reset, or raise the limit with OpenAI.",
+      "Your OpenAI account has no allowance left for now. Wait for it to reset, or raise the limit with OpenAI.",
   },
   langy_model_not_allowed: {
     title: "That model isn't available here",

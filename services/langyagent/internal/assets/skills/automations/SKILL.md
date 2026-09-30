@@ -52,14 +52,14 @@ langwatch slack-connection list --format json
 ```
 
 1. When the user named a connection, take the `id` of the one whose `name` matches; when an existing Slack automation shows the one to reuse, take that. Create with it.
-2. Otherwise create the automation with `--action SEND_SLACK_MESSAGE` and the channel, and no connection. The refusal is expected: the user's panel shows the Slack connections this project can use, each with a button that answers you with its name and id, and, when there is none, a button that opens the Slack connection form on the Automations page. Say in one line that they should pick or add a connection, and stop the turn.
+2. Otherwise, including when the list is empty, create the automation with `--action SEND_SLACK_MESSAGE` and the channel, and no connection. Do not ask a question first, and never offer to take a webhook URL or token as an option. The refusal is expected: the user's panel shows the Slack connections this project can use, each with a button that answers you with its name and id, and, when there is none, a button that opens the Slack connection form on the Automations page. Say in one line that they should pick or add a connection, and stop the turn.
 3. When the answer names a connection id, run the same create again with `--slack-connection <id>`.
 
 Never create, edit, widen or delete a Slack connection yourself: connections are added and scoped by the user on the Automations page, where a new one is scoped to this project unless they choose otherwise.
 
 ## Deliver by Email, Webhook, Dataset or Annotation Queue
 
-- Email: `--action SEND_EMAIL --action-params '{"members":["me@example.com"]}'`. "Email me" means the user's own address: use it when the conversation names it, and otherwise ask for it with the `question` tool.
+- Email: `--action SEND_EMAIL --action-params '{"members":["me@example.com"]}'`. "Email me" means the user's own address: the turn names it ("You are talking to …"). Use that; ask with the `question` tool only when no address is given. Never run `langwatch whoami` for it: the worker is not device-logged-in.
 - Webhook: `--action SEND_WEBHOOK --action-params '{"url":"https://…"}'`, only for an https address the user gave for this purpose. Never add headers or a signing secret they would have to paste.
 - Dataset: `--action ADD_TO_DATASET` with `datasetId` and `datasetMapping`; read `langwatch docs datasets/automatically-from-traces` for the mapping.
 - Annotation queue: `--action ADD_TO_ANNOTATION_QUEUE` with `annotators`, each `{"id":"user-<userId>","name":"…"}` or `{"id":"queue-<queueId>","name":"…"}`.
@@ -73,6 +73,8 @@ langwatch trace search --filter '<query>' --format json
 ```
 
 An evaluation result is keyed by the MONITOR that ran it, not the evaluator: take the id from `langwatch monitor list --format json`.
+
+A thumbs-down from an end user is a `thumbs_up_down` event, not an annotation: `--filters '{"events.metrics.value":{"thumbs_up_down":{"vote":["-1"]}}}'`. A reviewer's thumbs-down is an annotation; when the user could mean either, ask which. Never guess a filter key: a refused key means read the reference above, not try another spelling.
 
 For an alert, find the graph that plots the metric with `langwatch graph list --format json`; when none does, create one with `langwatch graph create`. `--graph-alert` names the series as `<index>/<metric>/<aggregation>` (for example `0/performance.completion_time/p95`), a comparison `gt`, `gte`, `lt`, `lte` or `eq`, a threshold in the metric's own unit and a window in minutes (1, 5, 15, 30, 60 or 1440). A percentage written as "5%" is the threshold `5` on a percentage series and `0.05` on a rate series: read the graph to tell which.
 
