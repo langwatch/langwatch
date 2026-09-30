@@ -43,6 +43,13 @@ Feature: Evaluation service boundary
     And the call is never refused for want of a composed runtime
 
   @unit
+  Scenario: An installed evaluation module warms the evaluator runtime through the studio engine
+    Given a process that installs the evaluation feature
+    When the experiment workbench asks it to warm up 3 evaluator runtime instances
+    Then the workflow module is posted 3 "is_alive" studio events for that project
+    And the answer reports success for 3 instances
+
+  @unit
   Scenario: An installed evaluation module re-scores a stored trace through the caller's protections
     Given a process that installs the evaluation feature
     When a signed-in user re-runs an evaluator on one stored trace

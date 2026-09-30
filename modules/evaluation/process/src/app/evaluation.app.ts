@@ -450,6 +450,14 @@ export class EvaluationApp implements EvaluationApiContract {
             }),
         },
         runner: { runEvaluation: (input) => execution.executeForData(input) },
+        warmup: {
+          probe: ({ projectId }) =>
+            dependencies.workflows.postStudioEvent({
+              projectId,
+              event: { type: "is_alive", payload: {} },
+              onEvent: () => void 0,
+            }),
+        },
       },
       dependencies,
       repositories,

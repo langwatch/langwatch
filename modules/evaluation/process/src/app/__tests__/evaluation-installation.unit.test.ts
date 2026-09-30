@@ -24,13 +24,22 @@ import { describe, expect, it, vi } from "vitest";
 import { evaluationServer } from "../../evaluation.server.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
-function process(role: "api" | "worker", trace: TraceApi = createApiFixture<TraceApi>()) {
+function process(
+  role: "api" | "worker",
+  {
+    trace = createApiFixture<TraceApi>(),
+    workflow = createApiFixture<WorkflowApi>({
+      findEvaluatorWorkflows: async () => [],
+      postStudioEvent: async ({ onEvent }) => onEvent({ type: "is_alive_response" }),
+    }),
+  }: { trace?: TraceApi; workflow?: WorkflowApi } = {},
+) {
   return createApp({ role })
     .withModules([installableEvaluation])
     .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
     .withStores(memoryStores())
     .provide({
-      workflow: createApiFixture<WorkflowApi>({ findEvaluatorWorkflows: async () => [] }),
+      workflow,
       trace,
       "model-provider": createApiFixture<ModelProviderApi>({
         getExecutionProviders: async () => ({}),
@@ -94,6 +103,31 @@ describe("given a process that installs the evaluation feature", () => {
     });
   });
 
+  describe("when the experiment workbench warms the evaluator runtime", () => {
+    /** @scenario "An installed evaluation module warms the evaluator runtime through the studio engine" */
+    it("posts one is_alive studio event per requested instance", async () => {
+      const postStudioEvent = vi.fn(async () => void 0);
+      const runtime = await process("api", {
+        workflow: createApiFixture<WorkflowApi>({ postStudioEvent }),
+      }).boot();
+
+      try {
+        await expect(
+          runtime.service(EvaluationApi).warmupEvaluators({ projectId: "project-1", count: 3 }),
+        ).resolves.toEqual({ success: true, count: 3 });
+        expect(postStudioEvent).toHaveBeenCalledTimes(3);
+        expect(postStudioEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            projectId: "project-1",
+            event: { type: "is_alive", payload: {} },
+          }),
+        );
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when a caller runs an evaluator over data it holds", () => {
     /** @scenario "An installed evaluation module runs an evaluator over data it is handed" */
     it.each(["api", "worker"] as const)(
@@ -123,10 +157,9 @@ describe("given a process that installs the evaluation feature", () => {
       const viewer = { canSeeCosts: false, canSeeCapturedInput: false, canSeeCapturedOutput: true };
       const resolveViewerProtections = vi.fn(async () => viewer);
       const readTracesWithSpans = vi.fn(async () => []);
-      const runtime = await process(
-        "api",
-        createApiFixture<TraceApi>({ resolveViewerProtections, readTracesWithSpans }),
-      ).boot();
+      const runtime = await process("api", {
+        trace: createApiFixture<TraceApi>({ resolveViewerProtections, readTracesWithSpans }),
+      }).boot();
 
       try {
         await expect(
