@@ -195,6 +195,13 @@ single source program over the api closure is 5x faster than the graph but
 peaks at 4.5 GB (1 checker) to 8.3 GB (4), and the whole tree as one program
 passed 16.4 GB before it was killed.
 
+## Amendment: one process again (2026-09-29)
+
+The three-process split is gone: the root `typecheck` is one
+`GOMEMLIMIT=2GiB tsc -b --builders 1`, because a surprising script cost more
+than it saved. One builder stands in for the split as the RAM lever (four
+builders in one process thrashed, see above); not yet measured.
+
 ## References
 
 - Related ADRs: [ADR-090](090-haven-pressure-governor.md) (the pressure levels
