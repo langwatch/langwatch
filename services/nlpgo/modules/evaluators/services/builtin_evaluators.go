@@ -18,6 +18,7 @@ func BuiltinEvaluators() map[string]Evaluator {
 	}
 	maps.Copy(prepares, langevalsRulesPrepares())
 	maps.Copy(prepares, ragasTextPrepares())
+	maps.Copy(prepares, ragasLLMPrepares())
 	maps.Copy(prepares, vendorPrepares())
 	maps.Copy(prepares, linguaPrepares())
 	maps.Copy(prepares, piiPrepares())

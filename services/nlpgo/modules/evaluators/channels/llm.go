@@ -14,6 +14,9 @@ import (
 // ErrProviderNotConfigured means the tenant env holds no credentials for the model's provider.
 var ErrProviderNotConfigured = errors.New("model provider not configured")
 
+// ErrRateLimited means the provider answered 429; callers may retry.
+var ErrRateLimited = errors.New("model provider rate limited")
+
 // LLMChannel calls models with the tenant's own credentials, per call.
 type LLMChannel interface {
 	Complete(ctx context.Context, req CompletionRequest) (CompletionResponse, error)
