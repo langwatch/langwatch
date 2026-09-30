@@ -114,7 +114,7 @@ func judgeModelOf(t *testing.T, settings json.RawMessage) string {
 func TestReplayJudgesAnswerAsLangevalsAnswered(t *testing.T) {
 	for _, judge := range []string{
 		"llm_boolean", "llm_score", "llm_category", "llm_answer_match", "competitor_llm",
-		"competitor_llm_function_call", "off_topic", "query_resolution",
+		"competitor_llm_function_call", "off_topic", "query_resolution", "select_best_compare",
 	} {
 		t.Run(judge, func(t *testing.T) {
 			replayJudgeCases(t, judgeReplay{slug: "langevals/" + judge, file: "langevals__" + judge + ".json"})
