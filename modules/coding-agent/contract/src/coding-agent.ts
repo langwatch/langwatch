@@ -286,18 +286,6 @@ export const CODING_AGENT_SESSION_EVENT_KINDS = [
 /** Default page size for `GET .../sessions/:sessionId/events` when no `limit` is given. */
 export const CODING_AGENT_SESSION_EVENTS_DEFAULT_PAGE_SIZE = 500;
 
-/**
- * The wire shape of one session event: every scalar fact except the
- * working-context columns (`repositoryHost`/`repositoryOwner`/`repositoryName`/
- * `branch`), which the read groups sessions by rather than exposing per-event.
- */
-export const codingAgentSessionEventWireSchema = codingAgentSessionEventSchema.omit({
-  repositoryHost: true,
-  repositoryOwner: true,
-  repositoryName: true,
-  branch: true,
-});
-
 /** `GET .../sessions/:sessionId/events` path param. */
 export const codingAgentSessionEventsRestParamsSchema = z.object({
   sessionId: z
@@ -347,7 +335,7 @@ export const codingAgentSessionEventsRestQuerySchema = z.object({
 });
 
 export const codingAgentSessionEventsRestResponseSchema = z.object({
-  events: z.array(codingAgentSessionEventWireSchema),
+  events: z.array(codingAgentSessionEventSchema),
   nextCursor: z.string().nullable(),
 });
 

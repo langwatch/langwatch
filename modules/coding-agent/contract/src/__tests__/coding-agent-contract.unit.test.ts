@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   codingAgentRecentSessionsInputSchema,
+  codingAgentSessionEventSchema,
+  codingAgentSessionEventsRestResponseSchema,
   codingAgentSessionSchema,
   codingAgentUsageTotalsSchema,
 } from "../index.ts";
@@ -39,5 +41,19 @@ describe("coding-agent contract", () => {
         pullRequests: 0,
       }),
     ).toMatchObject({ sessionCount: 1 });
+  });
+
+  it("answers each event with its working-context columns, as main does", () => {
+    const zero = Object.fromEntries(
+      Object.entries(codingAgentSessionEventSchema.shape).map(([key, field]) => [
+        key,
+        field.validate("") ? "" : 0,
+      ]),
+    );
+    const page = { events: [{ ...zero, branch: "main" }], nextCursor: null };
+    expect(codingAgentSessionEventsRestResponseSchema.parse(page).events[0]).toMatchObject({
+      branch: "main",
+      repositoryHost: "",
+    });
   });
 });
