@@ -1,3 +1,5 @@
 # Evaluator fixture recorder
 
 `record_fixtures.py` runs the model-free Python langevals evaluators (basic, competitor_blocklist, exact_match, valid_format, lingua language_detection, and the non-LLM ragas metrics) in-process over `corpus/<family>__<name>.json` and writes `../fixtures/<family>__<name>.json` as `[{name, settings, entry, result}]`, with sorted keys and full-precision floats; error results have their traceback blanked. Run it from the repository root with `uv run --project services/langevals python services/nlpgo/modules/evaluators/testdata/record/record_fixtures.py` (optionally followed by corpus stems such as `langevals__basic` to record only those). It sets no provider keys and makes no network call; the Go ports replay the fixtures and must match.
+
+`record_llm_fixtures.py` records the LLM and embeddings evaluators the same way against the scripted fake model in `fake_llm.py`, adding every model call to each case; `FORMAT.md` is the format the Go replay reads.

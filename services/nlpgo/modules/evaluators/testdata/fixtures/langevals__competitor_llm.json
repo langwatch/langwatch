@@ -1,0 +1,218 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are a competitor detection system. Your task is to determine whether a question explicitly or implicitly refers to any competitors.\n        This includes: comparisons between our brand and others, direct inquiries about competitors' products or services, and any mention of similar industries.\n        Remember that Your company is LangWatch - We are providing an LLM observability and evaluation platform.\n        If a question pertains to a related industry but not directly to our company, treat it as an implicit reference to competitors.",
+              "role": "system"
+            },
+            {
+              "content": "How do I trace my agent?\nUse the LangWatch SDK.",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "competitor_check"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Check if there is implicit mention of competitor",
+                "name": "competitor_check",
+                "parameters": {
+                  "properties": {
+                    "competitor_mentioned": {
+                      "description": "True - If the competitor is mentioned, False - if not",
+                      "type": "boolean"
+                    },
+                    "confidence": {
+                      "description": "Confidence in your reasoning from 0 to 1",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "A short reasoning for the decision, written before the result",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "competitor_mentioned",
+                    "confidence",
+                    "reasoning"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"competitor_mentioned\": false, \"confidence\": 0.9}",
+                      "name": "competitor_check"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 166,
+            "total_tokens": 176
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "How do I trace my agent?",
+      "output": "Use the LangWatch SDK."
+    },
+    "env": {},
+    "name": "no_competitor",
+    "result": {
+      "cost": {
+        "amount": 3.09e-05,
+        "currency": "USD"
+      },
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 0.9,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are a competitor detection system. Your task is to determine whether a question explicitly or implicitly refers to any competitors.\n        This includes: comparisons between our brand and others, direct inquiries about competitors' products or services, and any mention of similar industries.\n        Remember that Your company is LangWatch - We are providing an LLM observability and evaluation platform.\n        If a question pertains to a related industry but not directly to our company, treat it as an implicit reference to competitors.",
+              "role": "system"
+            },
+            {
+              "content": "Is LangSmith better than you?\nBoth are tools.",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "competitor_check"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Check if there is implicit mention of competitor",
+                "name": "competitor_check",
+                "parameters": {
+                  "properties": {
+                    "competitor_mentioned": {
+                      "description": "True - If the competitor is mentioned, False - if not",
+                      "type": "boolean"
+                    },
+                    "confidence": {
+                      "description": "Confidence in your reasoning from 0 to 1",
+                      "type": "number"
+                    },
+                    "reasoning": {
+                      "description": "A short reasoning for the decision, written before the result",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "competitor_mentioned",
+                    "confidence",
+                    "reasoning"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"competitor_mentioned\": true, \"confidence\": 0.8}",
+                      "name": "competitor_check"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 165,
+            "total_tokens": 175
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "Is LangSmith better than you?",
+      "output": "Both are tools."
+    },
+    "env": {},
+    "name": "competitor_mentioned",
+    "result": {
+      "cost": {
+        "amount": 3.075e-05,
+        "currency": "USD"
+      },
+      "details": "0.8 - confidence score. Reasoning: Scripted reasoning.",
+      "label": null,
+      "passed": false,
+      "score": 0.8,
+      "status": "processed"
+    },
+    "settings": {
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]

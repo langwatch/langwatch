@@ -1,0 +1,236 @@
+[
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an LLM category evaluator. Please categorize the message in one of the following categories. Always output a valid json for the function call",
+              "role": "system"
+            },
+            {
+              "content": "# Input\nHi there!\n\n# Output\nHello! How can I help?\n\n# Task\nYou are an LLM category evaluator. Please categorize the message in one of the following categories\n\n# Categories\n- greeting: The message is a greeting\n- question: The message asks a question",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "evaluation"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the category of the message: a short reasoning first, then the label.",
+                "name": "evaluation",
+                "parameters": {
+                  "properties": {
+                    "label": {
+                      "description": "the final decision of the category for the message",
+                      "enum": [
+                        "greeting",
+                        "question"
+                      ],
+                      "type": "string"
+                    },
+                    "reasoning": {
+                      "description": "a short reasoning for the decision, written before the label",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "label"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"label\": \"greeting\"}",
+                      "name": "evaluation"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 119,
+            "total_tokens": 129
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "Hi there!",
+      "output": "Hello! How can I help?"
+    },
+    "env": {},
+    "name": "first_category",
+    "result": {
+      "cost": {
+        "amount": 2.385e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": "greeting",
+      "passed": null,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "categories": [
+        {
+          "description": "The message is a greeting",
+          "name": "greeting"
+        },
+        {
+          "description": "The message asks a question",
+          "name": "question"
+        }
+      ],
+      "model": "openai/gpt-4o-mini"
+    }
+  },
+  {
+    "calls": [
+      {
+        "kind": "chat",
+        "request": {
+          "messages": [
+            {
+              "content": "You are an LLM category evaluator. Please categorize the message in one of the following categories. Always output a valid json for the function call",
+              "role": "system"
+            },
+            {
+              "content": "# Input\nWhat is the capital of France?\n\n# Output\nParis is the capital of France.\n\n# Task\nYou are an LLM category evaluator. Please categorize the message in one of the following categories\n\n# Categories\n- greeting: The message is a greeting\n- question: The message asks a question",
+              "role": "user"
+            }
+          ],
+          "model": "gpt-4o-mini",
+          "tool_choice": {
+            "function": {
+              "name": "evaluation"
+            },
+            "type": "function"
+          },
+          "tools": [
+            {
+              "function": {
+                "description": "Record the category of the message: a short reasoning first, then the label.",
+                "name": "evaluation",
+                "parameters": {
+                  "properties": {
+                    "label": {
+                      "description": "the final decision of the category for the message",
+                      "enum": [
+                        "greeting",
+                        "question"
+                      ],
+                      "type": "string"
+                    },
+                    "reasoning": {
+                      "description": "a short reasoning for the decision, written before the label",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reasoning",
+                    "label"
+                  ],
+                  "type": "object"
+                }
+              },
+              "type": "function"
+            }
+          ]
+        },
+        "response": {
+          "choices": [
+            {
+              "finish_reason": "tool_calls",
+              "index": 0,
+              "message": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "function": {
+                      "arguments": "{\"reasoning\": \"Scripted reasoning.\", \"label\": \"question\"}",
+                      "name": "evaluation"
+                    },
+                    "id": "call_recorded_0",
+                    "type": "function"
+                  }
+                ]
+              }
+            }
+          ],
+          "created": 0,
+          "id": "chatcmpl-recorded",
+          "model": "gpt-4o-mini",
+          "object": "chat.completion",
+          "usage": {
+            "completion_tokens": 10,
+            "prompt_tokens": 127,
+            "total_tokens": 137
+          }
+        }
+      }
+    ],
+    "entry": {
+      "input": "What is the capital of France?",
+      "output": "Paris is the capital of France."
+    },
+    "env": {},
+    "name": "second_category",
+    "result": {
+      "cost": {
+        "amount": 2.505e-05,
+        "currency": "USD"
+      },
+      "details": "Scripted reasoning.",
+      "label": "question",
+      "passed": null,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "categories": [
+        {
+          "description": "The message is a greeting",
+          "name": "greeting"
+        },
+        {
+          "description": "The message asks a question",
+          "name": "question"
+        }
+      ],
+      "model": "openai/gpt-4o-mini"
+    }
+  }
+]
