@@ -7,6 +7,7 @@ import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
  * behind these stays private — composition states substrates, never classes.
  */
 import { BillingApp } from "./app/billing.app.ts";
+import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
 import type { BillableEventsMeterRepository } from "./repositories/billable-events-meter.repository.ts";
@@ -56,6 +57,7 @@ export const billingServer = defineServerModule("billing")
   )
   .withEventing(connectedBillingEventing)
   .withEventing(billingReportingEventing)
+  .withEventing(billingLifecycleEventing)
   .withTasks(async ({ secrets }) => [
     await secrets.into(BillingApp.secrets.stripeSecretKey, (secretKey) =>
       StripePricesSyncTask.create({ secretKey: () => secretKey }),

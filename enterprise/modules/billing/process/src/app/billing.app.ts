@@ -34,7 +34,7 @@ import {
   type UsageWarningDecision,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommands, EventingCommandSender } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
@@ -55,6 +55,7 @@ import { connectedStatementMailChannels } from "../channels/connected-statement-
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
+import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
   type BillingReportingDefinition,
   BillingReportingPipeline,
@@ -64,6 +65,7 @@ import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { resourceLimitCooldown } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
+import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
 import {
   EEWebhookService,
@@ -240,6 +242,10 @@ export class BillingApp
         statementMail: connectedStatementMailChannels.ses.create(mailer),
         usageWarnings: BillingApp.#composeUsageWarnings(setup, notices),
         resourceLimitAlerts: BillingApp.#composeResourceLimitAlerts(setup, notices),
+        lifecycle: BillingLifecycleAnnouncerService.create({
+          subscriptions: setup.repositories.webhookSubscriptions,
+          organizations: setup.dependencies.organizations,
+        }),
         webhook: {
           signing,
           host: billingWebhookHostChannels.slack.create({ notices }),
@@ -333,6 +339,7 @@ export class BillingApp
     resourceLimitAlerts,
     webhook,
     subscription,
+    lifecycle,
   }: {
     members: BillingMembers;
     repositories: Pick<
@@ -363,6 +370,8 @@ export class BillingApp
     webhook?: StripeWebhookComposition;
     /** Main's subscription door; absent, every `subscription.*` procedure answers not found. */
     subscription?: SubscriptionComposition;
+    /** Records the checkout and subscription changes for peers; absent where a suite composes none. */
+    lifecycle?: BillingLifecycleAnnouncerService;
   }): BillingApp {
     const { isSaas, nodeEnvironment } = members;
     const repository = repositories.connectedBilling;
@@ -402,6 +411,7 @@ export class BillingApp
     if (!stripeSecretKey) {
       return new BillingApp({
         ...gate,
+        lifecycle,
         connected: void 0,
         stripeWebhook: BillingApp.#undispatchedWebhook(),
         subscriptions: void 0,
@@ -433,6 +443,7 @@ export class BillingApp
 
     return new BillingApp({
       ...gate,
+      lifecycle,
       stripeWebhook: webhook
         ? BillingApp.#composeStripeWebhook({
             webhook,
@@ -442,6 +453,7 @@ export class BillingApp
             repositories,
             licensePaymentLinkId: config.licensePaymentLinkId,
             connectedBilling: billing,
+            announcer: lifecycle,
           })
         : BillingApp.#undispatchedWebhook(),
       subscriptions:
@@ -625,7 +637,9 @@ export class BillingApp
     repositories,
     licensePaymentLinkId,
     connectedBilling,
+    announcer,
   }: {
+    announcer: BillingLifecycleAnnouncerService | undefined;
     webhook: StripeWebhookComposition;
     isSaas: boolean;
     stripeSecretKey: string;
@@ -648,6 +662,7 @@ export class BillingApp
       host: webhook.host,
       retention: webhook.retention,
       connectedBilling,
+      ...(announcer ? { announcer } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
@@ -688,6 +703,7 @@ export class BillingApp
   readonly #reporting: BillingReportingPipeline;
   readonly #usageWarnings: UsageWarningService;
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
+  readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
 
   private constructor({
     stripeWebhook,
@@ -703,7 +719,9 @@ export class BillingApp
     reporting,
     usageWarnings,
     resourceLimitAlerts,
+    lifecycle,
   }: {
+    lifecycle: BillingLifecycleAnnouncerService | undefined;
     stripeWebhook: StripeWebhookReceiptService;
     subscriptions: SubscriptionDoor | undefined;
     connected: ConnectedBilling | undefined;
@@ -731,6 +749,7 @@ export class BillingApp
     this.#reporting = reporting;
     this.#usageWarnings = usageWarnings;
     this.#resourceLimitAlerts = resourceLimitAlerts;
+    this.#lifecycle = lifecycle;
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
@@ -760,6 +779,23 @@ export class BillingApp
     organizationId: string;
   }): Promise<{ pricingModel: BillingPricingModel | null }> {
     return this.#pricing.getPricingModel(input);
+  }
+
+  /** The pipeline `billing_lifecycle` registers, composed once by {@link create}. */
+  lifecyclePipeline(): BillingLifecyclePipeline {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+
+    return this.#lifecycle.pipeline;
+  }
+
+  /** Binds the lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: EventingCommands<BillingLifecyclePipeline>): void {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    this.#lifecycle.connect(commands);
   }
 
   /** The command-only pipeline `billing_reporting` registers, composed once by {@link assemble}. */

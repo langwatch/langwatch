@@ -15,6 +15,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -76,6 +77,7 @@ describe("given a process that installs the evaluation module over its repositor
           experiment: createApiFixture<ExperimentApi>(),
           automation: createApiFixture<AutomationApi>(),
           analytics: createApiFixture<AnalyticsApi>(),
+          projects: createApiFixture<ProjectApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
             getPlatformDefaultRetentionDays: () => 30,
           }),

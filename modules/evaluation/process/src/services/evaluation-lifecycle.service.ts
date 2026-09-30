@@ -54,7 +54,7 @@ export class EvaluationLifecycleService {
   /** Throws to be retried: the settled evaluation's own subscriber calls it. */
   async completed(input: {
     projectId: string;
-    run: EvaluationRunData;
+    run: Pick<EvaluationRunData, "evaluationId" | "evaluatorType" | "score" | "passed">;
     occurredAt: number;
   }): Promise<void> {
     const { projectId, run } = input;

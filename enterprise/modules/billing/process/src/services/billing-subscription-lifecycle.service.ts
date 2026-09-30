@@ -29,6 +29,7 @@ import type {
 } from "../repositories/billing-webhook-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
+import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
@@ -49,6 +50,11 @@ type BillingSubscriptionLifecycleOptions = {
   host: BillingWebhookHost;
   /** Data-retention's rules, which a first seat activation stamps at the platform default. */
   retention: SeatRetentionRules;
+  /** Records subscription changes for peers; absent where nothing composes a lifecycle. */
+  announcer?: Pick<
+    BillingLifecycleAnnouncerService,
+    "subscriptionActivated" | "subscriptionCancelled"
+  >;
 };
 
 /** The two data-retention operations seat provisioning reads and writes. */
@@ -65,6 +71,7 @@ export class BillingSubscriptionLifecycleService {
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
   private readonly retention: SeatRetentionRules;
+  private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
@@ -74,6 +81,7 @@ export class BillingSubscriptionLifecycleService {
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
     this.retention = options.retention;
+    this.announcer = options.announcer;
   }
 
   async handleSubscriptionDeleted({
@@ -106,6 +114,9 @@ export class BillingSubscriptionLifecycleService {
     }
 
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
+    await this.announcer?.subscriptionCancelled({
+      organizationId: existingSubscription.organizationId,
+    });
 
     await this.bestEffort.run({
       label: "cancellation notification",
@@ -166,6 +177,7 @@ export class BillingSubscriptionLifecycleService {
    */
   private async cancelSubscriptionRecord(existing: BillingSubscriptionRecord): Promise<void> {
     await this.subscriptionRepository.cancel({ id: existing.id });
+    await this.announcer?.subscriptionCancelled({ organizationId: existing.organizationId });
   }
 
   /** Reconciles the seat and event quantities Stripe now reports, and notifies on activation. */
@@ -205,6 +217,9 @@ export class BillingSubscriptionLifecycleService {
           startDate: updatedSubscription.startDate,
           ...planQuantitiesOf(updatedSubscription),
         }),
+    });
+    await this.announcer?.subscriptionActivated({
+      organizationId: updatedSubscription.organizationId,
     });
   }
 
@@ -317,6 +332,9 @@ export class BillingSubscriptionLifecycleService {
             startDate: updatedSubscription.startDate,
             ...planQuantitiesOf(updatedSubscription),
           }),
+      });
+      await this.announcer?.subscriptionActivated({
+        organizationId: updatedSubscription.organizationId,
       });
     }
   }

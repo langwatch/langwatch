@@ -43,6 +43,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -64,6 +65,7 @@ import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
 import { NullLangevalsChannel } from "../channels/null.langevals.channel.ts";
 import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
+import type { EvaluationLifecyclePipeline } from "../eventing/evaluation-lifecycle.pipeline.ts";
 import {
   EvaluationProcessingPipelineAdapter,
   type EvaluationAutomationReactions,
@@ -94,6 +96,7 @@ import {
   EVAL_INPUTS_PREVIEW_BYTES,
   EvaluationInputsOffloadService,
 } from "../services/evaluation-inputs-offload.service.ts";
+import { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
 import { EvaluationModelCascadeService } from "../services/evaluation-model-cascade.service.ts";
 import { EvaluationMonitorLookupService } from "../services/evaluation-monitor-lookup.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
@@ -269,6 +272,8 @@ export class EvaluationApp implements EvaluationApiContract {
     datasets: DatasetApi,
     /** The experiment and run history SDK batches and dataset evaluations are written into. */
     experiments: ExperimentApi,
+    /** Names the organization's admin and its projects when an evaluation settles. */
+    projects: ProjectApi,
   };
   static readonly reads = reads("objectStorage");
   static readonly secrets = {
@@ -299,6 +304,7 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #executionIntent: EvaluationExecutionIntent;
   readonly #eventing: EvaluationProcessingStoresAdapter;
   readonly #automations: EvaluationAutomationReactions;
+  readonly #lifecycle: EvaluationLifecycleService | undefined;
 
   private constructor({
     service,
@@ -309,6 +315,7 @@ export class EvaluationApp implements EvaluationApiContract {
     piiDetection,
     executionIntent,
     eventing,
+    lifecycle,
   }: {
     service: EvaluationService;
     dependencies: EvaluationSetup["dependencies"];
@@ -318,8 +325,10 @@ export class EvaluationApp implements EvaluationApiContract {
     piiDetection: LangevalsPiiDetectionService;
     executionIntent: EvaluationExecutionIntent;
     eventing: EvaluationProcessingStoresAdapter;
+    lifecycle: EvaluationLifecycleService | undefined;
   }) {
     this.#service = service;
+    this.#lifecycle = lifecycle;
     this.#clustering = clustering;
     this.#piiDetection = piiDetection;
     this.#executionIntent = executionIntent;
@@ -369,6 +378,10 @@ export class EvaluationApp implements EvaluationApiContract {
     environment: EvaluatorEnvironmentService,
   ): EvaluationApp {
     const commands = EvaluationCommandDispatcherService.create();
+    const lifecycle = EvaluationLifecycleService.create({
+      projects: dependencies.projects,
+      runs: repositories.runs,
+    });
     const langevals = config.langevalsEndpoint
       ? langevalsChannels.live.create({
           config,
@@ -438,6 +451,7 @@ export class EvaluationApp implements EvaluationApiContract {
         execution,
         inputResolution: inputs,
         environment,
+        analytics: { evaluationRan: (input) => void lifecycle.ran(input) },
         report: commands,
         rescore: {
           runForTrace: async (input, by) =>
@@ -462,6 +476,7 @@ export class EvaluationApp implements EvaluationApiContract {
       dependencies,
       repositories,
       commands,
+      lifecycle,
       clustering: LangevalsClusteringService.create({
         endpoint: config.langevalsEndpoint,
         langevals,
@@ -505,6 +520,8 @@ export class EvaluationApp implements EvaluationApiContract {
     dependencies: EvaluationSetup["dependencies"];
     repositories: Pick<EvaluationRepositories, "runs" | "monitorPerformance">;
     commands?: EvaluationCommandDispatcherService;
+    /** Absent where a suite composes none; the app then holds no lifecycle pipeline. */
+    lifecycle?: EvaluationLifecycleService;
     clustering: LangevalsClusteringService;
     piiDetection: LangevalsPiiDetectionService;
     executionIntent: EvaluationExecutionIntent;
@@ -515,6 +532,7 @@ export class EvaluationApp implements EvaluationApiContract {
       dependencies,
       repositories,
       commands,
+      lifecycle,
       clustering,
       piiDetection,
       executionIntent,
@@ -533,6 +551,7 @@ export class EvaluationApp implements EvaluationApiContract {
       dependencies,
       members,
       commands,
+      lifecycle,
       clustering,
       piiDetection,
       executionIntent,
@@ -546,7 +565,25 @@ export class EvaluationApp implements EvaluationApiContract {
       ...this.#eventing.buildStores(),
       executeEvaluationCommand: ExecuteEvaluationCommand.create(this.#executionIntent),
       automations: this.#automations,
+      ...(this.#lifecycle ? { lifecycle: this.#lifecycle } : {}),
     });
+  }
+
+  /** The pipeline `evaluation_lifecycle` registers, built once by {@link create}. */
+  lifecyclePipeline(): EvaluationLifecyclePipeline {
+    if (!this.#lifecycle) {
+      throw new Error("This evaluation app was composed without a lifecycle pipeline");
+    }
+
+    return this.#lifecycle.pipeline;
+  }
+
+  /** Binds the lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: EventingCommands<EvaluationLifecyclePipeline>): void {
+    if (!this.#lifecycle) {
+      throw new Error("This evaluation app was composed without a lifecycle pipeline");
+    }
+    this.#lifecycle.connect(commands);
   }
 
   /** Binds evaluation_processing's own senders; `reportEvaluation` goes through them. */

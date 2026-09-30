@@ -1,0 +1,444 @@
+# The `langwatch` CLI project-level families: model defaults, saved charts, dashboard widgets and
+# test suites (client-sdk/services/{model-defaults,charts,dashboard-widgets,test-suites}). Paths
+# are the ones the services call: `/api/v1/model-defaults` (PUT to update, 204 on update and
+# delete), `/api/v1/projects/{projectId}/analytics/{charts,dashboard-widgets}` and
+# `/api/v1/test-suites` (the client has no "suites" or duplicate route). Bodies are what the
+# commands build. Anything a scenario creates is removed in a teardown step. Written unrun.
+# The widget scenarios address the fixture widget project (the only project with the
+# release_custom_chart_playground flag on; in any other the widget routes refuse and the chart
+# routes work) with its fixed key, as the other scenarios cannot reach it.
+
+# ── model defaults ───────────────────────────────────────────────────────────
+
+- id: "cli-model-defaults-snapshot-carries-the-fields-the-cli-reads"
+  endpoint: "GET /api/v1/model-defaults"
+  auth: "org"
+  shard: "project"
+  request: {"path": "/api/v1/model-defaults", "headers": {"X-Project-Id": "{projectId}"}}
+  expect:
+    status: 200
+    body: {"scope": {"projectId": "{projectId}", "teamId": "<any>", "organizationId": "<any>", "organizationName": "<any>"}, "configs": "<any>"}
+    contains: ["effective", "DEFAULT", "FAST", "EMBEDDINGS"]
+
+- id: "cli-model-defaults-set-update-unset-round-trip"
+  endpoint: "POST /api/v1/model-defaults"
+  auth: "org"
+  shard: "project"
+  serial: true
+  request:
+    path: "/api/v1/model-defaults"
+    headers: {"X-Project-Id": "{projectId}"}
+    body: {"config": {"DEFAULT": "openai/gpt-5-mini"}, "scopes": [{"scopeType": "PROJECT", "scopeId": "{projectId}"}]}
+  capture: {"configId": "id"}
+  expect: {"status": [200, 201], "body": {"id": "<any>"}}
+  verify:
+    - request: "GET /api/v1/model-defaults"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect:
+        status: 200
+        body: {"effective": {"DEFAULT": {"model": "openai/gpt-5-mini", "source": "<any>"}}}
+        contains: ["{configId}", "PROJECT", "createdAt", "updatedAt"]
+    - request: "PUT /api/v1/model-defaults/{configId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      body: {"config": {"DEFAULT": "openai/gpt-5-mini", "FAST": "openai/gpt-5-nano"}}
+      expect: {"status": 204}
+    - request: "GET /api/v1/model-defaults"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "contains": ["{configId}", "openai/gpt-5-nano"]}
+    - request: "DELETE /api/v1/model-defaults/{configId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 204}
+    - request: "GET /api/v1/model-defaults"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "notContains": "{configId}"}
+  teardown:
+    - request: "DELETE /api/v1/model-defaults/{configId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+
+- id: "cli-model-defaults-update-unknown-config-is-404"
+  endpoint: "PUT /api/v1/model-defaults/{id}"
+  auth: "org"
+  shard: "project"
+  request: {"path": "/api/v1/model-defaults/cfg-nope-{uid}", "headers": {"X-Project-Id": "{projectId}"}, "body": {"config": {"DEFAULT": "openai/gpt-5"}}}
+  expect: {"status": 404}
+
+- id: "cli-model-defaults-delete-unknown-config-is-404"
+  endpoint: "DELETE /api/v1/model-defaults/{id}"
+  auth: "org"
+  shard: "project"
+  request: {"path": "/api/v1/model-defaults/cfg-nope-{uid}", "headers": {"X-Project-Id": "{projectId}"}}
+  expect: {"status": 404}
+
+# ── saved charts ─────────────────────────────────────────────────────────────
+
+- id: "cli-charts-create-get-list-update-place-unplace-delete"
+  endpoint: "POST /api/v1/projects/{projectId}/analytics/charts"
+  auth: "project"
+  setup:
+    - request: "POST /api/dashboards"
+      auth: "project"
+      body: {"name": "vd-dash-{uid}"}
+      capture: {"dashboardId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/projects/{projectId}/analytics/charts"
+    body: {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5", "parameters": {}}}
+  capture: {"chartId": "id"}
+  expect:
+    status: 201
+    body:
+      id: "<any>"
+      name: "vd-{uid}"
+      definition: {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5"}
+      createdAt: "<any>"
+      updatedAt: "<any>"
+      platformUrl: "<any>"
+      dashboardId: null
+      gridColumn: "<any>"
+      gridRow: "<any>"
+      colSpan: "<any>"
+      rowSpan: "<any>"
+  verify:
+    - request: "GET /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+      expect: {"status": 200, "body": {"id": "{chartId}", "name": "vd-{uid}"}}
+    - request: "GET /api/v1/projects/{projectId}/analytics/charts"
+      auth: "project"
+      expect: {"status": 200, "path": "data", "contains": ["{chartId}", "vd-{uid}"]}
+    - request: "PATCH /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+      body: {"name": "vd2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{chartId}", "name": "vd2-{uid}", "definition": {"sql": "SELECT TraceId FROM traces LIMIT 5"}}}
+    - request: "PATCH /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+      body: {"definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 7", "parameters": {}}}
+      expect: {"status": 200, "body": {"id": "{chartId}", "name": "vd2-{uid}", "definition": {"sql": "SELECT TraceId FROM traces LIMIT 7"}}}
+    - request: "PUT /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement"
+      auth: "project"
+      body: {"dashboardId": "{dashboardId}"}
+      expect: {"status": 200, "body": {"id": "{chartId}", "dashboardId": "{dashboardId}"}}
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement"
+      auth: "project"
+      expect: {"status": 204}
+    - request: "GET /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+      expect: {"status": 200, "body": {"id": "{chartId}", "dashboardId": null}}
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+      expect: {"status": 204}
+    - request: "GET /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+      expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+    - request: "DELETE /api/dashboards/{dashboardId}"
+      auth: "project"
+
+- id: "cli-charts-place-with-grid-position-reads-it-back"
+  endpoint: "PUT /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement"
+  auth: "project"
+  setup:
+    - request: "POST /api/dashboards"
+      auth: "project"
+      body: {"name": "vd-dash-{uid}"}
+      capture: {"dashboardId": "id"}
+      expect: {"status": 201}
+    - request: "POST /api/v1/projects/{projectId}/analytics/charts"
+      auth: "project"
+      body: {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5", "parameters": {}}}
+      capture: {"chartId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement"
+    body: {"dashboardId": "{dashboardId}", "gridColumn": 2, "gridRow": 3, "colSpan": 4, "rowSpan": 5}
+  expect: {"status": 200, "body": {"id": "{chartId}", "dashboardId": "{dashboardId}", "gridColumn": 2, "gridRow": 3, "colSpan": 4, "rowSpan": 5}}
+  teardown:
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+    - request: "DELETE /api/dashboards/{dashboardId}"
+      auth: "project"
+
+- id: "cli-charts-unplace-a-chart-that-is-not-placed-is-204"
+  endpoint: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement"
+  auth: "project"
+  setup:
+    - request: "POST /api/v1/projects/{projectId}/analytics/charts"
+      auth: "project"
+      body: {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5", "parameters": {}}}
+      capture: {"chartId": "id"}
+      expect: {"status": 201}
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement"}
+  expect: {"status": 204}
+  teardown:
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+
+- id: "cli-charts-place-on-an-unknown-dashboard-is-404"
+  endpoint: "PUT /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement"
+  auth: "project"
+  setup:
+    - request: "POST /api/v1/projects/{projectId}/analytics/charts"
+      auth: "project"
+      body: {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5", "parameters": {}}}
+      capture: {"chartId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement"
+    body: {"dashboardId": "dash-nope-{uid}"}
+  expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+
+- id: "cli-charts-update-with-neither-field-is-refused"
+  endpoint: "PATCH /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+  auth: "project"
+  setup:
+    - request: "POST /api/v1/projects/{projectId}/analytics/charts"
+      auth: "project"
+      body: {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5", "parameters": {}}}
+      capture: {"chartId": "id"}
+      expect: {"status": 201}
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts/{chartId}", "body": {}}
+  expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+      auth: "project"
+
+- id: "cli-charts-get-unknown-is-404"
+  endpoint: "GET /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+  auth: "project"
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts/chart-nope-{uid}"}
+  expect: {"status": 404}
+
+- id: "cli-charts-delete-unknown-is-404"
+  endpoint: "DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}"
+  auth: "project"
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts/chart-nope-{uid}"}
+  expect: {"status": 404}
+
+# ── dashboard widgets (fixture widget project) ───────────────────────────────
+
+- id: "cli-dashboard-widgets-create-get-list-update-pin-delete"
+  endpoint: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets"
+  auth: "none"
+  setup:
+    - request: "POST /api/dashboards"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      body: {"name": "vd-dash-{uid}"}
+      capture: {"dashboardId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets"
+    headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    body: {"name": "vd-{uid}", "code": "export default function Widget() { return null; }", "queries": [{"name": "q", "sql": "SELECT 1 AS one"}]}
+  capture: {"widgetId": "id"}
+  expect:
+    status: 201
+    body:
+      id: "<any>"
+      name: "vd-{uid}"
+      definition: {"version": "<any>", "code": "export default function Widget() { return null; }", "queries": [{"name": "q", "sql": "SELECT 1 AS one"}]}
+      createdAt: "<any>"
+      updatedAt: "<any>"
+      platformUrl: "<any>"
+      dashboardId: null
+      gridColumn: "<any>"
+      gridRow: "<any>"
+      colSpan: "<any>"
+      rowSpan: "<any>"
+  verify:
+    - request: "GET /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      expect: {"status": 200, "body": {"id": "{widgetId}", "name": "vd-{uid}"}}
+    - request: "GET /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      expect: {"status": 200, "path": "data", "contains": ["{widgetId}", "vd-{uid}"]}
+    - request: "PATCH /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      body: {"name": "vd2-{uid}", "code": "export default function Widget() { return 1; }", "queries": [{"name": "q", "sql": "SELECT 2 AS two"}]}
+      expect: {"status": 200, "body": {"id": "{widgetId}", "name": "vd2-{uid}", "definition": {"code": "export default function Widget() { return 1; }"}}}
+    - request: "POST /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}/dashboard"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      body: {"dashboardId": "{dashboardId}"}
+      expect: {"status": 200, "body": {"id": "{widgetId}", "dashboardId": "{dashboardId}"}}
+    - request: "DELETE /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      expect: {"status": 204}
+    - request: "GET /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "DELETE /api/dashboards/{dashboardId}"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+
+- id: "cli-dashboard-widgets-update-with-code-alone-is-refused"
+  endpoint: "PATCH /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+  auth: "none"
+  setup:
+    - request: "POST /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      body: {"name": "vd-{uid}", "code": "export default function Widget() { return null; }", "queries": [{"name": "q", "sql": "SELECT 1 AS one"}]}
+      capture: {"widgetId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
+    headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    body: {"code": "export default function Widget() { return 1; }"}
+  expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+
+- id: "cli-dashboard-widgets-pin-on-an-unknown-dashboard-is-404"
+  endpoint: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard"
+  auth: "none"
+  setup:
+    - request: "POST /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      body: {"name": "vd-{uid}", "code": "export default function Widget() { return null; }", "queries": [{"name": "q", "sql": "SELECT 1 AS one"}]}
+      capture: {"widgetId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}/dashboard"
+    headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    body: {"dashboardId": "dash-nope-{uid}"}
+  expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
+      auth: "none"
+      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+
+- id: "cli-dashboard-widgets-get-unknown-is-404"
+  endpoint: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+  auth: "none"
+  request:
+    path: "/api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/widget-nope-{uid}"
+    headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+  expect: {"status": 404}
+
+# ── test suites ──────────────────────────────────────────────────────────────
+
+- id: "cli-test-suites-create-with-fields-update-replaces-them"
+  endpoint: "POST /api/v1/test-suites"
+  request:
+    path: "/api/v1/test-suites"
+    body: {"name": "vd-{uid}", "fields": [{"identifier": "tenant_id", "type": "text"}]}
+  capture: {"suiteId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "name": "vd-{uid}", "slug": "<any>", "scenarioCount": 0, "archivedAt": null, "createdAt": "<any>", "updatedAt": "<any>", "platformUrl": "<any>"}
+    contains: ["tenant_id"]
+  verify:
+    - request: "GET /api/v1/test-suites/{suiteId}"
+      expect: {"status": 200, "body": {"id": "{suiteId}", "scenarios": "<any>"}, "contains": ["tenant_id"]}
+    - request: "PATCH /api/v1/test-suites/{suiteId}"
+      body: {"fields": [{"identifier": "region", "type": "text"}]}
+      expect: {"status": 200, "body": {"id": "{suiteId}", "name": "vd-{uid}"}, "contains": ["region"], "notContains": "tenant_id"}
+    - request: "PATCH /api/v1/test-suites/{suiteId}"
+      body: {"name": "vd2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{suiteId}", "name": "vd2-{uid}"}, "contains": ["region"]}
+  teardown:
+    - request: "DELETE /api/v1/test-suites/{suiteId}"
+
+- id: "cli-test-suites-list-hides-archived-unless-asked"
+  endpoint: "GET /api/v1/test-suites"
+  setup:
+    - request: "POST /api/v1/test-suites"
+      body: {"name": "vd-{uid}"}
+      capture: {"suiteId": "id"}
+      expect: {"status": 201}
+    - request: "DELETE /api/v1/test-suites/{suiteId}"
+      expect: {"status": 200, "body": {"id": "{suiteId}", "archived": true}}
+  request: {"path": "/api/v1/test-suites"}
+  expect: {"status": 200, "notContains": "{suiteId}"}
+  verify:
+    - request: "GET /api/v1/test-suites?includeArchived=true"
+      expect: {"status": 200, "contains": ["{suiteId}", "archivedAt"]}
+
+- id: "cli-test-suites-create-with-a-bad-field-identifier-is-refused"
+  endpoint: "POST /api/v1/test-suites"
+  request:
+    path: "/api/v1/test-suites"
+    body: {"name": "vd-{uid}", "fields": [{"identifier": "Bad Name", "type": "text"}]}
+  expect: {"status": [400, 422]}
+  verify:
+    - request: "GET /api/v1/test-suites"
+      expect: {"status": 200, "notContains": "vd-{uid}"}
+
+- id: "cli-test-suites-run-with-no-targets-is-refused"
+  endpoint: "POST /api/v1/test-suites/{id}/run"
+  setup:
+    - request: "POST /api/v1/test-suites"
+      body: {"name": "vd-{uid}"}
+      capture: {"suiteId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/test-suites/{suiteId}/run"
+    body: {"targets": []}
+  expect: {"status": [400, 422], "contains": "suite_targets_required"}
+  teardown:
+    - request: "DELETE /api/v1/test-suites/{suiteId}"
+
+- id: "cli-test-suites-run-schedules-jobs-and-answers-the-plan"
+  endpoint: "POST /api/v1/test-suites/{id}/run"
+  setup:
+    - request: "POST /api/v1/test-suites"
+      body: {"name": "vd-{uid}"}
+      capture: {"suiteId": "id"}
+      expect: {"status": 201}
+    - request: "POST /api/v1/scenarios"
+      body: {"name": "vd-{uid}", "situation": "A customer asks for a refund", "criteria": ["Agent apologises"], "labels": ["vd"], "testSuiteId": "{suiteId}"}
+      capture: {"scenarioId": "id"}
+      expect: {"status": [200, 201]}
+    - request: "POST /api/v1/agents"
+      body: {"name": "vd-{uid}", "type": "http", "config": {"url": "http://127.0.0.1:1/echo", "method": "POST"}}
+      capture: {"agentId": "id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/v1/test-suites/{suiteId}/run"
+    body: {"targets": [{"type": "http", "referenceId": "{agentId}"}], "name": "vd-plan-{uid}", "repeatCount": 1, "note": "apidiff"}
+  capture: {"planId": "runPlanId"}
+  expect:
+    status: [200, 201]
+    body: {"scheduled": true, "batchRunId": "<any>", "setId": "<any>", "jobCount": 1, "runPlanId": "<any>", "planName": "vd-plan-{uid}", "created": true, "items": "<any>"}
+  verify:
+    - request: "GET /api/v1/test-suites/{suiteId}"
+      expect: {"status": 200, "body": {"id": "{suiteId}", "scenarioCount": 1}, "contains": ["{scenarioId}"]}
+  teardown:
+    - request: "DELETE /api/v1/run-plans/{planId}"
+    - request: "DELETE /api/v1/test-suites/{suiteId}"
+    - request: "DELETE /api/v1/agents/{agentId}"
+
+- id: "cli-test-suites-run-unknown-suite-is-404"
+  endpoint: "POST /api/v1/test-suites/{id}/run"
+  request:
+    path: "/api/v1/test-suites/nope-{uid}/run"
+    body: {"targets": [{"type": "http", "referenceId": "agent-nope-{uid}"}]}
+  expect: {"status": 404}
+
+- id: "cli-test-suites-archive-unknown-suite-is-404"
+  endpoint: "DELETE /api/v1/test-suites/{id}"
+  request: {"path": "/api/v1/test-suites/nope-{uid}"}
+  expect: {"status": 404}

@@ -1,0 +1,204 @@
+# The `langwatch` CLI webhook family (sdks/typescript, client-sdk/services/webhooks): an
+# organization key as a Bearer token, the `/api/webhooks/v1/...` paths the service calls and the
+# bodies the CLI commands build (undefined fields are dropped, so a status change sends `status`
+# alone). Assertions name the fields WebhooksApiService and the commands read. Every scenario that
+# makes an endpoint archives it in a teardown step. Written unrun; the events log needs ClickHouse.
+
+- id: "cli-webhooks-create-list-get-update-archive"
+  endpoint: "POST /api/webhooks/v1/endpoints"
+  auth: "org"
+  request:
+    path: "/api/webhooks/v1/endpoints"
+    body: {"destination_kind": "http", "url": "https://example.com/vd-{uid}", "enabled_events": ["gateway.request.completed"]}
+  capture: {"endpointId": "data.id"}
+  expect:
+    status: 201
+    body:
+      data:
+        id: "<any>"
+        destination_kind: "http"
+        url: "https://example.com/vd-{uid}"
+        enabled_events: ["gateway.request.completed"]
+        status: "active"
+        secret: "<any>"
+        max_batch_size: "<any>"
+        max_batch_delay_ms: "<any>"
+        max_in_flight: "<any>"
+        created_at: "<any>"
+        updated_at: "<any>"
+  verify:
+    - request: "GET /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+      expect: {"status": 200, "body": {"data": {"id": "{endpointId}", "url": "https://example.com/vd-{uid}", "status": "active"}}, "notContains": "\"secret\""}
+    - request: "GET /api/webhooks/v1/endpoints"
+      auth: "org"
+      expect: {"status": 200, "path": "data", "contains": ["{endpointId}", "vd-{uid}"]}
+    - request: "PATCH /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+      body: {"url": "https://example.com/vd2-{uid}", "enabled_events": ["gateway.request.settled"], "max_batch_size": 5}
+      expect: {"status": 200, "body": {"data": {"id": "{endpointId}", "url": "https://example.com/vd2-{uid}", "enabled_events": ["gateway.request.settled"], "max_batch_size": 5}}}
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+      expect: {"status": 200}
+    - request: "GET /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+      expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+
+- id: "cli-webhooks-sqs-create-reads-queue-fields"
+  endpoint: "POST /api/webhooks/v1/endpoints"
+  auth: "org"
+  request:
+    path: "/api/webhooks/v1/endpoints"
+    body: {"destination_kind": "sqs", "sqs": {"queue_url": "https://sqs.eu-west-1.amazonaws.com/123456789012/vd-{uid}", "role_arn": "arn:aws:iam::123456789012:role/vd-{uid}"}, "enabled_events": ["gateway.request.completed"]}
+  capture: {"endpointId": "data.id"}
+  expect:
+    status: 201
+    body:
+      data:
+        destination_kind: "sqs"
+        url: null
+        sqs: {"queue_url": "https://sqs.eu-west-1.amazonaws.com/123456789012/vd-{uid}", "region": "eu-west-1", "account_id": "123456789012", "queue_name": "vd-{uid}", "credential_mode": "assume_role", "role_arn": "arn:aws:iam::123456789012:role/vd-{uid}", "external_id": "<any>"}
+        secret: "<any>"
+  teardown:
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+
+- id: "cli-webhooks-disable-and-enable-send-status-alone"
+  endpoint: "PATCH /api/webhooks/v1/endpoints/{id}"
+  auth: "org"
+  setup:
+    - request: "POST /api/webhooks/v1/endpoints"
+      auth: "org"
+      body: {"destination_kind": "http", "url": "https://example.com/vd-{uid}", "enabled_events": ["gateway.request.completed"]}
+      capture: {"endpointId": "data.id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/webhooks/v1/endpoints/{endpointId}"
+    method: "PATCH"
+    body: {"status": "disabled"}
+  expect: {"status": 200, "body": {"data": {"id": "{endpointId}", "status": "disabled", "disabled_at": "<any>", "url": "https://example.com/vd-{uid}"}}}
+  verify:
+    - request: "PATCH /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+      body: {"status": "active"}
+      expect: {"status": 200, "body": {"data": {"id": "{endpointId}", "status": "active", "disabled_at": null}}}
+  teardown:
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+
+- id: "cli-webhooks-roll-secret-carries-the-new-secret-once"
+  endpoint: "POST /api/webhooks/v1/endpoints/{id}/roll-secret"
+  auth: "org"
+  setup:
+    - request: "POST /api/webhooks/v1/endpoints"
+      auth: "org"
+      body: {"destination_kind": "http", "url": "https://example.com/vd-{uid}", "enabled_events": ["gateway.request.completed"]}
+      capture: {"endpointId": "data.id", "oldSecret": "data.secret"}
+      expect: {"status": 201}
+  request:
+    path: "/api/webhooks/v1/endpoints/{endpointId}/roll-secret"
+    method: "POST"
+  expect: {"status": 200, "body": {"data": {"id": "{endpointId}", "secret": "<any>", "status": "active"}}, "notContains": "{oldSecret}"}
+  verify:
+    - request: "GET /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+      expect: {"status": 200, "notContains": "\"secret\""}
+  teardown:
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+
+# The route answers 200 whenever the test ran; the CLI reads data.delivered and response_status.
+- id: "cli-webhooks-test-fire-answers-200-with-a-verdict"
+  endpoint: "POST /api/webhooks/v1/endpoints/{id}/test"
+  auth: "org"
+  setup:
+    - request: "POST /api/webhooks/v1/endpoints"
+      auth: "org"
+      body: {"destination_kind": "http", "url": "https://example.com/vd-{uid}", "enabled_events": ["gateway.request.completed"]}
+      capture: {"endpointId": "data.id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/webhooks/v1/endpoints/{endpointId}/test"
+    method: "POST"
+  expect: {"status": 200, "body": {"data": {"delivered": "<any>"}}, "contains": ["delivered", "response_status"]}
+  teardown:
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+
+- id: "cli-webhooks-deliveries-page-carries-data-and-cursor"
+  endpoint: "GET /api/webhooks/v1/endpoints/{id}/deliveries"
+  auth: "org"
+  setup:
+    - request: "POST /api/webhooks/v1/endpoints"
+      auth: "org"
+      body: {"destination_kind": "http", "url": "https://example.com/vd-{uid}", "enabled_events": ["gateway.request.completed"]}
+      capture: {"endpointId": "data.id"}
+      expect: {"status": 201}
+  request:
+    path: "/api/webhooks/v1/endpoints/{endpointId}/deliveries"
+    query: {"limit": 5}
+  expect: {"status": 200, "body": {"data": "<any>"}, "contains": ["next_cursor"]}
+  teardown:
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+
+- id: "cli-webhooks-deliveries-unknown-endpoint-is-404"
+  endpoint: "GET /api/webhooks/v1/endpoints/{id}/deliveries"
+  auth: "org"
+  request: {"path": "/api/webhooks/v1/endpoints/whe_nope{uid}/deliveries"}
+  expect: {"status": 404}
+
+- id: "cli-webhooks-health-carries-every-field-the-cli-prints"
+  endpoint: "GET /api/webhooks/v1/endpoints/{id}/health"
+  auth: "org"
+  setup:
+    - request: "POST /api/webhooks/v1/endpoints"
+      auth: "org"
+      body: {"destination_kind": "http", "url": "https://example.com/vd-{uid}", "enabled_events": ["gateway.request.completed"]}
+      capture: {"endpointId": "data.id"}
+      expect: {"status": 201}
+  request: {"path": "/api/webhooks/v1/endpoints/{endpointId}/health"}
+  expect:
+    status: 200
+    body: {"data": {"status": "active", "dlq_depth": "<any>", "sends_per_minute": "<any>"}}
+    contains: ["disabled_reason", "failing_since", "last_success_at", "last_failure_at", "oldest_undelivered_age_ms", "success_rate", "p95_latency_ms"]
+  teardown:
+    - request: "DELETE /api/webhooks/v1/endpoints/{endpointId}"
+      auth: "org"
+
+- id: "cli-webhooks-event-types-carry-the-catalogue-fields"
+  endpoint: "GET /api/webhooks/v1/event-types"
+  auth: "org"
+  request: {"path": "/api/webhooks/v1/event-types"}
+  expect: {"status": 200, "path": "data", "contains": ["gateway.request.completed", "family", "schema_version", "is_emitting", "description"]}
+
+- id: "cli-webhooks-events-page-carries-data-and-cursor"
+  endpoint: "GET /api/webhooks/v1/events"
+  auth: "org"
+  request:
+    path: "/api/webhooks/v1/events"
+    query: {"type": "gateway.request.completed", "from": "{nowMs-86400000}", "to": "{nowMs}", "limit": 5}
+  expect: {"status": 200, "body": {"data": "<any>"}, "contains": ["next_cursor"]}
+
+- id: "cli-webhooks-events-inverted-range-is-refused"
+  endpoint: "GET /api/webhooks/v1/events"
+  auth: "org"
+  request:
+    path: "/api/webhooks/v1/events"
+    query: {"from": "{nowMs}", "to": "{nowMs-86400000}"}
+  expect: {"status": [400, 422]}
+
+- id: "cli-webhooks-events-without-a-range-is-refused"
+  endpoint: "GET /api/webhooks/v1/events"
+  auth: "org"
+  request: {"path": "/api/webhooks/v1/events"}
+  expect: {"status": [400, 422]}
+
+- id: "cli-webhooks-event-get-unknown-is-404"
+  endpoint: "GET /api/webhooks/v1/events/{id}"
+  auth: "org"
+  request: {"path": "/api/webhooks/v1/events/evt_nope{uid}"}
+  expect: {"status": 404}

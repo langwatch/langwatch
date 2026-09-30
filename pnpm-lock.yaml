@@ -3777,9 +3777,15 @@ importers:
 
   enterprise/modules/nurturing/process:
     dependencies:
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../billing/contract
       '@langwatch/enterprise-nurturing-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/evaluation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../packages/eventing
@@ -7640,6 +7646,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets

@@ -14,6 +14,7 @@ import {
   BillingCheckoutCompletionService,
   type InviteApprover,
 } from "./billing-checkout-completion.service.ts";
+import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
   BillingSubscriptionLifecycleService,
   type SeatRetentionRules,
@@ -101,6 +102,7 @@ export class EEWebhookService implements WebhookService {
     host,
     retention,
     connectedBilling,
+    announcer,
   }: {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
@@ -112,6 +114,8 @@ export class EEWebhookService implements WebhookService {
     host: BillingWebhookHost;
     retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
+    /** Records the checkout and subscription changes for peers; absent where none is composed. */
+    announcer?: BillingLifecycleAnnouncerService;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -130,6 +134,7 @@ export class EEWebhookService implements WebhookService {
       inviteApprover,
       host,
       retention,
+      ...(announcer ? { announcer } : {}),
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository,
@@ -138,6 +143,7 @@ export class EEWebhookService implements WebhookService {
       itemCalculator,
       host,
       retention,
+      ...(announcer ? { announcer } : {}),
     });
   }
 
@@ -152,6 +158,7 @@ export class EEWebhookService implements WebhookService {
     host: BillingWebhookHost;
     retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
+    announcer?: BillingLifecycleAnnouncerService;
   }): EEWebhookService {
     return new EEWebhookService(options);
   }

@@ -19,6 +19,12 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../billing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/evaluation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/eventing/tsconfig.build.json"
     },
     {

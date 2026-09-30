@@ -24,6 +24,7 @@ import {
 } from "@langwatch/eventing";
 
 import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
+import type { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
 import {
   type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
@@ -53,6 +54,8 @@ export interface EvaluationProcessingPipelineDeps {
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
   automations: EvaluationAutomationReactions;
+  /** Records that an evaluation settled; absent where nothing composes a lifecycle. */
+  lifecycle?: Pick<EvaluationLifecycleService, "completed">;
   /** Each tenant's retention; a producer, which projects nothing, declares none. */
   retention?: RetentionPolicyResolver;
 }
@@ -114,6 +117,17 @@ export class EvaluationProcessingPipelineAdapter {
         ttl: 30_000,
         handler: (event, context) =>
           this.deps.automations.handleEvaluationTriggerMatch({ event, context }),
+      })
+      .withProjectionSubscriber("lifecycleCompleted", {
+        fold: "evaluationRun",
+        events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
+        handler: async (event, context) => {
+          await this.deps.lifecycle?.completed({
+            projectId: context.tenantId,
+            run: context.state,
+            occurredAt: event.occurredAt,
+          });
+        },
       })
       .withEventSubscriber("graphTriggerActivity", {
         events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],

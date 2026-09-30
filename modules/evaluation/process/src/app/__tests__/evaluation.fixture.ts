@@ -16,6 +16,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -207,6 +208,7 @@ export function createEvaluationTestApp(
       analytics: AnalyticsApi;
       datasets: DatasetApi;
       experiments: ExperimentApi;
+      projects: ProjectApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -230,6 +232,7 @@ export function createEvaluationTestApp(
       analytics: input.dependencies?.analytics ?? createApiFixture<AnalyticsApi>(),
       datasets: input.dependencies?.datasets ?? createApiFixture<DatasetApi>(),
       experiments: input.dependencies?.experiments ?? createApiFixture<ExperimentApi>(),
+      projects: input.dependencies?.projects ?? createApiFixture<ProjectApi>(),
     },
     clustering:
       input.clustering ??

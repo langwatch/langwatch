@@ -13,6 +13,7 @@ import type { BillingWebhookHost } from "../channels/billing-webhook-host.channe
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service.ts";
+import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
   BillingSubscriptionLifecycleService,
   type SeatRetentionRules,
@@ -41,6 +42,11 @@ type BillingCheckoutCompletionOptions = {
   inviteApprover?: InviteApprover;
   host: BillingWebhookHost;
   retention: SeatRetentionRules;
+  /** Records the checkout and subscription changes for peers; absent where none is composed. */
+  announcer?: Pick<
+    BillingLifecycleAnnouncerService,
+    "checkoutCompleted" | "subscriptionActivated" | "subscriptionCancelled"
+  >;
 };
 
 export class BillingCheckoutCompletionService {
@@ -52,6 +58,7 @@ export class BillingCheckoutCompletionService {
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
   private readonly inviteApprover?: InviteApprover;
   private readonly host: BillingWebhookHost;
+  private readonly announcer: BillingCheckoutCompletionOptions["announcer"];
   private readonly annualThreshold: AnnualEventsBillingThresholdService;
   private readonly lifecycle: BillingSubscriptionLifecycleService;
 
@@ -60,6 +67,7 @@ export class BillingCheckoutCompletionService {
     this.organizationRepository = options.organizationRepository;
     this.inviteApprover = options.inviteApprover;
     this.host = options.host;
+    this.announcer = options.announcer;
     this.annualThreshold = AnnualEventsBillingThresholdService.create({
       stripe: options.stripe,
       prices: options.itemCalculator.prices,
@@ -71,6 +79,7 @@ export class BillingCheckoutCompletionService {
       itemCalculator: options.itemCalculator,
       host: options.host,
       retention: options.retention,
+      ...(options.announcer ? { announcer: options.announcer } : {}),
     });
   }
 
@@ -78,6 +87,7 @@ export class BillingCheckoutCompletionService {
     event,
     subscriptionId,
     customerId,
+    organizationId,
   }: {
     event: Stripe.Event & { type: "checkout.session.completed" };
     subscriptionId: string;
@@ -107,6 +117,14 @@ export class BillingCheckoutCompletionService {
       );
 
       return;
+    }
+
+    if (organizationId) {
+      await this.announcer?.checkoutCompleted({
+        organizationId,
+        subscriptionId,
+        checkoutCreatedAt: new Date(checkoutSession.created * 1000).toISOString(),
+      });
     }
   }
 

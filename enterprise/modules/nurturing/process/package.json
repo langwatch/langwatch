@@ -21,7 +21,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-nurturing-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
