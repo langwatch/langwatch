@@ -3014,7 +3014,7 @@ const presentations = {
   sso_existing_account_unconfirmed: {
     title: "An account with this address already exists",
     describe: () =>
-      "Its address was never confirmed, so single sign-on can't be added to it yet. Sign in the way you did before, or ask whoever manages single sign-on to verify your organization's domain.",
+      "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain and your identity provider marks the address as verified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
   },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",

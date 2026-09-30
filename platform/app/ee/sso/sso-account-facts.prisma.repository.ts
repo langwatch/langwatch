@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { AsyncLocalStorage } from "node:async_hooks";
+
 import type {
   SignInLinkCandidate,
   SignInLinkEvidenceRepository,
@@ -45,10 +47,27 @@ export class PrismaSsoAccountFactsRepository
     SsoTestArrivalAccountsPort,
     SsoTestSignInLookup
 {
-  readonly #prisma: SsoAccountFactsPrisma;
+  readonly #client: SsoAccountFactsPrisma;
+  readonly #transactions?: AsyncLocalStorage<SsoAccountFactsPrisma>;
 
-  constructor(prisma: SsoAccountFactsPrisma) {
-    this.#prisma = prisma;
+  /**
+   * `transactions` is the identity callback's transaction, when one is open.
+   * The account-create hook reads these facts in the middle of a single
+   * sign-on callback, after the user resolver has written inside that same
+   * transaction (it confirms an address it links on a verified domain). A
+   * read on the outer client cannot see that uncommitted write, so the hook
+   * would judge the link on the state from before the resolver ran.
+   */
+  constructor(
+    prisma: SsoAccountFactsPrisma,
+    transactions?: AsyncLocalStorage<SsoAccountFactsPrisma>,
+  ) {
+    this.#client = prisma;
+    this.#transactions = transactions;
+  }
+
+  get #prisma(): SsoAccountFactsPrisma {
+    return this.#transactions?.getStore() ?? this.#client;
   }
 
   async countForUser({ userId }: { userId: string }): Promise<number> {
