@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { chooseStep, flagOf, type StepAnswer } from "../jev";
-import { Ledger } from "../ledger";
-import { candidatesOf } from "../page";
+import { chooseStep, flagOf, type StepAnswer } from "../jev.ts";
+import { Ledger } from "../ledger.ts";
+import { candidatesOf } from "../page.ts";
 
 const ARIA = `- navigation:
   - link "Datasets"

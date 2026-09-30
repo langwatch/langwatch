@@ -1,18 +1,18 @@
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { Side } from "@langwatch/visual-diff-runner/src/capture";
-import { fillPath } from "@langwatch/visual-diff-runner/src/flows/context";
-import { declinePasskeyOffer } from "@langwatch/visual-diff-runner/src/flows/primitives";
-import type { PlanStep } from "@langwatch/visual-diff-runner/src/protocol";
+import type { Side } from "@langwatch/visual-diff-runner/capture";
+import { fillPath } from "@langwatch/visual-diff-runner/flows/context";
+import { declinePasskeyOffer } from "@langwatch/visual-diff-runner/flows/primitives";
+import type { PlanStep } from "@langwatch/visual-diff-runner/protocol";
 
-import { chooseStep, flagOf, type JevConfig, type StepAnswer } from "./jev";
-import type { Ledger } from "./ledger";
-import type { JourneyResult } from "./map";
-import { actionFor, candidatesOf, pageSummary, perform, type Candidate } from "./page";
-import { replan, type Feature, type Journey, type Replan } from "./plan";
-import { logSignatures, stackOf } from "./signals";
-import type { SonnetConfig } from "./sonnet";
+import { chooseStep, flagOf, type JevConfig, type StepAnswer } from "./jev.ts";
+import type { Ledger } from "./ledger.ts";
+import type { JourneyResult } from "./map.ts";
+import { actionFor, candidatesOf, pageSummary, perform, type Candidate } from "./page.ts";
+import { replan, type Feature, type Journey, type Replan } from "./plan.ts";
+import { logSignatures, stackOf } from "./signals.ts";
+import type { SonnetConfig } from "./sonnet.ts";
 
 /** Walk is what one page needs to walk journeys: the models, the caps and where evidence goes. */
 export interface Walk {

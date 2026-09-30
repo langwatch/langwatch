@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { z } from "zod";
 
-import type { Ledger } from "./ledger";
-import { askSonnet, type SonnetConfig } from "./sonnet";
+import type { Ledger } from "./ledger.ts";
+import { askSonnet, type SonnetConfig } from "./sonnet.ts";
 
 const catalogueSchema = z.object({
   features: z.array(z.object({ id: z.string(), root: z.string() })),

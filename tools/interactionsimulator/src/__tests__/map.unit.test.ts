@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { mergeMaps, publishFeatures, renderMap, type JourneyResult, type ProductMap } from "../map";
+import {
+  mergeMaps,
+  publishFeatures,
+  renderMap,
+  type JourneyResult,
+  type ProductMap,
+} from "../map.ts";
 
 const result = (status: JourneyResult["status"], run: string): JourneyResult => ({
   goal: "Create a dataset",

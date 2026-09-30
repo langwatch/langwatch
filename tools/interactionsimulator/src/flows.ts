@@ -1,7 +1,7 @@
-import type { PlanFlow, PlanStep } from "@langwatch/visual-diff-runner/src/protocol";
+import type { PlanFlow, PlanStep } from "@langwatch/visual-diff-runner/protocol";
 import { dump } from "js-yaml";
 
-import type { Journey } from "./plan";
+import type { Journey } from "./plan.ts";
 
 /**
  * journeyFlow is a completed journey as a visualdiff flow: the start, every

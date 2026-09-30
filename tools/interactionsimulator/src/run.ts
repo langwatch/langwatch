@@ -1,15 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { openSideBrowser, type SideBrowser } from "@langwatch/visual-diff-runner/src/capture";
-import { signIn } from "@langwatch/visual-diff-runner/src/flows/actions";
-import { declinePasskeyOffer } from "@langwatch/visual-diff-runner/src/flows/primitives";
-import type { PlanFlow } from "@langwatch/visual-diff-runner/src/protocol";
+import { openSideBrowser, type SideBrowser } from "@langwatch/visual-diff-runner/capture";
+import { signIn } from "@langwatch/visual-diff-runner/flows/actions";
+import { declinePasskeyOffer } from "@langwatch/visual-diff-runner/flows/primitives";
+import type { PlanFlow } from "@langwatch/visual-diff-runner/protocol";
 
-import { flowFile, journeyFlow } from "./flows";
-import type { JevConfig } from "./jev";
-import { Ledger } from "./ledger";
-import { mapSchema, mergeMaps, renderMap, type ProductMap } from "./map";
+import { flowFile, journeyFlow } from "./flows.ts";
+import type { JevConfig } from "./jev.ts";
+import { Ledger } from "./ledger.ts";
+import { mapSchema, mergeMaps, renderMap, type ProductMap } from "./map.ts";
 import {
   features,
   pickFeatures,
@@ -18,10 +18,10 @@ import {
   visualdiffConfig,
   type Feature,
   type Journey,
-} from "./plan";
-import { SIMULATOR, seedSimulator } from "./seed";
-import type { SonnetConfig } from "./sonnet";
-import { JourneyWalk, type Walk, type Walked } from "./walk";
+} from "./plan.ts";
+import { SIMULATOR, seedSimulator } from "./seed.ts";
+import type { SonnetConfig } from "./sonnet.ts";
+import { JourneyWalk, type Walk, type Walked } from "./walk.ts";
 
 export interface RunOptions {
   root: string;

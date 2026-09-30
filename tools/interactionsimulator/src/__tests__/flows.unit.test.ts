@@ -1,7 +1,7 @@
-import { resolveAction } from "@langwatch/visual-diff-runner/src/flows/registry";
+import { resolveAction } from "@langwatch/visual-diff-runner/flows/registry";
 import { describe, expect, it } from "vitest";
 
-import { flowFile, journeyFlow } from "../flows";
+import { flowFile, journeyFlow } from "../flows.ts";
 
 /**
  * The emitted file is pinned to testdata/flows/simulated.yaml, which

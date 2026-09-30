@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { mapSchema, publishFeatures } from "./map";
-import { runSimulation, type RunOptions } from "./run";
+import { mapSchema, publishFeatures } from "./map.ts";
+import { runSimulation, type RunOptions } from "./run.ts";
 
 const USAGE = `interactionsimulator run [-features a,b] [-journeys N] [-pages N] [-steps N]
                           [-budget-usd X] [-minutes N] [-url URL]

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseJourneys, parseJson, replanSchema } from "../plan";
+import { parseJourneys, parseJson, replanSchema } from "../plan.ts";
 
 const journey = (id: string) => ({
   id,

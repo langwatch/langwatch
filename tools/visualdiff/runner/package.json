@@ -9,7 +9,11 @@
     "./protocol": "./src/protocol.ts",
     "./sign-in": "./src/sign-in.ts",
     "./module-load": "./src/module-load.ts",
-    "./settle": "./src/settle.ts"
+    "./settle": "./src/settle.ts",
+    "./flows/actions": "./src/flows/actions.ts",
+    "./flows/context": "./src/flows/context.ts",
+    "./flows/primitives": "./src/flows/primitives.ts",
+    "./flows/registry": "./src/flows/registry.ts"
   },
   "scripts": {
     "capture": "node --experimental-transform-types src/main.ts",

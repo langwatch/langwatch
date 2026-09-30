@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Ledger } from "./ledger";
+import type { Ledger } from "./ledger.ts";
 
 export const SONNET_MODEL = "claude-sonnet-5-5";
 

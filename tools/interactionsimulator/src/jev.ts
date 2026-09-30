@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import type { Ledger } from "./ledger";
-import type { Candidate } from "./page";
+import type { Ledger } from "./ledger.ts";
+import type { Candidate } from "./page.ts";
 
 /** jev's path and default model, as modules/instant-eval's HTTP judge addresses it. */
 const JEV_PATH = "/v1/systemone";

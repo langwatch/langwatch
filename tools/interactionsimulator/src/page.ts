@@ -1,4 +1,4 @@
-import type { PlanStep } from "@langwatch/visual-diff-runner/src/protocol";
+import type { PlanStep } from "@langwatch/visual-diff-runner/protocol";
 import type { Page } from "playwright";
 import { z } from "zod";
 
