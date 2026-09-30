@@ -75,7 +75,7 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
 
   if (!status?.hasLicense) {
     return (
-      <VStack align="start" gap={0} width="full">
+      <VStack align="start" gap={6} width="full">
         <NoLicenseCard
           licenseKey={licenseKey}
           onLicenseKeyChange={setLicenseKey}
@@ -91,7 +91,7 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
   }
 
   return (
-    <VStack align="start" gap={0} width="full">
+    <VStack align="start" gap={6} width="full">
       {licenseMetersSeats(status) && (
         <OverSeatsCallout currentMembers={status.currentMembers} maxMembers={status.maxMembers} />
       )}

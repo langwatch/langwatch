@@ -1,8 +1,9 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
+import { OverviewDetail, SettingList, SettingsCard } from "@langwatch/design-system/settings-card";
+import { RefreshCw } from "lucide-react";
 
 import { formatPeriodStart } from "../../model/hosted-services.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
-import { Figure, SettingsBlock } from "../elements/settings-block.tsx";
 import type { ConnectEnabledStatus } from "./connect-status.ts";
 
 /**
@@ -21,29 +22,26 @@ export function ConnectSyncSection({ status }: { status: ConnectEnabledStatus })
     : undefined;
 
   return (
-    <SettingsBlock
+    <SettingsCard
       title="License sync"
-      description="Once a day this install reports its seats in use to LangWatch and picks up a reissued license when one is waiting."
-      testId="connect-sync"
+      hint="Once a day this install reports its seats in use to LangWatch and picks up a reissued license when one is waiting."
+      leading={<RefreshCw size={16} />}
+      tone={failure ? "warning" : "neutral"}
+      data-testid="connect-sync"
     >
-      <HStack width="full" gap={10} align="start" flexWrap="wrap">
-        <Figure
-          label="Last successful sync"
-          value={formatPeriodStart({ value: sync.lastSyncAt, fallback: "It has not synced yet" })}
-        />
-      </HStack>
+      <SettingList>
+        <OverviewDetail label="Last successful sync">
+          {formatPeriodStart({ value: sync.lastSyncAt, fallback: "It has not synced yet" })}
+        </OverviewDetail>
+      </SettingList>
       {failure ? (
-        <Text
-          fontSize="sm"
-          paddingX={4}
-          paddingY={3}
-          backgroundColor="orange.subtle"
-          borderRadius="xl"
-          data-testid="connect-sync-failure"
-        >
-          {failure}
-        </Text>
+        <Alert.Root status="warning" data-testid="connect-sync-failure">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>{failure}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       ) : null}
-    </SettingsBlock>
+    </SettingsCard>
   );
 }
