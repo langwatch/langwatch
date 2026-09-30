@@ -1405,10 +1405,10 @@
 
 - id: otel-traces-happy
   endpoint: POST /api/otel/v1/traces
-  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "spanId": "b7e4a1c0b7e4a1c0", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790723307541000000", "endTimeUnixNano": "1790723308041000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
+  request: {"path": "/api/otel/v1/traces", "body": {"resourceSpans": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "vd"}}]}, "scopeSpans": [{"scope": {"name": "vd"}, "spans": [{"traceId": "{uidHex32}", "spanId": "{uidHex16}", "name": "vd-otlp-{uid}", "kind": 1, "startTimeUnixNano": "1790723307541000000", "endTimeUnixNano": "1790723308041000000", "attributes": [{"key": "langwatch.input", "value": {"stringValue": "vd-otlp-in-{uid}"}}]}]}]}]}}
   expect: {"status": 200}
   verify:
-    - {"request": "GET /api/traces/b7e4a1c0b7e4a1c0b7e4a1c0b7e4a1c0", "eventually": "60s", "expect": {"status": 200}}
+    - {"request": "GET /api/traces/{uidHex32}", "eventually": "60s", "expect": {"status": 200}}
 
 - id: otel-traces-empty-export
   endpoint: POST /api/otel/v1/traces
