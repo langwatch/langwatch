@@ -991,3 +991,48 @@ describe("API keys on a credential's behalf", () => {
     });
   });
 });
+
+describe("a restricted key read back by id", () => {
+  /** @scenario "A restricted API key reads back the permissions of its private role" */
+  it("reports its private role's permissions, which the user-created role listing never carries", async () => {
+    const findRolePermissions = vi
+      .fn()
+      .mockResolvedValue([
+        { id: "role-key", name: "apikey:restricted", permissions: ["project:view"] },
+      ]);
+    const service = createService(
+      new MemoryApiKeys(),
+      dependencies({
+        authz: createApiFixture<AuthzApi>({
+          listApiKeyBindings,
+          can: vi.fn().mockResolvedValue(true),
+          hasPermission: vi.fn().mockResolvedValue(true),
+          listUserCreatedRoles: vi.fn().mockResolvedValue([]),
+          findRolePermissions,
+        }),
+      }),
+    );
+    const created = await service.create({
+      name: "restricted",
+      organizationId: "org-1",
+      permissionMode: "default",
+      bindings: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: "project-1" }],
+    });
+    grantKey(created.apiKey.id, [
+      { role: "CUSTOM", scopeType: "PROJECT", scopeId: "project-1", customRoleId: "role-key" },
+    ]);
+
+    const detail = await service.getByIdForCaller({
+      id: created.apiKey.id,
+      organizationId: "org-1",
+      callerUserId: null,
+      callerCanReadAnyKey: true,
+    });
+
+    expect(detail.permissions).toEqual(["project:view"]);
+    expect(findRolePermissions).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      roleIds: ["role-key"],
+    });
+  });
+});

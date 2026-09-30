@@ -121,6 +121,10 @@ export interface AuthzApi {
   listUserCreatedRoles(
     args: Queries.AuthzListOrganizationBindingsInput,
   ): Promise<Queries.AuthzCustomRole[]>;
+  /** The permission sets of these roles in this organization, whatever their kind. */
+  findRolePermissions(
+    args: Queries.AuthzFindRolePermissionsInput,
+  ): Promise<Queries.AuthzRolePermissions[]>;
   wouldFirstBindingDisableLegacyAccess(
     args: Binding.AuthzLegacyAccessNoticeInput,
   ): Promise<boolean>;

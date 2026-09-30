@@ -407,6 +407,12 @@ Feature: Authorization grants
     Then it reads as missing
 
   @unit
+  Scenario: A restricted API key's private role permissions are read by id within its organization
+    Given a live role of the system API key kind in the organization
+    When its permissions are read by id
+    Then the role is returned with its permissions, whatever its kind
+
+  @unit
   Scenario: A changed binding role is confirmed by the canonical Grant projection
     Given a canonical Grant row with the requested role
     When the binding role is changed

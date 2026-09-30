@@ -405,6 +405,17 @@ export type AuthzBindingsForSynthesisOutput = z.infer<typeof authzBindingsForSyn
 export const authzCustomRolesOutputSchema = z.array(authzCustomRoleSchema);
 export type AuthzCustomRolesOutput = z.infer<typeof authzCustomRolesOutputSchema>;
 
+export const authzFindRolePermissionsInputSchema = z
+  .object({ organizationId: z.string(), roleIds: z.array(z.string()) })
+  .strict();
+export type AuthzFindRolePermissionsInput = z.infer<typeof authzFindRolePermissionsInputSchema>;
+
+/** One live role of any kind, a key's private role included, with its permission set. */
+export const authzRolePermissionsSchema = z
+  .object({ id: z.string(), name: z.string(), permissions: z.array(z.string()) })
+  .strict();
+export type AuthzRolePermissions = z.infer<typeof authzRolePermissionsSchema>;
+
 /** The scope an own-standing read resolved to, by kind and id. */
 const authzResolvedScopeSchema = z
   .object({
