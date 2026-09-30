@@ -10,6 +10,12 @@ export type TeamRoleValue = TeamUserRole | `custom:${string}`;
  * divergence fails the typecheck instead of writing a wrong role. EXTERNAL
  * (a lite member) deliberately lands as VIEWER: a lite seat never confers
  * write access on a scope it is granted into.
+ *
+ * DEVELOPER (ADR-143) has an entry because the record is total over the enum,
+ * and it is VIEWER, never ADMIN: an ORGANIZATION-scoped ADMIN binding opens
+ * every project. Write paths must not reach this entry for a Developer at
+ * all, because a Developer holds no binding outside their personal team;
+ * `holdsSharedAccess` is the check they branch on first.
  */
 export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
   OrganizationUserRole,
@@ -18,11 +24,24 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
   [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
   [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
   [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+  [OrganizationUserRole.DEVELOPER]: TeamUserRole.VIEWER,
 } as const;
+
+/**
+ * Whether a seat may hold access on anything the organisation shares: a
+ * shared team, a shared project, or the organisation itself. A Developer
+ * (ADR-143) may not; their personal team is the only scope they ever hold.
+ * Every write path that hands out shared access asks this before it reads
+ * `ORGANIZATION_TO_TEAM_ROLE_MAP`.
+ */
+export function holdsSharedAccess(role: OrganizationUserRole): boolean {
+  return role !== OrganizationUserRole.DEVELOPER;
+}
 
 export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
   if (role === OrganizationUserRole.ADMIN) return "Organization Admin";
   if (role === OrganizationUserRole.MEMBER) return "Organization Member";
+  if (role === OrganizationUserRole.DEVELOPER) return "Developer";
   return "Lite Member";
 }
 

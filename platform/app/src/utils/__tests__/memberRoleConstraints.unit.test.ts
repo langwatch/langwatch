@@ -5,12 +5,42 @@ import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   getDefaultTeamRoleForOrganizationRole,
   getOrganizationRoleLabel,
+  holdsSharedAccess,
   isBindingRoleAllowedForOrganizationRole,
   isTeamRoleAllowedForOrganizationRole,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
 } from "../memberRoleConstraints";
 
 describe("memberRoleConstraints", () => {
+  describe("ORGANIZATION_TO_TEAM_ROLE_MAP", () => {
+    describe("when the seat is Developer", () => {
+      /** Invariant (ADR-143): an ORGANIZATION-scoped ADMIN binding opens every project. */
+      it("never maps to Admin", () => {
+        expect(ORGANIZATION_TO_TEAM_ROLE_MAP[OrganizationUserRole.DEVELOPER]).not.toBe(
+          TeamUserRole.ADMIN,
+        );
+      });
+    });
+  });
+
+  describe("holdsSharedAccess()", () => {
+    it("is false for a Developer and true for every other seat", () => {
+      expect(holdsSharedAccess(OrganizationUserRole.DEVELOPER)).toBe(false);
+      expect(holdsSharedAccess(OrganizationUserRole.ADMIN)).toBe(true);
+      expect(holdsSharedAccess(OrganizationUserRole.MEMBER)).toBe(true);
+      expect(holdsSharedAccess(OrganizationUserRole.EXTERNAL)).toBe(true);
+    });
+  });
+
   describe("getOrganizationRoleLabel()", () => {
+    describe("when role is DEVELOPER", () => {
+      it("returns Developer", () => {
+        expect(getOrganizationRoleLabel(OrganizationUserRole.DEVELOPER)).toBe(
+          "Developer",
+        );
+      });
+    });
+
     describe("when role is ADMIN", () => {
       it("returns Organization Admin", () => {
         expect(getOrganizationRoleLabel(OrganizationUserRole.ADMIN)).toBe(

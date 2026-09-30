@@ -100,8 +100,12 @@ export type CollectedBinding = {
 export type CollectedGrants = {
   principal: AuthzPrincipalRef;
   organizationId: string;
-  /** Null for api-key principals and for users with no OrganizationUser row. */
-  organizationRole: "ADMIN" | "MEMBER" | "EXTERNAL" | null;
+  /**
+   * Null for api-key principals and for users with no OrganizationUser row.
+   * DEVELOPER (ADR-143) is a seat that holds its personal team and nothing
+   * shared; `bindingGrants` caps it the way it caps EXTERNAL.
+   */
+  organizationRole: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER" | null;
   /**
    * True when a user principal holds an ACTIVE OrganizationUser row. A row
    * an admin disabled to free its seat is not one: see `membershipDisabled`.

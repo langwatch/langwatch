@@ -115,16 +115,29 @@ export async function seedManagementOrg({
  * `OrganizationUserRole` and `TeamUserRole` are separate enums that happen to
  * share two names today, so the pairing is written out: a new organization
  * role then fails to compile here rather than writing a value the
- * `RoleBinding.role` column rejects at runtime. `EXTERNAL` is absent because
- * an external member holds no organization-scoped binding at all.
+ * `RoleBinding.role` column rejects at runtime. `EXTERNAL` and `DEVELOPER`
+ * are absent because neither seat holds an organization-scoped binding at
+ * all (ADR-143 for the Developer seat).
  */
 const ORGANIZATION_BINDING_ROLE = {
   [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
   [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
 } satisfies Record<
-  Exclude<OrganizationUserRole, typeof OrganizationUserRole.EXTERNAL>,
+  Exclude<
+    OrganizationUserRole,
+    typeof OrganizationUserRole.EXTERNAL | typeof OrganizationUserRole.DEVELOPER
+  >,
   TeamUserRole
 >;
+
+/** The seats that carry an organization-scoped binding at all. */
+function organizationBindingRoleFor(
+  role: OrganizationUserRole,
+): TeamUserRole | null {
+  if (role === OrganizationUserRole.ADMIN) return TeamUserRole.ADMIN;
+  if (role === OrganizationUserRole.MEMBER) return TeamUserRole.MEMBER;
+  return null;
+}
 
 /**
  * An additional organization member with the given role, plus (optionally)
@@ -147,8 +160,8 @@ export async function seedOrgMember({
   /**
    * Also write the ORGANIZATION-scoped role binding invite acceptance would
    * have written. Leave false to model a legacy member whose access derives
-   * from TeamUser rows alone. Ignored for `EXTERNAL` members: they never hold
-   * an organization-scoped binding.
+   * from TeamUser rows alone. Ignored for `EXTERNAL` and `DEVELOPER`
+   * members: neither seat ever holds an organization-scoped binding.
    */
   hasOrgBinding?: boolean;
 }): Promise<{ userId: string; email: string }> {
@@ -161,12 +174,13 @@ export async function seedOrgMember({
   await prisma.organizationUser.create({
     data: { userId: user.id, organizationId, role },
   });
-  if (hasOrgBinding && role !== OrganizationUserRole.EXTERNAL) {
+  const organizationBindingRole = organizationBindingRoleFor(role);
+  if (hasOrgBinding && organizationBindingRole !== null) {
     await seedRoleBinding(prisma, {
       id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
       organizationId,
       userId: user.id,
-      role: ORGANIZATION_BINDING_ROLE[role],
+      role: organizationBindingRole,
       scopeType: RoleBindingScopeType.ORGANIZATION,
       scopeId: organizationId,
     });
