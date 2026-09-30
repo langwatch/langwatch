@@ -66,6 +66,9 @@ type Stack struct {
 	// its own application, so `haven restart workers` bounces the group holding
 	// this port and can never reach the API's.
 	WorkerMetricsPort int `json:"workerMetricsPort"`
+	// EvaluatorRuntimeSecret is the per-stack dev secret shared by the app lanes
+	// and the nlp lane when the Go evaluator runtime is on. Empty means off.
+	EvaluatorRuntimeSecret string `json:"evaluatorRuntimeSecret,omitempty"`
 	// VoiceSocketPort is the worker's raw voice socket (VOICE_WS_PORT); each
 	// stack needs its own or two stacks collide on the default 3300.
 	VoiceSocketPort int `json:"voiceSocketPort"`

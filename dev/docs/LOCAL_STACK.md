@@ -101,6 +101,7 @@ make haven self install     # go install so plain `haven …` works, then check 
 make haven status      # every stack, service health, shared servers
 haven up +langy        # add a service to this stack, sticky (likewise -gateway, -nlp, -langy)
 haven logs nlp -f      # tail one service's logs from any terminal
+haven up +go-evaluators  # run evaluators on the Go runtime in the nlp lane (opt-in, sticky, needs nlp)
 ```
 
 haven supervises two Node lanes, `ui` and `api`, beside one `go` lane holding the

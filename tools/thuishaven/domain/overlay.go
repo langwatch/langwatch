@@ -285,6 +285,13 @@ func (s Stack) OverlayEnv() []string {
 	if s.RedisPort != 0 {
 		env = append(env, fmt.Sprintf("REDIS_URL=redis://127.0.0.1:%d", s.RedisPort))
 	}
+	if s.EvaluatorRuntimeSecret != "" && nlp.Port != 0 {
+		env = append(env,
+			"NLPGO_INTERNAL_SECRET="+s.EvaluatorRuntimeSecret,
+			"EVALUATOR_RUNTIME_ENDPOINT="+nlp.URL+"/go/evaluators",
+			"EVALUATOR_RUNTIME_ENGINE=go",
+		)
+	}
 	env = append(env, s.observabilityEnv()...)
 	env = append(env, NodeOptionsEnvFromProcess())
 	return append(env, s.ModeEnv...)
