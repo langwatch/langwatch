@@ -173,6 +173,49 @@ an app or an `"all"` role, are forbidden. What goes: `dev-supervisor.mjs --watch
    by haven; each reload logs its generation, changed files, drain time and time to serve.
 6. **Record it:** an ADR-004 amendment, `LOCAL_STACK.md`, haven's README, and B1's specs.
 
+## Step 1, as shipped
+
+In `dev/scripts/dev-supervisor.mjs` (proof: `dev/scripts/reload-burst.mjs`, run it with
+`--check`; `--ref HEAD` measures the committed supervisor for comparison):
+
+- **One reload at a time.** The first boot is a reload too. A change while a boot runs is queued
+  and answered by one follow-up when it settles: the child printed a line matching
+  `LANGWATCH_DEV_READY_PATTERN` (`dev-runtime` prints `backend ready`), exited, or
+  `LANGWATCH_DEV_BOOT_SETTLE_MS` (30 s) passed.
+- **A crashed boot waits.** A non-zero exit logs one line and the supervisor stays up for the
+  next change. With nothing watched it still exits, since no change can come.
+- **Quiet window with a max wait.** 2 s of quiet (`LANGWATCH_DEV_WATCH_DEBOUNCE_MS`), never more
+  than 30 s after the first change (`LANGWATCH_DEV_WATCH_MAX_WAIT_MS`).
+- **Skip what is not loaded.** `.md`, `.mdx`, `.feature`, `tsconfig*.json` and any `.json` outside
+  a `src/` tree (not `package.json`), plus every workspace package no dependency of the watched
+  command reaches (13 of 164 packages for `dev-runtime`: design-system, browser-host and the
+  like), derived from the `package.json` graph.
+- **The agent-turn hold.** A restart waits while the `.haven-hmr-gate` marker
+  (`apps/ui/.haven-hmr-gate`, unix-ms expiry, `LANGWATCH_DEV_HOLD_MARKER` overrides), is in the
+  future, at most 60 s. The supervisor only reads it.
+- **Not in step 1:** link-before-drop. Two whole-process backends cannot share a port, so a
+  failed boot still takes the old one down (it is the crashed-boot wait that keeps the lane
+  alive). It belongs to B1.
+
+The hold hooks are **opt-in**; `haven up` installs nothing new (open question 2). To try them, add
+to `.claude/settings.local.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "haven hmr on --ttl 60s" }]
+      }
+    ],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "haven hmr off" }] }]
+  }
+}
+```
+
+One marker serves every session in the worktree, so one session's `Stop` releases another's hold.
+
 ## Risks
 
 - **State leaks across generations.** Workspace packages re-evaluated by the runner must not keep
