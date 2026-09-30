@@ -85,7 +85,7 @@ function GovernanceUserDetailPage() {
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack align="stretch" gap={4} width="full">
+        <VStack align="stretch" gap={6} width="full">
           {showNotice && (
             <PermissionRequiredNotice
               permission="activityMonitor:view"

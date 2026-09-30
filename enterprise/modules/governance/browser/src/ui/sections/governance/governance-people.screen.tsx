@@ -445,7 +445,7 @@ function PeoplePage() {
       />
 
       <PageLayout.Container>
-        <VStack align="stretch" gap={4} width="full">
+        <VStack align="stretch" gap={6} width="full">
           <PeopleSampleBanner active={sample.active} />
 
           <PeopleSummaryStrip

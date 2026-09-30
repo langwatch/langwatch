@@ -35,7 +35,7 @@ function SignalsPage() {
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack align="stretch" gap={8} width="full">
+        <VStack align="stretch" gap={6} width="full">
           <Text color="fg.muted">
             A preview of where signal rules will live: a condition to watch for, and what happens
             when one fires. Nothing is being watched yet.

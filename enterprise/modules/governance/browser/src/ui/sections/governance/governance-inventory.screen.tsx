@@ -1176,7 +1176,7 @@ function InventoryPage() {
   const sources = page.sample.active ? SAMPLE_INGESTION_SOURCES : sourcesQuery.data;
 
   return (
-    <GovernanceLayout pageTitle="Inventory · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Inventory · AI Governance · LangWatch">
       <PageLayout.Header>
         <InventoryHeader />
         <Spacer />

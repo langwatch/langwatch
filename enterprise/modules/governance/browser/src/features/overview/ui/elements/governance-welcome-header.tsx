@@ -50,7 +50,7 @@ export function GovernanceWelcomeHeader() {
     // The page's serif display voice: the greeting is the hero's one big
     // line, so it speaks in the same face as the project home's own greeting.
     <Heading
-      as="h1"
+      as="h2"
       fontFamily={SERIF}
       fontWeight="500"
       fontSize="26px"

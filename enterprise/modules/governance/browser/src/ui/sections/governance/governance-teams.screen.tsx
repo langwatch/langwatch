@@ -1,4 +1,5 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { BackLink } from "@langwatch/design-system/back-link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
@@ -111,17 +112,14 @@ function GovernanceTeamsListPage() {
   return (
     <GovernanceLayout pageTitle="Teams · AI Governance · LangWatch">
       <PageLayout.Header>
-        <Text fontSize="xs" color="fg.muted">
-          <Link href="/governance" color="blue.600">
-            ← AI Governance
-          </Link>{" "}
-          · All teams
-        </Text>
+        <BackLink href="/governance" onNavigate={(href) => router.push(href)}>
+          AI Governance
+        </BackLink>
         <PageLayout.Heading>All teams by {SORT_LABEL[sortBy]}</PageLayout.Heading>
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack align="stretch" gap={4} width="full">
+        <VStack align="stretch" gap={6} width="full">
           <Text color="fg.muted" fontSize="sm">
             Every team that reported activity in the last 30 days. Click a row to drill into a
             single team.

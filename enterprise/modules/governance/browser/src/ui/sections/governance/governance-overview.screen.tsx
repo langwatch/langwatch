@@ -52,7 +52,7 @@ function GovernanceOverviewPage() {
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
       <PageLayout.Header>
         <PageLayout.Heading>AI Governance</PageLayout.Heading>
-        <Badge colorPalette="purple" variant="subtle">
+        <Badge colorPalette="purple" size="sm" variant="surface">
           Preview
         </Badge>
         <Spacer />

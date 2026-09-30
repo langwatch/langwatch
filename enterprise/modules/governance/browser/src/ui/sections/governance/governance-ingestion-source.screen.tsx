@@ -129,7 +129,7 @@ function SourceDetailHeader({
   const StatusIcon = status.icon;
   return (
     <PageLayout.Header>
-      <BackLink href="/governance/ingestion-sources" onNavigate={(href) => router.push(href)}>
+      <BackLink href="/governance/inventory?tab=sources" onNavigate={(href) => router.push(href)}>
         All sources
       </BackLink>
       <PageLayout.Heading>{source.name}</PageLayout.Heading>

@@ -470,7 +470,7 @@ function AgentsPage() {
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack align="stretch" gap={5} width="full">
+        <VStack align="stretch" gap={6} width="full">
           {sample.active && (
             <SampleDataBanner>
               These agents are an illustration of what this page will hold, nothing here is real.

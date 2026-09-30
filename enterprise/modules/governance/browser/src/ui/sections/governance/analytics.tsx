@@ -66,7 +66,7 @@ function AnalyticsPage() {
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack align="stretch" gap={5} width="full">
+        <VStack align="stretch" gap={6} width="full">
           <Text color="fg.muted">
             A preview of how you will explore activity in {orgName}. The controls below shape a
             query; running it is coming.

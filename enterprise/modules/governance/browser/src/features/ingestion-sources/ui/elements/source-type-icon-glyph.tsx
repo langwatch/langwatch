@@ -21,6 +21,7 @@ const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
   "claude_compliance",
   "anthropic_admin",
   "openai_compliance",
+  "openai_admin",
   "http_custom",
 ]);
 
@@ -36,8 +37,10 @@ const iconForSourceType = (sourceType: SourceType): ReactNode => {
     case "workato":
       return <WorkatoIcon />;
     case "copilot_studio":
+    case "copilot_studio_dataverse":
       return <MicrosoftIcon />;
     case "openai_compliance":
+    case "openai_admin":
       return <OpenAIIcon />;
     case "databricks_genie":
       return <DatabricksIcon />;

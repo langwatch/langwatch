@@ -1,4 +1,5 @@
 import { Box, Heading, HStack, SimpleGrid, Spinner, Text, VStack } from "@chakra-ui/react";
+import { BackLink } from "@langwatch/design-system/back-link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
@@ -70,15 +71,9 @@ function GovernanceTeamDetailPage() {
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <PageLayout.Header>
-        <Text fontSize="xs" color="fg.muted">
-          <Link href="/governance" color="blue.600">
-            ← AI Governance
-          </Link>{" "}
-          ·{" "}
-          <Link href="/governance/teams" color="blue.600">
-            All teams
-          </Link>
-        </Text>
+        <BackLink href="/governance/teams" onNavigate={(href) => router.push(href)}>
+          All teams
+        </BackLink>
         <HStack gap={2}>
           <Box
             width="14px"
@@ -94,7 +89,7 @@ function GovernanceTeamDetailPage() {
       </PageLayout.Header>
 
       <PageLayout.Container>
-        <VStack align="stretch" gap={4} width="full">
+        <VStack align="stretch" gap={6} width="full">
           {activityView === "forbidden" && (
             <PermissionRequiredNotice
               permission="activityMonitor:view"

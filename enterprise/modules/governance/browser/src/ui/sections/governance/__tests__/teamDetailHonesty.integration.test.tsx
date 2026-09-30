@@ -83,6 +83,10 @@ describe("given a team with spend in the window", () => {
     renderPage();
 
     expect(screen.getByRole("heading", { name: TEAM_NAME })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "All teams" })).toHaveAttribute(
+      "href",
+      "/governance/teams",
+    );
     expect(
       screen.getByText(
         "Per-day spend, per-user breakdown and model mix for this team are not available yet.",

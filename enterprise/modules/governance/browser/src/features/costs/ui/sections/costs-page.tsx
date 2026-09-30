@@ -96,7 +96,7 @@ export function CostsPage() {
         onToggleSample={toggleSample}
       />
       <PageLayout.Container>
-        <VStack align="stretch" gap={5} width="full">
+        <VStack align="stretch" gap={6} width="full">
           {showSample && <SampleDataBanner />}
           {/* Everything under the banner inherits what the banner said. While it
             is up, the per-panel marks stand down rather than restating it

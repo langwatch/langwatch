@@ -268,7 +268,7 @@ describe("governance pages for a delegated viewer", () => {
     // were re-grouped to make the delegated path work. This is what says the
     // regrouping did not take anything away from the admin.
     /** @scenario "An org admin meets the same overview a delegated viewer does" */
-    it("meets the same hero and sections, with no panel and no read", () => {
+    it("meets the same hero and sections, with no panel and only the source read", () => {
       renderPage({ Page: GovernanceOverviewPage, permissions: ORGANIZATION_ADMIN });
 
       expect(screen.getByRole("link", { name: "Add department" })).toBeVisible();
@@ -278,11 +278,11 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText("Add source")).toBeTruthy();
       expect(screen.queryByText(/Ask an organization admin to grant you/)).toBeNull();
 
-      // The panels moved to the pages that own them: the overview reads nothing.
+      // The panels moved to the pages that own them; the overview reads only the source list.
       expect(screen.queryByText("Recent anomalies")).toBeNull();
       expect(screen.queryByText("Ingestion sources")).toBeNull();
       expect(screen.queryByText("CLI session policy")).toBeNull();
-      expect(harness.requested).toEqual([]);
+      expect([...new Set(harness.requested)]).toEqual(["ingestionSources.list"]);
     });
 
     /** @scenario "An org admin still sees the department write controls" */

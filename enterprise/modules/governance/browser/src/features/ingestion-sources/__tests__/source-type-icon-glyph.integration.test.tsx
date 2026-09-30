@@ -8,6 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { SOURCE_TYPE_OPTIONS } from "../model/ingestion-source-catalog.ts";
 import { SourceTypeIconGlyph } from "../ui/elements/source-type-icon-glyph.tsx";
 
 afterEach(cleanup);
@@ -23,4 +24,19 @@ describe("given a source type that was offered before it worked", () => {
 
     expect(container.querySelector("svg")).not.toBeNull();
   });
+});
+
+describe("given every catalogued source type", () => {
+  it.each(SOURCE_TYPE_OPTIONS.map((option) => option.value))(
+    "draws a mark for %s",
+    (sourceType) => {
+      const { container } = render(
+        <ChakraProvider value={defaultSystem}>
+          <SourceTypeIconGlyph sourceType={sourceType} />
+        </ChakraProvider>,
+      );
+
+      expect(container.querySelector("svg")).not.toBeNull();
+    },
+  );
 });
