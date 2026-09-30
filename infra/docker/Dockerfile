@@ -14,6 +14,9 @@ COPY sdks/go/go.* sdks/go/
 COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 COPY cmd/devscripts ./cmd/devscripts
 COPY tools/devscripts ./tools/devscripts
+# devscripts imports these two stdlib-only packages.
+COPY tools/cliprof ./tools/cliprof
+COPY tools/internal ./tools/internal
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -o /out/devscripts ./cmd/devscripts
@@ -70,6 +73,9 @@ COPY vendor ./vendor
 # has nothing to check the lockfile against. This one carries no source into
 # the image — only the manifest the workspace needs to stay coherent.
 COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
+# agentic-e2e depends on @langwatch/e2e-stack (workspace:*), so `pnpm prune`
+# needs that manifest too.
+COPY dev/tests/e2e-stack/package.json ./dev/tests/e2e-stack/
 # The SDK, in full, because the app declares `langwatch: workspace:*` and so
 # imports THIS copy rather than a published release. Manifest-only was enough
 # while the app resolved the registry tarball; now the app's bundle cannot be
@@ -151,9 +157,11 @@ COPY specs/api-reference/openapi-document.json ./specs/api-reference/openapi-doc
 # .d.ts already on disk instead of emitting them 38 processes at a time.
 # The same preparation the CI build runs: generated files (modules, Prisma client,
 # langy skills) and the four dist-resolving packages (SDK, mcp-server, ksuid, mail)
-# before `build:types`, which reads their declarations.
+# before the declaration build, which reads their declarations. The root
+# `build:types` script goes through nx, whose workspace project is registered by
+# dev/nx plugins this stage does not copy, so run its tsc command directly.
 RUN pnpm start:prepare:files && pnpm ensure:built \
- && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build:types \
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 tsconfig.build.json \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
