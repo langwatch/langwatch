@@ -409,10 +409,16 @@ export function useEvaluatorEditorController(
   // stale value before the toggle-flip flushes), so cost gets a resolved
   // default that stomps duration back to `[]`. Latch a ref to "already done
   // the initial reset" for this evaluator so late-resolving defaults never
-  // re-fire the reset once the form is live.
+  // re-fire the reset once the form is live. The latch only closes once both
+  // cascade queries have answered: resetting while they are in flight would
+  // fill the model with the platform fallback and never pick up the
+  // configured default.
+  const resolvedDefaultsLoading =
+    resolvedDefaultModel.isLoading || resolvedDefaultEmbeddings.isLoading;
   const didInitializeCreateFormRef = useRef<string | null>(null);
   useEffect(() => {
     if (!evaluatorDef || evaluatorId) return;
+    if (resolvedDefaultsLoading) return;
     const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
     if (didInitializeCreateFormRef.current === key) return;
     form.reset({
@@ -427,6 +433,7 @@ export function useEvaluatorEditorController(
     defaultSettings,
     form,
     forceUserToDecideAName,
+    resolvedDefaultsLoading,
   ]);
 
   const savedFormValuesRef = useRef<EvaluatorFormValues | null>(null);
