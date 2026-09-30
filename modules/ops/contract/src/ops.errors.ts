@@ -26,7 +26,7 @@ export class CloudOpsKeyMismatchError extends HandledError {
   constructor() {
     super(
       "cloud_ops_key_mismatch",
-      "LANGWATCH_CLOUD_OPS is set but LANGWATCH_LICENSE_PRIVATE_KEY is missing or does not match this release's licence public key",
+      "Cloud admin was asked for, but the licence private key is missing or does not pair with this release's licence public key",
       { httpStatus: 500, fault: "platform" },
     );
     this.name = "CloudOpsKeyMismatchError";

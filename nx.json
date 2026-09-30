@@ -70,14 +70,16 @@
       {
         "externalDependencies": []
       }
-    ]
+    ],
+    "testReads": []
   },
   "plugins": [
     "./dev/nx/lint-plugin.mjs",
     "./dev/nx/go-plugin.mjs",
     "./dev/nx/npm-deps-plugin.mjs",
     "./dev/nx/helm-plugin.mjs",
-    "./dev/nx/workspace-plugin.mjs"
+    "./dev/nx/workspace-plugin.mjs",
+    "./dev/nx/test-reads-plugin.mjs"
   ],
   "targetDefaults": {
     "typecheck": [
@@ -281,6 +283,7 @@
           "default",
           "^production",
           "npmDeps",
+          "testReads",
           {
             "externalDependencies": ["vitest"]
           }
@@ -292,6 +295,12 @@
           "projects": ["@langwatch/prisma-client"]
         },
         "dependsOn": ["^build", "prisma:generate"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/test-harness"]
+        },
+        "cache": false
       }
     ],
     "test:unit": {
@@ -301,6 +310,7 @@
         "default",
         "^production",
         "npmDeps",
+        "testReads",
         {
           "externalDependencies": ["vitest"]
         }

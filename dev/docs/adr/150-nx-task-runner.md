@@ -298,3 +298,15 @@ change reaches it, and nothing depends on it. The root carries no project.
 - Related ADRs: [076](./076-single-pnpm-workspace.md) (single pnpm workspace),
   [143](./143-formatting.md)
 - Configuration: `nx.json`, `.nxignore`
+
+## Amendment, 2026-09-30: tests that read outside their package declare it
+
+A package's `test` inputs cover its own files and its dependencies' production
+files. A test that reads a file outside both (docs, skills, a chart, a Go tree,
+every module for a whole-tree walk) would replay a stale green when that file
+changed. Each such reader declares the globs in the `reads` table in
+`dev/nx/test-reads-plugin.mjs`, keyed by package name; the plugin exposes them
+as the `testReads` named input that `test` and `test:unit` take, so adding a
+reader is one row. The rows come from tracing real test runs, not from guessing.
+`@langwatch/test-harness` runs `git ls-files` over every tracked file, so its
+`test` is `cache: false`.
