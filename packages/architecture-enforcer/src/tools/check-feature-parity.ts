@@ -502,6 +502,7 @@ const LEGACY_INERT: string[] = [
   "specs/identity/org-admin-identity-surface.feature",
   // Planned, not yet built: the Go evaluator runtime that replaces langevals
   // (dev/docs/plans/langevals-go-replacement.md). Each leaves with its first binding.
+  "specs/evaluators/go-evaluator-ports.feature",
   "specs/evaluators/ragas-go-parity.feature",
   "specs/data-privacy/pii-analyser-choice.feature",
   "specs/langy/langy-agent-service-conventions.feature",
