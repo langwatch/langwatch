@@ -1,6 +1,6 @@
-import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
+import type { CustomGraphInput } from "../custom-graph.ts";
 import { resolveGraphTimeScale, withGroupedPipeline } from "../graph-query-compensation.ts";
 
 function makeInput(overrides: Partial<CustomGraphInput> = {}): CustomGraphInput {

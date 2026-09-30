@@ -12,6 +12,7 @@ export type {
 } from "./dashboard.api.ts";
 export * from "./graph.ts";
 export * from "./custom-graph.ts";
+export * from "./graph-query-compensation.ts";
 export * from "./graph.trpc.ts";
 export * from "./saved-view.ts";
 export * from "./saved-view.trpc.ts";

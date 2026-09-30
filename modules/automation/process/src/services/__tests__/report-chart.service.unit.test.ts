@@ -24,6 +24,10 @@ const COUNT_SERIES = {
 };
 /** The bucket key the timeseries result really uses — NOT the display name. */
 const COUNT_KEY = buildSeriesName(COUNT_SERIES as never, 0);
+/** The key once `withGroupedPipeline` injects its default pipeline into a grouped pie. */
+const PIPED_COUNT_KEY = `${COUNT_KEY}/trace_id/sum`;
+/** One stored series as the graph's JSON column carries it. */
+type StoredSeries = { [key: string]: string | { field: string; aggregation: string } };
 
 function makeGraph(overrides: Partial<CustomGraph> = {}): CustomGraph {
   return {
@@ -181,8 +185,8 @@ describe("ReportChartService.loadReportCharts", () => {
             {
               date: "2026-07-11T09:00:00Z",
               "metadata.model": {
-                "gpt-5-mini": { [COUNT_KEY]: 2 },
-                "claude-opus-4-8": { [COUNT_KEY]: 5 },
+                "gpt-5-mini": { [PIPED_COUNT_KEY]: 2 },
+                "claude-opus-4-8": { [PIPED_COUNT_KEY]: 5 },
               },
             },
           ],
@@ -202,6 +206,90 @@ describe("ReportChartService.loadReportCharts", () => {
       ]);
       expect(chart!.series).toEqual([]);
       expect(chart!.total).toBe(7);
+    });
+  });
+
+  describe("given a summary panel", () => {
+    it("queries with the full time scale, matching what the dashboard UI renders", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({
+            name: "Total traces",
+            graph: {
+              graphId: "graph-1",
+              graphType: "summary",
+              series: [COUNT_SERIES],
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+        ],
+        timeseries: {
+          previousPeriod: [],
+          currentPeriod: [{ date: "2026-07-11T09:00:00Z", [COUNT_KEY]: 42 }],
+        },
+      });
+
+      const [chart] = await run({
+        deps,
+        source: { kind: "customGraph", customGraphId: "graph-1" },
+      });
+
+      expect(deps.getTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({ timeScale: "full" }),
+      );
+      expect(chart?.isEmpty).toBe(false);
+    });
+  });
+
+  describe("given a grouped pie graph with no pipeline of its own", () => {
+    const groupedPie = (series: StoredSeries[]) =>
+      makeDeps({
+        graphs: [
+          makeGraph({
+            graph: {
+              graphId: "graph-1",
+              graphType: "pie",
+              series,
+              groupBy: "metadata.model",
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+        ],
+        timeseries: { previousPeriod: [], currentPeriod: [] },
+      });
+
+    it("queries with the default pipeline the backend needs to populate grouped buckets", async () => {
+      const deps = groupedPie([COUNT_SERIES]);
+
+      await run({ deps, source: { kind: "customGraph", customGraphId: "graph-1" } });
+
+      expect(deps.getTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({ pipeline: { field: "trace_id", aggregation: "sum" } }),
+          ],
+        }),
+      );
+    });
+
+    describe("when the graph already defines its own pipeline", () => {
+      it("leaves the author's pipeline alone", async () => {
+        const deps = groupedPie([
+          { ...COUNT_SERIES, pipeline: { field: "trace_id", aggregation: "avg" } },
+        ]);
+
+        await run({ deps, source: { kind: "customGraph", customGraphId: "graph-1" } });
+
+        expect(deps.getTimeseries).toHaveBeenCalledWith(
+          expect.objectContaining({
+            series: [
+              expect.objectContaining({ pipeline: { field: "trace_id", aggregation: "avg" } }),
+            ],
+          }),
+        );
+      });
     });
   });
 

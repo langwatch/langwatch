@@ -3,7 +3,7 @@
  * does not carry on its own: summary charts read "full", grouped pie/donut charts get a
  * default pipeline. The scheduled-report renderer applies the same pair (#6716).
  */
-import type { CustomGraphInput } from "@langwatch/dashboard-contract";
+import type { CustomGraphInput } from "./custom-graph.ts";
 
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;

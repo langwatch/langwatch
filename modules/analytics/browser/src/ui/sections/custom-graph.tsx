@@ -11,7 +11,11 @@ import {
 } from "@chakra-ui/react";
 import { getGroup, getMetric } from "@langwatch/analytics-browser-kit";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
-import type { CustomGraphInput } from "@langwatch/dashboard-contract";
+import {
+  resolveGraphTimeScale,
+  withGroupedPipeline,
+  type CustomGraphInput,
+} from "@langwatch/dashboard-contract";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
 import { nowInstant } from "@langwatch/time";
@@ -61,10 +65,6 @@ import {
   seriesColorIndex,
 } from "../../model/custom-graph-drill-down.ts";
 import { describeError } from "../../model/describe-error.ts";
-import {
-  resolveGraphTimeScale,
-  withGroupedPipeline,
-} from "../../model/graph-query-compensation.ts";
 import { monitorPeriodLabel, summarizeMonitor } from "../../model/monitor-summary.ts";
 import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name.ts";
 import { resolveSeriesValueFormat } from "../../model/series-value-format.ts";
