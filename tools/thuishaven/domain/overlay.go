@@ -170,6 +170,15 @@ func (s Stack) OverlayEnv() []string {
 	if s.DisableGoogleDLP {
 		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
 	}
+	// An untrusted checkout gets a private Nx cache and no daemon, so nothing it
+	// computes reaches the cache trusted worktrees share (see Stack.NxPrivateDir).
+	if s.NxPrivateDir != "" {
+		env = append(env,
+			"NX_CACHE_DIRECTORY="+s.NxPrivateDir+"/cache",
+			"NX_WORKSPACE_DATA_DIRECTORY="+s.NxPrivateDir+"/workspace-data",
+			"NX_DAEMON=false",
+		)
+	}
 	if s.VoiceSocketPort != 0 {
 		env = append(env, fmt.Sprintf("VOICE_WS_PORT=%d", s.VoiceSocketPort))
 	}

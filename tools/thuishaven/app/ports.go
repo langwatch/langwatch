@@ -362,6 +362,8 @@ type Semaphore interface {
 	// Acquire blocks until one of `slots` slots for `name` is free; returns a
 	// release func and the 1-based slot taken. ctx cancellation aborts the wait.
 	Acquire(ctx context.Context, name string, slots int) (release func(), slot int, err error)
+	// TryAcquire takes a free slot now or reports ok=false, never waiting.
+	TryAcquire(name string, slots int) (release func(), slot int, ok bool, err error)
 }
 
 // Hygiene is the disk-reclamation surface: enumerating a repo's worktrees,

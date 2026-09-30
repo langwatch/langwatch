@@ -385,6 +385,7 @@ func TestOverlayNeverEmitsLangwatchApiKey(t *testing.T) {
 // TestOverlayLeavesNxCacheLocationToNx pins ADR-150's shared cache: Nx 23 already
 // shares one cache and its index across every checkout (~/.nx/<id>), and any of
 // these variables makes it fall back to a per-checkout index over that cache.
+// @scenario "A trusted worktree leaves the Nx cache location to Nx"
 func TestOverlayLeavesNxCacheLocationToNx(t *testing.T) {
 	st := Stack{
 		Slug: "portless", APIPort: 1, LocalAPIKey: DefaultLocalAPIKey,
@@ -393,6 +394,24 @@ func TestOverlayLeavesNxCacheLocationToNx(t *testing.T) {
 	for _, key := range []string{"NX_CACHE_DIRECTORY", "NX_WORKSPACE_DATA_DIRECTORY", "NX_PROJECT_GRAPH_CACHE_DIRECTORY"} {
 		if hasKey(st.OverlayEnv(), key) {
 			t.Errorf("overlay emitted %s, which turns off Nx's cross-checkout cache", key)
+		}
+	}
+}
+
+// TestOverlayGivesUntrustedCheckoutAPrivateNxCache is the other direction: Nx
+// must never store a fork's task results in the cache trusted worktrees replay.
+// @scenario "An untrusted checkout gets a private Nx cache and no daemon"
+func TestOverlayGivesUntrustedCheckoutAPrivateNxCache(t *testing.T) {
+	st := Stack{Slug: "haven-pr-7", NxPrivateDir: "/home/.haven/nx-untrusted/haven-pr-7"}
+	env := EnvMap(st.OverlayEnv())
+	want := map[string]string{
+		"NX_CACHE_DIRECTORY":          "/home/.haven/nx-untrusted/haven-pr-7/cache",
+		"NX_WORKSPACE_DATA_DIRECTORY": "/home/.haven/nx-untrusted/haven-pr-7/workspace-data",
+		"NX_DAEMON":                   "false",
+	}
+	for k, v := range want {
+		if env[k] != v {
+			t.Errorf("%s = %q, want %q", k, env[k], v)
 		}
 	}
 }

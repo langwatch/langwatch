@@ -552,16 +552,24 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "typecheck",
-		summary: "pnpm typecheck under a machine-wide RAM slot (args forwarded)",
-		args:    "[args…]",
+		summary: "typecheck under the machine-wide RAM slot: --affected (agent default) or --all (human default); other args forwarded",
+		args:    "[--affected|--all] [args…]",
 		maxArgs: -1,
+		flags: []flagSpec{
+			{long: "--affected", summary: "nx affected -t typecheck from the merge-base with the upstream, or origin/main (the agent default)"},
+			{long: "--all", summary: "the whole-tree pnpm typecheck (the default for a person)"},
+		},
 		// The summary promises the arguments are forwarded, and they are handed
 		// to tsc verbatim — so tsc's own flags (--watch, --noEmit, -p) have to
 		// reach it. Without this every one of them was rejected as an unknown
 		// haven flag and the command could only ever run bare.
 		minusArgs: true,
 		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.Typecheck(ctx, d.worktree, inv.raw, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
+			args, affected := typecheckScope(inv.raw, d.isAgent)
+			return d.orch.Typecheck(ctx, app.TypecheckRun{
+				RepoDir: d.worktree, ExtraArgs: args, Affected: affected,
+				SlotsOverride: envInt("HAVEN_TYPECHECK_SLOTS", 0), MaxRSSOverrideMB: envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0),
+			})
 		},
 	},
 	{
@@ -720,4 +728,23 @@ func commandNames() []string {
 		}
 	}
 	return names
+}
+
+// typecheckScope takes haven's own --affected/--all and the `--` separator out
+// of the forwarded args. An agent gets the affected run unless it asks for
+// --all; a person the reverse.
+func typecheckScope(raw []string, isAgent bool) (args []string, affected bool) {
+	affected = isAgent
+	for _, a := range raw {
+		switch a {
+		case "--":
+		case "--affected":
+			affected = true
+		case "--all":
+			affected = false
+		default:
+			args = append(args, a)
+		}
+	}
+	return args, affected
 }

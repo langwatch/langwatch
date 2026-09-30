@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // ensureDeps installs node dependencies when the lockfile is newer than the
@@ -19,13 +22,13 @@ import (
 // depsStale found no lockfile there and read that as "nothing to install", so
 // a fresh worktree started every service against absent dependencies.
 //
-// withLifecycleScripts must be false whenever the checkout's package.json is not
+// WithLifecycleScripts must be false whenever the checkout's package.json is not
 // this repo's own — a play sandbox of a fork PR, most of all. This repo has a
 // postinstall, and a fork controls package scripts, so a plain install executes
 // fork-authored code with the developer's environment and credentials before a
 // single service starts. `haven pr` has always guarded this (see installDeps in
 // pr.go); play must guard it the same way.
-func (o *Orchestrator) ensureDeps(ctx context.Context, dir string, withLifecycleScripts bool) error {
+func (o *Orchestrator) ensureDeps(ctx context.Context, dir string, install depsInstall) error {
 	// Resolve the workspace root ourselves rather than trusting the caller to
 	// know the layout. The regression this guards against: both call sites
 	// used to pass langwatch/, depsStale found no lockfile there, and haven
@@ -43,17 +46,25 @@ func (o *Orchestrator) ensureDeps(ctx context.Context, dir string, withLifecycle
 	if !depsStale(rootDir) {
 		return nil
 	}
-	install := "pnpm --silent install"
-	if !withLifecycleScripts {
-		install = "pnpm --silent install --ignore-scripts"
+	shell := "pnpm --silent install"
+	if !install.WithLifecycleScripts {
+		shell = "pnpm --silent install --ignore-scripts"
 		fmt.Println("  dependencies: installing with --ignore-scripts (untrusted checkout: its lifecycle scripts will not run)…")
 	} else {
 		fmt.Println("  dependencies: lockfile changed since the last install — running pnpm install…")
 	}
-	if err := o.sup.RunOnce(ctx, "deps", rootDir, install, nil); err != nil {
+	if err := o.sup.RunOnce(ctx, "deps", rootDir, shell, install.Env); err != nil {
 		return fmt.Errorf("pnpm install failed: %w", err)
 	}
 	return nil
+}
+
+// depsInstall is how an install runs. Env carries the stack's Nx isolation
+// (nxEnv), so the install is one more lane of an untrusted stack, never the one
+// that reaches the shared cache.
+type depsInstall struct {
+	WithLifecycleScripts bool
+	Env                  []string
 }
 
 // findWorkspaceRoot walks up from dir to the nearest directory holding a
@@ -89,4 +100,29 @@ func depsStale(rootDir string) bool {
 		return true
 	}
 	return lock.ModTime().After(stamp.ModTime())
+}
+
+// nxPrivateDir is where an untrusted stack's Nx cache and workspace data live:
+// under haven's own home, one directory per stack, removed with the stack.
+func (o *Orchestrator) nxPrivateDir(slug string) string {
+	return filepath.Join(o.cfg.Home, "nx-untrusted", slug)
+}
+
+// nxEnv is only the Nx lines of a stack's overlay: what the install lane, which
+// needs no service wiring, still has to carry for an untrusted checkout.
+func nxEnv(st domain.Stack) []string {
+	var out []string
+	for _, kv := range st.OverlayEnv() {
+		if strings.HasPrefix(kv, "NX_") {
+			out = append(out, kv)
+		}
+	}
+	return out
+}
+
+// removeNxPrivateDir deletes an untrusted stack's private Nx cache with it.
+func (o *Orchestrator) removeNxPrivateDir(slug string) {
+	if slug != "" && o.cfg.Home != "" {
+		_ = os.RemoveAll(o.nxPrivateDir(slug))
+	}
 }

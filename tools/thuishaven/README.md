@@ -99,7 +99,7 @@ haven up         start or reconcile this worktree's stack — in a terminal it
                  langy and the two developer tools off. -w watches
                  the Go services via
                  air; -d detaches without the view; --rebuild forces images
-haven down       stop this worktree's stack — data is always kept;
+haven down       stop this worktree's stack and its Nx daemon — data is always kept;
                  --all stops every stack, the shared servers, daemon, and proxy
 haven restart    bounce one supervised service (or all) in place; `restart obs`
                  bounces the observability stack; `restart langy --rebuild`
@@ -112,7 +112,7 @@ haven logs       captured service logs from any terminal, attached or detached:
                  --since 10m windows, --level warn filters severity,
                  --stack <slug> reads another worktree, `logs obs` streams LGTM
 haven status     one-shot report: selection, per-service health, shared servers,
-                 RAM footprints (--json for machines)
+                 RAM footprints, every running Nx daemon (--json for machines)
 haven db         this stack's data: `db seed [preset]` (reseed in place, drops
                  nothing) · `db reset [preset]` (fresh database, confirmed;
                  --yes for scripts) · `db url [engine]`. Presets: demo,
@@ -151,7 +151,10 @@ haven slot       run any command under the machine-wide check slot:
                  longer it waits, so a sub-agent is never starved forever;
                  HAVEN_PRIORITY=high states a run matters, honoured once per
                  agent id every ten minutes
-haven typecheck  pnpm typecheck under a machine-wide RAM slot
+haven typecheck  typecheck under the machine-wide RAM slot: --affected runs
+                 `nx affected -t typecheck` from the merge-base with the
+                 branch's upstream (or origin/main) and is the agent default;
+                 --all is the whole-tree `pnpm typecheck`, the human default
 haven install    check this MACHINE for what haven drives but does not own —
                  portless, node, pnpm, go, the brew formulae behind the shared
                  Postgres and Redis, a container runtime, the ClickHouse
@@ -689,7 +692,18 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
 
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
   typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). It shares the `checks` semaphore with `haven slot run` and
-  hook-launched commands. Plain repository scripts run directly.
+  hook-launched commands. Plain repository scripts run directly. `--affected`
+  (the default for an agent) runs `nx affected -t typecheck` instead, holding
+  every check slot free when it starts (at least one) and setting `NX_PARALLEL`
+  to that count, so each parallel Nx task is one counted slot. The codegen lane
+  `up` runs gets `NX_PARALLEL` set to the free slots the same way.
+- **Nx and untrusted checkouts.** A fork under `haven pr` (and every `haven play`
+  sandbox) gets `NX_CACHE_DIRECTORY` and `NX_WORKSPACE_DATA_DIRECTORY` under
+  haven's home (`nx-untrusted/<slug>`) and `NX_DAEMON=false` on every lane,
+  install included: Nx runs the checkout's own plugins at graph time, and the
+  shared `~/.nx` cache is what trusted worktrees replay (ADR-150). `destroy`
+  removes that directory. `down` and `destroy` stop the worktree's Nx daemon, and
+  the daemon stops any Nx daemon whose worktree has been deleted.
 - **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
   agent edits, then fires one catch-up reload — a human's browser isn't thrashed
   through broken intermediate states. Opt-in and always time-bounded.

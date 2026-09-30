@@ -90,7 +90,10 @@ refuses any `@langwatch/*` import the `package.json` doesn't declare. That rule
 is what makes the cache trustworthy.
 
 The cache lives per user, not per checkout, so every worktree shares it. Don't
-set `NX_CACHE_DIRECTORY` locally: it turns the sharing off.
+set `NX_CACHE_DIRECTORY` locally: it turns the sharing off. The one exception is
+haven's: a fork under `haven pr` or a `haven play` sandbox gets a private cache
+and no daemon, because Nx runs that checkout's own plugins and trusted worktrees
+replay whatever lands in the shared cache.
 
 ## Why some things are in Go
 

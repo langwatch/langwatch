@@ -208,6 +208,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,
 		PortlessDisabled: o.cfg.PortlessDisabled,
 	}
+	if p.UntrustedCheckout {
+		st.NxPrivateDir = o.nxPrivateDir(slug)
+	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
 			Name: r.Name, Role: r.Role, Port: ports[i],
@@ -576,19 +579,19 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	// are suppressed for an untrusted one — `haven pr` sanitises the fork install
 	// it runs itself, and reaches this path immediately afterwards, so the two
 	// have to agree or the guard is void.
-	if err := o.ensureDeps(ctx, p.WorktreeDir, !p.UntrustedCheckout); err != nil {
-		return err
-	}
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
 	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
 	env := append(append(st.OverlayEnv(), o.credentialEnv(st.Slug, p.WorktreeDir)...), "DOTENV_CONFIG_QUIET=true")
+	if err := o.ensureDeps(ctx, p.WorktreeDir, depsInstall{WithLifecycleScripts: !p.UntrustedCheckout, Env: nxEnv(st)}); err != nil {
+		return err
+	}
 	jobs := prepShellsFor(st.Layout)
 	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
 	// the services boot. Owned here so `pnpm dev` is simply `haven up`.
 	if jobs.Codegen == "" {
 		fmt.Println("  codegen: left to the app lane, which runs it on its way up")
-	} else if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "codegen", Dir: p.WorktreeDir, Shell: jobs.Codegen, Env: env}); err != nil {
+	} else if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "codegen", Dir: p.WorktreeDir, Shell: jobs.Codegen, Env: append(o.nxParallelEnv(), env...)}); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
 	// Migrations failing on an existing database is the one prep step that must
@@ -878,6 +881,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	if !portlessDisabled {
 		o.removeStackRoutes(slug, st.Services)
 	}
+	o.stopNxDaemon(ctx, p.WorktreeDir)
 	o.store.RemoveStack(slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
 	return nil

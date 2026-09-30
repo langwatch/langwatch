@@ -154,6 +154,10 @@ func (unavailableSemaphore) Acquire(context.Context, string, int) (func(), int, 
 	return nil, 0, errors.New("lock directory unavailable")
 }
 
+func (unavailableSemaphore) TryAcquire(string, int) (func(), int, bool, error) {
+	return nil, 0, false, errors.New("lock directory unavailable")
+}
+
 func TestHookRunProceedsWhenSemaphoreStorageFails(t *testing.T) {
 	o, _ := sharedRunOrch(t)
 	o.sem = unavailableSemaphore{}

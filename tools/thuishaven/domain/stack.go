@@ -114,6 +114,11 @@ type Stack struct {
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
 	IsBaseline bool `json:"baseline,omitempty"`
+	// NxPrivateDir is set only for an untrusted checkout (a fork under `haven pr`,
+	// a play sandbox). Nx runs the checkout's own plugins at graph time, so its
+	// cache and workspace data live here, never in the shared ~/.nx cache that
+	// trusted worktrees replay (ADR-150). Empty means the shared cache.
+	NxPrivateDir string `json:"nxPrivateDir,omitempty"`
 	// LangyImage is the content-addressed langy image tag this stack was planned
 	// with (empty on the host tier or with langy off). `up` compares it against
 	// the freshly-derived tag so a source edit restarts the stack onto new bytes.

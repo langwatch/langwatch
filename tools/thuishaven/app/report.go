@@ -45,6 +45,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 		ok, detail := o.rds.Health(ctx)
 		servers["redis"] = health{OK: ok, Detail: detail}
 	}
+	nxDaemons := o.NxDaemons()
 	stackRSS := o.StackRSSByLauncher()
 	live, rss := o.stackFootprint(stackRSS)
 	selection, haveSelection := o.store.ReadSelection(worktreeDir)
@@ -67,6 +68,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 			"footprint":     map[string]any{"live": live, "rssBytes": rss},
 			"selection":     selection,
 			"overlay":       o.worktreeOverlay(worktreeDir, reveal),
+			"nxDaemons":     nxDaemons,
 		})
 	}
 
@@ -108,6 +110,9 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 			continue
 		}
 		fmt.Printf("%s %s — %s\n", ok(h.OK), name, h.Detail)
+	}
+	for _, d := range nxDaemons {
+		fmt.Printf("ok   nx daemon pid %d (%s, ~%s)\n", d.PID, d.Worktree, domain.HumanBytes(d.RSS))
 	}
 	o.printWorktreeOverlay(worktreeDir, reveal)
 	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",

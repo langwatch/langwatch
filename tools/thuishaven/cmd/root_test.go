@@ -380,3 +380,19 @@ func TestRemovedSelectionEnvIsReadForIntentNotOneSpelling(t *testing.T) {
 		}
 	})
 }
+
+// @scenario "An agent's typecheck is the affected one"
+func TestTypecheckScopeDefaultsByCaller(t *testing.T) {
+	if args, affected := typecheckScope([]string{"--verbose"}, true); !affected || len(args) != 1 {
+		t.Errorf("agent default: affected=%v args=%v", affected, args)
+	}
+	if _, affected := typecheckScope(nil, false); affected {
+		t.Errorf("a person gets the whole tree by default")
+	}
+	if args, affected := typecheckScope([]string{"--all", "--", "--verbose"}, true); affected || len(args) != 1 {
+		t.Errorf("--all must win for an agent and not be forwarded: affected=%v args=%v", affected, args)
+	}
+	if _, affected := typecheckScope([]string{"--affected"}, false); !affected {
+		t.Errorf("--affected must win for a person")
+	}
+}
