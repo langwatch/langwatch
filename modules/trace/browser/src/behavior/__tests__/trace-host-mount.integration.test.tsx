@@ -17,41 +17,43 @@ type ProjectRow = {
   presenceEnabled: boolean;
 };
 
-const { TEST_KEY, getAll, hasFirstMessage, invalidateGraph, reading, row, utils } = vi.hoisted(() => {
-  const invalidate = vi.fn();
-  const key = "sk-lw-test-fixture-not-a-real-key-000000000000";
-  const projectRow = {
-    id: "proj_agent",
-    name: "Agent",
-    slug: "acme-agent",
-    apiKey: key,
-    firstMessage: true,
-    presenceEnabled: true,
-  };
-  const organizationRow = { presenceEnabled: true };
-  const graph = () => [
-    {
-      id: "org_1",
-      name: "ACME",
-      presenceEnabled: organizationRow.presenceEnabled,
-      teams: [{ id: "team_1", name: "ACME", projects: [{ ...projectRow }] }],
-    },
-  ];
-  return {
-    TEST_KEY: key,
-    row: { project: projectRow, organization: organizationRow },
-    getAll: vi.fn((_input: unknown, options: { enabled: boolean }) => ({
-      data: options.enabled ? graph() : undefined,
-    })),
-    hasFirstMessage: {
-      data: undefined as { firstMessage: boolean } | undefined,
-      useQuery: vi.fn(),
-    },
-    invalidateGraph: invalidate,
-    utils: { organization: { getAll: { invalidate } } },
-    reading: { actor: { id: "user_1" } } as { actor: { id: string } | null },
-  };
-});
+const { TEST_KEY, getAll, hasFirstMessage, invalidateGraph, reading, row, utils } = vi.hoisted(
+  () => {
+    const invalidate = vi.fn();
+    const key = "sk-lw-test-fixture-not-a-real-key-000000000000";
+    const projectRow = {
+      id: "proj_agent",
+      name: "Agent",
+      slug: "acme-agent",
+      apiKey: key,
+      firstMessage: true,
+      presenceEnabled: true,
+    };
+    const organizationRow = { presenceEnabled: true };
+    const graph = () => [
+      {
+        id: "org_1",
+        name: "ACME",
+        presenceEnabled: organizationRow.presenceEnabled,
+        teams: [{ id: "team_1", name: "ACME", projects: [{ ...projectRow }] }],
+      },
+    ];
+    return {
+      TEST_KEY: key,
+      row: { project: projectRow, organization: organizationRow },
+      getAll: vi.fn((_input: unknown, options: { enabled: boolean }) => ({
+        data: options.enabled ? graph() : undefined,
+      })),
+      hasFirstMessage: {
+        data: undefined as { firstMessage: boolean } | undefined,
+        useQuery: vi.fn(),
+      },
+      invalidateGraph: invalidate,
+      utils: { organization: { getAll: { invalidate } } },
+      reading: { actor: { id: "user_1" } } as { actor: { id: string } | null },
+    };
+  },
+);
 
 vi.mock("../trace-api.ts", () => ({
   traceApi: {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { CHART_GRID_DEFAULT_ROW_SPAN } from "@langwatch/analytics-contract/chart-grid";
 
+import { CHART_GRID_DEFAULT_ROW_SPAN } from "@langwatch/analytics-contract/chart-grid";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import {
   PrismaConfigService,

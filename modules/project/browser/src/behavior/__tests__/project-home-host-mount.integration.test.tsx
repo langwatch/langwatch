@@ -37,8 +37,8 @@ vi.mock("@langwatch/langy-browser-kit", () => ({
   useReducedMotion: () => false,
 }));
 
-import ProjectHomeHostMount from "../project-home-host-mount.tsx";
 import { useProjectHomeHost } from "../../model/project-home-host.ts";
+import ProjectHomeHostMount from "../project-home-host-mount.tsx";
 
 function BaseHost() {
   return <output aria-label="base host">{useProjectHomeHost().deployment().baseHost}</output>;

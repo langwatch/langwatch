@@ -39,8 +39,8 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({ useDrawer: () => drawer }
 const graph = { organization: void 0, activeProject: void 0 };
 vi.mock("../api-key-organization-graph.ts", () => ({ useApiKeyOrganizationGraph: () => graph }));
 
-import ApiKeyHostMount from "../api-key-host-mount.tsx";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
+import ApiKeyHostMount from "../api-key-host-mount.tsx";
 
 function Endpoint() {
   return <output aria-label="endpoint">{useApiKeyHost().apiEndpoint()}</output>;
@@ -58,9 +58,7 @@ describe("ApiKeyHostMount", () => {
         </ApiKeyHostMount>,
       );
 
-      expect(screen.getByLabelText("endpoint")).toHaveTextContent(
-        "https://langwatch.acme.example",
-      );
+      expect(screen.getByLabelText("endpoint")).toHaveTextContent("https://langwatch.acme.example");
     });
   });
 });
