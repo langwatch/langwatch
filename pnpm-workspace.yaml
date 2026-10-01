@@ -179,9 +179,9 @@ overrides:
   "brace-expansion@>=4.0.0 <5.0.12": ">=5.0.12 <6"
   "file-type@>=13.0.0 <21.3.1": ">=21.3.1 <22"
   "prismjs@<1.30.0": ">=1.30.0"
-  "@grpc/grpc-js@<1.14.4": ">=1.14.4"
+  "@grpc/grpc-js@<1.14.5": ">=1.14.5 <2"
   "js-yaml@>=3.0.0 <3.15.2": ">=3.15.2 <4"
-  "dompurify@<3.4.13": ">=3.4.13 <4"
+  "dompurify@<3.4.16": ">=3.4.16 <4"
   # validator incomplete filtering (#216) via class-validator
   "validator@<13.15.22": ">=13.15.22"
   # express-rate-limit DoS (from mcp/typescript)
@@ -192,8 +192,8 @@ overrides:
   # dep of better-auth (the app is a Vite app).
   "next@>=13.0.0 <15.5.15": ">=15.5.15"
   # axios prototype pollution gadgets, header injection, loopback bypass
-  # (#982/#984/#987/#988)
-  "axios@>=1.0.0 <1.16.0": ">=1.16.0"
+  # (#982/#984/#987/#988), and a further set fixed in 1.20.0 (#2616-#2627).
+  "axios@>=1.0.0 <1.20.0": ">=1.20.0 <2"
   # fast-xml-builder attribute value quote bypass (#1028)
   "fast-xml-builder@<1.1.7": ">=1.1.7"
   # fast-uri path traversal + host confusion (#1031-#1042), with further
