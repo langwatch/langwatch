@@ -87,7 +87,9 @@ describe("the integrate pane", () => {
       renderPane();
 
       const title = screen.getByText("Instrument your agents in seconds");
-      const tokenCard = screen.getByText(/generate an access token/i);
+      const tokenCard = screen.getByRole("button", {
+        name: /create a personal access token/i,
+      });
       const actions = screen.getByRole("button", {
         name: /see sdk instructions/i,
       });

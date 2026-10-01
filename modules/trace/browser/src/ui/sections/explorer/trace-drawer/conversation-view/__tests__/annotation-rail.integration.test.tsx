@@ -10,6 +10,8 @@ import type {
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
+import { MemoryRouterWrapper } from "../../../hooks/__tests__/memory-router-wrapper.tsx";
 import "@testing-library/jest-dom/vitest";
 
 type MutationOptions = { onSuccess?: () => void; onError?: () => void };
@@ -267,17 +269,19 @@ function renderRow({
   anchoredAnnotations = [] as AnnotationByTrace[],
 } = {}) {
   return renderWithDesignSystem(
-    <AnnotatedTurnRow
-      parsed={parsedTurn()}
-      index={1}
-      layout={layout}
-      isCurrent={false}
-      onSelectTurn={vi.fn()}
-      annotations={annotations}
-      anchoredAnnotations={anchoredAnnotations}
-      isRailActive={isRailActive}
-      railLayout={railLayout}
-    />,
+    <MemoryRouterWrapper>
+      <AnnotatedTurnRow
+        parsed={parsedTurn()}
+        index={1}
+        layout={layout}
+        isCurrent={false}
+        onSelectTurn={vi.fn()}
+        annotations={annotations}
+        anchoredAnnotations={anchoredAnnotations}
+        isRailActive={isRailActive}
+        railLayout={railLayout}
+      />
+    </MemoryRouterWrapper>,
   );
 }
 

@@ -1,3 +1,8 @@
+import {
+  clearReaderUiStorage,
+  readerUiStorage,
+  setUiStorageReader,
+} from "@langwatch/browser-host/storage";
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -12,12 +17,14 @@ const VIEWPORT_WIDTH = 1440;
 const STORAGE_KEY = "langwatch:traces-v2:drawer-chrome";
 
 const stored = (): { state: Record<string, unknown> } | null => {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = readerUiStorage.getItem(STORAGE_KEY);
   return raw === null ? null : JSON.parse(raw);
 };
 
 beforeEach(() => {
+  clearReaderUiStorage();
   localStorage.clear();
+  setUiStorageReader("reader-1");
   drawerChrome.setState(drawerChrome.getInitialState(), true);
 });
 

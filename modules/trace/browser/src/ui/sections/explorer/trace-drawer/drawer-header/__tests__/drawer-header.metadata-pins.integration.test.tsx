@@ -5,6 +5,8 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { MemoryRouterWrapper } from "../../../hooks/__tests__/memory-router-wrapper.tsx";
 import "@testing-library/jest-dom/vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -168,7 +170,11 @@ function makeTrace(overrides: Partial<TraceHeader> = {}): TraceHeader {
 }
 
 function renderHeader(trace: TraceHeader = makeTrace()) {
-  return renderWithDesignSystem(<DrawerHeader trace={trace} onClose={vi.fn()} />);
+  return renderWithDesignSystem(
+    <MemoryRouterWrapper>
+      <DrawerHeader trace={trace} onClose={vi.fn()} />
+    </MemoryRouterWrapper>,
+  );
 }
 
 beforeEach(() => {

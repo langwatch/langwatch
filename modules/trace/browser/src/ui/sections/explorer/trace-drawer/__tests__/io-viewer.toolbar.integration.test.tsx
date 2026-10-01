@@ -79,13 +79,16 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
+import { MemoryRouterWrapper } from "../../hooks/__tests__/memory-router-wrapper.tsx";
 import { IOViewer } from "../io-viewer.tsx";
 
 const TRACE_ID = "trace-1";
 const SPAN_ID = "span-7";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+  <MemoryRouterWrapper>
+    <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+  </MemoryRouterWrapper>
 );
 
 /**

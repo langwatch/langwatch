@@ -90,6 +90,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
 }));
 
 import { RedactedField } from "../../../redacted-field.tsx";
+import { MemoryRouterWrapper } from "../../hooks/__tests__/memory-router-wrapper.tsx";
 import { IOViewer } from "../io-viewer.tsx";
 
 const TRACE_ID = "trace-1";
@@ -117,7 +118,9 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
 }
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+  <MemoryRouterWrapper>
+    <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+  </MemoryRouterWrapper>
 );
 
 beforeEach(() => {

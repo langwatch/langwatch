@@ -7,6 +7,7 @@ import type { SpanDetail, SpanTreeNode } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryRouterWrapper } from "../../../hooks/__tests__/memory-router-wrapper.tsx";
 import { SpanAccordions } from "../span-accordions.tsx";
 
 const { mockDetailState } = vi.hoisted(() => ({
@@ -106,7 +107,11 @@ function makeDetail(overrides: Partial<SpanDetail> = {}): SpanDetail {
 }
 
 function renderSpanDetail() {
-  return renderWithDesignSystem(<SpanAccordions traceId="trace-1" span={span} />);
+  return renderWithDesignSystem(
+    <MemoryRouterWrapper>
+      <SpanAccordions traceId="trace-1" span={span} />
+    </MemoryRouterWrapper>,
+  );
 }
 
 describe("Feature: Unmapped model cost suggestion in span details", () => {

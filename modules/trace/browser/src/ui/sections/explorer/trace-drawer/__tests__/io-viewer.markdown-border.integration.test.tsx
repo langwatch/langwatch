@@ -35,12 +35,15 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
+import { MemoryRouterWrapper } from "../../hooks/__tests__/memory-router-wrapper.tsx";
 import { IOViewer } from "../io-viewer.tsx";
 
 afterEach(cleanup);
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+  <MemoryRouterWrapper>
+    <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+  </MemoryRouterWrapper>
 );
 
 // Markdown content with structural signals but NO fenced code block, so the
