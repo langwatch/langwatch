@@ -85,27 +85,6 @@ describe("ClickHouseLogProcessingAdapter", () => {
     });
 
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
-    it("mounts the dispatch subscribers it is handed under their own names", () => {
-      const pipeline = LogProcessingAdapter.create({
-        repository: ClickHouseCanonicalLogRecordAppendRepository.create({
-          resolveClient: async () => client(),
-          defaultRetentionDays: 49,
-        }),
-        defaultRetentionDays: 49,
-        logCommandShardCount: 8,
-        subscribers: [
-          {
-            name: "codingAgentLogFactsDispatch",
-            eventTypes: ["lw.obs.log.record_received"],
-            handle: async () => undefined,
-          },
-        ],
-      }).build();
-
-      expect([...pipeline.eventSubscribers.keys()]).toEqual(["codingAgentLogFactsDispatch"]);
-    });
-
-    /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     it("appends through the tenant the record names", async () => {
       const insert = vi.fn<LogClickHouseClient["insert"]>(async () => undefined);
       const resolveClient = vi.fn(async () => client({ insert }));

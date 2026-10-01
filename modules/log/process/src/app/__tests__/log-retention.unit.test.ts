@@ -5,7 +5,6 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -34,7 +33,6 @@ describe("log app installation", () => {
         .provide({
           "data-privacy": createApiFixture<DataPrivacyApi>({}),
           trace: createApiFixture<TraceApi>({}),
-          "coding-agent": createApiFixture<CodingAgentApi>({}),
           "data-retention": createApiFixture<DataRetentionApi>({
             getResolvedForProject: async () => RETAINED,
           }),

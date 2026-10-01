@@ -1,5 +1,4 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -20,7 +19,6 @@ import {
 import type { OtlpDoorRequest } from "@langwatch/otlp";
 import { TraceApi } from "@langwatch/trace-contract";
 
-import { createCodingAgentMetricFactsDispatchSubscriber } from "../eventing/coding-agent-metric-facts-dispatch.subscriber.ts";
 import { ClickHouseMetricDataPointAppendRepository } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { resolveMetricCommandShardCount } from "../rules/metric-command-lanes.rules.ts";
 import { CanonicalMetricService } from "../services/canonical-metric.service.ts";
@@ -40,7 +38,6 @@ export type MetricInfrastructure = Readonly<{
 type MetricDependencies = Readonly<{
   dataPrivacy: typeof DataPrivacyApi;
   traces: typeof TraceApi;
-  codingAgents: typeof CodingAgentApi;
   retention: typeof DataRetentionApi;
 }>;
 type MetricSetup = FeatureSetup<MetricDependencies, MetricInfrastructure, MetricServerConfig>;
@@ -52,8 +49,6 @@ export class MetricApp implements MetricApiContract {
   static readonly dependencies: MetricDependencies = {
     dataPrivacy: DataPrivacyApi,
     traces: TraceApi,
-    /** Lifts a received point's session facts onto its own pipeline. */
-    codingAgents: CodingAgentApi,
     /** Each tenant's retention, which the metric rows are stamped with. */
     retention: DataRetentionApi,
   };
@@ -87,9 +82,6 @@ export class MetricApp implements MetricApiContract {
       }),
       defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
       metricCommandShardCount: resolveMetricCommandShardCount(config.processingShards),
-      subscribers: [
-        createCodingAgentMetricFactsDispatchSubscriber({ codingAgents: dependencies.codingAgents }),
-      ],
       retention: {
         resolve: (tenantId) =>
           dependencies.retention.getResolvedForProject({ projectId: tenantId }),

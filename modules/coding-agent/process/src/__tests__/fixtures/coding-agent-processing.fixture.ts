@@ -9,7 +9,10 @@ import {
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { EventingCodingAgentProcessingAdapter } from "../../eventing/coding-agent-processing.pipeline.ts";
+import {
+  type CodingAgentProcessingPipelineDeps,
+  EventingCodingAgentProcessingAdapter,
+} from "../../eventing/coding-agent-processing.pipeline.ts";
 import { MemoryCodingAgentSessionFoldCacheRepository } from "../../repositories/memory/memory.coding-agent-session-fold-cache.repository.ts";
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
 import type { CodingAgentCostMetrics } from "../../app/coding-agent.members.ts";
@@ -290,8 +293,17 @@ export class TestModelProviderService implements ModelProviderApi {
   }
 }
 
+/** The log and metric reactions, inert unless a test hands its own. */
+export const inertReceivedFacts: CodingAgentProcessingPipelineDeps["receivedFacts"] = {
+  contributeReceivedLogRecord: async () => undefined,
+  contributeReceivedMetricPoint: async () => undefined,
+};
+
 /** Builds the real pipeline definition without opening its runtime adapters. */
-export function buildTestCodingAgentProcessingPipeline(github?: GithubApi) {
+export function buildTestCodingAgentProcessingPipeline(
+  github?: GithubApi,
+  receivedFacts: CodingAgentProcessingPipelineDeps["receivedFacts"] = inertReceivedFacts,
+) {
   return EventingCodingAgentProcessingAdapter.create({
     traceCanonicalisation: new TestTraceCanonicalisationService(),
     modelProviders: new TestModelProviderService(),
@@ -303,5 +315,6 @@ export function buildTestCodingAgentProcessingPipeline(github?: GithubApi) {
     sessionContextMemo: MemorySessionContextMemoRepository.create(),
     sessionFoldCache: MemoryCodingAgentSessionFoldCacheRepository.create(),
     github,
+    receivedFacts,
   }).build();
 }

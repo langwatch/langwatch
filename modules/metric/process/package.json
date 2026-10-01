@@ -23,7 +23,6 @@
   "dependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
-    "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",

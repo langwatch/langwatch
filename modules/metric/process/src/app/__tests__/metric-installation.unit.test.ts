@@ -1,5 +1,4 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -45,7 +44,6 @@ function process(redactMetricAttributes: DataPrivacyApi["redactMetricAttributes"
     .provide({
       "data-privacy": createApiFixture<DataPrivacyApi>({ redactMetricAttributes }),
       trace: createApiFixture<TraceApi>({}),
-      "coding-agent": createApiFixture<CodingAgentApi>({}),
       "data-retention": createApiFixture<DataRetentionApi>({
         getResolvedForProject: async () => RETAINED,
       }),

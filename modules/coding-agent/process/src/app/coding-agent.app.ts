@@ -44,8 +44,6 @@ import type { EventingCommands } from "@langwatch/eventing";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { CanonicalLogRecord } from "@langwatch/log-contract";
-import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { type SpanDetail, TraceApi } from "@langwatch/trace-contract";
@@ -61,8 +59,6 @@ import {
   gateSessionListCost,
   gateSessionListTitles,
 } from "../rules/coding-agent-gates.rules.ts";
-import { liftLogContribution } from "../rules/coding-agent-log-facts.rules.ts";
-import { liftMetricContribution } from "../rules/coding-agent-metric-facts.rules.ts";
 import {
   encodeSessionCursor,
   readSessionCursor,
@@ -74,6 +70,7 @@ import { CodingAgentCommandDispatcherService } from "../services/coding-agent-co
 import { GovernanceCodingAgentBillingService } from "../services/coding-agent-cost-attribution.service.ts";
 import { OtelCodingAgentCostMetricsService } from "../services/coding-agent-cost-metrics.service.ts";
 import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
+import { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
 import { CodingAgentScopeDirectoryService } from "../services/coding-agent-scope-directory.service.ts";
 import { CodingAgentScopePermissionsService } from "../services/coding-agent-scope-permissions.service.ts";
 import { CodingAgentViewerVisibilityService } from "../services/coding-agent-viewer-visibility.service.ts";
@@ -215,6 +212,10 @@ export class CodingAgentApp implements CodingAgentApi {
       sessionContextMemo: repositories.sessionContextMemo,
       sessionFoldCache: repositories.sessionFoldCache,
       github: dependencies.github,
+      receivedFacts: CodingAgentReceivedFactsService.create({
+        traces: dependencies.traces,
+        commands,
+      }),
     }).build();
     return new CodingAgentApp({
       codingAgents: service,
@@ -282,18 +283,6 @@ export class CodingAgentApp implements CodingAgentApi {
 
   contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void> {
     return this.contributeSpanFacts(liftSpanContribution(input));
-  }
-
-  async contributeReceivedLogRecord(record: CanonicalLogRecord): Promise<void> {
-    const lifted = liftLogContribution({ record, traces: this.#traces });
-    if (lifted.outcome === "ignored") return;
-    await this.#commands.contributeLogFacts(lifted.contribution);
-  }
-
-  async contributeReceivedMetricPoint(point: CanonicalMetricDataPoint): Promise<void> {
-    const lifted = liftMetricContribution(point);
-    if (lifted.outcome === "ignored") return;
-    await this.#commands.contributeMetricFacts(lifted.contribution);
   }
 
   /** Pure derivation, no session store read: which log fields an event name captures. */

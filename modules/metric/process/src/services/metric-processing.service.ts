@@ -6,7 +6,6 @@ import {
   defineAggregate,
   defineCommandSchema,
   definePipeline,
-  type EventSubscriberDefinition,
   EventUtils,
   type Projection,
   type RetentionPolicyResolver,
@@ -43,8 +42,6 @@ export interface MetricProcessingPipelineDeps {
   metricSeriesCatalogAppendStore: AppendStore<CanonicalMetricDataPoint>;
   metricTimeRollupAppendStore: AppendStore<CanonicalMetricDataPoint>;
   metricCommandShardCount: number;
-  /** Cross-pipeline dispatchers (e.g. coding-agent metric-facts, ADR-056). */
-  subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
   /** Each tenant's retention, stamped on the metric rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
 }
@@ -53,7 +50,6 @@ export interface MetricProcessingServiceOptions {
   repository: MetricDataPointAppendRepository;
   defaultRetentionDays: number;
   metricCommandShardCount: number;
-  subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
   /** Each tenant's retention, stamped on the metric rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
 }
@@ -93,9 +89,6 @@ function createMetricProcessingPipeline(
       }),
     );
 
-  for (const subscriber of deps.subscribers ?? []) {
-    builder = builder.withEventSubscriber(subscriber.name, subscriber);
-  }
   if (deps.retention) builder = builder.withRetention(deps.retention);
 
   return builder
@@ -134,7 +127,6 @@ export class MetricProcessingService {
       ),
       metricTimeRollupAppendStore: MetricTimeRollupAppendStore.create(repository, retentionDays),
       metricCommandShardCount: this.options.metricCommandShardCount,
-      subscribers: this.options.subscribers,
       ...(this.options.retention === undefined ? {} : { retention: this.options.retention }),
     });
   }

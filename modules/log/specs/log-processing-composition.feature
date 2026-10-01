@@ -16,7 +16,7 @@ Feature: Composing durable log processing
     Given a process that can route a tenant to its ClickHouse instance
     When it composes durable log processing
     Then the pipeline is built without a trace read cap
-    And it registers the same command, projection and subscriber the App registers
+    And it registers the same command and projection the App registers
 
   @unit
   Scenario: The append surface offers no read
@@ -29,20 +29,6 @@ Feature: Composing durable log processing
     Given the full canonical-log repository and the append-only one
     When each is asked to store the same canonical record
     Then the same append path runs for both
-
-  @unit
-  Scenario: The ADR-056 edge is mounted rather than declared missing
-    Given a worker graph composed from its own substrate
-    When the graph is composed
-    Then the pipeline mounts its coding-agent dispatch subscriber
-    And nothing is reported at boot about a missing Coding Agent pipeline
-
-  @unit
-  Scenario: Each received log record is forwarded to coding-agent once per record
-    Given the coding-agent dispatch on the log pipeline
-    When the same received log record is delivered twice
-    Then each delivery forwards the record to coding-agent unchanged
-    And both deliveries share one deduplication identity, apart from any other record
 
   @integration
   Scenario: The api process serves every OTLP signal at its own module's door

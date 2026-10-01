@@ -1630,7 +1630,10 @@ lane already gives retry safety (Alex, 2026-09-30). A peer subscriber may declar
 shaping (`options`: delay, dedup, group lane) and is handed the event's `occurredAt`. Automation
 reacts to trace's span and origin events and evaluation's completed and reported events this way,
 keeping main's settle windows and reading fold state through `TraceApi.findSummary` and
-`EvaluationApi.findRunByEvaluationId`; neither owner knows automation (Alex, 2026-10-01). The runtime's own maintenance
+`EvaluationApi.findRunByEvaluationId`; neither owner knows automation (Alex, 2026-10-01).
+Coding-agent reacts to log's received-record and metric's received-point events the same way.
+A delivery is not a reaction: a producer still calls a destination kind's `requestDelivery`, and the
+destination holds no producer code (Alex, 2026-10-01; [ADR-167](adr/167-outbound-delivery.md)). The runtime's own maintenance
 pipelines (blob sweep, process-manager retention) are built by the eventing member where a Redis and a
 process store exist, answered by `maintenancePipelines()`, and installed once by the process after the
 modules', where the role drains (2026-09-25). The producer role holds the process store too, so

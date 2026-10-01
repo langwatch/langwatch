@@ -85,14 +85,6 @@ class TestCodingAgentApi {
     throw new Error("Not used by session group tests: contributeReceivedSpan.");
   }
 
-  contributeReceivedLogRecord(): never {
-    throw new Error("Not used by session group tests: contributeReceivedLogRecord.");
-  }
-
-  contributeReceivedMetricPoint(): never {
-    throw new Error("Not used by session group tests: contributeReceivedMetricPoint.");
-  }
-
   getSessionEvents(): never {
     throw new Error("Not used by session group tests: getSessionEvents.");
   }

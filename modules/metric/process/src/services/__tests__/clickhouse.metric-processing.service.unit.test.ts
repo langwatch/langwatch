@@ -41,27 +41,6 @@ describe("ClickHouseMetricProcessingAdapter", () => {
     });
 
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
-    it("mounts the dispatch subscribers it is handed under their own names", () => {
-      const pipeline = MetricProcessingService.create({
-        repository: ClickHouseMetricDataPointAppendRepository.create({
-          resolveClient: async () => client(),
-          defaultRetentionDays: 49,
-        }),
-        defaultRetentionDays: 49,
-        metricCommandShardCount: 8,
-        subscribers: [
-          {
-            name: "codingAgentMetricFactsDispatch",
-            eventTypes: ["lw.obs.metric.data_point_received"],
-            handle: async () => undefined,
-          },
-        ],
-      }).build();
-
-      expect([...pipeline.eventSubscribers.keys()]).toEqual(["codingAgentMetricFactsDispatch"]);
-    });
-
-    /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     it("appends through the tenant the point names", async () => {
       const insert = vi.fn<MetricClickHouseClient["insert"]>(async () => undefined);
       const resolveClient = vi.fn(async () => client({ insert }));

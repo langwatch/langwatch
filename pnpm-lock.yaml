@@ -6616,12 +6616,6 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
-      '@langwatch/log-contract':
-        specifier: workspace:*
-        version: link:../../log/contract
-      '@langwatch/metric-contract':
-        specifier: workspace:*
-        version: link:../../metric/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -10182,9 +10176,6 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
-      '@langwatch/coding-agent-contract':
-        specifier: workspace:*
-        version: link:../../coding-agent/contract
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
@@ -10274,9 +10265,6 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/coding-agent-contract':
-        specifier: workspace:*
-        version: link:../../coding-agent/contract
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
