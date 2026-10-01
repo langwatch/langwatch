@@ -11,9 +11,9 @@ const logger = createLogger("langwatch:annotations:trace-sync");
  * API wrote the annotation.
  *
  * Best-effort: Postgres is the source of truth, so a failed sync is logged
- * rather than failing a write that happened. A failed add is repaired by the
- * backfill task. A failed remove is not, since the backfill only merges ids:
- * the trace keeps the stale id until the next remove event for it.
+ * rather than failing a write that happened. Nothing retries it: an operator
+ * running `backfillAnnotationsToClickhouse` repairs a failed add, and nothing
+ * repairs a failed remove, since that task only merges ids.
  */
 export async function syncAnnotationToTrace({
   action,

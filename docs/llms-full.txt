@@ -72140,9 +72140,7 @@ event:thumbs_up_down
 `has:feedback` matches traces with `thumbs_up_down` feedback, recorded through
 `POST /api/events/track` or the SDK. `has:annotation` matches traces with an
 annotation, including ones created through `POST /api/annotations/trace/{id}`.
-The annotation reaches trace search shortly after it is saved. If that step
-fails, the annotation is still saved, and search finds it after the next
-annotation backfill.
+The annotation reaches trace search a moment after it is saved.
 `event:<name>` matches traces carrying an event with that name.
 
 <Note>
