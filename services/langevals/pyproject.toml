@@ -90,9 +90,11 @@ override-dependencies = [
     "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
     # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
     "json-repair>=0.60.1",
-    # security: PyJWT advisories covering <=2.13.0, including a CRITICAL; patched in 2.14.0. An override replaces the requirement, so the
+    # security: PyJWT advisories covering <=2.14.0, including a CRITICAL; patched in 2.15.0. An override replaces the requirement, so the
     # crypto extra that mcp asks for has to be restated here.
-    "pyjwt[crypto]>=2.14.0",
+    "pyjwt[crypto]>=2.15.0",
+    # security: urllib3 HTTPS-proxy TLS and chunked-read advisories; patched in 2.8.0.
+    "urllib3>=2.8.0",
     # --- Security floors below carry no API change for this workspace. Each is
     # the first patched release named by the advisory that produced the alert;
     # raise a floor rather than removing it, so a transitive downgrade can never
@@ -120,7 +122,7 @@ override-dependencies = [
     # torch: deserialization advisory in torch.load.
     "torch>=2.13.0",
     # tornado: HTTP header and multipart parsing advisories.
-    "tornado>=6.5.8",
+    "tornado>=6.5.9",
     # httpx2: two advisories fixed in 2.11.0 and one in 2.12.0.
     "httpx2>=2.12.0",
     #
