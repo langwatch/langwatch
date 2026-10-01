@@ -976,9 +976,11 @@ flows:
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
-      - action: wait
+      - action: expect
         with:
-          millis: "3000"
+          count: 'button:not([href]):has-text("Add chart")'
+          min: "1"
+          timeout: "30000"
       - action: click
         with:
           text: Add chart
@@ -1061,9 +1063,11 @@ flows:
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
-      - action: wait
+      - action: expect
         with:
-          millis: "3000"
+          count: 'button:not([href]):has-text("Add chart")'
+          min: "1"
+          timeout: "30000"
       - action: click
         with:
           text: Add chart

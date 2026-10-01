@@ -2,6 +2,9 @@ import type { Action } from "./context.ts";
 import { argument, scope } from "./context.ts";
 import { clickText, dismissTour, fillField, goTo } from "./primitives.ts";
 
+/** ADD_CHART_DRAWER_BUTTON is "Add chart" once the playground flag has resolved to the drawer. */
+const ADD_CHART_DRAWER_BUTTON = 'button:not([href]):has-text("Add chart")';
+
 const required = async (context: Parameters<Action>[0], text: string): Promise<void> =>
   clickText({ context, text });
 
@@ -243,6 +246,12 @@ export const createDashboard: Action = async (context) => {
     path: argument({ context, name: "start", fallback: "/{slug}/analytics/reports" }),
   });
   await context.snapshot("chart builder");
+  // Until the playground flag resolves, "Add chart" is a link (a button carrying an href).
+  await context.side.page
+    .locator(ADD_CHART_DRAWER_BUTTON)
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 })
+    .catch(() => undefined);
   await required(context, "Add chart");
   await context.snapshot("after adding a chart");
 };

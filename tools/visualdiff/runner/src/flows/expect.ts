@@ -5,6 +5,9 @@ import { hasTarget, targetOf } from "./target.ts";
 /** EXPECT_TIMEOUT_MILLIS bounds how long an expect polls before it fails. */
 export const EXPECT_TIMEOUT_MILLIS = 10_000;
 
+/** API_REQUEST_MILLIS caps one api read, so a slow answer is retried inside the step's timeout. */
+const API_REQUEST_MILLIS = 30_000;
+
 /** POLL_MILLIS is the gap between two reads of a polled expect. */
 const POLL_MILLIS = 250;
 
@@ -108,7 +111,13 @@ export const judgeBody = ({
 };
 
 /** readOnce checks an expect once against the side's current page: "" when it holds. */
-const readOnce = async (context: ActionContext): Promise<string> => {
+const readOnce = async ({
+  context,
+  deadline,
+}: {
+  context: ActionContext;
+  deadline: number;
+}): Promise<string> => {
   const { args, side } = context;
   const page = side.page;
   if (args.text !== undefined) {
@@ -144,14 +153,18 @@ const readOnce = async (context: ActionContext): Promise<string> => {
   }
   if (args.api !== undefined) {
     const token = args.auth ?? context.credential.projectKey;
-    const response = await page.request.get(
-      side.baseUrl + fillPath({ path: args.api, slug: context.slug }),
-      {
+    const response = await page.request
+      .get(side.baseUrl + fillPath({ path: args.api, slug: context.slug }), {
         headers: token === "none" ? {} : { "X-Auth-Token": token },
         failOnStatusCode: false,
         ignoreHTTPSErrors: true,
-      },
-    );
+        timeout: Math.min(Math.max(deadline - Date.now(), 1000), API_REQUEST_MILLIS),
+      })
+      .then(
+        (reply) => reply,
+        (error: unknown) => `request failed: ${String(error).split("\n")[0]}`,
+      );
+    if (typeof response === "string") return response;
     if (args.status !== undefined && String(response.status()) !== args.status) {
       return `answered ${response.status()}, want ${args.status}`;
     }
@@ -185,9 +198,8 @@ export const pollExpect = async ({
 };
 
 /** expectOutcome is the `expect` step: its `timeout` millis, EXPECT_TIMEOUT_MILLIS otherwise. */
-export const expectOutcome: Action = async (context) =>
-  pollExpect({
-    read: () => readOnce(context),
-    args: context.args,
-    timeout: Number(context.args.timeout ?? EXPECT_TIMEOUT_MILLIS),
-  });
+export const expectOutcome: Action = async (context) => {
+  const timeout = Number(context.args.timeout ?? EXPECT_TIMEOUT_MILLIS);
+  const deadline = Date.now() + timeout;
+  return pollExpect({ read: () => readOnce({ context, deadline }), args: context.args, timeout });
+};
