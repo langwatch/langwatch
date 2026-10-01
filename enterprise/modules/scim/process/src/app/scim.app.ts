@@ -65,7 +65,6 @@ import {
 import { scimTokenPepperSecrets } from "@langwatch/enterprise-scim-contract/token-pepper";
 import {
   ENTERPRISE_FEATURE_ERRORS,
-  EnterprisePlanRequiredError,
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
@@ -567,29 +566,17 @@ export class ScimApp implements ScimApiContract {
     return this.#scim.verifyToken(input);
   }
 
-  /** Plan-gated, unlike the request log: main's reconciliation read asks the plan. */
-  async getDirectoryReconciliation(
-    input: ScimReconciliationScope,
-  ): Promise<OrganizationReconciliation> {
-    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
-
+  getDirectoryReconciliation(input: ScimReconciliationScope): Promise<OrganizationReconciliation> {
     return this.#reconciliation.getAll(input);
   }
 
-  async findConnectionReconciliation(
+  findConnectionReconciliation(
     input: ScimConnectionRequestsInput,
   ): Promise<ConnectionReconciliation[]> {
-    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
-
     return this.#reconciliation.findById(input);
   }
 
-  /** Plan-gated like the panel it sits in, as main's getActivity asked the plan. */
-  async findDirectoryActivity(
-    input: ScimConnectionRequestsInput,
-  ): Promise<ScimDirectoryActivityEntry[]> {
-    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
-
+  findDirectoryActivity(input: ScimConnectionRequestsInput): Promise<ScimDirectoryActivityEntry[]> {
     return this.#reconciliation.findActivity(input);
   }
 

@@ -266,7 +266,6 @@ export class OrganizationMemberRoleService {
       currentRole: currentMember.role,
       userPermissions,
       role,
-      teamRoleUpdates,
       user: params.planUser,
     });
 

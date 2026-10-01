@@ -36,9 +36,6 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/feature-flag/contract/tsconfig.build.json"
     },
     {

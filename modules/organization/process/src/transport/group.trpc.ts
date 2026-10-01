@@ -1,15 +1,21 @@
 /**
- * The server half of `group.*`. Every procedure asks `organization:manage`.
- * Listing and creating also clear the Enterprise plan gate SCIM requires,
- * which the application asks now rather than the door.
+ * The server half of `group.*`: every procedure asks `organization:manage`.
+ * listAll and create declare the SCIM plan gate (create's covers custom roles);
+ * addGrant and applyEdits ask RBAC only when they grant a custom role.
  */
-
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import { groupTrpc, OrganizationApi } from "@langwatch/organization-contract";
+import {
+  assignsGroupCustomRole,
+  groupTrpc,
+  OrganizationApi,
+} from "@langwatch/organization-contract";
+
+const customRoleGate = { feature: "RBAC", when: assignsGroupCustomRole };
 
 export const groupTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof groupTrpc> =
   defineTrpcRouter(OrganizationApi, groupTrpc)
     .procedure("listAll")
+    .withEntitlement("enterprise", { feature: "SCIM" })
     .withPermission("organization:manage")
     .handle(({ app, input }) => app.listGroupsWithScopeNames(input))
 
@@ -18,10 +24,12 @@ export const groupTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof g
     .handle(({ app, input }) => app.getGroupWithScopeNames(input))
 
     .procedure("create")
+    .withEntitlement("enterprise", { feature: "SCIM" })
     .withPermission("organization:manage")
     .handle(({ app, input, actor }) => app.createLicensedGroup(input, { id: actor.id }))
 
     .procedure("addGrant")
+    .withEntitlement("enterprise", customRoleGate)
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) => {
       const { organizationId, groupId, ...grant } = input;
@@ -71,6 +79,7 @@ export const groupTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof g
     })
 
     .procedure("applyEdits")
+    .withEntitlement("enterprise", customRoleGate)
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) => {
       await app.applyGroupEdits(input, { id: actor.id });

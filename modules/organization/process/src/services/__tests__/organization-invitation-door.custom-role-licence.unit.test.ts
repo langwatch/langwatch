@@ -10,7 +10,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type {
   OrganizationInvitations,
-  OrganizationPlanGate,
   OrganizationSignals,
 } from "../../app/organization.members.ts";
 import { OrganizationInvitationDoorService } from "../organization-invitation-door.service.ts";
@@ -25,7 +24,6 @@ function door(options: { beyondCaller?: string[] }) {
   }));
   const createPaymentPending = vi.fn(async () => undefined);
   const invitations = createApiFixture<OrganizationInvitations>({ create, createPaymentPending });
-  const plans = createApiFixture<OrganizationPlanGate>({});
   const signals = createApiFixture<OrganizationSignals>({ trackServerEvent: vi.fn() });
 
   const assertWithinCaller = vi.fn(async () => {
@@ -39,7 +37,6 @@ function door(options: { beyondCaller?: string[] }) {
     service: OrganizationInvitationDoorService.create({
       invitations,
       joinRequests: null,
-      plans,
       signals,
       lifecycle: { membersInvited: vi.fn(), inviteAccepted: vi.fn() },
       creationThrottle: { assertCreationAllowed: async () => {} },

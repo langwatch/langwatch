@@ -179,7 +179,6 @@ import type {
   OrganizationDirectory,
   OrganizationInvitations,
   OrganizationJoinRequests,
-  OrganizationPlanGate,
   OrganizationPlanUser,
   OrganizationSignals,
 } from "./organization.members.ts";
@@ -278,7 +277,6 @@ export type OrganizationInfrastructure = Readonly<{
   inviteCreationThrottle: InviteCreationThrottleService;
   /** The join-request ledger, or none. */
   joinRequests: OrganizationJoinRequests | null;
-  plans: OrganizationPlanGate;
   signals: OrganizationSignals;
   /** Where a reached seat limit is recorded as this module's event (§9). */
   seatLimits: SeatLimitNoticeService;
@@ -444,7 +442,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       ? OrganizationInvitationDoorService.create({
           invitations: members.invitations,
           joinRequests: members.joinRequests,
-          plans: members.plans,
           signals: members.signals,
           lifecycle: members.lifecycle,
           creationThrottle: members.inviteCreationThrottle,
@@ -522,7 +519,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       ? OrganizationInvitationDoorService.create({
           invitations: members.invitations,
           joinRequests: members.joinRequests,
-          plans: members.plans,
           signals: members.signals,
           lifecycle: members.lifecycle,
           creationThrottle: members.inviteCreationThrottle,
@@ -1597,9 +1593,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /**
-   * One team-role change, with three guards ahead of it: a personal team is
-   * never role-administered from here, a custom role needs the plan that
-   * carries custom roles, and a Lite Member seat allows the Viewer role only.
+   * One team-role change, with two guards ahead of it: a personal team is
+   * never role-administered from here, and a Lite Member seat allows the
+   * Viewer role only. The custom-role plan is declared on the door.
    */
   async changeTeamMemberRole(
     input: Readonly<{ teamId: string; userId: string; role: string; customRoleId?: string }>,
@@ -1613,11 +1609,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       teamId: input.teamId,
     });
 
-    if (isOrganizationApiCustomRole(input.role)) {
-      if (input.customRoleId) {
-        await this.#members.plans.assertCustomRolesAllowed({ organizationId });
-      }
-    } else {
+    if (!isOrganizationApiCustomRole(input.role)) {
       await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
     }
 
@@ -1644,10 +1636,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     }>,
     by: OrganizationCaller,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
-    await this.#members.plans.assertAuditLogsAllowed({
-      organizationId: input.organizationId,
-    });
-
     if (input.projectId) {
       const permitted = await this.#dependencies.permissions.hasPermission({
         userId: by.id,
@@ -1715,12 +1703,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: Omit<UpdateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<void> {
-    const team = await this.getTeamById({ teamId: input.teamId });
-    await this.#assertMemberRolesLicensed({
-      organizationId: team.organizationId,
-      members: input.members,
-    });
-
     await this.updateTeamWithMembers(input, by);
   }
 
@@ -1728,11 +1710,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: Omit<CreateOrganizationTeamWithMembersInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationTeam> {
-    await this.#assertMemberRolesLicensed({
-      organizationId: input.organizationId,
-      members: input.members,
-    });
-
     return this.createTeamWithMembers(input, by);
   }
 
@@ -1757,8 +1734,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   async listGroupsWithScopeNames(
     input: Readonly<{ organizationId: string }>,
   ): Promise<GroupListItem[]> {
-    await this.#members.plans.assertScimAllowed(input);
-
     const page = await this.listGroups({ ...input, ...GROUP_PAGE });
     const scopeNames = await this.resolveBindingScopeNames({
       organizationId: input.organizationId,
@@ -1805,8 +1780,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: Omit<CreateOrganizationGroupInput, "actor" | "caller">,
     by: OrganizationCaller,
   ): Promise<OrganizationGroup> {
-    await this.#members.plans.assertScimAllowed({ organizationId: input.organizationId });
-
     return this.createGroup(input, by);
   }
 
@@ -1949,18 +1922,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.permissions.hasPermission({
       userId: input.by.id,
       permission: "organization:manage",
-      organizationId: input.organizationId,
-    });
-  }
-
-  /** Refuses a member list that assigns a custom role the plan does not carry. */
-  async #assertMemberRolesLicensed(input: {
-    organizationId: string;
-    members: readonly Readonly<{ role: string }>[];
-  }): Promise<void> {
-    if (!input.members.some((member) => isOrganizationApiCustomRole(member.role))) return;
-
-    await this.#members.plans.assertCustomRolesAllowed({
       organizationId: input.organizationId,
     });
   }

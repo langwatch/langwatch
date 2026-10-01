@@ -26,7 +26,6 @@ import { toDate } from "@langwatch/time";
 import type {
   OrganizationInvitations,
   OrganizationJoinRequests,
-  OrganizationPlanGate,
   OrganizationSignals,
 } from "../app/organization.members.ts";
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
@@ -43,8 +42,6 @@ import type { OrganizationLifecycleNoticeService } from "./organization-lifecycl
 export interface OrganizationInvitationDoorDependencies {
   readonly invitations: OrganizationInvitations;
   readonly joinRequests: OrganizationJoinRequests | null;
-  /** Unread: the custom-role plan gate is declared on the doors. Delete with its composition. */
-  readonly plans: OrganizationPlanGate;
   readonly signals: OrganizationSignals;
   /** Where an invitation batch and an acceptance are recorded as organization's events. */
   readonly lifecycle: Pick<OrganizationLifecycleNoticeService, "membersInvited" | "inviteAccepted">;

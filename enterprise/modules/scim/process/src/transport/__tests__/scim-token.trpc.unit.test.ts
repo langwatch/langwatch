@@ -16,8 +16,10 @@ type ScimTrpcTestContext = { actor: { id: string } };
 
 function testPorts(
   permits: (permission: string) => boolean,
+  enterprise: boolean,
 ): TrpcRuntimeMembers<ScimTrpcTestContext> {
   return {
+    entitlements: { holds: async () => enterprise },
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
@@ -58,6 +60,7 @@ class TokenDirectoryFake extends ScimServiceFake {
 function mount(
   options: {
     permits?: (permission: string) => boolean;
+    enterprise?: boolean;
     connections?: OrganizationSsoConnection[];
   } = {},
 ) {
@@ -67,7 +70,7 @@ function mount(
   const router = createTrpcRuntime<ScimTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: testPorts(options.permits ?? (() => true)),
+    members: testPorts(options.permits ?? (() => true), options.enterprise ?? true),
   }).mount(scimTokenTrpcTransport, () => app);
 
   return { scim, router, caller: router.createCaller({ actor: { id: "user-1" } }) };
@@ -243,6 +246,29 @@ describe("the scimToken tRPC namespace", () => {
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(scim.generateToken).not.toHaveBeenCalled();
       expect(scim.revokeToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an organization below Enterprise", () => {
+    it("refuses listing, minting and revoking with 402 naming SCIM, and writes nothing", async () => {
+      const { caller, scim } = mount({ enterprise: false });
+      const refused = { cause: { code: "enterprise_plan_required", meta: { feature: "SCIM" } } };
+
+      await expect(caller.list({ organizationId: "org_1" })).rejects.toMatchObject(refused);
+      await expect(caller.generate({ organizationId: "org_1" })).rejects.toMatchObject(refused);
+      await expect(
+        caller.revoke({ organizationId: "org_1", tokenId: "token_1" }),
+      ).rejects.toMatchObject(refused);
+      expect(scim.generateToken).not.toHaveBeenCalled();
+      expect(scim.revokeToken).not.toHaveBeenCalled();
+    });
+
+    it("tells a caller without sso:manage that, before it says what the plan lacks", async () => {
+      const { caller } = mount({ enterprise: false, permits: () => false });
+
+      await expect(caller.generate({ organizationId: "org_1" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
     });
   });
 });

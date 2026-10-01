@@ -1,7 +1,7 @@
 /**
- * The server half of `role.*`. Three procedures name a ROLE rather than the
- * organization the check runs against, so they declare themselves
- * service-authorized and the application runs that check where the row is.
+ * The server half of `role.*`. Three procedures name a ROLE, not an
+ * organization, so they are service-authorized and `update` asks its plan in
+ * the service too: with no scope to resolve, it cannot be declared.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { RoleApi, roleTrpc } from "@langwatch/role-contract";
@@ -31,6 +31,7 @@ export const roleTrpcTransport: TrpcRouterDeclaration<RoleApi, typeof roleTrpc> 
   .handle(async ({ app, input, actor }) => app.getRole({ roleId: input.roleId }, actor))
 
   .procedure("create")
+  .withEntitlement("enterprise", { feature: "RBAC" })
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }) =>
     app.createRole(

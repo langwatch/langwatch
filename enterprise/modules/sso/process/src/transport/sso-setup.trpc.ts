@@ -12,7 +12,12 @@ import {
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
-import { SsoApi, ssoSetupTrpc, type SsoAdministrator } from "@langwatch/enterprise-sso-contract";
+import {
+  SsoApi,
+  ssoSetupMigrationRouteSchema,
+  ssoSetupTrpc,
+  type SsoAdministrator,
+} from "@langwatch/enterprise-sso-contract";
 
 /**
  * Minted from the session, never taken from an input: the administrator this
@@ -25,6 +30,15 @@ function administratorOf(actor: TrpcHandlerActor): SsoAdministrator {
 
   return { id: actor.id };
 }
+
+/** Only moving traffic to the replacement is the paid rollout; rolling back never asks the plan. */
+function selectsDirectRoute(input: unknown): boolean {
+  const parsed = ssoSetupMigrationRouteSchema.safeParse(input);
+
+  return parsed.success && parsed.data.route === "direct";
+}
+
+const SSO_PLAN = { feature: "SSO" } as const;
 
 export const ssoSetupTrpcTransport: TrpcRouterDeclaration<SsoApi, typeof ssoSetupTrpc> =
   defineTrpcRouter(SsoApi, ssoSetupTrpc)
@@ -72,27 +86,28 @@ export const ssoSetupTrpcTransport: TrpcRouterDeclaration<SsoApi, typeof ssoSetu
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) => app.setupCheckDomainFile(input, administratorOf(actor)))
 
-    /** The Enterprise plan gate is NOT declared here and is not gone: it runs
-     *  second, inside the application, so a caller who does not hold
-     *  `sso:manage` is told that rather than told what was not bought. */
+    /** The Enterprise plan is declared and asked after access, so a caller who
+     *  does not hold `sso:manage` is told that rather than told what was not bought. */
     .procedure("register")
+    .withEntitlement("enterprise", SSO_PLAN)
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) => app.setupRegister(input, administratorOf(actor)))
 
     .procedure("startLegacyMigration")
+    .withEntitlement("enterprise", SSO_PLAN)
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) => app.setupStartLegacyMigration(input, administratorOf(actor)))
 
-    /** The plan gate runs inside the application and only for `direct`: rolling
-     *  back to the grandfathered provider stays reachable however a plan
-     *  stands. */
+    /** The plan gate holds only for `direct`: rolling back to the grandfathered
+     *  provider stays reachable however a plan stands. */
     .procedure("selectMigrationRoute")
+    .withEntitlement("enterprise", { feature: "SSO", when: selectsDirectRoute })
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) => app.setupSelectMigrationRoute(input, administratorOf(actor)))
 
-    /** Gated inside the application, like the registration that opened the
-     *  cutover — the permission refusal comes first either way. */
+    /** Gated like the registration that opened the cutover. */
     .procedure("finalizeLegacyMigration")
+    .withEntitlement("enterprise", SSO_PLAN)
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) =>
       app.setupFinalizeLegacyMigration(input, administratorOf(actor)),
@@ -103,11 +118,13 @@ export const ssoSetupTrpcTransport: TrpcRouterDeclaration<SsoApi, typeof ssoSetu
     .handle(({ app, input, actor }) => app.setupRename(input, administratorOf(actor)))
 
     .procedure("setArrivals")
+    .withEntitlement("enterprise", SSO_PLAN)
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) => app.setupSetArrivals(input, administratorOf(actor)))
 
-    /** The plan gate runs inside the application, like registration's. */
+    /** Gated like registration: turning it on is the same purchase. */
     .procedure("activate")
+    .withEntitlement("enterprise", SSO_PLAN)
     .withPermission("sso:manage")
     .handle(({ app, input, actor }) => app.setupActivate(input, administratorOf(actor)))
 

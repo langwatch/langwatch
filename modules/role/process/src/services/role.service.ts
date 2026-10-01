@@ -1,4 +1,9 @@
 import {
+  assertEnterprisePlanType,
+  ENTERPRISE_FEATURE_ERRORS,
+  type EntitlementApi,
+} from "@langwatch/entitlement-contract";
+import {
   RoleDuplicateNameError,
   RoleNotFoundError,
   RoleReservedNameError,
@@ -14,13 +19,33 @@ const RESERVED_ROLE_NAME_PREFIX = "apikey:";
 /** The custom-role definitions, as this feature's own rows answer for them. */
 export class RoleService {
   #repository: RoleRepository;
+  #entitlement: Pick<EntitlementApi, "getActivePlan">;
 
-  private constructor(repository: RoleRepository) {
+  private constructor(
+    repository: RoleRepository,
+    entitlement: Pick<EntitlementApi, "getActivePlan">,
+  ) {
     this.#repository = repository;
+    this.#entitlement = entitlement;
   }
 
-  static create({ repository }: { repository: RoleRepository }): RoleService {
-    return new RoleService(repository);
+  static create({
+    repository,
+    entitlement,
+  }: {
+    repository: RoleRepository;
+    entitlement: Pick<EntitlementApi, "getActivePlan">;
+  }): RoleService {
+    return new RoleService(repository, entitlement);
+  }
+
+  /** Refuses an organization whose plan does not carry custom roles, asked on the loaded role. */
+  async assertCustomRolesAllowed({ organizationId }: { organizationId: string }): Promise<void> {
+    const plan = await this.#entitlement.getActivePlan({ organizationId });
+    assertEnterprisePlanType({
+      planType: plan.type,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+    });
   }
 
   /** One custom role by id. A system role reads as absent. */

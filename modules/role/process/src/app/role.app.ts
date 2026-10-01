@@ -15,11 +15,7 @@ import {
   type BuiltInRoleId,
   type GrantScopeTier,
 } from "@langwatch/authz-contract";
-import {
-  assertEnterprisePlanType,
-  ENTERPRISE_FEATURE_ERRORS,
-  EntitlementApi,
-} from "@langwatch/entitlement-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import {
@@ -77,7 +73,6 @@ export class RoleApp implements RoleApi {
   #roles: RoleService;
   #permissions: AuthzApi;
   #organizations: OrganizationApi;
-  #entitlement: EntitlementApi;
   #prisma: RoleSetup["members"]["prisma"];
 
   private constructor(
@@ -85,10 +80,12 @@ export class RoleApp implements RoleApi {
     dependencies: RoleSetup["dependencies"],
     members: RoleSetup["members"],
   ) {
-    this.#roles = RoleService.create({ repository: repositories.roles });
+    this.#roles = RoleService.create({
+      repository: repositories.roles,
+      entitlement: dependencies.entitlement,
+    });
     this.#permissions = dependencies.permissions;
     this.#organizations = dependencies.organizations;
-    this.#entitlement = dependencies.entitlement;
     this.#prisma = members.prisma;
   }
 
@@ -150,7 +147,6 @@ export class RoleApp implements RoleApi {
   /** Defines a custom role, attributed to the caller who asked for it. */
   async createRole(input: { role: RoleCreate }, by: RoleCaller): Promise<Role> {
     this.#roles.assertNameAllowed(input.role.name);
-    await this.#assertCustomRolesAllowed({ organizationId: input.role.organizationId });
     await this.#assertWithinCaller({
       organizationId: input.role.organizationId,
       added: input.role.permissions,
@@ -195,7 +191,7 @@ export class RoleApp implements RoleApi {
   ): Promise<Role> {
     const role = await this.#roles.getById({ roleId: input.roleId });
     await this.#assertMayReach(by, role.organizationId, "organization:manage");
-    await this.#assertCustomRolesAllowed({ organizationId: role.organizationId });
+    await this.#roles.assertCustomRolesAllowed({ organizationId: role.organizationId });
 
     return this.#write(role, input.changes, by);
   }
@@ -238,10 +234,7 @@ export class RoleApp implements RoleApi {
     input: { userId: string; teamId: string; customRoleId: string },
     by: RoleCaller,
   ): Promise<RoleWriteAcknowledged> {
-    // The team's organization first, so a team nobody can name reads as a
-    // not-found rather than as a plan refusal.
     const organizationId = await this.getAssignmentOrganization({ teamId: input.teamId });
-    await this.#assertCustomRolesAllowed({ organizationId });
 
     const role = await this.#roles.getById({ roleId: input.customRoleId });
     if (role.organizationId !== organizationId) throw new RoleNotAssignableError();
@@ -365,15 +358,6 @@ export class RoleApp implements RoleApi {
       permissions: [...added],
     });
     if (missing.length > 0) throw new RoleExceedsCallerPermissionsError(missing);
-  }
-
-  /** Whether the organization's plan carries custom roles. */
-  async #assertCustomRolesAllowed({ organizationId }: { organizationId: string }): Promise<void> {
-    const plan = await this.#entitlement.getActivePlan({ organizationId });
-    assertEnterprisePlanType({
-      planType: plan.type,
-      errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-    });
   }
 
   /** The organization decision an input could not name, run where the row is. */

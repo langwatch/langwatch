@@ -146,12 +146,9 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
-  assertEnterprisePlanType,
   isEnterpriseTier,
   EntitlementApi,
   type EntitlementOperator,
-  type EnterpriseFeature,
-  ENTERPRISE_FEATURE_ERRORS,
 } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -241,6 +238,7 @@ import { GovernanceIngestReceiverService } from "../services/governance-ingest-r
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
 import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.service.ts";
 import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
+import { GovernancePlanGateService } from "../services/governance-plan-gate.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
 import { GovernanceTraceFactsService } from "../services/governance-trace-facts.service.ts";
@@ -557,6 +555,7 @@ export class GovernanceApp implements GovernanceRestApi {
     this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.activityMonitor = ActivityMonitorService.create(repositories.activityMonitor);
+    this.planGate = GovernancePlanGateService.create({ entitlements: dependencies.entitlements });
     this.costAttributionPolicy = PostgresGovernancePolicyService.create(
       repositories.costAttributionPolicies,
     );
@@ -859,6 +858,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly dependencies: GovernanceAppDependencies;
   private readonly anomalyRules: AnomalyRuleService;
   private readonly activityMonitor: ActivityMonitorService;
+  private readonly planGate: GovernancePlanGateService;
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
   private readonly sessionPolicy: OrganizationSessionPolicyService;
   private readonly costAttributionPolicy: PostgresGovernancePolicyService;
@@ -1388,7 +1388,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: GovernanceOcsfExportInput,
     by: EntitlementOperator,
   ): Promise<GovernanceOcsfExportPage> {
-    await this.assertEnterprise({
+    await this.planGate.assertEnterprise({
       organizationId: input.organizationId,
       by,
       feature: "OCSF_EXPORT",
@@ -1510,7 +1510,7 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   private assertGovernanceCost(organizationId: string, by: EntitlementOperator): Promise<void> {
-    return this.assertEnterprise({ organizationId, by, feature: "GOVERNANCE_COST" });
+    return this.planGate.assertEnterprise({ organizationId, by, feature: "GOVERNANCE_COST" });
   }
 
   governancePeopleList(input: { organizationId: string }): Promise<PeopleScreenPerson[]> {
@@ -1581,7 +1581,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: { organizationId: string },
     by: EntitlementOperator,
   ): Promise<AnomalyRule[]> {
-    await this.assertEnterprise({
+    await this.planGate.assertEnterprise({
       organizationId: input.organizationId,
       by,
       feature: "ANOMALY_RULES",
@@ -1593,7 +1593,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: { id: string; organizationId: string },
     by: EntitlementOperator,
   ): Promise<AnomalyRule> {
-    await this.assertEnterprise({
+    await this.planGate.assertEnterprise({
       organizationId: input.organizationId,
       by,
       feature: "ANOMALY_RULES",
@@ -1605,7 +1605,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: CreateAnomalyRuleInput,
     by: EntitlementOperator,
   ): Promise<AnomalyRule> {
-    await this.assertEnterprise({
+    await this.planGate.assertEnterprise({
       organizationId: input.organizationId,
       by,
       feature: "ANOMALY_RULES",
@@ -1619,7 +1619,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: UpdateAnomalyRuleInput,
     by: EntitlementOperator,
   ): Promise<AnomalyRule> {
-    await this.assertEnterprise({
+    await this.planGate.assertEnterprise({
       organizationId: input.organizationId,
       by,
       feature: "ANOMALY_RULES",
@@ -1633,7 +1633,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: { id: string; organizationId: string },
     by: EntitlementOperator,
   ): Promise<AnomalyRule> {
-    await this.assertEnterprise({
+    await this.planGate.assertEnterprise({
       organizationId: input.organizationId,
       by,
       feature: "ANOMALY_RULES",
@@ -1723,26 +1723,7 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   private assertActivityMonitor(organizationId: string, by: EntitlementOperator): Promise<void> {
-    return this.assertEnterprise({ organizationId, by, feature: "ACTIVITY_MONITOR" });
-  }
-
-  private async assertEnterprise({
-    organizationId,
-    by,
-    feature,
-  }: {
-    organizationId: string;
-    by: EntitlementOperator;
-    feature: EnterpriseFeature;
-  }): Promise<void> {
-    const operator = by.impersonatorId
-      ? { id: by.id, impersonatorId: by.impersonatorId }
-      : { id: by.id };
-    const plan = await this.dependencies.entitlements.getActivePlan({ organizationId, operator });
-    assertEnterprisePlanType({
-      planType: plan.type,
-      errorMessage: ENTERPRISE_FEATURE_ERRORS[feature],
-    });
+    return this.planGate.assertEnterprise({ organizationId, by, feature: "ACTIVITY_MONITOR" });
   }
 
   // ── The AI tools catalogue (the console's tRPC) ──────────────────────────

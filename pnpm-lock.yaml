@@ -4311,9 +4311,6 @@ importers:
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/entitlement-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/entitlement/contract
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../../../modules/feature-flag/contract

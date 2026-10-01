@@ -67,3 +67,27 @@ export const groupApiApplyEditsInputSchema = z.object({
   memberUserIdsToRemove: z.array(z.string()),
 });
 export type GroupApiApplyEditsInput = z.infer<typeof groupApiApplyEditsInputSchema>;
+
+const groupGrantRoleSchema = z.object({
+  role: z.string().optional(),
+  customRoleId: z.string().nullish(),
+});
+
+/** Every place a group write names a grant: a new group, one grant, a batch of edits. */
+const groupGrantsSchema = z.object({
+  ...groupGrantRoleSchema.shape,
+  grants: z.array(groupGrantRoleSchema).optional(),
+  grantsToCreate: z.array(groupGrantRoleSchema).optional(),
+});
+
+/** Whether a group write grants a custom role: the question only Enterprise answers yes to. */
+export function assignsGroupCustomRole(input: unknown): boolean {
+  const parsed = groupGrantsSchema.safeParse(input);
+  if (!parsed.success) return false;
+
+  const { grants = [], grantsToCreate = [], ...single } = parsed.data;
+
+  return [single, ...grants, ...grantsToCreate].some(
+    (grant) => Boolean(grant.customRoleId) || grant.role === "CUSTOM",
+  );
+}

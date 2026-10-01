@@ -13,7 +13,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
-  createSsoTestEntitlements,
   createSsoTestFeatureFlags,
   createSsoTestIdentity,
   RecordingSsoBreakGlass,
@@ -25,8 +24,12 @@ import { ssoSetupTrpcTransport } from "../sso-setup.trpc.ts";
 
 type TestContext = { actor: { id: string } };
 
-function runtimePorts(permits: (permission: string) => boolean): TrpcRuntimeMembers<TestContext> {
+function runtimePorts(
+  permits: (permission: string) => boolean,
+  enterprise: boolean,
+): TrpcRuntimeMembers<TestContext> {
   return {
+    entitlements: { holds: async () => enterprise },
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
@@ -99,8 +102,8 @@ async function harness(
   options: {
     permits?: (permission: string) => boolean;
     setup?: SsoSetupView;
-    /** The organization's plan, which the commands — and only the commands —
-     *  are gated on. */
+    /** The organization's plan, which the declared gates — and only they —
+     *  ask about. */
     planType?: string;
     /** The cutover identity answers for this organization, if any. */
     migration?: SsoMigrationView | null;
@@ -161,7 +164,6 @@ async function harness(
         commands,
         breakGlass,
       }),
-      entitlements: createSsoTestEntitlements(options.planType ?? "ENTERPRISE"),
       featureFlags: createSsoTestFeatureFlags(options.optedIn ?? []),
     },
   });
@@ -169,7 +171,10 @@ async function harness(
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: runtimePorts(options.permits ?? (() => true)),
+    members: runtimePorts(
+      options.permits ?? (() => true),
+      (options.planType ?? "ENTERPRISE") === "ENTERPRISE",
+    ),
   }).mount(ssoSetupTrpcTransport, () => app);
 
   return {
@@ -470,8 +475,20 @@ describe("the organization's own single sign-on surface", () => {
             certificate: null,
           },
         }),
-      ).rejects.toMatchObject({ cause: { code: "enterprise_plan_required" } });
+      ).rejects.toMatchObject({
+        cause: { code: "enterprise_plan_required", meta: { feature: "SSO" } },
+      });
       expect(commands.register).not.toHaveBeenCalled();
+    });
+
+    it("tells a caller without sso:manage that, before it says what the plan lacks", async () => {
+      const { caller, commands } = await harness({
+        planType: "LAUNCH",
+        permits: (permission) => permission === "sso:view",
+      });
+
+      await expect(caller.activate(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(commands.activate).not.toHaveBeenCalled();
     });
 
     it("refuses to change who it admits, which is the same purchase", async () => {

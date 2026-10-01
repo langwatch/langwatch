@@ -26,7 +26,6 @@
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-sso-contract": "workspace:*",
-    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",

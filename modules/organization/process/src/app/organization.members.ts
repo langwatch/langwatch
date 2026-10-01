@@ -116,15 +116,14 @@ export interface OrganizationSeatLicense {
   }): Promise<OrganizationSeatDecision>;
 
   /**
-   * Refuses a role change the organization's plan does not carry: seat classification first,
-   * then the Enterprise requirement a custom-role assignment implies. Throws, never a soft answer.
+   * Refuses a role change the organization's seats do not carry. Throws, never a soft answer.
+   * The custom-role plan is declared on the door.
    */
   assertRoleChangeAllowed(input: {
     organizationId: string;
     currentRole: string;
     userPermissions: string[] | undefined;
     role: string;
-    teamRoleUpdates?: readonly { role: string; customRoleId?: string }[] | undefined;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void>;
 }
@@ -371,20 +370,6 @@ export interface OrganizationInvitations {
   ): Promise<void>;
   /** The person behind an invited address, when they already have an account. */
   findUserIdByEmail(input: Readonly<{ email: string }>): Promise<string | null>;
-}
-
-/**
- * What the organization's plan carries. Each one throws by name; a refusal is
- * never turned into a different answer.
- */
-export interface OrganizationPlanGate {
-  // A property of function type rather than method shorthand: a test holds
-  // a mock built to this interface and asserts on this member via
-  // `expect(...).not.toHaveBeenCalled()`, which is unsafe against a
-  // method-shorthand member under `unbound-method`.
-  assertCustomRolesAllowed: (input: Readonly<{ organizationId: string }>) => Promise<void>;
-  assertAuditLogsAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
-  assertScimAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
 }
 
 /**

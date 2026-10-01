@@ -216,8 +216,8 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .handle(async ({ app, input, actor }, person) => {
     const caller = callerOf(actor, person);
     // The whole orchestration - personal-workspace assertion, shared-team
-    // scoping, seat classification, the Enterprise gate for custom roles  -
-    // lives in the service, so the REST surface runs the same rules.
+    // scoping, seat classification - lives in the service, so the REST
+    // surface runs the same rules; the custom-role plan is declared above.
     const { teamsLeftWithoutAdmin } = await app.changeMemberRole(
       {
         organizationId: input.organizationId,
@@ -236,6 +236,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   })
 
   .procedure("getAuditLogs")
+  .withEntitlement("enterprise", { feature: "AUDIT_LOGS" })
   .withFacts(organizationSessionPersonFact)
   .withPermission(AUDIT_LOG_VIEW)
   .handle(({ app, input, actor }, person) =>

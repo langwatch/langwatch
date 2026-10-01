@@ -30,7 +30,7 @@ import type { OrganizationLifecycleNoticeService } from "../../services/organiza
 import { SeatLimitNoticeService } from "../../services/seat-limit-notice.service.ts";
 import { InviteServiceOrganizationInvitations } from "../organization-composition.build.ts";
 import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
-import type { OrganizationPlanGate, OrganizationSignals } from "../organization.members.ts";
+import type { OrganizationSignals } from "../organization.members.ts";
 import { organizationAppForTesting } from "./support/organization-app-for-testing.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -373,7 +373,6 @@ function doorWithFullSeats(seatsFull: Readonly<{ members: number; membersLite: n
   const door = OrganizationInvitationDoorService.create({
     invitations: invitations({ seatsFull, notices }),
     joinRequests: null,
-    plans: createApiFixture<OrganizationPlanGate>(),
     signals,
     lifecycle: createApiFixture<OrganizationLifecycleNoticeService>({
       membersInvited: () => {},

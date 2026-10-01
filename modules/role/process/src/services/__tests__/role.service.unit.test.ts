@@ -1,6 +1,7 @@
 import { ROLE_KIND, RoleNotFoundError, type Role } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
 
+import { testPlan } from "../../app/__tests__/role.fixture.ts";
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
 import { RoleService } from "../role.service.ts";
 
@@ -17,10 +18,15 @@ const role = (overrides: Partial<Role> = {}): Role => ({
 });
 
 function serviceWith(...roles: Role[]) {
+  return serviceOnPlan("ENTERPRISE", ...roles);
+}
+
+function serviceOnPlan(planType: string, ...roles: Role[]) {
   const repository = MemoryRoleRepository.create();
   for (const stored of roles) repository.save(stored);
+  const entitlement = { getActivePlan: async () => testPlan({ type: planType }) };
 
-  return { service: RoleService.create({ repository }), repository };
+  return { service: RoleService.create({ repository, entitlement }), repository };
 }
 
 describe("given a stored custom role", () => {
@@ -90,6 +96,27 @@ describe("given roles from two organizations", () => {
       await expect(
         service.filterAssignable({ roleIds: [], organizationId: "org-1" }),
       ).resolves.toEqual([]);
+    });
+  });
+});
+
+describe("given an organization's plan", () => {
+  describe("when custom roles are asked of a plan below Enterprise", () => {
+    /** @scenario "Non-enterprise org cannot update custom roles" */
+    it("refuses, naming the Enterprise plan", async () => {
+      const { service } = serviceOnPlan("FREE");
+
+      await expect(
+        service.assertCustomRolesAllowed({ organizationId: "org-1" }),
+      ).rejects.toThrowError(/Enterprise plan/);
+    });
+
+    it("admits an Enterprise organization", async () => {
+      const { service } = serviceOnPlan("ENTERPRISE");
+
+      await expect(
+        service.assertCustomRolesAllowed({ organizationId: "org-1" }),
+      ).resolves.toBeUndefined();
     });
   });
 });

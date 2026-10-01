@@ -65,11 +65,6 @@ import {
   isNamedProviderMounted,
   resolveSignInProviders,
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
-import {
-  EntitlementApi,
-  EnterprisePlanRequiredError,
-  isEnterpriseTier,
-} from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { IdentityApi, SsoConnectionNotFoundError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -164,13 +159,6 @@ const TEARDOWN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 /** The audit row's target, so a connection's history is one query. */
 const AUDIT_TARGET_KIND = "ssoConnection";
 
-/**
- * What an organization whose plan does not carry single sign-on is told. The
- * words are upstream's, carried as a literal because entitlement's feature
- * registry has no `SSO` key yet (handoff §10).
- */
-const SSO_ENTERPRISE_REFUSAL = "Single sign-on requires an Enterprise plan";
-
 export class SsoApp implements SsoApiContract {
   static readonly contract = SsoApi;
   static readonly dependencies = {
@@ -179,7 +167,6 @@ export class SsoApp implements SsoApiContract {
     users: UserApi,
     auditLog: AuditLogApi,
     identity: IdentityApi,
-    entitlements: EntitlementApi,
     featureFlags: FeatureFlagApi,
   };
   static readonly config = ssoConfig;
@@ -203,7 +190,6 @@ export class SsoApp implements SsoApiContract {
   readonly #operators: OpsApi;
   readonly #users: UserApi;
   readonly #auditLog: AuditLogApi;
-  readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
 
   private constructor({
     gate,
@@ -266,7 +252,6 @@ export class SsoApp implements SsoApiContract {
     this.#operators = dependencies.operators;
     this.#users = dependencies.users;
     this.#auditLog = dependencies.auditLog;
-    this.#entitlements = dependencies.entitlements;
   }
 
   static async create({ dependencies, members, config, secrets }: SsoSetup): Promise<SsoApp> {
@@ -671,16 +656,15 @@ export class SsoApp implements SsoApiContract {
   }
 
   /**
-   * Registering is the purchase, so it is the press the plan gate stands in
-   * front of. The audit row records who asked for what and NOT this input: it
-   * carries a client secret, so the recorded args name the protocol instead.
+   * Registering is the purchase, so the plan gate is declared on its door.
+   * The audit row records who asked for what and NOT this input: it carries
+   * a client secret, so the recorded args name the protocol instead.
    */
   async setupRegister(
     input: SsoSetupRegisterInput,
     by: SsoAdministrator,
   ): Promise<SsoSetupRegistered> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     return this.#attempted({
       by,
@@ -702,13 +686,12 @@ export class SsoApp implements SsoApiContract {
     });
   }
 
-  /** Registering a replacement is registering, so it is gated like one. */
+  /** Registering a replacement is registering, so its door declares the same plan gate. */
   async setupStartLegacyMigration(
     input: SsoSetupStartMigrationInput,
     by: SsoAdministrator,
   ): Promise<SsoSetupRegistered> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     return this.#attempted({
       by,
@@ -741,8 +724,6 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupMigrationRouteInput,
     by: SsoAdministrator,
   ): Promise<void> {
-    if (input.route === "direct") await this.#requireEnterprisePlan(input.organizationId);
-
     await this.#attempted({
       by,
       action: "selectMigrationRoute",
@@ -752,17 +733,16 @@ export class SsoApp implements SsoApiContract {
   }
 
   /**
-   * Finishing the cutover is part of the rollout that was bought, so it is
-   * gated like the registration that started it. What finalizing takes with
-   * it — and whether the evidence still allows it — is identity's, re-read
-   * there at the moment of the press.
+   * Finishing the cutover is part of the rollout that was bought, so its door
+   * gates it like the registration that started it. What finalizing takes
+   * with it — and whether the evidence still allows it — is identity's,
+   * re-read there at the moment of the press.
    */
   async setupFinalizeLegacyMigration(
     input: SsoSetupConnectionInput,
     by: SsoAdministrator,
   ): Promise<void> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
       by,
@@ -793,7 +773,6 @@ export class SsoApp implements SsoApiContract {
    */
   async setupSetArrivals(input: SsoSetupArrivalsInput, by: SsoAdministrator): Promise<void> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
       by,
@@ -818,7 +797,6 @@ export class SsoApp implements SsoApiContract {
    */
   async setupActivate(input: SsoSetupConnectionInput, by: SsoAdministrator): Promise<void> {
     await this.#assertSelfServeAvailable(input.organizationId);
-    await this.#requireEnterprisePlan(input.organizationId);
 
     await this.#attempted({
       by,
@@ -920,11 +898,6 @@ export class SsoApp implements SsoApiContract {
     by?: SsoAdministrator,
   ): Promise<Extract<SsoSelfServeAvailability, { available: true }>> {
     return this.#selfServeContext.assertAvailable({ organizationId, actorId: by?.id });
-  }
-
-  async #requireEnterprisePlan(organizationId: string): Promise<void> {
-    const plan = await this.#entitlements.getActivePlan({ organizationId });
-    if (!isEnterpriseTier(plan.type)) throw new EnterprisePlanRequiredError(SSO_ENTERPRISE_REFUSAL);
   }
 
   /**

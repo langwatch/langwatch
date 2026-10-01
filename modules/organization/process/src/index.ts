@@ -74,7 +74,6 @@ export type {
   OrganizationInvitesCreated,
   OrganizationJoinRequests,
   OrganizationJoinRequestState,
-  OrganizationPlanGate,
   OrganizationSignals,
 } from "./app/organization.members.ts";
 export { groupsRest } from "./transport/group.rest.ts";

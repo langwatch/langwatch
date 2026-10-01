@@ -3,8 +3,6 @@ import type { OrganizationUserRole } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
-  ENTERPRISE_FEATURE_ERRORS,
-  assertEnterprisePlanType,
   getRoleChangeType,
   isViewOnlyCustomRole,
   type EntitlementApi,
@@ -33,7 +31,6 @@ import type { OrganizationSeatRepository } from "../repositories/organization-se
 import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
 import { PrismaOrganizationSeatRepository } from "../repositories/prisma/prisma.organization-seat.repository.ts";
 import { PrismaOrganizationUserDirectoryRepository } from "../repositories/prisma/prisma.organization-user-directory.repository.ts";
-import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { InviteAssignableRoles } from "../rules/invite-contracts.rules.ts";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
@@ -64,7 +61,6 @@ import type {
   OrganizationInvitesCreated,
   OrganizationInviteWithOrganization,
   OrganizationJoinRequests,
-  OrganizationPlanGate,
   OrganizationPlanUser,
   OrganizationPromptSeed,
   OrganizationSignals,
@@ -109,12 +105,11 @@ class EntitlementOrganizationSeatLicense {
     currentRole: string;
     userPermissions: string[] | undefined;
     role: string;
-    teamRoleUpdates?: readonly { role: string; customRoleId?: string }[] | undefined;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void> {
     const plan = await this.activePlan(input.organizationId, input.user);
     // The NEW role's permissions are deliberately not read: a built-in role
-    // carries none, and a custom one is gated below on the plan rather than on
+    // carries none, and a custom one is gated on the plan by the door, not on
     // a seat. That is the platform's own call, kept.
     const change = getRoleChangeType({
       oldRole: input.currentRole as OrganizationUserRole,
@@ -123,16 +118,6 @@ class EntitlementOrganizationSeatLicense {
       newPermissions: undefined,
     });
     await this.assertSeatForChange({ change, organizationId: input.organizationId, plan });
-
-    const assignsCustomRole = (input.teamRoleUpdates ?? []).some(
-      (update) => Boolean(update.customRoleId) || isCustomRole(update.role),
-    );
-    if (assignsCustomRole) {
-      assertEnterprisePlanType({
-        planType: plan.type,
-        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-      });
-    }
   }
 
   private async assertSeatForChange(input: {
@@ -424,28 +409,6 @@ class LoggedOrganizationPromptSeed implements OrganizationPromptSeed {
 }
 
 /**
- * The Enterprise plan gates, over the ONE plan application this process
- * resolves every allowance through.
- */
-function organizationPlanGate(options: {
-  plans: Pick<EntitlementApi, "getActivePlan">;
-}): OrganizationPlanGate {
-  const assertPlan = async (organizationId: string, errorMessage: string) => {
-    const plan = await options.plans.getActivePlan({ organizationId });
-    assertEnterprisePlanType({ planType: plan.type, errorMessage });
-  };
-
-  return {
-    assertCustomRolesAllowed: ({ organizationId }) =>
-      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.RBAC),
-    assertAuditLogsAllowed: ({ organizationId }) =>
-      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS),
-    assertScimAllowed: ({ organizationId }) =>
-      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.SCIM),
-  };
-}
-
-/**
  * The trail a sign-up, an invitation and a chosen integration leave outside
  * this feature. The sign-up announcement posts to our own Slack; no
  * product-analytics sink or marketing gateway is composed, so those say so at debug.
@@ -655,7 +618,6 @@ export function buildOrganizationInfrastructure(input: {
     }),
     // Identity owns the join-request ledger; this feature serves its door.
     joinRequests: identityJoinRequests(dependencies.identity),
-    plans: organizationPlanGate({ plans: dependencies.entitlement }),
     signals,
     seatLimits,
     lifecycle,

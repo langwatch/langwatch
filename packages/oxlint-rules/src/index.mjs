@@ -39,6 +39,7 @@ import { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
 import { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
 import { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";
 import { noFormWatchInChildRule } from "./rules/no-form-watch-in-child.rule.mjs";
+import { noHandRolledPlanGateRule } from "./rules/no-hand-rolled-plan-gate.rule.mjs";
 import { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule.mjs";
 import { noLoggerSpyRule } from "./rules/no-logger-spy.rule.mjs";
 import { noPortVocabularyRule } from "./rules/no-port-vocabulary.rule.mjs";
@@ -114,6 +115,7 @@ const RULES = [
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  noHandRolledPlanGateRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,
@@ -200,6 +202,7 @@ export {
   namespaceClassRule,
   noAliasReexportRule,
   noBootHookOutsideGuardRule,
+  noHandRolledPlanGateRule,
   noInlineDynamicImportRule,
   noLoggerSpyRule,
   noPortVocabularyRule,

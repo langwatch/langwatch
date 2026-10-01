@@ -3,7 +3,6 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { type SsoConfig } from "@langwatch/enterprise-sso-contract";
-import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   ssoDomainRecordLocation,
@@ -306,27 +305,6 @@ export class RecordingSsoSetupCommands implements SsoSetupCommandsApi {
   }));
 }
 
-/** A complete plan, at the type the gate only ever reads `.type` off. */
-export function createSsoTestPlan(type: string): Plan {
-  return {
-    planSource: "subscription",
-    type,
-    name: type,
-    free: false,
-    maxMembers: 0,
-    maxMembersLite: 0,
-    maxMessagesPerMonth: 0,
-    canPublish: true,
-    prices: { USD: 0, EUR: 0 },
-  };
-}
-
-export function createSsoTestEntitlements(planType = "ENTERPRISE"): EntitlementApi {
-  return createApiFixture<EntitlementApi>({
-    getActivePlan: () => Promise.resolve(createSsoTestPlan(planType)),
-  });
-}
-
 /** The flag service, answering `self_serve_sso` for the organizations named. */
 export function createSsoTestFeatureFlags(optedIn: readonly string[] = []): FeatureFlagApi {
   return createApiFixture<FeatureFlagApi>({
@@ -349,7 +327,6 @@ export function createSsoTestApp(
       users: UserApi;
       auditLog: AuditLogApi;
       identity: IdentityApi;
-      entitlements: EntitlementApi;
       featureFlags: FeatureFlagApi;
     }>;
   }> = {},
@@ -363,7 +340,6 @@ export function createSsoTestApp(
       users: input.dependencies?.users ?? createSsoTestUsers(),
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
       identity: input.dependencies?.identity ?? createSsoTestIdentity({ connections }),
-      entitlements: input.dependencies?.entitlements ?? createSsoTestEntitlements(),
       featureFlags: input.dependencies?.featureFlags ?? createSsoTestFeatureFlags(),
     },
     members: {

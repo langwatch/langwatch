@@ -202,7 +202,6 @@ describe("OrganizationInvitationDoorService.create", () => {
       const door = OrganizationInvitationDoorService.create({
         invitations,
         joinRequests: null,
-        plans: { assertCustomRolesAllowed: async () => {} } as never,
         signals: { trackServerEvent: () => {} } as never,
         lifecycle: { membersInvited: () => {}, inviteAccepted: () => {} },
         creationThrottle: throttle,

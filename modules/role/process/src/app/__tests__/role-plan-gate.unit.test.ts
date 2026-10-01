@@ -1,7 +1,7 @@
 /**
- * The Enterprise plan gate as the application applies it: defining, rewriting
- * and handing out a role are gated; taking one back and deleting one are not,
- * so an organization that leaves the plan can still clean up.
+ * The one plan question the application still asks: rewriting a role, whose
+ * organization is loaded data. Define and assign are declared on the doors;
+ * taking back and deleting are never gated, so a lapsed plan can clean up.
  */
 import { ROLE_KIND, type Role } from "@langwatch/role-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -49,21 +49,6 @@ function harness(planType: "FREE" | "ENTERPRISE") {
 }
 
 describe("given an organization whose plan is not ENTERPRISE", () => {
-  describe("when an administrator defines a custom role", () => {
-    /** @scenario "Non-enterprise org cannot create custom roles" */
-    it("refuses before the definition is written", async () => {
-      const { app, permissions } = harness("FREE");
-
-      await expect(
-        app.createRole(
-          { role: { organizationId: ORGANIZATION_ID, name: "Auditor", permissions: [] } },
-          CALLER,
-        ),
-      ).rejects.toThrowError(NOT_IN_PLAN);
-      expect(permissions.defineRole).not.toHaveBeenCalled();
-    });
-  });
-
   describe("when an administrator rewrites a custom role", () => {
     /** @scenario "Non-enterprise org cannot update custom roles" */
     it("refuses before the definition is rewritten", async () => {
@@ -73,19 +58,6 @@ describe("given an organization whose plan is not ENTERPRISE", () => {
         app.updateRole({ roleId: role.id, changes: { name: "Auditor" } }, CALLER),
       ).rejects.toThrowError(NOT_IN_PLAN);
       expect(permissions.defineRole).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when an administrator hands a custom role to a team member", () => {
-    /** @scenario "Non-enterprise org cannot assign custom roles to users" */
-    it("refuses before a grant is written", async () => {
-      const { app, permissions } = harness("FREE");
-
-      await expect(
-        app.assignRoleToUser({ userId: "user-2", teamId: "team-1", customRoleId: role.id }, CALLER),
-      ).rejects.toThrowError(NOT_IN_PLAN);
-      expect(permissions.changeBindingRole).not.toHaveBeenCalled();
-      expect(permissions.attachBindings).not.toHaveBeenCalled();
     });
   });
 

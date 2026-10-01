@@ -104,6 +104,7 @@ describe("given an organization below Enterprise", () => {
     ).toBe(false);
   });
 
+  /** @scenario "Non-enterprise org cannot update team member role to custom role" */
   it("asks for Enterprise when one team member's role becomes a custom role", () => {
     const gate = organization.get("updateTeamMemberRole");
 

@@ -26,9 +26,8 @@ const TARGET_FILES = new Set([
   "raw-socket.ts",
   "access/index.ts",
   "access/access.ts",
-  "contract/index.ts",
-  "contract/rest-middleware.ts",
-  "contract/trpc-contract.ts",
+  "access/declaration.ts",
+  "access/declared-middleware.ts",
   // Transport hosting: HTTP mux, API hosts and browser bundle (record section 4).
   "hosting/index.ts",
   "hosting/api-application.ts",
@@ -69,6 +68,7 @@ const TARGET_FILES = new Set([
   "trpc/host.ts",
   "trpc/policy.ts",
   "trpc/runtime.ts",
+  "trpc/session-version.ts",
   "trpc/sse.ts",
   "trpc/throttle.ts",
   // The browser door, folded in from @langwatch/platform-api-client.

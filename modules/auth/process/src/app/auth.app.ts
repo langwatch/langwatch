@@ -26,7 +26,6 @@ import {
   type ReleaseHeldAccountResult,
   type SaveSignInSecurityInput,
   type SaveSignInSecurityResult,
-  SIGN_IN_SECURITY_ENTERPRISE_REFUSAL,
   type SignInSecuritySettings,
   type VerifiedBrowserSession,
   type AuthUsageCount,
@@ -45,11 +44,7 @@ import {
   isNamedProviderMounted,
   resolveSignInProviders,
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
-import {
-  EnterprisePlanRequiredError,
-  EntitlementApi,
-  isEnterpriseTier,
-} from "@langwatch/entitlement-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -130,7 +125,6 @@ import {
 import {
   SignInSecuritySettingsService,
   type SignInSecurityMembers,
-  type SignInSecurityPlanGate,
   type SignInSecurityReleaseEvidence,
 } from "../services/sign-in-security-settings.service.ts";
 import { SignUpEnrollmentService } from "../services/sign-up-enrollment.service.ts";
@@ -487,7 +481,7 @@ export class AuthApp implements AuthApiContract {
         settings: repositories.signInSecurity,
         locks: repositories.signInLocks,
         members: signInSecurityMembers(dependencies.organizations),
-        plan: signInSecurityPlanGate(dependencies.entitlements),
+        entitlements: dependencies.entitlements,
         evidence: auditedReleaseEvidence(dependencies.auditLog),
         sessions,
       }),
@@ -1183,17 +1177,6 @@ function signInSecurityMembers(organizations: OrganizationApi): SignInSecurityMe
     findMemberUserIds: async ({ organizationId }) =>
       (await organizations.getAllMembers({ organizationId })).map((member) => member.id),
     isMember: (input) => organizations.isMember(input),
-  };
-}
-
-function signInSecurityPlanGate(entitlements: EntitlementApi): SignInSecurityPlanGate {
-  return {
-    assertEntitled: async ({ organizationId }) => {
-      const plan = await entitlements.getActivePlan({ organizationId });
-      if (!isEnterpriseTier(plan.type)) {
-        throw new EnterprisePlanRequiredError(SIGN_IN_SECURITY_ENTERPRISE_REFUSAL);
-      }
-    },
   };
 }
 

@@ -64,8 +64,12 @@ describe("given the role transport declared by the feature", () => {
       }
     });
 
-    /** @scenario Assigning a custom role is refused below Enterprise on every grant door */
-    it("asks for Enterprise, naming RBAC, before assigning a custom role to a member", () => {
+    /**
+     * @scenario Assigning a custom role is refused below Enterprise on every grant door
+     * @scenario "Non-enterprise org cannot create custom roles"
+     * @scenario "Non-enterprise org cannot assign custom roles to users"
+     */
+    it("asks for Enterprise, naming RBAC, before defining or assigning a custom role", () => {
       const gates: Record<string, unknown> = {};
       roleTrpcTransport.router(
         {
@@ -80,8 +84,10 @@ describe("given the role transport declared by the feature", () => {
         },
       );
 
+      expect(gates.create).toEqual({ entitlement: "enterprise", feature: "RBAC" });
       expect(gates.assignToUser).toEqual({ entitlement: "enterprise", feature: "RBAC" });
       expect(gates.removeFromUser).toBeUndefined();
+      expect(gates.delete).toBeUndefined();
     });
   });
 });
