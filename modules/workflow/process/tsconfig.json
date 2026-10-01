@@ -33,9 +33,6 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/nurturing/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {

@@ -252,7 +252,7 @@ export const scenarioAppDependencyTokens = {
   presence: PresenceApi,
   auditLog: AuditLogApi,
   traces: TraceApi,
-  /** Where a created scenario is told, for product analytics and nurturing. */
+  /** Where a finished run is told, until nurturing reacts to the finished event itself. */
   nurturing: NurturingApi,
   /** The platform default a simulation run row is stamped with, read per write. */
   retention: DataRetentionApi,
@@ -519,7 +519,7 @@ export class ScenarioApp implements ScenarioApi {
         allowLoopbackVoiceProviders: config.allowLoopbackVoiceProviders,
         recordings: voiceRecordingChannels.live.create(),
       }),
-      lifecycle: buildScenarioLifecyclePipeline(setup.dependencies.nurturing),
+      lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,
       simulationProcessing: SimulationProcessingRuntimeAdapter.create({
         runs: setup.repositories.simulationRunProcessing,

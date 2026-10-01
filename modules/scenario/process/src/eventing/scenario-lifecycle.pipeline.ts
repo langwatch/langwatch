@@ -15,10 +15,6 @@ import {
 
 import type { ScenarioApp } from "../app/scenario.app.ts";
 import {
-  createScenarioCreatedNurturingSubscriber,
-  type ScenarioCreatedNurturingDeps,
-} from "./scenario-created-nurturing.subscriber.ts";
-import {
   RecordScenarioCreatedCommand,
   type RecordScenarioCreatedCommandData,
 } from "./scenario-lifecycle.commands.ts";
@@ -29,10 +25,8 @@ export type ScenarioLifecyclePipeline = StaticPipelineDefinition<
   { name: "recordScenarioCreated"; payload: RecordScenarioCreatedCommandData }
 >;
 
-/** The api sends the command; only the worker constructs the subscriber that announces it. */
-export function buildScenarioLifecyclePipeline(
-  nurturing: ScenarioCreatedNurturingDeps,
-): ScenarioLifecyclePipeline {
+/** The api sends the command; peers (nurturing) react to its event from their own side (§9). */
+export function buildScenarioLifecyclePipeline(): ScenarioLifecyclePipeline {
   return definePipeline({
     name: SCENARIO_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({
@@ -40,10 +34,6 @@ export function buildScenarioLifecyclePipeline(
     }),
   })
     .withEvents([scenarioCreatedEventSchema])
-    .withEventSubscriber(
-      "scenarioCreatedNurturing",
-      createScenarioCreatedNurturingSubscriber(nurturing),
-    )
     .withCommand("recordScenarioCreated", RecordScenarioCreatedCommand)
     .build();
 }

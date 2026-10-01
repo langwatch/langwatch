@@ -8,10 +8,6 @@ import {
 import type { AuthApp } from "../app/auth.app.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import {
-  type AuthLifecycleNurturingDeps,
-  createAuthLifecycleNurturingSubscriber,
-} from "./auth-lifecycle-nurturing.subscriber.ts";
-import {
   RecordSessionStartedCommand,
   RecordSsoAutoAddedCommand,
 } from "./auth-lifecycle.commands.ts";
@@ -34,23 +30,13 @@ function lifecycleCommands() {
 
 export type AuthLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
 
-/** auth_lifecycle: the api only records; the worker also tells nurturing (§9). */
-export function buildAuthLifecyclePipeline(input: {
-  nurturing?: AuthLifecycleNurturingDeps;
-}): AuthLifecycleDefinition {
-  const nurturing = input.nurturing;
-  if (!nurturing) return lifecycleCommands().build();
-  return lifecycleCommands()
-    .withEventSubscriber(
-      "authLifecycleNurturing",
-      createAuthLifecycleNurturingSubscriber(nurturing),
-    )
-    .build();
+/** auth_lifecycle records; peers (nurturing) react to its events from their own side (§9). */
+export function buildAuthLifecyclePipeline(): AuthLifecycleDefinition {
+  return lifecycleCommands().build();
 }
 
 export const authLifecycleEventing = defineEventingModule({
   pipeline: AUTH_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<AuthRepositories, AuthApp>) =>
-    app.lifecyclePipeline({ participation }),
+  build: ({ app }: EventingSetup<AuthRepositories, AuthApp>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycle(commands),
 });

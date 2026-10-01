@@ -34,7 +34,6 @@
     "auth -> feature-flag": 1,
     "auth -> identity": 1,
     "auth -> licensing": 1,
-    "auth -> nurturing": 1,
     "auth -> organization": 1,
     "auth -> sso": 1,
     "auth -> user": 1,
@@ -44,7 +43,6 @@
     "automation -> dataset": 1,
     "automation -> entitlement": 1,
     "automation -> evaluation": 1,
-    "automation -> feature-flag": 1,
     "automation -> monitor": 1,
     "automation -> project": 1,
     "automation -> trace": 1,
@@ -245,9 +243,7 @@
     "organization -> api-key": 1,
     "organization -> billing": 1,
     "organization -> entitlement": 1,
-    "organization -> governance": 1,
     "organization -> identity": 1,
-    "organization -> nurturing": 1,
     "organization -> project": 1,
     "organization -> role": 1,
     "organization -> share": 1,
@@ -264,12 +260,10 @@
     "project -> trace": 1,
     "prompt -> entitlement": 1,
     "prompt -> model-provider": 1,
-    "prompt -> nurturing": 1,
     "prompt -> project": 1,
     "prompt -> workflow": 1,
     "role -> entitlement": 1,
     "role -> organization": 1,
-    "role -> user": 1,
     "scenario -> agent": 1,
     "scenario -> api-key": 1,
     "scenario -> audit-log": 1,
@@ -350,7 +344,6 @@
     "workflow -> evaluator": 1,
     "workflow -> experiment": 1,
     "workflow -> model-provider": 1,
-    "workflow -> monitor": 1,
-    "workflow -> nurturing": 1
+    "workflow -> monitor": 1
   }
 }

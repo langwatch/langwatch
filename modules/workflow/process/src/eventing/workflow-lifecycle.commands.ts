@@ -6,15 +6,17 @@ import {
   stripEnvelope,
   withCommandEnvelope,
 } from "@langwatch/eventing";
+import {
+  WORKFLOW_CREATED_EVENT_TYPE,
+  workflowCreatedEventDataSchema,
+} from "@langwatch/workflow-contract";
 import type { z } from "zod";
 
 import {
   RECORD_WORKFLOW_CREATED_COMMAND_TYPE,
   WORKFLOW_AGGREGATE_TYPE,
-  WORKFLOW_CREATED_EVENT_TYPE,
   WORKFLOW_CREATED_EVENT_VERSION,
   type WorkflowCreatedEvent,
-  workflowCreatedEventDataSchema,
 } from "./workflow-lifecycle.events.ts";
 
 export const recordWorkflowCreatedCommandDataSchema = withCommandEnvelope(
@@ -44,7 +46,7 @@ export class RecordWorkflowCreatedCommand implements CommandHandler<
         tenantId: createTenantId(command.tenantId),
         type: WORKFLOW_CREATED_EVENT_TYPE,
         version: WORKFLOW_CREATED_EVENT_VERSION,
-        data,
+        data: { ...data, occurredAt: command.data.occurredAt },
         occurredAt: command.data.occurredAt,
         idempotencyKey: `${command.tenantId}:${data.workflowId}:created`,
       }),

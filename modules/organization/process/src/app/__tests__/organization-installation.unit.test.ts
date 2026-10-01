@@ -2,8 +2,6 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
@@ -44,10 +42,8 @@ function process(role: "api" | "worker") {
       authz: createApiFixture<AuthzApi>(),
       billing: createApiFixture<BillingApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
-      governance: createApiFixture<GovernanceRestApi>(),
       identity: createApiFixture<IdentityApi>(),
       notification: createApiFixture<NotificationService>(),
-      nurturing: createApiFixture<NurturingApi>(),
       project: createApiFixture<ProjectApi>(),
       role: createApiFixture<RoleApi>(),
       share: createApiFixture<ShareApi>(),

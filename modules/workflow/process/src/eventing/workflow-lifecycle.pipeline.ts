@@ -10,10 +10,6 @@ import {
 import type { WorkflowApp } from "../app/workflow.app.ts";
 import type { WorkflowRepositories } from "../repositories/workflow-repositories.registry.ts";
 import {
-  createWorkflowCreatedNurturingSubscriber,
-  type WorkflowCreatedNurturingDeps,
-} from "./workflow-created-nurturing.subscriber.ts";
-import {
   RecordWorkflowCreatedCommand,
   type RecordWorkflowCreatedCommandData,
 } from "./workflow-lifecycle.commands.ts";
@@ -30,19 +26,13 @@ export type WorkflowLifecyclePipeline = StaticPipelineDefinition<
   { name: "recordWorkflowCreated"; payload: RecordWorkflowCreatedCommandData }
 >;
 
-/** The api sends the command; only the worker constructs the subscriber that announces it. */
-export function buildWorkflowLifecyclePipeline(
-  nurturing: WorkflowCreatedNurturingDeps,
-): WorkflowLifecyclePipeline {
+/** The api sends the command; peers (nurturing) react to its event from their own side (§9). */
+export function buildWorkflowLifecyclePipeline(): WorkflowLifecyclePipeline {
   return definePipeline({
     name: WORKFLOW_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: WORKFLOW_AGGREGATE_TYPE }),
   })
     .withEvents([workflowCreatedEventSchema])
-    .withEventSubscriber(
-      "workflowCreatedNurturing",
-      createWorkflowCreatedNurturingSubscriber(nurturing),
-    )
     .withCommand("recordWorkflowCreated", RecordWorkflowCreatedCommand)
     .build();
 }

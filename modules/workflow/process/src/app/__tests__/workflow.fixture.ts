@@ -133,7 +133,7 @@ export function createWorkflowTestInfrastructure(
     codeCompletions: noCodeCompletions,
     studioRuns: noStudioRuns,
     signals: silentSignals,
-    lifecycle: buildWorkflowLifecyclePipeline({ recordSignal: async () => void 0 }),
+    lifecycle: buildWorkflowLifecyclePipeline(),
     ...overrides,
   };
 }

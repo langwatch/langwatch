@@ -3,7 +3,6 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @vitest-environment node
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createApp } from "@langwatch/kernel";
 import { memoryStores } from "@langwatch/process-stores";
@@ -31,7 +30,6 @@ function process(role: "api" | "worker") {
       entitlement: createApiFixture<EntitlementApi>({}),
       workflow: createApiFixture<WorkflowApi>({}),
       "model-provider": defaultModelFixture(),
-      nurturing: createApiFixture<NurturingApi>({}),
     });
 }
 

@@ -1,7 +1,7 @@
-import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 /**
- * A created scenario is recorded on scenario's own pipeline, and the worker's
- * subscriber tells nurturing. @see specs/features/customer-io-nurturing-integration.feature
+ * A created scenario is recorded on scenario's own pipeline, and nurturing
+ * reacts to its event from its own side.
+ * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { createTenantId, type EventingCommandSender } from "@langwatch/eventing";
 import {
@@ -123,51 +123,6 @@ describe("the scenario lifecycle pipeline", () => {
 
       await vi.waitFor(() => expect(sent).toHaveLength(1));
       expect(sent[0]).toMatchObject({ scenarioCount: 1, onboardingVariant: null });
-    });
-  });
-
-  describe("when the worker's subscriber handles scenario_created", () => {
-    /** @scenario "Scenario creation updates scenario count and fires event" */
-    it("tells nurturing the scenario with the event it came from", async () => {
-      const recorded: NurturingSignal[] = [];
-      const { app } = await createScenarioRestTestApp({
-        nurturing: {
-          recordSignal: async (input) => {
-            recorded.push(input);
-          },
-        },
-      });
-      const subscriber = app.lifecyclePipeline().eventSubscribers.get("scenarioCreatedNurturing");
-      if (!subscriber) throw new Error("the pipeline declares no nurturing subscriber");
-      const event = createdEvent();
-
-      await subscriber.handle(event, { tenantId: PROJECT_ID, aggregateId: "scenario-1" });
-
-      expect(recorded).toEqual([
-        {
-          kind: "scenario_created",
-          sourceEventId: event.id,
-          tenantId: PROJECT_ID,
-          occurredAt: 1_700_000_000_000,
-          ...signal,
-        },
-      ]);
-    });
-
-    it("lets a nurturing failure reach the queue, which retries it", async () => {
-      const { app } = await createScenarioRestTestApp({
-        nurturing: {
-          recordSignal: async () => {
-            throw new Error("nurturing unavailable");
-          },
-        },
-      });
-      const subscriber = app.lifecyclePipeline().eventSubscribers.get("scenarioCreatedNurturing");
-      if (!subscriber) throw new Error("the pipeline declares no nurturing subscriber");
-
-      await expect(
-        subscriber.handle(createdEvent(), { tenantId: PROJECT_ID, aggregateId: "scenario-1" }),
-      ).rejects.toThrow("nurturing unavailable");
     });
   });
 });

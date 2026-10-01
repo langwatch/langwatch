@@ -35,9 +35,6 @@
       "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/nurturing/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../enterprise/modules/sso/contract/tsconfig.build.json"
     },
     {

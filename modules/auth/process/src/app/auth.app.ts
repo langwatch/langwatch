@@ -39,7 +39,6 @@ import {
 } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
@@ -61,7 +60,7 @@ import {
   type SignedInWith,
   SignInMethodPolicyService,
 } from "@langwatch/identity-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -209,7 +208,6 @@ type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
   identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
-  nurturing: Pick<NurturingApi, "recordSignal">;
 }>;
 
 type AuthSetup = FeatureSetup<
@@ -244,8 +242,6 @@ export class AuthApp implements AuthApiContract {
     sso: SsoApi,
     /** Whether a CLI approver may still hand out a shared project's key (`project:manage`). */
     authz: AuthzApi,
-    /** Told a person's sessions and domain auto-joins by the worker's subscriber (§9). */
-    nurturing: NurturingApi,
   };
   static readonly config = authServerConfig;
   static readonly publicConfig = authBrowserConfig.project;
@@ -480,7 +476,6 @@ export class AuthApp implements AuthApiContract {
         apiKeys: dependencies.apiKeys,
         featureFlags: dependencies.featureFlags,
         identity: dependencies.identity,
-        nurturing: dependencies.nurturing,
       },
       legacySsoAccess: LegacySsoAccessService.create({
         accounts: accountRows,
@@ -651,13 +646,8 @@ export class AuthApp implements AuthApiContract {
     });
   }
 
-  lifecyclePipeline({
-    participation,
-  }: {
-    participation: EventingParticipation;
-  }): AuthLifecycleDefinition {
-    if (participation === "produce") return buildAuthLifecyclePipeline({});
-    return buildAuthLifecyclePipeline({ nurturing: this.#dependencies.nurturing });
+  lifecyclePipeline(): AuthLifecycleDefinition {
+    return buildAuthLifecyclePipeline();
   }
 
   connectLifecycle(senders: AuthLifecycleSenders): void {

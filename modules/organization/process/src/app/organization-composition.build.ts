@@ -1,7 +1,6 @@
 /** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
 import type { OrganizationUserRole } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -479,15 +478,8 @@ function organizationSignals({
  * project goes through the project application rather than a second creation
  * path, so it writes the same rows the project surface writes.
  */
-function organizationCeremony(options: {
-  projects: ProjectApi;
-  governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
-}): OrganizationCeremony {
+function organizationCeremony(options: { projects: ProjectApi }): OrganizationCeremony {
   return {
-    /** Main's onboarding seeded it; non-fatal at the call site. */
-    ensureDefaultAiToolCatalog: async ({ organizationId }) => {
-      await options.governance.aiToolEnsureDefaultCatalog({ organizationId });
-    },
     createProject: async (input) => {
       const project = await options.projects.create(
         {
@@ -617,7 +609,6 @@ export function buildOrganizationInfrastructure(input: {
     entitlement: Pick<EntitlementApi, "getActivePlan" | "requestBound">;
     permissions: AuthzApi;
     roles: InviteAssignableRoles;
-    governance: Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">;
     notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
   };
 }): OrganizationInfrastructure {
@@ -668,10 +659,7 @@ export function buildOrganizationInfrastructure(input: {
     signals,
     seatLimits,
     lifecycle,
-    ceremony: organizationCeremony({
-      projects: dependencies.projects,
-      governance: dependencies.governance,
-    }),
+    ceremony: organizationCeremony({ projects: dependencies.projects }),
     directory: organizationDirectory({
       identity: dependencies.identity,
       userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),

@@ -76,8 +76,6 @@ export class OrganizationInitializationService {
         by,
       );
 
-      await this.#seedCatalogue(created.organization.id);
-
       // The coding-agent track lives on the personal portal, so its workspace
       // is provisioned here rather than on the first command-line sign-in:
       // otherwise the ending page shows an empty shell.
@@ -118,23 +116,6 @@ export class OrganizationInitializationService {
 
   recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void {
     this.deps.lifecycle.integrationMethodChosen(input);
-  }
-
-  /**
-   * Every new organization gets the standard catalogue at creation, whatever
-   * its intent, so the portal renders tiles on its first load.
-   */
-  async #seedCatalogue(organizationId: string): Promise<void> {
-    try {
-      await this.deps.ceremony.ensureDefaultAiToolCatalog({ organizationId });
-    } catch (error) {
-      this.deps.signals.reportError(error, {
-        extra: {
-          origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
-          organizationId,
-        },
-      });
-    }
   }
 
   async #provisionPersonalWorkspace(input: {

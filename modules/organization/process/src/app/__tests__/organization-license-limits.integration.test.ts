@@ -7,7 +7,6 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -64,7 +63,6 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
         entitlement,
         permissions: createApiFixture<AuthzApi>(),
         roles: createApiFixture<InviteAssignableRoles>(),
-        governance: createApiFixture<Pick<GovernanceRestApi, "aiToolEnsureDefaultCatalog">>(),
         notifications:
           createApiFixture<Pick<NotificationService, "sendEmail" | "getMailDelivery">>(),
       },

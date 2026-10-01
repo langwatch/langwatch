@@ -7,8 +7,6 @@ import {
   type GrantsLedgerActor,
 } from "@langwatch/authz-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
-import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
@@ -315,12 +313,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     entitlement: EntitlementApi,
     /** Where custom-role assignability is defined, for the invitation door. */
     roles: RoleApi,
-    /** Seeds the standard AI-tool catalogue during the sign-up ceremony. */
-    governance: GovernanceRestApi,
     /** Told of a reached seat limit by this module's own subscriber, as §9 rules. */
     billing: BillingApi,
-    /** Told of a sign-up, an invitation batch and an acceptance by this module's subscriber. */
-    nurturing: NurturingApi,
     /** Sends the invitation mails; notification owns the gateway. */
     notifications: NotificationService,
   };
@@ -369,7 +363,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
         projects: setup.dependencies.projects,
         identity: setup.dependencies.identity,
         entitlement: setup.dependencies.entitlement,
-        governance: setup.dependencies.governance,
         permissions: setup.dependencies.permissions,
         roles: setup.dependencies.roles,
         notifications: setup.dependencies.notifications,
@@ -417,7 +410,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
     application.#members = members;
     application.#billing = setup.dependencies.billing;
-    application.#nurturing = setup.dependencies.nurturing;
     application.#licenseLimits = LicenseLimitService.create({
       seats: members.seats,
       notices: members.seatLimits,
@@ -558,8 +550,6 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   #licenseLimits!: LicenseLimitService;
   /** The peer the worker's seat-limit subscriber tells; absent only in a test's app. */
   #billing: Pick<BillingApi, "notifyResourceLimitReached"> | undefined;
-  /** The peer the worker's lifecycle subscriber tells; absent only in a test's app. */
-  #nurturing: Pick<NurturingApi, "recordSignal"> | undefined;
   #visibility!: OrganizationVisibilityService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
@@ -1507,14 +1497,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return buildSeatLimitPipeline({ billing: this.#billing });
   }
 
-  /** organization_lifecycle for this role: the worker also tells nurturing (§9). */
-  lifecyclePipeline({
-    participation,
-  }: {
-    participation: EventingParticipation;
-  }): OrganizationLifecycleDefinition {
-    if (participation === "produce") return buildOrganizationLifecyclePipeline({});
-    return buildOrganizationLifecyclePipeline({ nurturing: this.#nurturing });
+  /** organization_lifecycle: the same in every role, since its peers react from their side (§9). */
+  lifecyclePipeline(): OrganizationLifecycleDefinition {
+    return buildOrganizationLifecyclePipeline();
   }
 
   connectLifecycle(senders: OrganizationLifecycleSenders): void {

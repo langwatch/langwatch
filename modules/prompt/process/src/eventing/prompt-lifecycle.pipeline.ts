@@ -10,10 +10,6 @@ import {
 import type { PromptApp } from "../app/prompt.app.ts";
 import type { PromptRepositories } from "../repositories/prompt.repositories.ts";
 import {
-  createPromptCreatedNurturingSubscriber,
-  type PromptCreatedNurturingDeps,
-} from "./prompt-created-nurturing.subscriber.ts";
-import {
   RecordPromptCreatedCommand,
   type RecordPromptCreatedCommandData,
 } from "./prompt-lifecycle.commands.ts";
@@ -30,19 +26,13 @@ export type PromptLifecyclePipeline = StaticPipelineDefinition<
   { name: "recordPromptCreated"; payload: RecordPromptCreatedCommandData }
 >;
 
-/** The api sends the command; only the worker constructs the subscriber that announces it. */
-export function buildPromptLifecyclePipeline(
-  nurturing: PromptCreatedNurturingDeps,
-): PromptLifecyclePipeline {
+/** The api sends the command; peers (nurturing) react to its event from their own side (§9). */
+export function buildPromptLifecyclePipeline(): PromptLifecyclePipeline {
   return definePipeline({
     name: PROMPT_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: PROMPT_AGGREGATE_TYPE }),
   })
     .withEvents([promptCreatedEventSchema])
-    .withEventSubscriber(
-      "promptCreatedNurturing",
-      createPromptCreatedNurturingSubscriber(nurturing),
-    )
     .withCommand("recordPromptCreated", RecordPromptCreatedCommand)
     .build();
 }

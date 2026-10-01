@@ -1,3 +1,4 @@
+import { SESSION_STARTED_EVENT_TYPE, SSO_AUTO_ADDED_EVENT_TYPE } from "@langwatch/auth-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 
@@ -10,9 +11,7 @@ import {
   recordSessionStartedCommandDataSchema,
   type RecordSsoAutoAddedCommandData,
   recordSsoAutoAddedCommandDataSchema,
-  SESSION_STARTED_EVENT_TYPE,
   type SessionStartedEvent,
-  SSO_AUTO_ADDED_EVENT_TYPE,
   type SsoAutoAddedEvent,
 } from "./auth-lifecycle.events.ts";
 

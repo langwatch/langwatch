@@ -3767,6 +3767,9 @@ importers:
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../../../modules/onboarding/contract
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
@@ -3783,6 +3786,9 @@ importers:
 
   enterprise/modules/nurturing/process:
     dependencies:
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/auth/contract
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../billing/contract
@@ -3807,18 +3813,30 @@ importers:
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../../../modules/onboarding/contract
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../modules/project/contract
+      '@langwatch/prompt-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/prompt/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/scenario/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/workflow/contract
       posthog-node:
         specifier: 'catalog:'
         version: 5.48.1(rxjs@7.8.2)
@@ -5799,9 +5817,6 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
-      '@langwatch/enterprise-nurturing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/sso/contract
@@ -11891,15 +11906,9 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
-      '@langwatch/enterprise-governance-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/governance/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
-      '@langwatch/enterprise-nurturing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -12794,9 +12803,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/enterprise-nurturing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -16050,9 +16056,6 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
-      '@langwatch/enterprise-nurturing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract

@@ -434,8 +434,7 @@ export interface OrganizationSignals {
 }
 
 /**
- * The parts of the sign-up ceremony that belong to other features: the
- * standard AI-tool catalogue Enterprise governance seeds, and the first
+ * The part of the sign-up ceremony that belongs to another feature: the first
  * project, created through the SAME project service every other door uses.
  */
 export interface OrganizationCeremony {
@@ -443,7 +442,6 @@ export interface OrganizationCeremony {
   // mock built to this interface and asserts on these members via
   // `expect(...).toHaveBeenCalledWith`/`.not.toHaveBeenCalled()`, which is
   // unsafe against a method-shorthand member under `unbound-method`.
-  ensureDefaultAiToolCatalog: (input: Readonly<{ organizationId: string }>) => Promise<void>;
   createProject: (
     input: Readonly<{
       organizationId: string;

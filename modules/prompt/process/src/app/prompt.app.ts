@@ -1,6 +1,5 @@
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 /**
@@ -68,8 +67,8 @@ export interface PromptCaller {
 export interface PromptInfrastructure {
   /**
    * Fires when a project gains a prompt (write, copy or sync). Fire-and-forget:
-   * it may not fail a create. Sends nurturing a `prompt_created` signal, resolving
-   * the org admin as attribution when the write carried no user (the REST/CLI door).
+   * it may not fail a create. Records `prompt_created`, resolving the org admin
+   * as attribution when the write carried no user (the REST/CLI door).
    */
   afterPromptCreated(input: { projectId: string; promptId: string; userId?: string | null }): void;
   /** Read/write engine (temporary bridge; move to repository bundle once memory twins exist). */
@@ -86,8 +85,6 @@ type PromptDependencies = Readonly<{
   workflow: typeof WorkflowApi;
   /** The default model a prompt created without one takes. */
   modelProviders: typeof ModelProviderApi;
-  /** Where a created prompt is told, by the lifecycle pipeline's subscriber. */
-  nurturing: typeof NurturingApi;
 }>;
 
 /**
@@ -122,7 +119,7 @@ type PromptAppDependencies = Readonly<{
    */
   publicBaseUrl: string | undefined;
   /**
-   * The prompt's own lifecycle pipeline, whose worker subscriber tells nurturing.
+   * The prompt's own lifecycle pipeline, whose event nurturing reacts to (§9).
    * Absent only on the read-only twin, which announces nothing.
    */
   lifecycle: PromptLifecyclePipeline | undefined;
@@ -136,7 +133,6 @@ export class PromptApp implements PromptApi {
     plans: EntitlementApi,
     workflow: WorkflowApi,
     modelProviders: ModelProviderApi,
-    nurturing: NurturingApi,
   };
   /**
    * `rateLimiter` is the playground door's run counter.
@@ -163,7 +159,7 @@ export class PromptApp implements PromptApi {
    */
   static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptApp {
     const { dependencies, members } = setup;
-    const lifecycle = buildPromptLifecyclePipeline(dependencies.nurturing);
+    const lifecycle = buildPromptLifecyclePipeline();
     // Tied the knot: the callback below fires only once a request calls
     // `announceCreated`, by which point `app` is always assigned.
     const appRef: { current?: PromptApp } = {};
@@ -173,7 +169,7 @@ export class PromptApp implements PromptApi {
       void app.#recordPromptCreated(input).catch((error: unknown) =>
         members.logger.error(
           { error, projectId: input.projectId },
-          "prompt_created nurturing signal failed",
+          "prompt_created was not recorded",
         ),
       );
     };

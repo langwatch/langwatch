@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
+  SESSION_STARTED_EVENT_TYPE,
+  sessionStartedEventDataSchema,
+  SSO_AUTO_ADDED_EVENT_TYPE,
+  ssoAutoAddedEventDataSchema,
+} from "@langwatch/auth-contract";
+import {
   CHECKOUT_COMPLETED_EVENT_TYPE,
   checkoutCompletedEventDataSchema,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
@@ -29,10 +35,32 @@ import {
   guidedOnboardingRecordedEventDataSchema,
 } from "@langwatch/onboarding-contract";
 import {
+  INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
+  integrationMethodChosenEventDataSchema,
+  INVITE_ACCEPTED_EVENT_TYPE,
+  inviteAcceptedEventDataSchema,
+  MEMBERS_INVITED_EVENT_TYPE,
+  membersInvitedEventDataSchema,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  organizationSignedUpEventDataSchema,
+} from "@langwatch/organization-contract";
+import {
   PROJECT_CREATED_EVENT_TYPE,
   type ProjectCreatedEventData,
   projectCreatedEventDataSchema,
 } from "@langwatch/project-contract";
+import {
+  PROMPT_CREATED_EVENT_TYPE,
+  promptCreatedEventDataSchema,
+} from "@langwatch/prompt-contract";
+import {
+  SCENARIO_CREATED_EVENT_TYPE,
+  scenarioCreatedEventDataSchema,
+} from "@langwatch/scenario-contract";
+import {
+  WORKFLOW_CREATED_EVENT_TYPE,
+  workflowCreatedEventDataSchema,
+} from "@langwatch/workflow-contract";
 
 import type { NurturingApp } from "../app/nurturing.app.ts";
 import {
@@ -40,7 +68,16 @@ import {
   evaluationRanSignal,
   experimentRanSignal,
   guidedOnboardingSignal,
+  integrationMethodChosenSignal,
+  inviteAcceptedSignal,
+  membersInvitedSignal,
+  promptCreatedSignal,
+  scenarioCreatedSignal,
+  sessionStartedSignal,
+  signedUpSignal,
+  ssoAutoAddedSignal,
   subscriptionChangedSignal,
+  workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
 import { nurturingSignalKey, RecordNurturingSignalCommand } from "./nurturing-signal.commands.ts";
 import {
@@ -59,8 +96,8 @@ export type NurturingPipeline = StaticPipelineDefinition<
 >;
 
 /**
- * Owners' commands land here as events; the worker's subscriber sends each one out. Owners that
- * record their own lifecycle events are reacted to here as peers (§9), delivered without a hop.
+ * Owners record their own lifecycle events and nurturing reacts to them here as peers (§9),
+ * delivered without a hop; a recorded signal command is sent out by the worker's subscriber.
  */
 export function buildNurturingPipeline(deps: {
   deliver: (input: { key: string; signal: NurturingSignal }) => Promise<void>;
@@ -131,6 +168,78 @@ export function buildNurturingPipeline(deps: {
       data: checkoutCompletedEventDataSchema,
       handle: (data, { aggregateId }) => {
         const signal = checkoutCompletedSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("sessionStarted", {
+      eventType: SESSION_STARTED_EVENT_TYPE,
+      data: sessionStartedEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = sessionStartedSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("ssoAutoAdded", {
+      eventType: SSO_AUTO_ADDED_EVENT_TYPE,
+      data: ssoAutoAddedEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = ssoAutoAddedSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("organizationSignedUp", {
+      eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+      data: organizationSignedUpEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = signedUpSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("membersInvited", {
+      eventType: MEMBERS_INVITED_EVENT_TYPE,
+      data: membersInvitedEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = membersInvitedSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("inviteAccepted", {
+      eventType: INVITE_ACCEPTED_EVENT_TYPE,
+      data: inviteAcceptedEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = inviteAcceptedSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("integrationMethodChosen", {
+      eventType: INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
+      data: integrationMethodChosenEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = integrationMethodChosenSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("promptCreated", {
+      eventType: PROMPT_CREATED_EVENT_TYPE,
+      data: promptCreatedEventDataSchema,
+      handle: (data, context) => {
+        const signal = promptCreatedSignal({ data, ...context });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("workflowCreated", {
+      eventType: WORKFLOW_CREATED_EVENT_TYPE,
+      data: workflowCreatedEventDataSchema,
+      handle: (data, context) => {
+        const signal = workflowCreatedSignal({ data, ...context });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("scenarioCreated", {
+      eventType: SCENARIO_CREATED_EVENT_TYPE,
+      data: scenarioCreatedEventDataSchema,
+      handle: (data, context) => {
+        const signal = scenarioCreatedSignal({ data, ...context });
         return deps.deliver({ key: nurturingSignalKey(signal), signal });
       },
     })

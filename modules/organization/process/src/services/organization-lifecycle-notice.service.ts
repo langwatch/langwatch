@@ -1,8 +1,8 @@
+import type { EventingCommandSender } from "@langwatch/eventing";
 import {
   integrationMethodSelectionSchema,
   nurturingSignUpDataSchema,
-} from "@langwatch/enterprise-nurturing-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+} from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type {
@@ -25,9 +25,9 @@ export type OrganizationLifecycleSenders = Readonly<{
 }>;
 
 /**
- * Where a sign-up, an invitation batch and an acceptance are recorded as organization's events,
- * which the worker hands to nurturing (§9). The senders arrive once the pipeline registers, and a
- * record that fails is reported, never thrown: an organization that was not announced still is one.
+ * Records a sign-up, an invitation batch and an acceptance as organization's events, which peers
+ * such as nurturing react to from their own side (§9). The senders arrive once the pipeline
+ * registers; a failed record is reported, never thrown.
  */
 export class OrganizationLifecycleNoticeService {
   static create(dependencies: {

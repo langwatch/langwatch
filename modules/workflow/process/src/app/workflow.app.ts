@@ -10,7 +10,6 @@ import { AuthzApi } from "@langwatch/authz-contract";
  * operation serves a browser session, an API key and a background job alike.
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
-import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
@@ -326,7 +325,7 @@ export interface WorkflowInfrastructure {
   codeCompletions: WorkflowCodeCompletions;
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
-  /** The workflow's own lifecycle pipeline, whose worker subscriber tells nurturing. */
+  /** The workflow's own lifecycle pipeline, whose event nurturing reacts to (§9). */
   lifecycle: WorkflowLifecyclePipeline;
   /**
    * The account the studio's engines are deployed into, for the daily sweep.
@@ -607,8 +606,6 @@ export class WorkflowApp implements WorkflowApi {
     experiments: ExperimentApi,
     /** The monitors an archived workflow's evaluators back, deleted with it. */
     monitors: MonitorApi,
-    /** Where a created workflow is told, by the lifecycle pipeline's subscriber. */
-    nurturing: NurturingApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -696,7 +693,7 @@ export class WorkflowApp implements WorkflowApi {
       }),
       publications: publicationsOf(setup.repositories.lineage),
       signals: WorkflowSignalsService.create(),
-      lifecycle: buildWorkflowLifecyclePipeline(setup.dependencies.nurturing),
+      lifecycle: buildWorkflowLifecyclePipeline(),
     });
   }
 

@@ -1,6 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -72,7 +71,6 @@ function harness() {
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
-        nurturing: createApiFixture<NurturingApi>(),
       },
       members: {
         logger: createTestLogger().logger,
@@ -324,7 +322,6 @@ describe("PromptApp.create", () => {
           plans: createApiFixture<EntitlementApi>(),
           workflow: createApiFixture<WorkflowApi>(),
           modelProviders: defaultModelFixture(),
-          nurturing: createApiFixture<NurturingApi>(),
         },
         members: {
           logger: fakeLogger,
@@ -382,7 +379,6 @@ describe("PromptApp.create", () => {
           plans: createApiFixture<EntitlementApi>(),
           workflow: createApiFixture<WorkflowApi>(),
           modelProviders: defaultModelFixture(),
-          nurturing: createApiFixture<NurturingApi>(),
         },
         members: {
           logger: createTestLogger().logger,

@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../billing/contract/tsconfig.build.json"
     },
     {
@@ -48,16 +51,28 @@
       "path": "../../../../modules/onboarding/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/prisma-client/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/workflow/contract/tsconfig.build.json"
     }
   ]
 }

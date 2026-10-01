@@ -8,10 +8,6 @@ import {
 import type { ServerOrganizationApp } from "../app/organization.app.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import {
-  createOrganizationLifecycleNurturingSubscriber,
-  type OrganizationLifecycleNurturingDeps,
-} from "./organization-lifecycle-nurturing.subscriber.ts";
-import {
   RecordIntegrationMethodChosenCommand,
   RecordInviteAcceptedCommand,
   RecordMembersInvitedCommand,
@@ -51,23 +47,14 @@ export type OrganizationLifecycleDefinition = ReturnType<
   ReturnType<typeof lifecycleCommands>["build"]
 >;
 
-/** organization_lifecycle: the api only records; the worker also tells nurturing (§9). */
-export function buildOrganizationLifecyclePipeline(input: {
-  nurturing?: OrganizationLifecycleNurturingDeps;
-}): OrganizationLifecycleDefinition {
-  const nurturing = input.nurturing;
-  if (!nurturing) return lifecycleCommands().build();
-  return lifecycleCommands()
-    .withEventSubscriber(
-      "organizationLifecycleNurturing",
-      createOrganizationLifecycleNurturingSubscriber(nurturing),
-    )
-    .build();
+/** organization_lifecycle records; peers (nurturing, governance) react from their own side (§9). */
+export function buildOrganizationLifecyclePipeline(): OrganizationLifecycleDefinition {
+  return lifecycleCommands().build();
 }
 
 export const organizationLifecycleEventing = defineEventingModule({
   pipeline: ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<OrganizationRepositories, ServerOrganizationApp>) =>
-    app.lifecyclePipeline({ participation }),
+  build: ({ app }: EventingSetup<OrganizationRepositories, ServerOrganizationApp>) =>
+    app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycle(commands),
 });
