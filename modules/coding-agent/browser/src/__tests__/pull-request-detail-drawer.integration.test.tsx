@@ -1,4 +1,3 @@
-import "@testing-library/jest-dom/vitest";
 /**
  * @vitest-environment jsdom
  * Pull-request detail drawer: what it shows a reader and what it must never
@@ -6,6 +5,7 @@ import "@testing-library/jest-dom/vitest";
  * drawer's address — nothing here reaches into trace-web's store.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
+import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
