@@ -5,11 +5,11 @@
  */
 
 import { featureFlagTrpc } from "@langwatch/feature-flag-contract";
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { navigationApi } from "./behavior/navigation-api.ts";
 
-export const navigationWeb = defineWebModule("navigation")
+export const navigationWeb = defineBrowserModule("navigation")
   // navigationApi reads featureFlag.*, so the flags' session tier travels with it.
   .withApi(navigationApi, { contracts: [featureFlagTrpc] })
   .withScreens({

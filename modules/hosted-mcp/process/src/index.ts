@@ -11,5 +11,5 @@ export type {
   McpAuthorizeProject,
 } from "./services/mcp-authorization.service.ts";
 export { type McpAuthorizeApi, mcpAuthorizeRest } from "./transport/mcp-authorize.rest.ts";
-export { hostedMcpServer } from "./hosted-mcp.server.ts";
-export type { HostedMcpInfrastructure } from "./hosted-mcp.server.ts";
+export { hostedMcpProcessModule } from "./hosted-mcp.module.ts";
+export type { HostedMcpInfrastructure } from "./hosted-mcp.module.ts";

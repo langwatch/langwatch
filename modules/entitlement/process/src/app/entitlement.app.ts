@@ -105,7 +105,7 @@ type EntitlementMembers = MembersRead<readonly ["logger"]> &
   Readonly<{ isSaas: boolean; processName: string }>;
 
 type EntitlementSetup = FeatureSetup<
-  typeof EntitlementApp.dependencies,
+  typeof EntitlementModule.dependencies,
   EntitlementMembers,
   EntitlementConfig,
   EntitlementRepositories
@@ -122,7 +122,7 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
 type EntitlementCallerLookup = Pick<EntitlementDependencies, "users" | "organizations">;
 
 /** What a plan allows, and what has been used and spent against it. */
-export class EntitlementApp implements EntitlementApiContract {
+export class EntitlementModule implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
   static readonly dependencies = {
     users: UserApi,
@@ -174,7 +174,7 @@ export class EntitlementApp implements EntitlementApiContract {
     this.#requestBoundOverrides = config.requestBounds ?? {};
   }
 
-  static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementApp {
+  static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementModule {
     const infrastructure = buildEntitlementInfrastructure({
       logger: members.logger,
       isSaas: members.isSaas,
@@ -184,7 +184,7 @@ export class EntitlementApp implements EntitlementApiContract {
       usage: dependencies,
     });
 
-    return new EntitlementApp({ repositories, members: infrastructure, dependencies, config });
+    return new EntitlementModule({ repositories, members: infrastructure, dependencies, config });
   }
 
   /**
@@ -197,8 +197,8 @@ export class EntitlementApp implements EntitlementApiContract {
     members: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
     config?: EntitlementConfig;
-  }): EntitlementApp {
-    return new EntitlementApp({
+  }): EntitlementModule {
+    return new EntitlementModule({
       repositories: setup.repositories,
       members: setup.members,
       dependencies: setup.dependencies,

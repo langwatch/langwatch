@@ -1,5 +1,5 @@
 /**
- * Builds the {@link IdentityInfrastructure} `IdentityApp.create` hands its services, from the
+ * Builds the {@link IdentityInfrastructure} `IdentityModule.create` hands its services, from the
  * module's own rows and the process's `eventing` member plus its own config.
  */
 import type { EventSourcing } from "@langwatch/eventing";
@@ -175,7 +175,7 @@ function ssoConnectionHistoryStore(options: {
   };
 }
 
-/** What this process hands `IdentityApp` at boot, built from its own rows, members and config. */
+/** What this process hands `IdentityModule` at boot, built from its own rows, members and config. */
 export function buildIdentityInfrastructure(input: {
   repositories: Pick<
     IdentityRepositories,

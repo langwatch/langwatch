@@ -13,7 +13,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { GithubApp } from "../app/github.app.ts";
+import type { GithubModule } from "../app/github.app.ts";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
 import type { GithubBranchMaintenance } from "../services/github-branch-maintenance.service.ts";
 import { runGithubBranchRecheck, runGithubRetentionPrune } from "./github-branch-recheck.intent.ts";
@@ -67,6 +67,6 @@ export function buildGithubMaintenancePipeline(
 
 export const githubMaintenanceEventing = defineEventingModule({
   pipeline: "github_maintenance",
-  build: ({ app, processStore }: EventingSetup<GithubRepositories, GithubApp>) =>
+  build: ({ app, processStore }: EventingSetup<GithubRepositories, GithubModule>) =>
     buildGithubMaintenancePipeline({ github: app.branchMaintenance(), processStore }),
 });

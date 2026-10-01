@@ -95,7 +95,7 @@ type EvaluatorMembers = Readonly<{
 }>;
 
 type EvaluatorSetup = FeatureSetup<
-  typeof EvaluatorApp.dependencies,
+  typeof EvaluatorModule.dependencies,
   EvaluatorMembers,
   undefined,
   EvaluatorRepositories
@@ -110,7 +110,7 @@ type EvaluatorAppParts = Readonly<{
   publicBaseUrl: string | undefined;
 }>;
 
-export class EvaluatorApp implements EvaluatorApi {
+export class EvaluatorModule implements EvaluatorApi {
   static readonly contract = EvaluatorApi;
   static readonly dependencies = {
     /** Answers whether the caller may act in a project that is not the request's. */
@@ -129,13 +129,13 @@ export class EvaluatorApp implements EvaluatorApi {
   /** From the process's vocabulary; boot refuses by name. */
   static readonly reads = ["publicBaseUrl"] as const;
 
-  static create(setup: EvaluatorSetup): EvaluatorApp {
+  static create(setup: EvaluatorSetup): EvaluatorModule {
     const graph = EvaluatorLinkedRowsService.create({
       workflows: setup.dependencies.workflows,
       monitors: setup.dependencies.monitors,
     });
 
-    return EvaluatorApp.createWithGraph(setup, graph);
+    return EvaluatorModule.createWithGraph(setup, graph);
   }
 
   /**
@@ -143,10 +143,10 @@ export class EvaluatorApp implements EvaluatorApi {
    * the workflow/monitor graph without a real database — the graph interface
    * is this module's own seam, not a process member.
    */
-  static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorApp {
+  static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorModule {
     const { dependencies, repositories, members } = setup;
 
-    return new EvaluatorApp({
+    return new EvaluatorModule({
       evaluators: EvaluatorRuntimeService.create({
         repository: repositories.evaluators,
         workflows: dependencies.workflows,

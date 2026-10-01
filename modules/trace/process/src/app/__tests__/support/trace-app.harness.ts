@@ -1,11 +1,11 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { TraceApp, type TraceAppDependencies } from "../../trace.app.ts";
+import { TraceModule, type TraceAppDependencies } from "../../trace.app.ts";
 
 type TraceReaders = TraceAppDependencies["traces"];
 
 /**
- * A real `TraceApp` over doubles for everything a test does not configure: each unconfigured
+ * A real `TraceModule` over doubles for everything a test does not configure: each unconfigured
  * member throws by name when called, so a test states exactly the readers it drives.
  */
 export function createTraceAppHarness({
@@ -13,8 +13,8 @@ export function createTraceAppHarness({
   ...dependencies
 }: Partial<Omit<TraceAppDependencies, "traces">> & {
   traces?: Partial<TraceReaders>;
-} = {}): TraceApp {
-  return TraceApp.create({
+} = {}): TraceModule {
+  return TraceModule.create({
     storedObjects: createApiFixture<TraceAppDependencies["storedObjects"]>({}, "storedObjects"),
     topics: createApiFixture<TraceAppDependencies["topics"]>({}, "topics"),
     broadcast: createApiFixture<TraceAppDependencies["broadcast"]>({}, "broadcast"),

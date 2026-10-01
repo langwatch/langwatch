@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
-import { AnalyticsApp } from "../analytics.app.ts";
+import { AnalyticsModule } from "../analytics.app.ts";
 
 const PROJECT_ID = "project-judging";
 const ORGANIZATION_ID = "org-judging";
@@ -32,7 +32,7 @@ const ORGANIZATION_ID = "org-judging";
  */
 async function harness(flagAnswer: boolean) {
   const flagReads: { key: string; target: FeatureFlagTarget }[] = [];
-  const app = await AnalyticsApp.create({
+  const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: (key, target) => {
@@ -90,7 +90,7 @@ async function harness(flagAnswer: boolean) {
 const appFunction = (schema: LangWatchQLSchema, name: string) =>
   schema.appFunctions.find((entry) => entry.name === name);
 
-describe("AnalyticsApp.describeLangWatchQLSchema", () => {
+describe("AnalyticsModule.describeLangWatchQLSchema", () => {
   describe("given the Instant Evals flag is off for the project", () => {
     /** @scenario "The schema publishes eval functions as unavailable while they are gated" */
     it("publishes every eval function as unavailable, leaving extraction availability to permissions", async () => {
@@ -134,7 +134,7 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
   });
 });
 
-describe("AnalyticsApp.executeLangWatchQL", () => {
+describe("AnalyticsModule.executeLangWatchQL", () => {
   describe("given a statement that calls no eval function", () => {
     it("never resolves the project's Instant Evals gate", async () => {
       const { execute, flagReads } = await harness(true);

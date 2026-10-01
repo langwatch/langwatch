@@ -1,12 +1,12 @@
 export type { AutomationDatabase } from "./repositories/prisma/prisma.automation.repositories.ts";
 export type { AutomationRepositories } from "./repositories/automation.repositories.ts";
-export { automationServer } from "./automation.server.ts";
+export { automationProcessModule } from "./automation.module.ts";
 export {
   createAutomationCustomGraphs,
   createAutomationGraphTriggerSent,
   createAutomationTraceTriggerCatalogue,
   createAutomationTriggers,
-} from "./automation.server.ts";
+} from "./automation.module.ts";
 export { SlackWebhookDeliveryChannel } from "./channels/slack/slack.webhook-delivery.channel.ts";
 export type {
   RenderedSlackMessageRequest,
@@ -211,7 +211,7 @@ export type {
 /**
  * The declared transports a process mounts. `/api/triggers` is a factory because
  * its rows carry a platform URL only the mounting process can build; the other
- * four are inert declarations, carried by `automationServer` too.
+ * four are inert declarations, carried by `automationProcessModule` too.
  */
 export { createAutomationRest } from "./transport/automation.rest.ts";
 export { slackAutomationRest } from "./transport/slack-trigger.rest.ts";
@@ -263,7 +263,7 @@ export {
   type AutomationRunawayCollaborator,
   type AutomationSettlement,
   type AutomationSettlementRepositories,
-} from "./automation.server.ts";
+} from "./automation.module.ts";
 /** The ledger a late-built containment collaborator filters its notice through. */
 export type { AutomationSettlementLedgerService } from "./services/automation-settlement-ledger.service.ts";
 

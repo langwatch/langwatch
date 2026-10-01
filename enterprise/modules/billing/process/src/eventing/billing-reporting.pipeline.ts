@@ -12,7 +12,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { BillingApp } from "../app/billing.app.ts";
+import type { BillingModule } from "../app/billing.app.ts";
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import type { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
@@ -117,7 +117,7 @@ export class BillingReportingPipeline {
 
 export const billingReportingEventing = defineEventingModule({
   pipeline: BILLING_REPORTING_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<BillingRepositories, BillingApp>) =>
+  build: ({ app, participation }: EventingSetup<BillingRepositories, BillingModule>) =>
     app.reportingPipeline({ participation }),
   connect: ({ app, commands }) => app.connectReporting(commands.reportUsageForMonth),
 });

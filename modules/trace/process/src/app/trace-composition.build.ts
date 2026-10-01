@@ -558,7 +558,7 @@ export type TraceTreeCompositionOptions = {
   fullIo: TraceFullIo;
 };
 
-/** Where TraceApp builds the trace-tree read from its ClickHouse and query-value boundaries. */
+/** Where TraceModule builds the trace-tree read from its ClickHouse and query-value boundaries. */
 export class TraceTreeComposition {
   private constructor(private readonly options: TraceTreeCompositionOptions) {}
 

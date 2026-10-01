@@ -22,7 +22,7 @@
     },
     "./scenario-child": {
       "types": "./dist/scenario-child.server.d.ts",
-      "default": "./src/scenario-child.server.ts"
+      "default": "./src/scenario-child.module.ts"
     },
     "./composition/scenario-failure-handler": {
       "types": "./dist/services/scenario-failure-handler.service.d.ts",

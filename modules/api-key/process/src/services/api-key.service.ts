@@ -51,7 +51,7 @@ export type ApiKeyDependencies = {
   tokens: ApiKeyTokenService;
 };
 
-/** The only public capability for API credentials; ApiKeyApp adapts it to the contract API. */
+/** The only public capability for API credentials; ApiKeyModule adapts it to the contract API. */
 export class ApiKeyService {
   private readonly policy: ApiKeyGrantPolicyService;
   private readonly catalog: ApiKeyCatalogService;

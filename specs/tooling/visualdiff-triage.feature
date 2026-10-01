@@ -418,7 +418,7 @@ Feature: visualdiff catches regressions and reports its own coverage
     @unit
     Scenario: A flow or route whose last verdict was works is skipped while nothing it touches changed
       Given a route with no finding or a flow judged works, recorded in .visualdiff/works.json at its candidate commit
-      And the module that touches it is read from the candidate's defineWebModule screen declarations
+      And the module that touches it is read from the candidate's defineBrowserModule screen declarations
       When a later run finds git diff since that commit empty over that module's browser, process and contract paths, the shell packages, apps/ui and the runner, and a flow's steps and expects unchanged
       Then it is skipped as the done ledger skips a section, the dry run lists it, and verdict.md says "skipped (works at <sha>, unchanged)"
       And a route no module declares, or a flow with no go step, is walked with the reason printed

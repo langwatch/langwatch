@@ -2,7 +2,7 @@
  * Langy mounts once per layout route; every route below a layout gets the panel.
  * Spec: specs/langy/langy-mount-scope.feature
  */
-import { webModules } from "@langwatch/installed-web-modules";
+import { browserModules } from "@langwatch/installed-web-modules";
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { describe, expect, it } from "vitest";
 
@@ -71,7 +71,7 @@ describe("given the Langy layout route the table nests product pages under", () 
      * @scenario A product page renders inside the Langy layout
      */
     it("is langy's declared layout, never an unframed placeholder", () => {
-      expect(installedModuleScreens(webModules).loaders[LANGY_LAYOUT]).toBeDefined();
+      expect(installedModuleScreens(browserModules).loaders[LANGY_LAYOUT]).toBeDefined();
       expect(uiUnservedPageLoaders[LANGY_LAYOUT]).toBeUndefined();
     });
   });

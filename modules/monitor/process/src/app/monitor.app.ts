@@ -56,13 +56,13 @@ const MONITOR_KSUID_RESOURCE = "monitor";
 
 /** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type MonitorSetup = FeatureSetup<
-  typeof MonitorApp.dependencies,
+  typeof MonitorModule.dependencies,
   Readonly<{ publicBaseUrl: string | undefined }>,
   undefined,
   MonitorRepositories
 >;
 
-export class MonitorApp implements MonitorApi {
+export class MonitorModule implements MonitorApi {
   static readonly contract = MonitorApi;
   static readonly dependencies = {
     permissions: AuthzApi,
@@ -104,8 +104,8 @@ export class MonitorApp implements MonitorApi {
     this.#publicBaseUrl = publicBaseUrl;
   }
 
-  static create(setup: MonitorSetup): MonitorApp {
-    return new MonitorApp(setup.repositories, setup.dependencies, setup.members.publicBaseUrl);
+  static create(setup: MonitorSetup): MonitorModule {
+    return new MonitorModule(setup.repositories, setup.dependencies, setup.members.publicBaseUrl);
   }
 
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {

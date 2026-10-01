@@ -1,5 +1,5 @@
-export { EvaluationApp } from "./app/evaluation.app.ts";
-export { evaluationServer } from "./evaluation.server.ts";
+export { EvaluationModule } from "./app/evaluation.app.ts";
+export { evaluationProcessModule } from "./evaluation.module.ts";
 export { ExecuteEvaluationCommand } from "./eventing/evaluation-execution.intent.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
 
@@ -25,4 +25,4 @@ export {
 } from "./services/evaluation-execution.service.ts";
 export { EvaluationExecutionMetricsService } from "./services/evaluation-execution-metrics.service.ts";
 export { EvaluationExecutionReceiptService } from "./services/evaluation-execution-receipt.service.ts";
-export { createMonitorPerformanceReads } from "./evaluation.server.ts";
+export { createMonitorPerformanceReads } from "./evaluation.module.ts";

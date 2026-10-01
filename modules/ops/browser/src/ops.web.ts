@@ -4,9 +4,9 @@
  * (`?drawer.open=<name>`), under the names the product has always used.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const opsWeb = defineWebModule("ops")
+export const opsWeb = defineBrowserModule("ops")
   .withHosts({
     requires: ["OpsHostApi", "CheckupHostApi"],
     mounts: {

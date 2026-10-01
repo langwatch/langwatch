@@ -80,7 +80,7 @@ export type {
  * the delivery hop a test fire uses, and the `Idempotency-Key` ledger.
  */
 export {
-  WebhookApp,
+  WebhookModule,
   type WebhookAppDependencies,
   type WebhookTestDispatch,
 } from "./app/webhook.app.ts";
@@ -90,11 +90,11 @@ export {
  * rendered through.
  */
 export {
-  webhookServer,
+  webhookProcessModule,
   createWebhookEnvelopes,
   type WebhookEnvelopes,
   type WebhookLiveDatabase,
-} from "./webhook.server.ts";
+} from "./webhook.module.ts";
 
 /**
  * The session-authenticated tRPC namespace this feature owns, `webhookEndpoints`.

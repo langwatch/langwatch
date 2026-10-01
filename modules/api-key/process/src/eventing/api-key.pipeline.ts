@@ -12,7 +12,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { ApiKeyApp } from "../app/api-key.app.ts";
+import type { ApiKeyModule } from "../app/api-key.app.ts";
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
 import { AgentSandboxKeyReapService } from "../services/agent-sandbox-key-reap.service.ts";
 import { CliLoginKeyReapService } from "../services/cli-login-key-reap.service.ts";
@@ -41,7 +41,7 @@ import {
 
 export const apiKeyEventing = defineEventingModule({
   pipeline: "agent_sandbox_maintenance",
-  build: ({ repositories, app, processStore }: EventingSetup<ApiKeyRepositories, ApiKeyApp>) => {
+  build: ({ repositories, app, processStore }: EventingSetup<ApiKeyRepositories, ApiKeyModule>) => {
     const reap = AgentSandboxKeyReapService.create({ repository: repositories.apiKeys });
     const workflowRunReap = WorkflowRunKeyReapService.create({ repository: repositories.apiKeys });
     const loginKeyReap = CliLoginKeyReapService.create({

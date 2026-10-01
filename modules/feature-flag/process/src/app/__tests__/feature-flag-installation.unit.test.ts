@@ -2,7 +2,7 @@ import { FeatureFlagApi, UnknownFeatureFlagError } from "@langwatch/feature-flag
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
-import { featureFlagServer } from "../../feature-flag.server.ts";
+import { featureFlagProcessModule } from "../../feature-flag.module.ts";
 import {
   createFeatureFlagTestAuthz,
   createFeatureFlagTestProjects,
@@ -13,7 +13,7 @@ const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(featureFlagServer)])
+    .withModules([withMemoryRepositories(featureFlagProcessModule)])
     .withConfig({ "feature-flag": { forceEnable: [], overrides: {}, legacy: {} } })
     .provide({
       authz: createFeatureFlagTestAuthz(),
@@ -29,7 +29,7 @@ describe("feature flag app installation", () => {
     try {
       const app = runtime.service(FeatureFlagApi);
 
-      expect(runtime.module(featureFlagServer).provided).toBe(app);
+      expect(runtime.module(featureFlagProcessModule).provided).toBe(app);
 
       await expect(app.isEnabled(SYSTEM_FLAG, { kind: "system" })).resolves.toBe(false);
 

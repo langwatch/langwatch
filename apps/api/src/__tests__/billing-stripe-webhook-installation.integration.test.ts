@@ -5,7 +5,7 @@
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
 import { RestHost } from "@langwatch/api/rest";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import { ModuleApiToken } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
@@ -37,7 +37,7 @@ describe("the api process installation", () => {
       });
       const isCallback = (transport: { protocol: string; namespace?: string }) =>
         transport.protocol === "rest" && transport.namespace === "billing-stripe-webhook";
-      const owner = serverModules.find((module) => (module.transports ?? []).some(isCallback));
+      const owner = processModules.find((module) => (module.transports ?? []).some(isCallback));
       const callback = owner?.transports?.find(isCallback);
       const contract = owner?.apiContract;
       if (!owner || !callback || !(contract instanceof ModuleApiToken)) {
@@ -61,7 +61,7 @@ describe("the api process installation", () => {
   });
 
   it("serves main's subscription and currency procedures from the installed billing module", () => {
-    const billing = serverModules.find((module) => module.name === "billing");
+    const billing = processModules.find((module) => module.name === "billing");
     const procedures = (billing?.transports ?? []).flatMap((transport) => {
       if (transport.protocol !== "trpc" || !("contract" in transport)) return [];
       const { contract } = transport;

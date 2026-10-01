@@ -19,7 +19,7 @@ import { GATEWAY_DEBITS_PROCESS_NAME } from "../../eventing/gateway-debit.proces
 import { gatewayRealtimeSessionEventing } from "../../eventing/gateway-realtime-session.pipeline.ts";
 import { SPEND_SETTLEMENT_PROCESS_NAME } from "../../eventing/gateway-spend-settlement.process.ts";
 import { gatewaySpendEventing } from "../../eventing/gateway-spend.pipeline.ts";
-import { gatewayServer } from "../../gateway.server.ts";
+import { gatewayProcessModule } from "../../gateway.module.ts";
 import type { GatewayGuardrailCheckRow } from "../../repositories/gateway-guardrail.repository.ts";
 import type { OpenAdmission } from "../../repositories/gateway-open-admissions.repository.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
@@ -31,19 +31,19 @@ import { GatewayConfigMaterialiserService } from "../../services/gateway-config-
 import type { GatewaySpendApp } from "../../services/gateway-spend-reconciliation.service.ts";
 import { signedGatewayRequest } from "../../transport/__tests__/support/gateway-internal-rest.harness.ts";
 import { gatewayInternalRest } from "../../transport/gateway-internal.rest.ts";
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 import { virtualKeyRow } from "./gateway-virtual-key.fixture.ts";
 
 /**
  * `withTransports` type-checks a family's declared Api, never its App, so a
  * member the spend routes read off `GatewaySpendApp` could go missing from
- * `GatewayApp` and still compile. The one proof the mount is whole.
+ * `GatewayModule` and still compile. The one proof the mount is whole.
  */
-type GatewayAppServesSpend = GatewayApp extends GatewaySpendApp ? true : never;
+type GatewayAppServesSpend = GatewayModule extends GatewaySpendApp ? true : never;
 const spendFamilyIsWhole: GatewayAppServesSpend = true;
 
 /**
- * The two members `GatewayApp` declares it reads. Boot touches no store —
+ * The two members `GatewayModule` declares it reads. Boot touches no store —
  * the control plane only constructs repositories — so each must EXIST and
  * refuse on first use, naming "the test reached a datastore" as a failure.
  */
@@ -137,8 +137,8 @@ async function sweepOnce(clickhouse: ClickHouseQueryClient) {
   const settled: unknown[] = [];
   try {
     const app = state.provided;
-    if (!(app instanceof GatewayApp)) {
-      throw new Error("Gateway installation did not provide GatewayApp");
+    if (!(app instanceof GatewayModule)) {
+      throw new Error("Gateway installation did not provide GatewayModule");
     }
     const consumed = gatewaySpendEventing.build({
       repositories: undefined,
@@ -191,7 +191,7 @@ async function installGateway({
   );
 
   try {
-    const state = await gatewayServer.install({
+    const state = await gatewayProcessModule.install({
       resources,
       config: { spendSettlementGraceMs: undefined },
       members: {
@@ -215,7 +215,7 @@ async function installGateway({
 type InstalledGateway = Awaited<ReturnType<typeof installGateway>>["state"];
 
 /** The internal family on a closed REST host, bound to the credential the install published. */
-function servedInternalDoor(state: InstalledGateway, app: GatewayApp) {
+function servedInternalDoor(state: InstalledGateway, app: GatewayModule) {
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
   const runtime = RestHost.create({
     identities: {
@@ -234,10 +234,10 @@ function servedInternalDoor(state: InstalledGateway, app: GatewayApp) {
   return runtime.app;
 }
 
-function installedApp(state: InstalledGateway): GatewayApp {
+function installedApp(state: InstalledGateway): GatewayModule {
   const app = state.provided;
-  if (!(app instanceof GatewayApp))
-    throw new Error("Gateway installation did not provide GatewayApp");
+  if (!(app instanceof GatewayModule))
+    throw new Error("Gateway installation did not provide GatewayModule");
 
   return app;
 }
@@ -274,14 +274,14 @@ describe("gateway app installation", () => {
 
       try {
         const app = state.provided;
-        if (!(app instanceof GatewayApp)) {
-          throw new Error("Gateway installation did not provide GatewayApp");
+        if (!(app instanceof GatewayModule)) {
+          throw new Error("Gateway installation did not provide GatewayModule");
         }
         const credential = state.facts?.find(isInternalCredential);
         if (!credential)
           throw new Error("Gateway installation did not bind its internal credential");
 
-        expect(GatewayApp.contract).toBe(GatewayApi);
+        expect(GatewayModule.contract).toBe(GatewayApi);
         expect(spendFamilyIsWhole).toBe(true);
         expect(credential.resolveIdentity()).toBe(app.internalDoor());
 
@@ -309,8 +309,8 @@ describe("gateway app installation", () => {
 
       try {
         const app = state.provided;
-        if (!(app instanceof GatewayApp)) {
-          throw new Error("Gateway installation did not provide GatewayApp");
+        if (!(app instanceof GatewayModule)) {
+          throw new Error("Gateway installation did not provide GatewayModule");
         }
         const setup = {
           repositories: undefined,
@@ -321,7 +321,7 @@ describe("gateway app installation", () => {
         const produced = gatewaySpendEventing.build({ ...setup, participation: "produce" });
         const consumed = gatewaySpendEventing.build({ ...setup, participation: "consume" });
 
-        expect(gatewayServer.eventing?.pipeline).toContain("gateway_spend_processing");
+        expect(gatewayProcessModule.eventing?.pipeline).toContain("gateway_spend_processing");
         expect(produced.metadata.name).toBe("gateway_spend_processing");
         expect(consumed.metadata.name).toBe("gateway_spend_processing");
         expect([...consumed.foldProjections.keys()]).toHaveLength(1);
@@ -336,8 +336,8 @@ describe("gateway app installation", () => {
 
       try {
         const app = state.provided;
-        if (!(app instanceof GatewayApp)) {
-          throw new Error("Gateway installation did not provide GatewayApp");
+        if (!(app instanceof GatewayModule)) {
+          throw new Error("Gateway installation did not provide GatewayModule");
         }
         const setup = {
           repositories: undefined,
@@ -363,8 +363,8 @@ describe("gateway app installation", () => {
 
       try {
         const app = state.provided;
-        if (!(app instanceof GatewayApp)) {
-          throw new Error("Gateway installation did not provide GatewayApp");
+        if (!(app instanceof GatewayModule)) {
+          throw new Error("Gateway installation did not provide GatewayModule");
         }
         const setup = {
           repositories: undefined,
@@ -434,8 +434,8 @@ describe("gateway app installation", () => {
 
       try {
         const app = state.provided;
-        if (!(app instanceof GatewayApp)) {
-          throw new Error("Gateway installation did not provide GatewayApp");
+        if (!(app instanceof GatewayModule)) {
+          throw new Error("Gateway installation did not provide GatewayModule");
         }
         const consumed = gatewaySpendEventing.build({
           repositories: undefined,
@@ -464,8 +464,8 @@ describe("gateway app installation", () => {
 
       try {
         const app = state.provided;
-        if (!(app instanceof GatewayApp)) {
-          throw new Error("Gateway installation did not provide GatewayApp");
+        if (!(app instanceof GatewayModule)) {
+          throw new Error("Gateway installation did not provide GatewayModule");
         }
         const maintenance = gatewayRealtimeSessionEventing.build({
           repositories: undefined,
@@ -474,7 +474,7 @@ describe("gateway app installation", () => {
           participation: "consume",
         });
 
-        expect(gatewayServer.eventing?.pipeline).toContain("gateway_realtime_session_maintenance");
+        expect(gatewayProcessModule.eventing?.pipeline).toContain("gateway_realtime_session_maintenance");
         expect(
           maintenance.processManagers.get("gatewayRealtimeSessionReconcile")?.config.schedule,
         ).toEqual({ everyMs: 60_000 });
@@ -484,7 +484,7 @@ describe("gateway app installation", () => {
     });
   });
 
-  // Each callback's collaborator is built in GatewayApp's own composition; an install that
+  // Each callback's collaborator is built in GatewayModule's own composition; an install that
   // drops one compiles nowhere else, so these drive the signed door of the installed module.
   describe("given the data plane calls back into the installed control plane", () => {
     /** @scenario "The installed gateway answers a config fetch from its config materialiser" */

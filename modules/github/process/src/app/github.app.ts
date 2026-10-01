@@ -133,7 +133,7 @@ export interface GithubAppTokenCache {
 }
 
 type GithubSetup = FeatureSetup<
-  typeof GithubApp.dependencies,
+  typeof GithubModule.dependencies,
   never,
   GithubServerConfig,
   GithubRepositories
@@ -202,7 +202,7 @@ export type GithubBranchDemand = Pick<
 >;
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
-export class GithubApp implements GithubApiContract {
+export class GithubModule implements GithubApiContract {
   static readonly contract = GithubApi;
   static readonly dependencies = {
     organizations: OrganizationApi,
@@ -321,7 +321,7 @@ export class GithubApp implements GithubApiContract {
   /**
    * The fleet-wide branch sweep alone: the pull-request rows, the
    * installation reads, an App token minter and the host — without composing
-   * the organization or project services {@link GithubApp.composeApi} needs.
+   * the organization or project services {@link GithubModule.composeApi} needs.
    */
   static composeBranchMaintenance(
     parts: GithubBranchMaintenanceComposition,
@@ -376,18 +376,18 @@ export class GithubApp implements GithubApiContract {
     secrets,
     config,
     dependencies,
-  }: GithubSetup): Promise<GithubApp> {
+  }: GithubSetup): Promise<GithubModule> {
     const branchConfig = {
       appId: config.appId ?? "",
-      privateKey: await secrets.into(GithubApp.secrets.privateKey, (value) => value ?? ""),
+      privateKey: await secrets.into(GithubModule.secrets.privateKey, (value) => value ?? ""),
     };
     const signingKey =
-      (await secrets.into(GithubApp.secrets.signingKey, (value) => value ?? "")) ||
-      (await secrets.into(GithubApp.secrets.signingKeyFallback, (value) => value ?? ""));
+      (await secrets.into(GithubModule.secrets.signingKey, (value) => value ?? "")) ||
+      (await secrets.into(GithubModule.secrets.signingKeyFallback, (value) => value ?? ""));
     const hostConfig = config.host === undefined ? {} : { hostConfig: { host: config.host } };
 
-    return new GithubApp({
-      service: GithubApp.composeApi({
+    return new GithubModule({
+      service: GithubModule.composeApi({
         repositories,
         organization: dependencies.organizations,
         project: dependencies.projects,
@@ -395,7 +395,7 @@ export class GithubApp implements GithubApiContract {
           ...branchConfig,
           appSlug: config.appSlug ?? "",
           webhookSecret: await secrets.into(
-            GithubApp.secrets.webhookSecret,
+            GithubModule.secrets.webhookSecret,
             (value) => value ?? "",
           ),
           signingKey,
@@ -405,7 +405,7 @@ export class GithubApp implements GithubApiContract {
       // `github_maintenance` (ADR-144), ported from the deleted
       // `GithubWorkerFeatureInstaller`: composed here, not received, so the
       // sweep runs over this same graph's rows.
-      branchMaintenance: GithubApp.composeBranchMaintenance({
+      branchMaintenance: GithubModule.composeBranchMaintenance({
         repositories,
         config: branchConfig,
         ...hostConfig,

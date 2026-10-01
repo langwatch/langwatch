@@ -394,7 +394,7 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
  * attention: a transport reaches this object through the operations-only feature-API
  * proxy, so an unserved operation is a runtime `TypeError`, not a caught type error.
  */
-export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, AnalyticsLegacyApi {
+export class AnalyticsModule implements AnalyticsApiContract, AnalyticsQueryApi, AnalyticsLegacyApi {
   static readonly contract = AnalyticsApiToken;
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
@@ -426,7 +426,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
     lwqlPostgresReaderPassword: Secret.load("LWQL_POSTGRES_READER_PASSWORD", { optional: true }),
   } as const;
 
-  static async create(setup: AnalyticsSetup): Promise<AnalyticsApp> {
+  static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
     const clickhouse = setup.members.clickhouse;
     const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
       Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
@@ -450,7 +450,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
         })
       : { available: false as const };
     const connection: LangWatchQLConnection | null = target.available
-      ? await setup.secrets.into(AnalyticsApp.secrets.lwqlClickHousePassword, (password) =>
+      ? await setup.secrets.into(AnalyticsModule.secrets.lwqlClickHousePassword, (password) =>
           typeof password === "string" && password
             ? {
                 url: target.url,
@@ -465,7 +465,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
     const lwqlProvisioning =
       admin.configured && postgres.configured && connection
         ? await setup.secrets.into(
-            AnalyticsApp.secrets.lwqlPostgresReaderPassword,
+            AnalyticsModule.secrets.lwqlPostgresReaderPassword,
             (readerPassword) =>
               lwqlProvisioningOperations({
                 admin,
@@ -482,7 +482,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
     });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
-    return new AnalyticsApp(
+    return new AnalyticsModule(
       {
         analytics,
         filterOptions: FilterService.create({

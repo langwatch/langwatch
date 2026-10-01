@@ -53,7 +53,7 @@ export type {
   OrganizationCaller,
   OrganizationWithMembersAndTheirTeams,
 } from "./app/organization.app.ts";
-export { organizationServer } from "./organization.server.ts";
+export { organizationProcessModule } from "./organization.module.ts";
 export type { OrganizationRepositories } from "./repositories/organization.repositories.ts";
 export { organizationManagementRest } from "./transport/organization-management.rest.ts";
 export { groupTrpcTransport } from "./transport/group.trpc.ts";

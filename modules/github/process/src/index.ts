@@ -13,14 +13,14 @@ export {
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
 } from "./eventing/github-branch-recheck.process.ts";
-export { GithubApp } from "./app/github.app.ts";
+export { GithubModule } from "./app/github.app.ts";
 export {
-  githubServer,
+  githubProcessModule,
   composeGithubApi,
   composeGithubBranchMaintenance,
   composeGithubBranchDemand,
   createGithubMaintenancePipeline,
-} from "./github.server.ts";
+} from "./github.module.ts";
 
 // The GitHub App installation flow's REST family: the session-gated start, the
 // protocol-mandated Setup URL and the HMAC-verified webhook, plus the two

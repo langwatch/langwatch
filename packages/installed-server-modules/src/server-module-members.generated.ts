@@ -8,7 +8,7 @@
  * repository tier requires, and refuses by module and member when this
  * process cannot supply one.
  */
-export const serverModuleMembers = {
+export const processModuleMembers = {
   agent: ["publicBaseUrl"],
   analytics: ["clickhouse", "clickhouseAdmin", "databaseTarget", "prisma", "publicBaseUrl", "rateLimiter"],
   annotation: [],

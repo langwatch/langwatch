@@ -26,7 +26,7 @@ import {
 import type { TracesReadMembers } from "../../../../services/trace-transcript-read.service.ts";
 import type { TraceViewerProtectionService } from "../../../../services/trace-viewer-protection.service.ts";
 
-// Real TraceApp required: readSpans decides tenant key and visibility cutoff.
+// Real TraceModule required: readSpans decides tenant key and visibility cutoff.
 export function createTranscriptApp(
   codingAgents: CodingAgentApi,
   protections?: Partial<TraceViewerProtectionService>,

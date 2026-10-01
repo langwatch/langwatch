@@ -24,7 +24,7 @@ import {
  * Two processes, one declaration, one queue: the api's send reaches the
  * worker's process manager, and the api builds no reaction at all.
  */
-import { createApp, defineServerModule, type FeatureSetup } from "@langwatch/process";
+import { createApp, defineProcessModule, type FeatureSetup } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -67,13 +67,13 @@ class RecordCommand implements CommandHandler<
   }
 }
 
-/** The module's app, as small as `withApp` accepts one. */
-abstract class TraceApp {
+/** The module's app, as small as `withApi` accepts one. */
+abstract class TraceModule {
   abstract sendRecord(note: string): Promise<void>;
 }
 
-class ComposedTraceApp extends TraceApp {
-  static readonly contract = TraceApp;
+class ComposedTraceApp extends TraceModule {
+  static readonly contract = TraceModule;
   static readonly dependencies = {};
   /** The member this process's role decides the half of. */
   static readonly reads = ["eventing"] as const;
@@ -110,7 +110,7 @@ interface InstalledAs {
 function traceEventing(seen: InstalledAs[]) {
   return defineEventingModule({
     pipeline: "trace_processing",
-    build: (setup: EventingSetup<undefined, TraceApp>) => {
+    build: (setup: EventingSetup<undefined, TraceModule>) => {
       seen.push({ participation: setup.participation, processStore: setup.processStore });
       return definePipeline({
         name: "trace_processing",
@@ -177,8 +177,8 @@ describe("given one module declaration installed by an api process and a worker"
       const eventStore = EventStoreMemory.createForTesting();
       const processStore = InMemoryProcessStore.createForTesting();
       const installedAs: InstalledAs[] = [];
-      const module = defineServerModule("trace")
-        .withApp(ComposedTraceApp)
+      const module = defineProcessModule("trace")
+        .withApi(ComposedTraceApp)
         .withEventing(traceEventing(installedAs));
 
       const worker = new EventSourcing({
@@ -204,7 +204,7 @@ describe("given one module declaration installed by an api process and a worker"
         .withModules([module])
         .boot();
 
-      await apiRuntime.service(TraceApp).sendRecord("sent by the api");
+      await apiRuntime.service(TraceModule).sendRecord("sent by the api");
       await queue.settle();
 
       const instance = await processStore.findByRef({
@@ -232,8 +232,8 @@ describe("given one module declaration installed by an api process and a worker"
     it("builds the api's half with no process runtime and no process store", async () => {
       const queue = sharedQueue();
       const installedAs: InstalledAs[] = [];
-      const module = defineServerModule("trace")
-        .withApp(ComposedTraceApp)
+      const module = defineProcessModule("trace")
+        .withApi(ComposedTraceApp)
         .withEventing(traceEventing(installedAs));
       const api = new EventSourcing({
         eventStore: EventStoreMemory.createForTesting(),
@@ -262,8 +262,8 @@ describe("given a process whose shape is not its role's", () => {
     it("installs the declaration as a consumer inside an api-role process", async () => {
       const queue = sharedQueue();
       const installedAs: InstalledAs[] = [];
-      const module = defineServerModule("trace")
-        .withApp(ComposedTraceApp)
+      const module = defineProcessModule("trace")
+        .withApi(ComposedTraceApp)
         .withEventing(traceEventing(installedAs));
       const stated = new EventSourcing({
         eventStore: EventStoreMemory.createForTesting(),

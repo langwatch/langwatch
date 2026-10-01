@@ -53,7 +53,7 @@ function pkg(kind: "contract" | "process" | "browser", feature = "widget"): Clas
 function generatedModuleList(identifiers: readonly string[] = []): void {
   write(
     "packages/installed-server-modules/src/server-modules.generated.ts",
-    `export const serverModules = [${identifiers.join(", ")}] as const;\n`,
+    `export const processModules = [${identifiers.join(", ")}] as const;\n`,
   );
 }
 
@@ -61,7 +61,7 @@ function generatedModuleList(identifiers: readonly string[] = []): void {
 function referenceFeature(): void {
   generatedModuleList(["widgetServer"]);
   write("modules/widget/contract/src/widget.api.ts");
-  write("modules/widget/process/src/widget.server.ts");
+  write("modules/widget/process/src/widget.module.ts");
   write("modules/widget/process/src/app/widget.app.ts");
   write("modules/widget/process/src/app/__tests__/widget.fixture.ts");
   write("modules/widget/process/src/services/widget.service.ts");
@@ -293,9 +293,9 @@ describe("feature shape", () => {
   });
 
   describe("given a feature that lacks a piece of the reference", () => {
-    it("asks for the installer when no <feature>.server.ts exists", () => {
+    it("asks for the installer when no <feature>.module.ts exists", () => {
       referenceFeature();
-      rmSync(join(root, "modules/widget/process/src/widget.server.ts"));
+      rmSync(join(root, "modules/widget/process/src/widget.module.ts"));
 
       expect(findings().map((finding) => finding.kind)).toEqual(["no-installer"]);
     });
@@ -316,7 +316,7 @@ describe("feature shape", () => {
         {
           feature: "widget",
           kind: "installer-not-booted",
-          path: "modules/widget/process/src/widget.server.ts",
+          path: "modules/widget/process/src/widget.module.ts",
         },
       ]);
     });

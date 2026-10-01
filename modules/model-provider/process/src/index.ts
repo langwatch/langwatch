@@ -1,11 +1,11 @@
 export {
   PostgresModelProviderAdapter,
   type PostgresModelProviderAdapterOptions,
-} from "./model-provider.server.ts";
+} from "./model-provider.module.ts";
 export {
   PrismaModelCostCatalogRepository,
   type ModelCostCatalogDatabase,
-} from "./model-provider.server.ts";
+} from "./model-provider.module.ts";
 export type { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
 export {
   ModelCostProject,
@@ -76,7 +76,7 @@ export type {
   ModelProviderInfrastructure,
   SpanReader,
 } from "./app/model-provider.app.ts";
-export { modelProviderServer } from "./model-provider.server.ts";
+export { modelProviderProcessModule } from "./model-provider.module.ts";
 
 // --------------------------------------------------------------------------- Model Provider's
 // composition seam: how a process composes the gateway from its own substrates, without naming
@@ -93,7 +93,7 @@ export {
   type ModelProviderRuntime,
   type ModelProviderRuntimeInput,
   type ModelProviderTranslationSurface,
-} from "./model-provider.server.ts";
+} from "./model-provider.module.ts";
 export { modelProviderRest } from "./transport/model-provider.rest.ts";
 export { modelDefaultsRest, modelDefaultsRestCredential } from "./transport/model-defaults.rest.ts";
 export { playgroundRest } from "./transport/playground.rest.ts";

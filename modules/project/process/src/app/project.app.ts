@@ -101,7 +101,7 @@ type ProjectSetup = FeatureSetup<
  * door each call, handed through the operations-only proxy — an unserved
  * member throws at first request, which `implements` turns into a build failure.
  */
-export class ProjectApp implements ProjectApiContract, ProjectManagementApi, ProjectBrowserApi {
+export class ProjectModule implements ProjectApiContract, ProjectManagementApi, ProjectBrowserApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
     return this.#projectService.listPaths(input);
   }
@@ -181,7 +181,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     this.#logger = logger;
   }
 
-  static create({ members, dependencies, repositories }: ProjectSetup): ProjectApp {
+  static create({ members, dependencies, repositories }: ProjectSetup): ProjectModule {
     const lifecycle = ProjectCreatedNoticeService.create({
       logger: members.logger,
       projects: repositories.projects,
@@ -201,7 +201,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
       topics: dependencies.topics,
       now: members.now ?? (() => nowInstant().epochMilliseconds),
     });
-    return new ProjectApp({
+    return new ProjectModule({
       projectService: projects,
       operations,
       lifecycle,

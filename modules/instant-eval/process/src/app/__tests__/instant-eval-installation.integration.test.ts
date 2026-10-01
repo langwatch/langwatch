@@ -35,7 +35,7 @@ import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { instantEvalServer } from "../../instant-eval.server.ts";
+import { instantEvalProcessModule } from "../../instant-eval.module.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -86,7 +86,7 @@ function judgeSecrets(judgeKey: string | undefined): ModuleSecretsScope {
   return (owner, declared) => resolver.scopeTo(owner, declared);
 }
 
-const instantEval = withMemoryRepositories(instantEvalServer);
+const instantEval = withMemoryRepositories(instantEvalProcessModule);
 
 const CREATED = new Date("2026-01-01T00:00:00.000Z");
 

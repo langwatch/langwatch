@@ -185,7 +185,7 @@ type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption",
   }>;
 
 type IdentitySetup = FeatureSetup<
-  typeof IdentityApp.dependencies,
+  typeof IdentityModule.dependencies,
   IdentityMembers,
   IdentityServerConfig
 > &
@@ -394,7 +394,7 @@ function joinRateLimit(limiter: RateLimiter): JoinRequestsServiceDeps["rateLimit
   };
 }
 
-export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
+export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
   /** The two peers an admission orchestrates: the module that owns
@@ -429,12 +429,12 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
   /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
-  static async create(setup: IdentitySetup): Promise<IdentityApp> {
+  static async create(setup: IdentitySetup): Promise<IdentityModule> {
     const mailer: MailSender = {
       send: (content) => setup.dependencies.notifications.sendEmail(content),
     };
     const signupAnnouncements = await setup.secrets.into(
-      IdentityApp.secrets.internalSlackSignupsWebhook,
+      IdentityModule.secrets.internalSlackSignupsWebhook,
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
@@ -717,7 +717,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       }),
     });
 
-    return new IdentityApp({
+    return new IdentityModule({
       emails,
       ceremonies,
       identityGuards,

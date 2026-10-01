@@ -34,14 +34,14 @@ import {
   scenarioInstallationSecrets,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
-import { scenarioServer } from "../../scenario.server.ts";
+import { scenarioProcessModule } from "../../scenario.module.ts";
 import type { ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 const projectId = "project-1";
 
 function process(role: "api" | "worker", emitter: EventEmitter) {
   return createApp({ role, secrets: scenarioInstallationSecrets() })
-    .withModules([withMemoryRepositories(scenarioServer)])
+    .withModules([withMemoryRepositories(scenarioProcessModule)])
     .withConfig({ scenario: scenarioTestConfig })
     .withStores(memoryStores())
     .withAnalytical(createApiFixture<ScenarioReadOnlyClickHouse>())

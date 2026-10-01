@@ -64,13 +64,13 @@ type PresenceProcessMembers = Readonly<{
 }>;
 
 type PresenceSetup = FeatureSetup<
-  typeof PresenceApp.dependencies,
+  typeof PresenceModule.dependencies,
   PresenceProcessMembers,
   undefined,
   PresenceRepositories
 >;
 
-export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric {
+export class PresenceModule implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
   static readonly dependencies = { projects: ProjectApi, users: UserApi };
   static readonly reads = ["redis", "logger"] as const;
@@ -106,7 +106,7 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
     this.#broadcast = broadcast;
   }
 
-  static create({ repositories, members, dependencies, resources }: PresenceSetup): PresenceApp {
+  static create({ repositories, members, dependencies, resources }: PresenceSetup): PresenceModule {
     const needsDerivedFabric = !members.broadcast || !members.emitters;
     const derived = needsDerivedFabric
       ? RedisBroadcastRepository.create(members.redis, {
@@ -133,7 +133,7 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
       diagnostics,
     });
 
-    return new PresenceApp({
+    return new PresenceModule({
       presence,
       stream: PresenceStreamService.create({ presence, emitters }),
       readHints: ReadHintStreamService.create({ emitters }),

@@ -33,7 +33,7 @@ function firstCall(method: unknown): Record<string, unknown> {
   return mock.mock.calls[0]?.[0] as Record<string, unknown>;
 }
 
-describe("EvaluatorApp", () => {
+describe("EvaluatorModule", () => {
   describe("when a new evaluator needs an id", () => {
     it("mints it under the one scheme every call site now shares", () => {
       expect(newEvaluatorId()).toMatch(/^evaluator_.+/);

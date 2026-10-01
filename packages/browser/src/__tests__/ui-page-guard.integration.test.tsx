@@ -20,7 +20,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { installedModuleScreens } from "../ui-module-screens.ts";
 import { resolveUiPageAccess, withUiPageGuard } from "../ui-page-guard.tsx";
-import { defineWebModule } from "../web-module.ts";
+import { defineBrowserModule } from "../web-module.ts";
 
 class SilentNavigation extends UiNavigation {
   navigate(): void {}
@@ -274,7 +274,7 @@ describe("given a page behind a flag and a permission", () => {
 });
 
 describe("given a module declaring a screen that requires a grant", () => {
-  const probeWeb = defineWebModule("probe").withScreens({
+  const probeWeb = defineBrowserModule("probe").withScreens({
     "pages/[project]/probe": {
       load: async () => ({ default: Page }),
       requires: "workflows:view",

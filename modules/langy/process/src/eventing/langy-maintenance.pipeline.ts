@@ -5,12 +5,12 @@
  */
 import { defineEventingModule, type EventingSetup } from "@langwatch/eventing";
 
-import type { LangyApp } from "../app/langy.app.ts";
+import type { LangyModule } from "../app/langy.app.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 
 export const langyMaintenanceEventing = defineEventingModule({
   pipeline: "langy_maintenance",
-  build: ({ app, processStore }: EventingSetup<LangyRepositories, LangyApp>) =>
+  build: ({ app, processStore }: EventingSetup<LangyRepositories, LangyModule>) =>
     app.maintenanceEventingPipeline({
       deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
     }),

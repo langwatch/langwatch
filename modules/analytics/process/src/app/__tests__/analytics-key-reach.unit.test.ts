@@ -23,7 +23,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
-import { AnalyticsApp } from "../analytics.app.ts";
+import { AnalyticsModule } from "../analytics.app.ts";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-123";
@@ -76,7 +76,7 @@ async function appOver(input: {
   flaggedProjects?: readonly string[];
 }) {
   const flagsAsked: string[] = [];
-  const app = await AnalyticsApp.create({
+  const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: (_key, target) => {
@@ -152,7 +152,7 @@ async function referenceFor(input: { listed: readonly Project[]; grants: readonl
   return (await appOver(input)).app.describeQueryReferenceForKey({ reach: KEY });
 }
 
-describe("AnalyticsApp.describeQueryReferenceForKey", () => {
+describe("AnalyticsModule.describeQueryReferenceForKey", () => {
   describe("when the key holds analytics:view on a readable project", () => {
     /** @scenario "A key holding analytics:view reads the reference" */
     it("describes both query languages in one payload", async () => {
@@ -226,7 +226,7 @@ describe("AnalyticsApp.describeQueryReferenceForKey", () => {
   });
 });
 
-describe("AnalyticsApp.describeLangWatchQLSchemaForKey", () => {
+describe("AnalyticsModule.describeLangWatchQLSchemaForKey", () => {
   const isEvalAvailable = (schema: {
     appFunctions: readonly { name: string; available: boolean }[];
   }) => schema.appFunctions.find((entry) => entry.name === "eval")?.available;

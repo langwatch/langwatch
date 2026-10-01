@@ -1,4 +1,4 @@
-import { serverModules as processModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import { createLogger } from "@langwatch/observability";
 import { processConfig, Server } from "@langwatch/process";
 import { Task, TaskCatalogue } from "@langwatch/task";

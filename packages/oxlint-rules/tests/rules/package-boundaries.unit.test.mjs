@@ -94,7 +94,7 @@ describe("given package-boundaries", () => {
     /** @scenario "A test installs a peer module or reads its test seam" */
     it("leaves a test's peer installer and the declared ./testing seam alone", () => {
       expect(
-        report(SERVICE_TEST, 'import { projectServer } from "@langwatch/project-process";'),
+        report(SERVICE_TEST, 'import { projectProcessModule } from "@langwatch/project-process";'),
       ).toEqual([]);
       expect(
         report(SERVICE_TEST, 'import { fixture } from "@langwatch/project-process/testing";'),
@@ -233,7 +233,7 @@ describe("given package-boundaries", () => {
       expect(
         ids(
           SERVICE,
-          'import { governanceServer } from "@langwatch/enterprise-governance-process";',
+          'import { governanceProcessModule } from "@langwatch/enterprise-governance-process";',
         ),
       ).toContain("coreImportsEnterprise");
     });

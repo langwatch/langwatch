@@ -24,7 +24,7 @@ import type { TraceService as TraceTreeService } from "../../services/trace.serv
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
 import { tracesRestCredential } from "../../transport/traces.rest.ts";
 import {
-  TraceApp,
+  TraceModule,
   type TraceEditOverlayStore,
   type TraceSummaryReader,
   type TracesListReader,
@@ -82,7 +82,7 @@ function bootTraceApp(options: {
     findSpanForPromptStudio: unread,
   };
 
-  const app = TraceApp.create({
+  const app = TraceModule.create({
     storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
       existence: {

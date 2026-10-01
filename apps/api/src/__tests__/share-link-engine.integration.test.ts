@@ -7,7 +7,7 @@
 import { AUTHZ_ENGINE_MIGRATION_NAME, AuthzApi } from "@langwatch/authz-contract";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -51,7 +51,7 @@ const prisma = connection?.client as PrismaClient;
 const ns = `share-engine-${generate("test").toString()}`;
 const MAX_VIEWS = 2;
 
-const authz = serverModules.filter((module) => module.name === "authz");
+const authz = processModules.filter((module) => module.name === "authz");
 
 /** The authz module alone, installed as the api installs it, over the live database. */
 const bootAuthz = () =>

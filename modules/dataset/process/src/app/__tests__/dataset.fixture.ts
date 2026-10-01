@@ -14,7 +14,7 @@ import type { DatasetRepositories } from "../../repositories/dataset.repositorie
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { DatasetAttachmentReferenceService } from "../../services/dataset-attachment-reference.service.ts";
 import { DatasetRequestBoundsService } from "../../services/dataset-request-bounds.service.ts";
-import { DatasetApp } from "../dataset.app.ts";
+import { DatasetModule } from "../dataset.app.ts";
 
 /** One experiment, as this feature reads it: a name to borrow and an id. */
 export function datasetTestExperiment(
@@ -111,8 +111,8 @@ export function createDatasetTestApp(
       storedObjects: StoredObjectApi;
     }>;
   }> = {},
-): DatasetApp {
-  return DatasetApp.create({
+): DatasetModule {
+  return DatasetModule.create({
     repositories: input.repositories ?? MemoryDatasetRepositories.create(),
     dependencies: {
       experiments: input.dependencies?.experiments ?? createDatasetTestExperiments(),

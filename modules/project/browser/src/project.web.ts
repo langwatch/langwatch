@@ -3,9 +3,9 @@
  * lands on, and the project settings page.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const projectWeb = defineWebModule("project")
+export const projectWeb = defineBrowserModule("project")
   .withHosts({
     requires: ["ProjectHostApi", "ProjectHomeHost"],
     mounts: {

@@ -9,7 +9,7 @@ import type { TeamRepository } from "./team.repository.ts";
 
 /**
  * The rows the organization module owns and constructs through
- * `ServerOrganizationApp.create`, chosen once at boot. Invitations are still
+ * `OrganizationModule.create`, chosen once at boot. Invitations are still
  * composed on a separate path outside this module's boot (follow-up work).
  */
 export interface OrganizationRepositories {

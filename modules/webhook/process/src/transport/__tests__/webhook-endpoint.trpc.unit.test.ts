@@ -11,7 +11,7 @@ import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  WebhookApp,
+  WebhookModule,
   type WebhookAppDependencies,
   type WebhookId,
   type WebhookSecret,
@@ -94,7 +94,7 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
   // that the tests below call reaches them. They throw rather than answering so
   // a future procedure that does reach one fails loudly here instead of passing
   // against a silent stub.
-  const app = WebhookApp.fromDependencies({
+  const app = WebhookModule.fromDependencies({
     endpoints,
     health: {
       health: () => {

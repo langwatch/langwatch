@@ -1,5 +1,5 @@
 import "@langwatch/time/polyfill";
-import { serverModules as processModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process";
 

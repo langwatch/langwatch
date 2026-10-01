@@ -23,9 +23,9 @@ export type {
   UpdateApiKeyRequest,
 } from "./app/api-key.app.ts";
 export {
-  apiKeyServer,
+  apiKeyProcessModule,
   createAgentSandboxKeyReapService,
   createCliLoginKeyReapService,
-} from "./api-key.server.ts";
+} from "./api-key.module.ts";
 export { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 export { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";

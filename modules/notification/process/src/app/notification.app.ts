@@ -37,13 +37,13 @@ type NotificationMembers = Readonly<{
 }>;
 
 type NotificationSetup = FeatureSetup<
-  typeof NotificationApp.dependencies,
+  typeof NotificationModule.dependencies,
   NotificationMembers,
   NotificationServerConfig,
   NotificationRepositories
 >;
 
-export class NotificationApp implements NotificationApiContract {
+export class NotificationModule implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
   static readonly reads = ["publicBaseUrl", "outboundProxy"] as const;
@@ -71,7 +71,7 @@ export class NotificationApp implements NotificationApiContract {
     secrets,
     members,
     resources,
-  }: NotificationSetup): Promise<NotificationApp> {
+  }: NotificationSetup): Promise<NotificationModule> {
     const settings = await mailGatewaySettings({ config, secrets });
     const configuration = {
       ...settings,
@@ -93,7 +93,7 @@ export class NotificationApp implements NotificationApiContract {
     });
     resources.own("Notification mail gateway", () => delivery.close());
     const mailDelivery = MailDeliveryService.create({ settings: async () => settings, delivery });
-    return new NotificationApp(repositories, mailDelivery);
+    return new NotificationModule(repositories, mailDelivery);
   }
 
   listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
@@ -122,7 +122,7 @@ async function mailGatewaySettings({
   config,
   secrets,
 }: Pick<NotificationSetup, "config" | "secrets">): Promise<MailGatewaySettings> {
-  const handles = NotificationApp.secrets;
+  const handles = NotificationModule.secrets;
   const [sendgrid, smtpUrl, smtpPassword, resend] = await Promise.all([
     secrets.into(handles.sendgrid, (value) => value),
     secrets.into(handles.smtpUrl, (value) => value),

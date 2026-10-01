@@ -16,7 +16,7 @@ import { vi } from "vitest";
 import { MemoryPresenceRepositories } from "../../repositories/memory/memory.presence.repositories.ts";
 import type { PresenceRepositories } from "../../repositories/presence.repositories.ts";
 import type { PresenceBroadcast, PresenceDiagnostics, PresenceEmitter } from "../presence.app.ts";
-import { PresenceApp } from "../presence.app.ts";
+import { PresenceModule } from "../presence.app.ts";
 
 type PresencePublishInput = Parameters<PresenceBroadcast["publish"]>[0];
 
@@ -67,8 +67,8 @@ export function createPresenceTestApp(
     projects?: ProjectApi;
     users?: UserApi;
   }> = {},
-): PresenceApp {
-  return PresenceApp.create({
+): PresenceModule {
+  return PresenceModule.create({
     repositories: input.repositories ?? MemoryPresenceRepositories.create(),
     members: {
       redis: null,

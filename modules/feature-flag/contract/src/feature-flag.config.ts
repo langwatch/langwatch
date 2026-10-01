@@ -49,7 +49,7 @@ function isFeatureFlagKey(value: string): value is FeatureFlagKey {
 
 /**
  * One leaf per registered flag: the env vars are fixed at compile time, so
- * this maps over the static registry. `FeatureFlagApp` assembles the parsed
+ * this maps over the static registry. `FeatureFlagModule` assembles the parsed
  * leaves into the service's `Map`/`Set` pair.
  */
 export const featureFlagConfig = Config.define((c) => ({

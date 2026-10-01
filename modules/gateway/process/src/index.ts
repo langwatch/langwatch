@@ -2,7 +2,7 @@
  * The feature declaration, and what another package composes from this
  * feature: the advisory dedupe window a spend graph debits through.
  */
-export { gatewayServer, createGatewayBudgetChangeDedupe } from "./gateway.server.ts";
+export { gatewayProcessModule, createGatewayBudgetChangeDedupe } from "./gateway.module.ts";
 export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { agentCacheRest } from "./transport/agent-cache.rest.ts";
 export { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";

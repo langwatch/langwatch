@@ -13,7 +13,7 @@ import {
   PROJECT_LIFECYCLE_PIPELINE_NAME,
 } from "@langwatch/project-contract";
 
-import type { ProjectApp } from "../app/project.app.ts";
+import type { ProjectModule } from "../app/project.app.ts";
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
 import {
   RecordProjectCreatedCommand,
@@ -55,7 +55,7 @@ export function buildProjectLifecyclePipeline(deps: {
 
 export const projectLifecycleEventing = defineEventingModule({
   pipeline: PROJECT_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<ProjectRepositories, ProjectApp>) =>
+  build: ({ app }: EventingSetup<ProjectRepositories, ProjectModule>) =>
     buildProjectLifecyclePipeline({
       recordProjectCreated: (input) => app.recordProjectCreated(input),
     }),

@@ -45,7 +45,7 @@ export type {
   CodingAgentPullRequestRef,
   CodingAgentScopeMembers,
 } from "./app/coding-agent.app.ts";
-export { codingAgentServer } from "./coding-agent.server.ts";
+export { codingAgentProcessModule } from "./coding-agent.module.ts";
 export {
   codingAgentRest,
   codingAgentRestCaller,

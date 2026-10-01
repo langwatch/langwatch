@@ -2,7 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { defineServerModule, type FeatureSetup } from "../src/index.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/index.ts";
 import {
   assertRepositoryOwnership,
   RepositoryOwnershipConflictError,
@@ -12,28 +12,28 @@ import { memberSourceOf } from "./member-source.ts";
 const userTables = { store: "prisma", tables: ["User"] };
 const created = vi.fn();
 
-class UserApp {
-  static readonly contract = moduleApi<UserApp>()("user");
+class UserModule {
+  static readonly contract = moduleApi<UserModule>()("user");
   static readonly dependencies = {};
   static readonly repositories = { users: { tables: userTables } };
   private constructor() {}
-  static create(_setup: FeatureSetup<typeof UserApp.dependencies, object, undefined>) {
+  static create(_setup: FeatureSetup<typeof UserModule.dependencies, object, undefined>) {
     created();
-    return new UserApp();
+    return new UserModule();
   }
   ping() {
     return "user";
   }
 }
 
-class AnnotationApp {
-  static readonly contract = moduleApi<AnnotationApp>()("annotation");
+class AnnotationModule {
+  static readonly contract = moduleApi<AnnotationModule>()("annotation");
   static readonly dependencies = {};
   static readonly repositories = { foreign: { tables: userTables } };
   private constructor() {}
-  static create(_setup: FeatureSetup<typeof AnnotationApp.dependencies, object, undefined>) {
+  static create(_setup: FeatureSetup<typeof AnnotationModule.dependencies, object, undefined>) {
     created();
-    return new AnnotationApp();
+    return new AnnotationModule();
   }
   ping() {
     return "annotation";
@@ -46,8 +46,8 @@ describe("repository ownership", () => {
     async (role) => {
       created.mockClear();
       const runtime = createApp({ role, members: memberSourceOf({}) }).withModules([
-        defineServerModule("user").withApp(UserApp).build(),
-        defineServerModule("annotation").withApp(AnnotationApp).build(),
+        defineProcessModule("user").withApi(UserModule).build(),
+        defineProcessModule("annotation").withApi(AnnotationModule).build(),
       ]);
       await expect(runtime.boot()).rejects.toThrow(RepositoryOwnershipConflictError);
       expect(created).not.toHaveBeenCalled();
@@ -83,12 +83,12 @@ describe("repository ownership", () => {
   it("freezes a declaration independently of later metadata mutation", () => {
     const tables = ["AuditLog"];
     const app = {
-      contract: UserApp.contract,
+      contract: UserModule.contract,
       dependencies: {},
       repositories: { rows: { tables: { store: "prisma", tables } } },
-      create: (...args: Parameters<typeof UserApp.create>) => UserApp.create(...args),
+      create: (...args: Parameters<typeof UserModule.create>) => UserModule.create(...args),
     };
-    const declaration = defineServerModule("user").withApp(app).build();
+    const declaration = defineProcessModule("user").withApi(app).build();
     tables.push("User");
     expect(declaration.repositories?.rows?.tables.tables).toEqual(["AuditLog"]);
     expect(Object.isFrozen(declaration.repositories?.rows?.tables.tables)).toBe(true);

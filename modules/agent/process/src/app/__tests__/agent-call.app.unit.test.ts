@@ -26,7 +26,7 @@ const input = {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("AgentApp.call", () => {
+describe("AgentModule.call", () => {
   it.each([null, "another_user"])(
     "refuses a personal agent for viewer %s before dispatch",
     async (viewerUserId) => {

@@ -510,7 +510,7 @@ function organizationDirectory(options: {
 
 /**
  * `InviteService` composed from this process's own reads plus the peers
- * `ServerOrganizationApp` depends on. The workspace-size census stays
+ * `OrganizationModule` depends on. The workspace-size census stays
  * uncomposed: its absence is supported, the invitation mail just says less.
  */
 function organizationInvitations(input: {
@@ -552,7 +552,7 @@ function organizationInvitations(input: {
   });
 }
 
-/** What this process hands `ServerOrganizationApp` at boot. */
+/** What this process hands `OrganizationModule` at boot. */
 export function buildOrganizationInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   encryption: { encrypt(value: string): string; decrypt(value: string): string };

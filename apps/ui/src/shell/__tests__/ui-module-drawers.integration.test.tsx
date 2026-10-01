@@ -8,7 +8,7 @@ import {
   type UiEvaluatorEditorDrawerProps,
   useDrawer,
 } from "@langwatch/browser-host/drawer";
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -64,11 +64,11 @@ function EvaluatorEditorDrawer(_props: UiEvaluatorEditorDrawerProps) {
   );
 }
 
-const traceModule = defineWebModule("trace").withDrawers({
+const traceModule = defineBrowserModule("trace").withDrawers({
   traceDetails: { load: () => Promise.resolve({ default: TraceDetailsDrawer }) },
 });
 
-const evaluatorModule = defineWebModule("evaluator").withDrawers({
+const evaluatorModule = defineBrowserModule("evaluator").withDrawers({
   evaluatorEditor: { load: () => Promise.resolve({ default: EvaluatorEditorDrawer }) },
 });
 

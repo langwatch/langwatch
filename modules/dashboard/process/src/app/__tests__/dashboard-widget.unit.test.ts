@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { createDashboardTestApp } from "./dashboard.fixture.ts";
 
-describe("DashboardApp dashboard widgets", () => {
+describe("DashboardModule dashboard widgets", () => {
   it("forwards create, read, update, list, and delete through its widget service", async () => {
     const dashboard = createDashboardTestApp();
     const created = await dashboard.createDashboardWidget({

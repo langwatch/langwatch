@@ -19,7 +19,7 @@ import { ScopedSecrets, signInProviderSecrets, type SecretHandle } from "@langwa
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";
+import { SsoModule, type SsoInfrastructure } from "../sso.app.ts";
 import type { SsoConnectionLedger, SsoGateLogger } from "../sso.members.ts";
 
 export function createSsoTestConfig(overrides: Partial<SsoConfig> = {}): SsoConfig {
@@ -309,9 +309,9 @@ export function createSsoTestApp(
       featureFlags: FeatureFlagApi;
     }>;
   }> = {},
-): Promise<SsoApp> {
+): Promise<SsoModule> {
   const connections = input.connections ?? RecordingSsoConnectionLedger.create();
-  return SsoApp.create({
+  return SsoModule.create({
     config: input.config ?? createSsoTestConfig(),
     dependencies: {
       licensing: input.dependencies?.licensing ?? createSsoTestLicensing(),

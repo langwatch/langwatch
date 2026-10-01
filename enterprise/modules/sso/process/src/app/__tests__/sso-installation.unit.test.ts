@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * `SsoApp.create` directly: `createApp().boot()`'s test harness has no
+ * `SsoModule.create` directly: `createApp().boot()`'s test harness has no
  * `ModuleSecretsScope` yet, so a module resolving a declared handle cannot
  * boot through it. `managed-provider` and `scim` test the same way.
  */

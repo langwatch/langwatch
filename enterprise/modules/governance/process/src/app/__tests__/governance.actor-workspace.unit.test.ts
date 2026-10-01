@@ -32,7 +32,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp } from "../governance.app.ts";
+import { GovernanceModule } from "../governance.app.ts";
 
 const ORGANIZATION_ID = "org-1";
 
@@ -84,7 +84,7 @@ async function buildApp(options: {
     return options.workspace;
   });
 
-  const app = await GovernanceApp.create({
+  const app = await GovernanceModule.create({
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
@@ -121,7 +121,7 @@ async function buildApp(options: {
   return { app, findByEmail, isOrganizationMember, getPersonalWorkspace };
 }
 
-describe("GovernanceApp.tryResolveActorWorkspace", () => {
+describe("GovernanceModule.tryResolveActorWorkspace", () => {
   describe("given an actor token that names a member with a personal workspace", () => {
     it("answers where that workspace lives", async () => {
       const { app, findByEmail } = await buildApp({

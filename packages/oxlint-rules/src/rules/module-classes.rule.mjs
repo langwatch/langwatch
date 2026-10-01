@@ -10,7 +10,7 @@ const FACTORY_CREATE =
   "a `static create(...)` method, or `static readonly create = this.factory(...)` inherited from `PrismaRepository.for(...)`";
 
 const CONTRACT_KINDS = [
-  { pattern: /^src\/[^/]+\.app\.ts$/, suffix: "App", shape: "declared" },
+  { pattern: /^src\/[^/]+\.app\.ts$/, suffix: "Module", shape: "declared" },
   { pattern: /^src\/.+\.service\.ts$/, suffix: "Service", shape: "declared" },
 ];
 
@@ -24,7 +24,7 @@ const PROCESS_KINDS = [
   },
   {
     pattern: /^src\/app\/[^/]+\.app\.ts$/,
-    suffix: "App",
+    suffix: "Module",
     shape: "concrete",
     create: METHOD_CREATE,
   },

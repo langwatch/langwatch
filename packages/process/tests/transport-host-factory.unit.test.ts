@@ -3,7 +3,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { MissingTransportPeerError } from "../src/transport-peers.ts";
 import { memberSourceOf } from "./member-source.ts";
 
@@ -42,8 +42,8 @@ function doorFrom(peers: TransportPeers): FeatureRestHost<MountedRest> {
   return { mount: (declaration) => ({ declaration, door: catalogue.read() }) };
 }
 
-const datasetModule = defineServerModule("dataset")
-  .withApp(CatalogueApp)
+const datasetModule = defineProcessModule("dataset")
+  .withApi(CatalogueApp)
   .withTransports(catalogueRest);
 
 describe("given a process whose doors are built from its own modules", () => {

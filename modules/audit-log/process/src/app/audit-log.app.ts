@@ -29,13 +29,13 @@ import type { AuditLogHomeApi } from "../transport/home.trpc.ts";
 const MAX_ARGS_BYTES = 4 * 1024;
 
 type AuditLogSetup = FeatureSetup<
-  typeof AuditLogApp.dependencies,
+  typeof AuditLogModule.dependencies,
   never,
   undefined,
   AuditLogRepositories
 >;
 
-export class AuditLogApp implements AuditLogApi, AuditLogHomeApi {
+export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
   static readonly contract = AuditLogApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -61,8 +61,8 @@ export class AuditLogApp implements AuditLogApi, AuditLogHomeApi {
     this.#recentItems = recentItems;
   }
 
-  static create({ repositories, dependencies }: AuditLogSetup): AuditLogApp {
-    return new AuditLogApp({
+  static create({ repositories, dependencies }: AuditLogSetup): AuditLogModule {
+    return new AuditLogModule({
       entries: AuditLogService.create({
         repository: repositories.entries,
         maxArgsBytes: MAX_ARGS_BYTES,

@@ -147,7 +147,7 @@ type CodingAgentSetup = FeatureSetup<
   CodingAgentRepositories
 >;
 
-export class CodingAgentApp implements CodingAgentApi {
+export class CodingAgentModule implements CodingAgentApi {
   static readonly contract = CodingAgentApiToken;
   static readonly dependencies: CodingAgentDependencies = {
     projects: ProjectApi,
@@ -167,7 +167,7 @@ export class CodingAgentApp implements CodingAgentApi {
     governance: GovernanceRestApi,
   };
 
-  static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
+  static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentModule {
     const service = CodingAgentFeatureService.create({
       sessions: repositories.sessions,
       traceSessions: repositories.traceSessions,
@@ -217,7 +217,7 @@ export class CodingAgentApp implements CodingAgentApi {
         commands,
       }),
     }).build();
-    return new CodingAgentApp({
+    return new CodingAgentModule({
       codingAgents: service,
       github: dependencies.github,
       traces: dependencies.traces,

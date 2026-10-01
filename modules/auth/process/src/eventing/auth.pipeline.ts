@@ -11,7 +11,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { AuthApp } from "../app/auth.app.ts";
+import type { AuthModule } from "../app/auth.app.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { SignInLockReapService } from "../services/sign-in-lock-reap.service.ts";
 import { SIGN_IN_LOCK_REAP_PROCESS_NAME, runSignInLockReap } from "./sign-in-lock-reap.intent.ts";
@@ -56,5 +56,5 @@ export function buildSignInLockMaintenance({
 
 export const authEventing = defineEventingModule({
   pipeline: SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME,
-  build: (setup: EventingSetup<AuthRepositories, AuthApp>) => buildSignInLockMaintenance(setup),
+  build: (setup: EventingSetup<AuthRepositories, AuthModule>) => buildSignInLockMaintenance(setup),
 });

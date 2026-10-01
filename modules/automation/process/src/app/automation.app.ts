@@ -311,7 +311,7 @@ interface AutomationAppCollaborators {
   settlement: AutomationSettlement | undefined;
 }
 
-export class AutomationApp implements AutomationApi {
+export class AutomationModule implements AutomationApi {
   static readonly contract = AutomationApiToken;
   static readonly dependencies = {
     analytics: AnalyticsApi,
@@ -340,10 +340,10 @@ export class AutomationApp implements AutomationApi {
   /**
    * Builds this process's own {@link AutomationInfrastructure} from the
    * members it reads and its own config, then composes exactly as
-   * {@link AutomationApp.fromInfrastructure} does.
+   * {@link AutomationModule.fromInfrastructure} does.
    */
-  static create(setup: AutomationSetup): Promise<AutomationApp> {
-    return setup.secrets.into(AutomationApp.secrets.unsubscribe, (unsubscribeSigningSecret) => {
+  static create(setup: AutomationSetup): Promise<AutomationModule> {
+    return setup.secrets.into(AutomationModule.secrets.unsubscribe, (unsubscribeSigningSecret) => {
       const { slack, projects } = setup.dependencies;
       const crypto = setup.members.encryption;
       const slackConnections = AutomationSlackConnectionService.create({ slack, projects, crypto });
@@ -363,13 +363,13 @@ export class AutomationApp implements AutomationApi {
           tenantDailyCap: setup.config.tenantDailyCap,
         },
       });
-      const automation = AutomationApp.fromInfrastructure({
+      const automation = AutomationModule.fromInfrastructure({
         infrastructure,
         dependencies: setup.dependencies,
         repositories: setup.repositories,
         config: setup.config,
       });
-      automation.#settlement = AutomationApp.#composeSettlement(setup, infrastructure, automation);
+      automation.#settlement = AutomationModule.#composeSettlement(setup, infrastructure, automation);
       automation.#reportDispatcher = createAutomationReportDispatcher({
         repositories: setup.repositories,
         projects: setup.dependencies.projects,
@@ -397,7 +397,7 @@ export class AutomationApp implements AutomationApi {
   static #composeSettlement(
     setup: AutomationSetup,
     infrastructure: AutomationComposedInfrastructure,
-    automation: AutomationApp,
+    automation: AutomationModule,
   ): AutomationSettlement {
     const { members, dependencies, config } = setup;
     const logger = infrastructure.logger;
@@ -466,7 +466,7 @@ export class AutomationApp implements AutomationApi {
     dependencies: AutomationRuntimeDependencies;
     repositories: AutomationRepositories;
     config: AutomationServerConfig;
-  }): AutomationApp {
+  }): AutomationModule {
     const { infrastructure: members, dependencies, repositories, config } = setup;
 
     const persistCaps = AutomationPersistCapService.create({
@@ -533,7 +533,7 @@ export class AutomationApp implements AutomationApi {
       monitors: dependencies.monitors,
     });
 
-    return new AutomationApp({
+    return new AutomationModule({
       automation,
       rules,
       authoring: AutomationAuthoringService.create({
@@ -769,8 +769,8 @@ export class AutomationApp implements AutomationApi {
   registeredMigrations(): readonly SystemMigration[] {
     if (!this.#migration) {
       throw new Error(
-        "This AutomationApp was composed from already-built services, so it holds no migration: " +
-          "compose it through AutomationApp.create to answer its registered migrations.",
+        "This AutomationModule was composed from already-built services, so it holds no migration: " +
+          "compose it through AutomationModule.create to answer its registered migrations.",
       );
     }
     return [this.#migration];

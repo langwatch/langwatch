@@ -31,10 +31,10 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
-import { governanceServer } from "../../governance.server.ts";
+import { governanceProcessModule } from "../../governance.module.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp } from "../governance.app.ts";
+import { GovernanceModule } from "../governance.app.ts";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-1";
@@ -43,7 +43,7 @@ async function buildApp() {
   const getOrganizationId = vi.fn<ProjectApi["getOrganizationId"]>(async () => ORGANIZATION_ID);
   const repositories = MemoryGovernanceRepositories.create();
 
-  const app = await GovernanceApp.create({
+  const app = await GovernanceModule.create({
     config: void 0,
     repositories,
     dependencies: {
@@ -93,7 +93,7 @@ async function buildCliApp(planType = "ENTERPRISE") {
       }) as never,
   );
 
-  const app = await GovernanceApp.create({
+  const app = await GovernanceModule.create({
     config: void 0,
     repositories,
     dependencies: {
@@ -127,7 +127,7 @@ async function buildCliApp(planType = "ENTERPRISE") {
   return { app, getCliAccessSession, getActivePlan };
 }
 
-describe("GovernanceApp ingestion templates", () => {
+describe("GovernanceModule ingestion templates", () => {
   describe("given a caller who names only their project", () => {
     it("resolves the organization from the project rather than taking one", async () => {
       const { app, getOrganizationId, repositories } = await buildApp();
@@ -265,7 +265,7 @@ describe("GovernanceApp ingestion templates", () => {
   });
 });
 
-describe("GovernanceApp default AI tool catalogue", () => {
+describe("GovernanceModule default AI tool catalogue", () => {
   describe("given an organization whose catalogue never had an entry", () => {
     /** @scenario "A fresh organization gets the full standard catalog with no admin action" */
     it("seeds every starter tile once, and nothing on a second ask", async () => {
@@ -287,12 +287,12 @@ describe("GovernanceApp default AI tool catalogue", () => {
   });
 });
 
-describe("GovernanceApp as the module a process installs", () => {
+describe("GovernanceModule as the module a process installs", () => {
   describe("given the one REST declaration the module mounts", () => {
     it("answers every capability the declarations name from the one app", async () => {
       const { app } = await buildCliApp();
 
-      expect(governanceServer.transports.map((transport) => transport.protocol)).toEqual([
+      expect(governanceProcessModule.transports.map((transport) => transport.protocol)).toEqual([
         "rest",
         "rest",
         "rest",

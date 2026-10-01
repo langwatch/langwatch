@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
 import {
-  defineServerModule,
+  defineProcessModule,
   type FeatureSetup,
   type ServerRole,
 } from "../src/feature-installer.ts";
@@ -39,7 +39,7 @@ type Harness = Readonly<{
   capture?: (resources: ResourceOwnership) => void;
 }>;
 
-class ProjectApp implements ProjectApi {
+class ProjectModule implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = {};
   static readonly reads = [
@@ -56,7 +56,7 @@ class ProjectApp implements ProjectApi {
   static create({
     members,
     resources,
-  }: FeatureSetup<typeof ProjectApp.dependencies, DeclaredMembers, undefined>): ProjectApi {
+  }: FeatureSetup<typeof ProjectModule.dependencies, DeclaredMembers, undefined>): ProjectApi {
     const { events } = members;
     resources.own("connection", () => {
       events.push("connection:close");
@@ -85,7 +85,7 @@ class ProjectApp implements ProjectApi {
     members.capture?.(resources);
     if (members.bootFailure) throw members.bootFailure;
 
-    return new ProjectApp();
+    return new ProjectModule();
   }
 
   name(): string {
@@ -93,7 +93,7 @@ class ProjectApp implements ProjectApi {
   }
 }
 
-const project = defineServerModule("project").withApp(ProjectApp).build();
+const project = defineProcessModule("project").withApi(ProjectModule).build();
 function graph(harness: Harness, role: ServerRole = "api") {
   return createApp({
     role,

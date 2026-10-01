@@ -208,7 +208,7 @@ describe("given a strict feature process module", () => {
 
 it.each([
   "modules/agent/contract/src/agent.app.ts",
-  "modules/agent/process/src/agent.server.ts",
+  "modules/agent/process/src/agent.module.ts",
   "modules/agent/process/src/app/agent.app.ts",
 ])("accepts the app composition home %s", (file) => {
   expect(report(file)).toEqual([]);

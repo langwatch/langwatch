@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { createApp } from "../src/application.ts";
 import {
-  defineServerModule,
+  defineProcessModule,
   defineRepositories,
   withMemoryRepositories,
   type FeatureSetup,
@@ -76,13 +76,13 @@ class ConfiguredApp {
   constructor(readonly value: string) {}
 }
 
-const feature = defineServerModule("annotation")
+const feature = defineProcessModule("annotation")
   .withRepositories(repositories)
-  .withApp(App)
+  .withApi(App)
   .build();
-const configuredFeature = defineServerModule("agent")
+const configuredFeature = defineProcessModule("agent")
   .withRepositories(repositories)
-  .withApp(ConfiguredApp)
+  .withApi(ConfiguredApp)
   .build();
 
 let duplicateCreates = 0;
@@ -113,9 +113,9 @@ const duplicateRepositories = defineRepositories({
   live: DuplicateRepositories,
   memory: DuplicateRepositories,
 });
-const duplicateFeature = defineServerModule("project")
+const duplicateFeature = defineProcessModule("project")
   .withRepositories(duplicateRepositories)
-  .withApp(DuplicateApp)
+  .withApi(DuplicateApp)
   .build();
 
 class CanonicalPrismaRepositories {
@@ -133,9 +133,9 @@ const canonicalPrismaRepositories = defineRepositories({
   live: CanonicalPrismaRepositories,
   memory: CanonicalPrismaRepositories,
 });
-const canonicalPrismaFeature = defineServerModule("user")
+const canonicalPrismaFeature = defineProcessModule("user")
   .withRepositories(canonicalPrismaRepositories)
-  .withApp(DuplicateApp)
+  .withApi(DuplicateApp)
   .build();
 
 describe("given a module that declares both repository tiers", () => {
@@ -222,7 +222,7 @@ describe("given a module that declares both repository tiers", () => {
           return new StorelessApp();
         }
       }
-      const plain = defineServerModule("share").withApp(StorelessApp).build();
+      const plain = defineProcessModule("share").withApi(StorelessApp).build();
 
       expect(() => withMemoryRepositories(plain)).toThrow("has no memory tier");
     });
@@ -271,9 +271,9 @@ describe("given a module that declares both repository tiers", () => {
   describe("when two selected tiers claim the same table", () => {
     it("refuses before either repository factory runs", async () => {
       duplicateCreates = 0;
-      const conflictingFeature = defineServerModule("user")
+      const conflictingFeature = defineProcessModule("user")
         .withRepositories(duplicateRepositories)
-        .withApp(DuplicateApp)
+        .withApi(DuplicateApp)
         .build();
 
       await expect(
@@ -308,9 +308,9 @@ describe("given a module that declares both repository tiers", () => {
         }
         constructor(readonly value: string) {}
       }
-      const methodFeature = defineServerModule("share")
+      const methodFeature = defineProcessModule("share")
         .withRepositories(repositories)
-        .withApp(MethodApp)
+        .withApi(MethodApp)
         .build();
 
       const runtime = await createApp({ role: "api", members: memberSourceOf({}) })

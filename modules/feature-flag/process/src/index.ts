@@ -1,4 +1,4 @@
-export { featureFlagServer } from "./feature-flag.server.ts";
+export { featureFlagProcessModule } from "./feature-flag.module.ts";
 export { featureFlagTrpcTransport } from "./transport/feature-flag.trpc.ts";
 export type {
   FeatureFlagCache,

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import type { OpsApp } from "../app/ops.app.ts";
+import type { OpsModule } from "../app/ops.app.ts";
 
 const logger = createLogger("langwatch:task:grant-platform-operator");
 
@@ -15,14 +15,14 @@ export class GrantPlatformOperatorTask extends Task {
   readonly description =
     "Grants the platform-operator role to the existing, active account an email address belongs to.";
 
-  private constructor(private readonly operators: Pick<OpsApp, "grantPlatformOperatorAsSystem">) {
+  private constructor(private readonly operators: Pick<OpsModule, "grantPlatformOperatorAsSystem">) {
     super();
   }
 
   static create({
     operators,
   }: {
-    operators: Pick<OpsApp, "grantPlatformOperatorAsSystem">;
+    operators: Pick<OpsModule, "grantPlatformOperatorAsSystem">;
   }): GrantPlatformOperatorTask {
     return new GrantPlatformOperatorTask(operators);
   }

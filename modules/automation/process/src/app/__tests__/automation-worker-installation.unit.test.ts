@@ -39,7 +39,7 @@ import {
   settlementSummary,
   settlementTrace,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
-import { automationServer } from "../../automation.server.ts";
+import { automationProcessModule } from "../../automation.module.ts";
 import { AutomationPersistCapService } from "../../services/persist-cap.service.ts";
 
 const CONFIG: AutomationServerConfig = {
@@ -85,7 +85,7 @@ function composed(role: "api" | "worker", eventing: EventSourcing, installed: In
     SecretsChain.start({ environment: { NEXTAUTH_SECRET: "session-secret" } }).withEnv(),
   );
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(automationServer)])
+    .withModules([withMemoryRepositories(automationProcessModule)])
     .withConfig({ automation: CONFIG })
     .withStores(memoryStores())
     .withEventing(eventing)

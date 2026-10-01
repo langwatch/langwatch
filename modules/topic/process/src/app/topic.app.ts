@@ -39,9 +39,9 @@ export interface TopicClusteringScheduleReader {
   findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
 }
 
-type TopicSetup = FeatureSetup<typeof TopicApp.dependencies, never, undefined, TopicRepositories>;
+type TopicSetup = FeatureSetup<typeof TopicModule.dependencies, never, undefined, TopicRepositories>;
 
-export class TopicApp implements TopicApi {
+export class TopicModule implements TopicApi {
   static readonly contract = TopicApiToken;
   static readonly dependencies = {
     evaluations: EvaluationApi,
@@ -72,7 +72,7 @@ export class TopicApp implements TopicApi {
     this.#pipeline = parts.pipeline;
   }
 
-  static create(setup: TopicSetup): TopicApp {
+  static create(setup: TopicSetup): TopicModule {
     const { repositories, dependencies } = setup;
     const commands = EventingTopicClusteringCommandsService.create();
     const outcomes = EventingTopicClusteringOutcomeCommandsService.create();
@@ -94,7 +94,7 @@ export class TopicApp implements TopicApi {
       observePayloadSize: (kind, sizeBytes) => metrics.observePayloadSize(kind, sizeBytes),
     });
 
-    return new TopicApp({
+    return new TopicModule({
       topics: TopicService.create({
         repository: repositories.topics,
         schedule: EventingTopicClusteringScheduleService.create({

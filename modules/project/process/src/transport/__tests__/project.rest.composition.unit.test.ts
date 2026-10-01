@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * `/api/projects` against the real `ProjectApp`, not a stub — the stub
+ * `/api/projects` against the real `ProjectModule`, not a stub — the stub
  * passed while production 500'd because the proxy refuses uncomposed calls.
  * Spec: specs/projects/projects-management-door.feature
  */
@@ -21,7 +21,7 @@ import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProjectApp } from "../../app/project.app.ts";
+import { ProjectModule } from "../../app/project.app.ts";
 import type { RecordProjectCreatedCommandData } from "../../eventing/project-lifecycle.events.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
@@ -108,12 +108,12 @@ function project(overrides: Partial<Project> = {}): Project {
 const REACHES_EVERYTHING: ApiKeyVisibleProjects = { kind: "all" };
 
 /**
- * The application exactly as `ProjectApp.create` builds it at boot, over the
+ * The application exactly as `ProjectModule.create` builds it at boot, over the
  * in-memory backing of its own repository interface, seeded with one project
  * in this organization and one in another.
  */
 function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
-  app: ProjectApp;
+  app: ProjectModule;
   database: MemoryProjectDatabase;
 } {
   const database = MemoryProjectDatabase.create();
@@ -155,7 +155,7 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
     },
   });
 
-  const app = ProjectApp.create({
+  const app = ProjectModule.create({
     dependencies: { apiKeys, ...unreachablePeers(), organizations, dataPrivacy },
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),

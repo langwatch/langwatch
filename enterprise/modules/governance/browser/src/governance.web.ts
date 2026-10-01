@@ -4,9 +4,9 @@
  * Always installed, so nothing here gates itself by tier or flag.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const governanceWeb = defineWebModule("governance")
+export const governanceWeb = defineBrowserModule("governance")
   .withHosts({
     requires: ["GovernanceHostApi"],
     mounts: {

@@ -10,7 +10,7 @@ import type { ErasedIdentifierSuppressionRow } from "../erased-identifier-suppre
 import type { GovernanceTenantRow } from "../governance-tenant-history.repository.ts";
 import { SuppressionSnapshotRepository } from "../suppression-snapshot.repository.ts";
 
-/** Governance's declared reads across organizations, named on `GovernanceApp` (ARCHITECTURE §7). */
+/** Governance's declared reads across organizations, named on `GovernanceModule` (ARCHITECTURE §7). */
 export const governanceOperatorReads = {
   suppressions: OperatorRead.of("ErasedIdentifierSuppression", { actions: ["findMany"] }),
   tenantHistory: OperatorRead.of("GovernanceTenantHistory", { actions: ["findMany"] }),

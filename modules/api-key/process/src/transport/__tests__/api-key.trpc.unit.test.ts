@@ -5,7 +5,7 @@
 // The `apiKey.*` declared transport, exercised through the real runtime
 // with permissive ports: what reaches the app, what the caller is
 // answered, and which refusals cross unchanged. Authorization DECISIONS
-// belong to `ApiKeyApp`; here the app is a stub and transport is the unit under test.
+// belong to `ApiKeyModule`; here the app is a stub and transport is the unit under test.
 
 import {
   ApiKeyAdminRequiredError,

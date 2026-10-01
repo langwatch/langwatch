@@ -32,7 +32,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
-import { SuiteApp } from "../../app/suite.app.ts";
+import { SuiteModule } from "../../app/suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import {
@@ -452,7 +452,7 @@ export function mountSuiteFamilies(
   const commands = new CollapsingRunCommands();
   const scenarios = memoryScenarioApi(world, commands);
 
-  const app = SuiteApp.createForTesting({
+  const app = SuiteModule.createForTesting({
     repositories: { suites: MemorySuiteRepository.create({ database }) },
     dependencies: {
       scenarios,

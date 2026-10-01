@@ -9,7 +9,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { workflowServer } from "../../workflow.server.ts";
+import { workflowProcessModule } from "../../workflow.module.ts";
 import { createWorkflowTestInfrastructure, createWorkflowTestService } from "./workflow.fixture.ts";
 
 const NOW = new Date("2026-09-09T00:00:00.000Z");
@@ -40,7 +40,7 @@ function process_() {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
 
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(workflowServer)])
+    .withModules([withMemoryRepositories(workflowProcessModule)])
     .withConfig({
       workflow: {
         stagingThresholdBytes: undefined,
@@ -78,7 +78,7 @@ describe("workflow app installation", () => {
       try {
         const app = runtime.service(WorkflowApi);
 
-        expect(runtime.module(workflowServer).provided).toBe(app);
+        expect(runtime.module(workflowProcessModule).provided).toBe(app);
         await expect(app.list({ projectId: "project-1" })).resolves.toEqual([]);
       } finally {
         await runtime.stop();

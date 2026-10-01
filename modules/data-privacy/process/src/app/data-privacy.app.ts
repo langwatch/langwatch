@@ -82,7 +82,7 @@ export interface DataPrivacyDirectoryReader {
 const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 type DataPrivacySetup = FeatureSetup<
-  typeof DataPrivacyApp.dependencies,
+  typeof DataPrivacyModule.dependencies,
   Readonly<{ nodeEnvironment: string | undefined }>,
   DataPrivacyServerConfig,
   DataPrivacyRepositories
@@ -92,7 +92,7 @@ type DataPrivacySetup = FeatureSetup<
 type GoogleCredentialsUse = <Out>(build: (credential: string | undefined) => Out) => Out;
 
 /** The one public object of the scoped privacy rules. */
-export class DataPrivacyApp implements DataPrivacyApi {
+export class DataPrivacyModule implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -143,9 +143,9 @@ export class DataPrivacyApp implements DataPrivacyApi {
     dependencies,
     config,
     secrets,
-  }: DataPrivacySetup): Promise<DataPrivacyApp> {
+  }: DataPrivacySetup): Promise<DataPrivacyModule> {
     const googleCredentials = await secrets.into(
-      DataPrivacyApp.secrets.googleApplicationCredentials,
+      DataPrivacyModule.secrets.googleApplicationCredentials,
       (credential): GoogleCredentialsUse =>
         (build) =>
           build(credential),
@@ -171,7 +171,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
 
-    return new DataPrivacyApp({
+    return new DataPrivacyModule({
       privacy,
       redaction: OtlpSpanPiiRedactionService.create({
         transport: analysis,

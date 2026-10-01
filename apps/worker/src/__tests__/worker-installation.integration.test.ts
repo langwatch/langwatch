@@ -7,7 +7,7 @@ import {
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import { ModuleApiToken } from "@langwatch/module";
 import {
   bootInstalledProcess,
@@ -66,7 +66,7 @@ const SAAS_ENVIRONMENT: Readonly<Record<string, string>> = {
 
 async function bootWorker({ live = false, saas = false }: { live?: boolean; saas?: boolean } = {}) {
   const environment = saas ? SAAS_ENVIRONMENT : SYNTHETIC_ENVIRONMENT;
-  const owners = processConfig(serverModules, ROLE);
+  const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment });
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
   refuseDoubleClaims(owners);
@@ -103,7 +103,7 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -144,7 +144,7 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
   return { runtime, eventing };
 }
 
-const moduleApis = serverModules.flatMap((module) =>
+const moduleApis = processModules.flatMap((module) =>
   module.apiContract instanceof ModuleApiToken ? [module.apiContract] : [],
 );
 

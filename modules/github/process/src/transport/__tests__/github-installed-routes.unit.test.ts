@@ -16,7 +16,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { githubServer } from "../../github.server.ts";
+import { githubProcessModule } from "../../github.module.ts";
 import { githubInstallRest } from "../github-install.rest.ts";
 
 const SESSION_COOKIE = "session=flow-owner";
@@ -40,7 +40,7 @@ async function installedGithub(
   const { signedInAs = "user-1", canManage = true } = options;
 
   return createApp({ role: "api", secrets: githubSecrets() })
-    .withModules([githubServer])
+    .withModules([githubProcessModule])
     .withConfig({ github: { appId: undefined, host: undefined, appSlug: undefined } })
     .withStores(memoryStores())
     .provide({
@@ -110,7 +110,7 @@ async function setupAfterSignedFlow(runtime: Awaited<ReturnType<typeof installed
     nonceRegistered: false,
   });
   const host = restHost();
-  host.mount(githubInstallRest.router(), () => runtime.module(githubServer).provided);
+  host.mount(githubInstallRest.router(), () => runtime.module(githubProcessModule).provided);
 
   const response = await host.app.request(
     new Request(
@@ -130,7 +130,7 @@ describe("given the github module installed over memory stores", () => {
 
       try {
         const host = restHost();
-        const provided = runtime.module(githubServer).provided;
+        const provided = runtime.module(githubProcessModule).provided;
         host.mount(githubInstallRest.router(), () => provided);
 
         const response = await host.app.request(
@@ -154,7 +154,7 @@ describe("given the github module installed over memory stores", () => {
 
       try {
         const host = restHost();
-        host.mount(githubInstallRest.router(), () => runtime.module(githubServer).provided);
+        host.mount(githubInstallRest.router(), () => runtime.module(githubProcessModule).provided);
 
         const response = await host.app.request(
           new Request("http://api.test/api/github/setup?installation_id=1&state=not-signed"),

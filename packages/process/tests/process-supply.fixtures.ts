@@ -3,7 +3,7 @@ import { moduleApi, supplyToken } from "@langwatch/module";
 import { z } from "zod";
 
 import {
-  defineServerModule,
+  defineProcessModule,
   type FeatureSetup,
   withMemoryRepositories,
 } from "../src/feature-installer.ts";
@@ -13,18 +13,18 @@ export interface ProjectApi {
   getById(id: string): string;
 }
 export const ProjectApi = moduleApi<ProjectApi>()("project");
-class ProjectApp implements ProjectApi {
+class ProjectModule implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = {};
-  static create(_setup?: Readonly<{ config: undefined }>): ProjectApp {
-    return new ProjectApp();
+  static create(_setup?: Readonly<{ config: undefined }>): ProjectModule {
+    return new ProjectModule();
   }
   getById(id: string): string {
     return `project:${id}`;
   }
 }
-export const projectModule = defineServerModule("project").withApp(ProjectApp).build();
-export const project = ProjectApp.create();
+export const projectModule = defineProcessModule("project").withApi(ProjectModule).build();
+export const project = ProjectModule.create();
 
 interface ClockApi {
   now(): string;
@@ -51,7 +51,7 @@ export class ClockApp implements ClockApi {
     return this.#clock();
   }
 }
-export const clockModule = defineServerModule("annotation").withApp(ClockApp).build();
+export const clockModule = defineProcessModule("annotation").withApi(ClockApp).build();
 export const clock = () => "frozen";
 
 interface ConfigApi {
@@ -75,7 +75,7 @@ class ConfigApp implements ConfigApi {
     return this.#pepper;
   }
 }
-export const configModule = defineServerModule("api-key").withApp(ConfigApp).build();
+export const configModule = defineProcessModule("api-key").withApi(ConfigApp).build();
 
 interface PeerApi {
   read(id: string): string;
@@ -97,7 +97,7 @@ class PeerApp implements PeerApi {
     return this.#projects.getById(id);
   }
 }
-export const peerModule = defineServerModule("audit-log").withApp(PeerApp).build();
+export const peerModule = defineProcessModule("audit-log").withApi(PeerApp).build();
 
 type Facilities = {
   relational: { query(): string };
@@ -139,7 +139,7 @@ class FacilityApp implements FacilityApi {
     return this.#members.relational.query();
   }
 }
-export const facilityModule = defineServerModule("user").withApp(FacilityApp).build();
+export const facilityModule = defineProcessModule("user").withApi(FacilityApp).build();
 export const facilities: Facilities = {
   relational: { query: () => "rows" },
   keyvalue: { get: (key) => key },
@@ -208,9 +208,9 @@ class RepositoryApp implements RepositoryApi {
     return this.#row();
   }
 }
-export const repositoryModule = defineServerModule("dataset")
+export const repositoryModule = defineProcessModule("dataset")
   .withRepositories(repositories)
-  .withApp(RepositoryApp)
+  .withApi(RepositoryApp)
   .build();
 export const memoryRepositoryModule = withMemoryRepositories(repositoryModule);
 
@@ -234,7 +234,7 @@ class ConnectionsApp implements ConnectionsApi {
   }
 }
 export const connections = { primary: () => "primary" } satisfies Connections;
-export const connectionsModule = defineServerModule("sso").withApp(ConnectionsApp).build();
+export const connectionsModule = defineProcessModule("sso").withApi(ConnectionsApp).build();
 
 interface LicenseSource {
   resolve(): string;
@@ -258,6 +258,6 @@ class LicenseConsumerApp implements LicenseConsumerApi {
   }
 }
 export const licenseSource = { resolve: () => "pro" } satisfies LicenseSource;
-export const licenseConsumerModule = defineServerModule("entitlement")
-  .withApp(LicenseConsumerApp)
+export const licenseConsumerModule = defineProcessModule("entitlement")
+  .withApi(LicenseConsumerApp)
   .build();

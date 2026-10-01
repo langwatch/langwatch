@@ -6,7 +6,7 @@ import {
 } from "@langwatch/eventing";
 import { USER_AGGREGATE_TYPE, USER_LIFECYCLE_PIPELINE_NAME } from "@langwatch/user-contract";
 
-import type { UserApp } from "../app/user.app.ts";
+import type { UserModule } from "../app/user.app.ts";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import {
   RecordUserDeactivatedCommand,
@@ -33,6 +33,6 @@ export function buildUserLifecyclePipeline(): UserLifecycleDefinition {
 
 export const userLifecycleEventing = defineEventingModule({
   pipeline: USER_LIFECYCLE_PIPELINE_NAME,
-  build: (_setup: EventingSetup<UserRepositories, UserApp>) => buildUserLifecyclePipeline(),
+  build: (_setup: EventingSetup<UserRepositories, UserModule>) => buildUserLifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycle(commands),
 });

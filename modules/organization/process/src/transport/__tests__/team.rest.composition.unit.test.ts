@@ -138,7 +138,7 @@ function projectRow(overrides: Partial<Project> = {}): Project {
 }
 
 /**
- * The application as `ServerOrganizationApp` is wired at boot: real
+ * The application as `OrganizationModule` is wired at boot: real
  * organization and membership services over the module's own in-memory
  * repositories, with authorization and projects as complete doubles.
  */

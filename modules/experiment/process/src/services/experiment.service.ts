@@ -128,7 +128,7 @@ export type ExperimentServiceOptions = {
 
 /**
  * The experiment feature's persistence-and-orchestration service: the full
- * surface `ExperimentApp` forwards from, plus peer compositions calling it
+ * surface `ExperimentModule` forwards from, plus peer compositions calling it
  * directly. Folded out of contract per ADR-133 (the flagged "contract-service" shape).
  */
 export class ExperimentService {

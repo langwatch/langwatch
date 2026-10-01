@@ -19,7 +19,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { pullRequest } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import { codingAgentServer } from "../../coding-agent.server.ts";
+import { codingAgentProcessModule } from "../../coding-agent.module.ts";
 
 const ORGANIZATION = "organization-1";
 
@@ -65,7 +65,7 @@ function installation() {
   const projects = [project("project-shared"), project("project-other")];
 
   const process = createApp({ role: "api" })
-    .withModules([withMemoryRepositories(codingAgentServer)])
+    .withModules([withMemoryRepositories(codingAgentProcessModule)])
     .provide({
       project: createApiFixture<ProjectApi>({
         listByOrganization: async ({ page, limit }) => ({

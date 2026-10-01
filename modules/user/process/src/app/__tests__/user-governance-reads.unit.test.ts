@@ -50,7 +50,7 @@ function appWhere({ member }: { member: boolean }) {
   return { app, personalUsageDashboard, personalBudgetOverview, cliBootstrap };
 }
 
-describe("UserApp governance reads", () => {
+describe("UserModule governance reads", () => {
   describe("given a caller outside the organization", () => {
     /** @scenario "A caller outside the organization cannot read a personal usage rollup" */
     it("refuses the personal usage read before governance is asked", async () => {

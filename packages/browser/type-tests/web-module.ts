@@ -1,8 +1,8 @@
 import { expectTypeOf } from "vitest";
 
-import { defineWebModule } from "../src/web-module.ts";
+import { defineBrowserModule } from "../src/web-module.ts";
 
-const withCapability = defineWebModule("capability-slot-proof").withCapabilities({
+const withCapability = defineBrowserModule("capability-slot-proof").withCapabilities({
   double: (value: string) => value.length * 2,
   kind: "scope",
 });
@@ -20,7 +20,7 @@ withCapability.installation.capabilities.double(1);
 // real work, not merely decorating the signature.
 expectTypeOf<typeof withCapability.installation.capabilities.kind>().toEqualTypeOf<"scope">();
 
-const withoutCapabilities = defineWebModule("no-capabilities-proof");
+const withoutCapabilities = defineBrowserModule("no-capabilities-proof");
 expectTypeOf<typeof withoutCapabilities.installation.capabilities>().toEqualTypeOf<
   Record<never, never>
 >();

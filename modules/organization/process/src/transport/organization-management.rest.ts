@@ -49,7 +49,7 @@ export const organizationKeyFacts = defineRestMiddleware(
 
 /**
  * Who a write on an organization key answers as: the member behind a personal key, else `nobody`.
- * The key itself bounds what it may grant, never its owner (as authz.server.ts rules).
+ * The key itself bounds what it may grant, never its owner (as authz.module.ts rules).
  */
 export const keyCallerOf = ({
   actor,

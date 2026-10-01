@@ -54,7 +54,7 @@ export {
 } from "./channels/http/http.workflow-studio-stream.channel.ts";
 export type { WorkflowStudioDispatchInput } from "./services/workflow-studio-dispatch.service.ts";
 export {
-  WorkflowApp,
+  WorkflowModule,
   type WorkflowCodeCompletions,
   type WorkflowCommitMessageWriter,
   type WorkflowEvaluationTrigger,
@@ -68,7 +68,7 @@ export {
   type NlpLambdaFunction,
   type NlpLambdaArnCache,
 } from "./app/workflow.app.ts";
-export { workflowServer } from "./workflow.server.ts";
+export { workflowProcessModule } from "./workflow.module.ts";
 
 /** The five declarations the installer carries, and the sixth the process builds. */
 export { workflowTrpcTransport } from "./transport/workflow.trpc.ts";

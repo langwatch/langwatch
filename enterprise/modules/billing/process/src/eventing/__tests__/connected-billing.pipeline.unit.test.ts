@@ -3,7 +3,7 @@ import { intentAccessorOf } from "@langwatch/eventing/testing";
 /** @see specs/self-hosting/connected-services/connected-billing.feature */
 import { describe, expect, it, vi } from "vitest";
 
-import { billingServer } from "../../billing.server.ts";
+import { billingProcessModule } from "../../billing.module.ts";
 import { CONNECTED_BILLING_PROCESS_NAME } from "../connected-billing.intent.ts";
 import {
   CONNECTED_BILLING_PIPELINE_NAME,
@@ -41,7 +41,7 @@ function wakeAt({ at, lastTickAt }: { at: number; lastTickAt: number | null }) {
 
 describe("given the connected billing tick's eventing declaration", () => {
   it("carries the daily tick onto the installable module", () => {
-    expect(billingServer.eventing?.pipeline.split(", ")).toContain(CONNECTED_BILLING_PIPELINE_NAME);
+    expect(billingProcessModule.eventing?.pipeline.split(", ")).toContain(CONNECTED_BILLING_PIPELINE_NAME);
     expect(connectedBillingEventing.pipeline).toBe(CONNECTED_BILLING_PIPELINE_NAME);
   });
 

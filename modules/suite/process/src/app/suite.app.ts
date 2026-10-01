@@ -127,20 +127,20 @@ type SuiteProcessMembers = Readonly<{
  * naming this module and member, rather than serving an empty history from nothing.
  */
 type SuiteSetup = FeatureSetup<
-  typeof SuiteApp.dependencies,
+  typeof SuiteModule.dependencies,
   SuiteProcessMembers,
   undefined,
   SuiteRepositories
 >;
 
-/** What `SuiteApp` builds for itself, over its own reads and its peers. */
+/** What `SuiteModule` builds for itself, over its own reads and its peers. */
 interface SuiteAppInfrastructure {
   execution: SuiteExecution;
   connectedPresence: ConnectedPresenceReader;
   publicBaseUrl: string | undefined;
 }
 
-export class SuiteApp implements SuiteApi {
+export class SuiteModule implements SuiteApi {
   static readonly contract = SuiteApi;
   static readonly dependencies = {
     scenarios: ScenarioApi,
@@ -158,10 +158,10 @@ export class SuiteApp implements SuiteApi {
   /** Every name is from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["clickhouse", "publicBaseUrl", "redis"] as const;
 
-  static create(setup: SuiteSetup): SuiteApp {
+  static create(setup: SuiteSetup): SuiteModule {
     const { members, dependencies, repositories } = setup;
     const runItems = SuiteRunItemCommandsService.create();
-    const infrastructure = SuiteApp.infrastructureOver({
+    const infrastructure = SuiteModule.infrastructureOver({
       agents: dependencies.agents,
       scenarios: dependencies.scenarios,
       commands: runItems,
@@ -183,17 +183,17 @@ export class SuiteApp implements SuiteApi {
       connectedPresence: infrastructure.connectedPresence,
     });
 
-    return new SuiteApp({
+    return new SuiteModule({
       ...dependencies,
       suites,
       runItems,
-      runPlans: SuiteApp.buildRunPlans({
+      runPlans: SuiteModule.buildRunPlans({
         repositories,
         dependencies,
         publicBaseUrl: infrastructure.publicBaseUrl,
       }),
       publicBaseUrl: infrastructure.publicBaseUrl,
-      pipeline: SuiteApp.buildEventingPipeline({
+      pipeline: SuiteModule.buildEventingPipeline({
         clickhouse: members.clickhouse,
         redis: members.redis,
         defaultRetentionDays,
@@ -281,9 +281,9 @@ export class SuiteApp implements SuiteApi {
     /** Deterministic ids and a fixed clock are the service's own seams, not infrastructure. */
     generateId?: () => string;
     now?: () => Instant;
-  }): SuiteApp {
+  }): SuiteModule {
     const runItems = SuiteRunItemCommandsService.create();
-    const defaults = SuiteApp.infrastructureOver({
+    const defaults = SuiteModule.infrastructureOver({
       agents: setup.dependencies.agents,
       scenarios: setup.dependencies.scenarios,
       commands: runItems,
@@ -303,11 +303,11 @@ export class SuiteApp implements SuiteApi {
       ...(setup.now ? { now: setup.now } : {}),
     });
 
-    return new SuiteApp({
+    return new SuiteModule({
       ...setup.dependencies,
       suites,
       runItems,
-      runPlans: SuiteApp.buildRunPlans({
+      runPlans: SuiteModule.buildRunPlans({
         repositories: setup.repositories,
         dependencies: setup.dependencies,
         publicBaseUrl: infrastructure.publicBaseUrl,

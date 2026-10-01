@@ -45,14 +45,14 @@ import { PersonalVirtualKeyService } from "../services/personal-virtual-key.serv
 import { RoutingPolicyService } from "../services/routing-policy.service.ts";
 
 type EnterpriseGatewaySetup = FeatureSetup<
-  typeof EnterpriseGatewayApp.dependencies,
+  typeof EnterpriseGatewayModule.dependencies,
   Readonly<{ isSaas: boolean }>,
   EnterpriseGatewayConfig | undefined,
   EnterpriseGatewayRepositories
 >;
 
 /** Routing policies and personal keys, over the gateway's own virtual keys through `GatewayApi`. */
-export class EnterpriseGatewayApp implements EnterpriseGatewayApiContract {
+export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
   static readonly contract = EnterpriseGatewayApi;
   static readonly config = enterpriseGatewayConfig;
   static readonly reads = ["isSaas"] as const;
@@ -83,7 +83,7 @@ export class EnterpriseGatewayApp implements EnterpriseGatewayApiContract {
     config,
     members,
     repositories,
-  }: EnterpriseGatewaySetup): EnterpriseGatewayApp {
+  }: EnterpriseGatewaySetup): EnterpriseGatewayModule {
     const policies = RoutingPolicyService.create({
       repository: repositories.routingPolicies,
       providers: dependencies.modelProviders,
@@ -97,7 +97,7 @@ export class EnterpriseGatewayApp implements EnterpriseGatewayApiContract {
       policies,
       gatewayBaseUrl: enterpriseGatewayBaseUrl({ config, isSaas: members.isSaas }),
     });
-    return new EnterpriseGatewayApp({
+    return new EnterpriseGatewayModule({
       policies,
       personalKeys,
       personalKeyDoors: PersonalVirtualKeyAccessService.create({

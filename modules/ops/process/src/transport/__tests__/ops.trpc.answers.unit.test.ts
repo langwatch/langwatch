@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * What the ops surface answers, over the real runtime and a real `OpsApp`.
+ * What the ops surface answers, over the real runtime and a real `OpsModule`.
  * Every operator page reads its fields off these shapes, so a changed one
  * is a blank card rather than an error.
  */

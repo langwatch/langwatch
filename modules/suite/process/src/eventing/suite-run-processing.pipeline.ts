@@ -18,7 +18,7 @@ import {
   SuiteRunItemRegradedEventSchema,
 } from "@langwatch/suite-contract";
 
-import type { SuiteApp } from "../app/suite.app.ts";
+import type { SuiteModule } from "../app/suite.app.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { SuiteRunStateFoldProjection } from "./suite-run-state.projection.ts";
 import {
@@ -127,6 +127,6 @@ export function buildSuiteRunProcessingPipeline(
 
 export const suiteRunProcessingEventing = defineEventingModule({
   pipeline: "suite_run_processing",
-  build: ({ app }: EventingSetup<SuiteRepositories, SuiteApp>) => app.eventingPipeline(),
+  build: ({ app }: EventingSetup<SuiteRepositories, SuiteModule>) => app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

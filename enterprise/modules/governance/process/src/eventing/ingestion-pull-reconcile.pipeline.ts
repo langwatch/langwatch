@@ -9,7 +9,7 @@ import {
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { GovernanceApp } from "../app/governance.app.ts";
+import type { GovernanceModule } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import {
   INGESTION_PULL_RECONCILE_PROCESS_NAME,
@@ -31,7 +31,7 @@ export function buildIngestionPullReconcile({
   app,
   processStore,
   bootedAt = nowInstant().epochMilliseconds,
-}: EventingSetup<unknown, Pick<GovernanceApp, "reconcileIngestionPulls">> & {
+}: EventingSetup<unknown, Pick<GovernanceModule, "reconcileIngestionPulls">> & {
   bootedAt?: number;
 }): StaticPipelineDefinition<never> {
   return definePipeline({
@@ -67,6 +67,6 @@ export function buildIngestionPullReconcile({
 
 export const ingestionPullReconcileEventing = defineEventingModule({
   pipeline: INGESTION_PULL_RECONCILE_PIPELINE_NAME,
-  build: (setup: EventingSetup<GovernanceRepositories, GovernanceApp>) =>
+  build: (setup: EventingSetup<GovernanceRepositories, GovernanceModule>) =>
     buildIngestionPullReconcile(setup),
 });

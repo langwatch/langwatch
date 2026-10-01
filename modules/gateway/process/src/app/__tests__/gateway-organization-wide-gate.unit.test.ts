@@ -13,7 +13,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const PROJECT_ID = "project_caller";
@@ -25,8 +25,8 @@ const reversible: Encryption = {
   decrypt: (ciphertext) => ciphertext.replace(/^sealed:/, ""),
 };
 
-function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayApp> {
-  return GatewayApp.create({
+function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
@@ -74,7 +74,7 @@ async function createBudgetGate({
   app,
   credential,
 }: {
-  app: GatewayApp;
+  app: GatewayModule;
   credential: GatewayRequestCredential;
 }): Promise<void> {
   const { actor } = app.actorForCredential({ projectId: PROJECT_ID, credential });

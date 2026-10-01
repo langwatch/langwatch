@@ -39,7 +39,7 @@ export type EffectivePermissions =
 
 /**
  * The complete callable authorization boundary.  This is deliberately a
- * structural interface: callers can use an installed AuthzApp without
+ * structural interface: callers can use an installed AuthzModule without
  * receiving its services, repositories, or transport adapters.
  */
 export interface AuthzApi {

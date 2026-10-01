@@ -16,7 +16,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { entitlementServer } from "../../entitlement.server.ts";
+import { entitlementProcessModule } from "../../entitlement.module.ts";
 import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
 import { MemoryOrganizationSpendRepository } from "../../repositories/memory/memory.organization-spend.repository.ts";
 import { MemoryUsageMembershipRepository } from "../../repositories/memory/memory.usage-membership.repository.ts";
@@ -79,7 +79,7 @@ describe("entitlement app installation", () => {
   /**
    * @scenario "The core baseline works without enterprise sources"
    * @scenario "An organization's month volume is counted from its projects in its metering unit"
-   * `EntitlementApp` declares `reads = ["logger"]` and no subscription
+   * `EntitlementModule` declares `reads = ["logger"]` and no subscription
    * dependency at all, and its declared `license` dependency is answered
    * here with a source that never grants — so a plain boot, with no
    * Enterprise billing composed and no active license, still resolves a
@@ -93,7 +93,7 @@ describe("entitlement app installation", () => {
       const { logger } = createTestLogger();
       const warned: Parameters<BillingApi["sendUsageWarning"]>[0][] = [];
       const runtime = await createApp({ role })
-        .withModules([withMemoryRepositories(entitlementServer)])
+        .withModules([withMemoryRepositories(entitlementProcessModule)])
         .withConfig({ entitlement: { requestBounds: undefined } })
         .withMembers({ isSaas: true, processName: "test" })
         .withObservability((observability) => observability.withLogging(logger))
@@ -128,7 +128,7 @@ describe("entitlement app installation", () => {
       try {
         const app = runtime.service(EntitlementApi);
 
-        expect(runtime.module(entitlementServer).provided).toBe(app);
+        expect(runtime.module(entitlementProcessModule).provided).toBe(app);
 
         await expect(
           app.getActivePlan({ organizationId: "organization-1" }),
@@ -168,13 +168,13 @@ describe("entitlement app installation", () => {
 
   describe("given the activated license source a process composition root provided", () => {
     /**
-     * Tests what EntitlementApp does once told "licensed" or "not licensed".
+     * Tests what EntitlementModule does once told "licensed" or "not licensed".
      * The licensing service handles the other three "not licensed" causes.
      */
     async function bootWithLicense(source: EntitlementSource) {
       const { logger } = createTestLogger();
       const runtime = await createApp({ role: "api" })
-        .withModules([withMemoryRepositories(entitlementServer)])
+        .withModules([withMemoryRepositories(entitlementProcessModule)])
         .withConfig({ entitlement: { requestBounds: undefined } })
         .withMembers({ isSaas: true, processName: "test" })
         .withObservability((observability) => observability.withLogging(logger))
@@ -307,7 +307,7 @@ describe("entitlement app installation", () => {
   describe("given the installed licensing module", () => {
     /** @scenario "Entitlement resolves licenses through its installed peer" */
     it("declares the exact LicensingApi token supplied by the licensing module", () => {
-      expect(entitlementServer.dependencies.license).toBe(LicensingApi);
+      expect(entitlementProcessModule.dependencies.license).toBe(LicensingApi);
     });
   });
 

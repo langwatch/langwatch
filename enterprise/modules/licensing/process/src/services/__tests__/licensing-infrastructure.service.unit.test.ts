@@ -8,7 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
-import { LicensingApp } from "../../app/licensing.app.ts";
+import { LicensingModule } from "../../app/licensing.app.ts";
 import type { OrganizationLicenseReads } from "../../app/licensing.members.ts";
 import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
 import { LicensingInfrastructureService } from "../licensing-infrastructure.service.ts";
@@ -40,7 +40,7 @@ function composeWithoutMutation() {
 describe("licensing infrastructure composed without licence mutation", () => {
   /** @scenario "A process that composes no licence mutation still scans the licence rows" */
   it("accepts a key activated on an organization when no instance key is set", async () => {
-    const app = await LicensingApp.create({
+    const app = await LicensingModule.create({
       dependencies: {
         instantEval: createApiFixture<InstantEvalApi>(),
         projects: createApiFixture<ProjectApi>(),

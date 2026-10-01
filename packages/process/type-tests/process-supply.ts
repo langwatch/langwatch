@@ -1,7 +1,7 @@
 /* oxlint-disable import/namespace -- Negative probes intentionally access unexported names. */
 import { expectTypeOf } from "vitest";
 
-import { defineServerModule } from "../src/feature-installer.ts";
+import { defineProcessModule } from "../src/feature-installer.ts";
 import * as packageEntry from "../src/index.ts";
 import * as supplyEntry from "../src/process-supply.ts";
 import { createApp, ProcessSupply } from "../src/process-supply.ts";
@@ -148,8 +148,8 @@ const overwritten = createApp({ role: "api" })
   .withModules([clockModule]);
 expectTypeOf<MissingNames<typeof overwritten>>().toEqualTypeOf<"clock">();
 
-const withTransport = defineServerModule("annotation")
-  .withApp(ClockApp)
+const withTransport = defineProcessModule("annotation")
+  .withApi(ClockApp)
   .withTransports({ protocol: "rest", router: () => ({}) });
 const transportClock = createApp({ role: "api" }).withModules([withTransport]);
 expectTypeOf<MissingNames<typeof transportClock>>().toEqualTypeOf<"clock">();

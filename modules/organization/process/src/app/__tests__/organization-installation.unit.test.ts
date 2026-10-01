@@ -17,7 +17,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { organizationServer } from "../../organization.server.ts";
+import { organizationProcessModule } from "../../organization.module.ts";
 
 /**
  * @vitest-environment node
@@ -28,7 +28,7 @@ import { organizationServer } from "../../organization.server.ts";
 function process(role: "api" | "worker") {
   const secrets = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role, secrets: (owner, declared) => secrets.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(organizationServer)])
+    .withModules([withMemoryRepositories(organizationProcessModule)])
     .withMembers({
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
       processName: "organization-installation-test",
@@ -56,7 +56,7 @@ describe("organization app installation", () => {
     const runtime = await process(role).boot();
 
     try {
-      expect(runtime.service(OrganizationApi)).toBe(runtime.module(organizationServer).provided);
+      expect(runtime.service(OrganizationApi)).toBe(runtime.module(organizationProcessModule).provided);
     } finally {
       await runtime.stop();
     }

@@ -24,7 +24,7 @@ import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.wor
 import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import { workflowRunCallerKey, workflowRunRest } from "../../transport/workflow-run.rest.ts";
-import { WorkflowApp } from "../workflow.app.ts";
+import { WorkflowModule } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 class NoopTestEncryption {
@@ -39,7 +39,7 @@ class NoopTestEncryption {
 
 async function postRun({ repositories }: { repositories: WorkflowRepositories }) {
   const members = createWorkflowTestInfrastructure();
-  const app = await WorkflowApp.create({
+  const app = await WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),

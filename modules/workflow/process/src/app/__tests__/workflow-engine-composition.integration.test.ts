@@ -23,7 +23,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
-import { WorkflowApp } from "../workflow.app.ts";
+import { WorkflowModule } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 class NoopTestEncryption {
@@ -42,10 +42,10 @@ async function appAt({
 }: {
   nlpServiceUrl: string | undefined;
   repositories?: WorkflowRepositories;
-}): Promise<WorkflowApp> {
+}): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure();
 
-  return WorkflowApp.create({
+  return WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),

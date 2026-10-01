@@ -87,7 +87,7 @@ type StoredObjectSetup = FeatureSetup<
   StoredObjectRepositories
 >;
 
-export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
+export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi {
   static readonly contract = StoredObjectApi;
   static readonly dependencies: StoredObjectDependencies = { authz: AuthzApi };
   static readonly config = storedObjectConfig;
@@ -104,12 +104,12 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
   /**
    * Builds this process's own {@link StoredObjectInfrastructure} from the
    * members it reads and its own config, then composes over it exactly as
-   * {@link StoredObjectApp.fromInfrastructure} does.
+   * {@link StoredObjectModule.fromInfrastructure} does.
    */
-  static create(setup: StoredObjectSetup): StoredObjectApp {
+  static create(setup: StoredObjectSetup): StoredObjectModule {
     const infrastructure = buildStoredObjectInfrastructure({ members: setup.members });
 
-    return StoredObjectApp.fromInfrastructure({
+    return StoredObjectModule.fromInfrastructure({
       infrastructure,
       repositories: setup.repositories,
       permissions: setup.dependencies.authz,
@@ -135,10 +135,10 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
     permissions: AuthzApi;
     rateLimiter: RateLimiter;
     images: ExternalImageChannel;
-  }): StoredObjectApp {
+  }): StoredObjectModule {
     const { infrastructure: members, repositories } = setup;
 
-    return new StoredObjectApp({
+    return new StoredObjectModule({
       storage: StoredObjectService.create({
         records: repositories.records,
         storage: members.storage,

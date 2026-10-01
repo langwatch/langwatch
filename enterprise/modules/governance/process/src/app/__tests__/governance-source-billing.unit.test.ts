@@ -23,7 +23,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryCostAttributionPolicyRepository } from "../../repositories/memory/memory.cost-attribution-policy.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp } from "../governance.app.ts";
+import { GovernanceModule } from "../governance.app.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
 
 async function buildApp() {
@@ -32,7 +32,7 @@ async function buildApp() {
     organizationId: "org-1",
     config: { assistantKind: "codex", bundledPlan: false },
   });
-  return GovernanceApp.create({
+  return GovernanceModule.create({
     config: void 0,
     repositories: { ...MemoryGovernanceRepositories.create(), costAttributionPolicies },
     dependencies: {
@@ -64,7 +64,7 @@ async function buildApp() {
   });
 }
 
-describe("GovernanceApp.isSourceBilled", () => {
+describe("GovernanceModule.isSourceBilled", () => {
   /** @scenario "Governance answers whether a coding-assistant source is billed" */
   it("bills only a source whose tile opts out of the bundled plan", async () => {
     const app = await buildApp();

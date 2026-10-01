@@ -78,6 +78,6 @@ export {
   ConsumerPipelines,
   type PipelineSettings,
 } from "./pipeline-selection.ts";
-export { openProcessStores } from "./open-stores.ts";
+export { openStores } from "./open-stores.ts";
 export { clickhouseRoutesOf } from "./clickhouse-routes.ts";
 export { memoryObjectStorage } from "./object-storage-memory.ts";

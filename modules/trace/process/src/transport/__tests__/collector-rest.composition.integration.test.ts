@@ -26,14 +26,14 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it } from "vitest";
 
 import { composeTraceAppDependencies } from "../../app/trace-composition.build.ts";
-import { TraceApp } from "../../app/trace.app.ts";
+import { TraceModule } from "../../app/trace.app.ts";
 import type { TraceProcessingCommands } from "../../app/trace.members.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { traceServer } from "../../trace.server.ts";
+import { traceProcessModule } from "../../trace.module.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
 
 const PROJECT = {
@@ -161,7 +161,7 @@ function deployment(access: CollectorAccess = {}) {
   };
 
   const canonicalisation = TraceCanonicalisationService.create();
-  const app = TraceApp.create(
+  const app = TraceModule.create(
     composeTraceAppDependencies({
       repositories: MemoryTraceRepositories.create(),
       storedObjects: createApiFixture<StoredObjectApi>(),
@@ -222,9 +222,9 @@ function deployment(access: CollectorAccess = {}) {
   });
 
   // Whether the MODULE declares the collector among its transports — the
-  // point of the file: dropping it from `trace.server.ts` turns every
+  // point of the file: dropping it from `trace.module.ts` turns every
   // request below into the 404 a customer's SDK was getting.
-  const declaredRest: readonly FeatureTransportDescriptor[] = traceServer.transports;
+  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports;
   const servesCollector = declaredRest.includes(collectorRest);
 
   const mounted = servesCollector

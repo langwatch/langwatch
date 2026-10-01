@@ -25,7 +25,7 @@ import type { AutomationRunawayRepository } from "../../repositories/automation-
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
-import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
+import { AutomationModule, type AutomationInfrastructure } from "../automation.app.ts";
 import type {
   AutomationLogger,
   AutomationRunawaySignals,
@@ -33,7 +33,7 @@ import type {
 } from "../automation.members.ts";
 
 export function createCanonicalAutomationApp(): {
-  app: AutomationApp;
+  app: AutomationModule;
   triggerCreate: ReturnType<typeof vi.fn>;
   resources: ResourceScope;
 } {
@@ -190,7 +190,7 @@ export function createCanonicalAutomationApp(): {
     hasRecordedSince: vi.fn(async () => false),
   };
   return {
-    app: AutomationApp.fromInfrastructure({
+    app: AutomationModule.fromInfrastructure({
       repositories: PostgresAutomationRepositories.create({
         prisma: database,
         redis: memoryRedisDouble(),

@@ -104,7 +104,7 @@ function isRequestBodyRead(node) {
   return BODY_READERS.has(reader) && lastName(node.callee.object) === "req";
 }
 
-/** A transport or `*.server.ts` source that reads the request's media type or body to decide
+/** A transport or `*.module.ts` source that reads the request's media type or body to decide
  * on it. */
 export function reportRequestRechecks(program, tools) {
   walk(program, (node) => {

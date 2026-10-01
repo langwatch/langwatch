@@ -1,2 +1,2 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-export { enterpriseOpsServer } from "./enterprise-ops.server.ts";
+export { enterpriseOpsProcessModule } from "./enterprise-ops.module.ts";

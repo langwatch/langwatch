@@ -4,13 +4,13 @@
  * (`?drawer.open=<name>`) under the name the product has always used.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 // Declare the `trace:` slices at install, so langy and annotation read them from first paint.
 import "./behavior/annotation-queue-session.store.ts";
 import "./behavior/explorer-scope.slice.ts";
 
-export const traceWeb = defineWebModule("trace")
+export const traceWeb = defineBrowserModule("trace")
   .withHosts({
     requires: ["TraceHostApi"],
     mounts: { TraceHostApi: { load: () => import("./behavior/trace-host-mount.tsx") } },

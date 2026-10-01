@@ -8,7 +8,7 @@ import {
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { DemoDataApp } from "../app/demo-data.app.ts";
+import type { DemoDataModule } from "../app/demo-data.app.ts";
 import {
   DEMO_DATA_INTERVAL_MS,
   DEMO_DATA_PROCESS_NAME,
@@ -48,7 +48,7 @@ export function buildDemoDataPipeline(
 
 export const demoDataEventing = defineEventingModule({
   pipeline: DEMO_DATA_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<undefined, DemoDataApp>) =>
+  build: ({ app, processStore }: EventingSetup<undefined, DemoDataModule>) =>
     app.demoDataPipeline({
       deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
     }),

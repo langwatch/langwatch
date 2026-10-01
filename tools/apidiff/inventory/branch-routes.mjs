@@ -52,8 +52,8 @@ const installed = join(
   repoRoot,
   "packages/installed-server-modules/src/server-modules.generated.ts",
 );
-const { serverModules } = await import(pathToFileURL(installed).href);
-for (const module of serverModules) {
+const { processModules } = await import(pathToFileURL(installed).href);
+for (const module of processModules) {
   const source = `module ${module.name}`;
   for (const descriptor of module.transports ?? []) {
     try {

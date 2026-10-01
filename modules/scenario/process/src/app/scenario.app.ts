@@ -308,7 +308,7 @@ type ScenarioProcessMembers = Readonly<{
 }>;
 
 /**
- * What `ScenarioApp.create` is handed as `setup.members`: the platform
+ * What `ScenarioModule.create` is handed as `setup.members`: the platform
  * members read directly, plus the collaborators still handed over whole from
  * the deleted `scenario.composition.ts` (scenario-composition-green handover).
  */
@@ -318,7 +318,7 @@ type ScenarioAppMembers = ScenarioProcessMembers &
     "ids" | "testSuiteIds" | "clock" | "secretCipher" | "scenarioTabs"
   >;
 
-export class ScenarioApp implements ScenarioApi {
+export class ScenarioModule implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
   /** Every name is from the process's vocabulary; boot refuses by name. */
@@ -348,13 +348,13 @@ export class ScenarioApp implements ScenarioApi {
       ScenarioServerConfig,
       ScenarioRepositories
     >,
-  ): Promise<ScenarioApp> {
+  ): Promise<ScenarioModule> {
     const { secrets } = setup;
     const signingSecret = await secrets.into(
-      ScenarioApp.secrets.voiceSessionSigning,
+      ScenarioModule.secrets.voiceSessionSigning,
       (credentials) =>
         secrets.into(
-          ScenarioApp.secrets.voiceSessionSigningFallback,
+          ScenarioModule.secrets.voiceSessionSigningFallback,
           (session) => credentials ?? session,
         ),
     );
@@ -437,7 +437,7 @@ export class ScenarioApp implements ScenarioApi {
       publicBaseUrl: setup.members.publicBaseUrl,
     };
 
-    return new ScenarioApp({
+    return new ScenarioModule({
       agentTesting: AgentTestService.create({
         agents: peers.agents,
         projects: peers.projects,

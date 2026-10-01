@@ -18,7 +18,7 @@ Feature: Agents package boundary
     Then contract artifacts use subject.artifact.ts names
     And the server uses app, services, repositories and flat transport directories
     And Prisma implementations use prisma.subject.repository.ts names
-    And AgentApp owns private services which receive private repository interfaces
+    And AgentModule owns private services which receive private repository interfaces
     And the installer selects a repository backend without the App importing Prisma
 
   @unit @agents
@@ -32,7 +32,7 @@ Feature: Agents package boundary
   @unit @agents
   Scenario: A created agent is validated, persisted and returned resolved
     Given a create command whose config matches its declared agent type
-    When AgentApp handles it
+    When AgentModule handles it
     Then the repository is asked to persist it exactly once
     And the agent comes back with its input and output fields resolved from that config
 
@@ -54,14 +54,14 @@ Feature: Agents package boundary
   Scenario: Internal RPC invokes the injected agent service
     Given an authenticated product user may manage agents in a project
     When the user creates an agent through the internal RPC interface
-    Then the package-owned router invokes the installed AgentApp
+    Then the package-owned router invokes the installed AgentModule
     And it returns an Agents contract response
 
   @integration @rest
   Scenario: Legacy REST forwards to the same agent service
     Given a valid project API key
     When a client creates an agent through the legacy REST interface
-    Then the REST handler invokes the same AgentApp command as internal RPC
+    Then the REST handler invokes the same AgentModule command as internal RPC
     And the response preserves the documented REST status and shape
     And the REST adapter does not call Prisma or the internal HTTP server
 
@@ -106,7 +106,7 @@ Feature: Agents package boundary
   @unit @agents
   Scenario: Linked workflow behaviour uses the injected Workflow API
     Given an agent operation needs to read, copy or archive a linked workflow
-    When AgentApp performs the operation
+    When AgentModule performs the operation
     Then it invokes the complete WorkflowApi supplied by the composition root
     And Agents server imports no Workflows server or repository implementation
 
@@ -200,7 +200,7 @@ Feature: Agents package boundary
     Given no Agents installer has been called
     Then importing an Agents package registers no route or background work
     When the API process installs Agent
-    Then its RPC, REST and connection protocols use the same AgentApp
+    Then its RPC, REST and connection protocols use the same AgentModule
     When the worker process installs Agent
     Then dispatch and presence use its composed App without mounting inbound transports
     And each process starts and stops the connected runtime with its owned resources

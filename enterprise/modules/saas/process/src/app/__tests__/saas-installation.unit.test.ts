@@ -11,12 +11,12 @@ import { createTestLogger, frozenAt, memoryRateLimiter } from "@langwatch/test-h
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { saasServer } from "../../saas.server.ts";
+import { saasProcessModule } from "../../saas.module.ts";
 
 function boot({ isSaas, recorded }: { isSaas: boolean; recorded: IncomingUsageReport[] }) {
   const { logger } = createTestLogger();
   return createApp({ role: "api" })
-    .withModules([saasServer])
+    .withModules([saasProcessModule])
     .withStores(memoryStores())
     .withMembers({ isSaas, rateLimiter: memoryRateLimiter(), clock: frozenAt() })
     .withObservability((observability) => observability.withLogging(logger))
@@ -46,7 +46,7 @@ describe("saas installation", () => {
     try {
       const app = runtime.service(SaasApi);
 
-      expect(runtime.module(saasServer).provided).toBe(app);
+      expect(runtime.module(saasProcessModule).provided).toBe(app);
       await expect(app.receiveUsageReport(REQUEST)).resolves.toEqual({
         message: "Event captured",
       });

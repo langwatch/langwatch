@@ -14,7 +14,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { vi } from "vitest";
 
 import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
-import { EvaluatorApp, type EvaluatorGraph } from "../evaluator.app.ts";
+import { EvaluatorModule, type EvaluatorGraph } from "../evaluator.app.ts";
 
 /** The workflow and monitor rows, as recording doubles. */
 export function testEvaluatorGraph(overrides: Partial<EvaluatorGraph> = {}): EvaluatorGraph {
@@ -59,7 +59,7 @@ export function createEvaluatorTestApp(
     graph?: EvaluatorGraph;
   }> = {},
 ): Readonly<{
-  app: EvaluatorApp;
+  app: EvaluatorModule;
   repository: MemoryEvaluatorRepository;
   modelProviders: ModelProviderApi;
   permissions: AuthzApi;
@@ -80,7 +80,7 @@ export function createEvaluatorTestApp(
     ...input.modelProviders,
   });
 
-  const app = EvaluatorApp.createWithGraph(
+  const app = EvaluatorModule.createWithGraph(
     {
       repositories: { evaluators: repository },
       dependencies: {

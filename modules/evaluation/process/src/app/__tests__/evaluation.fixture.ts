@@ -20,7 +20,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
-import { evaluationServer } from "../../evaluation.server.ts";
+import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EvaluationProcessingStoresAdapter } from "../../eventing/evaluation-processing-stores.pipeline.ts";
 import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
 import type { EvaluationRetentionLookup } from "../../repositories/evaluation.repository.ts";
@@ -33,7 +33,7 @@ import type { EvaluatorEnvironmentService } from "../../services/evaluator-envir
 import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
 import { LangevalsPiiDetectionService } from "../../services/langevals-pii-detection.service.ts";
 import {
-  EvaluationApp,
+  EvaluationModule,
   type EvaluationCustomEvaluators,
   type EvaluationInfrastructure,
   type EvaluationRescore,
@@ -208,10 +208,10 @@ export function createEvaluationTestApp(
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
-): EvaluationApp {
+): EvaluationModule {
   const repositories = input.repositories ?? MemoryEvaluationRepositories.create();
 
-  return EvaluationApp.fromInfrastructure({
+  return EvaluationModule.fromInfrastructure({
     infrastructure: createEvaluationTestInfrastructure(input.members ?? {}),
     repositories,
     dependencies: {
@@ -254,7 +254,7 @@ export function createEvaluationTestApp(
   });
 }
 
-const memoryEvaluation = withMemoryRepositories(evaluationServer);
+const memoryEvaluation = withMemoryRepositories(evaluationProcessModule);
 
 /** `createApp` composes no secrets chain: the install gets a scope answering every handle unset. */
 export const installableEvaluation: typeof memoryEvaluation = {

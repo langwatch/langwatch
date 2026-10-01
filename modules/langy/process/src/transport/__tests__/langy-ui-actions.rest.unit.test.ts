@@ -12,7 +12,7 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { langyServer } from "../../langy.server.ts";
+import { langyProcessModule } from "../../langy.module.ts";
 import { langyUiActionsRest } from "../langy-ui-actions.rest.ts";
 
 const PROJECT_ID = "project-1";
@@ -76,7 +76,7 @@ describe("given the langy module installed in the api process", () => {
   describe("when the process mounts its REST families", () => {
     /** @scenario "The CLI's UI-action door is served where main served it" */
     it("declares the UI-action door among langy's transports", () => {
-      expect(langyServer.transports).toContain(langyUiActionsRest);
+      expect(langyProcessModule.transports).toContain(langyUiActionsRest);
     });
   });
 });

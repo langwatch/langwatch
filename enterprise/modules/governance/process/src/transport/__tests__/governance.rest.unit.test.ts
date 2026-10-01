@@ -40,7 +40,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
-import { GovernanceApp } from "../../app/governance.app.ts";
+import { GovernanceModule } from "../../app/governance.app.ts";
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
@@ -129,7 +129,7 @@ async function buildApi(
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
   const repositories = MemoryGovernanceRepositories.create();
 
-  const app = await GovernanceApp.create({
+  const app = await GovernanceModule.create({
     config: void 0,
     repositories,
     dependencies: {

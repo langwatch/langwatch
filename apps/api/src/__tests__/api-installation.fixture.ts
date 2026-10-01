@@ -1,7 +1,7 @@
 import { type TransportPeers } from "@langwatch/api";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
   type ExposedSurface,
@@ -47,7 +47,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 export async function bootApi({
   surface,
 }: { surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown> } = {}) {
-  const owners = processConfig(serverModules, ROLE);
+  const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -80,7 +80,7 @@ export async function bootApi({
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     ...(surface ? { surface } : {}),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),

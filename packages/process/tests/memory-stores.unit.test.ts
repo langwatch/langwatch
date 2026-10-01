@@ -2,7 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import {
   createApp,
   defineRepositories,
-  defineServerModule,
+  defineProcessModule,
   type FeatureSetup,
 } from "@langwatch/process";
 import {
@@ -38,7 +38,7 @@ class MemoryRepositories {
   }
 }
 
-class ProjectApp implements ProjectApi {
+class ProjectModule implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = {};
   readonly #projects: ProjectRepository;
@@ -49,8 +49,8 @@ class ProjectApp implements ProjectApi {
 
   static create({
     repositories,
-  }: FeatureSetup<{}, unknown, undefined, { projects: ProjectRepository }>): ProjectApp {
-    return new ProjectApp(repositories.projects);
+  }: FeatureSetup<{}, unknown, undefined, { projects: ProjectRepository }>): ProjectModule {
+    return new ProjectModule(repositories.projects);
   }
 
   name(): string {
@@ -58,9 +58,9 @@ class ProjectApp implements ProjectApi {
   }
 }
 
-const project = defineServerModule("project")
+const project = defineProcessModule("project")
   .withRepositories(defineRepositories({ live: LiveRepositories, memory: MemoryRepositories }))
-  .withApp(ProjectApp)
+  .withApi(ProjectModule)
   .build();
 
 class StatelessApp {
@@ -72,7 +72,7 @@ class StatelessApp {
   }
 }
 
-const stateless = defineServerModule("annotation").withApp(StatelessApp).build();
+const stateless = defineProcessModule("annotation").withApi(StatelessApp).build();
 
 interface FilesApi {
   storage(): ObjectStorage;
@@ -99,7 +99,7 @@ class FilesApp implements FilesApi {
   }
 }
 
-const files = defineServerModule("stored-object").withApp(FilesApp).build();
+const files = defineProcessModule("stored-object").withApi(FilesApp).build();
 
 async function* chunks(...values: string[]): AsyncGenerator<Uint8Array> {
   for (const value of values) yield Buffer.from(value);

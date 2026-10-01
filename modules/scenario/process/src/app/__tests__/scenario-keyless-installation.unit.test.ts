@@ -16,7 +16,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
-import { memoryStores, openProcessStores, PipelineParticipation } from "@langwatch/process-stores";
+import { memoryStores, openStores, PipelineParticipation } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -35,7 +35,7 @@ import {
   scenarioInstallationSecrets,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
-import { scenarioServer } from "../../scenario.server.ts";
+import { scenarioProcessModule } from "../../scenario.module.ts";
 import type { ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 const projectId = "project-1";
@@ -72,7 +72,7 @@ const storesConfig: StoresConfig = {
 /** The encryption member exactly as a process with no key builds it. */
 async function keylessEncryption() {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }).withEnv());
-  const { members } = await openProcessStores({
+  const { members } = await openStores({
     name: "scenario-keyless-test",
     config: storesConfig,
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),
@@ -88,7 +88,7 @@ const unconfiguredEncryption = { name: "MemberNotConfiguredError", member: "encr
 
 function process(role: "api" | "worker", emitter: EventEmitter) {
   return createApp({ role, secrets: scenarioInstallationSecrets() })
-    .withModules([withMemoryRepositories(scenarioServer)])
+    .withModules([withMemoryRepositories(scenarioProcessModule)])
     .withConfig({ scenario: scenarioTestConfig })
     .withStores(memoryStores())
     .withAnalytical(createApiFixture<ScenarioReadOnlyClickHouse>())

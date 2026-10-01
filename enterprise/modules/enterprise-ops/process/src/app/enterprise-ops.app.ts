@@ -11,10 +11,10 @@ import type { FeatureSetup } from "@langwatch/process";
 import { LicenseRegistryAuditService } from "../services/license-registry-audit.service.ts";
 import { SelfHostedInstanceAuditService } from "../services/self-hosted-instance-audit.service.ts";
 
-type EnterpriseOpsSetup = FeatureSetup<typeof EnterpriseOpsApp.dependencies, never, undefined>;
+type EnterpriseOpsSetup = FeatureSetup<typeof EnterpriseOpsModule.dependencies, never, undefined>;
 
 /** Admits Cloud admin staff through ops, then forwards to licensing with the staff member recorded. */
-export class EnterpriseOpsApp implements EnterpriseOpsApiContract {
+export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
   static readonly contract = EnterpriseOpsApi;
   static readonly dependencies = { ops: OpsApi, licensing: LicensingApi, auditLog: AuditLogApi };
 
@@ -32,9 +32,9 @@ export class EnterpriseOpsApp implements EnterpriseOpsApiContract {
     this.#instances = deps.instances;
   }
 
-  static create({ dependencies }: EnterpriseOpsSetup): EnterpriseOpsApp {
+  static create({ dependencies }: EnterpriseOpsSetup): EnterpriseOpsModule {
     const { ops, licensing, auditLog } = dependencies;
-    return new EnterpriseOpsApp({
+    return new EnterpriseOpsModule({
       ops,
       licenses: LicenseRegistryAuditService.create({ registry: licensing, auditLog }),
       instances: SelfHostedInstanceAuditService.create({ instances: licensing, auditLog }),

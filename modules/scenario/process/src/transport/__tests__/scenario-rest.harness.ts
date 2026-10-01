@@ -34,7 +34,7 @@ import {
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import {
-  ScenarioApp,
+  ScenarioModule,
   type ScenarioReadOnlyClickHouse,
   type ScenarioRedis,
   type ScenarioTabStore,
@@ -63,7 +63,7 @@ export async function createScenarioRestTestApp(
   );
   const redis = createApiFixture<ScenarioRedis>(options.redis ?? {}, "Redis");
 
-  const app = await ScenarioApp.create({
+  const app = await ScenarioModule.create({
     repositories: {
       ...MemoryScenarioRepositories.create(),
       ...(options.tabs

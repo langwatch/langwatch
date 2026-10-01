@@ -1,2 +1,2 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-export { demoDataServer } from "./demo-data.server.ts";
+export { demoDataProcessModule } from "./demo-data.module.ts";

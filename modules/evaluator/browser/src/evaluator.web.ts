@@ -5,11 +5,11 @@
  */
 
 import { evaluatorTrpc } from "@langwatch/evaluator-contract";
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { evaluatorApi } from "./behavior/evaluator-api.ts";
 
-export const evaluatorWeb = defineWebModule("evaluator")
+export const evaluatorWeb = defineBrowserModule("evaluator")
   .withApi(evaluatorApi, { contracts: [evaluatorTrpc] })
   .withHosts({
     requires: ["EvaluatorHostApi"],

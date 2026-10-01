@@ -1,5 +1,5 @@
 export type { PlatformHealthInfrastructure } from "./app/platform-health.app.ts";
-export { platformHealthServer } from "./platform-health.server.ts";
+export { platformHealthProcessModule } from "./platform-health.module.ts";
 export type {
   SubsystemProbeCollaborators,
   SubsystemProbeOutcome,

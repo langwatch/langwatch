@@ -82,12 +82,12 @@ function diagnosticsFor(source: string): Diagnostic[] {
   }
 }
 
-describe("defineServerModule compiler diagnostics", () => {
+describe("defineProcessModule compiler diagnostics", () => {
   it("accepts a valid declaration and matching root", () => {
     const diagnostics = diagnosticsFor(`
       import { createApp } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       class App extends Contract {
         static readonly contract = Contract;
@@ -95,7 +95,7 @@ describe("defineServerModule compiler diagnostics", () => {
         readonly value = "ok";
         static create(setup: FeatureSetup<{}, {}, undefined>): App { return new App(); }
       }
-      const feature = defineServerModule("annotation").withApp(App).build();
+      const feature = defineProcessModule("annotation").withApi(App).build();
       createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]);
     `);
@@ -107,7 +107,7 @@ describe("defineServerModule compiler diagnostics", () => {
       diagnosticsFor(`
       import { createApp } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       import { moduleApi } from "__CONTRACT__";
       interface ProjectApi { name(): string; }
       const ProjectApi = moduleApi<ProjectApi>()("project");
@@ -123,7 +123,7 @@ describe("defineServerModule compiler diagnostics", () => {
         }
         projectName(): string { return this.#projects.name(); }
       }
-      const feature = defineServerModule("annotation").withApp(App).build();
+      const feature = defineProcessModule("annotation").withApi(App).build();
       createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]);
     `),
@@ -135,19 +135,19 @@ describe("defineServerModule compiler diagnostics", () => {
       "rejects a factory that omits a linked API operation",
       "TS2769",
       `
-      import { defineServerModule } from "__INSTALLER__";
+      import { defineProcessModule } from "__INSTALLER__";
       import { moduleApi } from "__CONTRACT__";
       interface AnnotationApi { save(): string; }
       const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
       class App { static readonly contract = AnnotationApi; static readonly dependencies = {}; static create() { return { wrong: true }; } }
-      defineServerModule("annotation").withApp(App).build(); // EXPECT
+      defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
     [
       "rejects service constructor dependencies on API Apps",
       "TS2769",
       `
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       import { moduleApi } from "__CONTRACT__";
       abstract class ProjectService { abstract name(): string; }
       interface AnnotationApi { save(): string; }
@@ -157,7 +157,7 @@ describe("defineServerModule compiler diagnostics", () => {
         static readonly dependencies = { projects: ProjectService };
         static create(setup: FeatureSetup<typeof App.dependencies, {}, undefined>): AnnotationApi { return { save: () => "saved" }; }
       }
-      defineServerModule("annotation").withApp(App).build(); // EXPECT
+      defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
 
@@ -165,53 +165,53 @@ describe("defineServerModule compiler diagnostics", () => {
       "rejects an undeclared dependency",
       "TS2339",
       `
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, undefined>): App { setup.dependencies.missing; return new App(); } } // EXPECT
-      defineServerModule("annotation").withApp(App).build();
+      defineProcessModule("annotation").withApi(App).build();
     `,
     ],
     [
       "rejects a dependency map that disagrees with the factory",
       "TS2769",
       `
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       abstract class Peer { abstract readonly value: string; }
       class App extends Contract { static readonly contract = Contract; static readonly dependencies = { peer: Peer }; readonly value = "ok"; static create(setup: FeatureSetup<{ other: typeof Peer }, undefined, undefined>): App { return new App(); } }
-      defineServerModule("annotation").withApp(App).build(); // EXPECT
+      defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
     [
       "requires a config schema for typed config",
       "TS2769",
       `
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, { required: string }>): App { return new App(); } }
-      defineServerModule("annotation").withApp(App).build(); // EXPECT
+      defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
     [
       "rejects a declared slice that disagrees with the factory config",
       "TS2769",
       `
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       import { Config } from "__CONFIG__";
       import { z } from "__ZOD__";
       abstract class Contract { abstract readonly value: string; }
       class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; static readonly config = Config.define((c) => ({ other: c.env("OTHER", z.coerce.number()) })); readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, { required: string }>): App { return new App(); } }
-      defineServerModule("annotation").withApp(App).build(); // EXPECT
+      defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
     [
       "rejects an app result incompatible with its contract",
       "TS2769",
       `
-      import { defineServerModule } from "__INSTALLER__";
+      import { defineProcessModule } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       class App { static readonly contract = Contract; static readonly dependencies = {}; static create(): { wrong: boolean } { return { wrong: true }; } }
-      defineServerModule("annotation").withApp(App).build(); // EXPECT
+      defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
     [
@@ -250,7 +250,7 @@ describe("defineServerModule compiler diagnostics", () => {
       "rejects a repository backend result the app cannot consume",
       "TS2769",
       `
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       import { defineRepositories } from "__REPOSITORY_REGISTRY__";
       type Repositories = { value: { read(): string } };
       class LiveRepositories {
@@ -267,7 +267,7 @@ describe("defineServerModule compiler diagnostics", () => {
         static readonly dependencies = {};
         static create({ repositories }: FeatureSetup<{}, never, undefined, Repositories>) { return new App(); }
       }
-      defineServerModule("annotation").withRepositories(repositories).withApp(App); // EXPECT
+      defineProcessModule("annotation").withRepositories(repositories).withApi(App); // EXPECT
     `,
     ],
   ] as const;
@@ -287,14 +287,14 @@ describe("defineServerModule compiler diagnostics", () => {
         readonly value = "ok";
         static create(setup: FeatureSetup<{}, {}, { suffix: string }>): App { return new App(); }
       }
-      const feature = defineServerModule("annotation").withApp(App).build();`;
+      const feature = defineProcessModule("annotation").withApi(App).build();`;
 
   it("accepts a module whose config slice this process stated", () => {
     expect(
       diagnosticsFor(`
       import { createApp } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
       createApp({ role: "api", config: { annotation: { suffix: "!" } }, members: memberSourceOf({}) })
         .withModules([feature]);
@@ -307,7 +307,7 @@ describe("defineServerModule compiler diagnostics", () => {
       diagnosticsFor(`
       import { createApp } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
       const config: Readonly<Record<string, unknown>> = { annotation: { suffix: "!" } };
       createApp({ role: "api", config, members: memberSourceOf({}) })
@@ -321,7 +321,7 @@ describe("defineServerModule compiler diagnostics", () => {
       `
       import { createApp } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
       createApp({ role: "api", config: { other: {} }, members: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
@@ -335,7 +335,7 @@ describe("defineServerModule compiler diagnostics", () => {
       `
       import { createApp } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
       createApp({ role: "api", config: { annotation: {} }, members: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
@@ -350,10 +350,10 @@ describe("defineServerModule compiler diagnostics", () => {
       `
       import { createApp } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
-      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value: string; constructor(value: string) { super(); this.value = value; } static create(setup: FeatureSetup<{}, { suffix: string }, undefined>): App { return new App(setup.members.suffix); } }
-      const feature = defineServerModule("annotation").withApp(App).build();
+      const feature = defineProcessModule("annotation").withApi(App).build();
       createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
     `,

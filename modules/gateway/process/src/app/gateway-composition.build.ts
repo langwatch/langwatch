@@ -250,7 +250,7 @@ function everyClickHouseServer(clickhouse: ClickHouseQueryClient): GatewayClickH
 }
 
 /**
- * Composes the gateway control plane: the whole of what {@link GatewayApp}'s
+ * Composes the gateway control plane: the whole of what {@link GatewayModule}'s
  * core surface answers from.
  */
 export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): GatewayControlPlane {

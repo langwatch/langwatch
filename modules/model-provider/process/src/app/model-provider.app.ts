@@ -166,7 +166,7 @@ type ModelProviderMembers = MembersRead<readonly ["redis"]> &
   Readonly<{ nlpServiceUrl: string | undefined }>;
 
 type ModelProviderSetup = FeatureSetup<
-  typeof ModelProviderApp.dependencies,
+  typeof ModelProviderModule.dependencies,
   ModelProviderMembers,
   ModelProviderServerConfig,
   ModelProviderRepositories
@@ -205,7 +205,7 @@ export type ModelProviderBuildConfig = Readonly<{
  */
 const CODEX_CODING_ROLES = ["LANGY", "FAST"] as const;
 
-export class ModelProviderApp implements ModelProviderApi {
+export class ModelProviderModule implements ModelProviderApi {
   static readonly contract = ModelProviderApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -241,15 +241,15 @@ export class ModelProviderApp implements ModelProviderApi {
     openRouter: Secret.load("OPENROUTER_API_KEY", { optional: true }),
   } as const;
   static readonly secrets = {
-    ...ModelProviderApp.platformCredentials,
-    ...ModelProviderApp.operationalSecrets,
+    ...ModelProviderModule.platformCredentials,
+    ...ModelProviderModule.operationalSecrets,
   } as const;
   static readonly reads = ["redis", "nlpServiceUrl"] as const;
 
-  static async create(setup: ModelProviderSetup): Promise<ModelProviderApp> {
-    return ModelProviderApp.withPlatformChain(
+  static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
+    return ModelProviderModule.withPlatformChain(
       setup,
-      await ModelProviderApp.resolvePlatformChain(setup.secrets),
+      await ModelProviderModule.resolvePlatformChain(setup.secrets),
     );
   }
 
@@ -261,7 +261,7 @@ export class ModelProviderApp implements ModelProviderApi {
     secrets: ModelProviderSetup["secrets"],
   ): Promise<PlatformProviderChainService> {
     let chain = PlatformProviderChainService.create();
-    for (const [provider, handle] of Object.entries(ModelProviderApp.platformCredentials)) {
+    for (const [provider, handle] of Object.entries(ModelProviderModule.platformCredentials)) {
       chain = await secrets.into(handle, (credential) => chain.with(provider, credential));
     }
 
@@ -271,7 +271,7 @@ export class ModelProviderApp implements ModelProviderApi {
   private static withPlatformChain(
     { repositories, dependencies, members, config }: ModelProviderSetup,
     platformChain: PlatformProviderChainService,
-  ): ModelProviderApp {
+  ): ModelProviderModule {
     const executionProxyBaseUrl = members.nlpServiceUrl
       ? `${members.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
       : UNCONFIGURED_EXECUTION_PROXY;
@@ -291,7 +291,7 @@ export class ModelProviderApp implements ModelProviderApi {
       config: buildConfig,
       dependencies,
     });
-    return new ModelProviderApp({
+    return new ModelProviderModule({
       repositories,
       dependencies,
       members: infrastructure,
@@ -311,8 +311,8 @@ export class ModelProviderApp implements ModelProviderApi {
     members: ModelProviderInfrastructure;
     executionProxyBaseUrl?: string;
     platformChain?: PlatformProviderChainService;
-  }): ModelProviderApp {
-    return new ModelProviderApp({
+  }): ModelProviderModule {
+    return new ModelProviderModule({
       repositories: setup.repositories,
       dependencies: setup.dependencies,
       members: setup.members,

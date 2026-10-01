@@ -16,7 +16,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { identityServer } from "../../identity.server.ts";
+import { identityProcessModule } from "../../identity.module.ts";
 import { SsoBreakGlassService } from "../../services/sso-break-glass.service.ts";
 import { SsoDomainReproofService } from "../../services/sso-domain-reproof.service.ts";
 import {
@@ -67,7 +67,7 @@ async function installed() {
     role: "worker",
     secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared),
   })
-    .withModules([withMemoryRepositories(identityServer)])
+    .withModules([withMemoryRepositories(identityProcessModule)])
     .withMembers({
       publicBaseUrl: undefined,
       isSaas: false,
@@ -108,7 +108,7 @@ describe("given identity's eventing declaration", () => {
   describe("when the module is declared", () => {
     /** @scenario "The worker hosts identity's scheduled sweeps from the module" */
     it("carries the declaration onto the installable module", () => {
-      const eventing = identityServer.eventing;
+      const eventing = identityProcessModule.eventing;
       const declarations = eventing && "declarations" in eventing ? eventing.declarations : [];
       expect(declarations).toContain(identityEventing);
       expect(identityEventing.pipeline).toBe(IDENTITY_MAINTENANCE_PIPELINE_NAME);

@@ -47,7 +47,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { opsServer } from "../../ops.server.ts";
+import { opsProcessModule } from "../../ops.module.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { SNAPSHOT_LEASE_KEY } from "../../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
@@ -81,7 +81,7 @@ function process(
         build(handle.id === "LANGWATCH_LICENSE_PRIVATE_KEY" ? cloud.privateKey : void 0),
       ),
   })
-    .withModules([withMemoryRepositories(opsServer)])
+    .withModules([withMemoryRepositories(opsProcessModule)])
     .withConfig({
       ops: {
         apiKey: undefined,
@@ -155,7 +155,7 @@ describe("ops app installation", () => {
       try {
         const app = runtime.service(OpsApi);
 
-        expect(runtime.module(opsServer).provided).toBe(app);
+        expect(runtime.module(opsProcessModule).provided).toBe(app);
         expect(await app.operatorScope({ id: "user_alex", email: OPS_STAFF_ADDRESS })).toEqual({
           kind: "platform",
         });

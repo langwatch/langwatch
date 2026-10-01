@@ -20,7 +20,7 @@ import { nowInstant } from "@langwatch/time";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../../app/gateway.app.ts";
+import { GatewayModule } from "../../app/gateway.app.ts";
 import { gatewayBudgetTrpcTransport } from "../gateway-budget.trpc.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
@@ -158,7 +158,7 @@ function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 async function callerFor(budgets: Record<string, unknown>[]) {
-  const app = await GatewayApp.create({
+  const app = await GatewayModule.create({
     dependencies: {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),

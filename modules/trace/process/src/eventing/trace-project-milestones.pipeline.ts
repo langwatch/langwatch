@@ -5,7 +5,7 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 
-import type { TraceApp } from "../app/trace.app.ts";
+import type { TraceModule } from "../app/trace.app.ts";
 import {
   RecordFirstTraceCommand,
   RecordTraceReceivedCommand,
@@ -38,6 +38,6 @@ export function buildTraceProjectMilestonesPipeline(): TraceProjectMilestonesDef
 
 export const traceProjectMilestonesEventing = defineEventingModule({
   pipeline: TRACE_PROJECT_MILESTONES_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, TraceApp>) => app.projectMilestonesPipeline(),
+  build: ({ app }: EventingSetup<never, TraceModule>) => app.projectMilestonesPipeline(),
   connect: ({ app, commands }) => app.connectProjectMilestones(commands),
 });

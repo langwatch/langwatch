@@ -14,7 +14,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
 import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
-import { gatewayServer } from "../../gateway.server.ts";
+import { gatewayProcessModule } from "../../gateway.module.ts";
 import {
   GatewayGuardrailRepository,
   type GatewayGuardrailCheckRow,
@@ -145,7 +145,7 @@ const drainedOutcome = {
 
 describe("the gateway internal control plane", () => {
   it("publishes the signed control-plane family from the installed gateway module", () => {
-    expect(gatewayServer.transports).toContain(gatewayInternalRest);
+    expect(gatewayProcessModule.transports).toContain(gatewayInternalRest);
   });
 
   describe("given a request signed with the shared internal secret", () => {

@@ -44,7 +44,7 @@ export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
   type AppDefinition,
   type AppDefinitionWithoutConfig,
-  defineServerModule,
+  defineProcessModule,
   type FeatureTransportDescriptor,
   type FeatureSetup,
   type FeatureInstallArguments,

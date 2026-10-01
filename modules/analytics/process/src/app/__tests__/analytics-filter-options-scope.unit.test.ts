@@ -16,9 +16,9 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
-import { AnalyticsApp } from "../analytics.app.ts";
+import { AnalyticsModule } from "../analytics.app.ts";
 
-type Setup = Parameters<typeof AnalyticsApp.create>[0];
+type Setup = Parameters<typeof AnalyticsModule.create>[0];
 
 async function appOver() {
   const translateLegacyFilters = vi.fn<TraceApi["translateLegacyFilters"]>(() => ({
@@ -33,7 +33,7 @@ async function appOver() {
       return { rows: [] };
     },
   });
-  const app = await AnalyticsApp.create({
+  const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       authz: createApiFixture<AuthzApi>(),
@@ -68,7 +68,7 @@ async function appOver() {
   return { app, translateLegacyFilters, statements };
 }
 
-describe("AnalyticsApp.filterOptions", () => {
+describe("AnalyticsModule.filterOptions", () => {
   describe("given a picker for one field with other filters selected", () => {
     /** @scenario "Analytics' filter picker is scoped through Trace's translation" */
     it("asks Trace to translate the other filters, leaving out the field being picked", async () => {

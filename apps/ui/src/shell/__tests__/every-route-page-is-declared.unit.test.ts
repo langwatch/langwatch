@@ -3,7 +3,7 @@
  * missing declaration takes the whole browser down. Nothing else composes the
  * real table against the real modules, so the gap read green until this test.
  */
-import { webModules } from "@langwatch/installed-web-modules";
+import { browserModules } from "@langwatch/installed-web-modules";
 import { mergeUiPageLoaders, uiRoutePageKeys } from "@langwatch/browser/feature-install";
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { describe, expect, it } from "vitest";
@@ -12,7 +12,7 @@ import { uiRouteTable } from "../ui-route-table";
 import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 
 /** Composed exactly as `main.tsx` composes it: module screens over the app's own. */
-const moduleScreens = installedModuleScreens(webModules).loaders;
+const moduleScreens = installedModuleScreens(browserModules).loaders;
 const loaders = mergeUiPageLoaders({ own: moduleScreens, host: uiUnservedPageLoaders });
 
 describe("given the route table the shell builds its router from", () => {

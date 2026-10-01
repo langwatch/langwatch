@@ -11,7 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
-import { licensingServer } from "../../licensing.server.ts";
+import { licensingProcessModule } from "../../licensing.module.ts";
 import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
 import { connectHostedRest } from "../../transport/connect-hosted.rest.ts";
 
@@ -39,7 +39,7 @@ async function hostedFamily() {
   const unregistered = partial.unavailableRegistry();
   const findByVirtualKeyId = vi.fn().mockResolvedValue(null);
   const resources = new ResourceScope();
-  const state = await licensingServer.install({
+  const state = await licensingProcessModule.install({
     resources,
     config: TEST_LICENSING_CONFIG,
     members: {

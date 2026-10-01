@@ -680,7 +680,7 @@ type OpsAppRuntimeDependencies = OpsAppDependencies &
   Readonly<{ apiKeys: ApiKeyApiContract; featureFlags: FeatureFlagApi }>;
 
 type OpsSetup = FeatureSetup<
-  typeof OpsApp.dependencies,
+  typeof OpsModule.dependencies,
   OpsProcessMembers,
   OpsServerConfig,
   OpsRepositories
@@ -694,7 +694,7 @@ export interface OpsBadgeReading {
   computedAt: OpsApiGetBadgeCountsOutput["computedAt"];
 }
 
-export class OpsApp implements OpsApi {
+export class OpsModule implements OpsApi {
   static readonly contract = OpsApi;
   static readonly dependencies = {
     users: UserApi,
@@ -752,11 +752,11 @@ export class OpsApp implements OpsApi {
 
   /**
    * Builds this process's own {@link OpsAppInfrastructure} from the members it
-   * reads, then composes over it exactly as {@link OpsApp.fromInfrastructure}
+   * reads, then composes over it exactly as {@link OpsModule.fromInfrastructure}
    * does — what a hand composition (or a test) still supplies directly.
    */
-  static async create(setup: OpsSetup): Promise<OpsApp> {
-    const cloudOps = await setup.secrets.into(OpsApp.secrets.licensePrivateKey, (privateKey) =>
+  static async create(setup: OpsSetup): Promise<OpsModule> {
+    const cloudOps = await setup.secrets.into(OpsModule.secrets.licensePrivateKey, (privateKey) =>
       decideCloudOps({
         asked: setup.config.cloudOps,
         privateKey,
@@ -796,7 +796,7 @@ export class OpsApp implements OpsApi {
       },
       repositories: {
         postgres: PrismaPostgresHealthRepository.create(members.prisma),
-        clickhouse: await setup.secrets.into(OpsApp.secrets.clickhouseUrl, (connectionUrl) =>
+        clickhouse: await setup.secrets.into(OpsModule.secrets.clickhouseUrl, (connectionUrl) =>
           ClickHouseClickHouseHealthRepository.create({
             clickhouse: members.clickhouse,
             connectionUrl,
@@ -837,7 +837,7 @@ export class OpsApp implements OpsApi {
       members.logger.warn(warning);
     }
 
-    const app = OpsApp.fromInfrastructure({
+    const app = OpsModule.fromInfrastructure({
       infrastructure,
       dependencies,
       repositories: setup.repositories,
@@ -871,13 +871,13 @@ export class OpsApp implements OpsApi {
     storageStats?: StorageStatsCollectionService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
-  }): OpsApp {
+  }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
     const inbox = BugReportInboxService.create({ reports: repositories.bugReports });
     const systemMigrationPassRequests = SystemMigrationPassRequestsService.create();
 
-    return new OpsApp({
+    return new OpsModule({
       ops: members.createCapability(dependencies),
       authz: dependencies.authz,
       inbox,

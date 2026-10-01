@@ -10,7 +10,7 @@ import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-ob
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { storedObjectServer } from "../../stored-object.server.ts";
+import { storedObjectProcessModule } from "../../stored-object.module.ts";
 
 function unavailable(name: string): never {
   return new Proxy(
@@ -25,7 +25,7 @@ function unavailable(name: string): never {
 
 function installation(role: "api" | "worker" | "tasks") {
   return createApp({ role })
-    .withModules([storedObjectServer])
+    .withModules([storedObjectProcessModule])
     .withConfig({
       "stored-object": {
         azureSpoolRetentionConfirmed: false,
@@ -68,7 +68,7 @@ describe("stored-object app installation", () => {
         try {
           const app = runtime.service(StoredObjectApi);
 
-          expect(runtime.module(storedObjectServer).provided).toBe(app);
+          expect(runtime.module(storedObjectProcessModule).provided).toBe(app);
 
           const stored = await app.storeFromBytes(bytes);
 

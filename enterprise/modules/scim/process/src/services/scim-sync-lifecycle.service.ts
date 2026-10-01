@@ -84,7 +84,7 @@ export type ScimUserPushOperation = "create" | "update" | "deactivate";
 
 export type ScimRemovalOperation = "delete_user" | "deactivate_user";
 
-/** Durable directory-sync history, which `ScimApp` builds over its own guards and ledger. */
+/** Durable directory-sync history, which `ScimModule` builds over its own guards and ledger. */
 export type ScimSyncLifecycle = Pick<
   ScimSyncLifecycleService,
   "tokenIssued" | "userPushed" | "groupMapped" | "applyFailed" | "applyRedriven" | "revoked"

@@ -21,7 +21,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { evaluationServer } from "../../evaluation.server.ts";
+import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
 function process(
@@ -91,7 +91,7 @@ describe("given a process that installs the evaluation feature", () => {
       try {
         const app = runtime.service(EvaluationApi);
 
-        expect(runtime.module(evaluationServer).provided).toBe(app);
+        expect(runtime.module(evaluationProcessModule).provided).toBe(app);
         await expect(app.listCustomEvaluators({ projectId: "project-1" })).resolves.toEqual([]);
         await expect(app.warmupEvaluators({ projectId: "project-1", count: 1 })).resolves.toEqual({
           success: true,

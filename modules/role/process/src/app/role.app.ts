@@ -52,15 +52,15 @@ import type { RoleRepositories } from "../repositories/role.repositories.ts";
 import { RoleService } from "../services/role.service.ts";
 
 type RoleSetup = FeatureSetup<
-  typeof RoleApp.dependencies,
-  MembersRead<typeof RoleApp.reads>,
+  typeof RoleModule.dependencies,
+  MembersRead<typeof RoleModule.reads>,
   undefined,
   RoleRepositories
 >;
 
 const WRITE_ACKNOWLEDGED: RoleWriteAcknowledged = { success: true };
 
-export class RoleApp implements RoleApi {
+export class RoleModule implements RoleApi {
   static readonly contract = RoleApi;
   static readonly dependencies = {
     permissions: AuthzApi,
@@ -88,8 +88,8 @@ export class RoleApp implements RoleApi {
     this.#prisma = members.prisma;
   }
 
-  static create({ repositories, dependencies, members }: RoleSetup): RoleApp {
-    return new RoleApp(repositories, dependencies, members);
+  static create({ repositories, dependencies, members }: RoleSetup): RoleModule {
+    return new RoleModule(repositories, dependencies, members);
   }
 
   // ── custom roles ───────────────────────────────────────────────────────────

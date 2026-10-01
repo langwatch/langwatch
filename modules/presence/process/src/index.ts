@@ -1,8 +1,8 @@
 export {
-  presenceServer,
+  presenceProcessModule,
   createBroadcast,
   type PresenceBroadcastCapability,
-} from "./presence.server.ts";
+} from "./presence.module.ts";
 export { presenceTrpcTransport } from "./transport/presence.trpc.ts";
 export {
   type PresenceBroadcast,

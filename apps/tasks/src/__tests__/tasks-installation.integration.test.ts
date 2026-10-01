@@ -6,7 +6,7 @@ import {
   type BlobCleanupDeps,
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
   type InstallableServerFeature,
@@ -55,7 +55,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 }
 
 async function bootTasks() {
-  const owners = processConfig(serverModules);
+  const owners = processConfig(processModules);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -94,7 +94,7 @@ async function bootTasks() {
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {

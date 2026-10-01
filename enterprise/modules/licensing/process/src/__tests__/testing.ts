@@ -18,7 +18,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { LicensingApp } from "../app/licensing.app.ts";
+import { LicensingModule } from "../app/licensing.app.ts";
 import { type LicenseStorage, type StoredLicense } from "../app/licensing.members.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
 
@@ -172,8 +172,8 @@ class TestLicenseStorage implements LicenseStorage {
   }
 }
 
-export function createTestLicensingApp(): Promise<LicensingApp> {
-  return LicensingApp.create({
+export function createTestLicensingApp(): Promise<LicensingModule> {
+  return LicensingModule.create({
     dependencies: {
       instantEval: createApiFixture<InstantEvalApi>(),
       projects: createApiFixture<ProjectApi>(),

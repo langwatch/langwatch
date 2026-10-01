@@ -19,12 +19,12 @@ import { DemoDataService } from "../services/demo-data.service.ts";
 const DEMO_DATA_READS = ["logger"] as const;
 
 type DemoDataSetup = FeatureSetup<
-  typeof DemoDataApp.dependencies,
+  typeof DemoDataModule.dependencies,
   MembersRead<typeof DEMO_DATA_READS>,
   DemoDataConfig | undefined
 >;
 
-export class DemoDataApp implements DemoDataApiContract {
+export class DemoDataModule implements DemoDataApiContract {
   static readonly contract = DemoDataApi;
   static readonly dependencies = {
     /** The demo organization's name and slug, which the first action verifies. */
@@ -39,8 +39,8 @@ export class DemoDataApp implements DemoDataApiContract {
     this.#seeds = seeds;
   }
 
-  static create({ dependencies, members, config }: DemoDataSetup): DemoDataApp {
-    return new DemoDataApp(
+  static create({ dependencies, members, config }: DemoDataSetup): DemoDataModule {
+    return new DemoDataModule(
       DemoDataService.create({
         organizations: dependencies.organizations,
         demoOrgIds: config?.demoOrgIds,

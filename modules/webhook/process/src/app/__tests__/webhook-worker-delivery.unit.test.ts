@@ -15,7 +15,7 @@ import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { spendSteps } from "../../__tests__/fixtures/spend-delivery.fixtures.ts";
-import { webhookServer } from "../../webhook.server.ts";
+import { webhookProcessModule } from "../../webhook.module.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const PROJECT_ID = "project-1";
@@ -55,7 +55,7 @@ function worker() {
   });
 
   return createApp({ role: "worker" })
-    .withModules([withMemoryRepositories(webhookServer)])
+    .withModules([withMemoryRepositories(webhookProcessModule)])
     .withConfig({
       webhook: {
         allowInsecureLocalUrls: false,

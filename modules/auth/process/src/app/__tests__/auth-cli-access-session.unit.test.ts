@@ -19,13 +19,13 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthApp } from "../auth.app.ts";
+import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 
 const ACCESS_TOKEN = "lw_at_active";
 const AUTHORIZATION = `Bearer ${ACCESS_TOKEN}`;
 
-async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<AuthApp> {
+async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<AuthModule> {
   const secrets: SecretResolver = {
     find: () => void 0,
     read: (key) => {
@@ -33,7 +33,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
     },
   };
 
-  return AuthApp.create({
+  return AuthModule.create({
     config: {
       sessionUrl: undefined,
       mfaEnrollmentOpen: false,

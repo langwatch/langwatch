@@ -11,7 +11,7 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { datasetServer } from "../../dataset.server.ts";
+import { datasetProcessModule } from "../../dataset.module.ts";
 import {
   createDatasetTestAuthz,
   createDatasetTestEntitlement,
@@ -21,7 +21,7 @@ import {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(datasetServer)])
+    .withModules([withMemoryRepositories(datasetProcessModule)])
     .withStores(memoryStores())
     .withMember("publicBaseUrl", undefined)
     .provide({
@@ -41,7 +41,7 @@ describe("dataset app installation", () => {
 
     try {
       const app = runtime.service(DatasetApi);
-      expect(runtime.module(datasetServer).provided).toBe(app);
+      expect(runtime.module(datasetProcessModule).provided).toBe(app);
 
       const created = await app.upsertDataset({
         projectId,

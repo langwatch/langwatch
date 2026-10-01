@@ -13,7 +13,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { logServer } from "../../log.server.ts";
+import { logProcessModule } from "../../log.module.ts";
 
 const RETAINED = { traces: 365, scenarios: 30, experiments: 30 };
 
@@ -26,7 +26,7 @@ describe("log app installation", () => {
         processStore: InMemoryProcessStore.createForTesting(),
       });
       const runtime = await createApp({ role: "worker" })
-        .withModules([logServer])
+        .withModules([logProcessModule])
         .withAnalytical(createApiFixture<ClickHouseQueryClient>())
         .withConfig({ log: { processingShards: void 0 } })
         .withEventing(eventing)

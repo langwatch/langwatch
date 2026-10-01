@@ -3,9 +3,9 @@
  * bar opens (`?drawer.open=<name>`).
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const agentWeb = defineWebModule("agent")
+export const agentWeb = defineBrowserModule("agent")
   .withHosts({
     requires: ["AgentManagementHostApi"],
     mounts: {

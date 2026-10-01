@@ -120,13 +120,13 @@ type DataRetentionMembers = Readonly<{
  * with no ClickHouse refuses at boot rather than silently metering at zero.
  */
 type DataRetentionSetup = FeatureSetup<
-  typeof DataRetentionApp.dependencies,
+  typeof DataRetentionModule.dependencies,
   DataRetentionMembers,
   DataRetentionServerConfig,
   DataRetentionRepositories
 >;
 
-export class DataRetentionApp implements DataRetentionApiContract {
+export class DataRetentionModule implements DataRetentionApiContract {
   static readonly contract = DataRetentionApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -164,7 +164,7 @@ export class DataRetentionApp implements DataRetentionApiContract {
     members,
     dependencies,
     config,
-  }: DataRetentionSetup): DataRetentionApp {
+  }: DataRetentionSetup): DataRetentionModule {
     const storageMeter = StorageMeterService.create({
       clickhouse: members.clickhouse,
       cache: RedisStorageMeterCacheRepository.create({
@@ -200,7 +200,7 @@ export class DataRetentionApp implements DataRetentionApiContract {
       }),
     });
 
-    return new DataRetentionApp({
+    return new DataRetentionModule({
       retention,
       policy,
       snapshots: DataRetentionSnapshotService.create({

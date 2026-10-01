@@ -1,7 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
   type InstallableServerFeature,
@@ -52,7 +52,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 }
 
 export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickHouseQueryClient }) {
-  const owners = processConfig(serverModules, ROLE);
+  const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -85,7 +85,7 @@ export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickH
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {

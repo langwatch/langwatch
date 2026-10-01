@@ -8,7 +8,7 @@ import {
   MissingProviderError,
 } from "../src/boot-errors.ts";
 import {
-  defineServerModule,
+  defineProcessModule,
   serverFeature,
   type FeatureSetup,
   type ServerRole,
@@ -152,7 +152,7 @@ type Harness = Readonly<{
   failOrganization?: Error;
 }>;
 
-class ProjectApp implements ProjectApi {
+class ProjectModule implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = { organizations: OrganizationApi };
   static readonly reads = ["events", "inspectPeer", "failOrganization"] as const;
@@ -168,12 +168,12 @@ class ProjectApp implements ProjectApi {
     dependencies,
     members,
     resources,
-  }: FeatureSetup<typeof ProjectApp.dependencies, DeclaredMembers, undefined>) {
+  }: FeatureSetup<typeof ProjectModule.dependencies, DeclaredMembers, undefined>) {
     members.events.push("create:project");
     resources.own("project", () => {
       members.events.push("close:project");
     });
-    return new ProjectApp(dependencies.organizations);
+    return new ProjectModule(dependencies.organizations);
   }
 
   async name(): Promise<string> {
@@ -227,8 +227,8 @@ class OrganizationApp implements OrganizationApi {
   }
 }
 
-const project = defineServerModule("project").withApp(ProjectApp).build();
-const organization = defineServerModule("organization").withApp(OrganizationApp).build();
+const project = defineProcessModule("project").withApi(ProjectModule).build();
+const organization = defineProcessModule("organization").withApi(OrganizationApp).build();
 
 /** Every member these modules declared, so the process can answer all of them. */
 function processMembers(harness: Harness = { events: [] }) {
@@ -296,7 +296,7 @@ describe("feature APIs", () => {
       createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([legacy])
         .boot(),
-    ).rejects.toThrow("defineServerModule().withApp()");
+    ).rejects.toThrow("defineProcessModule().withApi()");
     expect(events).toEqual([]);
   });
 
@@ -418,7 +418,7 @@ describe("feature APIs", () => {
   it("rejects two distinct token objects claiming the same feature identity", async () => {
     const builder = createApp({ role: "api", members: processMembers() }).withModules([
       project,
-      defineServerModule("project").withApp(ProjectApp).build(),
+      defineProcessModule("project").withApi(ProjectModule).build(),
     ]);
     await expect(builder.boot()).rejects.toBeInstanceOf(DuplicateProviderError);
   });
@@ -459,8 +459,8 @@ describe("feature APIs", () => {
       }
     }
 
-    const grantedOrganization = defineServerModule("organization")
-      .withApp(GrantedOrganizationApp)
+    const grantedOrganization = defineProcessModule("organization")
+      .withApi(GrantedOrganizationApp)
       .build();
 
     /** @scenario "The process supplies a capability a module of that name does not answer for" */
@@ -495,7 +495,7 @@ describe("feature APIs", () => {
 
   it("rejects a declaration/API name mismatch before invoking the factory", async () => {
     const events: string[] = [];
-    const declaration = defineServerModule("organization").withApp(ProjectApp).build();
+    const declaration = defineProcessModule("organization").withApi(ProjectModule).build();
 
     await expect(
       createApp({ role: "api", members: processMembers({ events }) })

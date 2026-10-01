@@ -946,7 +946,7 @@ export function serverFeature<Members>(
 }
 
 /** Names a module's server half: its App, repositories, channels and transports. */
-export function defineServerModule<const Name extends ModuleName>(
+export function defineProcessModule<const Name extends ModuleName>(
   name: Name,
 ): DefinedFeatureBuilder<Name> {
   publicNamespaceFromUnknown(name);
@@ -985,7 +985,7 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
     return new RepositoryDefinedFeatureBuilder(this.name, repositories);
   }
 
-  withApp<
+  withApi<
     Dependencies extends TokenMap,
     Members,
     Config,
@@ -994,7 +994,7 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
   >(
     app: AppDefinition<Dependencies, Members, Config, App> & { readonly reads: Reads },
   ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>;
-  withApp<
+  withApi<
     Dependencies extends TokenMap,
     Members,
     Slice extends ConfigSlice,
@@ -1003,19 +1003,19 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
   >(
     app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App> & { readonly reads: Reads },
   ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, Reads>;
-  withApp<Dependencies extends TokenMap, Members, App, const Reads extends readonly string[]>(
+  withApi<Dependencies extends TokenMap, Members, App, const Reads extends readonly string[]>(
     app: AppDefinitionWithoutConfig<Dependencies, Members, App> & { readonly reads: Reads },
   ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>;
-  withApp<Dependencies extends TokenMap, Members, Config, App>(
+  withApi<Dependencies extends TokenMap, Members, Config, App>(
     app: AppDefinition<Dependencies, Members, Config, App>,
   ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, readonly []>;
-  withApp<Dependencies extends TokenMap, Members, Slice extends ConfigSlice, App>(
+  withApi<Dependencies extends TokenMap, Members, Slice extends ConfigSlice, App>(
     app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App>,
   ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, readonly []>;
-  withApp<Dependencies extends TokenMap, Members, App>(
+  withApi<Dependencies extends TokenMap, Members, App>(
     app: AppDefinitionWithoutConfig<Dependencies, Members, App>,
   ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, readonly []>;
-  withApp(
+  withApi(
     app:
       | AppDefinition<TokenMap, unknown, unknown, unknown>
       | AppDefinitionWithoutConfig<TokenMap, unknown, unknown>,
@@ -1091,7 +1091,7 @@ class RepositoryDefinedFeatureBuilder<
     private readonly repositories: RepositoryRegistry<Live, Memory>,
   ) {}
 
-  withApp<
+  withApi<
     Dependencies extends TokenMap,
     Members extends object,
     Config,
@@ -1108,7 +1108,7 @@ class RepositoryDefinedFeatureBuilder<
       Created
     > & { readonly reads: Reads },
   ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads, Created>;
-  withApp<
+  withApi<
     Dependencies extends TokenMap,
     Members extends object,
     App,
@@ -1132,7 +1132,7 @@ class RepositoryDefinedFeatureBuilder<
     Reads,
     Created
   >;
-  withApp<Dependencies extends TokenMap, Members extends object, Config, App, Created extends App>(
+  withApi<Dependencies extends TokenMap, Members extends object, Config, App, Created extends App>(
     app: RepositoryAppDefinition<
       Dependencies,
       Members,
@@ -1152,7 +1152,7 @@ class RepositoryDefinedFeatureBuilder<
     readonly [],
     Created
   >;
-  withApp<
+  withApi<
     Dependencies extends TokenMap,
     Members extends object = object,
     App = unknown,
@@ -1175,7 +1175,7 @@ class RepositoryDefinedFeatureBuilder<
     readonly [],
     Created
   >;
-  withApp<
+  withApi<
     Dependencies extends TokenMap,
     Members extends object,
     Slice extends ConfigSlice,
@@ -1202,7 +1202,7 @@ class RepositoryDefinedFeatureBuilder<
     Reads,
     Created
   >;
-  withApp<
+  withApi<
     Dependencies extends TokenMap,
     Members extends object,
     Slice extends ConfigSlice,
@@ -1228,7 +1228,7 @@ class RepositoryDefinedFeatureBuilder<
     readonly [],
     Created
   >;
-  withApp(
+  withApi(
     app:
       | RepositoryAppDefinition<
           TokenMap,

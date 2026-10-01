@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   OpsEventingIntrospection,
   OpsKillSwitchDescriptor,
-  OpsApp,
+  OpsModule,
   OpsCapability,
 } from "../ops.app.ts";
 import { createOpsTestApp } from "./ops.fixture.ts";
@@ -39,7 +39,7 @@ class OneSwitchIntrospection implements OpsEventingIntrospection {
   }
 }
 
-function buildApp(): { app: OpsApp; written: string[] } {
+function buildApp(): { app: OpsModule; written: string[] } {
   const written: string[] = [];
   const featureFlags = createApiFixture<FeatureFlagApi>({
     setEnabled: async ({ key }: { key: string }) => {

@@ -101,4 +101,4 @@ export { opsBugReportTrpcTransport } from "./transport/ops-bug-report.trpc.ts";
 // decision about which client an EXPLAIN is allowed to reach.
 export type { OpsExplainBuild } from "./rules/ops-clickhouse-explain.rules.ts";
 export type { OpsExplainOutcome } from "./services/ops-clickhouse-explain.service.ts";
-export { opsServer } from "./ops.server.ts";
+export { opsProcessModule } from "./ops.module.ts";

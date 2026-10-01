@@ -6,7 +6,7 @@ import {
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
-import { annotationServer } from "../../annotation.server.ts";
+import { annotationProcessModule } from "../../annotation.module.ts";
 import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
 import { MemoryAnnotationRepository } from "../../repositories/memory/memory.annotation.repository.ts";
 import {
@@ -24,7 +24,7 @@ import {
  */
 function process() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(annotationServer)])
+    .withModules([withMemoryRepositories(annotationProcessModule)])
     .provide({
       project: createAnnotationTestProjects(),
       organization: createAnnotationTestOrganizations(),
@@ -50,7 +50,7 @@ describe("annotation app installation", () => {
       const app = runtime.service(AnnotationApi);
       const created = await app.createUnattributed(input);
 
-      expect(runtime.module(annotationServer).provided).toBe(app);
+      expect(runtime.module(annotationProcessModule).provided).toBe(app);
 
       await expect(
         app.getById({ projectId: input.projectId, id: created.id }),

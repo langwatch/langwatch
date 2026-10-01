@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
-import { suiteServer } from "../../suite.server.ts";
+import { suiteProcessModule } from "../../suite.module.ts";
 import {
   memoryAgentApi,
   memoryScenarioApi,
@@ -29,7 +29,7 @@ import {
 } from "../../transport/__tests__/suite-rest.harness.ts";
 
 /**
- * The one store-backed member `SuiteApp` declares reading. Installing on
+ * The one store-backed member `SuiteModule` declares reading. Installing on
  * the memory tier never reaches a store, so boot needs the member to
  * EXIST — a stub that refuses on use proves it, naming the failure.
  */
@@ -44,7 +44,7 @@ function analyticalWithoutStore(): ClickHouseQueryClient {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(suiteServer)])
+    .withModules([withMemoryRepositories(suiteProcessModule)])
     .withAnalytical(analyticalWithoutStore())
     .withKeyvalue(null)
     .withMembers({ publicBaseUrl: undefined })
@@ -96,7 +96,7 @@ describe("suite app installation", () => {
       const app = runtime.service(SuiteApi);
       const created = await app.create(plan);
 
-      expect(runtime.module(suiteServer).provided).toBe(app);
+      expect(runtime.module(suiteProcessModule).provided).toBe(app);
       expect(created.slug).toBe("nightly");
 
       await expect(app.list({ projectId: plan.projectId })).resolves.toMatchObject([
@@ -132,7 +132,7 @@ describe("given a stored run plan in the api role", () => {
     const scenario = world.addScenario({ name: "Refund flow" });
     const agent = world.addAgent();
     const runtime = await createApp({ role: "api" })
-      .withModules([withMemoryRepositories(suiteServer)])
+      .withModules([withMemoryRepositories(suiteProcessModule)])
       .withAnalytical(analyticalWithoutStore())
       .withKeyvalue(null)
       .withEventing(

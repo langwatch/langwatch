@@ -3,10 +3,10 @@
  * declares the `presence:` slices at install; the trace explorer reads and feeds them.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import "./behavior/presence-preferences-store.ts";
 import "./behavior/presence-store.ts";
 import "./behavior/section-tracker-store.ts";
 
-export const presenceWeb = defineWebModule("presence");
+export const presenceWeb = defineBrowserModule("presence");

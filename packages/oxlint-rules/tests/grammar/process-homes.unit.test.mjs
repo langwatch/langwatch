@@ -15,7 +15,7 @@ import {
 
 const EXAMPLE = [
   "index.ts",
-  "annotation.server.ts",
+  "annotation.module.ts",
   "app/annotation.app.ts",
   "app/annotation.members.ts",
   "transport/annotation.rest.ts",

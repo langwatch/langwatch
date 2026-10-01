@@ -224,8 +224,8 @@ export interface EvaluationRunner {
 }
 
 type EvaluationSetup = FeatureSetup<
-  typeof EvaluationApp.dependencies,
-  MembersRead<typeof EvaluationApp.reads>,
+  typeof EvaluationModule.dependencies,
+  MembersRead<typeof EvaluationModule.reads>,
   EvaluationServerConfig,
   EvaluationRepositories
 >;
@@ -261,7 +261,7 @@ function verdictOf(
 }
 
 /** The one process-owned Evaluation capability. */
-export class EvaluationApp implements EvaluationApiContract {
+export class EvaluationModule implements EvaluationApiContract {
   static readonly contract = EvaluationApi;
   /** `langevalsEndpoint`: where this deployment's evaluator and clustering service answers. */
   static readonly config = evaluationConfig;
@@ -274,7 +274,7 @@ export class EvaluationApp implements EvaluationApiContract {
     retention: DataRetentionApi,
     featureFlags: FeatureFlagApi,
     evaluators: EvaluatorApi,
-    /** Read per request (queued runs, slug lookups), never in construction: MonitorApp needs us. */
+    /** Read per request (queued runs, slug lookups), never in construction: MonitorModule needs us. */
     monitors: MonitorApi,
     /** Where the analytics folds and rollup are written. */
     analytics: AnalyticsApi,
@@ -364,10 +364,10 @@ export class EvaluationApp implements EvaluationApiContract {
   }
 
   /** The closed stub answers what has no port yet (see the port-evaluation-runtime handoff). */
-  static async create(setup: EvaluationSetup): Promise<EvaluationApp> {
+  static async create(setup: EvaluationSetup): Promise<EvaluationModule> {
     const { secrets } = setup;
-    const environment = await secrets.into(EvaluationApp.secrets.openAi, (openAi) =>
-      secrets.into(EvaluationApp.secrets.azureContentSafety, (azureContentSafety) =>
+    const environment = await secrets.into(EvaluationModule.secrets.openAi, (openAi) =>
+      secrets.into(EvaluationModule.secrets.azureContentSafety, (azureContentSafety) =>
         EvaluatorEnvironmentService.create({
           config: setup.config,
           openAiApiKey: openAi,
@@ -376,13 +376,13 @@ export class EvaluationApp implements EvaluationApiContract {
       ),
     );
 
-    return EvaluationApp.withEnvironment(setup, environment);
+    return EvaluationModule.withEnvironment(setup, environment);
   }
 
   private static withEnvironment(
     { dependencies, repositories, members, config }: EvaluationSetup,
     environment: EvaluatorEnvironmentService,
-  ): EvaluationApp {
+  ): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
     const lifecycle = EvaluationLifecycleService.create();
     const langevals = config.langevalsEndpoint
@@ -432,7 +432,7 @@ export class EvaluationApp implements EvaluationApiContract {
       telemetry,
     });
 
-    return EvaluationApp.fromInfrastructure({
+    return EvaluationModule.fromInfrastructure({
       infrastructure: {
         ...unavailable,
         customEvaluators: {
@@ -529,7 +529,7 @@ export class EvaluationApp implements EvaluationApiContract {
     piiDetection: LangevalsPiiDetectionService;
     executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
     eventing: EvaluationProcessingStoresAdapter;
-  }): EvaluationApp {
+  }): EvaluationModule {
     const {
       infrastructure: members,
       dependencies,
@@ -542,7 +542,7 @@ export class EvaluationApp implements EvaluationApiContract {
       eventing,
     } = setup;
 
-    return new EvaluationApp({
+    return new EvaluationModule({
       service: EvaluationService.create({
         repository: repositories.runs,
         monitorPerformance: repositories.monitorPerformance,

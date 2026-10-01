@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { webModules } from "@langwatch/installed-web-modules";
+import { browserModules } from "@langwatch/installed-web-modules";
 import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -43,7 +43,7 @@ function featureMapUiAddresses(): string[] {
 /** Both halves of the surface: the application's table, and what modules declare. */
 const patterns = [
   ...uiRouteDescriptors(uiRouteTable).map((descriptor) => descriptor.path),
-  ...installedModuleScreens(webModules).routes.project.map((route) => route.path),
+  ...installedModuleScreens(browserModules).routes.project.map((route) => route.path),
 ].filter((path): path is string => typeof path === "string");
 
 /**

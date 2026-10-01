@@ -42,13 +42,13 @@ type PlatformHealthMembers = Readonly<{
 }>;
 
 type PlatformHealthSetup = FeatureSetup<
-  typeof PlatformHealthApp.dependencies,
+  typeof PlatformHealthModule.dependencies,
   PlatformHealthMembers,
   undefined
 >;
 
 /** The process-owned platform-health capability. */
-export class PlatformHealthApp implements PlatformHealthApiContract {
+export class PlatformHealthModule implements PlatformHealthApiContract {
   static readonly contract = PlatformHealthApi;
   static readonly dependencies = {
     automation: AutomationApi,
@@ -90,12 +90,12 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     dependencies,
     members,
     secrets,
-  }: PlatformHealthSetup): Promise<PlatformHealthApp> {
+  }: PlatformHealthSetup): Promise<PlatformHealthModule> {
     const probeApiKey = await secrets.into(
-      PlatformHealthApp.secrets.probeApiKey,
+      PlatformHealthModule.secrets.probeApiKey,
       (value) => value ?? "",
     );
-    const apiKey = await secrets.into(PlatformHealthApp.secrets.apiKey, (value) => value ?? "");
+    const apiKey = await secrets.into(PlatformHealthModule.secrets.apiKey, (value) => value ?? "");
     const collaborators: SubsystemProbeCollaborators = {
       canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: members.publicBaseUrl ?? "" }),
       automation: () => ({
@@ -117,7 +117,7 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
       },
     };
 
-    return new PlatformHealthApp({
+    return new PlatformHealthModule({
       health: PlatformHealthService.create({
         probes: PLATFORM_HEALTH_CHECK_NAMES.map((name) =>
           SubsystemProbeRunService.create({ name, probes, credential }),

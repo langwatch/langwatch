@@ -6,7 +6,7 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 
-import type { ScimApp } from "../app/scim.app.ts";
+import type { ScimModule } from "../app/scim.app.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import type { ScimDirectoryMoveService } from "../services/scim-directory-move.service.ts";
 import {
@@ -50,7 +50,7 @@ export function buildScimDirectoryPipeline(input: {
 
 export const scimDirectoryEventing = defineEventingModule({
   pipeline: SCIM_DIRECTORY_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<ScimRepositories, ScimApp>) =>
+  build: ({ app, participation }: EventingSetup<ScimRepositories, ScimModule>) =>
     app.directoryPipeline({ participation }),
   connect: ({ app, commands }) => app.connectDirectory(commands),
 });

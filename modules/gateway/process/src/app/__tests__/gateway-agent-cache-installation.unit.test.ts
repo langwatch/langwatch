@@ -10,7 +10,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
@@ -19,8 +19,8 @@ const reversible: Encryption = {
   decrypt: (ciphertext) => ciphertext.replace(/^sealed:/, ""),
 };
 
-function gatewayApp(): Promise<GatewayApp> {
-  return GatewayApp.create({
+function gatewayApp(): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),

@@ -42,7 +42,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangyApp } from "../app/langy.app.ts";
+import { LangyModule } from "../app/langy.app.ts";
 import { createLangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
@@ -271,8 +271,8 @@ function compositionOptions() {
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-async function createApp(): Promise<LangyApp> {
-  const app = await LangyApp.create({
+async function createApp(): Promise<LangyModule> {
+  const app = await LangyModule.create({
     dependencies: {
       presence: testPresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -320,7 +320,7 @@ async function createApp(): Promise<LangyApp> {
 }
 
 /** Registers the pipeline's producer half and hands its senders to the app, as boot does. */
-function connectProducer(app: LangyApp): void {
+function connectProducer(app: LangyModule): void {
   const registered = producerEventing().register(
     app.conversationPipeline({ participation: "produce" }),
   );

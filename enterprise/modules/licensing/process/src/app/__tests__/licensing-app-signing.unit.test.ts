@@ -18,7 +18,7 @@ import {
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
-import { LicensingApp } from "../licensing.app.ts";
+import { LicensingModule } from "../licensing.app.ts";
 
 const PURCHASE = {
   organizationName: "Acme",
@@ -27,8 +27,8 @@ const PURCHASE = {
   maxMembers: 4,
 };
 
-function licensingWithSigningKey(signingKey: string | undefined): Promise<LicensingApp> {
-  return LicensingApp.create({
+function licensingWithSigningKey(signingKey: string | undefined): Promise<LicensingModule> {
+  return LicensingModule.create({
     dependencies: {
       instantEval: createApiFixture<InstantEvalApi>(),
       projects: createApiFixture<ProjectApi>(),

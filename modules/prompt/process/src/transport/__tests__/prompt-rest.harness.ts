@@ -14,7 +14,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
 
-import { PromptApp } from "#app/prompt.app";
+import { PromptModule } from "#app/prompt.app";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
@@ -41,8 +41,8 @@ const renderRefusal: RestErrorHandler = (error, c) => {
 };
 
 /** The real application over a scripted engine, so the family's own operations run. */
-export function buildPromptApp(prompts: PromptService): PromptApp {
-  return PromptApp.createWithPrompts(
+export function buildPromptApp(prompts: PromptService): PromptModule {
+  return PromptModule.createWithPrompts(
     {
       dependencies: {
         projects: createApiFixture<ProjectApi>(),

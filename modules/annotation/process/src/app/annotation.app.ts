@@ -103,7 +103,7 @@ const annotatorReferenceSchema = z.string().transform((reference, context) => {
   return z.NEVER;
 });
 
-export class AnnotationApp implements AnnotationApi {
+export class AnnotationModule implements AnnotationApi {
   static readonly contract = AnnotationApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -146,8 +146,8 @@ export class AnnotationApp implements AnnotationApi {
     this.#entitlement = dependencies.entitlement;
   }
 
-  static create({ repositories, dependencies }: AnnotationSetup): AnnotationApp {
-    return new AnnotationApp(repositories, dependencies);
+  static create({ repositories, dependencies }: AnnotationSetup): AnnotationModule {
+    return new AnnotationModule(repositories, dependencies);
   }
 
   create(input: CreateAnnotationInput): Promise<Annotation> {

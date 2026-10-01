@@ -102,7 +102,7 @@ export const CONTRACT_ARTIFACT_ONLY = new RegExp(`^(?:${CONTRACT_ARTIFACTS})\\.t
  * file prints. A test pins it to `PROCESS_PATTERNS` so the two cannot drift.
  */
 export const PROCESS_HOMES =
-  "index.ts, <feature>.server.ts, app/<feature>.app.ts, app/<feature>.members.ts, " +
+  "index.ts, <feature>.module.ts, app/<feature>.app.ts, app/<feature>.members.ts, " +
   "transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, " +
   "repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), " +
   "channels/ (the interface, the bundle, the registry, and a tier folder beside them), " +
@@ -128,7 +128,7 @@ export function stripFeaturePrefix(path) {
 
 export const PROCESS_PATTERNS = [
   /^index\.ts$/,
-  new RegExp(`^${NAME}\\.server\\.ts$`),
+  new RegExp(`^${NAME}\\.module\\.ts$`),
   new RegExp(`^app/${NAME}\\.app\\.ts$`),
   // The closed record of members a process hands the app (ADR-144), declared
   // beside the app it feeds.

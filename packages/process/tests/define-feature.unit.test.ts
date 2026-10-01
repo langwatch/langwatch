@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { createApp } from "../src/application.ts";
-import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { memberSourceOf } from "./member-source.ts";
 
 abstract class DirectoryApp {
@@ -34,27 +34,27 @@ class ComposedDirectoryApp extends DirectoryApp {
   }
 }
 
-const directoryServer = defineServerModule("annotation").withApp(ComposedDirectoryApp).build();
+const directoryProcessModule = defineProcessModule("annotation").withApi(ComposedDirectoryApp).build();
 const directoryApis = [
   { protocol: "rest", router: (host: string) => ({ host }) },
   { protocol: "trpc", router: (host: string) => ({ host }) },
 ] as const;
-const directoryWithTransports = defineServerModule("annotation")
-  .withApp(ComposedDirectoryApp)
+const directoryWithTransports = defineProcessModule("annotation")
+  .withApi(ComposedDirectoryApp)
   .withTransports(...directoryApis);
 
-describe("defineServerModule", () => {
+describe("defineProcessModule", () => {
   it("constructs the declared app once during boot and publishes its contract", async () => {
     const runtime = await createApp({
       role: "api",
       config: { annotation: { suffix: "directory" } },
       members: memberSourceOf({ prefix: "tenant-" }),
     })
-      .withModules([directoryServer])
+      .withModules([directoryProcessModule])
       .boot();
 
     expect(runtime.service(DirectoryApp).name).toBe("tenant-directory");
-    expect(runtime.module(directoryServer).provided).toBe(runtime.service(DirectoryApp));
+    expect(runtime.module(directoryProcessModule).provided).toBe(runtime.service(DirectoryApp));
   });
 
   it("passes the framework resource owner to the factory context", async () => {
@@ -75,7 +75,7 @@ describe("defineServerModule", () => {
       }
     }
 
-    const declaration = defineServerModule("presence").withApp(ResourceApp).build();
+    const declaration = defineProcessModule("presence").withApi(ResourceApp).build();
     const runtime = await createApp({ role: "api", members: memberSourceOf({ prefix: "unused" }) })
       .withModules([declaration])
       .boot();

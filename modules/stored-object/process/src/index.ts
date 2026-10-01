@@ -1,4 +1,4 @@
-export { storedObjectServer } from "./stored-object.server.ts";
+export { storedObjectProcessModule } from "./stored-object.module.ts";
 export { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
 export { StoredObjectStorageRuntimeService } from "./services/stored-object-storage-runtime.service.ts";
 export { AbsentPayloadStagingService } from "./services/absent-payload-staging.service.ts";

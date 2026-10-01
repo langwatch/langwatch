@@ -249,7 +249,7 @@ export class InviteTeamAssignmentService {
 
     // Through the role service, which is where assignability is defined: an invite validated
     // against a different rule than `applyInvite` applies would be accepted here and silently
-    // dropped on acceptance. The service rather than `RoleApp`: this asks which custom roles
+    // dropped on acceptance. The service rather than `RoleModule`: this asks which custom roles
     // an organization may assign, not whether the caller may administer them, and there is no
     // administrator on this path.
     const roleService = this.roleService;

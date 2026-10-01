@@ -24,7 +24,7 @@ import { NLP_LAMBDA_CLEANUP_PROCESS_NAME } from "../../eventing/workflow-nlp-lam
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { WorkflowApp, type NlpLambdaArnCache, type NlpLambdaFleet } from "../workflow.app.ts";
+import { WorkflowModule, type NlpLambdaArnCache, type NlpLambdaFleet } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 /** Decrypts nothing a test named - the sweep never reaches it. */
@@ -42,10 +42,10 @@ class NoopTestEncryption {
  * The App reads nothing off a setup but its members, so a test builds the one
  * it cares about rather than booting a process to reach one method.
  */
-async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowApp> {
+async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure(fleet ? { nlpLambdaFleet: fleet } : {});
 
-  return WorkflowApp.create({
+  return WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
@@ -88,7 +88,7 @@ async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowApp> {
 }
 
 /** Runs the sweep intent the daily wake asks for, as the worker's outbox would. */
-async function runSweep(app: WorkflowApp): Promise<void> {
+async function runSweep(app: WorkflowModule): Promise<void> {
   const process = app
     .nlpLambdaCleanupPipeline({ deleteDispatchedBefore: async () => 0 })
     .processManagers.get(NLP_LAMBDA_CLEANUP_PROCESS_NAME);

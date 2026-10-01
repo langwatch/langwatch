@@ -27,7 +27,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp } from "../governance.app.ts";
+import { GovernanceModule } from "../governance.app.ts";
 
 const ORGANIZATION_ID = "org-1";
 const CALLER = { id: "user-1" };
@@ -66,7 +66,7 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
     completionTokens: 0,
     topModel: null,
   }));
-  const app = await GovernanceApp.create({
+  const app = await GovernanceModule.create({
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
@@ -110,7 +110,7 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
   return { app, traceSpend, budgetOverviewForUser, getPrincipalSpendSummary };
 }
 
-describe("GovernanceApp personal surface", () => {
+describe("GovernanceModule personal surface", () => {
   describe("given a member with no personal workspace yet", () => {
     it("answers the usage dashboard with zeros", async () => {
       const { app } = await buildApp({ workspace: null });

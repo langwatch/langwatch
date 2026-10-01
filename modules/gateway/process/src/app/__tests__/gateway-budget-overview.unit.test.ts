@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * `GatewayApp.budgetOverviewForUser`: delegates to `BudgetOverviewService`
+ * `GatewayModule.budgetOverviewForUser`: delegates to `BudgetOverviewService`
  * and proves it stays scoped to the caller's own organization.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -15,7 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
@@ -70,8 +70,8 @@ function fakePrisma(overrides: {
 }
 
 /** The slice of the application this surface reaches, and nothing else. */
-async function gatewayAppStub(): Promise<GatewayApp> {
-  return GatewayApp.create({
+async function gatewayAppStub(): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
@@ -110,7 +110,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
   });
 }
 
-describe("GatewayApp.budgetOverviewForUser", () => {
+describe("GatewayModule.budgetOverviewForUser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getPersonalWorkspace.mockRejectedValue(new TeamNotFoundError());

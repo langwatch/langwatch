@@ -6,7 +6,7 @@
 
 import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
 import { savedViewTrpc } from "@langwatch/dashboard-contract";
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 import { createElement } from "react";
 
 import { analyticsApi } from "./behavior/analytics-api.ts";
@@ -22,7 +22,7 @@ function customGraph(mode: CustomGraphScreenMode) {
   };
 }
 
-export const analyticsWeb = defineWebModule("analytics")
+export const analyticsWeb = defineBrowserModule("analytics")
   .withApi(analyticsApi, { contracts: [analyticsTrpc, analyticsLwqlTrpc, savedViewTrpc] })
   .withHosts({
     requires: ["AnalyticsHostApi"],

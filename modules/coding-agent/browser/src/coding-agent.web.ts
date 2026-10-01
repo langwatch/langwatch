@@ -3,10 +3,10 @@
  * own — it lends its activity tables to user's workspace screens.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 /** The pull requests and sessions tables, lent to user (§3.4 rule 7). */
-export const codingAgentWeb = defineWebModule("coding-agent").withCapabilities({
+export const codingAgentWeb = defineBrowserModule("coding-agent").withCapabilities({
   codingAgentPullRequestsTable: {
     load: async () => ({
       default: (await import("./lent-activity-tables.tsx")).LentPullRequestsTable,

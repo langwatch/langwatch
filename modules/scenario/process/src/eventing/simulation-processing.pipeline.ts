@@ -29,7 +29,7 @@ import {
   SimulationSetArchivedEventSchema,
 } from "@langwatch/scenario-contract";
 
-import type { ScenarioApp } from "../app/scenario.app.ts";
+import type { ScenarioModule } from "../app/scenario.app.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
 import { QueueRunCommand } from "./queue-run.commands.ts";
@@ -184,7 +184,7 @@ export const simulationProcessingEventing = defineEventingModule({
     participation,
     priorEvents,
     resources,
-  }: EventingSetup<never, ScenarioApp, Pick<ResourceOwnership, "own">>) =>
+  }: EventingSetup<never, ScenarioModule, Pick<ResourceOwnership, "own">>) =>
     app.simulationPipeline({
       participation,
       ...(priorEvents ? { priorEvents } : {}),

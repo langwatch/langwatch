@@ -19,7 +19,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { enterpriseOpsServer } from "../../enterprise-ops.server.ts";
+import { enterpriseOpsProcessModule } from "../../enterprise-ops.module.ts";
 
 type Registry = LicensingApi;
 
@@ -104,7 +104,7 @@ async function build(registry: Partial<Registry> = {}) {
     ...registry,
   });
   const runtime = await createApp({ role: "api" })
-    .withModules([enterpriseOpsServer])
+    .withModules([enterpriseOpsProcessModule])
     .withStores(memoryStores())
     .provide({ ops, licensing, "audit-log": auditLog })
     .boot();

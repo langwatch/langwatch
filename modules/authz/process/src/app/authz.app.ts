@@ -64,18 +64,18 @@ export interface AuthzCompatibilityLedger {
 /**
  * The whole adapter surface, as a caller composing this graph BY HAND
  * supplies it. The installed module reads the two members it needs and
- * builds the rest itself (see {@link AuthzApp.create}); kept for hand composition.
+ * builds the rest itself (see {@link AuthzModule.create}); kept for hand composition.
  */
 export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositories">;
 export type AuthzSetup = FeatureSetup<
   Readonly<{}>,
-  MembersRead<typeof AuthzApp.reads>,
+  MembersRead<typeof AuthzModule.reads>,
   AuthzServerConfig,
   AuthzRepositories
 >;
 
 /** The composed callable authorization boundary. */
-export class AuthzApp implements AuthzApi {
+export class AuthzModule implements AuthzApi {
   static readonly contract = AuthzApiToken;
   static readonly dependencies = {} as const;
   static readonly config = authzServerConfig;
@@ -91,7 +91,7 @@ export class AuthzApp implements AuthzApi {
   #grantIdentity = AuthzGrantIdentityService.create();
   #grants: AuthzGrantsService;
   /**
-   * Both absent on an app built by {@link AuthzApp.fromServices}: a hand
+   * Both absent on an app built by {@link AuthzModule.fromServices}: a hand
    * composition registers the pipeline and connects the dispatcher itself, so
    * it has no use for either and this app never holds one.
    */
@@ -100,15 +100,15 @@ export class AuthzApp implements AuthzApi {
   #demoProjectId: string | undefined;
   #demoProjectUserId: string | undefined;
   /**
-   * Absent on an app built by {@link AuthzApp.fromServices}, which composes
+   * Absent on an app built by {@link AuthzModule.fromServices}, which composes
    * no repositories; the three admission verbs refuse by name there.
    */
   #admissions: AuthzAdmissionService | undefined;
-  /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no migration. */
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no migration. */
   #migration: SystemMigration | undefined;
-  /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no version store. */
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no version store. */
   #sessionVersions: AuthzSessionVersionService | undefined;
-  /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no platform tier. */
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no platform tier. */
   #platformOperators: AuthzPlatformOperatorsService | undefined;
 
   private constructor(
@@ -147,7 +147,7 @@ export class AuthzApp implements AuthzApi {
   eventingPipeline(): AuthzPipeline {
     if (!this.#pipeline) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no pipeline: " +
+        "This AuthzModule was composed from already-built services, so it holds no pipeline: " +
           "the composition that built them registers its own.",
       );
     }
@@ -158,7 +158,7 @@ export class AuthzApp implements AuthzApi {
    * Build AuthZ graph; dispatcher constructed here, connected by eventing
    * (needs pipeline's registered senders). Metrics optional for non-scrape.
    */
-  static create(setup: AuthzSetup): AuthzApp {
+  static create(setup: AuthzSetup): AuthzModule {
     const dispatcher = AuthzCommandDispatcherService.create();
     const bindingIds = AuthzGrantIdService.create();
     const config = authzRuntimeConfig(setup.config);
@@ -171,7 +171,7 @@ export class AuthzApp implements AuthzApi {
       cacheEnabled: config.cacheEnabled,
       demoProjectId: config.demoProjectId,
     }).build();
-    return new AuthzApp(built.authz, built.grants, {
+    return new AuthzModule(built.authz, built.grants, {
       demoProjectId: config.demoProjectId(),
       demoProjectUserId: setup.config.demoProjectUserId,
       admissions: AuthzAdmissionService.create({ admissions: setup.repositories.admissions }),
@@ -199,8 +199,8 @@ export class AuthzApp implements AuthzApi {
     permissions: AuthzService;
     grants: AuthzGrantsService;
     config?: AuthzServerConfig | undefined;
-  }): AuthzApp {
-    return new AuthzApp(input.permissions, input.grants, {
+  }): AuthzModule {
+    return new AuthzModule(input.permissions, input.grants, {
       demoProjectId: input.config?.demoProjectId,
       demoProjectUserId: input.config?.demoProjectUserId,
     });
@@ -320,8 +320,8 @@ export class AuthzApp implements AuthzApi {
   getSessionVersion: AuthzApi["getSessionVersion"] = (a) => {
     if (!this.#sessionVersions) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no session " +
-          "version store: compose it through AuthzApp.create to read one.",
+        "This AuthzModule was composed from already-built services, so it holds no session " +
+          "version store: compose it through AuthzModule.create to read one.",
       );
     }
     return this.#sessionVersions.getSessionVersion(a);
@@ -385,8 +385,8 @@ export class AuthzApp implements AuthzApi {
   registeredMigrations(): readonly SystemMigration[] {
     if (!this.#migration) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no migration: " +
-          "compose it through AuthzApp.create to answer its registered migrations.",
+        "This AuthzModule was composed from already-built services, so it holds no migration: " +
+          "compose it through AuthzModule.create to answer its registered migrations.",
       );
     }
     return [this.#migration];
@@ -395,8 +395,8 @@ export class AuthzApp implements AuthzApi {
   private platformOperators(): AuthzPlatformOperatorsService {
     if (!this.#platformOperators) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no platform " +
-          "tier: compose it through AuthzApp.create to grant, revoke or list operators.",
+        "This AuthzModule was composed from already-built services, so it holds no platform " +
+          "tier: compose it through AuthzModule.create to grant, revoke or list operators.",
       );
     }
     return this.#platformOperators;
@@ -405,8 +405,8 @@ export class AuthzApp implements AuthzApi {
   private admissions(): AuthzAdmissionService {
     if (!this.#admissions) {
       throw new Error(
-        "This AuthzApp was composed from already-built services, so it holds no admission " +
-          "repository: compose it through AuthzApp.create to read or clear an admission.",
+        "This AuthzModule was composed from already-built services, so it holds no admission " +
+          "repository: compose it through AuthzModule.create to read or clear an admission.",
       );
     }
     return this.#admissions;

@@ -20,9 +20,9 @@ const SAAS_CLOSED_READS = ["logger", "clock", "rateLimiter"] as const;
 export type SaasProcessMembers = MembersRead<typeof SAAS_CLOSED_READS> &
   Readonly<{ isSaas: boolean }>;
 
-type SaasSetup = FeatureSetup<typeof SaasApp.dependencies, SaasProcessMembers, undefined>;
+type SaasSetup = FeatureSetup<typeof SaasModule.dependencies, SaasProcessMembers, undefined>;
 
-export class SaasApp implements SaasApiContract {
+export class SaasModule implements SaasApiContract {
   static readonly contract = SaasApi;
   static readonly dependencies = {
     /** Where this deployment's product analytics goes. */
@@ -39,14 +39,14 @@ export class SaasApp implements SaasApiContract {
     this.#usageReports = usageReports;
   }
 
-  static create({ dependencies, members, resources }: SaasSetup): SaasApp {
+  static create({ dependencies, members, resources }: SaasSetup): SaasModule {
     const analytics = productAnalyticsChannels.live.create({
       targets: () => dependencies.ops.findProductAnalyticsTargets(),
       logger: members.logger,
     });
     resources.own("LangWatch Cloud product-analytics client", () => analytics.close());
 
-    return new SaasApp(
+    return new SaasModule(
       UsageReportReceiverService.create({
         cloud: LangWatchCloudService.create({ isSaas: members.isSaas }),
         rateLimiter: members.rateLimiter,

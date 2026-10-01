@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
 import { DuplicateProviderError } from "../src/boot-errors.ts";
-import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { MissingMemberError } from "../src/module-members.ts";
 import type { MemberSource } from "../src/module-members.ts";
 
@@ -23,7 +23,7 @@ const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
 
 type Members = Readonly<{ clock: () => string; mail: { sent: string[] }; unread: string }>;
 
-class AnnotationApp implements AnnotationApi {
+class AnnotationModule implements AnnotationApi {
   static readonly contract = AnnotationApi;
   static readonly dependencies = { projects: ProjectApi };
   static readonly reads = ["clock"] as const;
@@ -34,10 +34,10 @@ class AnnotationApp implements AnnotationApi {
   ) {}
 
   static create(
-    setup: FeatureSetup<typeof AnnotationApp.dependencies, Members, undefined>,
-  ): AnnotationApp {
+    setup: FeatureSetup<typeof AnnotationModule.dependencies, Members, undefined>,
+  ): AnnotationModule {
     handed = setup.members as Readonly<Record<string, unknown>>;
-    return new AnnotationApp(setup.members.clock, setup.dependencies.projects);
+    return new AnnotationModule(setup.members.clock, setup.dependencies.projects);
   }
 
   stamp(): string {
@@ -48,7 +48,7 @@ class AnnotationApp implements AnnotationApi {
 /** What the app was handed, read back outside its API reference. */
 let handed: Readonly<Record<string, unknown>> = {};
 
-const annotation = defineServerModule("annotation").withApp(AnnotationApp).build();
+const annotation = defineProcessModule("annotation").withApi(AnnotationModule).build();
 
 /** A source that records which members were asked for, and in which order. */
 function recordingSource(members: Partial<Members>, asked: string[]): MemberSource<Members> {
@@ -103,7 +103,7 @@ describe("given a process whose modules declare what they read", () => {
   describe("when this process cannot supply a member a module declared", () => {
     /** @scenario "A pool member the module named is absent at boot" */
     it("refuses before serving, naming the module and the member", async () => {
-      const create = vi.spyOn(AnnotationApp, "create");
+      const create = vi.spyOn(AnnotationModule, "create");
       const booting = createApp({ role: "api", members: recordingSource({}, []) })
         .withProvided(ProjectApi, projects)
         .withModules([annotation])

@@ -2,7 +2,7 @@ import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
+import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
 
 function fixture(options: { storeFromBytes?: StoredObjectApi["storeFromBytes"] } = {}) {
@@ -21,7 +21,7 @@ function fixture(options: { storeFromBytes?: StoredObjectApi["storeFromBytes"] }
       isDuplicate: false,
     });
   const storedObjects = createApiFixture<StoredObjectApi>({ storeFromBytes });
-  const app = TraceApp.create(
+  const app = TraceModule.create(
     createApiFixture<TraceAppDependencies>({
       storedObjects,
       traces: createApiFixture<TraceAppDependencies["traces"]>({
@@ -56,7 +56,7 @@ const input = {
 
 describe("TraceApi.extractInlineMediaFromEvent", () => {
   it("declares Stored Object as the required media peer", () => {
-    expect(TraceApp.dependencies.storedObjects).toBe(StoredObjectApi);
+    expect(TraceModule.dependencies.storedObjects).toBe(StoredObjectApi);
   });
 
   /** @scenario "Inline file part is externalized and the event payload is rewritten by id" */

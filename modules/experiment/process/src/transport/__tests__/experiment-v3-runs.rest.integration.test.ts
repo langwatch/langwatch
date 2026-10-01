@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * The workbench's run doors over a real `ExperimentApp`, pinned to the wire
+ * The workbench's run doors over a real `ExperimentModule`, pinned to the wire
  * main published: every status, JSON body, event-stream header and frame.
  */
 import { AgentOwnerOnlyError } from "@langwatch/agent-contract";
@@ -19,11 +19,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ExperimentApp, type ExperimentAppDependencies } from "../../app/experiment.app.ts";
+import { ExperimentModule, type ExperimentAppDependencies } from "../../app/experiment.app.ts";
 import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import type { ExperimentRunStreamMessage } from "../../channels/experiment-run-event-stream.channel.ts";
 import type { ExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
-import { experimentServer } from "../../experiment.server.ts";
+import { experimentProcessModule } from "../../experiment.module.ts";
 import type { ExperimentIdLookupRepository } from "../../repositories/experiment-id-lookup.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
@@ -214,7 +214,7 @@ async function harness({
     workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
     runProcessing: pipeline.runProcessing,
   };
-  const app = ExperimentApp.createForTesting(dependencies);
+  const app = ExperimentModule.createForTesting(dependencies);
 
   const identity = {
     identify: () => ({ actor: { type: "user" as const, id: "user-1" }, scope: null }),
@@ -262,7 +262,7 @@ async function harness({
     bearers: () => identity,
     audit: { record: async () => {} },
   });
-  for (const transport of experimentServer.transports) {
+  for (const transport of experimentProcessModule.transports) {
     if (transport.protocol !== "rest") continue;
     host.mount(transport.router(), () => app, {
       facts: [

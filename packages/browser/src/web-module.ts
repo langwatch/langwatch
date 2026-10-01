@@ -411,7 +411,7 @@ export type SupplyModule = WebModule<
   boolean
 >;
 
-export function defineWebModule<const Name extends string>(
+export function defineBrowserModule<const Name extends string>(
   name: Name,
 ): WebModule<Name, Empty, Empty, EmptyDeclaration, true> {
   return WebModule.create(name);

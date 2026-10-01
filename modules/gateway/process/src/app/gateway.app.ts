@@ -721,7 +721,7 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
 };
 
 type GatewaySetup = FeatureSetup<
-  typeof GatewayApp.dependencies,
+  typeof GatewayModule.dependencies,
   Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption" | "redis"> &
     Readonly<{
       /** The expected control plane, where the gateway's own setting says nothing. */
@@ -730,7 +730,7 @@ type GatewaySetup = FeatureSetup<
   GatewayServerConfig
 >;
 
-export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
+export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
   static readonly contract = GatewayApiToken;
   static readonly dependencies = {
     /**
@@ -791,11 +791,11 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
    */
   static readonly reads = ["prisma", "clickhouse", "encryption", "redis", "publicBaseUrl"] as const;
 
-  static async create(setup: GatewaySetup): Promise<GatewayApp> {
-    return setup.secrets.into(GatewayApp.secrets.internalSecret, (internalSecret) =>
-      setup.secrets.into(GatewayApp.secrets.jwtSecret, (jwtSecret) =>
-        setup.secrets.into(GatewayApp.secrets.virtualKeyPepper, (virtualKeyPepper) =>
-          GatewayApp.#createWithSecrets(setup, { internalSecret, jwtSecret, virtualKeyPepper }),
+  static async create(setup: GatewaySetup): Promise<GatewayModule> {
+    return setup.secrets.into(GatewayModule.secrets.internalSecret, (internalSecret) =>
+      setup.secrets.into(GatewayModule.secrets.jwtSecret, (jwtSecret) =>
+        setup.secrets.into(GatewayModule.secrets.virtualKeyPepper, (virtualKeyPepper) =>
+          GatewayModule.#createWithSecrets(setup, { internalSecret, jwtSecret, virtualKeyPepper }),
         ),
       ),
     );
@@ -808,7 +808,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       jwtSecret: string | undefined;
       virtualKeyPepper: string | undefined;
     }>,
-  ): GatewayApp {
+  ): GatewayModule {
     const governanceEvents = GatewayGovernanceEventsService.create({
       projects: setup.dependencies.projects,
     });
@@ -896,7 +896,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       realtimeSessions,
     });
 
-    return new GatewayApp({
+    return new GatewayModule({
       members: {
         ...controlPlane,
         agentCache: {

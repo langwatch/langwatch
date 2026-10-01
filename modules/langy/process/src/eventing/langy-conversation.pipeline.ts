@@ -4,12 +4,12 @@
  */
 import { defineEventingModule, type EventingSetup } from "@langwatch/eventing";
 
-import type { LangyApp } from "../app/langy.app.ts";
+import type { LangyModule } from "../app/langy.app.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 
 export const langyConversationEventing = defineEventingModule({
   pipeline: "langy_conversation_processing",
-  build: ({ app, participation }: EventingSetup<LangyRepositories, LangyApp>) =>
+  build: ({ app, participation }: EventingSetup<LangyRepositories, LangyModule>) =>
     app.conversationPipeline({ participation }),
   connect: ({ app, commands }) => app.connectConversationCommands(commands),
 });

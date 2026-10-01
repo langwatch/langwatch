@@ -16,7 +16,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { identityServer } from "../../identity.server.ts";
+import { identityProcessModule } from "../../identity.module.ts";
 
 /** An empty secrets chain: every optional handle, the sign-ups webhook included, reads as unset. */
 const noSecretsChain = SecretsResolver.over(SecretsChain.start({ environment: {} }));
@@ -40,7 +40,7 @@ async function bootIdentity() {
     role: "api",
     secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared),
   })
-    .withModules([withMemoryRepositories(identityServer)])
+    .withModules([withMemoryRepositories(identityProcessModule)])
     .withMembers({
       publicBaseUrl: undefined,
       isSaas: false,

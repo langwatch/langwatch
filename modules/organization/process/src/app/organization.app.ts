@@ -256,7 +256,7 @@ type OrganizationMembers = MembersRead<readonly ["prisma", "encryption", "logger
   }>;
 
 type OrganizationSetup = FeatureSetup<
-  typeof ServerOrganizationApp.dependencies,
+  typeof OrganizationModule.dependencies,
   OrganizationMembers,
   undefined,
   OrganizationRepositories
@@ -309,7 +309,7 @@ const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
  * and {@link TeamManagementApi} explicitly, so a `/api/teams` member this
  * class doesn't serve fails the build instead of throwing at request time.
  */
-export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi {
+export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -345,9 +345,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   static readonly secrets = { internalSlackSignupsWebhook } as const;
   #dependencies: ServerOrganizationAppDependencies;
 
-  static async create(setup: OrganizationSetup): Promise<ServerOrganizationApp> {
+  static async create(setup: OrganizationSetup): Promise<OrganizationModule> {
     const signupAnnouncements = await setup.secrets.into(
-      ServerOrganizationApp.secrets.internalSlackSignupsWebhook,
+      OrganizationModule.secrets.internalSlackSignupsWebhook,
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
@@ -413,7 +413,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       organizations,
       projects: setup.dependencies.projects,
     });
-    const application = new ServerOrganizationApp({
+    const application = new OrganizationModule({
       organizations,
       membership,
       groups,
@@ -495,9 +495,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     /** Defaults to a reader that finds no organizations. */
     scopeGraph?: OrganizationScopeGraphReader;
     memberProvenance: MemberProvenanceService;
-  }): ServerOrganizationApp {
+  }): OrganizationModule {
     const { groups, ...dependencies } = setup.dependencies;
-    const application = new ServerOrganizationApp({
+    const application = new OrganizationModule({
       ...dependencies,
       groups:
         groups ??

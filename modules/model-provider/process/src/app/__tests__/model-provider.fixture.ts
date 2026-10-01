@@ -21,7 +21,7 @@ import { UnavailableModelProviderCredentialProbeService } from "../../services/u
 import { UnmanagedModelProviderGatewayService } from "../../services/unmanaged-model-provider-gateway.service.ts";
 import { VercelAiModelTranslationService } from "../../services/vercel-ai-model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterService } from "../../services/windowed-model-provider-connection-rate-limiter.service.ts";
-import { ModelProviderApp, type ModelProviderInfrastructure } from "../model-provider.app.ts";
+import { ModelProviderModule, type ModelProviderInfrastructure } from "../model-provider.app.ts";
 import type { ModelProviderCredentialProbe } from "../model-provider.members.ts";
 
 /** A suite that did not decide the issuer's answers must not reach one. */
@@ -137,8 +137,8 @@ export function createModelProviderTestApp(
       managed: ManagedProviderApi;
     }>;
   }> = {},
-): ModelProviderApp {
-  return ModelProviderApp.createForTesting({
+): ModelProviderModule {
+  return ModelProviderModule.createForTesting({
     repositories: input.repositories ?? MemoryModelProviderRepositories.create(),
     members: createModelProviderTestInfrastructure(input.members ?? {}),
     dependencies: {

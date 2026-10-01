@@ -28,7 +28,7 @@ import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { userServer } from "../../user.server.ts";
+import { userProcessModule } from "../../user.module.ts";
 import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -71,7 +71,7 @@ function process(
   peers: Readonly<{ auth?: AuthApi; governance?: GovernanceRestApi; project?: ProjectApi }>,
 ) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(userServer)])
+    .withModules([withMemoryRepositories(userProcessModule)])
     .withMembers({
       passkeysEnabled: false,
       publicBaseUrl: undefined,

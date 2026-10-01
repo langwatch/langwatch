@@ -341,7 +341,7 @@ describe("browser-only UI never reaches backend code", () => {
   // edge is a hole in the guard that looks exactly like a clean graph.
   describe("given a package-internal subpath import", () => {
     it("resolves it through the owning manifest's imports map", () => {
-      const server = join(REPO_ROOT, "modules/agent/process/src/agent.server.ts");
+      const server = join(REPO_ROOT, "modules/agent/process/src/agent.module.ts");
       expect(valueImports({ file: server }).map((entry) => entry.specifier)).toContain(
         "#app/agent.app",
       );

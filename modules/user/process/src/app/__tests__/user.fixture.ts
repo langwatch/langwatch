@@ -17,7 +17,7 @@ import type { RecordUserLifecycleCommandData } from "../../eventing/user-lifecyc
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../../repositories/user.repositories.ts";
 import type { UserLifecycleSenders } from "../../services/user-lifecycle-notice.service.ts";
-import { UserApp, type UserFacts } from "../user.app.ts";
+import { UserModule, type UserFacts } from "../user.app.ts";
 import type { UserAvatarStorage, UserInfrastructure } from "../user.members.ts";
 
 /** The issuer this deployment stores its credential account rows under. */
@@ -222,8 +222,8 @@ export function createUserTestApp(
     facts?: UserFacts;
     lifecycle?: UserLifecycleSenders;
   }> = {},
-): UserApp {
-  const app = UserApp.createForTesting({
+): UserModule {
+  const app = UserModule.createForTesting({
     repositories: input.repositories ?? MemoryUserRepositories.create(),
     members: createUserTestInfrastructure(input.members ?? {}),
     facts: input.facts ?? TEST_USER_CONFIG,

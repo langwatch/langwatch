@@ -4,9 +4,9 @@
  */
 
 import { SelectDatasetDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-contract";
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const datasetWeb = defineWebModule("dataset")
+export const datasetWeb = defineBrowserModule("dataset")
   .withHosts({
     requires: ["DatasetHostApi"],
     mounts: { DatasetHostApi: { load: () => import("./behavior/dataset-host-mount.tsx") } },

@@ -33,7 +33,7 @@ export class SaaSPlanProviderService extends BillingService {
   }
 
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
-    // BillingApp lifts the limits for an impersonating operator; this source never does.
+    // BillingModule lifts the limits for an impersonating operator; this source never does.
     const overrideAddingLimitations = false;
 
     // Unreachable through the wiring: a self-hosted deployment resolves its plan from the

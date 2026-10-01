@@ -22,7 +22,7 @@ function appWhere({ isOperator }: { isOperator: boolean }) {
   });
 }
 
-describe("AuthzApp.effectivePermissionsFor", () => {
+describe("AuthzModule.effectivePermissionsFor", () => {
   describe("given the session's user holds the platform-operator grant", () => {
     /** @scenario A platform operator's session carries ops permissions */
     it("adds ops:view and ops:manage to the scope's permissions", async () => {

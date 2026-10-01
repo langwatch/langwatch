@@ -12,7 +12,7 @@ import {
   TAMPERED_LICENSE_KEY,
   TEST_LICENSING_CONFIG,
 } from "../../__tests__/testing.ts";
-import { LicensingApp, type LicensingInfrastructure } from "../licensing.app.ts";
+import { LicensingModule, type LicensingInfrastructure } from "../licensing.app.ts";
 import type { LicenseStorage } from "../licensing.members.ts";
 
 describe("the installed licensing application's plan operation", () => {
@@ -25,7 +25,7 @@ describe("the installed licensing application's plan operation", () => {
       licenseKey: keys.get(organizationId) ?? null,
     }));
     const repository = createApiFixture<LicenseStorage>({ getOrganizationLicense });
-    const app = await LicensingApp.create({
+    const app = await LicensingModule.create({
       dependencies: {
         instantEval: createApiFixture<InstantEvalApi>(),
         projects: createApiFixture<ProjectApi>(),

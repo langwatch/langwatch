@@ -17,7 +17,7 @@ import type { NlpPayloadStaging } from "../../channels/nlp-lambda.channel.ts";
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { WorkflowApp, type NlpLambdaArnCache } from "../workflow.app.ts";
+import { WorkflowModule, type NlpLambdaArnCache } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 class NoopTestEncryption {
@@ -50,10 +50,10 @@ async function appWith({
 }: {
   lineage: Partial<WorkflowLineageRepository>;
   evaluators: EvaluatorApi;
-}): Promise<WorkflowApp> {
+}): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure({ evaluators });
 
-  return WorkflowApp.create({
+  return WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),

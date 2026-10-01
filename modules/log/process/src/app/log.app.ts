@@ -42,7 +42,7 @@ type LogDependencies = Readonly<{
 type LogSetup = FeatureSetup<LogDependencies, LogInfrastructure, LogServerConfig>;
 
 /** The process-owned Log capability over private preparation, persistence and its pipeline. */
-export class LogApp implements LogApiContract {
+export class LogModule implements LogApiContract {
   static readonly contract = LogApi;
   static readonly config = logConfig;
   static readonly dependencies: LogDependencies = {
@@ -72,7 +72,7 @@ export class LogApp implements LogApiContract {
     this.#collection = parts.collection;
   }
 
-  static create({ dependencies, members, config }: LogSetup): LogApp {
+  static create({ dependencies, members, config }: LogSetup): LogModule {
     const repository = ClickHouseCanonicalLogRecordRepository.create({
       resolveClient: ClickHouseCanonicalLogRecordAppendRepository.resolverOver(members.clickhouse),
       defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,
@@ -98,7 +98,7 @@ export class LogApp implements LogApiContract {
       logs: service,
       recordLogRecords: (records) => app.recordCanonicalLogRecords(records),
     });
-    const app: LogApp = new LogApp({
+    const app: LogModule = new LogModule({
       service,
       pipeline,
       receiver: OtlpLogReceiverService.create({ traces: dependencies.traces, collection }),

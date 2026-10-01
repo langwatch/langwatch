@@ -2,7 +2,7 @@ import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contr
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
-import { dashboardServer } from "../../dashboard.server.ts";
+import { dashboardProcessModule } from "../../dashboard.module.ts";
 import {
   createDashboardTestAnalytics,
   createDashboardTestAutomation,
@@ -11,7 +11,7 @@ import {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(dashboardServer)])
+    .withModules([withMemoryRepositories(dashboardProcessModule)])
     .withMember("publicBaseUrl", undefined)
     .provide({
       analytics: createDashboardTestAnalytics(),
@@ -28,7 +28,7 @@ describe("dashboard app installation", () => {
       try {
         const app = runtime.service(DashboardApi);
 
-        expect(runtime.module(dashboardServer).provided).toBe(app);
+        expect(runtime.module(dashboardProcessModule).provided).toBe(app);
 
         const created = await app.create({ projectId: "project-1", name: "Reports" });
 

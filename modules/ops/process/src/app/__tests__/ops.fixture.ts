@@ -1,6 +1,6 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
- * A real `OpsApp` over memory repositories, fixture peers and a literal
+ * A real `OpsModule` over memory repositories, fixture peers and a literal
  * members record. Every collaborator a test wants to watch is passed in
  * rather than reached for.
  */
@@ -21,7 +21,7 @@ import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
 import { AdminAccessService } from "../../services/admin-access.service.ts";
 import type { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
-  OpsApp,
+  OpsModule,
   type OpsAppInfrastructure,
   type OpsCapability,
   type OpsEventingIntrospection,
@@ -82,7 +82,7 @@ export type OpsTestAppOptions = Readonly<{
   checkup?: OpsCheckupService;
 }>;
 
-export type OpsTestApp = Readonly<{ app: OpsApp; repositories: OpsRepositories }>;
+export type OpsTestApp = Readonly<{ app: OpsModule; repositories: OpsRepositories }>;
 
 /** The members record a process supplies, with nothing configured. */
 export function createOpsTestInfrastructure(
@@ -130,7 +130,7 @@ export function createOpsTestInfrastructure(
 export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
   const repositories = options.repositories ?? MemoryOpsRepositories.create();
 
-  const app = OpsApp.fromInfrastructure({
+  const app = OpsModule.fromInfrastructure({
     infrastructure: createOpsTestInfrastructure(options.members, options.capability),
     dependencies: {
       users: createApiFixture<UserApi>(),

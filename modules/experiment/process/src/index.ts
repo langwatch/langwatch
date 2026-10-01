@@ -23,7 +23,7 @@ export type {
   ExperimentRunProcessingPipeline,
 } from "./eventing/experiment-run-processing.pipeline.ts";
 export type { ExperimentAppDependencies, ExperimentPeople } from "./app/experiment.app.ts";
-export { experimentServer } from "./experiment.server.ts";
+export { experimentProcessModule } from "./experiment.module.ts";
 export { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 export { ExperimentWorkbenchUpdates } from "./services/experiment-workbench.service.ts";

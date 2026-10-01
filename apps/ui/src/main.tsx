@@ -11,7 +11,7 @@ import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
-import { webModules } from "@langwatch/installed-web-modules";
+import { browserModules } from "@langwatch/installed-web-modules";
 import { createUi } from "@langwatch/browser";
 import { createUiApplication, type UiApplication } from "@langwatch/browser/application";
 import { UiApplicationShell } from "@langwatch/browser/application-shell";
@@ -245,7 +245,7 @@ export async function startUi(): Promise<void> {
   });
   const rootCapabilities = await loadUiRootCapabilities();
   const installed = await createUi({ document, mount: "root" })
-    .withModules(webModules)
+    .withModules(browserModules)
     .withTransport(transport)
     .withInjectedConfig(() => served)
     .render();

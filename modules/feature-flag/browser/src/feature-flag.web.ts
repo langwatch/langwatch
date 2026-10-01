@@ -3,6 +3,6 @@
  * own — ops mounts the operator catalogue view inline.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const featureFlagWeb = defineWebModule("feature-flag");
+export const featureFlagWeb = defineBrowserModule("feature-flag");

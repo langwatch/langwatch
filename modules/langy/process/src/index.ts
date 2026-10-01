@@ -6,7 +6,7 @@ export {
   LangyTrustedMessage,
   type LangyPostgresServiceOptions,
 } from "./services/langy-postgres.service.ts";
-export { langyServer } from "./langy.server.ts";
+export { langyProcessModule } from "./langy.module.ts";
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
 export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
 export { type LangySessionKeyMetrics } from "./app/langy.members.ts";
@@ -18,7 +18,7 @@ export type { PrismaLangySessionKeyReapDatabase } from "./repositories/prisma/pr
 // The seam for the two rows above: a composing worker calls this instead of naming either
 // class (private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).
 // The raw exports stay until every importer is rewired onto the seam.
-export { createLangySessionKeyReap } from "./langy.server.ts";
+export { createLangySessionKeyReap } from "./langy.module.ts";
 export type { LangySessionKeyRevocation } from "./services/langy-session-key.service.ts";
 export type {
   LangyConversationCommands,
@@ -116,7 +116,7 @@ export {
   createLangyTokenBufferRedisRepository,
   createLangyTurnHandoffRedisRepository,
   createLangyTitleGenerator,
-} from "./langy.server.ts";
+} from "./langy.module.ts";
 export {
   LANGY_SESSION_KEY_REAP_INTERVAL_MS,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,

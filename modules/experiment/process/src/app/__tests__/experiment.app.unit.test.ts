@@ -17,7 +17,7 @@ import { ExperimentFindOrCreateService } from "../../services/experiment-find-or
 import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
-import { ExperimentApp } from "../experiment.app.ts";
+import { ExperimentModule } from "../experiment.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -177,7 +177,7 @@ function harness({
     archiveWorkflow,
     monitors,
     workbenchObserver,
-    app: ExperimentApp.createForTesting({
+    app: ExperimentModule.createForTesting({
       experiments: experimentService,
       runLookup,
       workflows: workflowService,
@@ -202,7 +202,7 @@ function firstCall(method: unknown): Record<string, unknown> {
   return mock.mock.calls[0]?.[0] as Record<string, unknown>;
 }
 
-describe("ExperimentApp", () => {
+describe("ExperimentModule", () => {
   describe("when nobody has run an experiment", () => {
     it("aggregates it to no runs rather than to a hole the caller fills", async () => {
       const { app } = harness();

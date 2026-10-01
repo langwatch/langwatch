@@ -1,5 +1,5 @@
 /**
- * Tests that ModelProviderApp.create builds collaborators from declared members and config,
+ * Tests that ModelProviderModule.create builds collaborators from declared members and config,
  * not from hand-composed infrastructure. Regression: before regaining build step, calls
  * crashed on undefined errors (defaultFeatures, systemProviders, exists).
  */
@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import { ModelProviderApp } from "../model-provider.app.ts";
+import { ModelProviderModule } from "../model-provider.app.ts";
 import {
   createModelProviderTestDataPrivacy,
   createModelProviderTestManagedProviders,
@@ -106,8 +106,8 @@ function fakeRedis(): RedisConnection {
  */
 function createRealModelProviderApp(
   repositories: ModelProviderRepositories = MemoryModelProviderRepositories.create(),
-): Promise<ModelProviderApp> {
-  return ModelProviderApp.create({
+): Promise<ModelProviderModule> {
+  return ModelProviderModule.create({
     repositories,
     dependencies: {
       projects: createFullModelProviderTestProjects(),
@@ -136,12 +136,12 @@ function createRealModelProviderApp(
     resources: new ResourceScope(),
     secrets: SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(
       "model-provider",
-      Object.values(ModelProviderApp.secrets),
+      Object.values(ModelProviderModule.secrets),
     ),
   });
 }
 
-describe("ModelProviderApp.create", () => {
+describe("ModelProviderModule.create", () => {
   describe("given only the process's own redis and secrets members", () => {
     it("answers the default-models feature catalogue instead of crashing on undefined defaultFeatures", async () => {
       const app = await createRealModelProviderApp();

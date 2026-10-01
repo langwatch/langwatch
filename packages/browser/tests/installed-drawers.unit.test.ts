@@ -1,17 +1,17 @@
 import type { UiEvaluatorEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import { describe, expect, it } from "vitest";
 
-import { defineWebModule, installedDrawerLoaders } from "../src/index.ts";
+import { defineBrowserModule, installedDrawerLoaders } from "../src/index.ts";
 
 const traceDrawer = { default: () => null };
 const spanDrawer = { default: () => null };
 
-const trace = defineWebModule("trace").withDrawers({
+const trace = defineBrowserModule("trace").withDrawers({
   traceDetails: { load: () => Promise.resolve(traceDrawer) },
   spanDetails: { load: () => Promise.resolve(spanDrawer) },
 });
 
-const evaluator = defineWebModule("evaluator").withDrawers({
+const evaluator = defineBrowserModule("evaluator").withDrawers({
   evaluatorEditor: {
     load: () => Promise.resolve({ default: (_props: UiEvaluatorEditorDrawerProps) => null }),
   },
@@ -19,7 +19,7 @@ const evaluator = defineWebModule("evaluator").withDrawers({
 
 describe("installed drawers", () => {
   it("is empty for modules that declare none", () => {
-    expect(installedDrawerLoaders([defineWebModule("annotation")])).toEqual({});
+    expect(installedDrawerLoaders([defineBrowserModule("annotation")])).toEqual({});
   });
 
   it("carries every declared drawer under the name the address bar uses", async () => {
@@ -34,7 +34,7 @@ describe("installed drawers", () => {
   });
 
   it("refuses two modules claiming one drawer name, naming both", () => {
-    const rival = defineWebModule("scenario").withDrawers({
+    const rival = defineBrowserModule("scenario").withDrawers({
       traceDetails: { load: () => Promise.resolve({ default: () => null }) },
     });
 

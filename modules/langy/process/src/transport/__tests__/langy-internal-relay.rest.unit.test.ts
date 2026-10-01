@@ -1,5 +1,5 @@
 /**
- * The relay route over a LangyApp composed the way a process composes it.
+ * The relay route over a LangyModule composed the way a process composes it.
  * @vitest-environment node
  * @see modules/langy/specs/langy-internal-relay.feature
  */
@@ -32,7 +32,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { LangyApp } from "../../app/langy.app.ts";
+import { LangyModule } from "../../app/langy.app.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { langyInternalRest } from "../langy-internal.rest.ts";
 
@@ -58,7 +58,7 @@ function quietPresence(): PresenceApi {
 }
 
 async function relayRoute() {
-  const app = await LangyApp.create({
+  const app = await LangyModule.create({
     dependencies: {
       presence: quietPresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),

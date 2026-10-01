@@ -25,7 +25,7 @@ async function savedHttpAgent(options: Parameters<typeof createAgentAppFixture>[
   return { ...fixture, agent, values: store.values };
 }
 
-describe("AgentApp HTTP agent credentials", () => {
+describe("AgentModule HTTP agent credentials", () => {
   /** @scenario "Saving an HTTP agent with blank credentials keeps the stored ones" */
   it("keeps the stored header and bearer token where the update leaves them blank", async () => {
     const { app, agent } = await savedHttpAgent();

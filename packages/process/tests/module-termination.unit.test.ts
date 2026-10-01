@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  defineServerModule,
+  defineProcessModule,
   type FeatureSetup,
   type InstallableServerFeature,
   type ModuleConfigFor,
@@ -54,8 +54,8 @@ const catalogueRest = {
   router: () => ({ family: "dataset" }),
 } as const;
 
-const withoutBuild = defineServerModule("annotation")
-  .withApp(CatalogueApp)
+const withoutBuild = defineProcessModule("annotation")
+  .withApi(CatalogueApp)
   .withTransports(catalogueRest);
 
 describe("given a module that states its doors", () => {
@@ -141,9 +141,9 @@ describe("given a module that owns repositories", () => {
     }
   }
 
-  const stored = defineServerModule("annotation")
+  const stored = defineProcessModule("annotation")
     .withRepositories(registry)
-    .withApp(StoredApp)
+    .withApi(StoredApp)
     .withTransports(catalogueRest);
 
   it("terminates the same way on the repository path", () => {

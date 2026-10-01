@@ -24,7 +24,7 @@ function appWhere({ canManageProject }: { canManageProject: boolean }) {
   return { app, hasPermission };
 }
 
-describe("UserApp.getPersonalContext", () => {
+describe("UserModule.getPersonalContext", () => {
   describe.each([true, false])("given the caller's project:manage is %s", (canManageProject) => {
     /** @scenario "The personal context never carries the personal project's API key" */
     it("blanks the API key and still answers a valid personal context", async () => {

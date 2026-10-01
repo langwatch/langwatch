@@ -4,8 +4,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { BillingApp, type ConnectedBillingPeers } from "../../app/billing.app.ts";
-import { billingServer } from "../../billing.server.ts";
+import { BillingModule, type ConnectedBillingPeers } from "../../app/billing.app.ts";
+import { billingProcessModule } from "../../billing.module.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import { BillableEventsQueryService } from "../../services/billable-events-query.service.ts";
 import { BillingErrorReporterService } from "../../services/billing-error-reporter.service.ts";
@@ -82,7 +82,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
   describe("given a deployment that is not SaaS", () => {
     /** @scenario "The monthly roll-up is registered on every install" */
     it("still mounts the command-only roll-up, with no meter beside it", () => {
-      const app = BillingApp.assemble({
+      const app = BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
         members: { isSaas: false, nodeEnvironment: "test" },
@@ -94,7 +94,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
 
       const pipeline = app.reportingPipeline({ participation: "consume" });
 
-      expect(billingServer.eventing?.pipeline.split(", ")).toContain("billing_reporting");
+      expect(billingProcessModule.eventing?.pipeline.split(", ")).toContain("billing_reporting");
       expect(billingReportingEventing.pipeline).toBe("billing_reporting");
       expect(pipeline.metadata.name).toBe("billing_reporting");
       expect(pipeline.foldProjections.size + pipeline.mapProjections.size).toBe(0);
@@ -104,7 +104,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
 
   describe("given a SaaS deployment with no Stripe secret", () => {
     const composeSaas = () =>
-      BillingApp.assemble({
+      BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
         members: { isSaas: true, nodeEnvironment: "test" },

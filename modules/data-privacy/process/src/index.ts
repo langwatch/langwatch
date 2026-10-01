@@ -1,8 +1,8 @@
 export {
-  dataPrivacyServer,
+  dataPrivacyProcessModule,
   createOtlpSpanContentDropService,
   createOtlpSpanPiiRedactionService,
-} from "./data-privacy.server.ts";
+} from "./data-privacy.module.ts";
 export { dataPrivacyTrpcTransport } from "./transport/data-privacy.trpc.ts";
 /**
  * The lineage a rule is placed and named against. It reads stores this feature

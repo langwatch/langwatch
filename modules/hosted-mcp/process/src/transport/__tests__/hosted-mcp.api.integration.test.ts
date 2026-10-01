@@ -19,7 +19,7 @@ import {
   vi,
 } from "vitest";
 
-import { HostedMcpApp } from "../../app/hosted-mcp.app.ts";
+import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
 import { HeaderMcpClientAddressService, type McpHandler } from "../../index.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
 import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
@@ -341,7 +341,7 @@ let server: Server;
 let handler: McpHandler;
 
 beforeAll(async () => {
-  handler = HostedMcpApp.fromDependencies({
+  handler = HostedMcpModule.fromDependencies({
     redis: redisDouble(mockRedis),
     projects: new FakeProjectLookup(),
     grants: sessionGrant,

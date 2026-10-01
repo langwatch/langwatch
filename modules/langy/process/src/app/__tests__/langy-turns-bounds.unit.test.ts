@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 
 /**
- * `LangyApp.startConversationTurn` — every turn is counted against the
+ * `LangyModule.startConversationTurn` — every turn is counted against the
  * project's tier-effective window before it dispatches; an over-limit caller
  * never reaches the engine.
  * @vitest-environment node
@@ -41,7 +41,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import { LangyApp } from "../langy.app.ts";
+import { LangyModule } from "../langy.app.ts";
 
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
@@ -103,7 +103,7 @@ function fakePresence(): PresenceApi {
 }
 
 async function harness() {
-  const app = await LangyApp.create({
+  const app = await LangyModule.create({
     dependencies: {
       presence: fakePresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -178,7 +178,7 @@ async function harness() {
 
 const FREE_TURNS_PER_MINUTE = resolveRequestBound("langyTurnsPerMinute", "FREE");
 
-describe("LangyApp.startConversationTurn", () => {
+describe("LangyModule.startConversationTurn", () => {
   describe("given a free-tier project under its turn ceiling", () => {
     it("dispatches every turn", async () => {
       const { startTurn, dispatched } = await harness();

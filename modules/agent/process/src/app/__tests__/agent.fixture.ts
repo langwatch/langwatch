@@ -19,7 +19,7 @@ import {
 
 import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
-import { AgentApp } from "../agent.app.ts";
+import { AgentModule } from "../agent.app.ts";
 
 type AgentAppMembers = Readonly<{ publicBaseUrl: string | undefined }>;
 
@@ -82,7 +82,7 @@ export function createAgentAppFixture(
 ) {
   const repositories = options.repositories ?? MemoryAgentRepositories.create();
   const resources = new ResourceScope();
-  const app = AgentApp.create({
+  const app = AgentModule.create({
     dependencies: {
       apiKeys: options.apiKeys ?? createApiFixture<ApiKeyApi>(),
       auditLog: options.auditLog ?? createApiFixture<AuditLogApi>(),

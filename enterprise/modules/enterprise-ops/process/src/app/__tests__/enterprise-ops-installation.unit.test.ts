@@ -17,7 +17,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { enterpriseOpsServer } from "../../enterprise-ops.server.ts";
+import { enterpriseOpsProcessModule } from "../../enterprise-ops.module.ts";
 
 const staff: OpsOperator = { id: "user_olive", email: "olive@langwatch.test" };
 const customerAdmin: OpsOperator = { id: "user_mallory", email: "admin@customer.test" };
@@ -33,7 +33,7 @@ function boot({
 }) {
   const { logger } = createTestLogger();
   return createApp({ role: "api" })
-    .withModules([enterpriseOpsServer])
+    .withModules([enterpriseOpsProcessModule])
     .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
@@ -64,7 +64,7 @@ function boot({
 describe("enterprise ops installation", () => {
   /** @scenario "The enterprise ops module serves the license and self-hosted instance registries" */
   it("serves the license registry and the self-hosted instance registry", () => {
-    expect(enterpriseOpsServer.transports.map((transport) => transport.namespace)).toEqual([
+    expect(enterpriseOpsProcessModule.transports.map((transport) => transport.namespace)).toEqual([
       "licenseRegistry",
       "selfHostedInstances",
     ]);
@@ -78,7 +78,7 @@ describe("enterprise ops installation", () => {
 
       try {
         const app = runtime.service(EnterpriseOpsApi);
-        expect(runtime.module(enterpriseOpsServer).provided).toBe(app);
+        expect(runtime.module(enterpriseOpsProcessModule).provided).toBe(app);
         await expect(
           app.listSelfHostedInstances({ page: 0, pageSize: 25, operator: staff }),
         ).resolves.toEqual({ instances: [], total: 3 });

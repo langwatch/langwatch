@@ -7,12 +7,12 @@ import { PresenceApi } from "@langwatch/presence-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
-import { presenceServer } from "../../presence.server.ts";
+import { presenceProcessModule } from "../../presence.module.ts";
 import { createPresenceTestProjects, createPresenceTestUsers } from "./presence.fixture.ts";
 
 function bootPresence() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(presenceServer)])
+    .withModules([withMemoryRepositories(presenceProcessModule)])
     .withMember("keyvalue", null)
     .withMember("logging", { warn: () => undefined })
     .provide({
@@ -126,7 +126,7 @@ describe("given a process that installs presence", () => {
       const runtime = await bootPresence();
 
       await expect(
-        runtime.module(presenceServer).provided.list({ projectId: "project-1" }),
+        runtime.module(presenceProcessModule).provided.list({ projectId: "project-1" }),
       ).resolves.toEqual([]);
     });
   });

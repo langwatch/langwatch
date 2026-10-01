@@ -130,7 +130,7 @@ function processConfigOf(options: {
 }
 
 /** Connection values remain inside the construction closure; only opened members escape. */
-export function openProcessStores(options: {
+export function openStores(options: {
   name: string;
   config: StoresConfig;
   secrets: ScopedSecrets;

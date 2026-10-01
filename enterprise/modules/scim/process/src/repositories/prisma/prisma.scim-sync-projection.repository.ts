@@ -28,7 +28,7 @@ import type { ScimSyncReadRepository } from "../scim-sync.repository.ts";
 
 const storedFailuresSchema = z.array(scimSyncFailureSchema);
 
-/** Scim's declared read across organizations, named on `ScimApp` (ARCHITECTURE §7). */
+/** Scim's declared read across organizations, named on `ScimModule` (ARCHITECTURE §7). */
 export const scimOperatorReads = {
   syncs: OperatorRead.of("ScimSyncState", { actions: ["findMany", "count"] }),
 };

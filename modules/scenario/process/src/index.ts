@@ -31,7 +31,7 @@ export {
 } from "./eventing/simulation-processing.pipeline.ts";
 export { SimulationProcessingProducerPipeline } from "./eventing/simulation-processing-producer.pipeline.ts";
 export {
-  ScenarioApp,
+  ScenarioModule,
   scenarioAppDependencyTokens,
   type ScenarioAppDependencies,
   type ScenarioAppInfrastructure,
@@ -84,7 +84,7 @@ export { MemoryRunConfigurationsRepository } from "./repositories/memory/memory.
 export { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
 export type { ScenarioRepositories } from "./repositories/scenario.repositories.ts";
 export { NullSimulationRepository } from "./repositories/simulation.repository.ts";
-export { scenarioServer } from "./scenario.server.ts";
+export { scenarioProcessModule } from "./scenario.module.ts";
 export { AgentTestService, type AgentTestServiceOptions } from "./services/agent-test.service.ts";
 export * from "./services/scenario-execution-pool.service.ts";
 export * from "./services/scenario-execution-prefetcher.service.ts";

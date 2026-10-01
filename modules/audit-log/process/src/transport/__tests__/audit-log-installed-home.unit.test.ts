@@ -21,7 +21,7 @@ import {
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
-import { auditLogServer } from "../../audit-log.server.ts";
+import { auditLogProcessModule } from "../../audit-log.module.ts";
 import { homeTrpcTransport } from "../home.trpc.ts";
 
 const ACTOR = { id: "user-1" };
@@ -149,7 +149,7 @@ function owners(): Owners {
 
 async function installed(peers: Owners = owners()) {
   const runtime = await createApp({ role: "api" })
-    .withModules([withMemoryRepositories(auditLogServer)])
+    .withModules([withMemoryRepositories(auditLogProcessModule)])
     .withConfig({ "audit-log": undefined })
     .provide(peers)
     .boot();
@@ -161,7 +161,7 @@ async function installed(peers: Owners = owners()) {
       checkScopeLineage: async () => ({ kind: "consistent" }),
     },
   });
-  host.mount(homeTrpcTransport, () => runtime.module(auditLogServer).provided);
+  host.mount(homeTrpcTransport, () => runtime.module(auditLogProcessModule).provided);
 
   return { runtime, host, audit: runtime.service(AuditLogApi) };
 }

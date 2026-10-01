@@ -11,7 +11,7 @@ import {
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { EntitlementApp } from "../app/entitlement.app.ts";
+import type { EntitlementModule } from "../app/entitlement.app.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import {
   USAGE_WARNING_SWEEP_INTERVAL_MS,
@@ -51,7 +51,7 @@ export function buildUsageWarningPipeline(
 
 export const entitlementUsageWarningEventing = defineEventingModule({
   pipeline: USAGE_WARNING_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<EntitlementRepositories, EntitlementApp>) =>
+  build: ({ app, processStore }: EventingSetup<EntitlementRepositories, EntitlementModule>) =>
     app.usageWarningEventingPipeline({
       deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
     }),

@@ -24,11 +24,11 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp } from "../governance.app.ts";
+import { GovernanceModule } from "../governance.app.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
 
 function buildApp() {
-  return GovernanceApp.create({
+  return GovernanceModule.create({
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {

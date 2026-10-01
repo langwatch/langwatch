@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createSuiteTestApp } from "./suite.fixture.ts";
 
-describe("SuiteApp test-suite mutations", () => {
+describe("SuiteModule test-suite mutations", () => {
   /** @scenario "Renaming a missing suite reports the suite error" */
   it("translates a missing scenario test suite while renaming at the app boundary", async () => {
     const renameTestSuite = vi

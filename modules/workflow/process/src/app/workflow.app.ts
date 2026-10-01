@@ -378,7 +378,7 @@ type WorkflowProcessFacts = Readonly<{
 }>;
 
 type WorkflowSetup = FeatureSetup<
-  typeof WorkflowApp.dependencies,
+  typeof WorkflowModule.dependencies,
   WorkflowHostMembers & MembersRead<readonly ["prisma", "encryption"]> & WorkflowProcessFacts,
   WorkflowServerConfig,
   WorkflowRepositories
@@ -598,7 +598,7 @@ function relatedProjectIdsOf(workflow: WorkflowLineageRow): readonly string[] {
   ];
 }
 
-export class WorkflowApp implements WorkflowApi {
+export class WorkflowModule implements WorkflowApi {
   static readonly contract = WorkflowApi;
   static readonly dependencies = {
     /** The evaluators a workflow is published as - a peer's App, not a member. */
@@ -640,7 +640,7 @@ export class WorkflowApp implements WorkflowApi {
   static readonly repositories = workflowRepositories;
   static readonly secrets = { nlpLambdaFleet: nlpLambdaFleetSecret } as const;
 
-  static async create(setup: WorkflowSetup): Promise<WorkflowApp> {
+  static async create(setup: WorkflowSetup): Promise<WorkflowModule> {
     const engine = await composeEngine(setup);
     const datasets = setup.dependencies.datasets;
     const llmParameters = ModelProviderWorkflowLlmParameters.create({
@@ -680,7 +680,7 @@ export class WorkflowApp implements WorkflowApi {
       modelProviders,
     });
 
-    return new WorkflowApp({
+    return new WorkflowModule({
       ...setup.members,
       ...(engine.fleet ? { nlpLambdaFleet: engine.fleet } : {}),
       permissions: WorkflowPermissionService.create({ authz: setup.dependencies.authz }),

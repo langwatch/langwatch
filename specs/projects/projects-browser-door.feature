@@ -13,7 +13,7 @@ Feature: The project.* browser namespace is served by the application the compos
   # the first access, which the boundary degrades to a generic "unknown".
   # apidiff never saw this family, because apidiff probes REST only.
   #
-  # These scenarios are bound to tests that build the REAL ProjectApp over its
+  # These scenarios are bound to tests that build the REAL ProjectModule over its
   # own repository interface and reach it through that same proxy.
   #
   # The scenarios below drive each procedure through the INSTALLED module

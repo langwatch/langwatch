@@ -4,7 +4,7 @@
 import { getRoutePolicy } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
-import { HostedMcpApp } from "../../app/hosted-mcp.app.ts";
+import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
 import {
   HeaderMcpClientAddressService,
   hostedMcpRoutePolicies,
@@ -40,7 +40,7 @@ class PlainCipher implements McpApiKeyCipher {
 }
 
 function handler() {
-  return HostedMcpApp.fromDependencies({
+  return HostedMcpModule.fromDependencies({
     redis: null,
     projects: new NoProjects(),
     grants: new NoGrants(),

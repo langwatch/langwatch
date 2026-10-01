@@ -25,7 +25,7 @@ const copyInput = {
   actorUserId: "user_1",
 };
 
-describe("AgentApp workflow and audit ownership", () => {
+describe("AgentModule workflow and audit ownership", () => {
   it("refuses to fabricate a navigation path when a copy's project is missing", async () => {
     const { app, repositories } = createAgentAppFixture({
       projects: createApiFixture<ProjectApi>({ listPaths: async () => [] }),

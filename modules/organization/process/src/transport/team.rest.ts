@@ -248,7 +248,7 @@ export const teamsRest: Readonly<{
       organizationId: scope.id,
       userId: input.userId,
       role: input.role,
-      // The key bounds what it grants, never its owner (authz.server.ts rules the same).
+      // The key bounds what it grants, never its owner (authz.module.ts rules the same).
       caller: { type: "apiKey", id: key.apiKeyId },
       actor: ledgerActor,
     });

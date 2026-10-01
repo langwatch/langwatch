@@ -11,7 +11,7 @@ import type { SeatRetentionRules } from "../../services/billing-subscription-lif
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
 import type { UsageWarningService } from "../../services/usage-warning.service.ts";
-import { type ConnectedBillingPeers, BillingApp } from "../billing.app.ts";
+import { type ConnectedBillingPeers, BillingModule } from "../billing.app.ts";
 
 const ACME = "org-acme";
 const STAFF = { id: "user-operator", email: "ops@langwatch.example" };
@@ -87,7 +87,7 @@ function billingApp({
 }) {
   const registry = licensedAt(commitUsdCents);
   const repositories = MemoryBillingRepositories.create();
-  const app = BillingApp.assemble({
+  const app = BillingModule.assemble({
     usageWarnings: createApiFixture<UsageWarningService>({}),
     resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
     members: { isSaas, nodeEnvironment: "test" },
@@ -322,7 +322,7 @@ describe("the subscription plan billing answers entitlement", () => {
   });
 });
 
-describe("the Stripe callback BillingApp answers", () => {
+describe("the Stripe callback BillingModule answers", () => {
   const payload = JSON.stringify({
     id: "evt_1",
     object: "event",
@@ -377,7 +377,7 @@ describe("the Stripe callback BillingApp answers", () => {
   });
 });
 
-describe("the currency BillingApp detects", () => {
+describe("the currency BillingModule detects", () => {
   describe("given LangWatch Cloud", () => {
     /** @scenario "LangWatch Cloud detects the currency a reader's prices are shown in" */
     it("answers from the request, falling back when nothing names a country", () => {
@@ -399,7 +399,7 @@ describe("the currency BillingApp detects", () => {
   });
 });
 
-describe("the subscription door BillingApp serves", () => {
+describe("the subscription door BillingModule serves", () => {
   describe("given a deployment that composed no subscription door", () => {
     it("answers not found, as main mounted no subscription router there", async () => {
       const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });

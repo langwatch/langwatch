@@ -95,7 +95,7 @@ type screenOwner struct {
 }
 
 // ScreenOwners reads which module declares each screen from its
-// defineWebModule screens (coverage.go's declarations, with their files).
+// defineBrowserModule screens (coverage.go's declarations, with their files).
 type ScreenOwners []screenOwner
 
 func screenOwners(parser *declarationParser) ScreenOwners {

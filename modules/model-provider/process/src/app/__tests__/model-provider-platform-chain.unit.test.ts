@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { createModelProviderTestApp } from "./model-provider.fixture.ts";
 
-describe("ModelProviderApp.platformProviderChain", () => {
+describe("ModelProviderModule.platformProviderChain", () => {
   /** @scenario "The platform chain borrows the Google credential from data privacy" */
   it("offers vertex_ai under the credential data privacy lends, on the read", async () => {
     const lent: string[] = [];

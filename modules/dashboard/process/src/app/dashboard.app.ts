@@ -95,7 +95,7 @@ class AnalyticsWorkbenchCaller implements WorkbenchCaller {
   }
 }
 
-export class DashboardApp implements DashboardApi {
+export class DashboardModule implements DashboardApi {
   static readonly contract = DashboardApi;
   static readonly dependencies = {
     analytics: AnalyticsApi,
@@ -147,12 +147,12 @@ export class DashboardApp implements DashboardApi {
     this.#publicBaseUrl = publicBaseUrl;
   }
 
-  static create(setup: DashboardSetup): DashboardApp {
+  static create(setup: DashboardSetup): DashboardModule {
     const analytics: AnalyticsApiContract = setup.dependencies.analytics;
     const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
 
-    return new DashboardApp({
+    return new DashboardModule({
       services: {
         dashboards: DashboardService.create({
           repository: setup.repositories.dashboards,

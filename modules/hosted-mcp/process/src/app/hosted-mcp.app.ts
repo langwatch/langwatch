@@ -66,7 +66,7 @@ type HostedMcpDependenciesMap = Readonly<{
 type HostedMcpSetup = FeatureSetup<HostedMcpDependenciesMap, HostedMcpInfrastructure, undefined>;
 
 /** Owns the hosted MCP session transport's collaborators for one process. */
-export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
+export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
   static readonly contract = HostedMcpApi;
   static readonly dependencies: HostedMcpDependenciesMap = {
     projects: ProjectApi,
@@ -89,7 +89,7 @@ export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
   }
 
   /** Refuses by name: a deployment naming no `BASE_HOST` cannot mount MCP. */
-  static create({ members, dependencies }: HostedMcpSetup): HostedMcpApp {
+  static create({ members, dependencies }: HostedMcpSetup): HostedMcpModule {
     if (members.publicBaseUrl === undefined) {
       throw new Error(
         "The hosted MCP endpoint needs a public base URL, but this deployment named no BASE_HOST",
@@ -117,7 +117,7 @@ export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
       },
     });
 
-    return new HostedMcpApp(
+    return new HostedMcpModule(
       {
         redis: members.redis,
         projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
@@ -133,8 +133,8 @@ export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
   }
 
   /** The app over collaborators already built, as a suite or another composition holds them. */
-  static fromDependencies(dependencies: HostedMcpDependencies): HostedMcpApp {
-    return new HostedMcpApp(dependencies, undefined);
+  static fromDependencies(dependencies: HostedMcpDependencies): HostedMcpModule {
+    return new HostedMcpModule(dependencies, undefined);
   }
 
   /** `POST /api/mcp/authorize`, main's approval step of the hosted MCP OAuth flow. */

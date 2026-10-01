@@ -1,22 +1,22 @@
+/**
+ * @vitest-environment node
+ * `GatewayModule.authorizeKeyCaller`: any API key, including an organization key
+ * that names no project, is authorized for organization-owned budget rows.
+ * @see specs/ai-gateway/per-team-budget-reorganization.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-/**
- * @vitest-environment node
- * `GatewayApp.authorizeKeyCaller`: any API key, including an organization key
- * that names no project, is authorized for organization-owned budget rows.
- * @see specs/ai-gateway/per-team-budget-reorganization.feature
- */
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 function peer(name: string): never {
   return new Proxy(
@@ -40,8 +40,8 @@ const findProject = vi.fn<ProjectApi["findIdentity"]>();
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-async function gatewayApp(): Promise<GatewayApp> {
-  return GatewayApp.create({
+async function gatewayApp(): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
@@ -93,7 +93,7 @@ const projectKey = {
   resolvedProject: { id: PROJECT_ID, teamId: TEAM_ID },
 };
 
-describe("GatewayApp.authorizeKeyCaller", () => {
+describe("GatewayModule.authorizeKeyCaller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hasApiKeyPermission.mockResolvedValue(true);

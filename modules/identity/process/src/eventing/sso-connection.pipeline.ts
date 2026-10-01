@@ -19,7 +19,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { ZodType } from "zod";
 
-import type { IdentityApp } from "../app/identity.app.ts";
+import type { IdentityModule } from "../app/identity.app.ts";
 import type { SsoDomainProofMail } from "../app/identity.members.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
@@ -480,7 +480,7 @@ export function composeSsoConnectionGraph(options: {
 
 export const ssoConnectionEventing = defineEventingModule({
   pipeline: SSO_CONNECTION_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.ssoConnectionPipeline(),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) => app.ssoConnectionPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: SSO_CONNECTION_PIPELINE_NAME, commands }),
 });

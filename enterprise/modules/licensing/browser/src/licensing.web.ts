@@ -4,9 +4,9 @@
  * Always installed, so nothing here gates itself by tier.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const licensingWeb = defineWebModule("licensing")
+export const licensingWeb = defineBrowserModule("licensing")
   .withHosts({
     requires: ["LicensingHostApi"],
     mounts: {

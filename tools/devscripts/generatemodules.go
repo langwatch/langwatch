@@ -115,7 +115,7 @@ func hasDeclarationExport(half string, manifest packageJSON, id, indexPath strin
 
 func declarationsFor(root string, cat catalogue, half, suffix string) ([]declaration, error) {
 	dir := "browser"
-	if half == "server" {
+	if half == "module" {
 		dir = "process"
 	}
 	var out []declaration
@@ -222,7 +222,7 @@ func memberSource(root string, cat catalogue) (string, error) {
 		" * repository tier requires, and refuses by module and member when this",
 		" * process cannot supply one.",
 		" */",
-		"export const serverModuleMembers = {",
+		"export const processModuleMembers = {",
 	}
 	lines = append(lines, rows...)
 	lines = append(lines, "} as const;", "")
@@ -292,7 +292,7 @@ func pairingSource(root string, cat catalogue, serverNames []string) string {
 	}
 	var paired []string
 	for _, entry := range cat.Features {
-		if declares(entry.Root, "browser", entry.ID, "web") && declares(entry.Root, "process", entry.ID, "server") {
+		if declares(entry.Root, "browser", entry.ID, "web") && declares(entry.Root, "process", entry.ID, "module") {
 			paired = append(paired, entry.ID)
 		}
 	}
@@ -309,7 +309,7 @@ func pairingSource(root string, cat catalogue, serverNames []string) string {
 	return strings.Join([]string{
 		"type PairedOnDisk = " + union(paired) + ";",
 		"type ServerHalfOnDisk = " + union(serverNames) + ";",
-		"type MissingWeb = Exclude<PairedOnDisk, (typeof webModules)[number][\"name\"]>;",
+		"type MissingWeb = Exclude<PairedOnDisk, (typeof browserModules)[number][\"name\"]>;",
 		"type MissingServer = Exclude<PairedOnDisk, ServerHalfOnDisk>;",
 		"export const webModulePairing = {} satisfies {",
 		"  [Id in `missing web half \"${MissingWeb}\"` | `missing server half \"${MissingServer}\"`]: never;",
@@ -353,7 +353,7 @@ func GenerateModules(root string) ([]Output, error) {
 	if err != nil {
 		return nil, err
 	}
-	servers, err := declarationsFor(root, cat, "server", "Server")
+	servers, err := declarationsFor(root, cat, "module", "ProcessModule")
 	if err != nil {
 		return nil, err
 	}
@@ -387,8 +387,8 @@ func GenerateModules(root string) ([]Output, error) {
 		return nil, err
 	}
 	outputs := []Output{
-		{serverList, listSource(servers, "serverModules", "server")},
-		{webList, listSource(webs, "webModules", "web") + pairingSource(root, cat, serverNames)},
+		{serverList, listSource(servers, "processModules", "server")},
+		{webList, listSource(webs, "browserModules", "web") + pairingSource(root, cat, serverNames)},
 		{serverMembers, members},
 		{serverPackage, serverPackageText},
 		{webPackage, webPackageText},

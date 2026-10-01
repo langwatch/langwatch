@@ -28,7 +28,7 @@ describe("given a repository", () => {
       const code = [
         'import { z } from "zod";',
         'import { AgentService } from "../../services/agent.service.ts";',
-        'import { AgentApp } from "#app/agent.app";',
+        'import { AgentModule } from "#app/agent.app";',
         'import { AgentDerived } from "../../eventing/agent-derived.projection.ts";',
       ].join("\n");
 
@@ -48,7 +48,7 @@ describe("given a repository", () => {
         'import { agentRules } from "../../rules/agent.rules.ts";',
         'import { AgentStore } from "../../eventing/agent-item.store.ts";',
         'import type { AgentService } from "../../services/agent.service.ts";',
-        'import { type AgentApp } from "../../app/agent.app.ts";',
+        'import { type AgentModule } from "../../app/agent.app.ts";',
       ].join("\n");
 
       expect(report(REPOSITORY, code)).toEqual([]);

@@ -25,7 +25,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
 import { NLP_LAMBDA_ARN_CACHE_PREFIX } from "../../services/nlp-lambda-runtime.service.ts";
-import { WorkflowApp } from "../workflow.app.ts";
+import { WorkflowModule } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 const lambda = vi.hoisted(() => {
@@ -91,10 +91,10 @@ function appWith({
 }: {
   fleetSecret: string;
   repositories?: WorkflowRepositories;
-}): Promise<WorkflowApp> {
+}): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure();
 
-  return WorkflowApp.create({
+  return WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),

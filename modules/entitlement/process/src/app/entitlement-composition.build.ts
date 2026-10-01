@@ -221,7 +221,7 @@ export type EntitlementUsagePeers = Readonly<{
   projects: Pick<ProjectApi, "listIdsByOrganization">;
 }>;
 
-/** What this module hands `EntitlementApp` at boot. */
+/** What this module hands `EntitlementModule` at boot. */
 export function buildEntitlementInfrastructure(input: {
   logger: Logger;
   /** OUT OF SCOPE for this port; carried through exactly as before. */

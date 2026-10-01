@@ -23,7 +23,7 @@ import { CachedFeatureFlagRowService } from "../../services/cached-feature-flag-
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../../services/organization-created-at-cache.service.ts";
 import {
-  FeatureFlagApp,
+  FeatureFlagModule,
   type FeatureFlagCache,
   type FeatureFlagCacheSlot,
 } from "../feature-flag.app.ts";
@@ -167,8 +167,8 @@ export function createFeatureFlagTestApp(
       organizations: OrganizationApi;
     }>;
   }> = {},
-): FeatureFlagApp {
-  return FeatureFlagApp.create({
+): FeatureFlagModule {
+  return FeatureFlagModule.create({
     repositories: input.repositories ?? MemoryFeatureFlagRepositories.create(),
     dependencies: {
       permissions: input.dependencies?.permissions ?? createFeatureFlagTestAuthz(),

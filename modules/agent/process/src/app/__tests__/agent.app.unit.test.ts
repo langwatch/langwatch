@@ -24,7 +24,7 @@ const connected = {
   },
 };
 
-describe("AgentApp connected views", () => {
+describe("AgentModule connected views", () => {
   it("reports the parameters and live instance registered through its connected runtime", async () => {
     const { app, resources } = createAgentAppFixture({
       config: { replicaCount: 1, relayMaxPayloadMb: void 0 },
@@ -137,7 +137,7 @@ describe("AgentApp connected views", () => {
   });
 });
 
-describe("AgentApp HTTP agent testing", () => {
+describe("AgentModule HTTP agent testing", () => {
   /** @scenario "Sending a test request from the agent editor executes it" */
   it("runs the request through the workflow engine and answers its output", async () => {
     const executed: string[] = [];

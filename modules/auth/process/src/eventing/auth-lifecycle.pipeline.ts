@@ -5,7 +5,7 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 
-import type { AuthApp } from "../app/auth.app.ts";
+import type { AuthModule } from "../app/auth.app.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import {
   RecordSessionStartedCommand,
@@ -37,6 +37,6 @@ export function buildAuthLifecyclePipeline(): AuthLifecycleDefinition {
 
 export const authLifecycleEventing = defineEventingModule({
   pipeline: AUTH_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<AuthRepositories, AuthApp>) => app.lifecyclePipeline(),
+  build: ({ app }: EventingSetup<AuthRepositories, AuthModule>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycle(commands),
 });

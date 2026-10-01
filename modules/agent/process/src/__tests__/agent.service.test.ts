@@ -9,7 +9,7 @@ const config = {
   outputs: [{ identifier: "answer", type: "str" as const }],
 };
 
-describe("AgentApp entity operations", () => {
+describe("AgentModule entity operations", () => {
   /** @scenario "A created agent is validated, persisted and returned resolved" */
   it("validates, persists, and enriches a created agent", async () => {
     const { app, repositories } = createAgentAppFixture();

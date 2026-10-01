@@ -4,7 +4,7 @@
 # declares what it needs; boot validates and constructs; start serves. Imports
 # and constructors never start background work.
 #
-# Accepted app factory target: defineModule(...).withApp(ServerApp), with
+# Accepted app factory target: defineModule(...).withApi(ServerApp), with
 # static API, dependencies and create on the server class. Scenarios tagged
 # @unimplemented describe the agreed API still to be built. withTransports takes
 # variadic inbound declarations; namespaces derive from the owner.
@@ -53,7 +53,7 @@ Feature: Composing a process from feature installers
       Given an annotation server app linked to its portable callable API
       And its dependency map declares project and organization API tokens
       And the process installs providers for both contracts
-      When the process boots with the annotation server app selected through withApp
+      When the process boots with the annotation server app selected through withApi
       Then its static create factory receives the resolved project and organization apps
       And the factory is called once with typed infrastructure and validated config
       And the returned object is registered under the linked annotation API token
@@ -71,7 +71,7 @@ Feature: Composing a process from feature installers
     Scenario: An app must implement its linked callable API
       Given a server app linked to an annotation API with callable use cases
       When its factory returns an object missing one use case
-      Then selecting that server app through withApp fails type checking
+      Then selecting that server app through withApi fails type checking
 
     @unit
     Scenario: Reciprocal API dependencies bind before readiness

@@ -1,4 +1,4 @@
-import { openProcessStores, PipelineParticipation } from "@langwatch/process-stores";
+import { openStores, PipelineParticipation } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
@@ -61,7 +61,7 @@ const storesConfig: StoresConfig = {
 /** The encryption member exactly as a process with no key builds it. */
 async function keylessEncryption(name: string) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }).withEnv());
-  const { members } = await openProcessStores({
+  const { members } = await openStores({
     name,
     config: storesConfig,
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),

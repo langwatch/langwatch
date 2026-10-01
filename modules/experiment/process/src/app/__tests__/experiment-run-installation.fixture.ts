@@ -57,7 +57,7 @@ import type {
   WorkflowApi,
 } from "@langwatch/workflow-contract";
 
-import { experimentServer } from "../../experiment.server.ts";
+import { experimentProcessModule } from "../../experiment.module.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
 
 /** A ClickHouse that holds no rows: every read answers empty, every write lands nowhere. */
@@ -337,7 +337,7 @@ function boot({
   workflow: WorkflowApi;
 }) {
   const app = createApp({ role })
-    .withModules([experimentServer])
+    .withModules([experimentProcessModule])
     .withStores(memoryStores())
     .withEventing(eventing)
     .withRelational(database.client)
@@ -461,8 +461,8 @@ export async function bootRunPair(options: RunPairOptions) {
   });
 
   return {
-    api: installedExperimentOf(api.module(experimentServer).provided),
-    worker: installedExperimentOf(worker.module(experimentServer).provided),
+    api: installedExperimentOf(api.module(experimentProcessModule).provided),
+    worker: installedExperimentOf(worker.module(experimentProcessModule).provided),
     engine,
     queue,
     /** The jobs of one kind the queue was sent, in order. */

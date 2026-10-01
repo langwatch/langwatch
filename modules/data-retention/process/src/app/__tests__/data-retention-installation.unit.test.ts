@@ -6,7 +6,7 @@ import {
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
-import { dataRetentionServer } from "../../data-retention.server.ts";
+import { dataRetentionProcessModule } from "../../data-retention.module.ts";
 import {
   createDataRetentionTestAuthz,
   createDataRetentionTestEntitlement,
@@ -17,7 +17,7 @@ import {
 } from "./data-retention.fixture.ts";
 
 /**
- * The ClickHouse member `DataRetentionApp` reads. Memory-tier
+ * The ClickHouse member `DataRetentionModule` reads. Memory-tier
  * installation never reaches a store, so the boot only needs the member to
  * EXIST — a stub that refuses on use proves that without opening a client.
  */
@@ -32,7 +32,7 @@ function analyticalWithoutStore(): ClickHouseQueryClient {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(dataRetentionServer)])
+    .withModules([withMemoryRepositories(dataRetentionProcessModule)])
     .withConfig({
       "data-retention": { platformDefaultDays: undefined, isSaas: true },
     })
@@ -55,7 +55,7 @@ describe("data retention app installation", () => {
     try {
       const app = runtime.service(DataRetentionApi);
 
-      expect(runtime.module(dataRetentionServer).provided).toBe(app);
+      expect(runtime.module(dataRetentionProcessModule).provided).toBe(app);
 
       await expect(
         app.getResolvedForProject({ projectId: retentionTestGraph.projectId }),

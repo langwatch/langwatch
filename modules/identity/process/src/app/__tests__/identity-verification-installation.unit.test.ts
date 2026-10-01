@@ -14,7 +14,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { identityServer } from "../../identity.server.ts";
+import { identityProcessModule } from "../../identity.module.ts";
 
 describe("identity verification installation", () => {
   it("composes the ceremony behind IdentityApi and keeps an unlatched user from spending a proof", async () => {
@@ -22,7 +22,7 @@ describe("identity verification installation", () => {
       role: "api",
       secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared),
     })
-      .withModules([withMemoryRepositories(identityServer)])
+      .withModules([withMemoryRepositories(identityProcessModule)])
       .withMembers({
         publicBaseUrl: undefined,
         isSaas: false,

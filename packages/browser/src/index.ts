@@ -31,7 +31,7 @@ export type {
   RequiredUiSupply,
 } from "./ui-supply.types.ts";
 export {
-  defineWebModule,
+  defineBrowserModule,
   WebModule,
   type SupplyModule,
   type UiFacilityName,

@@ -7,7 +7,7 @@ import type { FeatureEventing, FeatureEventingSetup } from "@langwatch/eventing"
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
 import { memberSourceOf } from "./member-source.ts";
 
@@ -115,9 +115,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
     /** @scenario "A module declares its event sourcing beside its transports" */
     it("registers the pipeline the module named", async () => {
       const eventing = eventingHost("consume");
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(keyEventing());
 
       await createApp({ role: "worker", members: memberSourceOf({ eventing: eventing.host }) })
@@ -133,9 +133,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
     it("builds the pipeline over the repositories the app itself was given", async () => {
       const eventing = eventingHost("consume");
       const declaration = keyEventing();
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(declaration);
 
       const runtime = await createApp({
@@ -155,9 +155,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
     /** @scenario "A module declares its event sourcing beside its transports" */
     it("hands the module the senders registration answered with", async () => {
       const eventing = eventingHost("produce");
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(keyEventing());
 
       const runtime = await createApp({
@@ -173,9 +173,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
     /** @scenario "A module declares its event sourcing beside its transports" */
     it("builds against the process store of the graph that installs it", async () => {
       const eventing = eventingHost("consume");
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(keyEventing());
 
       await createApp({ role: "worker", members: memberSourceOf({ eventing: eventing.host }) })
@@ -211,9 +211,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
         },
         register: () => ({}),
       };
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(pipeline("scenario_lifecycle", "scenario"))
         .withEventing(pipeline("simulation_processing", "simulation_run"));
 
@@ -242,9 +242,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
     /** @scenario "The role decides which half a process installs" */
     it("installs the worker's declaration as a consumer", async () => {
       const declaration = keyEventing();
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(declaration);
 
       await createApp({
@@ -260,9 +260,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
     /** @scenario "The role decides which half a process installs" */
     it("installs the api's declaration as a producer", async () => {
       const declaration = keyEventing();
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(declaration);
 
       await createApp({
@@ -297,9 +297,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
           return { commands: { owner: name } };
         },
       };
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(pipeline("agent_sandbox_maintenance"))
         .withEventing(pipeline("key_rotation"))
         .withEventing(pipeline("key_audit"));
@@ -331,9 +331,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
         holdConsumers: () => calls.push("hold"),
         startConsumers: () => calls.push("start"),
       };
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(keyEventing());
 
       const runtime = await createApp({
@@ -360,9 +360,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
           { name: "process_manager_maintenance" },
         ],
       };
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(keyEventing());
       await createApp({ role: "worker", members: memberSourceOf({ eventing: host }) })
         .withModules([module])
@@ -385,9 +385,9 @@ describe("given a module that declares its event sourcing with withEventing", ()
     /** @scenario "A role that runs no event sourcing ignores the declaration" */
     it("boots without building or registering anything", async () => {
       const declaration = keyEventing();
-      const module = defineServerModule("api-key")
+      const module = defineProcessModule("api-key")
         .withRepositories(keyRepositories)
-        .withApp(ComposedKeyApp)
+        .withApi(ComposedKeyApp)
         .withEventing(declaration);
 
       const runtime = await createApp({ role: "tasks", members: memberSourceOf({}) })

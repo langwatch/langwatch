@@ -19,7 +19,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProjectApp } from "../../app/project.app.ts";
+import { ProjectModule } from "../../app/project.app.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import type { ProjectBrowserApi } from "../project.trpc.ts";
@@ -110,7 +110,7 @@ type PermissionQuestion = {
 };
 
 /**
- * The application exactly as `ProjectApp.create` builds it at boot: its own
+ * The application exactly as `ProjectModule.create` builds it at boot: its own
  * repository over an in-memory backing, the peers it declares, and the two
  * process members it reads.
  */
@@ -144,7 +144,7 @@ function application(
   });
 
   const logged: { payload: Readonly<Record<string, unknown>>; message: string }[] = [];
-  const app = ProjectApp.create({
+  const app = ProjectModule.create({
     dependencies: {
       apiKeys: new TestApiKeyService(),
       authorization,

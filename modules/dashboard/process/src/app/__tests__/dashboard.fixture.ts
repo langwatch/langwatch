@@ -14,7 +14,7 @@ import { vi } from "vitest";
 
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
-import { DashboardApp } from "../dashboard.app.ts";
+import { DashboardModule } from "../dashboard.app.ts";
 
 /** Everything visible: the caller the gates are measured against. */
 export const FULLY_PERMITTED: LangWatchQLProtections = {
@@ -81,8 +81,8 @@ export function createDashboardTestApp(
       projects: ProjectApi;
     }>;
   }> = {},
-): DashboardApp {
-  return DashboardApp.create({
+): DashboardModule {
+  return DashboardModule.create({
     repositories: input.repositories ?? MemoryDashboardRepositories.create(),
     members: { publicBaseUrl: input.publicBaseUrl },
     dependencies: {

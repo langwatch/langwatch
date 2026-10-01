@@ -7,7 +7,7 @@ import { createApp } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { dataPrivacyServer } from "../../data-privacy.server.ts";
+import { dataPrivacyProcessModule } from "../../data-privacy.module.ts";
 import {
   createDataPrivacyTestProjects,
   installableDataPrivacy,
@@ -38,7 +38,7 @@ describe("data privacy app installation", () => {
     try {
       const app = runtime.service(DataPrivacyApi);
 
-      expect(runtime.module(dataPrivacyServer).provided).toBe(app);
+      expect(runtime.module(dataPrivacyProcessModule).provided).toBe(app);
 
       await expect(app.getResolvedForProject({ projectId: PROJECT_ID })).resolves.toEqual(
         PLATFORM_DEFAULT_DATA_PRIVACY,

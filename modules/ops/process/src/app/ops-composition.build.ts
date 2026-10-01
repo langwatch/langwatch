@@ -222,7 +222,7 @@ class UnauditedOpsAuditSink extends AdminAuditSink {
   }
 }
 
-/** Builds the {@link OpsAppInfrastructure} `OpsApp.create` composes over. */
+/** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */
 export function buildOpsInfrastructure(input: {
   members: OpsProcessMembers;
   config: OpsServerConfig;

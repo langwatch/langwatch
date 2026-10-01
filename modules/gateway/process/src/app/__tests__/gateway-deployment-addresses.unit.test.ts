@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * `GatewayApp.getDeploymentAddresses`: what the checkup's gateway rows read.
+ * `GatewayModule.getDeploymentAddresses`: what the checkup's gateway rows read.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -11,7 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
@@ -25,8 +25,8 @@ function gatewayApp({
   controlPlaneUrl: string | undefined;
   baseUrl?: string;
   publicUrl?: string;
-}): Promise<GatewayApp> {
-  return GatewayApp.create({
+}): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
@@ -63,7 +63,7 @@ function gatewayApp({
   });
 }
 
-describe("GatewayApp.getDeploymentAddresses", () => {
+describe("GatewayModule.getDeploymentAddresses", () => {
   describe("given the gateway's own addresses are configured", () => {
     it("answers them as configured", async () => {
       const app = await gatewayApp({

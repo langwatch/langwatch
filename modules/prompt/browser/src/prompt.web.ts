@@ -3,11 +3,11 @@
  */
 
 import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { promptApi } from "./behavior/prompt-api.ts";
 
-export const promptWeb = defineWebModule("prompt")
+export const promptWeb = defineBrowserModule("prompt")
   .withApi(promptApi, { contracts: [promptTrpc, promptTagTrpc] })
   .withHosts({
     requires: ["PromptHostApi"],

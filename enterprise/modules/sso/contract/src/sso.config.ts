@@ -15,7 +15,7 @@ export type SsoConfig = ConfigOf<typeof ssoConfig>;
 
 /**
  * What `SsoGateService` and the BetterAuth adapter consume: every provider's
- * public and credentialed halves in one object, assembled by `SsoApp.create`
+ * public and credentialed halves in one object, assembled by `SsoModule.create`
  * from `ssoConfig`, `signInProviderSecrets`, and the process's public base URL.
  *
  * `isSaas` is a known gap, not a value this module can resolve on its own:

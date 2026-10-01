@@ -12,7 +12,7 @@ import {
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { LicensingApp } from "../app/licensing.app.ts";
+import type { LicensingModule } from "../app/licensing.app.ts";
 import { LICENSE_SYNC_PROCESS_NAME, runLicenseSync } from "./license-sync.intent.ts";
 import {
   LICENSE_SYNC_FIRST_DELAY_MS,
@@ -29,7 +29,7 @@ export function buildLicenseSync({
   app,
   processStore,
   bootedAt = nowInstant().epochMilliseconds,
-}: EventingSetup<unknown, Pick<LicensingApp, "syncLicenses">> & {
+}: EventingSetup<unknown, Pick<LicensingModule, "syncLicenses">> & {
   bootedAt?: number;
 }): StaticPipelineDefinition<never> {
   return definePipeline({
@@ -59,5 +59,5 @@ export function buildLicenseSync({
 
 export const licenseSyncEventing = defineEventingModule({
   pipeline: LICENSE_SYNC_PIPELINE_NAME,
-  build: (setup: EventingSetup<undefined, LicensingApp>) => buildLicenseSync(setup),
+  build: (setup: EventingSetup<undefined, LicensingModule>) => buildLicenseSync(setup),
 });

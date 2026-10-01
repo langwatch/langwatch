@@ -3,9 +3,9 @@
  * unsubscribed from a project's notifications, and undoing it.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const notificationWeb = defineWebModule("notification")
+export const notificationWeb = defineBrowserModule("notification")
   .withHosts({
     requires: ["NotificationHostApi"],
     mounts: {

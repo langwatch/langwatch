@@ -103,7 +103,7 @@ class StoredObjectOwnerAbsence extends StoredObjectOwnerResolver {
   }
 }
 
-/** Builds the {@link StoredObjectInfrastructure} `StoredObjectApp.create` composes over. */
+/** Builds the {@link StoredObjectInfrastructure} `StoredObjectModule.create` composes over. */
 export function buildStoredObjectInfrastructure(input: {
   members: StoredObjectProcessMembers;
 }): StoredObjectInfrastructure {

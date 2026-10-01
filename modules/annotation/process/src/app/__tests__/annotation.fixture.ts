@@ -11,7 +11,7 @@ import { vi } from "vitest";
 
 import type { AnnotationRepositories } from "../../repositories/annotation.repositories.ts";
 import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
-import { AnnotationApp } from "../annotation.app.ts";
+import { AnnotationModule } from "../annotation.app.ts";
 
 export function createAnnotationTestProjects(organizationId = "organization-1") {
   return Object.assign(createApiFixture<ProjectApi>(), {
@@ -98,8 +98,8 @@ export function createAnnotationTestApp(
       entitlement: EntitlementApi;
     }>;
   }> = {},
-): AnnotationApp {
-  return AnnotationApp.create({
+): AnnotationModule {
+  return AnnotationModule.create({
     repositories: input.repositories ?? MemoryAnnotationRepositories.create(),
     dependencies: {
       projects: input.dependencies?.projects ?? createAnnotationTestProjects(),

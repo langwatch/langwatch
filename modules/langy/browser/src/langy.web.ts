@@ -4,7 +4,7 @@
  * inside other modules' pages, which is why its host mounts above the tree.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { langyApi } from "./behavior/langy-api.ts";
 import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";
@@ -13,7 +13,7 @@ import "./behavior/langy-context-target.store.ts";
 import "./behavior/langy-page-context.store.ts";
 import "./behavior/langy-registrations.store.ts";
 
-export const langyWeb = defineWebModule("langy")
+export const langyWeb = defineBrowserModule("langy")
   .withApi(langyApi)
   // Path-less: the route table nests every project and settings page under
   // it, so the panel and its provider survive navigation between them.

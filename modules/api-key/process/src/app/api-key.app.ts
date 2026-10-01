@@ -117,7 +117,7 @@ function scopeNames(
 
 /** The first pepper the chain answers; none refuses the boot rather than hashing under "". */
 async function apiKeyPepper(secrets: ScopedSecrets): Promise<string> {
-  const { pepper, pepperFallback, pepperLastFallback } = ApiKeyApp.secrets;
+  const { pepper, pepperFallback, pepperLastFallback } = ApiKeyModule.secrets;
   const answered = await secrets.into(pepper, (primary) =>
     secrets.into(pepperFallback, (credentials) =>
       secrets.into(pepperLastFallback, (session) =>
@@ -133,7 +133,7 @@ async function apiKeyPepper(secrets: ScopedSecrets): Promise<string> {
   return answered;
 }
 
-export class ApiKeyApp implements ApiKeyApi {
+export class ApiKeyModule implements ApiKeyApi {
   static readonly contract = ApiKeyApi;
   static readonly dependencies: ApiKeyDependencies = {
     authorization: AuthzApi,
@@ -149,7 +149,7 @@ export class ApiKeyApp implements ApiKeyApi {
     pepperLastFallback: sessionSecret,
   } as const;
 
-  static async create(setup: ApiKeySetup): Promise<ApiKeyApp> {
+  static async create(setup: ApiKeySetup): Promise<ApiKeyModule> {
     const pepper = await apiKeyPepper(setup.secrets);
     const authorization = setup.dependencies.authorization;
     const { redis } = setup.members;
@@ -176,7 +176,7 @@ export class ApiKeyApp implements ApiKeyApi {
     });
     const runKeys = RunKeyMintService.create({ apiKeys: service, authz: authorization });
 
-    return new ApiKeyApp(service, authorization, runKeys);
+    return new ApiKeyModule(service, authorization, runKeys);
   }
 
   private constructor(service: ApiKeyService, authorization: AuthzApi, runKeys: RunKeyMintService) {

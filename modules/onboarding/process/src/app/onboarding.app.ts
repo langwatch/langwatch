@@ -39,9 +39,9 @@ import { GuidedOnboardingService } from "../services/guided-onboarding.service.t
 import { OnboardingChecksService } from "../services/onboarding-checks.service.ts";
 import type { IntegrationsChecksApi } from "../transport/integrations-checks.trpc.ts";
 
-type OnboardingSetup = FeatureSetup<typeof OnboardingApp.dependencies, never, undefined>;
+type OnboardingSetup = FeatureSetup<typeof OnboardingModule.dependencies, never, undefined>;
 
-export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksApi {
+export class OnboardingModule implements OnboardingApiContract, IntegrationsChecksApi {
   static readonly contract = OnboardingApi;
   static readonly dependencies = {
     organizations: OrganizationApi,
@@ -93,7 +93,7 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
     this.#senders = parts.senders;
   }
 
-  static create(setup: OnboardingSetup): OnboardingApp {
+  static create(setup: OnboardingSetup): OnboardingModule {
     const ops = setup.dependencies.ops;
     const events = HttpPostHogEventsChannel.create({
       targets: () => ops.findProductAnalyticsTargets(),
@@ -132,7 +132,7 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
       },
     });
 
-    return new OnboardingApp({
+    return new OnboardingModule({
       guided,
       checks,
       permissions: setup.dependencies.permissions,

@@ -5,7 +5,7 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 
-import type { ServerOrganizationApp } from "../app/organization.app.ts";
+import type { OrganizationModule } from "../app/organization.app.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import {
   RecordIntegrationMethodChosenCommand,
@@ -54,7 +54,7 @@ export function buildOrganizationLifecyclePipeline(): OrganizationLifecycleDefin
 
 export const organizationLifecycleEventing = defineEventingModule({
   pipeline: ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<OrganizationRepositories, ServerOrganizationApp>) =>
+  build: ({ app }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
     app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycle(commands),
 });

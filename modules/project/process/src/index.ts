@@ -8,11 +8,11 @@ export {
 } from "./services/project-credentials.service.ts";
 export type { ProjectInfrastructure } from "./app/project.app.ts";
 export {
-  projectServer,
+  projectProcessModule,
   createGovernanceInternalProjectService,
   createProjectCodingAgentActivityRepository,
   createProjectMetadataService,
-} from "./project.server.ts";
+} from "./project.module.ts";
 export { ProjectDiagnostics, ProjectStoredObjects } from "./services/project.service.ts";
 export {
   type ProjectManagementApi,

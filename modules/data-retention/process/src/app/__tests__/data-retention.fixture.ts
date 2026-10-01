@@ -13,7 +13,7 @@ import { vi } from "vitest";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
 import {
-  DataRetentionApp,
+  DataRetentionModule,
   type DataRetentionDirectoryReader,
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
@@ -271,14 +271,14 @@ export function createDataRetentionTestApp(
     }>;
     platformDefaultRetentionDays?: number;
   }> = {},
-): DataRetentionApp {
+): DataRetentionModule {
   const members: DataRetentionTestMembers = {
     clickhouse: input.clickhouse ?? noopClickHouse(),
     nodeEnvironment: "test",
     redis: null,
   };
 
-  return DataRetentionApp.create({
+  return DataRetentionModule.create({
     repositories: input.repositories ?? {
       ...MemoryDataRetentionRepositories.create(),
       directory: input.directory ?? MemoryRetentionDirectory.create(),

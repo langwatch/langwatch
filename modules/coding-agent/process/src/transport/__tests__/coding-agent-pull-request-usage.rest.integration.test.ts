@@ -17,7 +17,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { CodingAgentApp } from "#app/coding-agent.app";
+import { CodingAgentModule } from "#app/coding-agent.app";
 
 import {
   TestGithubService,
@@ -99,7 +99,7 @@ function mount({
   const repositories = MemoryCodingAgentRepositories.create();
   const candidateReads = vi.spyOn(repositories.sessions, "findByRepositoryBranch");
 
-  const app = CodingAgentApp.create({
+  const app = CodingAgentModule.create({
     dependencies: {
       github,
       projects: new ProjectForRest([...new Set([...reach.key, ...reach.holder])]),

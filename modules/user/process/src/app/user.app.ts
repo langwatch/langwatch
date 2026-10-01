@@ -163,13 +163,13 @@ type UserMembers = MembersRead<readonly ["prisma", "redis"]> &
 export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
 
 type UserSetup = FeatureSetup<
-  typeof UserApp.dependencies,
+  typeof UserModule.dependencies,
   UserMembers,
   undefined,
   UserRepositories
 >;
 
-export class UserApp implements UserApi {
+export class UserModule implements UserApi {
   static readonly contract = UserApi;
   /** `publicBaseUrl` is named raw: the process answers it, no store does. */
   static readonly reads = ["prisma", "redis", "publicBaseUrl"] as const;
@@ -195,7 +195,7 @@ export class UserApp implements UserApi {
     storedObjects: StoredObjectApi,
   };
 
-  static create(setup: UserSetup): UserApp {
+  static create(setup: UserSetup): UserModule {
     const members = buildUserInfrastructure({
       prisma: setup.members.prisma,
       redis: setup.members.redis,
@@ -210,7 +210,7 @@ export class UserApp implements UserApi {
       storedObjects: setup.dependencies.storedObjects,
     });
 
-    return UserApp.#build({
+    return UserModule.#build({
       members,
       dependencies: setup.dependencies,
       repositories: setup.repositories,
@@ -234,8 +234,8 @@ export class UserApp implements UserApi {
     dependencies: UserAppDependencies;
     members: UserInfrastructure;
     facts: UserFacts;
-  }): UserApp {
-    return UserApp.#build(setup);
+  }): UserModule {
+    return UserModule.#build(setup);
   }
 
   static #build({
@@ -248,11 +248,11 @@ export class UserApp implements UserApi {
     dependencies: UserAppDependencies;
     repositories: UserRepositories;
     facts: UserFacts;
-  }): UserApp {
+  }): UserModule {
     const now = members.now;
     const lifecycle = UserLifecycleNoticeService.create();
 
-    return new UserApp({
+    return new UserModule({
       users: UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,

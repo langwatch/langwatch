@@ -21,9 +21,9 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import type { MonitorRepositories } from "../../repositories/monitor.repositories.ts";
-import { MonitorApp } from "../monitor.app.ts";
+import { MonitorModule } from "../monitor.app.ts";
 
-type MonitorTestSetup = Parameters<typeof MonitorApp.create>[0];
+type MonitorTestSetup = Parameters<typeof MonitorModule.create>[0];
 
 function evaluatorRow(input: {
   id: string;
@@ -125,13 +125,13 @@ export function createMonitorTestApp(
     replication?: FakeMonitorReplication;
     publicBaseUrl?: string;
   }> = {},
-): MonitorApp {
+): MonitorModule {
   const evaluators = input.evaluators ?? new FakeMonitorEvaluators();
   const performance = input.performance ?? new FakeMonitorPerformance();
   const replication =
     input.replication ?? new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null });
 
-  return MonitorApp.create({
+  return MonitorModule.create({
     repositories: input.repositories ?? createMonitorTestRepositories(),
     members: { publicBaseUrl: input.publicBaseUrl ?? "https://app.langwatch.test" },
     dependencies: {

@@ -12,7 +12,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { PromptApp } from "#app/prompt.app";
+import { PromptModule } from "#app/prompt.app";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
@@ -25,7 +25,7 @@ function buildCaller(options: { manageable: readonly string[] }) {
     options.manageable.includes(check.projectId ?? ""),
   );
 
-  const prompts = PromptApp.createWithPrompts(
+  const prompts = PromptModule.createWithPrompts(
     {
       dependencies: {
         projects: createApiFixture<ProjectApi>({

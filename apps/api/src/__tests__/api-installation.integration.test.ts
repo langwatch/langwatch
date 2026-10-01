@@ -9,7 +9,7 @@ import { AuthApi } from "@langwatch/auth-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModuleApiToken } from "@langwatch/module";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -86,7 +86,7 @@ const OTLP_POSTS: readonly (readonly [string, object])[] = [
   ["/v1/metrics", OTLP_METRIC_BATCH],
 ];
 
-const moduleApis = serverModules.flatMap((module) =>
+const moduleApis = processModules.flatMap((module) =>
   module.apiContract instanceof ModuleApiToken ? [module.apiContract] : [],
 );
 
@@ -105,7 +105,7 @@ describe("the api process installation", () => {
         ({ metadata }) => metadata.name === "trace_processing",
       );
       expect(trace?.open((definition) => definition.foldProjections.size)).toBeGreaterThan(0);
-      expect(serverModules.flatMap((module) => module.transports ?? [])).not.toEqual([]);
+      expect(processModules.flatMap((module) => module.transports ?? [])).not.toEqual([]);
     } finally {
       await runtime.stop();
     }
@@ -113,7 +113,7 @@ describe("the api process installation", () => {
 
   /** @scenario "The installed api serves the trace reads from coding-agent's namespace only" */
   it("serves the drawer's coding-agent reads under codingAgents, not traces", () => {
-    const procedures = serverModules
+    const procedures = processModules
       .flatMap((module) => module.transports ?? [])
       .flatMap((transport) => {
         if (transport.protocol !== "trpc" || !("contract" in transport)) return [];
@@ -200,7 +200,7 @@ describe("the api process installation", () => {
         audit: { record: async () => {} },
       });
       const hono = host.app;
-      const deviceFlow = serverModules
+      const deviceFlow = processModules
         .filter((module) => module.apiContract === AuthApi)
         .flatMap((module) => module.transports ?? [])
         .find((transport) => transport.protocol === "rest" && transport.namespace === "auth-cli");
@@ -273,7 +273,7 @@ describe("the api process installation", () => {
       });
       const isApproval = (transport: { protocol: string; namespace?: string }) =>
         transport.protocol === "rest" && transport.namespace === "mcp-authorize";
-      const owner = serverModules.find((module) => (module.transports ?? []).some(isApproval));
+      const owner = processModules.find((module) => (module.transports ?? []).some(isApproval));
       const approval = owner?.transports?.find(isApproval);
       const contract = owner?.apiContract;
       if (!owner || !approval || !(contract instanceof ModuleApiToken)) {
@@ -333,7 +333,7 @@ describe("the api process installation", () => {
       });
       const isIngest = (transport: { protocol: string; namespace?: string }) =>
         transport.protocol === "rest" && transport.namespace === "ingest";
-      const owner = serverModules.find((module) => (module.transports ?? []).some(isIngest));
+      const owner = processModules.find((module) => (module.transports ?? []).some(isIngest));
       const ingest = owner?.transports?.find(isIngest);
       const contract = owner?.apiContract;
       if (!owner || !ingest || !(contract instanceof ModuleApiToken)) {
@@ -395,7 +395,7 @@ describe("the api process installation", () => {
         audit: { record: async () => {} },
       });
       const families = new Map<string, string>();
-      for (const module of serverModules) {
+      for (const module of processModules) {
         const token = module.apiContract;
         if (!(token instanceof ModuleApiToken)) continue;
         for (const transport of module.transports ?? []) {

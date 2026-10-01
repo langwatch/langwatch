@@ -1,4 +1,4 @@
-export { entitlementServer } from "./entitlement.server.ts";
+export { entitlementProcessModule } from "./entitlement.module.ts";
 export type { CataloguePlan, PlanCatalogueReader } from "./app/entitlement.app.ts";
 export { PlanNextStepService } from "./services/plan-next-step.service.ts";
 

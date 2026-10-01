@@ -13,7 +13,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
 import type { UsageLimitResult } from "../../services/usage-enforcement.service.ts";
-import { EntitlementApp } from "../entitlement.app.ts";
+import { EntitlementModule } from "../entitlement.app.ts";
 import type { EntitlementInfrastructure } from "../entitlement.app.ts";
 import {
   USAGE_UNKNOWN,
@@ -91,8 +91,8 @@ export function createEntitlementTestApp(
     dependencies?: Partial<{ users: UserApi; organizations: OrganizationApi }>;
     config?: EntitlementConfig;
   }>,
-): EntitlementApp {
-  return EntitlementApp.createForTesting({
+): EntitlementModule {
+  return EntitlementModule.createForTesting({
     repositories: input.repositories ?? MemoryEntitlementRepositories.create(),
     members: {
       ...input.members,

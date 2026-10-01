@@ -15,11 +15,11 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { hostedMcpServer } from "../../hosted-mcp.server.ts";
+import { hostedMcpProcessModule } from "../../hosted-mcp.module.ts";
 
 function process() {
   return createApp({ role: "api" })
-    .withModules([hostedMcpServer])
+    .withModules([hostedMcpProcessModule])
     .withMember("keyvalue", null)
     .withMember("encryption", {
       encrypt: (value: string) => value,
@@ -41,7 +41,7 @@ describe("hosted MCP app installation", () => {
 
     try {
       const app = runtime.service(HostedMcpApi);
-      expect(runtime.module(hostedMcpServer).provided).toBe(app);
+      expect(runtime.module(hostedMcpProcessModule).provided).toBe(app);
 
       const handler = app.createHandler();
       expect(handler.isMcpRoute("/mcp")).toBe(true);

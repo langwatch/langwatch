@@ -12,7 +12,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { storedObjectServer } from "../../stored-object.server.ts";
+import { storedObjectProcessModule } from "../../stored-object.module.ts";
 import { storedObjectFileRest } from "../stored-object-file.rest.ts";
 
 const PROJECT = "project_1";
@@ -25,7 +25,7 @@ type Scripted = {
 
 function installed({ authz, allowed = true }: Scripted) {
   return createApp({ role: "api" })
-    .withModules([storedObjectServer])
+    .withModules([storedObjectProcessModule])
     .withConfig({
       "stored-object": {
         azureSpoolRetentionConfirmed: false,
@@ -91,7 +91,7 @@ async function readThroughInstalledModule({
 
   try {
     const host = restHost();
-    const provided = runtime.module(storedObjectServer).provided;
+    const provided = runtime.module(storedObjectProcessModule).provided;
     host.mount(storedObjectFileRest.router(), () => provided);
 
     const response = await host.app.request(new Request(`http://api.test${path}`, { headers }));

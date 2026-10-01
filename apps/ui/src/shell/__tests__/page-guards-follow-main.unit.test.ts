@@ -3,7 +3,7 @@
  * on origin/main), read against what the installed modules now declare.
  * specs/ui/page-permission-guards.feature
  */
-import { webModules } from "@langwatch/installed-web-modules";
+import { browserModules } from "@langwatch/installed-web-modules";
 import type { WebScreen } from "@langwatch/browser";
 import { resolveUiPageAccess } from "@langwatch/browser/page-guard";
 import { describe, expect, it } from "vitest";
@@ -76,7 +76,7 @@ const MAIN_GUARDS: readonly MainGuard[] = [
 ];
 
 const declared: Record<string, WebScreen> = Object.fromEntries(
-  webModules.flatMap((module) => Object.entries(module.installation.screens)),
+  browserModules.flatMap((module) => Object.entries(module.installation.screens)),
 );
 
 function accessFor({

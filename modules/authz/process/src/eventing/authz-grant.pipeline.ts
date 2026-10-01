@@ -11,7 +11,7 @@ import {
   userLifecycleEventDataSchema,
 } from "@langwatch/user-contract";
 
-import type { AuthzApp } from "../app/authz.app.ts";
+import type { AuthzModule } from "../app/authz.app.ts";
 import type { AuthzAuditTrailRepository } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
@@ -131,6 +131,6 @@ export class EventingAuthzAdapter {
 
 export const authzEventing = defineEventingModule({
   pipeline: AUTHZ_GRANT_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<AuthzRepositories, AuthzApp>) => app.eventingPipeline(),
+  build: ({ app }: EventingSetup<AuthzRepositories, AuthzModule>) => app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

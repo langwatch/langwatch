@@ -22,11 +22,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { AnalyticsApp } from "../../app/analytics.app.ts";
+import { AnalyticsModule } from "../../app/analytics.app.ts";
 import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
 import { analyticsLwqlTrpcTransport } from "../analytics-lwql.trpc.ts";
 
-type Setup = Parameters<typeof AnalyticsApp.create>[0];
+type Setup = Parameters<typeof AnalyticsModule.create>[0];
 type TestContext = { actor: { id: string } };
 
 const PROJECT = { projectId: "project-1" };
@@ -64,7 +64,7 @@ const allowEveryRequest: RateLimiter = { check: async () => ({ allowed: true }) 
 
 /** The app as production composes it, with no LangWatchQL identity provisioned. */
 async function callerFor({ switchOn, held }: { switchOn: boolean; held: readonly string[] }) {
-  const app = await AnalyticsApp.create({
+  const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => switchOn }),
       authz: createApiFixture<AuthzApi>(),

@@ -74,8 +74,8 @@ Feature: Provider-neutral entitlement resolution
   @architecture @typecheck
   Scenario: The entitlement installer constructs its private service
     Given Entitlements contract schemas are compiled independently
-    When a runtime installs entitlementServer
-    Then EntitlementApp.create constructs its private service from typed sources
+    When a runtime installs entitlementProcessModule
+    Then EntitlementModule.create constructs its private service from typed sources
     And peers receive the callable EntitlementApi
     And importing the feature starts no work or reads the environment
 

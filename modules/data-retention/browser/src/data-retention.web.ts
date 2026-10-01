@@ -3,9 +3,9 @@
  * schedule screen.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const dataRetentionWeb = defineWebModule("data-retention")
+export const dataRetentionWeb = defineBrowserModule("data-retention")
   .withHosts({
     requires: ["DataRetentionHostApi"],
     mounts: {

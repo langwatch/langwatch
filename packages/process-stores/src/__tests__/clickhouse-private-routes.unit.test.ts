@@ -2,7 +2,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { storesOwner, type StoresConfig } from "../config-owner.ts";
-import { openProcessStores } from "../open-stores.ts";
+import { openStores } from "../open-stores.ts";
 import { PipelineParticipation } from "../pipeline-selection.ts";
 
 const storesConfig: StoresConfig = {
@@ -41,7 +41,7 @@ async function privateOrganizations(environment: Record<string, string>) {
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { ...DATABASE, ...environment } }).withEnv(),
   );
-  const { members } = await openProcessStores({
+  const { members } = await openStores({
     name: "clickhouse-private-routes-test",
     config: storesConfig,
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),

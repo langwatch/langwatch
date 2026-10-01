@@ -1,8 +1,8 @@
 /** What a browser installs for integration: the Integrations screen and its GitHub host. */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const integrationWeb = defineWebModule("integration")
+export const integrationWeb = defineBrowserModule("integration")
   .withHosts({
     requires: ["GithubHostApi"],
     mounts: { GithubHostApi: { load: () => import("./behavior/github-host-mount.tsx") } },

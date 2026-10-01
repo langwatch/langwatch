@@ -10,11 +10,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { auditLogServer } from "../../audit-log.server.ts";
+import { auditLogProcessModule } from "../../audit-log.module.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(auditLogServer)])
+    .withModules([withMemoryRepositories(auditLogProcessModule)])
     .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } })
     .provide({
       project: createApiFixture<ProjectApi>({}),
@@ -42,7 +42,7 @@ describe("given a process that installed the audit log", () => {
 
       try {
         const app = runtime.service(AuditLogApi);
-        expect(runtime.module(auditLogServer).provided).toBe(app);
+        expect(runtime.module(auditLogProcessModule).provided).toBe(app);
 
         await app.record(command);
 

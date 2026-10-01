@@ -197,13 +197,13 @@ export interface ExperimentAppDependencies {
 const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
 type ExperimentSetup = FeatureSetup<
-  typeof ExperimentApp.dependencies,
+  typeof ExperimentModule.dependencies,
   MembersRead<readonly ["prisma", "clickhouse", "redis", "logger"]> &
     Readonly<{ publicBaseUrl: string | undefined; processName: string; isSaas: boolean }>,
   ExperimentServerConfig
 >;
 
-export class ExperimentApp implements ExperimentApi {
+export class ExperimentModule implements ExperimentApi {
   static readonly contract = ExperimentApi;
   static readonly dependencies = {
     workflows: WorkflowApi,
@@ -243,7 +243,7 @@ export class ExperimentApp implements ExperimentApi {
     "isSaas",
   ] as const;
 
-  static create(setup: ExperimentSetup): ExperimentApp {
+  static create(setup: ExperimentSetup): ExperimentModule {
     const { members, dependencies, config } = setup;
     const { prisma, clickhouse, logger } = members;
     const { workflows, dataset, agents, evaluators, prompts, retention } = dependencies;
@@ -284,7 +284,7 @@ export class ExperimentApp implements ExperimentApi {
     const targetNames = ExperimentWorkbenchTargetNamesService.create();
     const entities = ExperimentTargetEntityNamesService.create({ agents, evaluators });
 
-    return new ExperimentApp({
+    return new ExperimentModule({
       experiments,
       runLookup: ExperimentFindOrCreateService.create(experiments),
       slugify: slugifyExperimentName,
@@ -309,8 +309,8 @@ export class ExperimentApp implements ExperimentApi {
    * rather than driving the reads/dependencies this App builds them from —
    * the process root never calls this, since a real one is always booted.
    */
-  static createForTesting(dependencies: ExperimentAppDependencies): ExperimentApp {
-    return new ExperimentApp(dependencies);
+  static createForTesting(dependencies: ExperimentAppDependencies): ExperimentModule {
+    return new ExperimentModule(dependencies);
   }
 
   #dependencies: ExperimentAppDependencies;
@@ -658,7 +658,7 @@ export class ExperimentApp implements ExperimentApi {
   ): Promise<WorkbenchSaveResult> {
     return this.#dependencies.experiments.saveWorkbenchState({
       ...input,
-      actor: ExperimentApp.actorFor(by),
+      actor: ExperimentModule.actorFor(by),
     });
   }
 
@@ -675,7 +675,7 @@ export class ExperimentApp implements ExperimentApi {
     return this.#dependencies.experiments.createEvaluationsV3({
       ...rest,
       state: state ?? createBlankWorkbenchState(rest.name ? { name: rest.name } : {}),
-      actor: ExperimentApp.actorFor(by),
+      actor: ExperimentModule.actorFor(by),
     });
   }
 
@@ -686,7 +686,7 @@ export class ExperimentApp implements ExperimentApi {
   ): Promise<WorkbenchSaveResult> {
     return this.#dependencies.experiments.commitWorkbenchVersion({
       ...input,
-      actor: ExperimentApp.actorFor(by),
+      actor: ExperimentModule.actorFor(by),
     });
   }
 
@@ -697,7 +697,7 @@ export class ExperimentApp implements ExperimentApi {
   ): Promise<WorkbenchSaveResult> {
     return this.#dependencies.experiments.restoreWorkbenchVersion({
       ...input,
-      actor: ExperimentApp.actorFor(by),
+      actor: ExperimentModule.actorFor(by),
     });
   }
 
@@ -706,7 +706,7 @@ export class ExperimentApp implements ExperimentApi {
     input: Readonly<{ projectId: string; slug: string; version: number }>,
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
-    return this.#workbenchVersions.restoreBySlug({ ...input, actor: ExperimentApp.actorFor(by) });
+    return this.#workbenchVersions.restoreBySlug({ ...input, actor: ExperimentModule.actorFor(by) });
   }
 
   /** `GET /:slug/workbench-state`'s answer, `fields=version` leaving out the setup. */
@@ -719,7 +719,7 @@ export class ExperimentApp implements ExperimentApi {
     input: SaveWorkbenchStateBySlugRequest,
     by: ExperimentCaller,
   ): Promise<WorkbenchSavedVersion> {
-    return this.#workbenchVersions.saveBySlug({ ...input, actor: ExperimentApp.actorFor(by) });
+    return this.#workbenchVersions.saveBySlug({ ...input, actor: ExperimentModule.actorFor(by) });
   }
 
   /** `GET /:slug/versions`: one page of the history, as the REST door publishes it. */
@@ -968,7 +968,7 @@ export class ExperimentApp implements ExperimentApi {
    * rather than called through the module's reference, because several of
    * those doors read the service the reference only publishes operations on.
    */
-  experiments(): ExperimentApp {
+  experiments(): ExperimentModule {
     return this;
   }
 

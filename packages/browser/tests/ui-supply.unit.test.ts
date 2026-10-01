@@ -7,7 +7,7 @@ import {
   BrowserMountMissingError,
   BrowserSupplyMissingError,
   createUi,
-  defineWebModule,
+  defineBrowserModule,
 } from "../src/index.ts";
 import {
   browserUiTransport,
@@ -34,7 +34,7 @@ describe("UI supply", () => {
   });
 
   it("reads and parses every declared config slice before resolving", async () => {
-    const secondConfig = defineWebModule("second-config").withConfig({
+    const secondConfig = defineBrowserModule("second-config").withConfig({
       notification: z.strictObject({ email: z.boolean() }),
     });
     const reader = vi.fn(() => publicAppConfig);
@@ -66,7 +66,7 @@ describe("UI supply", () => {
   });
 
   it("names the module refusing a slice and never repeats the value", async () => {
-    const refusing = defineWebModule("refusing").withConfig({
+    const refusing = defineBrowserModule("refusing").withConfig({
       process: z.strictObject({ mode: z.string().refine((mode) => mode === "production") }),
     });
     const render = createUi({ document: documentRoot, mount: "root" })

@@ -5,11 +5,11 @@
  */
 
 import { modelProviderTrpc } from "@langwatch/model-provider-contract";
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { modelProviderApi } from "./behavior/model-provider-api.ts";
 
-export const modelProviderWeb = defineWebModule("model-provider")
+export const modelProviderWeb = defineBrowserModule("model-provider")
   .withApi(modelProviderApi, { contracts: [modelProviderTrpc] })
   .withHosts({
     requires: ["ModelProviderHostApi"],

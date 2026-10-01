@@ -3,11 +3,11 @@
  * the product-flavour flow and project creation.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { onboardingGuidedTour } from "./features/guided-onboarding/behavior/guided-tour.capability.ts";
 
-export const onboardingWeb = defineWebModule("onboarding")
+export const onboardingWeb = defineBrowserModule("onboarding")
   // The tour's state for Langy's tour card, and the Home offer a screen draws in its own space.
   .withCapabilities({
     guidedTour: onboardingGuidedTour,

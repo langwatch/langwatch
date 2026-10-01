@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
-  TraceApp,
+  TraceModule,
   type TraceEditOverlayStore,
   type TraceSummaryReader,
   type TracesListReader,
@@ -48,7 +48,7 @@ function harness(tier: "free" | "paid" | "enterprise") {
   };
   const summary: TraceSummaryReader = { getByTraceId: async () => ({}) as never };
 
-  const app = TraceApp.create({
+  const app = TraceModule.create({
     storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
       existence: {

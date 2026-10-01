@@ -293,7 +293,7 @@ const logger = createLogger("langwatch:governance");
 
 type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 
-/** The peers this application reads, resolved from {@link GovernanceApp.dependencies}. */
+/** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
 export interface GovernanceAppDependencies {
   /**
    * The organization a project belongs to, for the project-scoped REST family,
@@ -423,10 +423,10 @@ export interface GovernanceAppDependencies {
 
 /** How a process installs this application: its peers, its members, its repositories. */
 type GovernanceSetup = Readonly<{
-  dependencies: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["dependencies"];
+  dependencies: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["dependencies"];
   config: GovernanceConfig | undefined;
-  resources: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["resources"];
-  secrets: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["secrets"];
+  resources: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["resources"];
+  secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
   members: Readonly<{
     encryption: GovernanceEncryptor;
     isSaas: boolean;
@@ -437,7 +437,7 @@ type GovernanceSetup = Readonly<{
   repositories: GovernanceRepositories;
 }>;
 
-export class GovernanceApp implements GovernanceRestApi {
+export class GovernanceModule implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
   static readonly reads = ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"] as const;
   /**
@@ -475,7 +475,7 @@ export class GovernanceApp implements GovernanceRestApi {
     dependencies,
     repositories,
     secrets,
-  }: GovernanceSetup): Promise<GovernanceApp> {
+  }: GovernanceSetup): Promise<GovernanceModule> {
     const erasureSuppression = await secrets.into(
       governanceSecrets.erasurePseudonymSecret,
       (erasureSecret) =>
@@ -495,7 +495,7 @@ export class GovernanceApp implements GovernanceRestApi {
         secret,
       }),
     );
-    return new GovernanceApp({
+    return new GovernanceModule({
       ottl,
       ingestionSecrets,
       dependencies: {

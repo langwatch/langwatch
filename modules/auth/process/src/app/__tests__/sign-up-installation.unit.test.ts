@@ -23,7 +23,7 @@ import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { authServer } from "../../auth.server.ts";
+import { authProcessModule } from "../../auth.module.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 
 /** A signed-out sign-up through the installed auth module, memory rows and a recording mailer. */
@@ -41,7 +41,7 @@ async function bootAuth({
 }) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(authServer)])
+    .withModules([withMemoryRepositories(authProcessModule)])
     .withMembers({
       publicBaseUrl: "https://app.acme.test",
       isSaas: false,

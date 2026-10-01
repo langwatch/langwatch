@@ -4,9 +4,9 @@
  * bar opens (`?drawer.open=<name>`) under the names the product already uses.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const scenarioWeb = defineWebModule("scenario")
+export const scenarioWeb = defineBrowserModule("scenario")
   .withHosts({
     requires: ["ScenarioHostApi"],
     mounts: { ScenarioHostApi: { load: () => import("./behavior/scenario-host-mount.tsx") } },

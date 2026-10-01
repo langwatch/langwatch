@@ -4,9 +4,9 @@
  * band. Always installed — scim refuses per-organization on entitlement, never by tier.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const scimWeb = defineWebModule("scim")
+export const scimWeb = defineBrowserModule("scim")
   .withHosts({
     requires: ["ScimHostApi"],
     mounts: { ScimHostApi: { load: () => import("./behavior/scim-host-mount.tsx") } },

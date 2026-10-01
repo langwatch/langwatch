@@ -11,7 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { SuiteApp } from "../suite.app.ts";
+import { SuiteModule } from "../suite.app.ts";
 import { createSuiteTestRepositories } from "./suite.fixture.ts";
 
 function testSuite(overrides: Partial<ScenarioTestSuite> = {}): ScenarioTestSuite {
@@ -138,7 +138,7 @@ function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
     ...overrides.scenarios,
   });
 
-  const app = SuiteApp.createForTesting({
+  const app = SuiteModule.createForTesting({
     repositories: createSuiteTestRepositories(),
     dependencies: {
       scenarios,
@@ -168,7 +168,7 @@ function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
   return { app, updateTestSuite };
 }
 
-describe("SuiteApp.update", () => {
+describe("SuiteModule.update", () => {
   describe("given a test suite", () => {
     /** @scenario "The suite editor refuses to broaden a test suite into a code-owned suite" */
     it("refuses a scope or scenarioIds write on a test suite", async () => {
@@ -282,7 +282,7 @@ describe("SuiteApp.update", () => {
   });
 });
 
-describe("SuiteApp.listByIds", () => {
+describe("SuiteModule.listByIds", () => {
   it("keeps matching test suites, omits missing associations and looks up duplicate IDs once", async () => {
     const lookup = vi.fn<ScenarioApi["findTestSuite"]>(async ({ testSuiteId, projectId }) =>
       testSuiteId === "test_suite_1" && projectId === "project_1" ? testSuite() : null,

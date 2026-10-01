@@ -121,7 +121,7 @@ type BillingMembers = Readonly<{ isSaas: boolean; nodeEnvironment: string | unde
 const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
 type BillingSetup = FeatureSetup<
-  typeof BillingApp.dependencies,
+  typeof BillingModule.dependencies,
   BillingMembers & Readonly<{ publicBaseUrl: string | undefined }>,
   BillingServerConfig,
   BillingRepositories
@@ -185,7 +185,7 @@ type ConnectedBilling = Readonly<{
   tick: ConnectedBillingTickService;
 }>;
 
-export class BillingApp
+export class BillingModule
   implements BillingApi, BillingStripeWebhookApi, BillingCurrencyApi, BillingSubscriptionApi
 {
   static readonly contract = BillingApi;
@@ -219,14 +219,14 @@ export class BillingApp
   } as const;
   static readonly reads = ["isSaas", "nodeEnvironment", "publicBaseUrl"] as const;
 
-  static async create(setup: BillingSetup): Promise<BillingApp> {
+  static async create(setup: BillingSetup): Promise<BillingModule> {
     const mailer: MailSender = {
       send: (content) => setup.dependencies.notifications.sendEmail(content),
     };
-    const signing = await setup.secrets.into(BillingApp.secrets.stripeWebhookSecret, (secret) =>
+    const signing = await setup.secrets.into(BillingModule.secrets.stripeWebhookSecret, (secret) =>
       StripeWebhookSignatureService.create(secret),
     );
-    const notices = await BillingApp.#composeNotices(setup);
+    const notices = await BillingModule.#composeNotices(setup);
     // Licensing holds the signing key and refuses a purchase it cannot sign.
     const licensePurchase = LicensePurchaseService.create({
       generateLicense: LicensingLicenseGeneratorService.create({
@@ -238,16 +238,16 @@ export class BillingApp
         notices,
       }),
     });
-    return setup.secrets.into(BillingApp.secrets.stripeSecretKey, (stripeSecretKey) =>
-      BillingApp.assemble({
+    return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (stripeSecretKey) =>
+      BillingModule.assemble({
         members: setup.members,
         repositories: setup.repositories,
         config: setup.config,
         peers: setup.dependencies,
         stripeSecretKey,
         statementMail: connectedStatementMailChannels.ses.create(mailer),
-        usageWarnings: BillingApp.#composeUsageWarnings(setup, notices),
-        resourceLimitAlerts: BillingApp.#composeResourceLimitAlerts(setup, notices),
+        usageWarnings: BillingModule.#composeUsageWarnings(setup, notices),
+        resourceLimitAlerts: BillingModule.#composeResourceLimitAlerts(setup, notices),
         lifecycle: BillingLifecycleAnnouncerService.create({
           subscriptions: setup.repositories.webhookSubscriptions,
           organizations: setup.dependencies.organizations,
@@ -270,7 +270,7 @@ export class BillingApp
   /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
   static async #composeNotices(setup: BillingSetup): Promise<BillingUsageNoticeService> {
     const { config, secrets } = setup;
-    const handles = BillingApp.secrets;
+    const handles = BillingModule.secrets;
     return secrets.into(handles.stripeSecretKey, (stripeSecretKey) =>
       secrets.into(handles.internalSlackPlanLimitWebhook, (slackPlanLimitChannel) =>
         secrets.into(handles.internalSlackSubscriptionsWebhook, (slackSubscriptionsChannel) =>
@@ -378,7 +378,7 @@ export class BillingApp
     subscription?: SubscriptionComposition;
     /** Records the checkout and subscription changes for peers; absent where a suite composes none. */
     lifecycle?: BillingLifecycleAnnouncerService;
-  }): BillingApp {
+  }): BillingModule {
     const { isSaas, nodeEnvironment } = members;
     const repository = repositories.connectedBilling;
     const facts = ConnectedCustomerFactsService.create(peers);
@@ -400,7 +400,7 @@ export class BillingApp
       resourceLimitAlerts,
       billableEvents: BillableEventsQueryService.create(repositories.billableEvents),
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
-      reporting: BillingApp.#composeReporting({
+      reporting: BillingModule.#composeReporting({
         repositories,
         peers,
         facts,
@@ -415,11 +415,11 @@ export class BillingApp
       }),
     };
     if (!stripeSecretKey) {
-      return new BillingApp({
+      return new BillingModule({
         ...gate,
         lifecycle,
         connected: void 0,
-        stripeWebhook: BillingApp.#undispatchedWebhook(),
+        stripeWebhook: BillingModule.#undispatchedWebhook(),
         subscriptions: void 0,
       });
     }
@@ -447,11 +447,11 @@ export class BillingApp
     });
     const seats = ConnectedSeatChangeService.create({ repository, invoicing, licensing });
 
-    return new BillingApp({
+    return new BillingModule({
       ...gate,
       lifecycle,
       stripeWebhook: webhook
-        ? BillingApp.#composeStripeWebhook({
+        ? BillingModule.#composeStripeWebhook({
             webhook,
             isSaas,
             stripeSecretKey,
@@ -461,10 +461,10 @@ export class BillingApp
             connectedBilling: billing,
             announcer: lifecycle,
           })
-        : BillingApp.#undispatchedWebhook(),
+        : BillingModule.#undispatchedWebhook(),
       subscriptions:
         subscription && isSaas
-          ? BillingApp.#composeSubscriptions({
+          ? BillingModule.#composeSubscriptions({
               subscription,
               stripeSecretKey,
               nodeEnvironment,

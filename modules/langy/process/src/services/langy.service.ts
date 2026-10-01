@@ -53,7 +53,7 @@ export { ADOPTABLE_CONVERSATION_ID };
 
 /**
  * The Langy feature's own conversation-and-turn service: the full surface
- * `LangyApp` forwards from. Folded out of the contract package per
+ * `LangyModule` forwards from. Folded out of the contract package per
  * ADR-133 (the flagged "contract-service" shape); now the sole definition.
  */
 export class LangyService {

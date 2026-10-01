@@ -4,7 +4,7 @@ import { intentAccessorOf } from "@langwatch/eventing/testing";
 import type { Anomaly } from "@langwatch/ops-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { opsServer } from "../../ops.server.ts";
+import { opsProcessModule } from "../../ops.module.ts";
 import { MemoryAnomalyRateTrackerRepository } from "../../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
 import { MemoryAnomalyStateRepository } from "../../repositories/memory/memory.anomaly-state.repository.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
@@ -86,7 +86,7 @@ describe("given ops's anomaly detection declaration", () => {
     const { definition, process } = built(async () => ({ surfaced: 0, cleared: 0 }));
 
     expect(anomalyDetectionEventing.pipeline).toBe(ANOMALY_DETECTION_PIPELINE_NAME);
-    expect(opsServer.eventing?.pipeline.split(", ")).toContain(ANOMALY_DETECTION_PIPELINE_NAME);
+    expect(opsProcessModule.eventing?.pipeline.split(", ")).toContain(ANOMALY_DETECTION_PIPELINE_NAME);
     expect(definition.metadata.name).toBe(ANOMALY_DETECTION_PIPELINE_NAME);
     expect(process.config.schedule?.everyMs).toBe(60_000);
   });

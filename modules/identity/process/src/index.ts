@@ -3,7 +3,7 @@
  * platform (ADR-101, ADR-115): guards, services and crypto over the app's
  * heads/ledger/records ports. The pure half is `@langwatch/identity-contract`.
  */
-export { identityServer } from "./identity.server.ts";
+export { identityProcessModule } from "./identity.module.ts";
 export type { IdentityInfrastructure } from "./app/identity.members.ts";
 export { SsoConnectionLedgerStore } from "./eventing/sso-connection-ledger.store.ts";
 export type { SsoConnectionEvent } from "./eventing/sso-connection-state.projection.ts";

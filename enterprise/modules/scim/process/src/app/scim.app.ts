@@ -114,8 +114,8 @@ import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
 
 type ScimSetup = FeatureSetup<
-  typeof ScimApp.dependencies,
-  MembersRead<typeof ScimApp.reads>,
+  typeof ScimModule.dependencies,
+  MembersRead<typeof ScimModule.reads>,
   ScimServerConfig,
   ScimRepositories
 >;
@@ -249,7 +249,7 @@ type ScimAppOptions = {
   minting: Pick<ScimTokenMintService, "assertMayMint">;
 };
 
-export class ScimApp implements ScimApiContract {
+export class ScimModule implements ScimApiContract {
   static readonly contract = ScimApi;
   static readonly dependencies = {
     authorization: AuthzApi,
@@ -301,11 +301,11 @@ export class ScimApp implements ScimApiContract {
     });
   }
 
-  static async create(setup: ScimSetup): Promise<ScimApp> {
+  static async create(setup: ScimSetup): Promise<ScimModule> {
     const { dependencies, members, config, secrets, repositories } = setup;
     const auth0WebhookSecret = await secrets.into(scimSecrets.auth0WebhookSecret, (value) => value);
-    const tokenPepper = await secrets.into(ScimApp.secrets.tokenPepper, (credentials) =>
-      secrets.into(ScimApp.secrets.tokenPepperFallback, (session) => credentials ?? session),
+    const tokenPepper = await secrets.into(ScimModule.secrets.tokenPepper, (credentials) =>
+      secrets.into(ScimModule.secrets.tokenPepperFallback, (session) => credentials ?? session),
     );
     const scimSyncLedger = ScimSyncLedgerWriterService.create();
     const lifecycle = ScimSyncLifecycleService.create({
@@ -336,7 +336,7 @@ export class ScimApp implements ScimApiContract {
 
     const connections = ScimConnectionsService.create(dependencies.identity);
 
-    const app = ScimApp.createWithService({
+    const app = ScimModule.createWithService({
       scim,
       connections,
       directoryExternalIds: ScimDirectoryExternalIdsService.create({
@@ -409,8 +409,8 @@ export class ScimApp implements ScimApiContract {
    * and the two peers the doors exercise, without a real database or the
    * three peers `create` resolves only to build the service.
    */
-  static createWithService(options: ScimAppOptions): ScimApp {
-    return new ScimApp(options);
+  static createWithService(options: ScimAppOptions): ScimModule {
+    return new ScimModule(options);
   }
 
   /** Drops recorded requests past their retention window; the worker's sweep. */

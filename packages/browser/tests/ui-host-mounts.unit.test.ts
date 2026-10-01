@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BrowserHostUnmountedError,
   checkHostMounts,
-  defineWebModule,
+  defineBrowserModule,
   findUnmountedHostOwners,
   findUnrequiredHostMounts,
   installedModuleHostMounts,
@@ -19,7 +19,7 @@ function mountMap(hosts: readonly string[]): Record<string, typeof stubMount> {
 
 describe("findUnmountedHostOwners", () => {
   it("returns nothing when every required host is mounted somewhere", () => {
-    const module = defineWebModule("trace").withHosts({
+    const module = defineBrowserModule("trace").withHosts({
       requires: ["TraceHostApi"],
       mounts: { TraceHostApi: stubMount },
     });
@@ -28,8 +28,8 @@ describe("findUnmountedHostOwners", () => {
   });
 
   it("does not refuse a host a peer module mounts on its behalf", () => {
-    const scenario = defineWebModule("scenario").withHosts({ requires: ["WorkflowHostApi"] });
-    const workflow = defineWebModule("workflow").withHosts({
+    const scenario = defineBrowserModule("scenario").withHosts({ requires: ["WorkflowHostApi"] });
+    const workflow = defineBrowserModule("workflow").withHosts({
       mounts: { WorkflowHostApi: stubMount },
     });
 
@@ -37,7 +37,7 @@ describe("findUnmountedHostOwners", () => {
   });
 
   it("does not refuse a host the composing shell mounts outside any module", () => {
-    const navigation = defineWebModule("navigation").withHosts({ requires: ["NavigationHost"] });
+    const navigation = defineBrowserModule("navigation").withHosts({ requires: ["NavigationHost"] });
 
     expect(
       findUnmountedHostOwners({ modules: [navigation], mountedByShell: ["NavigationHost"] }),
@@ -45,9 +45,9 @@ describe("findUnmountedHostOwners", () => {
   });
 
   it("collects every owing module, not only the first", () => {
-    const trace = defineWebModule("trace").withHosts({ requires: ["TraceHostApi"] });
-    const auth = defineWebModule("auth").withHosts({ requires: ["AuthHostApi"] });
-    const prompt = defineWebModule("prompt").withHosts({ requires: ["PromptHostApi"] });
+    const trace = defineBrowserModule("trace").withHosts({ requires: ["TraceHostApi"] });
+    const auth = defineBrowserModule("auth").withHosts({ requires: ["AuthHostApi"] });
+    const prompt = defineBrowserModule("prompt").withHosts({ requires: ["PromptHostApi"] });
 
     const owners = findUnmountedHostOwners({ modules: [trace, auth, prompt] });
 
@@ -113,7 +113,7 @@ describe("findUnmountedHostOwners", () => {
     }
 
     const modules = Object.entries(owningModuleHosts).map(([name, hosts]) =>
-      defineWebModule(name).withHosts({
+      defineBrowserModule(name).withHosts({
         requires: hosts,
         mounts: mountMap([
           ...hosts.filter((host) => mountedBySelf.has(host)),
@@ -135,8 +135,8 @@ describe("findUnmountedHostOwners", () => {
 
 describe("checkHostMounts", () => {
   it("throws one BrowserHostUnmountedError naming every module, not the first", () => {
-    const trace = defineWebModule("trace").withHosts({ requires: ["TraceHostApi"] });
-    const auth = defineWebModule("auth").withHosts({ requires: ["AuthHostApi"] });
+    const trace = defineBrowserModule("trace").withHosts({ requires: ["TraceHostApi"] });
+    const auth = defineBrowserModule("auth").withHosts({ requires: ["AuthHostApi"] });
 
     let caught: unknown;
     try {
@@ -161,7 +161,7 @@ describe("checkHostMounts", () => {
   });
 
   it("does not throw when nothing is outstanding", () => {
-    const module = defineWebModule("trace").withHosts({
+    const module = defineBrowserModule("trace").withHosts({
       requires: ["TraceHostApi"],
       mounts: { TraceHostApi: stubMount },
     });
@@ -173,7 +173,7 @@ describe("checkHostMounts", () => {
 describe("findUnrequiredHostMounts", () => {
   /** @scenario "A host mounted under a name nothing reads is refused" */
   it("names a mount whose host no installed module requires", () => {
-    const workflow = defineWebModule("workflow").withHosts({
+    const workflow = defineBrowserModule("workflow").withHosts({
       requires: ["WorkflowHostApi"],
       mounts: { WorkflowHost: stubMount },
     });
@@ -184,8 +184,8 @@ describe("findUnrequiredHostMounts", () => {
   });
 
   it("accepts a mount a peer module requires", () => {
-    const scenario = defineWebModule("scenario").withHosts({ requires: ["WorkflowHostApi"] });
-    const workflow = defineWebModule("workflow").withHosts({
+    const scenario = defineBrowserModule("scenario").withHosts({ requires: ["WorkflowHostApi"] });
+    const workflow = defineBrowserModule("workflow").withHosts({
       mounts: { WorkflowHostApi: stubMount },
     });
 
@@ -196,7 +196,7 @@ describe("findUnrequiredHostMounts", () => {
   it("refuses at install once every required host IS mounted", () => {
     // Both halves declared, one of them misspelled: the unmounted check has
     // nothing to say here, which is exactly when the typo used to survive.
-    const workflow = defineWebModule("workflow").withHosts({
+    const workflow = defineBrowserModule("workflow").withHosts({
       requires: ["WorkflowHostApi"],
       mounts: { WorkflowHostApi: stubMount, WorkflowHost: stubMount },
     });
@@ -208,11 +208,11 @@ describe("findUnrequiredHostMounts", () => {
 describe("installedModuleHostMounts", () => {
   /** @scenario "Every declared mount is collected, named by its module and host" */
   it("collects every module's mounts in install order, named by module and host", () => {
-    const secret = defineWebModule("secret").withHosts({
+    const secret = defineBrowserModule("secret").withHosts({
       requires: ["SecretHostApi"],
       mounts: { SecretHostApi: stubMount },
     });
-    const workflow = defineWebModule("workflow").withHosts({
+    const workflow = defineBrowserModule("workflow").withHosts({
       requires: ["WorkflowHostApi"],
       mounts: { WorkflowHostApi: stubMount },
     });
@@ -228,7 +228,7 @@ describe("installedModuleHostMounts", () => {
   /** @scenario "Every declared mount is collected, named by its module and host" */
   it("carries the loader the declaration named", async () => {
     const mount = { load: async () => ({ default: () => null }) };
-    const secret = defineWebModule("secret").withHosts({
+    const secret = defineBrowserModule("secret").withHosts({
       requires: ["SecretHostApi"],
       mounts: { SecretHostApi: mount },
     });

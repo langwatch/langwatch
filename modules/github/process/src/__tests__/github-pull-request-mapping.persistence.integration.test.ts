@@ -4,7 +4,7 @@
 import { generateKeyPairSync } from "crypto";
 
 import { type GithubPullRequestEvent, type GithubApi } from "@langwatch/github-contract";
-import { GithubApp, PostgresGithubRepositories } from "@langwatch/github-process";
+import { GithubModule, PostgresGithubRepositories } from "@langwatch/github-process";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -173,7 +173,7 @@ function harness(input: { host?: string } = {}) {
   return {
     http,
     projects,
-    github: GithubApp.composeApi({
+    github: GithubModule.composeApi({
       repositories: {
         ...unansweredRedisRepositories(),
         ...PostgresGithubRepositories.create({ prisma: database() }),

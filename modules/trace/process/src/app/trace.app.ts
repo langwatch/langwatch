@@ -692,7 +692,7 @@ type TraceSetup = FeatureSetup<
 >;
 
 /** Trace implements its public API and the collector's internal transport seam. */
-export class TraceApp implements TraceApi, CollectorApp {
+export class TraceModule implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
   static readonly config = traceConfig;
@@ -709,8 +709,8 @@ export class TraceApp implements TraceApi, CollectorApp {
     "processName",
   ] as const;
 
-  static create(input: TraceAppDependencies | TraceSetup): TraceApp {
-    if (!("members" in input)) return new TraceApp(input);
+  static create(input: TraceAppDependencies | TraceSetup): TraceModule {
+    if (!("members" in input)) return new TraceModule(input);
 
     const commands = TraceProcessingCommandsService.create({
       processName: input.members.processName,
@@ -728,7 +728,7 @@ export class TraceApp implements TraceApi, CollectorApp {
         logger: input.members.logger,
       }),
     });
-    const app = new TraceApp({
+    const app = new TraceModule({
       ...composeTraceAppDependencies({
         ...collaborators,
         ...input.dependencies,

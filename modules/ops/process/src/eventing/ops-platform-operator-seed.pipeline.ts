@@ -9,7 +9,7 @@ import {
 } from "@langwatch/eventing";
 import type { z } from "zod";
 
-import type { OpsApp } from "../app/ops.app.ts";
+import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
 import { RecordPlatformOperatorSeedCommand } from "./ops-platform-operator-seed.commands.ts";
 import {
@@ -48,7 +48,7 @@ export function buildPlatformOperatorSeed({
   app,
 }: EventingSetup<
   unknown,
-  Pick<OpsApp, "seedPlatformOperators" | "grantSeededPlatformOperators">
+  Pick<OpsModule, "seedPlatformOperators" | "grantSeededPlatformOperators">
 >): PlatformOperatorSeedPipelineDefinition {
   return definePipeline({
     name: PLATFORM_OPERATOR_SEED_PIPELINE_NAME,
@@ -75,6 +75,6 @@ export function buildPlatformOperatorSeed({
 
 export const platformOperatorSeedEventing = defineEventingModule({
   pipeline: PLATFORM_OPERATOR_SEED_PIPELINE_NAME,
-  build: (setup: EventingSetup<OpsRepositories, OpsApp>) => buildPlatformOperatorSeed(setup),
+  build: (setup: EventingSetup<OpsRepositories, OpsModule>) => buildPlatformOperatorSeed(setup),
   connect: ({ app, commands }) => app.connectPlatformOperatorSeedCommands(commands),
 });

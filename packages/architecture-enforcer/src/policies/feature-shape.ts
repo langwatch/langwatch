@@ -58,7 +58,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "legacy-transport-runtime":
     "A transport is a declaration the process mounts on its runtime: defineRestRouter(<Feature>Api) mounted with createRestRuntime, defineTrpcRouter mounted with createTrpcRuntime. The legacy builders (createVersionedApp, createTrpcService, mountProjectTransport and their kin) are deleted when the last family leaves them.",
   "unregistered-repositories":
-    "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ live, memory }) and select it with .withRepositories() in <feature>.server.ts.",
+    "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ live, memory }) and select it with .withRepositories() in <feature>.module.ts.",
   "unregistered-channels":
     "A channel carries messages the module does not own the state of. Add channels/<feature>-channels.registry.ts exporting { live, memory }, each a class with static readonly requires and static create, and a memory twin under channels/memory/ for every live tier.",
   "postgres-without-memory":
@@ -66,9 +66,9 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "memory-twin-untested":
     "A memory twin is proven by repositories/__tests__/<x>.repository.contract.test.ts running the same cases against the memory and the Prisma backends; an installation test booting over the twin proves nothing about the twin.",
   "no-installer":
-    'The server package is installed through src/<feature>.server.ts: defineServerModule("<feature>").withRepositories(registry).withApp(<Feature>App).withTransports(...).build().',
+    'The server package is installed through src/<feature>.module.ts: defineProcessModule("<feature>").withRepositories(registry).withApi(<Feature>Module).withTransports(...).build().',
   "no-app":
-    "One app: src/app/<feature>.app.ts is class <Feature>App implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
+    "One app: src/app/<feature>.app.ts is class <Feature>Module implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
   "installer-not-booted":
     "The generated module list is stale relative to the catalogue. Run `pnpm generate:modules` to regenerate packages/installed-server-modules/src/server-modules.generated.ts from modules/catalogue.json, and check in the result.",
   "refusing-composition":
@@ -193,7 +193,7 @@ function serverFindings({
     findings.push({ feature, kind, path: workspacePath(root, path) });
   };
 
-  const installer = join(src, `${feature}.server.ts`);
+  const installer = join(src, `${feature}.module.ts`);
   const installed = isFile(installer);
   const bootedSomewhere = installed && isBooted(feature, booted);
 

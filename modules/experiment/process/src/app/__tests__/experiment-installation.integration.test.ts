@@ -39,7 +39,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { experimentServer } from "../../experiment.server.ts";
+import { experimentProcessModule } from "../../experiment.module.ts";
 
 /** A ClickHouse that holds no rows: every read answers empty, every write is kept. */
 class EmptyDriver implements QueryDriver {
@@ -87,7 +87,7 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
     processStore: InMemoryProcessStore.createForTesting(),
   });
   const runtime = await createApp({ role: "worker" })
-    .withModules([experimentServer])
+    .withModules([experimentProcessModule])
     .withStores(memoryStores())
     .withEventing(eventing)
     .withRelational(createApiFixture<ProcessMembers["prisma"]>({}, "prisma (unused at boot)"))

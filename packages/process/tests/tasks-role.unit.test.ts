@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/application.ts";
 import { RoleContributionError } from "../src/boot-errors.ts";
-import { defineServerModule } from "../src/feature-installer.ts";
+import { defineProcessModule } from "../src/feature-installer.ts";
 
 interface AnnotationApi {
   label(): string;
@@ -28,24 +28,24 @@ class NamedTask {
 const isNamedTask = (contribution: unknown): contribution is NamedTask =>
   contribution instanceof NamedTask;
 
-class AnnotationApp implements AnnotationApi {
+class AnnotationModule implements AnnotationApi {
   static readonly contract = AnnotationApi;
   static readonly dependencies = {};
   static readonly reads = [] as const;
-  static create(): AnnotationApp {
-    return new AnnotationApp();
+  static create(): AnnotationModule {
+    return new AnnotationModule();
   }
   label(): string {
     return "annotation";
   }
 }
 
-class DatasetApp implements DatasetApi {
+class DatasetModule implements DatasetApi {
   static readonly contract = DatasetApi;
   static readonly dependencies = {};
   static readonly reads = [] as const;
-  static create(): DatasetApp {
-    return new DatasetApp();
+  static create(): DatasetModule {
+    return new DatasetModule();
   }
   label(): string {
     return "dataset";
@@ -55,10 +55,10 @@ class DatasetApp implements DatasetApi {
 const annotationTask = new NamedTask("dataset-backfill");
 const datasetTask = new NamedTask("weekly-report");
 
-const annotation = defineServerModule("annotation")
-  .withApp(AnnotationApp)
+const annotation = defineProcessModule("annotation")
+  .withApi(AnnotationModule)
   .withTasks(annotationTask);
-const dataset = defineServerModule("dataset").withApp(DatasetApp).withTasks(datasetTask);
+const dataset = defineProcessModule("dataset").withApi(DatasetModule).withTasks(datasetTask);
 
 describe("given modules that declare one-shot work", () => {
   describe("when a tasks process boots", () => {
@@ -84,7 +84,7 @@ describe("given modules that declare one-shot work", () => {
   describe("when a module declared something that is not a task", () => {
     /** @scenario "A module that declared something other than a task is named" */
     it("refuses, naming the module that declared it", async () => {
-      const wrong = defineServerModule("dataset").withApp(DatasetApp).withTasks({ notATask: true });
+      const wrong = defineProcessModule("dataset").withApi(DatasetModule).withTasks({ notATask: true });
       const runtime = await createApp({ role: "tasks" }).withModules([wrong]).boot();
 
       expect(() => runtime.tasks(isNamedTask)).toThrowError(RoleContributionError);
@@ -95,8 +95,8 @@ describe("given modules that declare one-shot work", () => {
 });
 
 describe("given a module that builds its tasks over its own app", () => {
-  const bound = defineServerModule("annotation")
-    .withApp(AnnotationApp)
+  const bound = defineProcessModule("annotation")
+    .withApi(AnnotationModule)
     .withTransports()
     .withTasks(({ app }) => [new NamedTask(`${app.label()}-backfill`)]);
 

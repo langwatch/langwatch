@@ -4,7 +4,7 @@ import { z } from "zod";
 
 /**
  * What the judge costs and how fast it may be asked. `JEV_API_KEY` resolves
- * through `InstantEvalApp.secrets` (ADR-132), never this slice: a deployment
+ * through `InstantEvalModule.secrets` (ADR-132), never this slice: a deployment
  * with no key judges nothing, which the null judge answers by name.
  */
 export const instantEvalConfig = Config.define((c) => ({

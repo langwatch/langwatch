@@ -13,7 +13,7 @@ import {
   WEBHOOK_SPEND_DELIVERY_AGGREGATE_TYPE,
 } from "@langwatch/webhook-contract";
 
-import type { WebhookApp } from "../app/webhook.app.ts";
+import type { WebhookModule } from "../app/webhook.app.ts";
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
 import {
   GOVERNANCE_EVENTS_PROCESS_NAME,
@@ -59,7 +59,7 @@ export function buildWebhookDeliveryPipeline(input: {
 
 export const webhookDeliveryEventing = defineEventingModule({
   pipeline: WEBHOOK_DELIVERY_PIPELINE_NAME,
-  build: ({ app, participation, processStore }: EventingSetup<WebhookRepositories, WebhookApp>) =>
+  build: ({ app, participation, processStore }: EventingSetup<WebhookRepositories, WebhookModule>) =>
     app.deliveryPipeline({ participation, processStore }),
   connect: ({ app, commands }) => app.connectDelivery(commands),
 });

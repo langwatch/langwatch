@@ -18,7 +18,7 @@ import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { MemorySelfHostedInstanceRepository } from "../../repositories/memory/memory.self-hosted-instance.repository.ts";
 import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
-import { LicensingApp, type LicensingInfrastructure } from "../licensing.app.ts";
+import { LicensingModule, type LicensingInfrastructure } from "../licensing.app.ts";
 import type { SelfHostedInstancesInfrastructure } from "../licensing.members.ts";
 
 const SEEN_AT = Temporal.Instant.from("2026-09-22T12:00:00Z");
@@ -69,8 +69,8 @@ async function instancesAttributedTo(
   };
 }
 
-function licensingOver(infrastructure: LicensingInfrastructure): Promise<LicensingApp> {
-  return LicensingApp.create({
+function licensingOver(infrastructure: LicensingInfrastructure): Promise<LicensingModule> {
+  return LicensingModule.create({
     dependencies: {
       instantEval: createApiFixture<InstantEvalApi>(),
       projects: createApiFixture<ProjectApi>(),

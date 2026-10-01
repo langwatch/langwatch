@@ -26,7 +26,7 @@ export class ScimTokenMintService {
   }): Promise<void> {
     const missing = await this.authz.findPermissionsBeyondCaller({
       organizationId,
-      // The key a call arrived on bounds it, never its owner (as authz.server.ts rules).
+      // The key a call arrived on bounds it, never its owner (as authz.module.ts rules).
       caller: by.apiKeyId ? { type: "apiKey", id: by.apiKeyId } : { type: "user", id: by.id },
       scope: { type: "organization", id: organizationId },
       permissions: [

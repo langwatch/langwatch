@@ -9,7 +9,7 @@
 Feature: Composing a process declaratively
 
   Background:
-    Given a module declares its server half with defineServerModule
+    Given a module declares its server half with defineProcessModule
     And the process holds one infrastructure pool
 
   @unit

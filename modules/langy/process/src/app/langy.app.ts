@@ -229,13 +229,13 @@ const langyStores = ["prisma", "redis", "rateLimiter"] as const;
 
 /** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type LangySetup = FeatureSetup<
-  typeof LangyApp.dependencies,
+  typeof LangyModule.dependencies,
   MembersRead<typeof langyStores> & Readonly<{ publicBaseUrl: string | undefined }>,
   LangyServerConfig,
   LangyRepositories
 >;
 
-export class LangyApp implements LangyApiContract {
+export class LangyModule implements LangyApiContract {
   static readonly contract: typeof LangyApi = LangyApi;
   /**
    * presence: same per-tenant fabric. featureFlags: deployment rollout store
@@ -278,7 +278,7 @@ export class LangyApp implements LangyApiContract {
   /** `rateLimiter` is the per-project counter every turn is checked against. */
   static readonly reads = [...langyStores, "publicBaseUrl"] as const;
 
-  static async create(setup: LangySetup): Promise<LangyApp> {
+  static async create(setup: LangySetup): Promise<LangyModule> {
     const { channel, door } = await setup.secrets.into(langySecrets.internal, (internalSecret) => {
       assertLangyServerConfig(setup.config, internalSecret);
       const metrics = LangyWorkerMetricsOtelService.create();
@@ -453,7 +453,7 @@ export class LangyApp implements LangyApiContract {
           })
         : null,
     });
-    return new LangyApp({
+    return new LangyModule({
       langy,
       uiActionDoor,
       internalDoor: door,

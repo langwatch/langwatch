@@ -1,7 +1,7 @@
 import { SupplyToken, supplyToken } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
-import { defineServerModule } from "../src/feature-installer.ts";
+import { defineProcessModule } from "../src/feature-installer.ts";
 import { createApp as packageCreateApp } from "../src/index.ts";
 import { createApp } from "../src/process-supply.ts";
 import {
@@ -21,8 +21,8 @@ import {
   memoryRepositoryModule,
 } from "./process-supply.fixtures.ts";
 
-const transportedClockModule = defineServerModule("annotation")
-  .withApp(ClockApp)
+const transportedClockModule = defineProcessModule("annotation")
+  .withApi(ClockApp)
   .withTransports(
     { protocol: "rest", router: () => ({ family: "clock" }) },
     { protocol: "trpc", namespace: "clock", router: () => ({ procedure: "now" }) },

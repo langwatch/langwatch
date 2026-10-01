@@ -1,7 +1,7 @@
 import { SecretsChain } from "@langwatch/secrets";
 
 /**
- * The pepper chain `ApiKeyApp.secrets` resolves, in its order (first set wins), or seeds never
+ * The pepper chain `ApiKeyModule.secrets` resolves, in its order (first set wins), or seeds never
  * verify. Absent is valid here, and never minted (random rows would not verify).
  */
 export const API_KEY_PEPPER_KEYS = [

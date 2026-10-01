@@ -1,10 +1,10 @@
-export { notificationServer } from "./notification.server.ts";
+export { notificationProcessModule } from "./notification.module.ts";
 
 /**
  * What a process composes this feature through: outbound mail, and the sender
  * address a configuration parser derives before it exists.
  */
-export { createEmailDelivery, type ClosableEmailDelivery } from "./notification.server.ts";
+export { createEmailDelivery, type ClosableEmailDelivery } from "./notification.module.ts";
 
 /** The outbound-mail vocabulary and the two ports it is carried over. */
 export {

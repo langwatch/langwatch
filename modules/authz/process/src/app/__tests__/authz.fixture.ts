@@ -9,7 +9,7 @@ import type {
   AuthzService,
 } from "@langwatch/authz-contract";
 
-import { AuthzApp } from "../authz.app.ts";
+import { AuthzModule } from "../authz.app.ts";
 
 function statedOrRefusing<Service extends object>(name: string, stated: object): Service {
   return new Proxy(stated as Service, {
@@ -28,8 +28,8 @@ export function createAuthzTestApp(
     grants?: Partial<AuthzGrantsService>;
     config?: AuthzServerConfig | undefined;
   }> = {},
-): AuthzApp {
-  return AuthzApp.fromServices({
+): AuthzModule {
+  return AuthzModule.fromServices({
     permissions: statedOrRefusing<AuthzService>("permissions", services.permissions ?? {}),
     grants: statedOrRefusing<AuthzGrantsService>("grants", services.grants ?? {}),
     config: services.config,

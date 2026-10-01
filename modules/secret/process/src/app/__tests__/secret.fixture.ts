@@ -7,7 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { MemorySecretRepositories } from "../../repositories/memory/memory.secret.repositories.ts";
 import type { SecretRepositories } from "../../repositories/secret.repositories.ts";
 import type { SecretEncryption } from "../secret.app.ts";
-import { SecretApp } from "../secret.app.ts";
+import { SecretModule } from "../secret.app.ts";
 
 /**
  * A reversible stand-in for AES-GCM. It is not a cipher and does not pretend
@@ -108,8 +108,8 @@ export function createSecretTestApp(
     encryption?: SecretEncryption;
     peers?: SecretTestPeers;
   }> = {},
-): SecretApp {
-  return SecretApp.create({
+): SecretModule {
+  return SecretModule.create({
     repositories: input.repositories ?? MemorySecretRepositories.create(),
     dependencies: input.peers ?? teamWithMembers([]),
     members: { encryption: input.encryption ?? new ReversibleTestSecretEncryption() },

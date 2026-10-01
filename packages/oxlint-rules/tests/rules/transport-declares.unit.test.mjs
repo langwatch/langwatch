@@ -11,7 +11,7 @@ const TRANSPORT = "modules/widget/process/src/transport/widget.api.ts";
 const REST_FAMILY = "modules/widget/process/src/transport/api-rest/widget.api.ts";
 const TRPC_FAMILY = "modules/widget/process/src/transport/api-trpc/widget.api.ts";
 const SERVICE = "modules/widget/process/src/services/widget.service.ts";
-const SERVER = "modules/widget/process/src/widget.server.ts";
+const SERVER = "modules/widget/process/src/widget.module.ts";
 
 function report(code, filename = TRANSPORT) {
   return runRule(transportDeclaresRule, { code, cwd: workspace.cwd, filename });

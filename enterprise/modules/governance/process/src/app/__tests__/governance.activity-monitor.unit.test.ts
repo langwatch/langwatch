@@ -28,7 +28,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryActivityMonitorRepository } from "../../repositories/memory/memory.activity-monitor.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp } from "../governance.app.ts";
+import { GovernanceModule } from "../governance.app.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
 
 const ADMIN = { id: "user-1" };
@@ -50,7 +50,7 @@ function planOfType(type: string): Plan {
 async function buildApp(planType: string) {
   const plansAsked: unknown[] = [];
   const activity = MemoryActivityMonitorRepository.create();
-  const app = await GovernanceApp.create({
+  const app = await GovernanceModule.create({
     config: void 0,
     repositories: { ...MemoryGovernanceRepositories.create(), activityMonitor: activity },
     dependencies: {

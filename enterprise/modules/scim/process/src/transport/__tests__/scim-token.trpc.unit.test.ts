@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * The `scimToken.*` procedures over the real runtime and a real `ScimApp`.
+ * The `scimToken.*` procedures over the real runtime and a real `ScimModule`.
  * @see enterprise/modules/scim/specs/scim.feature
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";

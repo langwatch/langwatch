@@ -122,7 +122,7 @@ export type SsoInfrastructure = Readonly<{
   isSaas: boolean;
 }>;
 
-type SsoSetup = FeatureSetup<typeof SsoApp.dependencies, SsoInfrastructure, SsoConfig>;
+type SsoSetup = FeatureSetup<typeof SsoModule.dependencies, SsoInfrastructure, SsoConfig>;
 
 /** Every credential this module resolves, alongside the deployment facts. */
 async function resolveConfiguration(
@@ -174,7 +174,7 @@ function isPlatformOperator({
 /** The audit row's target, so a connection's history is one query. */
 const AUDIT_TARGET_KIND = "ssoConnection";
 
-export class SsoApp implements SsoApiContract {
+export class SsoModule implements SsoApiContract {
   static readonly contract = SsoApi;
   static readonly dependencies = {
     licensing: LicensingApi,
@@ -264,7 +264,7 @@ export class SsoApp implements SsoApiContract {
     this.#auditLog = dependencies.auditLog;
   }
 
-  static async create({ dependencies, members, config, secrets }: SsoSetup): Promise<SsoApp> {
+  static async create({ dependencies, members, config, secrets }: SsoSetup): Promise<SsoModule> {
     // A peer may not be invoked while the process constructs, so the ledger
     // forwards to identity per call rather than being fetched here.
     const backoffice = () => dependencies.identity.ssoBackoffice();
@@ -311,7 +311,7 @@ export class SsoApp implements SsoApiContract {
       revoke: (input) => ways().revoke(input),
     };
     const configuration = await resolveConfiguration(config, members, secrets);
-    return new SsoApp({
+    return new SsoModule({
       gate: SsoGateService.create({
         configuration,
         licensing: dependencies.licensing,

@@ -9,7 +9,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { entitlementServer } from "../../entitlement.server.ts";
+import { entitlementProcessModule } from "../../entitlement.module.ts";
 import { createEntitlementTestUsers } from "./entitlement.fixture.ts";
 
 const free: Plan = {
@@ -38,7 +38,7 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
   const { logger } = createTestLogger();
 
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(entitlementServer)])
+    .withModules([withMemoryRepositories(entitlementProcessModule)])
     .withConfig({ entitlement: { requestBounds: undefined } })
     .withMembers({ isSaas, processName: "test" })
     .withObservability((observability) => observability.withLogging(logger))

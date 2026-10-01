@@ -3,7 +3,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import {
   DuplicateTransportNamespaceError,
   MissingTransportHostError,
@@ -100,8 +100,8 @@ function trpcBinding(read: () => string) {
 describe("given a feature whose server declares transports", () => {
   describe("when the application was handed the process's own doors", () => {
     it("mounts every declared family on the REST door", async () => {
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueRest);
       const rest = recordingRestHost();
 
@@ -115,8 +115,8 @@ describe("given a feature whose server declares transports", () => {
     });
 
     it("binds the handler's application to the feature's own app", async () => {
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueTrpc);
 
       const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
@@ -130,8 +130,8 @@ describe("given a feature whose server declares transports", () => {
     });
 
     it("keys each mounted namespace by the name its declaration carries", async () => {
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueTrpc);
 
       const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
@@ -144,8 +144,8 @@ describe("given a feature whose server declares transports", () => {
 
     it("mounts with no install-side options", async () => {
       const rest = recordingRestHost();
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueRest);
 
       await createApp({ role: "api", members: memberSourceOf({}) })
@@ -160,8 +160,8 @@ describe("given a feature whose server declares transports", () => {
   describe("when the module binds the facts its own declarations name", () => {
     it("mounts the family with what the module bound", async () => {
       const rest = recordingRestHost();
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueRest)
         .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
 
@@ -177,8 +177,8 @@ describe("given a feature whose server declares transports", () => {
 
     it("reads the value off the module's own App, not off the process", async () => {
       const rest = recordingRestHost();
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueRest)
         .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
 
@@ -197,8 +197,8 @@ describe("given a feature whose server declares transports", () => {
     it("hands each door only the bindings of its own protocol", async () => {
       const rest = recordingRestHost();
       const trpc = recordingTrpcHost();
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueRest, catalogueTrpc)
         .withTransportFacts(({ app }) => [
           restBinding(() => app.read()),
@@ -220,8 +220,8 @@ describe("given a feature whose server declares transports", () => {
 
     it("binds nothing in a role that serves no doors", async () => {
       let bound = 0;
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueRest)
         .withTransportFacts(() => {
           bound += 1;
@@ -239,8 +239,8 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when the process opened no door for a declared protocol", () => {
     it("refuses at boot, naming the feature and the protocol", async () => {
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueTrpc);
 
       await expect(
@@ -254,12 +254,12 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when two installed features claim one namespace", () => {
     it("refuses at boot, naming both", async () => {
-      const dataset = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const dataset = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueTrpc);
-      const monitor = defineServerModule("monitor")
-        .withApp(
-          class MonitorApp {
+      const monitor = defineProcessModule("monitor")
+        .withApi(
+          class MonitorModule {
             static readonly contract = moduleApi<CatalogueApi>()("monitor");
             static readonly dependencies = {};
             static create(): CatalogueApi {
@@ -280,8 +280,8 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when the same feature is installed on a worker", () => {
     it("mounts nothing, because a worker serves no door", async () => {
-      const server = defineServerModule("dataset")
-        .withApp(CatalogueApp)
+      const server = defineProcessModule("dataset")
+        .withApi(CatalogueApp)
         .withTransports(catalogueRest, catalogueTrpc);
       const rest = recordingRestHost();
 
@@ -309,8 +309,8 @@ const catalogueSocket = {
 } as const;
 
 describe("given a feature whose server declares a socket", () => {
-  const server = defineServerModule("dataset")
-    .withApp(CatalogueApp)
+  const server = defineProcessModule("dataset")
+    .withApi(CatalogueApp)
     .withTransports(catalogueRest, catalogueSocket);
 
   describe("when the api process opened an upgrade router", () => {
@@ -366,8 +366,8 @@ const mediaDoor = {
 } as const;
 
 describe("given a feature whose server declares a raw-socket door", () => {
-  const server = defineServerModule("dataset")
-    .withApp(CatalogueApp)
+  const server = defineProcessModule("dataset")
+    .withApi(CatalogueApp)
     .withTransports(catalogueRest, mediaDoor);
 
   describe("when the worker opened its raw-socket host", () => {
@@ -417,8 +417,8 @@ const endpointDoor = {
 } as const;
 
 describe("given a feature whose server declares a raw HTTP door", () => {
-  const server = defineServerModule("dataset")
-    .withApp(CatalogueApp)
+  const server = defineProcessModule("dataset")
+    .withApi(CatalogueApp)
     .withTransports(catalogueRest, endpointDoor);
 
   describe("when the api process opened its raw HTTP host", () => {

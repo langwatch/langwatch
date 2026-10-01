@@ -22,7 +22,7 @@ import {
   TEST_DATABASE_URL,
 } from "../../repositories/prisma/__tests__/support/licensing-database.fixture.ts";
 import { PrismaSelfHostedInstanceRepository } from "../../repositories/prisma/prisma.self-hosted-instance.repository.ts";
-import { LicensingApp } from "../licensing.app.ts";
+import { LicensingModule } from "../licensing.app.ts";
 
 const RUN = `instlist-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -61,7 +61,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
         lastUnknownFields: 0,
         raisedSignals: [],
       });
-      const app = await LicensingApp.create({
+      const app = await LicensingModule.create({
         dependencies: {
           instantEval: createApiFixture<InstantEvalApi>(),
           projects: createApiFixture<ProjectApi>(),

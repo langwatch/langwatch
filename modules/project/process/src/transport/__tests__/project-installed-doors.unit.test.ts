@@ -17,7 +17,7 @@ import type { Protections, TraceApi } from "@langwatch/trace-contract";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
-import { projectServer } from "../../project.server.ts";
+import { projectProcessModule } from "../../project.module.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
 
 const ACTOR = { id: "user-1" };
@@ -47,7 +47,7 @@ function recordingAuditLog(recorded: RecordAuditLogCommand[]): AuditLogApi {
 
 function installed(peers: Peers) {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(projectServer)])
+    .withModules([withMemoryRepositories(projectProcessModule)])
     .withConfig({ project: undefined })
     .withMembers({
       encryption: { encrypt: (plaintext: string) => `cipher(${plaintext})` },
@@ -92,7 +92,7 @@ async function doors(overrides: Partial<Peers> = {}) {
           input.projectId === PROJECT_ID && input.userId === ACTOR.id ? CALLER_PROTECTIONS : {},
       }),
   });
-  const provided = () => runtime.module(projectServer).provided;
+  const provided = () => runtime.module(projectProcessModule).provided;
   const host = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: ACTOR.id }) }),
     authz: {

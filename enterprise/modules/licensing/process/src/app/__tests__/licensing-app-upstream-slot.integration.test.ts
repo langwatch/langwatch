@@ -19,7 +19,7 @@ import {
   createLicensingTestConnection,
   TEST_DATABASE_URL,
 } from "../../repositories/prisma/__tests__/support/licensing-database.fixture.ts";
-import { LicensingApp } from "../licensing.app.ts";
+import { LicensingModule } from "../licensing.app.ts";
 
 const RUN = `slot-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -38,7 +38,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
         data: { name: "Acme", slug: `${RUN}-acme`, license: VALID_LICENSE_KEY },
       });
       const cleared: string[] = [];
-      const app = await LicensingApp.create({
+      const app = await LicensingModule.create({
         dependencies: {
           instantEval: createApiFixture<InstantEvalApi>(),
           projects: createApiFixture<ProjectApi>(),

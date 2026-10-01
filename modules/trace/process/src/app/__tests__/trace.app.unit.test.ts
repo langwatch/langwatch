@@ -22,7 +22,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
-  TraceApp,
+  TraceModule,
   type TraceEditOverlayStore,
   type TraceSummaryReader,
   type TracesListReader,
@@ -115,7 +115,7 @@ function harness(
 
   const summary: TraceSummaryReader = { getByTraceId };
 
-  const app = TraceApp.create({
+  const app = TraceModule.create({
     storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
       existence: {
@@ -161,9 +161,9 @@ function harness(
   };
 }
 
-describe("TraceApp", () => {
+describe("TraceModule", () => {
   it("declares Presence as the export progress peer its composed download service uses", () => {
-    expect(TraceApp.dependencies.presence).toBe(PresenceApi);
+    expect(TraceModule.dependencies.presence).toBe(PresenceApi);
   });
 
   describe("findTrace()", () => {

@@ -7,7 +7,7 @@ import {
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import { LangyApi } from "@langwatch/langy-contract";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -63,7 +63,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 }
 
 async function bootWorker({ prisma }: { prisma: ProcessMembers["prisma"] }) {
-  const owners = processConfig(serverModules, ROLE);
+  const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -101,7 +101,7 @@ async function bootWorker({ prisma }: { prisma: ProcessMembers["prisma"] }) {
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {

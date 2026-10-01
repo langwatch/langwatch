@@ -6,7 +6,7 @@ import { OperatorReadsResolver } from "@langwatch/prisma-client";
 import {
   MEMBER_NAMES,
   hostedMembers,
-  openProcessStores,
+  openStores,
   type ProcessMemberSource,
 } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
@@ -135,7 +135,7 @@ export class ProcessServer implements ProcessBoot {
         .into(observabilityOwner.secrets.otlpHeaders, (rawHeaders) =>
           telemetryExporterOf({ observability: this.config.observability, rawHeaders }),
         );
-      const stores = await openProcessStores({
+      const stores = await openStores({
         name: this.server.name,
         config,
         secrets,

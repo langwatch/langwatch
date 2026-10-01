@@ -2,7 +2,7 @@
 /**
  * The installer and the transport declarations a process mounts.
  */
-export { scimServer } from "./scim.server.ts";
+export { scimProcessModule } from "./scim.module.ts";
 
 // The four declared doors: three REST families and one tRPC namespace, each
 // inert until a process mounts it on its own runtime.

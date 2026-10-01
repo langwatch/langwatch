@@ -8,7 +8,7 @@ import { createServer, type Server, type IncomingMessage } from "node:http";
 
 import { type Cluster, Redis } from "ioredis";
 
-import { HostedMcpApp } from "../../../app/hosted-mcp.app.ts";
+import { HostedMcpModule } from "../../../app/hosted-mcp.app.ts";
 import type { McpHandler } from "../../../index.ts";
 import type { AuthzMcpSessionGrantService } from "../../../services/authz-mcp-session-grant.service.ts";
 import type { HeaderMcpClientAddressService } from "../../../services/header-mcp-client-address.service.ts";
@@ -182,7 +182,7 @@ export async function startReplicaPair({
   const urls: string[] = [];
   try {
     for (let i = 0; i < 2; i++) {
-      const handler = HostedMcpApp.fromDependencies({
+      const handler = HostedMcpModule.fromDependencies({
         redis,
         projects: new HarnessProjectLookup(apiKeys),
         grants: new HarnessSessionGrant(),

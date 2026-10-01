@@ -79,7 +79,7 @@ describe("given the checked-in module lists", () => {
 
     it("reads each module's members off the `reads` its App declared", () => {
       const root = moduleTree(`
-        export class AnnotationApp {
+        export class AnnotationModule {
           static readonly contract = AnnotationApi;
           static readonly reads = ["clock", "logger"] as const;
         }
@@ -90,7 +90,7 @@ describe("given the checked-in module lists", () => {
 
     it("records an empty list for a module whose App names no member", () => {
       const root = moduleTree(`
-        export class AnnotationApp {
+        export class AnnotationModule {
           static readonly contract = AnnotationApi;
         }
       `);

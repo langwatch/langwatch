@@ -15,7 +15,7 @@ export { ClickHouseTraceQueryRepository } from "./repositories/clickhouse/clickh
 export { EventingRecordSpanAdapter } from "./eventing/record-span.commands.ts";
 export { TraceListService } from "./services/trace-list-read.service.ts";
 export { TraceBlobStoreService } from "./services/trace-blob-store.service.ts";
-export { traceServer, type TraceInfrastructure } from "./trace.server.ts";
+export { traceProcessModule, type TraceInfrastructure } from "./trace.module.ts";
 
 // Restored: these names have consumers outside this module.
 export { traceRepositories } from "./repositories/trace-repositories.registry.ts";
@@ -114,4 +114,4 @@ export { TraceEvaluationLoopMetricsService } from "./services/trace-evaluation-l
 export { createEvaluationTriggerSubscriber } from "./eventing/evaluation-trigger.subscriber.ts";
 export type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
 export { VisibilityWindowService } from "./services/trace-visibility-window.service.ts";
-export { createTracePayloadReader, createTraceLegacyRead } from "./trace.server.ts";
+export { createTracePayloadReader, createTraceLegacyRead } from "./trace.module.ts";

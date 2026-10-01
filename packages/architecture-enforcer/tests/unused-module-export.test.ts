@@ -108,10 +108,10 @@ describe("unused module exports", () => {
       );
       write(`${SERVER}/rules/pricing.rules.ts`, "export const rate = 3;\n");
       write(
-        `${SERVER}/widget.server.ts`,
+        `${SERVER}/widget.module.ts`,
         'import { rate } from "#rules/pricing.rules";\nexport const widget = rate;\n',
       );
-      write(`${SERVER}/index.ts`, 'export { widget } from "./widget.server.ts";\n');
+      write(`${SERVER}/index.ts`, 'export { widget } from "./widget.module.ts";\n');
 
       expect(findings()).toEqual([]);
     });

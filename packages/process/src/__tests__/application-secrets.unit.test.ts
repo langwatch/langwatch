@@ -3,7 +3,7 @@ import { Secret, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../application.ts";
-import { defineServerModule, type FeatureSetup } from "../feature-installer.ts";
+import { defineProcessModule, type FeatureSetup } from "../feature-installer.ts";
 
 interface SessionIdentity {
   accepts(candidate: string): boolean;
@@ -32,7 +32,7 @@ class SessionApp implements SessionIdentity {
   }
 }
 
-const auth = defineServerModule("auth").withApp(SessionApp).build();
+const auth = defineProcessModule("auth").withApi(SessionApp).build();
 
 class UndeclaredSessionApp {
   static readonly contract = SessionIdentity;
@@ -72,7 +72,7 @@ describe("application secret declarations", () => {
   /** @scenario "An available secret remains inaccessible without a module declaration" */
   it("refuses an undeclared handle even when the chain contains its value", async () => {
     const secrets = resolver();
-    const undeclared = defineServerModule("auth").withApp(UndeclaredSessionApp).build();
+    const undeclared = defineProcessModule("auth").withApi(UndeclaredSessionApp).build();
 
     await expect(
       createApp({

@@ -13,7 +13,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { GovernanceApp } from "../app/governance.app.ts";
+import type { GovernanceModule } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { runGovernanceTraceFacts } from "./governance-trace-facts.intent.ts";
 import {
@@ -46,7 +46,7 @@ function buildGovernanceActivityMonitor({
 }: EventingSetup<
   unknown,
   Pick<
-    GovernanceApp,
+    GovernanceModule,
     "evaluateSpendSpikes" | "pullGovernanceTraceFacts" | "aiToolEnsureDefaultCatalog"
   >
 >): StaticPipelineDefinition<never> {
@@ -109,6 +109,6 @@ function buildGovernanceActivityMonitor({
 
 export const governanceActivityMonitorEventing = defineEventingModule({
   pipeline: GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME,
-  build: (setup: EventingSetup<GovernanceRepositories, GovernanceApp>) =>
+  build: (setup: EventingSetup<GovernanceRepositories, GovernanceModule>) =>
     buildGovernanceActivityMonitor(setup),
 });

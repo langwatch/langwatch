@@ -1,1 +1,1 @@
-export { instantEvalServer } from "./instant-eval.server.ts";
+export { instantEvalProcessModule } from "./instant-eval.module.ts";

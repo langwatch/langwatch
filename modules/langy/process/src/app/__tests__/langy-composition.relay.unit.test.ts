@@ -1,5 +1,5 @@
 /**
- * The relay a process opens, composed the way LangyApp composes it.
+ * The relay a process opens, composed the way LangyModule composes it.
  * @vitest-environment node
  * @see modules/langy/specs/langy-internal-relay.feature
  */
@@ -163,7 +163,7 @@ const bashCall = ({ id, command, output }: { id: string; command: string; output
   { type: "tool", id, name: "bash", phase: "end", input: { command }, output },
 ];
 
-describe("the relay LangyApp composes", () => {
+describe("the relay LangyModule composes", () => {
   describe("when Langy opens a resource the conversation remembered no link for", () => {
     /** @scenario "A navigate with no remembered link opens the resource's page" */
     it("navigates to the resource's own page under the project slug", async () => {

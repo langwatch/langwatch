@@ -19,7 +19,7 @@ import type { WorkflowLineageRepository } from "../../repositories/workflow-line
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import {
-  WorkflowApp,
+  WorkflowModule,
   type NlpLambdaArnCache,
   type WorkflowInfrastructure,
 } from "../workflow.app.ts";
@@ -38,10 +38,10 @@ class NoopTestEncryption {
 async function appWith(
   overrides: Partial<WorkflowInfrastructure>,
   authz: AuthzApi = createApiFixture<AuthzApi>({}, "AuthzApi"),
-): Promise<WorkflowApp> {
+): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure(overrides);
 
-  return WorkflowApp.create({
+  return WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
@@ -83,7 +83,7 @@ async function appWith(
   });
 }
 
-describe("WorkflowApp caller refusals", () => {
+describe("WorkflowModule caller refusals", () => {
   describe("given a key that cannot read the run it would start", () => {
     /** @scenario A workflows-only key cannot start a run it could not read */
     it("refuses before the trigger is reached", async () => {

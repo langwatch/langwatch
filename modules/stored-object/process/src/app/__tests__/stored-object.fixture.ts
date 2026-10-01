@@ -20,7 +20,7 @@ import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory
 import type { StoredObjectRepositories } from "../../repositories/stored-object.repositories.ts";
 import { StoredObjectUploadSignerService } from "../../services/stored-object-upload-signer.service.ts";
 import type { StoredObjectPermissions } from "../../services/stored-object.service.ts";
-import { StoredObjectApp, type StoredObjectInfrastructure } from "../stored-object.app.ts";
+import { StoredObjectModule, type StoredObjectInfrastructure } from "../stored-object.app.ts";
 import {
   StoredObjectDelivery,
   StoredObjectStorage,
@@ -177,10 +177,10 @@ export function createStoredObjectTestApp(
     permissions?: StoredObjectPermissions;
     images?: ExternalImageChannel;
   }> = {},
-): StoredObjectApp {
+): StoredObjectModule {
   const permissions = input.permissions ?? new GrantedStoredObjectPermissions();
 
-  return StoredObjectApp.fromInfrastructure({
+  return StoredObjectModule.fromInfrastructure({
     permissions: createApiFixture<AuthzApi>({
       getDecision: (args) => permissions.getDecision(args),
     }),

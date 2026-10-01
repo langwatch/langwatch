@@ -4,6 +4,6 @@
  */
 
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
-import { webModules } from "@langwatch/installed-web-modules";
+import { browserModules } from "@langwatch/installed-web-modules";
 
-export const installedUiDeclarations = uiDeclarations(webModules);
+export const installedUiDeclarations = uiDeclarations(browserModules);

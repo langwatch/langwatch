@@ -4,7 +4,7 @@
  * the same object the four doors are mounted on, so what a test drives is the
  * declaration and the application, never a stand-in for either.
  *
- * Built through {@link ScimApp.createWithService}, not {@link ScimApp.create}:
+ * Built through {@link ScimModule.createWithService}, not {@link ScimModule.create}:
  * the production path also resolves four peers it needs only to build the
  * `ScimService` (`AuthzApi`, `UserApi`, `AuthApi`, `GovernanceRestApi`) and reads
  * `prisma` off the process, none of which a transport test has a use for.
@@ -25,7 +25,7 @@ import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
-import { ScimApp } from "../../../app/scim.app.ts";
+import { ScimModule } from "../../../app/scim.app.ts";
 import {
   ScimConnectionsService,
   type ScimConnectionReads,
@@ -123,7 +123,7 @@ export function scimTestApp(
     },
   };
   const connections = ScimConnectionsService.create(identity);
-  const app = ScimApp.createWithService({
+  const app = ScimModule.createWithService({
     scim,
     connections,
     directoryExternalIds: ScimDirectoryExternalIdsService.create({

@@ -20,7 +20,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthApp } from "../auth.app.ts";
+import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -47,8 +47,8 @@ function countingLimiter() {
 
 async function appFor(
   limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
-): Promise<AuthApp> {
-  return AuthApp.create({
+): Promise<AuthModule> {
+  return AuthModule.create({
     config: {
       sessionUrl: undefined,
       mfaEnrollmentOpen: false,

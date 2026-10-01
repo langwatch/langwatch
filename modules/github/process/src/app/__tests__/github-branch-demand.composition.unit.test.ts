@@ -11,7 +11,7 @@ import type { Instant } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
-import { GithubApp } from "../../app/github.app.ts";
+import { GithubModule } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
 
@@ -113,7 +113,7 @@ function demand(
   client: PrismaClient,
   project: Pick<ProjectApi, "getOrganizationId" | "touchCodingAgentPullRequestSeen">,
 ) {
-  return GithubApp.composeBranchDemand({
+  return GithubModule.composeBranchDemand({
     repositories: {
       ...unansweredRedisRepositories(),
       installations: PrismaGithubInstallationsRepository.create(client),

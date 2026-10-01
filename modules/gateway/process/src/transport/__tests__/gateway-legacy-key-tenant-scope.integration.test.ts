@@ -15,7 +15,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../../app/gateway.app.ts";
+import { GatewayModule } from "../../app/gateway.app.ts";
 import {
   gatewayKeyCaller,
   gatewayPlatformRest,
@@ -173,7 +173,7 @@ async function mountAsLegacyProjectKey() {
     listTraceDestinations: async () => [],
   });
 
-  const app = await GatewayApp.create({
+  const app = await GatewayModule.create({
     dependencies: {
       webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),

@@ -3,9 +3,9 @@
  * settings screen.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const secretWeb = defineWebModule("secret")
+export const secretWeb = defineBrowserModule("secret")
   .withHosts({
     requires: ["SecretHostApi"],
     mounts: { SecretHostApi: { load: () => import("./behavior/secret-host-mount.tsx") } },

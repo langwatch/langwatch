@@ -1,1 +1,1 @@
-export { promptServer } from "./prompt.server.ts";
+export { promptProcessModule } from "./prompt.module.ts";

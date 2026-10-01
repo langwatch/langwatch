@@ -109,13 +109,13 @@ type AgentMembers = Readonly<{
  * module rather than starting with the relay quietly switched off.
  */
 type AgentSetup = FeatureSetup<
-  typeof AgentApp.dependencies,
+  typeof AgentModule.dependencies,
   AgentMembers,
   AgentServerConfig,
   AgentRepositories
 >;
 
-export class AgentApp implements AgentApi {
+export class AgentModule implements AgentApi {
   static readonly contract = AgentApi;
   static readonly config = agentServerConfig;
   static readonly dependencies = {
@@ -188,8 +188,8 @@ export class AgentApp implements AgentApi {
     });
   }
 
-  static create(setup: AgentSetup): AgentApp {
-    return new AgentApp(setup);
+  static create(setup: AgentSetup): AgentModule {
+    return new AgentModule(setup);
   }
 
   platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string {

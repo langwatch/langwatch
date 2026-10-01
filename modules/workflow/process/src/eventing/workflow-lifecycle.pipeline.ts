@@ -7,7 +7,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { WorkflowApp } from "../app/workflow.app.ts";
+import type { WorkflowModule } from "../app/workflow.app.ts";
 import type { WorkflowRepositories } from "../repositories/workflow-repositories.registry.ts";
 import {
   RecordWorkflowCreatedCommand,
@@ -39,6 +39,6 @@ export function buildWorkflowLifecyclePipeline(): WorkflowLifecyclePipeline {
 
 export const workflowLifecycleEventing = defineEventingModule({
   pipeline: WORKFLOW_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<WorkflowRepositories, WorkflowApp>) => app.lifecyclePipeline(),
+  build: ({ app }: EventingSetup<WorkflowRepositories, WorkflowModule>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycleCommands(commands),
 });

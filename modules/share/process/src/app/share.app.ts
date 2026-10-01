@@ -32,13 +32,13 @@ import { ShareService } from "../services/share.service.ts";
  * viewer check uncached and looking healthy while it does it.
  */
 type ShareSetup = FeatureSetup<
-  typeof ShareApp.dependencies,
-  MembersRead<typeof ShareApp.reads>,
+  typeof ShareModule.dependencies,
+  MembersRead<typeof ShareModule.reads>,
   undefined,
   ShareRepositories
 >;
 
-export class ShareApp implements ShareApiContract {
+export class ShareModule implements ShareApiContract {
   static readonly contract = ShareApi;
   static readonly dependencies = {
     dataRetention: DataRetentionApi,
@@ -55,7 +55,7 @@ export class ShareApp implements ShareApiContract {
     this.#retention = retention;
   }
 
-  static create(setup: ShareSetup): ShareApp {
+  static create(setup: ShareSetup): ShareModule {
     const { dataRetention, authorization, projects } = setup.dependencies;
     const repository = LedgerShareRepository.create({
       head: setup.repositories.shares,
@@ -64,7 +64,7 @@ export class ShareApp implements ShareApiContract {
       projects,
     });
 
-    return new ShareApp(
+    return new ShareModule(
       ShareService.create({
         repository,
         dataRetention,

@@ -6,7 +6,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { GatewayApp } from "../app/gateway.app.ts";
+import type { GatewayModule } from "../app/gateway.app.ts";
 import {
   type GatewayRealtimeSessionReconcileDeps,
   runGatewayRealtimeSessionReconcile,
@@ -25,7 +25,7 @@ export const GATEWAY_REALTIME_SESSION_PIPELINE_NAME = "gateway_realtime_session_
 /** The voice reconciler, hosted by the worker like every scheduled process manager. */
 export const gatewayRealtimeSessionEventing = defineEventingModule({
   pipeline: GATEWAY_REALTIME_SESSION_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<undefined, GatewayApp>) =>
+  build: ({ app, processStore }: EventingSetup<undefined, GatewayModule>) =>
     buildGatewayRealtimeSessionMaintenancePipeline({
       reconcile: () => app.reconcileRealtimeSessions(),
       deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),

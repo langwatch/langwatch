@@ -75,7 +75,7 @@ type DatasetMembers = Pick<ProcessMembers, "objectStorage"> &
   Readonly<{ publicBaseUrl: string | undefined }>;
 
 type DatasetSetup = FeatureSetup<
-  typeof DatasetApp.dependencies,
+  typeof DatasetModule.dependencies,
   DatasetMembers,
   undefined,
   DatasetRepositories
@@ -102,7 +102,7 @@ export interface DatasetUpsertInput {
   datasetRecords?: UpsertDatasetInput["datasetRecords"];
 }
 
-export class DatasetApp implements DatasetApi {
+export class DatasetModule implements DatasetApi {
   static readonly contract = DatasetApi;
   static readonly dependencies = {
     experiments: ExperimentApi,
@@ -180,8 +180,8 @@ export class DatasetApp implements DatasetApi {
     this.#publicBaseUrl = members.publicBaseUrl;
   }
 
-  static create({ repositories, dependencies, members }: DatasetSetup): DatasetApp {
-    return new DatasetApp(repositories, dependencies, members);
+  static create({ repositories, dependencies, members }: DatasetSetup): DatasetModule {
+    return new DatasetModule(repositories, dependencies, members);
   }
 
   // ── Datasets ─────────────────────────────────────────────────────────────

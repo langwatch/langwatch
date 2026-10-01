@@ -28,7 +28,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { governanceServer } from "../../governance.server.ts";
+import { governanceProcessModule } from "../../governance.module.ts";
 import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
 
@@ -67,9 +67,9 @@ function restHost() {
 
 async function boot(rest: RestHost) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }).withEnv());
-  await resolver.preflight(Object.values(governanceServer.secrets ?? {}));
+  await resolver.preflight(Object.values(governanceProcessModule.secrets ?? {}));
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([governanceServer])
+    .withModules([governanceProcessModule])
     .withStores(memoryStores())
     .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
     .withMembers({
@@ -109,7 +109,7 @@ describe("the governance installation's CLI plane", () => {
     const runtime = await boot(rest);
 
     try {
-      const mounted = governanceServer.transports.includes(governanceCliRest);
+      const mounted = governanceProcessModule.transports.includes(governanceCliRest);
       const routes = governanceCliRest
         .router()
         .routes.map((route) => `${route.method.toUpperCase()} ${route.path}`);

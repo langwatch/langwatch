@@ -138,7 +138,7 @@ class CapabilityLangyHost extends LangyHostApi {
 
 /**
  * The provider `mounts.load` would resolve. NOT YET WIRED: `modules/langy/browser`
- * has no `defineWebModule` to hang `.withHosts()` off — see the handoff.
+ * has no `defineBrowserModule` to hang `.withHosts()` off — see the handoff.
  */
 export default function LangyHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();

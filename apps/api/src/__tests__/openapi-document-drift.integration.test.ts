@@ -8,7 +8,7 @@ import { join } from "node:path";
 
 import { composeApiApplication } from "@langwatch/api/hosting";
 import { RestHost, type RestIdentity } from "@langwatch/api/rest";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import { describe, expect, it } from "vitest";
 
 import { bootApi } from "./api-installation.fixture.ts";
@@ -118,7 +118,7 @@ async function composedRoutes() {
     authorize: refuse,
   };
   const facts = new Map<string, { middleware: { name: string }; resolve: () => never }>();
-  for (const module of serverModules) {
+  for (const module of processModules) {
     for (const transport of module.transports ?? []) {
       if (transport.protocol !== "rest") continue;
       const declaration = transport.router() as {

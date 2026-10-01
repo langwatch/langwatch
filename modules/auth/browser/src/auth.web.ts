@@ -3,9 +3,9 @@
  * front-door screens, every one under the auth layout that mounts AuthHostApi.
  */
 
-import { defineWebModule } from "@langwatch/browser";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const authWeb = defineWebModule("auth")
+export const authWeb = defineBrowserModule("auth")
   .withScreens({
     // Placed by the application's route table until a top-level anchor accepts
     // declared routes; the loader is this module's either way.

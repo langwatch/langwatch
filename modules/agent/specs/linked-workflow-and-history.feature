@@ -5,7 +5,7 @@ Feature: Agent coordinates linked workflows and history through their owners
   @unit @agents
   Scenario: Workflow fields describe the current graph
     Given a workflow agent points to a graph in its project
-    When AgentApp reads the agent
+    When AgentModule reads the agent
     Then WorkflowApi supplies the graph's input and output fields
     And an archived or missing graph yields no fields and fieldsResolved false
     And a graph belonging to another project is not returned
@@ -13,14 +13,14 @@ Feature: Agent coordinates linked workflows and history through their owners
   @unit @agents
   Scenario: Cascade archive uses the workflow owner
     Given a workflow agent points to a live graph
-    When AgentApp cascade-archives the agent
+    When AgentModule cascade-archives the agent
     Then WorkflowApi archives the graph in the same project
     And the agent is archived and the affected workflow is reported
 
   @unit @agents
   Scenario: A workflow copy owns its copied graph
     Given a workflow agent is copied into another project
-    When AgentApp handles the copy
+    When AgentModule handles the copy
     Then WorkflowApi copies the graph using the target project and author
     And the new agent points at that copied graph
     And the source graph is unchanged
@@ -44,7 +44,7 @@ Feature: Agent coordinates linked workflows and history through their owners
   @unit @agents
   Scenario: History is scoped and enriched by its owners
     Given multiple agents and projects have audit entries
-    When AgentApp reads one agent's history
+    When AgentModule reads one agent's history
     Then AuditLogApi returns the newest matching entries in that project
     And subject, source and newly copied agent argument forms are matched
     And UserApi supplies each available author's id, name and email
