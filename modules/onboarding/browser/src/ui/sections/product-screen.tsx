@@ -96,8 +96,8 @@ export const ProductScreen: React.FC = () => {
               <>
                 <ScreenLifecycle key={currentScreen.id} boundary={currentScreen.id} />
                 {/*
-                 * Kept ambient: `currentScreen.component` can be `ViaClaudeCodeScreen`,
-                 * reused by other modules through this context, not a `surface` prop.
+                 * Kept ambient: screens such as `ViaClaudeCodeScreen` read the project and
+                 * both mints from ActiveProjectContext, not from a `surface` prop.
                  */}
                 <AnalyticsBoundary name={currentScreen.id}>
                   <currentScreen.component surface={{ boundary: currentScreen.id }} />

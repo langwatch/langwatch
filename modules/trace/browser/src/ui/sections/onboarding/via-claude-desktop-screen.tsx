@@ -1,5 +1,8 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
+import {
+  API_KEY_PLACEHOLDER,
+  PersonalAccessTokenBanner,
+} from "@langwatch/design-system/personal-access-token-banner";
 import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
@@ -12,6 +15,7 @@ import {
   findLangwatchEnvLines,
 } from "../../../model/onboarding/shared/build-mcp-config.ts";
 import { TabButton } from "../../elements/onboarding/shared/tab-button.tsx";
+import { showErrorToast } from "../errors/index.ts";
 import { useActiveProject } from "./active-project-context.tsx";
 import { CodePreview } from "./observability/code-preview.tsx";
 
@@ -54,18 +58,16 @@ const APPS: {
 ];
 
 export function ViaMcpClientScreen(): React.ReactElement {
-  const { project, freshToken } = useActiveProject();
+  // The MCP config takes its own project-reads token, never the `.env` ingestion one.
+  const { project, mcpMinting } = useActiveProject();
   const { appBaseUrl } = useUiDeployment();
   const [activeApp, setActiveApp] = useState<AppKey>("claude-desktop");
 
   const effectiveEndpoint = appBaseUrl;
   const effectiveProjectId = project?.id;
 
-  // Only use a freshly-minted token. If none has been minted this session,
-  // the config renders behind the empty-state overlay (driven by the
-  // canonical Generate CTA on the .env card above) — we don't mint from
-  // here so there's a single, unambiguous "Generate access token" surface.
-  const tokenForConfig = freshToken ?? null;
+  // Only a token created this session fills the config; until then it shows a placeholder.
+  const tokenForConfig = mcpMinting?.token ?? null;
   const hasToken = !!tokenForConfig;
 
   const configJson = useMemo(
@@ -219,10 +221,25 @@ export function ViaMcpClientScreen(): React.ReactElement {
           </Text>
           <Text fontSize="xs" color="fg.muted" lineHeight="tall">
             {hasToken
-              ? "Pre-filled with your API key. Copy and paste into your app."
-              : "We'll fill in the API key once you generate one."}
+              ? "Pre-filled with your personal access token. Copy and paste into your app."
+              : "We'll fill in the API key once you create a personal access token."}
           </Text>
         </VStack>
+
+        {mcpMinting ? (
+          <PersonalAccessTokenBanner
+            token={tokenForConfig}
+            isCreating={mcpMinting.isMinting}
+            onCreate={() => {
+              mcpMinting
+                .mint()
+                .catch((error: unknown) =>
+                  showErrorToast({ error, fallbackTitle: "Couldn't create the MCP access token" }),
+                );
+            }}
+            scopeNote={mcpMinting.scopeNote}
+          />
+        ) : null}
 
         <CodePreview
           code={configJson}

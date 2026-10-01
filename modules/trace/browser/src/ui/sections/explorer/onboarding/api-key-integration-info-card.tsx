@@ -14,7 +14,7 @@ import { CodePreview } from "../../onboarding/observability/code-preview.tsx";
 
 interface ApiKeyIntegrationInfoCardProps {
   projectId: string;
-  /** Held by the parent, so every setup tab uses the same token instead of minting its own. */
+  /** The `.env` ingestion token, held by the parent; the MCP config mints its own. */
   minting: PersonalTokenMint;
 }
 

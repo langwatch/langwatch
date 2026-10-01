@@ -107,10 +107,24 @@ describe("useMintPersonalToken", () => {
       act(() => void result.current.mint());
       await answer(0, "sk-lw-mcp");
 
-      expect(mints.calls[0]?.input.permissions).toEqual([...PROJECT_READ_PERMISSIONS]);
-      expect(PROJECT_READ_PERMISSIONS.every((permission) => permission.endsWith(":view"))).toBe(
-        true,
-      );
+      expect(mints.calls[0]?.input).toMatchObject({
+        permissionMode: "restricted",
+        bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "alpha" }],
+      });
+      expect(mints.calls[0]?.input.bindings).toHaveLength(1);
+      expect(mints.calls[0]?.input.permissions).toEqual([
+        "traces:view",
+        "analytics:view",
+        "prompts:view",
+        "scenarios:view",
+        "evaluations:view",
+        "datasets:view",
+        "experiments:view",
+        "workflows:view",
+        "annotations:view",
+        "triggers:view",
+        "project:view",
+      ]);
       expect(result.current.scopeNote).toBe(
         "This token can read this project's data. It can't send or change anything.",
       );

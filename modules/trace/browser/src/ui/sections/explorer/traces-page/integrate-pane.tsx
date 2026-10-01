@@ -1,4 +1,4 @@
-import { SETUP_AGENT_PERMISSIONS, useMintPersonalToken } from "@langwatch/api-key-client";
+import { useMintPersonalToken } from "@langwatch/api-key-client";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 /**
  * IntegratePane — the default view for no-traces projects.
@@ -37,9 +37,8 @@ export const IntegratePane: React.FC = () => {
     organizationId: organization?.id,
     projectId: project?.id,
     userId: useOptionalTraceHost()?.currentUser()?.id,
+    // Ingestion only: the env block and the agent prompt; this pane has no MCP config.
     name: "Personal access token",
-    // The MCP and skills tabs reuse this token, so it may also read the project.
-    permissions: SETUP_AGENT_PERMISSIONS,
   });
   const token = minting.token ?? null;
   const [showSdk, setShowSdk] = useState(false);

@@ -1,6 +1,6 @@
 import {
   type PersonalTokenMint,
-  SETUP_AGENT_PERMISSIONS,
+  PROJECT_READ_PERMISSIONS,
   useMintPersonalToken,
 } from "@langwatch/api-key-client";
 import { Kbd } from "@langwatch/design-system/kbd";
@@ -82,13 +82,17 @@ export function IntegrateDrawer({
   onOpenChange,
 }: IntegrateDrawerProps): React.ReactElement | null {
   const { project, organization } = useOrganizationTeamProject();
-  const minting = useMintPersonalToken({
+  const tokenScope = {
     organizationId: organization?.id,
     projectId: project?.id,
     userId: useOptionalTraceHost()?.currentUser()?.id,
-    name: "Personal access token",
-    // The MCP and skills tabs reuse this token, so it may also read the project.
-    permissions: SETUP_AGENT_PERMISSIONS,
+  };
+  // Two tokens, each minted only on its own click: ingestion for `.env`, project reads for MCP.
+  const minting = useMintPersonalToken({ ...tokenScope, name: "Personal access token" });
+  const mcpMinting = useMintPersonalToken({
+    ...tokenScope,
+    name: "MCP access token",
+    permissions: PROJECT_READ_PERMISSIONS,
   });
   const [segment, setSegment] = useState<Segment>("skill");
 
@@ -100,6 +104,7 @@ export function IntegrateDrawer({
     project,
     organization,
     freshToken: minting.token,
+    mcpMinting,
   };
 
   return (

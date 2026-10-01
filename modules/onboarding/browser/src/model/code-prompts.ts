@@ -47,7 +47,7 @@ Or add an entry named \`langwatch\` under the \`mcpServers\` object of \`~/.clau
 ## For other editors
 Add the same \`mcpServers.langwatch\` entry to your editor's MCP settings file using the fields listed above.
 
-**Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
+**Note:** The MCP needs its own key, which can read the project. The \`LANGWATCH_API_KEY\` in the project's \`.env\` file can only send data, so do not reuse it for the MCP configuration; ask the user for an MCP key instead.
 
 If MCP installation fails, see # Fetching LangWatch Docs Without MCP
 

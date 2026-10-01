@@ -34,11 +34,16 @@ vi.mock("../../../behavior/use-product-flow.ts", () => ({
 }));
 
 // The hook's own suite covers scoping; this double records the project and holds the token.
-const minted = vi.hoisted(() => ({
-  projects: [] as (string | undefined)[],
-  permissions: [] as (readonly string[] | undefined)[],
-  tokens: {} as Record<string, string>,
-}));
+// `tokens` answers the default (ingestion) mint, `readTokens` a mint that names permissions.
+const minted = vi.hoisted(() => {
+  const readTokens: Record<string, string> = {};
+  return {
+    projects: [] as (string | undefined)[],
+    permissions: [] as (readonly string[] | undefined)[],
+    tokens: {} as Record<string, string>,
+    readTokens,
+  };
+});
 const PROJECT_READS = vi.hoisted(() => ["project:view", "traces:view"]);
 vi.mock("@langwatch/api-key-client", () => ({
   PROJECT_READ_PERMISSIONS: PROJECT_READS,
@@ -60,7 +65,8 @@ function useMintDouble(projectId: string | undefined, permissions: readonly stri
     mint: async () => {
       minted.projects.push(projectId);
       minted.permissions.push(permissions);
-      const answer = projectId ? minted.tokens[projectId] : undefined;
+      const answers = permissions ? minted.readTokens : minted.tokens;
+      const answer = projectId ? answers[projectId] : undefined;
       if (!answer) throw new Error("refused");
       setToken(answer);
       return answer;
@@ -83,6 +89,7 @@ import {
   type UiDeployment,
 } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 
 import {
   OnboardingHostApi,
@@ -106,6 +113,7 @@ const SAAS_DEPLOYMENT: UiDeployment = {
 };
 
 const TEST_TOKEN = "lw-pat-test-fixture-not-a-real-token-0000";
+const READS_TOKEN = "lw-pat-test-fixture-project-reads-1111";
 
 const organization: OnboardingOrganization = {
   id: "org_1",
@@ -186,6 +194,7 @@ afterEach(() => {
   minted.projects = [];
   minted.permissions = [];
   minted.tokens = {};
+  minted.readTokens = {};
   shown.screen = "manually";
 });
 
@@ -262,22 +271,39 @@ describe("ProductScreen coding-agent setup", () => {
     /** @scenario A coding-agent setup mints its MCP token with project reads only, apart from the ingestion token */
     it("mints ingestion only for the manual snippets and project reads only for the MCP config", async () => {
       const host = new ProductTestHost();
+      const clipboard: string[] = [];
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: async (text: string) => void clipboard.push(text) },
+      });
       minted.tokens = { proj_agent: TEST_TOKEN };
-      renderManualSetup(host);
+      minted.readTokens = { proj_agent: READS_TOKEN };
+      const { rerenderManualSetup } = renderManualSetup(host);
       fireEvent.click(
         await screen.findByRole("button", { name: "Create a personal access token" }),
       );
-      await waitFor(() => expect(minted.permissions).toEqual([undefined]));
-      cleanup();
+      await waitFor(() =>
+        expect(screen.getByLabelText("Your API key").textContent).toContain(TEST_TOKEN),
+      );
+      expect(minted.permissions).toEqual([undefined]);
 
       shown.screen = "via-claude-code";
-      renderManualSetup(host);
+      rerenderManualSetup();
       fireEvent.click(await screen.findByRole("button", { name: "MCP" }));
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Create a personal access token" }),
-      );
+      const create = await screen.findByRole("button", {
+        name: "Create a personal access token",
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Copy config" }));
+      await waitFor(() => expect(clipboard).toHaveLength(1));
+      expect(clipboard[0]).toContain(API_KEY_PLACEHOLDER);
+      expect(clipboard[0]).not.toContain(TEST_TOKEN);
 
+      fireEvent.click(create);
       await waitFor(() => expect(minted.permissions).toEqual([undefined, PROJECT_READS]));
+      fireEvent.click(screen.getByRole("button", { name: "Copy config" }));
+      await waitFor(() => expect(clipboard).toHaveLength(2));
+      expect(clipboard[1]).toContain(READS_TOKEN);
+      expect(clipboard[1]).not.toContain(TEST_TOKEN);
       expect(minted.projects).toEqual(["proj_agent", "proj_agent"]);
     });
   });

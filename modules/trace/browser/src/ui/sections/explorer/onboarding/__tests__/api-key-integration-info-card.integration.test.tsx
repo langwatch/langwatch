@@ -34,7 +34,8 @@ import { ApiKeyIntegrationInfoCard } from "../api-key-integration-info-card.tsx"
 
 const TOKEN = "sk-lw-realtoken1234567890";
 const PROJECT_ID = "project_test123";
-const SCOPE_NOTE = "This token can send traces and read this project's data. It can't change anything.";
+const SCOPE_NOTE =
+  "This token can only send data to this project. It can't read or change anything.";
 
 afterEach(() => {
   cleanup();

@@ -1,3 +1,4 @@
+import type { PersonalTokenMint } from "@langwatch/api-key-client";
 import type React from "react";
 import { createContext, useContext } from "react";
 
@@ -14,6 +15,8 @@ export interface ActiveProjectContextValue {
    * mutation); undefined after a refresh. Held in component state only.
    */
   freshToken?: string;
+  /** Mints the MCP config's own token, project reads only; `freshToken` stays for `.env`. */
+  mcpMinting?: PersonalTokenMint;
 }
 
 const ActiveProjectContext = createContext<ActiveProjectContextValue | undefined>(undefined);

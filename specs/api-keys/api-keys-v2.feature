@@ -247,7 +247,8 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
         | screen                        | permissions                                     | can do                         |
         | the onboarding API card       | traces:create, as a CLI "login --project" key   | can only send data             |
         | the personal workspace setup  | traces:create                                   | can only send data             |
-        | the traces integrate drawer   | traces:create and the MCP and skills read grants | can send traces and read data  |
+        | the traces integrate drawer   | traces:create                                   | can only send data             |
+        | the traces MCP config         | the project read grants only                    | can read this project's data   |
         | the onboarding MCP config     | the project read grants only                    | can read this project's data   |
         | the prompt API dialog         | prompts:view                                    | can read prompts               |
         | the evaluator API integration | evaluations:manage                              | can manage evaluations         |
@@ -305,11 +306,16 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then a second token on project "alpha" is minted holding only the project read grants
       And the MCP config is filled with that second token, never the ingestion one
 
-    @unimplemented
-    Scenario: The traces integrate screens mint an ingestion token for .env and a reads token for MCP
-      When "ada" opens the traces integrate pane or drawer for project "alpha"
+    @integration
+    Scenario: The traces integrate drawer mints an ingestion token for .env and a reads token for MCP
+      When "ada" opens the traces integrate drawer for project "alpha"
       Then the env block's token holds only traces:create
       And the MCP config's token holds only the project read grants
+
+    @integration
+    Scenario: The traces integrate pane mints only an ingestion token
+      When "ada" opens the traces integrate pane for project "alpha"
+      Then the token it mints holds only traces:create
 
     @unimplemented
     Scenario: A setup skill that creates something gets its own token holding exactly that create permission

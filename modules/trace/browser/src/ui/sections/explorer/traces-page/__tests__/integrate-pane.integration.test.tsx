@@ -2,6 +2,7 @@
 // action (not tab).
 // @vitest-environment jsdom
 // Spec: specs/traces-v2/integrate-pane.feature
+// Spec: specs/api-keys/api-keys-v2.feature
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -41,14 +42,18 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
+const mintPersonalToken = vi.hoisted(() => vi.fn());
+
 vi.mock("@langwatch/api-key-client", () => ({
-  SETUP_AGENT_PERMISSIONS: [],
-  useMintPersonalToken: () => ({
-    token: undefined,
-    isMinting: false,
-    scopeNote: "",
-    mint: vi.fn(),
-  }),
+  useMintPersonalToken: (input: unknown) => {
+    mintPersonalToken(input);
+    return {
+      token: undefined,
+      isMinting: false,
+      scopeNote: "",
+      mint: vi.fn(),
+    };
+  },
 }));
 
 // The faded page chrome is the real SearchBar and Toolbar, which pull
@@ -103,6 +108,16 @@ describe("the integrate pane", () => {
       ).toBeTruthy();
       expect(screen.getByRole("button", { name: /setup via agent/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /see sample data/i })).toBeInTheDocument();
+    });
+
+    /** @scenario The traces integrate pane mints only an ingestion token */
+    it("mints its token with the default ingestion-only permissions", () => {
+      renderPane();
+
+      expect(mintPersonalToken).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "project_1" }),
+      );
+      expect(mintPersonalToken.mock.calls[0]?.[0]).not.toHaveProperty("permissions");
     });
 
     /** @scenario The setup paths are not a tab strip */

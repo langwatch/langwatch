@@ -24,12 +24,6 @@ export const PROJECT_READ_PERMISSIONS: readonly TokenPermission[] = [
   "project:view",
 ];
 
-/** One token for both `.env` and MCP; goes once the trace integrate screens mint two. */
-export const SETUP_AGENT_PERMISSIONS: readonly TokenPermission[] = [
-  ...INGESTION_PERMISSIONS,
-  ...PROJECT_READ_PERMISSIONS,
-];
-
 const PHRASES: Partial<Record<TokenPermission, string>> = {
   "prompts:view": "read prompts",
   "evaluations:manage": "manage evaluations",
@@ -50,9 +44,6 @@ export function tokenScopeNote({
   }
   if (sameSet(permissions, PROJECT_READ_PERMISSIONS)) {
     return "This token can read this project's data. It can't send or change anything.";
-  }
-  if (sameSet(permissions, SETUP_AGENT_PERMISSIONS)) {
-    return "This token can send traces and read this project's data. It can't change anything.";
   }
   const phrases = permissions.map((permission) => PHRASES[permission] ?? permission);
   return `This token can ${phrases.join(" and ")} in this project and nothing else.`;

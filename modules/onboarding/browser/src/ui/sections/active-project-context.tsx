@@ -15,7 +15,7 @@ export interface ActiveProjectContextValue {
    * mutation); undefined after a refresh. Held in component state only.
    */
   freshToken?: string;
-  /** Mints `freshToken` for every tab; dropped when the project, organisation or user changes. */
+  /** Mints `freshToken`, the `.env` and snippet ingestion token; dropped on scope change. */
   minting?: PersonalTokenMint;
   /** Mints the MCP config's own token, project reads only; `freshToken` stays for `.env`. */
   mcpMinting?: PersonalTokenMint;
