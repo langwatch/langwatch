@@ -14,7 +14,7 @@ export const integrationWeb = defineBrowserModule("integration")
       path: "/settings/integrations",
       within: "settings",
       label: "Integrations",
-      requires: "organization:manage",
+      requires: "organization:view",
       load: () => import("./ui/sections/integrations.screen.tsx"),
     },
   });
