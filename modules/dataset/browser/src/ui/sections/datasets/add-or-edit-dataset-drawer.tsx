@@ -73,8 +73,6 @@ type FormValues = {
   columnTypes: DatasetColumns;
 };
 
-/** Columns a freshly created dataset starts with, matching the trace fields
- *  a record carries by default. */
 type SavedDataset = { datasetId?: string } | undefined;
 
 function datasetDrawerHeading({
@@ -107,6 +105,8 @@ function datasetSavedTitle(datasetToSave: SavedDataset): string {
   return datasetToSave ? "Dataset Saved" : "Dataset Created";
 }
 
+/** Columns a freshly created dataset starts with, matching the trace fields
+ *  a record carries by default. */
 export const DATASET_DEFAULT_COLUMNS: DatasetColumns = [
   { name: "trace_id", type: "string" },
   { name: "timestamp", type: "date" },
