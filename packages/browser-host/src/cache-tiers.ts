@@ -3,8 +3,8 @@
  * procedure path, so no call site states a staleTime. ADR-164.
  */
 
-import type { TrpcCachePolicy, TrpcCacheTier } from "@langwatch/api/contract";
 import { trpcQueryKey } from "@langwatch/api/web";
+import type { TrpcCachePolicy, TrpcCacheTier } from "@langwatch/kernel/contract";
 import type { Query, QueryClient, QueryKey } from "@tanstack/react-query";
 
 /** How long a read of each tier stays fresh. */

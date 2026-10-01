@@ -22,9 +22,6 @@
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {

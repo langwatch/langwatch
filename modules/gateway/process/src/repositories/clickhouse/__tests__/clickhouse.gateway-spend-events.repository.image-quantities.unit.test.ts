@@ -43,6 +43,7 @@ describe("ClickHouseGatewaySpendEventsRepository image quantities", () => {
       expect(sql).toContain("ImageCount");
     });
 
+    /** @scenario The rollups sum image quantities beside the text ones */
     it("maps the summed image columns onto the row", async () => {
       const { repository } = repositoryOver([
         {
@@ -102,6 +103,7 @@ describe("ClickHouseGatewaySpendEventsRepository image quantities", () => {
   });
 
   describe("readEndUserSpend()", () => {
+    /** @scenario The rollups sum image quantities beside the text ones */
     it("selects and sums the image columns", async () => {
       const { repository, queries } = repositoryOver([
         {

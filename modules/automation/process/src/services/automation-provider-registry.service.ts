@@ -9,11 +9,11 @@ import {
   slackActionParamsSchema,
   slackProvider as slackShared,
   TriggerAction,
-  WEBHOOK_HEADER_VALUE_KEPT,
   webhookActionParamsSchema,
   webhookProvider as webhookShared,
   type SharedDef,
 } from "@langwatch/automation-contract";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import { z, type ZodTypeAny } from "zod";
 
 /** The Slack fields without the save-time refinement: a persist reads, it does not refuse. */

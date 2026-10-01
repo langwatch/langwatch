@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import { describe, expect, it } from "vitest";
 

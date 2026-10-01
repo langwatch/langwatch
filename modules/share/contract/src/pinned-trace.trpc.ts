@@ -4,8 +4,8 @@
  * holds the trace, which is why the namespace answers from share.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
 import { pinnedTraceSchema } from "@langwatch/data-retention-contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 export const pinnedTraceScopeSchema = z.object({

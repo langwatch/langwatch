@@ -14,10 +14,11 @@ Three layers, bottom up:
 2. **The fenced fetch** (`src/ssrf/fenced-fetch.ts`) — the only way a validated
    destination is actually contacted. `redirect: "manual"` always; a hop is
    either refused or re-judged, never taken on the receiver's say-so.
-3. **The webhook sender** (`src/webhook/`, `src/services/`) — the customer-
-   supplied destination on top of both: the admission policy (https, default
-   port, no credentials), the hourly dispatch cap, the Stripe-style signature,
-   the response caps and the retry-vs-terminal classification.
+3. **The outbound proxy** (`src/proxy/`) — how a self-hosted call leaves.
+
+The customer webhook sender (admission, hourly cap, signature, classification)
+stood on this fence here until ADR-167; it now lives in `modules/webhook`, which
+owns sending to webhook destinations.
 
 ## Why it is a package and not a feature
 
@@ -52,10 +53,8 @@ Nothing here reads the environment. A composition root states:
 
 - the **TLS policy** (`rejectUnauthorized`), which the application ties to
   `IS_SAAS` because on-prem receivers frequently carry self-signed certificates;
-- the **dispatch counter** (`WebhookDispatchRateLimiterPort`), because the cap
-  has to hold across a fleet and only the process knows what its fleet shares;
-- the **escape hatch**, per send, for the endpoints platform's opt-in to
-  plain-http internal receivers.
+- the **address policy** (`blockLocal`, allowlisted hosts) each caller's
+  destinations answer to.
 
 An admission this package cannot evaluate refuses. There is no default address
 policy, and a redirect that cannot be re-judged is not followed.

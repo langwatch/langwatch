@@ -5,9 +5,21 @@
  */
 import {
   ALL_PERMISSIONS,
+  PermissionDeniedError,
+  type AuthzDeclaredScopeId,
+  type AuthzGetDecisionInput,
+  type AuthzGetProjectAnyDecisionInput,
+  type AuthzPermission,
+  type AuthzScopeLineageInput,
+  type AuthzScopeLineageResult,
+  type DeclaredScopeTier,
+  type PermissionDecision,
+  type PermissionScopeArg,
+  type TierOfScopeArg,
+} from "@langwatch/authorization";
+import {
   AuthzEngine,
   AuthzService as AuthzServiceContract,
-  PermissionDeniedError,
   type ApiKeyPermissionCheck,
   type ApiKeyProjectDecision,
   type AuthzAccessBinding,
@@ -17,7 +29,6 @@ import {
   type AuthzRolePermissions,
   type AuthzAccessBreakdownInput,
   type AuthzAccessBreakdownOutput,
-  type AuthzDeclaredScopeId,
   type AuthzCanAnyByIdsInput,
   type AuthzCanAnyByIdsOutput,
   type AuthzCanBatchByIdsInput,
@@ -28,8 +39,6 @@ import {
   type AuthzCheckByIdsOutput,
   type AuthzDecision,
   type AuthzGetApiKeyProjectDecisionInput,
-  type AuthzGetDecisionInput,
-  type AuthzGetProjectAnyDecisionInput,
   type AuthzListBindingsForSynthesisInput,
   type AuthzListApiKeyBindingsInput,
   type AuthzListGroupBindingsInput,
@@ -42,20 +51,13 @@ import {
   type AuthzListTeamMemberBindingsInput,
   type AuthzListUserAndGroupBindingsInput,
   type AuthzListUserBindingsInput,
-  type AuthzPermission,
   type AuthzPrincipalRef,
   type AuthzLegacyAccessNoticeInput,
   type AuthzRequireProjectPermissionInput,
   type AuthzScopeRef,
-  type AuthzScopeLineageInput,
-  type AuthzScopeLineageResult,
   type AuthzTeamMemberBinding,
   type Authorized,
-  type BindingScopeTier,
   type CollectedGrants,
-  type PermissionDecision,
-  type PermissionScopeArg,
-  type TierOfScopeArg,
   scopeOrganizationId,
   AuthzScopeNotFoundError,
   type AuthzFindPermissionsBeyondCallerInput,
@@ -236,7 +238,7 @@ export class AuthzService extends AuthzServiceContract {
     return this.options.findEngineCutoverAt?.(organizationId) ?? null;
   }
 
-  async authorize<Tier extends BindingScopeTier, Permission extends AuthzPermission>({
+  async authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>({
     principal,
     permission,
     scope,

@@ -159,11 +159,12 @@ Feature: The local development topology
   # A checkout without cmd/service/combined_dev.go, or a monolith one, keeps
   # Haven's bundled simulator lanes (haven-bundled-simulators.feature).
   @unit
-  Scenario: A dev checkout's go lane hosts the simulators
+  Scenario: A dev checkout's sims lane hosts the simulators
     Given a checkout whose dev build links the simulators
     When haven plans a stack selecting every simulator
-    Then the go lane hosts idpsim, mailsim, storagesim, voicesim and llmsim with the env their own lanes carried
-    And no "idp", "mail", "storage", "voice" or "llm" lane is planned
+    Then a "sims" lane, a second combined Go process, hosts idpsim, mailsim, storagesim, voicesim, llmsim and analyticssim with the env their own lanes carried
+    And the go lane keeps only the gateway and the NLP engine, so load on a simulator cannot starve them
+    And no "idp", "mail", "storage", "voice", "llm" or "analytics" lane is planned
 
   # --- Restarting a lane ---
 
@@ -182,7 +183,7 @@ Feature: The local development topology
     When a developer names "gateway" or "nlp" to restart
     Then the command is refused with the restartable list
     And "go" is the name that bounces them
-    And "idp", "mail", "storage", "voice" and "llm" are offered only as "go" where the go lane hosts them
+    And "idp", "mail", "storage", "voice", "llm" and "analytics" are offered only as "sims" where the sims lane hosts them
 
   # --- The api.<slug> hostname ---
 

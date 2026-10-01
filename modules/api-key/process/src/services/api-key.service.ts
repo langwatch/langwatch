@@ -29,10 +29,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import type { ApiKeyGrantId } from "./api-key-grant-id.service.ts";
 import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import { ApiKeyCliService } from "./api-key-cli.service.ts";
 import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
+import type { ApiKeyGrantId } from "./api-key-grant-id.service.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
@@ -78,17 +78,26 @@ export class ApiKeyService {
     this.enrichment = ApiKeyEnrichmentService.create(dependencies, this.catalog);
   }
 
+  /** A change to a key, after which this process answers every token afresh. */
+  private async changing<T>(change: () => Promise<T>): Promise<T> {
+    try {
+      return await change();
+    } finally {
+      this.tokens.forget();
+    }
+  }
+
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
     return this.lifecycle.create(input);
   }
 
   async update(input: UpdateApiKeyInput): Promise<ApiKey> {
-    return this.lifecycle.update(input);
+    return this.changing(() => this.lifecycle.update(input));
   }
 
   async updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey> {
     try {
-      return await this.lifecycle.update(input);
+      return await this.changing(() => this.lifecycle.update(input));
     } catch (error) {
       if (error instanceof ApiKeyNotOwnedError) {
         throw new ApiKeyNotFoundError(input.id, { reasons: [error] });
@@ -140,7 +149,7 @@ export class ApiKeyService {
   }
 
   async revoke(input: RevokeApiKeyInput): Promise<ApiKey> {
-    return this.lifecycle.revoke(input);
+    return this.changing(() => this.lifecycle.revoke(input));
   }
 
   async ensureCallerIsOrgMember(input: { userId: string; organizationId: string }): Promise<void> {
@@ -263,7 +272,7 @@ export class ApiKeyService {
     exceptApiKeyId?: string;
     createdBefore?: Instant;
   }): Promise<void> {
-    return this.cli.revokeCliLoginKeysForDevice(input);
+    return this.changing(() => this.cli.revokeCliLoginKeysForDevice(input));
   }
 
   async revokeCliSessionKey(input: {
@@ -271,14 +280,14 @@ export class ApiKeyService {
     userId: string;
     organizationId: string;
   }): Promise<CliSessionKeyRevocation> {
-    return this.cli.revokeCliSessionKey(input);
+    return this.changing(() => this.cli.revokeCliSessionKey(input));
   }
 
   async applySessionCeiling(input: {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<number> {
-    return this.cli.applySessionCeiling(input);
+    return this.changing(() => this.cli.applySessionCeiling(input));
   }
 
   async revokeCliLoginKeyForLogout(input: {
@@ -286,7 +295,7 @@ export class ApiKeyService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    return this.cli.revokeCliLoginKeyForLogout(input);
+    return this.changing(() => this.cli.revokeCliLoginKeyForLogout(input));
   }
 
   async extendCliLoginKeyExpiry(input: {

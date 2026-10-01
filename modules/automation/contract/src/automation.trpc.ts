@@ -3,7 +3,7 @@
  * cache keys, so they are the wire names the automations page has always
  * called, in the order the authoring drawer and the list reach them.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 import {
   automationDailyCapSchema,

@@ -74,8 +74,4 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null> {
     return this.reader.findInputs(input);
   }
-
-  countOrganizationRuns(input: { tenantIds: readonly string[] }): Promise<number> {
-    return this.reader.countOrganizationRuns(input);
-  }
 }

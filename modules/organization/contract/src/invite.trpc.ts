@@ -1,6 +1,6 @@
 /** Every `invite.*` procedure: the invitations administrators send, and accepting one. */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 import {
   organizationInviteAcceptedSchema,

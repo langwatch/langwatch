@@ -2,7 +2,7 @@
  * The composer's tick arithmetic, as the custom-role editor spec states it.
  * Spec: specs/rbac/custom-role-permission-editing.feature
  */
-import { isRegistryPermission } from "@langwatch/authz-contract";
+import { isRegistryPermission } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import { ORDERED_RESOURCES } from "../permission-catalogue.ts";

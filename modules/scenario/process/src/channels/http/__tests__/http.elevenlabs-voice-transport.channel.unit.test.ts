@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createElevenLabsConvaiTransport,
   ELEVENLABS_CONNECT_REJECTED_PREFIX,
   elevenLabsConvaiTransport,
+  isAcceptableSignedUrl,
   readElevenLabsErrorReason,
   wrapConnectRejection,
 } from "../http.elevenlabs-voice-transport.channel.ts";
@@ -308,6 +310,66 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
 
         expect(result).toEqual({ signedUrl: "wss://regional.example.com/abc" });
       });
+    });
+  });
+});
+
+describe("isAcceptableSignedUrl and the dev loopback switch", () => {
+  const VOICESIM = "http://127.0.0.1:5591";
+  const VOICESIM_SOCKET = "ws://127.0.0.1:5591/v1/convai/conversation?agent_id=a";
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** @scenario The product reaches a loopback voice host only under the dev switch */
+  describe("when the switch is off", () => {
+    it.each([VOICESIM_SOCKET, "ws://localhost:5591/v1/convai/conversation"])(
+      "refuses the loopback socket %s",
+      (signedUrl) => {
+        expect(isAcceptableSignedUrl({ signedUrl, baseUrl: VOICESIM, allowLoopback: false })).toBe(
+          false,
+        );
+      },
+    );
+
+    it("refuses voicesim's socket through the transport", async () => {
+      mockFetchOnce({ json: async () => ({ signed_url: VOICESIM_SOCKET }) });
+      await expect(
+        createElevenLabsConvaiTransport({ allowLoopback: false }).mintSession({
+          agentId: "agent_1",
+          credential: { ...CREDENTIAL, baseUrl: VOICESIM },
+        }),
+      ).rejects.toThrow(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`);
+    });
+  });
+
+  describe("when the switch is on", () => {
+    it("accepts voicesim's loopback socket through the transport", async () => {
+      mockFetchOnce({ json: async () => ({ signed_url: VOICESIM_SOCKET }) });
+      const result = await createElevenLabsConvaiTransport({ allowLoopback: true }).mintSession({
+        agentId: "agent_1",
+        credential: { ...CREDENTIAL, baseUrl: VOICESIM },
+      });
+      expect(result).toEqual({ signedUrl: VOICESIM_SOCKET });
+    });
+
+    /** @scenario The dev switch never opens anything but loopback */
+    it.each([
+      "ws://10.0.0.5:5591/v1/convai/conversation",
+      "ws://169.254.169.254:80/latest/meta-data",
+      "ws://169.254.169.254/latest/meta-data",
+      "ws://evil.example:5591/v1/convai/conversation",
+      "ws://api.elevenlabs.io/v1/convai/conversation",
+      "ws://127.0.0.1.nip.io:5591/v1/convai/conversation",
+      "ws://localtest.me:5591/v1/convai/conversation",
+      "ws://127.0.0.1/v1/convai/conversation",
+      "http://127.0.0.1:5591/v1/convai/conversation",
+    ])("still refuses %s", (signedUrl) => {
+      expect(
+        isAcceptableSignedUrl({
+          signedUrl,
+          baseUrl: "https://api.elevenlabs.io",
+          allowLoopback: true,
+        }),
+      ).toBe(false);
     });
   });
 });

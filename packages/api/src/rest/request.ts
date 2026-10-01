@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { HandledError, remediation } from "@langwatch/handled-error";
+import { defineRestMiddleware, type RestTransportMiddleware } from "@langwatch/kernel/contract";
 import {
   classifyClient,
   createLogger,
@@ -27,7 +28,6 @@ import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z, ZodIssue, ZodSchema } from "zod";
 
-import { defineRestMiddleware, type RestTransportMiddleware } from "../contract/rest-middleware.ts";
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";

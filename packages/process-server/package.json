@@ -27,6 +27,7 @@
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",

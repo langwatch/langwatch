@@ -43,7 +43,6 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -272,8 +271,6 @@ export class EvaluationApp implements EvaluationApiContract {
     datasets: DatasetApi,
     /** The experiment and run history SDK batches and dataset evaluations are written into. */
     experiments: ExperimentApi,
-    /** Names the organization's admin and its projects when an evaluation settles. */
-    projects: ProjectApi,
   };
   static readonly reads = reads("objectStorage");
   static readonly secrets = {
@@ -378,10 +375,7 @@ export class EvaluationApp implements EvaluationApiContract {
     environment: EvaluatorEnvironmentService,
   ): EvaluationApp {
     const commands = EvaluationCommandDispatcherService.create();
-    const lifecycle = EvaluationLifecycleService.create({
-      projects: dependencies.projects,
-      runs: repositories.runs,
-    });
+    const lifecycle = EvaluationLifecycleService.create();
     const langevals = config.langevalsEndpoint
       ? langevalsChannels.live.create({
           config,

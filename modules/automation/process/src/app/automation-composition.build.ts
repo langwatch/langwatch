@@ -20,9 +20,9 @@ import {
   type DatasetApi,
   type DatasetRecordEntry,
 } from "@langwatch/dataset-contract";
-import { assertWebhookDelivered, WebhookEgressService } from "@langwatch/egress";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
+import { generate } from "@langwatch/ksuid";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import {
   EmailProviderNotConfiguredError,
@@ -33,18 +33,19 @@ import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { traceSchema, type TraceApi, type TraceRecord } from "@langwatch/trace-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import {
   AutomationTestFire,
+  TEST_FIRE_TRIGGER_ID_SENTINEL,
   type TestFireEmail,
   type TestFireSlackBot,
   type TestFireSlackWebhook,
   type TestFireWebhook,
 } from "../channels/automation-test-fire.channel.ts";
-import { EgressWebhookDeliveryTransport } from "../channels/http/http.webhook-egress.channel.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
 import { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
@@ -107,8 +108,6 @@ export type AutomationProcessMembers = Readonly<{
   logger: Logger;
   encryption: Encryption;
   publicBaseUrl: string | undefined;
-  /** SaaS verifies a webhook receiver's certificate; self-hosted receivers often self-sign. */
-  isSaas: boolean;
 }>;
 
 type AutomationInfrastructureInput = Readonly<{
@@ -118,19 +117,15 @@ type AutomationInfrastructureInput = Readonly<{
   slackConnections: AutomationSlackConnectionService;
   /** Every mail automation sends goes out through notification, which writes the envelope. */
   notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
+  /** Where a webhook action's attempt is sent and logged (ADR-167). */
+  webhooks: Pick<WebhookApi, "sendRequest">;
   auditLog: AuditLogApi;
   verifier: AutomationInfrastructure["verifier"];
   /** The key the verifier checks with, so every link this process mails verifies. */
   unsubscribeSigningSecret: string | undefined;
   repositories: Pick<
     AutomationRepositories,
-    | "triggers"
-    | "suppressions"
-    | "webhookDeliveries"
-    | "persistCaps"
-    | "callCounter"
-    | "webhookRateLimits"
-    | "emailCaps"
+    "triggers" | "suppressions" | "persistCaps" | "callCounter" | "emailCaps"
   >;
   caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
 }>;
@@ -146,11 +141,7 @@ export function buildAutomationInfrastructure(
   const { members } = input;
   const providers = AutomationProviderRegistryService.create(members.encryption);
   const clock = new ApiAutomationClock();
-  const egress = WebhookEgressService.create({
-    rateLimiter: input.repositories.webhookRateLimits,
-    tls: { rejectUnauthorized: members.isSaas },
-  });
-  const delivery = buildNotificationDelivery({ ...input, egress });
+  const delivery = buildNotificationDelivery(input);
   const emailCaps = AutomationEmailCapService.create({
     store: input.repositories.emailCaps,
     fallback: MemoryAutomationEmailCapRepository.create(),
@@ -168,7 +159,11 @@ export function buildAutomationInfrastructure(
     dispatchErrors: new ApiAutomationDispatchErrors(),
     heartbeat: new UnmeasuredApiAutomationHeartbeat(),
     runaway: new UncontainedApiAutomationRunaway(members.logger),
-    testFire: ApiAutomationTestFire.create({ mail: input.notifications, delivery, egress }),
+    testFire: ApiAutomationTestFire.create({
+      mail: input.notifications,
+      delivery,
+      webhooks: input.webhooks,
+    }),
     persistCaps: input.repositories.persistCaps,
     providers,
     slackChannels: new UnavailableAutomationSlackDirectory(),
@@ -214,17 +209,16 @@ export function buildGraphAlertNotifier(
 }
 
 /**
- * Mail, Slack and webhook delivery through notification and the fenced webhook sender
- * (main's worker-webhook-egress.composition.ts). No public origin, no delivery.
+ * Mail, Slack and webhook delivery through notification, Slack and the webhook module's
+ * `sendRequest` (ADR-167). No public origin, no delivery.
  */
 function buildNotificationDelivery(
   input: Pick<
     AutomationInfrastructureInput,
-    "members" | "notifications" | "unsubscribeSigningSecret"
-  > &
-    Readonly<{ egress: WebhookEgressService }>,
+    "members" | "notifications" | "webhooks" | "unsubscribeSigningSecret"
+  >,
 ): AutomationNotificationDelivery {
-  const { members, egress } = input;
+  const { members } = input;
   if (!members.publicBaseUrl) return new UnavailableNotificationDelivery();
 
   return AutomationNotificationDeliveryService.create({
@@ -234,7 +228,7 @@ function buildNotificationDelivery(
     ...(input.unsubscribeSigningSecret === undefined
       ? {}
       : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
-    webhookTransport: EgressWebhookDeliveryTransport.create(egress),
+    webhookTransport: input.webhooks,
     logger: members.logger,
   });
 }
@@ -388,14 +382,14 @@ class UncontainedApiAutomationRunaway
   }
 }
 
-/** A test fire takes the real fire's transports: notification's mail, Slack, the fenced sender. */
+/** A test fire takes the real fire's transports: notification's mail, Slack, the webhook module. */
 export class ApiAutomationTestFire extends AutomationTestFire {
   static create(input: {
     mail: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
     delivery: Pick<AutomationNotificationDelivery, "sendSlackWebhook" | "sendSlackBot">;
-    egress: Pick<WebhookEgressService, "send">;
+    webhooks: Pick<WebhookApi, "sendRequest">;
   }): ApiAutomationTestFire {
-    return new ApiAutomationTestFire(input.mail, input.delivery, input.egress);
+    return new ApiAutomationTestFire(input.mail, input.delivery, input.webhooks);
   }
 
   private constructor(
@@ -404,7 +398,7 @@ export class ApiAutomationTestFire extends AutomationTestFire {
       AutomationNotificationDelivery,
       "sendSlackWebhook" | "sendSlackBot"
     >,
-    private readonly egress: Pick<WebhookEgressService, "send">,
+    private readonly webhooks: Pick<WebhookApi, "sendRequest">,
   ) {
     super();
   }
@@ -424,11 +418,22 @@ export class ApiAutomationTestFire extends AutomationTestFire {
     return this.delivery.sendSlackBot({ ...input, triggerName: "test fire" });
   }
 
-  /** Marked as a test fire (ADR-040 §1); a non-2xx throws the classified DispatchError. */
+  /** A test fire (ADR-040 §1): uncapped, never logged; a non-2xx throws the classified error. */
   async sendWebhook(input: TestFireWebhook): Promise<{ status: number }> {
-    const result = await this.egress.send({ ...input, testFire: true });
-    assertWebhookDelivered({ result, triggerName: input.triggerName });
-    return { status: result.status };
+    const { status } = await this.webhooks.sendRequest({
+      projectId: TEST_FIRE_TRIGGER_ID_SENTINEL,
+      url: input.url,
+      method: input.method,
+      headers: input.headers,
+      body: input.body,
+      contentType: input.contentType,
+      signingSecrets: input.signingSecrets,
+      dispatchId: generate("event").toString(),
+      label: `Webhook for trigger "${input.triggerName}"`,
+      source: { module: "automation", ref: TEST_FIRE_TRIGGER_ID_SENTINEL },
+      testFire: true,
+    });
+    return { status };
   }
 }
 
@@ -477,7 +482,7 @@ class AuditLogAutomationAuditSink implements AutomationAuditSink {
 /** Every repository this feature's settlement half reads or writes, from the module's registry. */
 export type AutomationSettlementRepositories = Pick<
   AutomationRepositories,
-  "triggers" | "suppressions" | "webhookDeliveries" | "graphTriggerSent"
+  "triggers" | "suppressions" | "graphTriggerSent"
 >;
 
 /**
@@ -588,7 +593,6 @@ export function createAutomationSettlement(input: {
   const ledger = AutomationSettlementLedgerService.create({
     triggers: repositories.triggers,
     suppressions: repositories.suppressions,
-    webhookDeliveries: repositories.webhookDeliveries,
     clock,
     persistCaps: input.persistCapSlots,
     persistCap: persistCaps
@@ -642,7 +646,6 @@ export function createAutomationSettlement(input: {
         analytics: input.analytics,
         logger: input.logger,
       }),
-      repositories.webhookDeliveries,
       input.graphActivity,
     ),
   };
@@ -680,7 +683,6 @@ class LateContainmentBreach extends AutomationSettlementBreach {
 class ComposedScheduledIntents extends AutomationScheduledIntent {
   constructor(
     private readonly heartbeat: GraphTriggerHeartbeatService,
-    private readonly deliveries: { pruneExpired(now?: Instant): Promise<number> },
     private readonly graphActivity: AutomationGraphActivity | undefined,
   ) {
     super();
@@ -706,10 +708,6 @@ class ComposedScheduledIntents extends AutomationScheduledIntent {
     }
 
     return this.graphActivity.evaluateGraphTrigger(candidate);
-  }
-
-  pruneWebhookDeliveries(now?: Instant): Promise<number> {
-    return this.deliveries.pruneExpired(now);
   }
 }
 

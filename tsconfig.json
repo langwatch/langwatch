@@ -106,6 +106,9 @@
       "path": "modules/auth/process/tsconfig.json"
     },
     {
+      "path": "packages/authorization/tsconfig.json"
+    },
+    {
       "path": "modules/authz/browser/tsconfig.json"
     },
     {

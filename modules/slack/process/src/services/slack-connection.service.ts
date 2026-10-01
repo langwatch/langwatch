@@ -1,4 +1,5 @@
-import { PermissionDeniedError, type AuthzApi } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";

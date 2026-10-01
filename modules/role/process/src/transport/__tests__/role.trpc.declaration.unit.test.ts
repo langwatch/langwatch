@@ -4,7 +4,7 @@ import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc"
  * A rename is a cache-key change in every browser, and a widened decision is a
  * privilege-escalation surface.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { roleTrpc } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
 

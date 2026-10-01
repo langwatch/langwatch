@@ -4,6 +4,7 @@
  * `VoiceTransport`; the vendor coupling is sealed in here.
  */
 
+import { isAllowedElevenLabsUrl } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
@@ -15,7 +16,11 @@ import {
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { VoiceTransportCredential, VoiceTransportRunner } from "../voice-transport.channel.ts";
+import type {
+  VoiceSessionConnect,
+  VoiceTransportCredential,
+  VoiceTransportRunner,
+} from "../voice-transport.channel.ts";
 
 const logger = createLogger("langwatch:scenarios:voice:elevenlabs");
 
@@ -164,17 +169,20 @@ function authHeaders(credential: { apiKey: string }): Record<string, string> {
 }
 
 /**
- * A compromised upstream could hand back a `signed_url` pointing anywhere
- * the browser then connects to unchecked, so it is validated here: only a
- * secure websocket on ElevenLabs' domain or the project's base host is accepted.
+ * A compromised upstream could hand back a `signed_url` pointing anywhere the browser then
+ * connects to unchecked: only a secure websocket on ElevenLabs or the project's base host passes,
+ * plus a loopback stand-in under the dev switch (isAllowedElevenLabsUrl).
  */
 export function isAcceptableSignedUrl({
   signedUrl,
   baseUrl,
+  allowLoopback,
 }: {
   signedUrl: string;
   baseUrl: string;
+  allowLoopback: boolean;
 }): boolean {
+  if (isAllowedElevenLabsUrl({ url: signedUrl, secure: "wss:", allowLoopback })) return true;
   let url: URL;
   let base: URL;
   try {
@@ -183,12 +191,7 @@ export function isAcceptableSignedUrl({
   } catch {
     return false;
   }
-  if (url.protocol !== "wss:") return false;
-  return (
-    url.hostname === "elevenlabs.io" ||
-    url.hostname.endsWith(".elevenlabs.io") ||
-    url.hostname === base.hostname
-  );
+  return url.protocol === "wss:" && url.hostname === base.hostname;
 }
 
 /** Map an ElevenLabs transcript entry to a neutral turn. `agent` → agent,
@@ -202,44 +205,56 @@ function toTurn(entry: ElevenLabsTranscriptEntry): CallTurn {
   };
 }
 
+/** Mint the signed conversation URL; `allowLoopback` is the dev switch (isAllowedElevenLabsUrl). */
+async function mintSignedUrl({
+  agentId,
+  credential,
+  allowLoopback,
+}: {
+  agentId: string;
+  credential: VoiceTransportCredential;
+  allowLoopback: boolean;
+}): Promise<VoiceSessionConnect> {
+  const el = elevenLabsCredentialOf(credential);
+  const url = `${el.baseUrl}${SIGNED_URL_PATH}?agent_id=${encodeURIComponent(agentId)}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: authHeaders(el),
+      signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`);
+  }
+  if (!response.ok) {
+    const bodyText = await response.text().catch(() => "");
+    throw new Error(
+      `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${readElevenLabsErrorReason(
+        response.status,
+        bodyText,
+      )}`,
+    );
+  }
+  const body = (await response.json()) as { signed_url?: string };
+  if (!body.signed_url) {
+    throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: no signed URL returned`);
+  }
+  if (
+    !isAcceptableSignedUrl({
+      signedUrl: body.signed_url,
+      baseUrl: el.baseUrl,
+      allowLoopback,
+    })
+  ) {
+    throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`);
+  }
+  return { signedUrl: body.signed_url };
+}
+
 export const elevenLabsConvaiTransport: VoiceTransportRunner = {
   missingKeyMessage: NO_ELEVENLABS_KEY_MESSAGE,
 
-  async mintSession({ agentId, credential }) {
-    const el = elevenLabsCredentialOf(credential);
-    const url = `${el.baseUrl}${SIGNED_URL_PATH}?agent_id=${encodeURIComponent(agentId)}`;
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        headers: authHeaders(el),
-        signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
-      });
-    } catch (error) {
-      throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`);
-    }
-    if (!response.ok) {
-      const bodyText = await response.text().catch(() => "");
-      throw new Error(
-        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${readElevenLabsErrorReason(
-          response.status,
-          bodyText,
-        )}`,
-      );
-    }
-    const body = (await response.json()) as { signed_url?: string };
-    if (!body.signed_url) {
-      throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: no signed URL returned`);
-    }
-    if (
-      !isAcceptableSignedUrl({
-        signedUrl: body.signed_url,
-        baseUrl: el.baseUrl,
-      })
-    ) {
-      throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`);
-    }
-    return { signedUrl: body.signed_url };
-  },
+  mintSession: (input) => mintSignedUrl({ ...input, allowLoopback: false }),
 
   async getCallRecord({ conversationId, credential, audioProxyUrl }) {
     const el = elevenLabsCredentialOf(credential);
@@ -308,6 +323,8 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     const adapter = ScenarioRunner.voice.elevenLabsAgent({
       agentId,
       apiKey: el.apiKey,
+      // The vetted row host; the child inherits no ELEVENLABS_BASE_URL to fall back to.
+      baseUrl: el.baseUrl,
     });
     // A single agent turn should never out-wait the whole-call budget the
     // child enforces; clamp the per-turn wait to it. The whole-call cut is the
@@ -316,3 +333,15 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     return wrapConnectRejection(adapter);
   },
 };
+
+/** The runner with the dev loopback switch as configured; off in every production process. */
+export function createElevenLabsConvaiTransport({
+  allowLoopback,
+}: {
+  allowLoopback: boolean;
+}): VoiceTransportRunner {
+  return {
+    ...elevenLabsConvaiTransport,
+    mintSession: (input) => mintSignedUrl({ ...input, allowLoopback }),
+  };
+}

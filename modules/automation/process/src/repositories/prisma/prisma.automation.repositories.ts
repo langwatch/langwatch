@@ -12,7 +12,6 @@ import { RedisAutomationCallCounterRepository } from "../redis/redis.automation-
 import { RedisAutomationContainmentClaimRepository } from "../redis/redis.automation-containment-claim.repository.ts";
 import { RedisAutomationEmailCapRepository } from "../redis/redis.automation-email-cap.repository.ts";
 import { RedisAutomationPersistCapRepository } from "../redis/redis.automation-persist-cap.repository.ts";
-import { RedisAutomationWebhookRateLimitRepository } from "../redis/redis.automation-webhook-rate-limit.repository.ts";
 import { PrismaCustomGraphRepository } from "./prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionNameRepository } from "./prisma.email-suppression-name.repository.ts";
 import { PrismaEmailSuppressionRepository } from "./prisma.email-suppression.repository.ts";
@@ -20,7 +19,6 @@ import { PrismaGraphTriggerSentRepository } from "./prisma.graph-trigger-sent.re
 import { PrismaTriggerFireHistoryRepository } from "./prisma.trigger-fire-history.repository.ts";
 import { PrismaTriggerLatestEvaluationRepository } from "./prisma.trigger-latest-evaluation.repository.ts";
 import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
-import { PrismaWebhookDeliveryRepository } from "./prisma.webhook-delivery.repository.ts";
 
 /**
  * The live tier. Every automation row lives in one database; the Instant
@@ -43,13 +41,9 @@ export class PostgresAutomationRepositories {
       suppressions: PrismaEmailSuppressionRepository.create(database),
       names: PrismaEmailSuppressionNameRepository.create(database),
       customGraphs: PrismaCustomGraphRepository.create(database),
-      webhookDeliveries: PrismaWebhookDeliveryRepository.create(database),
       graphTriggerSent: PrismaGraphTriggerSentRepository.create(database),
       persistCaps: RedisAutomationPersistCapRepository.create({ connection: members.redis }),
       callCounter: RedisAutomationCallCounterRepository.create({ connection: members.redis }),
-      webhookRateLimits: RedisAutomationWebhookRateLimitRepository.create({
-        connection: members.redis,
-      }),
       containmentClaims: RedisAutomationContainmentClaimRepository.create({
         connection: members.redis,
       }),

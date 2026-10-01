@@ -1,5 +1,6 @@
+import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi, AuthzDefineRoleInput } from "@langwatch/authz-contract";
-import { AuthzGrantNotConfirmedError, PermissionDeniedError } from "@langwatch/authz-contract";
+import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import { OrganizationNotFoundForTeamError } from "@langwatch/organization-contract";
 import {
   OrgExclusivePermissionScopeError,

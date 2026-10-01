@@ -123,30 +123,36 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 // baseline fallbacks) — the `app` port is the ui lane's, so it is offered under
 // that name — plus the backend lane on its API port.
 //
-// gateway and nlp (and the simulators, where the checkout's dev build links
-// them) share ONE process locally (ADR-004, amendment 2026-09-07), so they are
-// offered as the single `go` lane rather than as names that would each take
-// the others down without saying so. Every lane is its own process
-// group, so bouncing one can never reach another's.
+// gateway and nlp share ONE process locally (ADR-004, amendment 2026-09-07),
+// offered as the single `go` lane; the simulators the dev build links share
+// the `sims` lane likewise. Every lane is its own process group, so bouncing
+// one can never reach another's.
 //
 // name=="" means all of them.
 func restartTargets(st domain.Stack, name string) []restartTarget {
 	var all []restartTarget
-	var goPort int
+	var goPort, simsPort int
 	// A monolith checkout runs each Go service in its own process (its
 	// mono-binary hosts no combined one) and serves the browser application and
 	// the API from one lane, so there is no `go` lane to collapse into and no
 	// `backend` lane to offer.
 	mono := st.Layout.IsMonolith()
 	inGo := map[string]bool{"gateway": !mono, "nlp": !mono}
+	inSims := map[string]bool{}
 	if !mono && goLaneHostsSimulators(st.WorktreeDir) {
 		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService} {
-			inGo[sim] = true
+			inSims[sim] = true
 		}
 	}
 	for _, r := range domain.PerWorktreeServices {
 		for _, svc := range st.Services {
 			if svc.Name != r.Name || svc.IsFallback || svc.Port == 0 {
+				continue
+			}
+			if inSims[svc.Name] {
+				if simsPort == 0 {
+					simsPort = svc.Port
+				}
 				continue
 			}
 			if inGo[svc.Name] {
@@ -160,6 +166,9 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	}
 	if goPort != 0 {
 		all = append(all, restartTarget{Name: GoLane, Port: goPort})
+	}
+	if simsPort != 0 {
+		all = append(all, restartTarget{Name: SimsLane, Port: simsPort})
 	}
 	if st.APIPort != 0 && !mono {
 		all = append(all, restartTarget{Name: APILane, Port: st.APIPort})

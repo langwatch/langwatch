@@ -3,7 +3,7 @@
  * manager is doing, what has stopped, and the verbs that put it back in
  * motion. Spec: specs/ops/process-manager-visibility.feature.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

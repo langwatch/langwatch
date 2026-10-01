@@ -179,6 +179,7 @@ import { ScenarioRunExportDownloadService } from "../services/scenario-run-expor
 import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
 import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
 import { ScenarioTabRegistryService } from "../services/scenario-tab-registry.service.ts";
+import { ScenarioVoiceTargetService } from "../services/scenario-voice-target.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 import { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
 import { SimulationRunViewService } from "../services/simulation-run-view.service.ts";
@@ -471,7 +472,12 @@ export class ScenarioApp implements ScenarioApi {
         secrets: peers.secrets,
         traces: peers.traces,
         apiKeys: peers.apiKeys,
-        voiceTargets: null,
+        voiceTargets: ScenarioVoiceTargetService.create({
+          agents: peers.agents,
+          modelProviders: peers.modelProviders,
+          gateway: peers.gateway,
+          voiceCallMaxSeconds: config.voiceCallMaxSeconds,
+        }),
       }),
       failures: ScenarioFailureHandlerService.create({ agents: peers.agents, simulations }),
       scenarioTabs,
@@ -510,6 +516,7 @@ export class ScenarioApp implements ScenarioApi {
         signingSecret,
         voicePublicBaseUrl: config.voicePublicBaseUrl,
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,
+        allowLoopbackVoiceProviders: config.allowLoopbackVoiceProviders,
         recordings: voiceRecordingChannels.live.create(),
       }),
       lifecycle: buildScenarioLifecyclePipeline(setup.dependencies.nurturing),

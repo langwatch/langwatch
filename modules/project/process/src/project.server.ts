@@ -20,6 +20,7 @@ import {
 import { ProjectCredentialsService } from "./services/project-credentials.service.ts";
 import { ProjectMetadataService } from "./services/project-metadata.service.ts";
 import type { ProjectDiagnostics } from "./services/project.service.ts";
+import { ProjectCreatedBackfillTask } from "./tasks/project-created-backfill.task.ts";
 import { projectRest, projectRestCredential } from "./transport/project.rest.ts";
 import { projectTrpcTransport } from "./transport/project.trpc.ts";
 
@@ -34,7 +35,10 @@ export const projectServer = defineServerModule("project")
       return { apiKeyId: credential.apiKeyId, userId: credential.userId };
     }),
   ])
-  .withEventing(projectLifecycleEventing);
+  .withEventing(projectLifecycleEventing)
+  .withTasks(({ app, dependencies }) => [
+    ProjectCreatedBackfillTask.create({ organizations: dependencies.organizations, projects: app }),
+  ]);
 
 /**
  * Composition seams for a process wiring this feature: thin factories over

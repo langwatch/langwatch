@@ -2,11 +2,8 @@ import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
-import {
-  AuthzApi,
-  ProjectPermissionDeniedError,
-  type AuthzPermission,
-} from "@langwatch/authz-contract";
+import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 /**
  * The workflow module's application: what all five of its doors call. A caller
  * arrives as an argument, never read from a session or a request, so one

@@ -1,7 +1,7 @@
+import { browserSessionInventoryEntrySchema } from "@langwatch/auth-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** `personalSessions.*`, the CLI devices and the web sessions, declared once, at main's wire names. */
-import { defineTrpcContract } from "@langwatch/api/contract";
-import { browserSessionInventoryEntrySchema } from "@langwatch/auth-contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { cliSessionCardSchema, cliSessionRevocationSchema } from "./cli-sessions.ts";

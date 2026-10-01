@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { deviceLabelForSession } from "@langwatch/api-key-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   type EnterpriseGatewayApi,
   NoEligibleProvidersError,

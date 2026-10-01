@@ -420,17 +420,30 @@ func StorageS3Env(resolved map[string]string, endpoint string) []string {
 	}
 }
 
-// VoiceProviderEnv points the scenario SDK's ElevenLabs client at voicesim on
-// port, or nil when the developer already named ELEVENLABS_BASE_URL. The SDK
-// reads it in the scenario child, which gets it only once the product forwards
-// it (see specs/setup/haven-voicesim.feature). OPENAI_BASE_URL is deliberately
-// not set: the product falls back to it for every OpenAI model call.
+// VoiceProviderEnv points the product's ElevenLabs provider at voicesim on
+// port, or nil when the developer already named ELEVENLABS_BASE_URL. The
+// storage seed stores the base URL on the ElevenLabs provider row, under a
+// dummy key when none is set. VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1 is the
+// product's dev switch that lets a loopback voice host through; haven sets it
+// only here, beside the voicesim URL. OPENAI_BASE_URL is deliberately not set:
+// the product has no audio-only OpenAI seam, and it would move every model call.
 func VoiceProviderEnv(resolved map[string]string, port int) []string {
 	if resolved["ELEVENLABS_BASE_URL"] != "" {
 		return nil
 	}
-	return []string{fmt.Sprintf("ELEVENLABS_BASE_URL=http://127.0.0.1:%d", port)}
+	env := []string{
+		fmt.Sprintf("ELEVENLABS_BASE_URL=http://127.0.0.1:%d", port),
+		VoiceLoopbackSwitch + "=1",
+	}
+	if resolved["ELEVENLABS_API_KEY"] == "" {
+		env = append(env, "ELEVENLABS_API_KEY=voicesim")
+	}
+	return env
 }
+
+// VoiceLoopbackSwitch is the product's dev-only switch (packages/config
+// deployment-facts.ts) admitting a loopback ElevenLabs host such as voicesim.
+const VoiceLoopbackSwitch = "VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS"
 
 // AnalyticsProviderEnv points the product's PostHog (server and browser) and
 // nurturing's Customer.io client at analyticssim's haven route, with dummy keys

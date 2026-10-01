@@ -3,11 +3,11 @@
  * caller before it runs. Spec: transport-declaration-split.feature.
  */
 import { moduleApi } from "@langwatch/kernel";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { defineTrpcContract } from "../../contract/trpc-contract.ts";
 import { RateLimitedError } from "../../errors.ts";
 import {
   createTrpcRuntime,

@@ -18,9 +18,6 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../automation/contract/tsconfig.build.json"
     },
     {

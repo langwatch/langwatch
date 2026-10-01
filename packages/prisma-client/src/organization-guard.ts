@@ -314,6 +314,12 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // action (findMany). Action-gating prevents replayed writes on bookkeeping.
     extraBound: ({ clause, action }) => action === "findMany" && isBranchRecheckSweep(clause),
   },
+  // Nurturing's read model: an organization row by its id, and a project's
+  // organization by the project id, which belongs to exactly one organization.
+  NurturingOrganization: {},
+  NurturingProject: {
+    extraBound: ({ clause }) => typeof clauseField(clause, "projectId") === "string",
+  },
 };
 
 /**

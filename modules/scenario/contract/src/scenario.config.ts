@@ -1,5 +1,6 @@
 import {
   allowedProxyHosts,
+  allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   Config,
   langwatchDefaultModel,
@@ -42,6 +43,8 @@ export const scenarioConfig = Config.define((c) => ({
   voiceWorkerOnly: c.env("VOICE_WORKER_ONLY", offUnlessTrue),
   /** The browser call's length cap in seconds; unusable values fall back to the default. */
   voiceCallMaxSeconds: c.env("VOICE_CALL_MAX_SECONDS", passthrough),
+  /** Dev only: a loopback voice stand-in's signed URL passes the check. */
+  allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   allowedProxyHosts,
   defaultModel: langwatchDefaultModel,

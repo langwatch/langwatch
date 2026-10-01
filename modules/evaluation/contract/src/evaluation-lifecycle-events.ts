@@ -17,18 +17,15 @@ export const evaluationRanEventDataSchema = z.object({
 });
 export type EvaluationRanEventData = z.infer<typeof evaluationRanEventDataSchema>;
 
-/** An evaluation settled (completed or reported), with the organization's count including it. */
+/** An evaluation settled (completed or reported); peers count it from their own side. */
 export const evaluationLifecycleCompletedEventDataSchema = z.object({
   tenantId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
-  /** The organization's admin. */
-  userId: z.string().min(1),
   projectId: z.string().min(1),
   evaluationId: z.string().min(1),
   evaluatorType: z.string().nullish(),
   score: z.number().nullish(),
   passed: z.boolean().nullish(),
-  organizationEvaluationCount: z.number().int().positive(),
 });
 export type EvaluationLifecycleCompletedEventData = z.infer<
   typeof evaluationLifecycleCompletedEventDataSchema

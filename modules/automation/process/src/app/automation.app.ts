@@ -74,6 +74,7 @@ import { SlackApi } from "@langwatch/slack-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
+import { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
@@ -271,6 +272,8 @@ type AutomationDependencies = Readonly<{
   notifications: typeof NotificationService;
   /** The Slack connections a Slack automation delivers through and claims. */
   slack: typeof SlackApi;
+  /** Where a webhook action's attempt is sent and logged; webhook owns the log (ADR-167). */
+  webhooks: typeof WebhookApi;
 }>;
 
 /** Peers only `create` composes (settlement's and mail's); `fromInfrastructure` never sees them. */
@@ -330,11 +333,13 @@ export class AutomationApp implements AutomationApi {
     notifications: NotificationService,
     /** The Slack connections a Slack automation delivers through and claims. */
     slack: SlackApi,
+    /** Sends and logs each webhook action attempt (ADR-167). */
+    webhooks: WebhookApi,
   };
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
   static readonly secrets = { unsubscribe: sessionSecret } as const;
-  static readonly reads = ["logger", "encryption", "publicBaseUrl", "isSaas"] as const;
+  static readonly reads = ["logger", "encryption", "publicBaseUrl"] as const;
 
   /**
    * Builds this process's own {@link AutomationInfrastructure} from the
@@ -351,6 +356,7 @@ export class AutomationApp implements AutomationApi {
         slackDestinations: SlackDestinationService.create({ slack, crypto }),
         slackConnections,
         notifications: setup.dependencies.notifications,
+        webhooks: setup.dependencies.webhooks,
         auditLog: setup.dependencies.auditLog,
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
         unsubscribeSigningSecret,
@@ -507,7 +513,7 @@ export class AutomationApp implements AutomationApi {
       suppressions: repositories.suppressions,
       names: repositories.names,
       customGraphs: repositories.customGraphs,
-      webhookDeliveries: repositories.webhookDeliveries,
+      webhookDeliveries: dependencies.webhooks,
       verifier: members.verifier,
       reportSchedules,
       clock: members.clock,

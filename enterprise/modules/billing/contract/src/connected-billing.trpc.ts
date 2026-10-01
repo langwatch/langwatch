@@ -4,7 +4,7 @@
  * `connectedBilling.*`: the backoffice's invoice billing for a connected
  * customer, gated on the operator staff list and answered 404 to anybody else.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 import {
   connectedAddCommitRequestSchema,

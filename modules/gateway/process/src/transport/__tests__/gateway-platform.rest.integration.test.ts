@@ -13,7 +13,7 @@ import {
   type IdempotentRunner,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { PermissionDeniedError } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import {
   type GatewayApi,
   type GatewayKeyCaller,
@@ -551,8 +551,36 @@ describe("the gateway platform family's caller", () => {
     });
   });
 
+  describe("given a scoped API key creating a virtual key", () => {
+    /** @scenario Writes from a scoped API key are attributed to its user */
+    it("mints the key as the key's owning user, 201", async () => {
+      const createVirtualKey = vi.fn(async () => ({
+        virtualKey: virtualKeyRow(),
+        secret: "secret_1",
+      }));
+      const post = mountAs({
+        credential: scopedKey,
+        app: createApiFixture<GatewayApi>({
+          ...callerOf,
+          organizationIdForProject: async () => ORGANIZATION_ID,
+          authorizeVirtualKeyCreate: async () => {},
+          createVirtualKey,
+          toVirtualKeySnakeDto: async () => virtualKeyDto,
+        }),
+      });
+
+      const response = await post("/virtual-keys", { name: "ci-key" });
+
+      expect(response.status).toBe(201);
+      expect(createVirtualKey).toHaveBeenCalledWith(
+        expect.objectContaining({ actorUserId: "user_1" }),
+      );
+    });
+  });
+
   describe("given a legacy project key", () => {
     /** @scenario "A legacy project key's own-project key is attributed to the machine principal" */
+    /** @scenario Writes from a legacy project key are attributed to the machine principal */
     it("mints its own project's key as svc_<projectId>, 201", async () => {
       const createVirtualKey = vi.fn(async () => ({
         virtualKey: virtualKeyRow(),

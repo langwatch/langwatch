@@ -1,5 +1,4 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { TrpcContract } from "@langwatch/api/contract";
 /**
  * @vitest-environment node
  * What the ops surface answers, over the real runtime and a real `OpsApp`.
@@ -7,6 +6,7 @@ import type { TrpcContract } from "@langwatch/api/contract";
  * is a blank card rather than an error.
  */
 import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import type { TrpcContract } from "@langwatch/kernel/contract";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
 import type { OpsCapability } from "@langwatch/ops-process";
 import { initTRPC } from "@trpc/server";

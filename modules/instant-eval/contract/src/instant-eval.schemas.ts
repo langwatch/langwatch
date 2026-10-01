@@ -5,8 +5,8 @@
  */
 
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
-import { defineRestMiddleware } from "@langwatch/api/contract";
 import type { RestProjectCredentialPrincipal } from "@langwatch/api/rest";
+import { defineRestMiddleware } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

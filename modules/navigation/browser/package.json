@@ -33,7 +33,7 @@
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",

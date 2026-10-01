@@ -3,7 +3,7 @@
  * role and its resolved permissions, so a peer answering its own seat
  * questions needs no capability from this module, only these functions.
  */
-import { OrganizationUserRole } from "@langwatch/authz-contract";
+import { OrganizationUserRole } from "@langwatch/authorization";
 
 export type MemberType = "FullMember" | "LiteMember";
 export type RoleChangeType = "no-change" | "lite-to-full" | "full-to-lite";

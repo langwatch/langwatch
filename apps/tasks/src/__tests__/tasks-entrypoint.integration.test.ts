@@ -36,6 +36,7 @@ describe("apps/tasks entrypoint", () => {
 
   describe("given an invalid process environment", () => {
     /** @scenario "The task process validates its configuration before a migration runs" */
+    /** @scenario Configuration is validated before any migration runs */
     it("refuses before it builds the catalogue or runs a task", async () => {
       const failure = execFileAsync("pnpm", ["-s", "task", "prisma-migrate"], {
         cwd: new URL("../..", import.meta.url).pathname,

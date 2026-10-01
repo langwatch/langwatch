@@ -53,6 +53,7 @@ describe("the rollup cell an observed charge is keyed by", () => {
   });
 
   describe("given an erased spender", () => {
+    /** @scenario "Pulled spend is erased by the same substitution as gateway spend" */
     it("keys an observation under the stand-in, never the original", () => {
       const { projection } = rollupFold({ pseudonyms: new Map([["ada@corp", "digest-1"]]) });
 

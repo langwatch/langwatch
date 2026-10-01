@@ -55,9 +55,6 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/egress/tsconfig.build.json"
-    },
-    {
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
@@ -122,6 +119,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../webhook/contract/tsconfig.build.json"
     }
   ]
 }

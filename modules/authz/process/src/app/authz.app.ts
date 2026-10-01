@@ -1,3 +1,4 @@
+import { type AuthzPermission } from "@langwatch/authorization";
 import {
   AuthzApi as AuthzApiToken,
   authzBrowserConfig,
@@ -12,7 +13,6 @@ import {
   type AuthzDeleteRoleInput,
   type AuthzGrantsService,
   type AuthzOffboardMemberInput,
-  type AuthzPermission,
   type AuthzRevokeBindingsInput,
   type AuthzRevokeBindingsWhereInput,
   type AuthzRevokeBindingsWhereOutput,

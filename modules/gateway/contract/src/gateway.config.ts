@@ -1,4 +1,5 @@
 import {
+  allowLoopbackVoiceProviders,
   Config,
   gatewayAddressOf,
   gatewayInternalUrl,
@@ -31,6 +32,8 @@ export const gatewayConfig = Config.define((c) => ({
   publicUrl: gatewayPublicUrl,
   /** The process's own leaf, read here only to pick the browser's default address. */
   isSaas,
+  /** Dev only: an ElevenLabs row may name a loopback stand-in. */
+  allowLoopbackVoiceProviders,
 }));
 
 export type GatewayServerConfig = ConfigOf<typeof gatewayConfig>;

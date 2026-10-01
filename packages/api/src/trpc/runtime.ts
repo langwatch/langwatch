@@ -6,14 +6,13 @@
 import { actorSchema, toLedgerActor, type Actor } from "@langwatch/actor";
 import {
   declaredScopeIdSchema,
-  type AuthzDeclaration,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
-  type EnforcedScopeFields,
   type ScopeTierField,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { ModuleApiToken } from "@langwatch/kernel";
+import type { TrpcContract, TrpcContractMember } from "@langwatch/kernel/contract";
 import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import { nowInstant } from "@langwatch/time";
@@ -60,7 +59,7 @@ import {
   type Entitlements,
   type PublicRouteAccess,
 } from "../access/access.ts";
-import type { TrpcContract, TrpcContractMember } from "../contract/trpc-contract.ts";
+import type { AuthzDeclaration, EnforcedScopeFields } from "../access/declared-middleware.ts";
 import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
 import {

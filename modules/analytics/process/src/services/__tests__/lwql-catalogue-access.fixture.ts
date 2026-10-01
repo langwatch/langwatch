@@ -1,11 +1,7 @@
 import type { LangWatchQLCatalogueAccess } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
-import type {
-  AuthzApi,
-  AuthzPermission,
-  AuthzPrincipalRef,
-  AuthzScopeRef,
-} from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi, AuthzPrincipalRef, AuthzScopeRef } from "@langwatch/authz-contract";
 
 import { EVERY_CATALOGUE_PERMISSION } from "../../app/__tests__/analytics.fixture.ts";
 

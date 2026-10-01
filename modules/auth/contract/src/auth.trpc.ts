@@ -1,10 +1,10 @@
+import { routingDecisionSchema } from "@langwatch/identity-contract";
 /**
  * Every `auth.*` procedure, declared once (D13, ADR-117 §6). The names
  * are the browser's cache keys, so they are the wire names the signed-out
  * screens have always called.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
-import { routingDecisionSchema } from "@langwatch/identity-contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

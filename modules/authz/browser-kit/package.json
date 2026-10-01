@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",

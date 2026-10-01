@@ -4,7 +4,7 @@
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 
-import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authz-contract";
+import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import { ScopeInputMismatchError } from "../../errors.ts";

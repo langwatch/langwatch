@@ -5,7 +5,8 @@
  */
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,

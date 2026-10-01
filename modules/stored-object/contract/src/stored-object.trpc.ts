@@ -3,7 +3,7 @@
  * The probe's own two schemas live here because nothing else asks either
  * question.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

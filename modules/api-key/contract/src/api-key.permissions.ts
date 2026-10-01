@@ -5,7 +5,7 @@ import {
   type AuthzResource,
   permissionResource,
   permissionSatisfiedBy,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import type { z } from "zod";
 
 export const API_KEY_PERMISSION_MODES = ["all", "readonly", "restricted"] as const;

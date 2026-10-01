@@ -1,10 +1,9 @@
+import { organizationRoleSchema, type OrganizationRole } from "@langwatch/authorization";
 import {
-  organizationRoleSchema,
   PRINCIPAL_KIND_FROM_STORED,
   storedPrincipalKindSchema,
   grantScopeTierSchema,
   teamUserRoleSchema,
-  type OrganizationRole,
   type GrantScopeTier,
 } from "@langwatch/authz-contract";
 import { z } from "zod";

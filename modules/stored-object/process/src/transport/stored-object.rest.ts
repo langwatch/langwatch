@@ -4,7 +4,7 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, ForbiddenError } from "@langwatch/api/rest";
-import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
+import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
 import {
   StoredObjectApi,
   storedObjectParamsSchema,

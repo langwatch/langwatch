@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 
 /**
  * The access decision for a single HTTP route. Every route mounted through the secured app builder

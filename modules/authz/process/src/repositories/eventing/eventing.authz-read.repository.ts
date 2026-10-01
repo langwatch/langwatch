@@ -1,10 +1,10 @@
 // Read repository for cut-over organizations; deliberately independent for parity verification.
+import type { ShareableResourceKind } from "@langwatch/authorization";
 import type {
   AuthzPrincipalRef,
   BindingRoleKey,
   CollectedBinding,
   GrantScopeTier,
-  ShareableResourceKind,
 } from "@langwatch/authz-contract";
 import { type Instant, fromDate } from "@langwatch/time";
 

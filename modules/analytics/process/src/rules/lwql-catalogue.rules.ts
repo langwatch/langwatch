@@ -4,7 +4,7 @@
  * @see specs/lwql/catalogue-grants.feature
  */
 
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 
 import type { LwqlClickHouseRows } from "./lwql-columns-manifest.generated.ts";
 import type { ColumnsManifest } from "./lwql-columns-manifest.rules.ts";

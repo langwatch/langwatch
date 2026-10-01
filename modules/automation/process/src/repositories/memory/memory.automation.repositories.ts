@@ -5,7 +5,6 @@ import { MemoryAutomationCallCounterRepository } from "./memory.automation-call-
 import { MemoryAutomationContainmentClaimRepository } from "./memory.automation-containment-claim.repository.ts";
 import { MemoryAutomationEmailCapRepository } from "./memory.automation-email-cap.repository.ts";
 import { MemoryAutomationPersistCapRepository } from "./memory.automation-persist-cap.repository.ts";
-import { MemoryAutomationWebhookRateLimitRepository } from "./memory.automation-webhook-rate-limit.repository.ts";
 import { MemoryAutomationStore } from "./memory.automation.store.ts";
 import { MemoryCustomGraphRepository } from "./memory.custom-graph.repository.ts";
 import { MemoryEmailSuppressionNameRepository } from "./memory.email-suppression-name.repository.ts";
@@ -14,7 +13,6 @@ import { MemoryGraphTriggerSentRepository } from "./memory.graph-trigger-sent.re
 import { MemoryTriggerFireHistoryRepository } from "./memory.trigger-fire-history.repository.ts";
 import { MemoryTriggerLatestEvaluationRepository } from "./memory.trigger-latest-evaluation.repository.ts";
 import { MemoryTriggerRepository } from "./memory.trigger.repository.ts";
-import { MemoryWebhookDeliveryRepository } from "./memory.webhook-delivery.repository.ts";
 
 /** The "memory" tier: every automation row the app is tested without a database. */
 export class MemoryAutomationRepositories {
@@ -33,11 +31,9 @@ export class MemoryAutomationRepositories {
       suppressions: MemoryEmailSuppressionRepository.create(memory),
       names: MemoryEmailSuppressionNameRepository.create(memory),
       customGraphs: MemoryCustomGraphRepository.create(memory),
-      webhookDeliveries: MemoryWebhookDeliveryRepository.create(memory),
       graphTriggerSent: MemoryGraphTriggerSentRepository.create(memory),
       persistCaps: MemoryAutomationPersistCapRepository.create(),
       callCounter: MemoryAutomationCallCounterRepository.create(),
-      webhookRateLimits: MemoryAutomationWebhookRateLimitRepository.create(),
       containmentClaims: MemoryAutomationContainmentClaimRepository.create(),
       emailCaps: MemoryAutomationEmailCapRepository.create(),
       processStore: InMemoryProcessStore.createForLocalDevelopment(),

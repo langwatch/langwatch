@@ -5,7 +5,7 @@
  * RBAC permission, plus the current-membership boundary the credential routes add.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { GovernanceCliRequest } from "@langwatch/enterprise-governance-contract";
 import {
   assertEnterprisePlan,

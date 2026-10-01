@@ -1,11 +1,12 @@
-import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
 /**
  * Grant rules: does a binding/legacy row/resource grant carry the requested
  * permission? Walk decides which to consult and order (ADR-092 §2).
  */
-import { bindingScopeCanGrantPermission, permissionSatisfiedBy } from "./registry.ts";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
+
+import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
 import { builtinRoleGrants } from "./roles.ts";
-import { audienceMatches } from "./scope.ts";
+import { audienceMatches, bindingScopeCanGrantPermission } from "./scope.ts";
 
 export function bindingGrants({
   binding,

@@ -51,6 +51,7 @@ const mutationInput = {
 
 describe("VirtualKeyService product-managed guard", () => {
   describe("given a product-managed key", () => {
+    /** @scenario Product-managed keys refuse customer-facing reads and mutations */
     it("reports it as absent on findById", async () => {
       const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
@@ -66,6 +67,7 @@ describe("VirtualKeyService product-managed guard", () => {
       });
     });
 
+    /** @scenario Product-managed keys refuse customer-facing reads and mutations */
     it("refuses rotate with NOT_FOUND, so no fresh secret is minted", async () => {
       const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 

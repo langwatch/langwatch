@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { CommandEnvelope } from "@langwatch/eventing";
 import {
   type LangyAgentRespondedEventData,

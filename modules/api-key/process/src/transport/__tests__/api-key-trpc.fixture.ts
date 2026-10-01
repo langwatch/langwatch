@@ -4,7 +4,7 @@
  * that records what each procedure declared without building one.
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { TrpcContract } from "@langwatch/api/contract";
+import type { AuthzDeclaration } from "@langwatch/api/access";
 import type {
   TrpcProcedureFactory,
   TrpcRouterDeclaration,
@@ -12,7 +12,8 @@ import type {
   TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
-import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { TrpcContract } from "@langwatch/kernel/contract";
 import { initTRPC } from "@trpc/server";
 
 type TestContext = object;

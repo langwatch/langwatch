@@ -2,7 +2,8 @@
  * The monitor feature's application layer; all business rules for monitors
  * live here.
  */
-import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import { type AuthzPermission } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   EvaluationApi,
   type MonitorPerformanceQuery,

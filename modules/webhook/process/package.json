@@ -41,6 +41,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
     "@trpc/server": "catalog:",
@@ -56,6 +57,7 @@
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
+    "undici": "catalog:",
     "vitest": "catalog:"
   }
 }

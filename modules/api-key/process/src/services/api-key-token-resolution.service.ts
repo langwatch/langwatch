@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   ApiKeyNotFoundError,
   apiKeyTokenResolutionInputSchema,
@@ -14,11 +16,19 @@ import {
 } from "@langwatch/api-key-contract";
 import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
-import { Temporal, fromDate, nowInstant } from "@langwatch/time";
+import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
+
+/** How long a key's answer is trusted: the bound on a revocation reaching every process. */
+export const API_KEY_ANSWER_TTL_MS = 5_000;
+/** How long "no such key" is trusted, so a flood of unknown tokens meets one read a moment. */
+export const API_KEY_UNKNOWN_TTL_MS = 2_000;
+const MAX_REMEMBERED = 10_000;
+
+type Remembered<T> = Map<string, { value: Promise<T>; until: number }>;
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
@@ -54,21 +64,51 @@ function bindingsReachProject(
 
 export class ApiKeyTokenResolutionService {
   static create(
-    options: ApiKeyDependencies & { repository: ApiKeyRepository },
+    options: ApiKeyDependencies & { repository: ApiKeyRepository; now?: () => Instant },
   ): ApiKeyTokenResolutionService {
     return new ApiKeyTokenResolutionService(options.repository, options);
   }
 
   private readonly bindings: ApiKeyGrantsService;
+  readonly #verified: Remembered<apiKeyContractModule.ApiKeyVerification | null> = new Map();
+  readonly #legacyProjectIds: Remembered<string | null> = new Map();
+  readonly #projects: Remembered<ProjectIdentity | null> = new Map();
 
   private constructor(
     private readonly repository: ApiKeyRepository,
-    private readonly options: ApiKeyDependencies,
+    private readonly options: ApiKeyDependencies & { now?: () => Instant },
   ) {
     this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
   }
 
-  async findVerifiedToken({
+  /** Drops every remembered answer: this process changed a key, so its next read is fresh. */
+  forget(): void {
+    this.#verified.clear();
+    this.#legacyProjectIds.clear();
+    this.#projects.clear();
+  }
+
+  /**
+   * Keyed by the whole token's hash, so a wrong secret is its own miss and is verified in
+   * full. An answer lapses at the key's own expiry when that comes sooner.
+   */
+  findVerifiedToken({
+    token,
+  }: {
+    token: string;
+  }): Promise<apiKeyContractModule.ApiKeyVerification | null> {
+    return this.remember({
+      entries: this.#verified,
+      key: tokenHash(token),
+      read: () => this.readVerifiedToken({ token }),
+      lifeMs: (verified) =>
+        verified?.expiresAt
+          ? Math.min(API_KEY_ANSWER_TTL_MS, verified.expiresAt.getTime() - this.nowMs())
+          : answerLife(verified),
+    });
+  }
+
+  private async readVerifiedToken({
     token,
   }: {
     token: string;
@@ -80,7 +120,7 @@ export class ApiKeyTokenResolutionService {
 
     const row = await this.repository.findByLookupId({ lookupId: split.lookupId });
     const expired =
-      row?.expiresAt != null && Temporal.Instant.compare(fromDate(row.expiresAt), nowInstant()) < 0;
+      row?.expiresAt != null && Temporal.Instant.compare(fromDate(row.expiresAt), this.now()) < 0;
     if (!row || row.revokedAt || expired) {
       return null;
     }
@@ -146,6 +186,7 @@ export class ApiKeyTokenResolutionService {
       projectId: input.projectId,
       token,
     });
+    this.forget();
     if (!rotated) {
       throw new ApiKeyNotFoundError(input.projectId);
     }
@@ -191,18 +232,23 @@ export class ApiKeyTokenResolutionService {
   private async isParentLive(parentApiKeyId: string): Promise<boolean> {
     const parent = await this.repository.findLivenessById({ id: parentApiKeyId });
     if (!parent || parent.revokedAt) return false;
-    return !(parent.expiresAt && Temporal.Instant.compare(parent.expiresAt, nowInstant()) < 0);
+    return !(parent.expiresAt && Temporal.Instant.compare(parent.expiresAt, this.now()) < 0);
   }
 
   private async findLegacyProjectKeyResolution(
     token: string,
   ): Promise<ResolvedApiKeyCredential | null> {
-    const projectId = await this.options.projects.findIdByLegacyApiKey({ token });
+    const projectId = await this.remember({
+      entries: this.#legacyProjectIds,
+      key: tokenHash(token),
+      read: () => this.options.projects.findIdByLegacyApiKey({ token }),
+      lifeMs: answerLife,
+    });
     if (!projectId) {
       return null;
     }
 
-    const project = await this.options.projects.findIdentity(projectId);
+    const project = await this.findProjectIdentity(projectId);
 
     return project ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project }) : null;
   }
@@ -234,7 +280,7 @@ export class ApiKeyTokenResolutionService {
       return null;
     }
 
-    const project = await this.options.projects.findIdentity(effectiveProjectId);
+    const project = await this.findProjectIdentity(effectiveProjectId);
     if (!project || project.organizationId !== apiKey.organizationId) {
       return null;
     }
@@ -256,4 +302,63 @@ export class ApiKeyTokenResolutionService {
       project,
     });
   }
+
+  private findProjectIdentity(projectId: string): Promise<ProjectIdentity | null> {
+    return this.remember({
+      entries: this.#projects,
+      key: projectId,
+      read: () => this.options.projects.findIdentity(projectId),
+      lifeMs: answerLife,
+    });
+  }
+
+  /** One read per key per lifetime, shared by concurrent callers; a failed read is not kept. */
+  private remember<T>({
+    entries,
+    key,
+    read,
+    lifeMs,
+  }: {
+    entries: Remembered<T>;
+    key: string;
+    read: () => Promise<T>;
+    lifeMs: (value: T) => number;
+  }): Promise<T> {
+    const nowMs = this.nowMs();
+    const remembered = entries.get(key);
+    if (remembered && remembered.until > nowMs) return remembered.value;
+
+    const value = read();
+    const entry = { value, until: nowMs + API_KEY_UNKNOWN_TTL_MS };
+    if (entries.size >= MAX_REMEMBERED) {
+      const oldest = entries.keys().next().value;
+      if (oldest !== void 0) entries.delete(oldest);
+    }
+    entries.set(key, entry);
+    value
+      .then((answer) => {
+        entry.until = nowMs + lifeMs(answer);
+      })
+      .catch(() => {
+        if (entries.get(key) === entry) entries.delete(key);
+      });
+
+    return value;
+  }
+
+  private now(): Instant {
+    return (this.options.now ?? nowInstant)();
+  }
+
+  private nowMs(): number {
+    return this.now().epochMilliseconds;
+  }
+}
+
+function tokenHash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function answerLife(answer: unknown): number {
+  return answer ? API_KEY_ANSWER_TTL_MS : API_KEY_UNKNOWN_TTL_MS;
 }

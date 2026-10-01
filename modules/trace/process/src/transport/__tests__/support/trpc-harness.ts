@@ -1,9 +1,10 @@
+import type { AuthzDeclaration } from "@langwatch/api/access";
 import {
   createTrpcRuntime,
   type TrpcProcedureFactory,
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
-import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { initTRPC } from "@trpc/server";
 
 export type TestContext = { actor: { id: string } };

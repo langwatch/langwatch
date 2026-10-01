@@ -3,10 +3,9 @@
  * new, tRPC, custom-role edits) reaches through the binding writer or
  * `AuthzApi.findPermissionsBeyondCaller`. specs/rbac/grants-rest-api.feature.
  */
+import { ALL_PERMISSIONS, permissionSatisfiedBy } from "@langwatch/authorization";
 import {
-  ALL_PERMISSIONS,
   builtinRolePermissions,
-  permissionSatisfiedBy,
   roleKeyForTeamRole,
   type AuthzManagedOrganizationBinding,
   type GrantScopeTier,

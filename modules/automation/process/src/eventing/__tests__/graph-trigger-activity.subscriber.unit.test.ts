@@ -17,7 +17,6 @@ import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.cu
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
-import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
 import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
@@ -85,7 +84,6 @@ describe("createGraphTriggerActivityHandler", () => {
           persistence: AutomationGraphDeliveryService.create({
             triggers,
             suppressions: PrismaEmailSuppressionRepository.create(database.prisma),
-            webhookDeliveries: PrismaWebhookDeliveryRepository.create(database.prisma),
           }),
           clock,
           projects: new OneProject(),

@@ -4,7 +4,8 @@
  * and the row-and-stream reads the byte surface performs.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi, AuthzDenialReason, PermissionDecision } from "@langwatch/authz-contract";
+import type { AuthzDenialReason, PermissionDecision } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import {
   StoredObjectNotFoundError,

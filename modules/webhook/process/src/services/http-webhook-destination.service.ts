@@ -1,14 +1,13 @@
 import {
-  classifyWebhookStatus,
-  WEBHOOK_DELIVERY_ID_HEADER,
-  type WebhookEgressService,
-} from "@langwatch/egress";
-
-import {
   type WebhookDestination,
   type WebhookDispatchRequest,
   type WebhookDispatchResult,
 } from "../app/webhook.app.ts";
+import {
+  classifyWebhookStatus,
+  WEBHOOK_DELIVERY_ID_HEADER,
+} from "../rules/webhook-delivery-classification.rules.ts";
+import type { WebhookEgressService } from "./webhook-egress.service.ts";
 
 /** How much of the receiver's response the delivery log keeps. */
 const RESPONSE_SNIPPET_CHARS = 1000;

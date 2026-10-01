@@ -336,32 +336,25 @@ export class NurturingDeliveryService {
     ]);
   }
 
-  /** Main's evaluation sync: as the simulation sync, plus `evaluation_ran` for every one. */
+  /** Main's evaluation sync, plus `evaluation_ran` for every one; `first` picks the milestone. */
   private evaluationCompleted(signal: NurturingSignalOf<"evaluation_completed">): void {
     const { userId, projectId, organizationEvaluationCount: count } = signal;
     const at = isoOf(signal.occurredAt);
-    const calls: CioBatchCall[] =
-      count > 1
-        ? [
-            {
-              type: "identify",
-              userId,
-              traits: { evaluation_count: count, last_evaluation_at: at },
-            },
-          ]
-        : [
-            {
-              type: "identify",
-              userId,
-              traits: { has_evaluations: true, evaluation_count: 1, first_evaluation_at: at },
-            },
-            {
-              type: "track",
-              userId,
-              event: "first_evaluation_created",
-              properties: { evaluation_type: signal.evaluatorType, project_id: projectId },
-            },
-          ];
+    const calls: CioBatchCall[] = signal.first
+      ? [
+          {
+            type: "identify",
+            userId,
+            traits: { has_evaluations: true, evaluation_count: 1, first_evaluation_at: at },
+          },
+          {
+            type: "track",
+            userId,
+            event: "first_evaluation_created",
+            properties: { evaluation_type: signal.evaluatorType, project_id: projectId },
+          },
+        ]
+      : [{ type: "identify", userId, traits: { evaluation_count: count, last_evaluation_at: at } }];
     calls.push({
       type: "track",
       userId,

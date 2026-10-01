@@ -5,7 +5,7 @@ import type {
   SessionKeyHolder,
   SessionKeyPresented,
 } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { z } from "zod";
 

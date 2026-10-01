@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-// maxCalls is how many recent calls the console keeps; the oldest drops first.
-const maxCalls = 200
+// defaultMaxCalls is how many recent calls the console keeps; the oldest drops first.
+const defaultMaxCalls = 200
 
-// maxEventsPerCall bounds one call's event log; later events are counted, not kept.
-const maxEventsPerCall = 500
+// defaultMaxEventsPerCall bounds one call's event log; later events are counted, not kept.
+const defaultMaxEventsPerCall = 500
 
 // Call is one simulated conversation, as the console shows it.
 type Call struct {
@@ -43,11 +43,27 @@ type Event struct {
 	Type      string    `json:"type"`
 }
 
-// callLog is the bounded ring of recent calls the console reads.
+// callLog is the bounded ring of recent calls the console reads. Zero caps mean the defaults.
 type callLog struct {
-	mu    sync.Mutex
-	next  int
-	calls []*Call // oldest first
+	mu        sync.Mutex
+	next      int
+	calls     []*Call // oldest first
+	maxCalls  int
+	maxEvents int
+}
+
+func (l *callLog) callCap() int {
+	if l.maxCalls > 0 {
+		return l.maxCalls
+	}
+	return defaultMaxCalls
+}
+
+func (l *callLog) eventCap() int {
+	if l.maxEvents > 0 {
+		return l.maxEvents
+	}
+	return defaultMaxEventsPerCall
 }
 
 // open starts a call with a deterministic id: conv_voicesim_0001, 0002, ...
@@ -56,8 +72,8 @@ func (l *callLog) open(agentID string) *Call {
 	defer l.mu.Unlock()
 	l.next++
 	call := &Call{ID: fmt.Sprintf("conv_voicesim_%04d", l.next), AgentID: agentID, StartedAt: time.Now().UTC()}
-	if len(l.calls) == maxCalls {
-		l.calls = l.calls[1:]
+	if len(l.calls) >= l.callCap() {
+		l.calls = l.calls[len(l.calls)-l.callCap()+1:]
 	}
 	l.calls = append(l.calls, call)
 	return call
@@ -73,7 +89,7 @@ func (l *callLog) update(call *Call, change func(*Call)) {
 // event records one protocol message on the call.
 func (l *callLog) event(call *Call, direction, kind string) {
 	l.update(call, func(c *Call) {
-		if len(c.Events) >= maxEventsPerCall {
+		if len(c.Events) >= l.eventCap() {
 			c.DroppedEvents++
 			return
 		}

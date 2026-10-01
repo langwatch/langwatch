@@ -1,4 +1,5 @@
-import { TriggerAction, WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automation-contract";
+import { TriggerAction } from "@langwatch/automation-contract";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import {

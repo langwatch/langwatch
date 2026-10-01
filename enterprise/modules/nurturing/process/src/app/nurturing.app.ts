@@ -12,7 +12,9 @@ import { UserApi } from "@langwatch/user-contract";
 
 import { postHogChannels } from "../channels/posthog-channels.registry.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurturing.pipeline.ts";
+import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
+import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
 type NurturingMembers = Readonly<{
@@ -22,7 +24,8 @@ type NurturingMembers = Readonly<{
 type NurturingSetup = FeatureSetup<
   typeof NurturingApp.dependencies,
   NurturingMembers,
-  NurturingServerConfig
+  NurturingServerConfig,
+  NurturingRepositories
 >;
 
 /** Owners tell nurturing; it names no peer, so it can never close a cycle (§9). */
@@ -44,6 +47,7 @@ export class NurturingApp implements NurturingApi {
     config,
     dependencies,
     members,
+    repositories,
     resources,
     secrets,
   }: NurturingSetup): Promise<NurturingApp> {
@@ -70,8 +74,16 @@ export class NurturingApp implements NurturingApi {
       posthog,
       users: dependencies.users,
     });
+    const milestones = NurturingMilestonesService.create({
+      milestones: repositories.milestones,
+      claims: members.idempotency,
+    });
     return new NurturingApp(
-      buildNurturingPipeline({ deliver: (input) => delivery.deliver(input) }),
+      buildNurturingPipeline({
+        deliver: (input) => delivery.deliver(input),
+        projectCreated: (data) => milestones.projectCreated(data),
+        evaluationCompleted: (input) => milestones.evaluationCompleted(input),
+      }),
     );
   }
 

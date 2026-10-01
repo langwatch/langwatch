@@ -71,6 +71,55 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       });
     });
 
+    describe("when a confirmed image generation is rendered", () => {
+      /** @scenario An image generation publishes its output image tokens */
+      it("carries the image tokens and count, and leaves the text output at zero", () => {
+        const envelope = gatewaySpendEventEnvelopeSchema.parse(
+          webhookEnvelopeFromSpendRow(
+            row({
+              requestType: "image_generation",
+              tokensInput: 12,
+              tokensOutput: 0,
+              tokensInputImage: 0,
+              tokensOutputImage: 1_600,
+              imageCount: 1,
+            }),
+          ),
+        );
+
+        expect(envelope.data).toMatchObject({
+          usage: {
+            output_tokens: 0,
+            output_image_tokens: 1_600,
+            input_image_tokens: 0,
+            image_count: 1,
+          },
+        });
+      });
+    });
+
+    describe("when a confirmed image edit is rendered", () => {
+      /** @scenario An image edit publishes its input image tokens and image count */
+      it("carries the input image tokens beside the text input tokens, and the count", () => {
+        const envelope = gatewaySpendEventEnvelopeSchema.parse(
+          webhookEnvelopeFromSpendRow(
+            row({
+              requestType: "image_edit",
+              tokensInput: 12,
+              tokensOutput: 0,
+              tokensInputImage: 323,
+              tokensOutputImage: 1_600,
+              imageCount: 1,
+            }),
+          ),
+        );
+
+        expect(envelope.data).toMatchObject({
+          usage: { input_tokens: 12, input_image_tokens: 323, image_count: 1 },
+        });
+      });
+    });
+
     describe("when a settled spend row is rendered", () => {
       it("parses with its quantities null", () => {
         const envelope = gatewaySpendEventEnvelopeSchema.parse(

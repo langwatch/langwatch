@@ -1,5 +1,5 @@
 /** The one public trace read (ADR-057): the share token in the input is the whole authorization. */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { sharedTraceDtoSchema } from "./trace-share.schemas.ts";

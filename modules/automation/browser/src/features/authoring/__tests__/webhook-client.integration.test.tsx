@@ -6,13 +6,13 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   type SavedTriggerRow,
-  WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookActionParams,
   type WebhookPreview,
   DEFAULT_ALERT_WEBHOOK_BODY_TEMPLATE,
   DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE,
   DEFAULT_WEBHOOK_BODY_TEMPLATE,
 } from "@langwatch/automation-contract";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";

@@ -4,7 +4,8 @@
  * as `actorId`, never read from a session or a request here.
  */
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,

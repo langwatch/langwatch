@@ -5,12 +5,8 @@
  * @see specs/lwql/catalogue-grants.feature
  */
 import type { LangWatchQLCatalogueAccess } from "@langwatch/analytics-contract";
-import {
-  permissionGrantTiers,
-  type AuthzApi,
-  type AuthzPermission,
-  type AuthzScopeRef,
-} from "@langwatch/authz-contract";
+import { permissionGrantTiers, type AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi, AuthzScopeRef } from "@langwatch/authz-contract";
 
 import { cataloguePermissions, type LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
 

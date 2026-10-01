@@ -1,3 +1,14 @@
+import type {
+  AuthzGetDecisionInput,
+  AuthzGetProjectAnyDecisionInput,
+  AuthzPermission,
+  AuthzScopeLineageInput,
+  AuthzScopeLineageResult,
+  DeclaredScopeTier,
+  PermissionDecision,
+  PermissionScopeArg,
+  TierOfScopeArg,
+} from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
@@ -5,7 +16,6 @@ import type { Instant } from "@langwatch/time";
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
 import type * as Grants from "./authz-grants-rest.schemas.ts";
 import type { RoleBindingRest } from "./authz-rest.schemas.ts";
-import type * as authzScopeLineageModule from "./authz-scope-lineage.ts";
 import type {
   AuthzAdmissionScope,
   AuthzPendingAdmissionRead,
@@ -15,10 +25,6 @@ import type * as Commands from "./authz.commands.ts";
 import type * as Binding from "./authz.grant-management.ts";
 import type * as Queries from "./authz.queries.ts";
 import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from "./authz.ts";
-import type * as declarationModule from "./declaration.ts";
-import type { AuthzPermission } from "./registry.ts";
-import type * as registryModule from "./registry.ts";
-import type { BindingScopeTier } from "./vocabulary.ts";
 
 export interface AuthzCaller {
   readonly id: string;
@@ -51,7 +57,7 @@ export interface AuthzApi {
   check(args: Queries.AuthzCheckInput): Promise<AuthzDecision>;
   checkDetailed(args: Queries.AuthzCheckInput): Promise<Queries.AuthzCheckDetailedOutput>;
   can(args: Queries.AuthzCheckInput): Promise<boolean>;
-  authorize<Tier extends BindingScopeTier, Permission extends AuthzPermission>(args: {
+  authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(args: {
     principal: AuthzPrincipalRef;
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;
@@ -67,28 +73,24 @@ export interface AuthzApi {
   ): Promise<Queries.AuthzCanBatchPermissionsByIdsOutput>;
   /** Throws `AuthzScopeNotFoundError` when no id names a live scope. */
   getScope(args: Queries.AuthzResolveScopeInput): Promise<AuthzScopeRef>;
-  checkScopeLineage(
-    args: authzScopeLineageModule.AuthzScopeLineageInput,
-  ): Promise<authzScopeLineageModule.AuthzScopeLineageResult>;
+  checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
   explainDecision(
     args: Queries.AuthzExplainDecisionInput,
   ): Promise<Queries.AuthzExplainDecisionOutput>;
-  getDecision(args: Queries.AuthzGetDecisionInput): Promise<Queries.PermissionDecision>;
-  getProjectAnyDecision(
-    args: Queries.AuthzGetProjectAnyDecisionInput,
-  ): Promise<Queries.PermissionDecision>;
+  getDecision(args: AuthzGetDecisionInput): Promise<PermissionDecision>;
+  getProjectAnyDecision(args: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
   hasPermission<Permission extends AuthzPermission>(
     check: {
       userId: string;
       permission: Permission;
-    } & declarationModule.PermissionScopeArg<Permission>,
+    } & PermissionScopeArg<Permission>,
   ): Promise<boolean>;
   authorizePermission<
     Permission extends AuthzPermission,
-    ScopeArg extends declarationModule.PermissionScopeArg<Permission>,
+    ScopeArg extends PermissionScopeArg<Permission>,
   >(
     check: { userId: string; permission: Permission } & ScopeArg,
-  ): Promise<Authorized<declarationModule.TierOfScopeArg<ScopeArg>, Permission>>;
+  ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>>;
   authorizeProjectPermission(args: Queries.AuthzRequireProjectPermissionInput): Promise<void>;
   hasApiKeyPermission(args: Queries.ApiKeyPermissionCheck): Promise<boolean>;
   getApiKeyProjectDecision(
@@ -222,7 +224,7 @@ export interface AuthzApi {
   hasProjectPermission(input: {
     userId: string;
     projectId: string;
-    permission: registryModule.AuthzPermission;
+    permission: AuthzPermission;
   }): Promise<boolean>;
   /**
    * Deterministic grant id to deduplicate replays and prevent drift from

@@ -15,59 +15,6 @@ export type {
 export { fetchValidatedDestination, RedirectRefusedError } from "./ssrf/fenced-fetch.ts";
 export type { EgressTlsPolicy, FencedFetchOptions } from "./ssrf/fenced-fetch.ts";
 
-export { WebhookDispatchRateLimiter } from "./services/webhook-dispatch-rate-limiter.service.ts";
-export type { WebhookDispatchRateLimitResult } from "./services/webhook-dispatch-rate-limiter.service.ts";
-export { InMemoryWebhookDispatchRateLimiterService } from "./services/in-memory.webhook-dispatch-rate-limiter.service.ts";
-
-export {
-  assertWebhookDelivered,
-  classifyWebhookStatus,
-  WEBHOOK_DELIVERY_ATTEMPT_HEADER,
-  WEBHOOK_DELIVERY_ID_HEADER,
-  WEBHOOK_EVENT_ID_HEADER,
-  WEBHOOK_TEST_FIRE_HEADER,
-} from "./webhook/delivery-classification.ts";
-export type { WebhookSendResult } from "./webhook/delivery-classification.ts";
-export {
-  assertDispatchBudget,
-  WEBHOOK_DISPATCH_HOURLY_CAP,
-  WEBHOOK_DISPATCH_WINDOW_SECONDS,
-  webhookDispatchBudgetKey,
-} from "./webhook/dispatch-budget.ts";
-export { sendHttpDestination } from "./webhook/http-destination.ts";
-export type {
-  HttpDestinationRequest,
-  HttpDestinationResponse,
-} from "./webhook/http-destination.ts";
-export {
-  signWebhookPayload,
-  verifyWebhookSignature,
-  WEBHOOK_PREVIOUS_SECRET_TTL_MS,
-  WEBHOOK_SIGNATURE_HEADER,
-  WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
-} from "./webhook/signature.ts";
-export {
-  buildVectors,
-  serializeVectors,
-  VECTORS_RELATIVE_PATH,
-} from "./webhook/signature-vectors.ts";
-export type {
-  SignatureVectorFile,
-  SigningVector,
-  VectorOutcome,
-  VerificationVector,
-} from "./webhook/signature-vectors.ts";
-export {
-  assertWebhookUrlAllowed,
-  inspectWebhookUrl,
-  webhookUrlValidator,
-} from "./webhook/url-policy.ts";
-
-export { WebhookEgressService } from "./services/webhook-egress.service.ts";
-export type { WebhookSendInput } from "./services/webhook-egress.service.ts";
-
-export { WebhookSignatureVectorsTask } from "./tasks/webhook-signature-vectors.task.ts";
-
 /**
  * The corporate proxy self-hosted outbound calls leave through — the
  * egress fence's other half (SSRF decides which addresses, this decides

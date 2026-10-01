@@ -3,11 +3,8 @@
  * their effective permissions at the scope, so expiry and key ceilings apply.
  * @see specs/rbac/grants-rest-api.feature
  */
-import {
-  ALL_PERMISSIONS,
-  builtinRolePermissions,
-  type CollectedBinding,
-} from "@langwatch/authz-contract";
+import { ALL_PERMISSIONS } from "@langwatch/authorization";
+import { builtinRolePermissions, type CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";

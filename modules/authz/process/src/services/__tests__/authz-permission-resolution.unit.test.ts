@@ -1,5 +1,6 @@
 // Permission decisions service-level resolution; engine walk in contract package.
-import type { AuthzPermission, CollectedBinding } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";

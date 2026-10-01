@@ -3,7 +3,7 @@
  * cache keys. `demonstrations` is a workflow dataset, so both write shapes
  * take THIS contract's own `nodeDatasetSchema`, avoiding a contract cycle.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { nodeDatasetSchema } from "./prompt.field-schemas.ts";

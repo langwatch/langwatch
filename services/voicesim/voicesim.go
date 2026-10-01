@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -27,15 +28,33 @@ type Config struct {
 	Addr string
 	// Stack is the haven stack slug the console names (VOICESIM_STACK, may be empty).
 	Stack string
+	// MaxCalls is how many recent calls the console keeps (VOICESIM_MAX_CALLS, default 200).
+	MaxCalls int
+	// MaxEventsPerCall bounds one call's protocol log (VOICESIM_MAX_EVENTS_PER_CALL, default 500).
+	MaxEventsPerCall int
+	// Seed loads one finished sample call at start, so the console has content (VOICESIM_SEED=1).
+	Seed bool
 }
 
 // LoadConfig reads voicesim's configuration from the environment.
 func LoadConfig() Config {
-	cfg := Config{Addr: os.Getenv("VOICESIM_ADDR"), Stack: os.Getenv("VOICESIM_STACK")}
+	cfg := Config{
+		Addr: os.Getenv("VOICESIM_ADDR"), Stack: os.Getenv("VOICESIM_STACK"),
+		MaxCalls:         envInt("VOICESIM_MAX_CALLS", defaultMaxCalls),
+		MaxEventsPerCall: envInt("VOICESIM_MAX_EVENTS_PER_CALL", defaultMaxEventsPerCall),
+		Seed:             os.Getenv("VOICESIM_SEED") == "1",
+	}
 	if cfg.Addr == "" {
 		cfg.Addr = ":5591"
 	}
 	return cfg
+}
+
+func envInt(key string, fallback int) int {
+	if n, err := strconv.Atoi(os.Getenv(key)); err == nil && n > 0 {
+		return n
+	}
+	return fallback
 }
 
 // Server answers the provider calls and the console.
@@ -53,6 +72,10 @@ func NewServer(cfg Config) *Server {
 
 func newServer(cfg Config, bundle fs.FS) *Server {
 	s := &Server{cfg: cfg, console: newConsole(bundle)}
+	s.calls.maxCalls, s.calls.maxEvents = cfg.MaxCalls, cfg.MaxEventsPerCall
+	if cfg.Seed {
+		s.seedCall()
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /v1/convai/conversation/get-signed-url", s.handleSignedURL)

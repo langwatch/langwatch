@@ -1,5 +1,6 @@
 /** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
-import type { AuthzApi, OrganizationUserRole } from "@langwatch/authz-contract";
+import type { OrganizationUserRole } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {

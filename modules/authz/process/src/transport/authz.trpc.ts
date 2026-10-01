@@ -1,7 +1,6 @@
 // Frontend query for caller's permissions; declared here to avoid package cycle.
 import type { Actor } from "@langwatch/actor";
 import { toLedgerActor } from "@langwatch/actor";
-import { defineTrpcContract } from "@langwatch/api/contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   AuthzApi,
@@ -22,6 +21,7 @@ import {
   grantSchema,
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 /** Whose permissions bound a grant is the session's, so the input never names it. */
 const IMPLIED_BY_SESSION = { caller: true, actor: true } as const;

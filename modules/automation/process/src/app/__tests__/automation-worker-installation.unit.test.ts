@@ -16,7 +16,7 @@ import { type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { DispatchError, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -30,6 +30,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { WebhookApi, WebhookSendRequest } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -75,6 +76,7 @@ type Installed = Readonly<{
   annotation?: AnnotationApi;
   authz?: AuthzApi;
   notification?: NotificationService;
+  webhook?: WebhookApi;
   logger?: ReturnType<typeof createTestLogger>["logger"];
 }>;
 
@@ -94,7 +96,6 @@ function composed(role: "api" | "worker", eventing: EventSourcing, installed: In
       decrypt: (value: string) => value,
     })
     .withMember("publicBaseUrl", "https://app.langwatch.test")
-    .withMember("isSaas", false)
     .withMember("logging", installed.logger ?? createTestLogger().logger);
 }
 
@@ -113,6 +114,7 @@ function peers(installed: Installed = {}) {
     authz: installed.authz ?? createApiFixture<AuthzApi>(),
     notification: installed.notification ?? createApiFixture<NotificationService>(),
     slack: createApiFixture<SlackApi>(),
+    webhook: installed.webhook ?? createApiFixture<WebhookApi>(),
   };
 }
 
@@ -300,6 +302,47 @@ describe("given a memory-tier worker settling a match end to end", () => {
       expect(sent[0]).toMatchObject({ to: "ops@acme.test", replyless: {} });
       expect(sent[0]?.html).toContain("https://app.langwatch.test");
       expect(await worker.lastRunAt()).toBeGreaterThan(0);
+      await worker.runtime.stop();
+    });
+  });
+
+  describe("when a settled window notifies a webhook automation", () => {
+    /** @scenario "A webhook automation hands each attempt to the webhook module" */
+    it("sends the attempt through the webhook module and rethrows its verdict for the outbox", async () => {
+      const requests: WebhookSendRequest[] = [];
+      const refusal = new DispatchError({
+        message: "HTTP 503",
+        retryable: true,
+        retryAfterMs: 60_000,
+      });
+      const webhook = createApiFixture<WebhookApi>({
+        sendRequest: async (request) => {
+          requests.push(request);
+          throw refusal;
+        },
+      });
+      const worker = await settlingWorker({ webhook, trace: tracesHolding(["trace-1"]) });
+      await worker.automations.create(
+        automation("SEND_WEBHOOK", { url: "https://hooks.acme.test/in", method: "POST" }),
+      );
+
+      await expect(
+        worker.run("notifyDigest", {
+          triggerId: "trigger-1",
+          traceIds: ["trace-1"],
+          boundary: 1_000,
+        }),
+      ).rejects.toBe(refusal);
+
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toMatchObject({
+        projectId: "project-1",
+        url: "https://hooks.acme.test/in",
+        method: "POST",
+        label: 'Webhook for trigger "Settles"',
+        source: { module: "automation", ref: "trigger-1" },
+      });
+      expect(requests[0]?.dispatchId).toMatch(/^evt_[0-9a-f]{32}$/);
       await worker.runtime.stop();
     });
   });

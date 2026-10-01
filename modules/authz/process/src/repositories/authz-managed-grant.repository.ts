@@ -1,9 +1,5 @@
-import type {
-  OrganizationRole,
-  PrincipalKind,
-  GrantScopeTier,
-  TeamUserRole,
-} from "@langwatch/authz-contract";
+import type { OrganizationRole } from "@langwatch/authorization";
+import type { PrincipalKind, GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
 
 export type AuthzBindingScopeRow =
   | {

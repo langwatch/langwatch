@@ -1,10 +1,10 @@
-import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
-
 import type { WebhookDestination } from "../app/webhook.app.ts";
 import type { SqsWebhookSender } from "../channels/webhook-destination.channel.ts";
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import { HttpWebhookDestinationService } from "./http-webhook-destination.service.ts";
 import { SqsWebhookDestinationService } from "./sqs-webhook-destination.service.ts";
+import type { WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
+import type { WebhookEgressService } from "./webhook-egress.service.ts";
 
 /**
  * What a process must hold before it can deliver to either transport.
@@ -13,12 +13,8 @@ export type WebhookDestinationDeps = Readonly<{
   egress: Pick<WebhookEgressService, "send">;
   allowInsecureLocal: boolean;
   sqs: SqsWebhookSender;
-  /**
-   * The counter the hourly dispatch cap is kept in. The HTTPS transport reads it off the egress
-   * service; a queue send never passes through that sender, so it has to be handed the same
-   * counter directly or a queue endpoint would be the one uncapped destination.
-   */
-  rateLimiter?: WebhookDispatchRateLimiter | undefined;
+  /** A queue send never passes through the HTTP sender, so it is handed the same cap. */
+  caps?: WebhookDispatchCapService | undefined;
 }>;
 
 /** Picks the transport one endpoint's configuration names. */
@@ -47,7 +43,7 @@ export class WebhookDestinationDispatchService {
             accessKeyId: config.accessKeyId,
             secretAccessKey: config.secretAccessKey,
             channel: this.deps.sqs,
-            ...(this.deps.rateLimiter ? { rateLimiter: this.deps.rateLimiter } : {}),
+            ...(this.deps.caps ? { caps: this.deps.caps } : {}),
           },
         });
     }

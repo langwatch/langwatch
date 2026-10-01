@@ -1,4 +1,5 @@
-import type { MigrationTenantStatus, OrganizationRole } from "@langwatch/authz-contract";
+import type { OrganizationRole } from "@langwatch/authorization";
+import type { MigrationTenantStatus } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 import type {

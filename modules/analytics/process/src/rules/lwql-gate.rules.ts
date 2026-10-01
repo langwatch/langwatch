@@ -5,7 +5,7 @@
  */
 
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 
 import type {
   LangWatchQLViewColumn,

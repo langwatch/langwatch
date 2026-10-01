@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSsrfUrlValidator } from "../url-validator.ts";
 
 /**
- * Spec: packages/egress/specs/webhook-egress.feature
+ * Spec: modules/webhook/specs/webhook-egress.feature
  */
 
 const strict = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });

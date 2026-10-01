@@ -52,7 +52,6 @@ const fakeSim = () =>
     }),
   );
 
-// @scenario "The console lists records by provider and kind"
 describe("the analyticssim console", () => {
   afterEach(() => {
     cleanup();
@@ -60,6 +59,7 @@ describe("the analyticssim console", () => {
     window.location.hash = "";
   });
 
+  /** @scenario The console lists records by provider and kind */
   it("lists every record newest first and opens one", async () => {
     fakeSim();
     render(<RecordsConsole />);

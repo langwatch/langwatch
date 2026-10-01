@@ -3,24 +3,15 @@
  * authorization checks and the scope-lineage guard.
  */
 import {
-  type AuthzDeclaration,
+  BlankScopeIdError,
+  PermissionDeniedError,
+  SCOPE_TIER_FIELDS,
+  type AuthzDeclaredScopeId,
   type AuthzDenialReason,
-  type AuthzGetDecisionInput,
-  type AuthzGetProjectAnyDecisionInput,
   type AuthzPermission,
   type AuthzScopeLineageInput,
-  type AuthzScopeLineageResult,
-  BlankScopeIdError,
-  type DeclaredAuthzMiddleware,
-  type DeclaredScopeId,
-  declareAuthzMiddleware,
-  type EnforcedScopeFields,
-  type PermissionDecision,
-  PermissionDeniedError,
-  resolveDeclaredScope,
-  SCOPE_TIER_FIELDS,
   type ScopeTierField,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
@@ -41,6 +32,14 @@ import type {
   Simplify,
 } from "@trpc/server/unstable-core-do-not-import";
 
+import type { Authorize } from "../access/access.ts";
+import { resolveDeclaredScope } from "../access/declaration.ts";
+import {
+  declareAuthzMiddleware,
+  type AuthzDeclaration,
+  type DeclaredAuthzMiddleware,
+  type EnforcedScopeFields,
+} from "../access/declared-middleware.ts";
 import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
 import {
   auditScopeIds,
@@ -163,19 +162,12 @@ export interface TrpcCauseTranslation {
   translate(cause: unknown): TrpcTranslatedCause | undefined;
 }
 
-/** The authorization decisions the spine asks for, and nothing else. */
-export interface TrpcAuthorizationDecisions {
-  getDecision(input: AuthzGetDecisionInput): Promise<PermissionDecision>;
-  getProjectAnyDecision(input: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
-  checkScopeLineage(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
-}
-
 /**
  * A resolver rather than a value: decisions are request scoped, so the
  * process composes them per request instead of reaching for a process-wide one.
  */
 export interface TrpcAuthorization<TContext> {
-  forRequest(ctx: TrpcMiddlewareContext<TContext>): TrpcAuthorizationDecisions;
+  forRequest(ctx: TrpcMiddlewareContext<TContext>): Authorize;
 }
 
 /**
@@ -535,7 +527,7 @@ function requireDeclaredScope({
   permission: AuthzPermission;
   input: ScopeInput;
   via?: ScopeTierField;
-}): DeclaredScopeId {
+}): AuthzDeclaredScopeId {
   const resolution = resolveDeclaredScope({ permission, input, via });
   if (resolution.resolved) return resolution.scope;
 
@@ -591,7 +583,7 @@ function deniedError({
   denials,
 }: {
   permission: AuthzPermission;
-  scope: DeclaredScopeId;
+  scope: AuthzDeclaredScopeId;
   organizationRole: TrpcOrganizationRole | null;
   denialReason?: AuthzDenialReason;
   denials: TrpcAuthorizationDenial;

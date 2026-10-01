@@ -7,13 +7,17 @@
 import { createHash, createHmac } from "node:crypto";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
-import { parseProcessConfig } from "@langwatch/config";
+import { allowLoopbackVoiceProviders, Config, parseProcessConfig } from "@langwatch/config";
 import {
   DEFAULT_LICENSE_PUBLIC_KEY,
   licensingConfig,
   licensingSecrets,
 } from "@langwatch/enterprise-licensing-contract";
-import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
+import {
+  elevenLabsLoopbackKeysSchema,
+  getSchemaShape,
+  modelProviders,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { aesEncryption, type Encryption } from "@langwatch/process-stores";
@@ -637,6 +641,7 @@ async function seedModelProviderFromEnv({
   envMap,
   organizationId,
   encryption,
+  allowLoopback,
 }: {
   prisma: PrismaClient;
   provider: string;
@@ -644,6 +649,7 @@ async function seedModelProviderFromEnv({
   envMap: Readonly<Record<string, string | undefined>>;
   organizationId: string;
   encryption: Encryption;
+  allowLoopback: boolean;
 }): Promise<void> {
   const names = providerKeyNames(def);
   const keys: Record<string, string> = {};
@@ -652,7 +658,10 @@ async function seedModelProviderFromEnv({
     if (name && value) keys[name] = value;
   }
   const missing = missingProviderKeys({ provider, def, names, keys });
-  const parsed = def.keysSchema.safeParse(keys);
+  // haven +voice seeds ElevenLabs at voicesim; only the dev switch lets its loopback URL through.
+  const keysSchema =
+    provider === "elevenlabs" && allowLoopback ? elevenLabsLoopbackKeysSchema : def.keysSchema;
+  const parsed = keysSchema.safeParse(keys);
   if (!parsed.success || missing.length > 0) {
     logger.info(
       { provider, apiKeyEnvVar: def.apiKey, missing },
@@ -710,6 +719,10 @@ async function seedModelProvidersFromEnv({
     logger.info("model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)");
     return;
   }
+  const { voice } = parseProcessConfig({
+    owners: [{ name: "voice", config: Config.define(() => ({ allowLoopbackVoiceProviders })) }],
+    environment,
+  });
   for (const [provider, def] of Object.entries(modelProviders)) {
     // "custom" has no inferable identity from the environment; skip it.
     if (provider === "custom") continue;
@@ -721,6 +734,7 @@ async function seedModelProvidersFromEnv({
       envMap: environment,
       organizationId,
       encryption,
+      allowLoopback: voice.allowLoopbackVoiceProviders,
     });
   }
 }

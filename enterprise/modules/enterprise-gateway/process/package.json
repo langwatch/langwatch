@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-gateway-contract": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",

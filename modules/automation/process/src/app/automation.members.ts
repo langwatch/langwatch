@@ -10,7 +10,6 @@ import type {
   TriggerMatchRecordedEventData,
   TriggerSummary,
   WebhookActionParams,
-  WebhookDeliveryInput,
   GraphAlertTemplateContext,
 } from "@langwatch/automation-contract";
 import type { IntentContext } from "@langwatch/eventing";
@@ -123,7 +122,6 @@ export interface AutomationGraphDelivery {
   }): Promise<string[]>;
   isSendClaimed(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean>;
   claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean>;
-  recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void>;
 }
 
 export type GraphAlertDispatchInput = {
@@ -263,8 +261,6 @@ export abstract class AutomationScheduledIntent {
     projectId: string;
     reason: GraphTriggerEvaluationReason;
   }): Promise<GraphTriggerEvaluationResult>;
-
-  abstract pruneWebhookDeliveries(now?: Instant): Promise<number>;
 }
 
 export abstract class AutomationSettlementExecutor {

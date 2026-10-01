@@ -4,7 +4,7 @@
  * `BatchEvaluation`, owned beside the datasets they ran against.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

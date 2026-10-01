@@ -14,7 +14,7 @@ import {
   ALL_PERMISSIONS,
   isRegistryPermission,
   type AuthzPermission,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 

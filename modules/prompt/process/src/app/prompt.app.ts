@@ -1,4 +1,5 @@
-import { AuthzApi, type AuthzPermission, PermissionDeniedError } from "@langwatch/authz-contract";
+import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";

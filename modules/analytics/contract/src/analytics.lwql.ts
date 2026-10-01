@@ -1,4 +1,4 @@
-import { authzPermissionSchema, type AuthzPermission } from "@langwatch/authz-contract";
+import { authzPermissionSchema, type AuthzPermission } from "@langwatch/authorization";
 import { z } from "zod";
 
 import type { LangWatchQLTimeWindow } from "./analytics.lwql-time-window.ts";

@@ -28,6 +28,7 @@ let mockServerTriggerRow: Record<string, unknown> | null = null;
 const {
   mockGetTriggerByIdQuery,
   mockCloseDrawer,
+  mockCloseAddressedDrawer,
   mockInvalidate,
   mockGetTriggerByIdInvalidate,
   mockGraphsGetAllInvalidate,
@@ -44,6 +45,7 @@ const {
     error: null as Error | null,
   })),
   mockCloseDrawer: vi.fn(),
+  mockCloseAddressedDrawer: vi.fn(),
   mockInvalidate: vi.fn(),
   // Without a seeded server row this is the no-op the other tests expect.
   mockGetTriggerByIdInvalidate: vi.fn(() => {
@@ -63,6 +65,7 @@ vi.mock("../../../behavior/automation-session.ts", () => ({
   }),
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
   useAppBaseUrl: () => "https://app.langwatch.ai",
+  useCloseAddressedDrawer: () => mockCloseAddressedDrawer,
 }));
 
 vi.mock("../../../behavior/automation-feedback.ts", () => ({
@@ -492,14 +495,13 @@ describe("AutomationDrawer", () => {
   // time or the replay wipes a draft the author is coming back to.
   describe("given the drawer opened straight from an address, which carries no onClose", () => {
     describe("when the author closes an untouched create", () => {
-      it("closes the drawer stack through the host", async () => {
+      it("closes the drawer its address names", async () => {
         const user = userEvent.setup();
-        render(<RegisteredAutomationDrawer onClose={mockCloseDrawer} />, { wrapper: Wrapper });
+        render(<RegisteredAutomationDrawer />, { wrapper: Wrapper });
 
         await user.click(await screen.findByRole("button", { name: /close/i }));
 
-        expect(host.recording.drawerCloses).toBe(1);
-        expect(mockCloseDrawer).not.toHaveBeenCalled();
+        expect(mockCloseAddressedDrawer).toHaveBeenCalledTimes(1);
       });
     });
   });

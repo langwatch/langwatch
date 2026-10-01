@@ -4,7 +4,7 @@
  * declared here; the browser reads the same names and schemas as types.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

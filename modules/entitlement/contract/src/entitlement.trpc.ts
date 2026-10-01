@@ -2,7 +2,7 @@
  * Every entitlement procedure, declared once: the plan an organization is on,
  * what it has used against that plan, and what it has spent.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

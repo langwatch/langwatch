@@ -11,7 +11,6 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/contract/index.ts",
     "./src/rest/index.ts",
     "./src/trpc/index.ts",
     "./src/composition.ts",
@@ -35,7 +34,7 @@
       "path": "../actor/tsconfig.build.json"
     },
     {
-      "path": "../../modules/authz/contract/tsconfig.build.json"
+      "path": "../authorization/tsconfig.build.json"
     },
     {
       "path": "../handled-error/tsconfig.build.json"

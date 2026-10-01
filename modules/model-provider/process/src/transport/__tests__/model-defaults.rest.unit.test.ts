@@ -5,7 +5,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @see specs/model-providers/model-default-config-cascade.feature
  */
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   ModelDefaultApiKeyScopeCheck,

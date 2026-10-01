@@ -72,6 +72,7 @@ async function gatewayApp(): Promise<GatewayApp> {
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,
+      allowLoopbackVoiceProviders: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

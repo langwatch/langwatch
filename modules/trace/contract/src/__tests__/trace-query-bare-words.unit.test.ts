@@ -126,7 +126,7 @@ describe("splitBareWords", () => {
   });
 
   describe("given a lowercase not inside a question", () => {
-    /** @scenario "A lowercase \"not\" inside a sentence is a word of the sentence" */
+    /** @scenario A lowercase "not" inside a sentence is a word of the sentence */
     it("keeps not as a word of the sentence", () => {
       const question = "where did a member ask about cover that is not in their plan?";
 

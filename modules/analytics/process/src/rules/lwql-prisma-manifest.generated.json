@@ -17675,6 +17675,89 @@
       ]
     },
     {
+      "name": "NurturingProject",
+      "tableName": "NurturingProject",
+      "documentation": "Nurturing's read model: which organization a project belongs to, from project's created event.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "NurturingOrganization",
+      "tableName": "NurturingOrganization",
+      "documentation": "Nurturing's read model per organization: its admin and its milestone counts.\n`seeded` marks an organization learned from the project backfill: its first_* already happened.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "adminUserId",
+          "columnName": "adminUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seeded",
+          "columnName": "seeded",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "evaluationCount",
+          "columnName": "evaluationCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "BillingMeterCheckpoint",
       "tableName": "BillingMeterCheckpoint",
       "documentation": "",

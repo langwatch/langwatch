@@ -1,4 +1,4 @@
-import { ProjectPermissionDeniedError } from "@langwatch/authz-contract";
+import { ProjectPermissionDeniedError } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import {
   CannotArchiveCurrentProjectError,

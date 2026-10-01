@@ -1,7 +1,8 @@
 /** Application: completes incomplete upserts and checks cross-project copy
  * reach. Wire mapping and read ceiling live in the doors.
  */
-import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DatasetApi,
   DatasetNotFoundError,

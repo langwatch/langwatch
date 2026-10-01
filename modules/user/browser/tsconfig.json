@@ -35,6 +35,9 @@
       "path": "../../auth/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -84,9 +87,6 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"

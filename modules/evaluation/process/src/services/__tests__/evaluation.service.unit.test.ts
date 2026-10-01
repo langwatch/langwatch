@@ -57,9 +57,6 @@ class FakeRepository extends EvaluationRunRepository {
   async findSummariesByTraceIds(): Promise<Record<string, never>> {
     return {};
   }
-  async countOrganizationRuns(): Promise<number> {
-    return this.value ? 1 : 0;
-  }
   async findTraceEvaluations(): Promise<Record<string, TraceEvaluationData[]>> {
     return {};
   }

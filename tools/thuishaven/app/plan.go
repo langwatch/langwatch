@@ -110,6 +110,7 @@ func (o *Orchestrator) mailEnv(st domain.Stack) []string {
 		fmt.Sprintf("MAILSIM_HTTP_ADDR=:%d", httpPort),
 		fmt.Sprintf("MAILSIM_SMTP_ADDR=:%d", smtpPort),
 		"MAILSIM_DATA_DIR=" + mailDataDir,
+		"MAILSIM_SEED=1",
 	}
 	if mailURL != "" {
 		env = append(env, "MAILSIM_BASE_URL="+mailURL)
@@ -238,13 +239,17 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		goServices = append(goServices, "nlpgo")
 		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", NLPAddrEnv, port("nlp")))
 	}
+	// The linked simulators get a lane of their own, so a simulator under load
+	// cannot starve the gateway: a second `service combined` process.
 	simsInGo := !st.Layout.IsMonolith() && goLaneHostsSimulators(opts.RepoRoot)
+	var simServices []string
+	simEnv := append(append([]string{}, base...), domain.LaneEnv(SimsLane))
 	var simulators []Child
 	if opts.Selection.IDP {
 		idpEnv := o.idpEnv(st)
 		if simsInGo {
-			goServices = append(goServices, "idpsim")
-			goEnv = append(append(goEnv, idpEnv...), fmt.Sprintf("%s=:%d", IDPAddrEnv, port("idp")))
+			simServices = append(simServices, "idpsim")
+			simEnv = append(append(simEnv, idpEnv...), fmt.Sprintf("%s=:%d", IDPAddrEnv, port("idp")))
 		} else {
 			simulators = append(simulators, Child{
 				Name: "idp", Dir: opts.RepoRoot, Color: palette[6], LogPath: logPath("idp"),
@@ -257,8 +262,8 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	if opts.Selection.Mail {
 		mailEnv := o.mailEnv(st)
 		if simsInGo {
-			goServices = append(goServices, "mailsim")
-			goEnv = append(goEnv, mailEnv...)
+			simServices = append(simServices, "mailsim")
+			simEnv = append(simEnv, mailEnv...)
 		} else {
 			simulators = append(simulators, Child{
 				Name: "mail", Dir: opts.RepoRoot, Color: palette[7], LogPath: logPath("mail"),
@@ -272,8 +277,8 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			return
 		}
 		if simsInGo {
-			goServices = append(goServices, binary)
-			goEnv = append(goEnv, env()...)
+			simServices = append(simServices, binary)
+			simEnv = append(simEnv, env()...)
 			return
 		}
 		simulators = append(simulators, child())
@@ -293,6 +298,13 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			Name: GoLane, Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath(GoLane),
 			Shell: goCombinedShell(opts.RepoRoot, goServices, opts.ShouldGoWatch),
 			Env:   goEnv,
+		})
+	}
+	if len(simServices) > 0 {
+		out = append(out, Child{
+			Name: SimsLane, Dir: opts.RepoRoot, Color: palette[8], LogPath: logPath(SimsLane),
+			Shell: goCombinedShell(opts.RepoRoot, simServices, opts.ShouldGoWatch),
+			Env:   simEnv,
 		})
 	}
 	out = append(out, simulators...)
@@ -389,6 +401,9 @@ const (
 	WorkerLane = "worker"
 	// GoLane is the process hosting the Go data-plane services.
 	GoLane = "go"
+	// SimsLane is the second Go process, hosting the simulators a stack
+	// selected, so load on one cannot starve the gateway.
+	SimsLane = "sims"
 )
 
 // The address variable each service in the combined Go process binds. One per

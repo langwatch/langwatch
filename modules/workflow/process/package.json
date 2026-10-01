@@ -31,6 +31,7 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/enterprise-nurturing-contract": "workspace:*",

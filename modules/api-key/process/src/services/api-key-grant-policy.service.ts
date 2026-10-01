@@ -3,7 +3,7 @@ import {
   apiKeyPermissionFormatSchema,
   type ApiKeyScope,
 } from "@langwatch/api-key-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 

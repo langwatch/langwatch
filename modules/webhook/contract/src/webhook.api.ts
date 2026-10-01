@@ -2,6 +2,12 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { WebhookGatewayEventDeliveryRequest } from "./webhook-governance-delivery.ts";
 import type {
+  WebhookRequestDelivery,
+  WebhookRequestSource,
+  WebhookSendRequest,
+  WebhookSendRequestResult,
+} from "./webhook-request.ts";
+import type {
   ApplyWebhookEndpointChangesCommand,
   CreateWebhookEndpointCommand,
   UpdateWebhookEndpointCommand,
@@ -60,6 +66,14 @@ export interface WebhookApi {
   }): Promise<void>;
   /** Queues one committed gateway event (spend or governance) for delivery; a repeat is dropped. */
   requestGatewayEventDelivery(input: WebhookGatewayEventDeliveryRequest): Promise<void>;
+  /** Sends one attempt and logs it; throws a classified `DispatchError` for the outbox. */
+  sendRequest(input: WebhookSendRequest): Promise<WebhookSendRequestResult>;
+  /** One source's recorded {@link sendRequest} attempts, newest first. */
+  findDeliveriesBySource(input: {
+    projectId: string;
+    source: WebhookRequestSource;
+    limit: number;
+  }): Promise<WebhookRequestDelivery[]>;
 }
 
 export const WebhookApi = moduleApi<WebhookApi>()("webhook");

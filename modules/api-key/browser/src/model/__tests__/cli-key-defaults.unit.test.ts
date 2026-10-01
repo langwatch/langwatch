@@ -3,7 +3,8 @@
 // Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
 
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
-import { builtinRolePermissions, permissionSatisfiedBy } from "@langwatch/authz-contract";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
 import { getUserPermissionsAcrossScopes } from "../api-key-permissions.ts";

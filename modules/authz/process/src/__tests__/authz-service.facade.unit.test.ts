@@ -1,7 +1,5 @@
-import {
-  AuthzService as AuthzServiceContract,
-  PermissionDeniedError,
-} from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzService as AuthzServiceContract } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";

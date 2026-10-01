@@ -4,12 +4,12 @@
  * a role the reader plainly cannot hand on. specs/rbac/roles-and-access-ui.feature
  */
 
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import {
   builtinRolePermissions,
   type BuiltInRoleId,
   type Grant,
   type GrantScopeType,
-  permissionSatisfiedBy,
 } from "@langwatch/authz-contract";
 import { currentTimeZone, type Instant, Temporal } from "@langwatch/time";
 

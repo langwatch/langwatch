@@ -4,9 +4,10 @@
  * building one.
  */
 import type { Actor } from "@langwatch/actor";
+import type { AuthzDeclaration } from "@langwatch/api/access";
 import type { TrpcProcedureFactory, TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { initTRPC } from "@trpc/server";
 
 type TestContext = object;

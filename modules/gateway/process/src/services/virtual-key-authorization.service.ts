@@ -1,4 +1,4 @@
-import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authz-contract";
+import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import type { VirtualKeyWithScopes, GuardrailAttachment } from "@langwatch/gateway-contract";
 import {
   GatewayGuardrailProjectMismatchError,

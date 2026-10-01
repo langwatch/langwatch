@@ -25,7 +25,11 @@ function serviceOver({ provider }: { provider: string | undefined }) {
   };
   const service = AutomationTemplateService.create({
     baseHost: "https://app.langwatch.ai",
-    delivery: ApiAutomationTestFire.create({ mail, delivery, egress: { send: unused } }),
+    delivery: ApiAutomationTestFire.create({
+      mail,
+      delivery,
+      webhooks: { sendRequest: unused },
+    }),
   });
 
   return { service, sendEmail };

@@ -1,6 +1,6 @@
 /** Organization and membership procedures; `invite.*` is its own namespace (`invite.trpc.ts`). */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { signUpDataSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 

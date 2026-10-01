@@ -278,6 +278,7 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
   });
 
   describe("when the delivery log is pruned", () => {
+    /** @scenario "The delivery log is pruned after 30 days" */
     it("drops rows older than the retention bound", async () => {
       const { endpoint } = await repository.create({
         organizationId: ORGANIZATION_ID,

@@ -20,10 +20,6 @@ import {
   PrismaTriggerRepository,
   type TriggerDatabase,
 } from "../repositories/prisma/prisma.trigger.repository.ts";
-import {
-  PrismaWebhookDeliveryRepository,
-  type WebhookDeliveryDatabase,
-} from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationGraphActivityService } from "../services/automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
 import type { AutomationSecretCrypto } from "../services/automation-slack-secrets.service.ts";
@@ -44,18 +40,16 @@ export type AutomationGraphActivityDatabase = TriggerDatabase &
   CustomGraphDatabase &
   GraphTriggerSentDatabase &
   EmailSuppressionDatabase &
-  WebhookDeliveryDatabase &
   TriggerLatestEvaluationDatabase;
 
 /** Graph delivery's Automation persistence, over its Prisma repositories. */
 export function composeAutomationGraphDelivery(input: {
-  database: TriggerDatabase & EmailSuppressionDatabase & WebhookDeliveryDatabase;
+  database: TriggerDatabase & EmailSuppressionDatabase;
   clock: AutomationClock;
 }): AutomationGraphDeliveryService {
   return AutomationGraphDeliveryService.create({
     triggers: PrismaTriggerRepository.create(input.database, input.clock),
     suppressions: PrismaEmailSuppressionRepository.create(input.database),
-    webhookDeliveries: PrismaWebhookDeliveryRepository.create(input.database),
   });
 }
 

@@ -1568,6 +1568,17 @@ export interface LwqlPrismaRows {
     readonly day: "String";
     readonly createdAt: "DateTime";
   };
+  readonly NurturingProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+  };
+  readonly NurturingOrganization: {
+    readonly organizationId: "String";
+    readonly adminUserId: "String?";
+    readonly seeded: "Boolean";
+    readonly evaluationCount: "Int";
+    readonly updatedAt: "DateTime";
+  };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";
     readonly organizationId: "String";

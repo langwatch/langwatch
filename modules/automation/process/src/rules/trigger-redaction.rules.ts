@@ -10,7 +10,6 @@ import {
   InvalidActionParamsError,
   slackProvider,
   TriggerAction,
-  WEBHOOK_HEADER_VALUE_KEPT,
   graphAlertActionParamsSchema,
   reportActionParamsSchema,
   TriggerActionParamsUnknownFieldsError,
@@ -20,6 +19,7 @@ import {
   type TriggerAction as TriggerActionValue,
   type TriggerKind,
 } from "@langwatch/automation-contract";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import { z, type ZodType } from "zod";
 
 /** What a delivery credential reads as on the public API. Clients and agents match on it. */

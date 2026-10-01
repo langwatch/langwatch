@@ -4,7 +4,8 @@ import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
  * What a mounted model-provider declaration runs on in a test: the runtime's
  * process members, and a real app over a gateway stub and a probe stub.
  */
-import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   ModelProviderApi,
   ModelProviderCredentialVerdict,

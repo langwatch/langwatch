@@ -770,6 +770,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
 
   describe("given a budget attached to the key itself", () => {
     /** @scenario "Creating a key with a budget creates both or neither" */
+    /** @scenario A key and its cap are created atomically over REST */
     it("creates the key and its budget in one transaction", async () => {
       const { virtualKey } = await virtualKeys.create({
         organizationId: ORG_ID,
@@ -814,6 +815,31 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
       });
       expect(budget).not.toBeNull();
       expect(budget!.archivedAt).not.toBeNull();
+    });
+
+    /** @scenario Revoke is idempotent and archives the key's cap */
+    it("answers a second revoke as the first and keeps the cap archived", async () => {
+      const { virtualKey } = await virtualKeys.create({
+        organizationId: ORG_ID,
+        name: `revoked-twice-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        budget: { limitUsd: "5.00", window: "MONTH" },
+      });
+      createdVirtualKeyIds.push(virtualKey.id);
+      const revoke = () =>
+        virtualKeys.revoke({ id: virtualKey.id, organizationId: ORG_ID, actorUserId: USER_ID });
+
+      const first = await revoke();
+      const second = await revoke();
+
+      expect(first.status).toBe("REVOKED");
+      expect(second.status).toBe("REVOKED");
+      const budgets = await prisma.gatewayBudget.findMany({
+        where: { organizationId: ORG_ID, scopeType: "VIRTUAL_KEY", scopeId: virtualKey.id },
+      });
+      expect(budgets.length).toBeGreaterThan(0);
+      expect(budgets.every((budget) => budget.archivedAt !== null)).toBe(true);
     });
 
     /** @scenario "Revoking a key retires a cap that targets only that key" */

@@ -3,6 +3,13 @@
  * Pure geometry over a scope reference: the binding scopes that can answer
  * at it, its organization, and whether an audience covers the caller.
  */
+import {
+  AUTHZ_RESOURCES,
+  type AuthzResource,
+  type AuthzScopeType,
+  permissionResource,
+} from "@langwatch/authorization";
+
 import type { AuthzScopeRef, CollectedGrants, GrantAudience, GrantScopeTier } from "./authz.ts";
 
 /** One link of a scope chain: a binding scope that can grant at the scope. */
@@ -76,4 +83,31 @@ export function audienceMatches({
         (binding) => binding.scopeType === "PROJECT" && binding.scopeId === audience.id,
       );
   }
+}
+
+/**
+ * ADR-021 scope fence as registry data: a binding at `scopeType` may grant
+ * `permission` only when the permission's resource is grantable at or
+ * below that tier. Platform resources are never grantable by any binding.
+ */
+export function bindingScopeCanGrantPermission({
+  scopeType,
+  permission,
+}: {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  permission: string;
+}): boolean {
+  const resource = permissionResource(permission);
+  const def = AUTHZ_RESOURCES[resource as AuthzResource];
+  // Unknown resources (legacy custom-role strings outside the registry) are
+  // treated as non-exclusive, matching the legacy fence which only checks a
+  // fixed org-exclusive set.
+  if (!def) return true;
+  const scopes: readonly AuthzScopeType[] = def.scopes;
+  // LEGACY-QUIRK(C): the legacy fence only knows the org-exclusive set, so a
+  // custom role CAN today grant `ops:*` from any binding. The platform tier
+  // becomes a real fence in stage C when platform-ops turns into a principal.
+  if (scopes.includes("platform")) return true;
+  if (scopeType === "ORGANIZATION") return true;
+  return scopes.includes("team") || scopes.includes("project");
 }

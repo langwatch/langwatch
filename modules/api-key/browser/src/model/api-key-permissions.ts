@@ -11,10 +11,10 @@ import {
   PERMISSION_CATEGORIES,
   type PermissionCategory,
 } from "@langwatch/api-key-contract";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import {
   bindingScopeCanGrantPermission,
   builtinRolePermissions,
-  permissionSatisfiedBy,
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
 

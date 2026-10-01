@@ -22,9 +22,6 @@
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
@@ -41,6 +38,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../webhook/contract/tsconfig.build.json"
     }
   ]
 }

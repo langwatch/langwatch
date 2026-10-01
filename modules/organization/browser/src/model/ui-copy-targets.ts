@@ -4,7 +4,7 @@
  * PROJECT, as main's `useProjectsForCopy` graded them. A closed project stays listed.
  */
 
-import { permissionSatisfiedBy } from "@langwatch/authz-contract";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import type { UiCopyTarget } from "@langwatch/browser-host/capabilities";
 import type { UiScopeOrganization } from "@langwatch/organization-contract";
 

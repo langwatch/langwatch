@@ -1,12 +1,8 @@
+import { organizationRoleSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import { grantsLedgerActorSchema } from "./authz-grant.events.ts";
-import {
-  authzPrincipalRefSchema,
-  organizationRoleSchema,
-  grantScopeTierSchema,
-  teamUserRoleSchema,
-} from "./authz.ts";
+import { authzPrincipalRefSchema, grantScopeTierSchema, teamUserRoleSchema } from "./authz.ts";
 
 /** Whose permissions bound what a write may grant (the key or person asking). */
 const callerSchema = authzPrincipalRefSchema;

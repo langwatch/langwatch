@@ -8,8 +8,8 @@ import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
 } from "@langwatch/analytics-contract/chart-grid";
-import { defineTrpcContract } from "@langwatch/api/contract";
 import { triggerSchema } from "@langwatch/automation-contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { graphSchema } from "./graph.ts";

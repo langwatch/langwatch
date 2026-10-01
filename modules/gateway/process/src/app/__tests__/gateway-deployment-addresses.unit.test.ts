@@ -55,6 +55,7 @@ function gatewayApp({
       baseUrl,
       publicUrl,
       isSaas: false,
+      allowLoopbackVoiceProviders: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

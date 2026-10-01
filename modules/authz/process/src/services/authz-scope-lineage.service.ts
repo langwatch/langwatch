@@ -1,16 +1,16 @@
 import {
-  BINDING_SCOPE_TIERS,
+  DECLARED_SCOPE_TIERS,
   type AuthzScopeLineageEntry,
   type AuthzScopeLineageInput,
   type AuthzScopeLineageResult,
   SCOPE_TIER_FIELDS,
-  type BindingScopeTier,
-} from "@langwatch/authz-contract";
+  type DeclaredScopeTier,
+} from "@langwatch/authorization";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 
-type PresentScope = Readonly<{ tier: BindingScopeTier; id: string }>;
+type PresentScope = Readonly<{ tier: DeclaredScopeTier; id: string }>;
 
 /** Resolves every scope id in one request and enforces one tenant lineage. */
 export class AuthzScopeLineageService {
@@ -68,7 +68,7 @@ export class AuthzScopeLineageService {
 }
 
 function presentScopes(input: AuthzScopeLineageInput): PresentScope[] {
-  return BINDING_SCOPE_TIERS.flatMap((tier) => {
+  return DECLARED_SCOPE_TIERS.flatMap((tier) => {
     const id = input[SCOPE_TIER_FIELDS[tier]];
 
     return typeof id === "string" && id.length > 0 ? [{ tier, id }] : [];
@@ -78,6 +78,6 @@ function presentScopes(input: AuthzScopeLineageInput): PresentScope[] {
 function widestScope(scopes: readonly PresentScope[]): PresentScope {
   return [...scopes].toSorted(
     (left, right) =>
-      BINDING_SCOPE_TIERS.indexOf(right.tier) - BINDING_SCOPE_TIERS.indexOf(left.tier),
+      DECLARED_SCOPE_TIERS.indexOf(right.tier) - DECLARED_SCOPE_TIERS.indexOf(left.tier),
   )[0]!;
 }

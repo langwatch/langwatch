@@ -22,9 +22,6 @@
   ],
   "references": [
     {
-      "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../licensing/contract/tsconfig.build.json"
     },
     {

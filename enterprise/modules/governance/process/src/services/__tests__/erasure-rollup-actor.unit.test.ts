@@ -27,6 +27,7 @@ const snapshotErasing = (digests: readonly string[]) => ({
 
 describe("the spender a cost rollup cell is keyed by", () => {
   describe("given the organization erased this spender", () => {
+    /** @scenario "The rebuilt money rows carry the stand-in, not the identifier" */
     it("keys the cell by the stand-in, never the original", () => {
       const actorId = serviceWith(SECRET).actorIdForRollupWrite({
         tenantId: "tenant-1",
@@ -39,6 +40,7 @@ describe("the spender a cost rollup cell is keyed by", () => {
   });
 
   describe("given the organization erased somebody else", () => {
+    /** @scenario "The rebuilt money rows carry the stand-in, not the identifier" */
     it("keeps the spender as the provider named them", () => {
       const actorId = serviceWith(SECRET).actorIdForRollupWrite({
         tenantId: "tenant-1",
@@ -51,6 +53,7 @@ describe("the spender a cost rollup cell is keyed by", () => {
   });
 
   describe("given an erasure but no erasure secret in this process", () => {
+    /** @scenario "A process with no secret refuses to write the money row" */
     it("refuses rather than writing an erased address into the cost table", () => {
       expect(() =>
         serviceWith(undefined).actorIdForRollupWrite({
@@ -71,6 +74,20 @@ describe("the spender a cost rollup cell is keyed by", () => {
       });
 
       expect(actorId).toBe("");
+    });
+  });
+
+  describe("given an organization that has never erased anybody", () => {
+    /** @scenario "A day nobody was erased on costs nothing to check" */
+    /** @scenario "A process with no secret refuses to write the money row" */
+    it("keeps the identifier exactly as the provider sent it, even with no erasure secret", () => {
+      const actorId = serviceWith(undefined).actorIdForRollupWrite({
+        tenantId: "tenant-1",
+        rawActorId: ERASED,
+        snapshot: snapshotErasing([]),
+      });
+
+      expect(actorId).toBe(ERASED);
     });
   });
 });

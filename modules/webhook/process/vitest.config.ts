@@ -38,7 +38,7 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "node",
-    isolate: false,
+    isolate: true,
     test: {
       environment: "node",
       include: ["src/**/*.test.ts"],

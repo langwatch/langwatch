@@ -441,7 +441,6 @@ export class TriggerSettlementNotificationService {
     });
     const eventId = `evt_${createHash("sha256").update(input.messageKey).digest("hex").slice(0, 32)}`;
     await this.composition.delivery.sendWebhook({
-      recorder: (record) => this.composition.automation.recordWebhookDelivery(record),
       projectId: input.projectId,
       triggerId: input.trigger.id,
       eventId,

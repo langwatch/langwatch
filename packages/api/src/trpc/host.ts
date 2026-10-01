@@ -4,26 +4,26 @@
  */
 import {
   LiteMemberRestrictedError,
+  MembershipDisabledError,
   type AuthzScopeLineageResult,
   type PermissionDecision,
-} from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
+} from "@langwatch/authorization";
 import type {
   FeatureTrpcHost,
   FeatureTrpcMountOptions,
   MountableTransport,
 } from "@langwatch/kernel";
+import type { TrpcContract, TrpcContractKind } from "@langwatch/kernel/contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
-import type { TrpcContract, TrpcContractKind } from "../contract/trpc-contract.ts";
+import type { Authorize } from "../access/access.ts";
 import type { RateLimiter } from "../ports.ts";
 import type { SessionCaller, SessionReader } from "../rest/credential.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
 import {
   createTrpcRuntimePolicy,
-  type TrpcAuthorizationDecisions,
   type TrpcAuthorizationDenial,
   type TrpcRequestLike,
 } from "./policy.ts";
@@ -103,23 +103,6 @@ export type TrpcAuditSink = Readonly<{
   }): Promise<void> | void;
 }>;
 
-/**
- * The caller still holds a membership in this organization, but an admin
- * disabled it to stay within the licensed seat count, so it grants nothing.
- */
-export class MembershipDisabledError extends HandledError {
-  declare readonly code: "membership_disabled";
-
-  constructor() {
-    super("membership_disabled", "Your access to this organization has been disabled", {
-      httpStatus: 403,
-      fault: "customer",
-    });
-
-    this.name = "MembershipDisabledError";
-  }
-}
-
 /** This transport's own refusal copy: the two answers the declared check gives. */
 const DENIALS: TrpcAuthorizationDenial = {
   membershipDisabled: () => new MembershipDisabledError(),
@@ -137,7 +120,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     /** Structural: this transport IS session-authenticated. */
     sessions: SessionReader;
     /** The SAME decisions REST authorizes through, never a second. */
-    authz: TrpcAuthorizationDecisions;
+    authz: Authorize;
     /** Where every recorded mutation lands. Absent, each one says so once. */
     audit?: TrpcAuditSink | undefined;
     /** The module-shaped cause payloads a browser interceptor reads. */
@@ -168,7 +151,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   readonly #revalidatedPaths = new Set<string>();
   readonly #options: Parameters<typeof TrpcHost.create>[0];
   /** One request's decisions, by the request itself: never shared with the next one. */
-  readonly #decisions = new WeakMap<TrpcRequestLike, TrpcAuthorizationDecisions>();
+  readonly #decisions = new WeakMap<TrpcRequestLike, Authorize>();
   #composed: AnyTRPCRouter | undefined;
 
   private constructor(options: Parameters<typeof TrpcHost.create>[0]) {
@@ -386,7 +369,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
    * The decisions a request is authorized through (policy.ts `forRequest`): a batch asking one
    * question on one scope asks authz once. A caller with no request asks authz directly.
    */
-  #decisionsFor(ctx: Pick<TrpcRequestContext, "req">): TrpcAuthorizationDecisions {
+  #decisionsFor(ctx: Pick<TrpcRequestContext, "req">): Authorize {
     if (!ctx.req) return this.#options.authz;
     const known = this.#decisions.get(ctx.req);
     if (known) return known;
@@ -469,7 +452,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
 }
 
 /** The same decisions, each distinct question asked once and its answer shared. */
-function decidingOnce(authz: TrpcAuthorizationDecisions): TrpcAuthorizationDecisions {
+function decidingOnce(authz: Authorize): Authorize {
   const decisions = new Map<string, Promise<PermissionDecision>>();
   const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
 

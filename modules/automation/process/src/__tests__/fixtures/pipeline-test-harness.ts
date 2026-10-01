@@ -36,10 +36,6 @@ export class InertScheduledIntents extends AutomationScheduledIntent {
   }): Promise<GraphTriggerEvaluationResult> {
     return { ...input, status: "skipped" as const };
   }
-
-  async pruneWebhookDeliveries(): Promise<number> {
-    return 0;
-  }
 }
 
 export class InertIntentRetention extends AutomationIntentRetentionRepository {
@@ -59,7 +55,7 @@ export function automationProcessDefinition({
   reports = { dispatch: async () => {} },
   reportRuns = { settleRun: async () => {} },
 }: {
-  name: "triggerSettlement" | "graphAlertSweep" | "webhookDeliveryPrune" | "reportSchedule";
+  name: "triggerSettlement" | "graphAlertSweep" | "reportSchedule";
   scheduledIntents?: AutomationScheduledIntent;
   retention?: AutomationIntentRetentionRepository;
   reports?: ReportDispatcher;

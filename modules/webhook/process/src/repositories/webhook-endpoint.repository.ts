@@ -4,6 +4,7 @@ import type {
   UpdateWebhookEndpointCommand,
   WebhookDeliveryOutcome,
   WebhookEndpointView,
+  WebhookRequestFailureResponse,
 } from "@langwatch/webhook-contract";
 
 import type { WebhookId, WebhookSecret } from "../app/webhook.app.ts";
@@ -116,4 +117,29 @@ export interface WebhookEndpointRepository {
     endpointId: string;
   }): Promise<WebhookEndpointStatusSnapshot>;
   pruneDeliveries(now?: Instant): Promise<number>;
+  /** One `sendRequest` attempt, filed under the project and trigger it came from. */
+  recordRequestAttempt(input: WebhookRequestAttempt): Promise<void>;
+  findRequestAttempts(input: {
+    projectId: string;
+    triggerId: string;
+    limit: number;
+  }): Promise<WebhookRequestAttemptRow[]>;
 }
+
+export type WebhookRequestAttempt = {
+  projectId: string;
+  triggerId: string;
+  dispatchId: string;
+  outcome: "success" | "retryable" | "terminal";
+  responseStatus: number | null;
+  latencyMs: number;
+  error: string | null;
+  response: WebhookRequestFailureResponse | null;
+};
+
+export type WebhookRequestAttemptRow = Omit<WebhookRequestAttempt, "outcome" | "latencyMs"> & {
+  id: string;
+  outcome: "success" | "retryable" | "terminal" | "pending";
+  latencyMs: number | null;
+  firedAt: Instant;
+};

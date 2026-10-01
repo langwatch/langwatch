@@ -1,5 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { OrganizationSettings } from "@langwatch/organization-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { SlackApi } from "@langwatch/slack-contract";

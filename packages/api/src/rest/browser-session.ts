@@ -1,6 +1,6 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 
+import type { Authorize } from "../access/access.ts";
 import { SurfaceUnverifiedError } from "../errors.ts";
 import { recordBrowserCaller, type SessionReader } from "./credential.ts";
 import type { RestCaller, RestIdentity } from "./runtime.ts";
@@ -16,7 +16,7 @@ export class BrowserOriginRefusedError extends HandledError {
 
 export class BrowserSessionIdentity implements RestIdentity {
   readonly #sessions: SessionReader;
-  readonly #authz: AuthzApi;
+  readonly #authz: Pick<Authorize, "getDecision">;
   readonly #publicOrigin: string | null;
 
   private constructor({
@@ -25,7 +25,7 @@ export class BrowserSessionIdentity implements RestIdentity {
     publicOrigin,
   }: {
     sessions: SessionReader;
-    authz: AuthzApi;
+    authz: Pick<Authorize, "getDecision">;
     publicOrigin: string | null;
   }) {
     this.#sessions = sessions;
@@ -40,7 +40,7 @@ export class BrowserSessionIdentity implements RestIdentity {
     publicBaseUrl,
   }: {
     sessions: SessionReader;
-    authz: AuthzApi;
+    authz: Pick<Authorize, "getDecision">;
     publicBaseUrl: string | undefined;
   }): BrowserSessionIdentity {
     const publicOrigin =

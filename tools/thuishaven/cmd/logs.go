@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
@@ -59,10 +60,10 @@ func apiLaneFile(available map[string]bool) string {
 	return ""
 }
 
-// goLaneSimulators are the simulators a go.work checkout's go lane hosts beside
-// the data plane (cmd/service/combined_dev.go). There they have no capture of
-// their own, so `haven logs idp` reads the go lane's lines that idpsim wrote.
-var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm"}
+// goLaneSimulators are the simulators a go.work checkout's sims lane hosts
+// (cmd/service/combined_dev.go), or its go lane on an older haven. They have
+// no capture of their own, so `haven logs idp` reads that lane's lines.
+var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm", "analytics"}
 
 // logSource is one selected view: a capture file, the CLI name its lines are
 // labeled with, and — for one application of a shared lane — the application a
@@ -92,7 +93,7 @@ func fileToCLIService(name string) string {
 // logServiceColors mirrors the supervisor's lane palette so a service reads
 // the same in `haven logs` as it did live.
 var logServiceColors = map[string]string{
-	"ui": "34", "api": "32", "go": "33", "langy": "92",
+	"ui": "34", "api": "32", "go": "33", "sims": "96", "langy": "92",
 	// The worker half, in the color of the lane that hosts it.
 	"worker": "32",
 	// The single Node lane of a monolith checkout, in the ui lane's color:
@@ -212,8 +213,10 @@ func resolveLogSource(name string, available map[string]bool) (logSource, bool) 
 	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) {
 		return logSource{file: file, label: name, app: name}, true
 	}
-	if available["go"] && slices.Contains(goLaneSimulators, name) {
-		return logSource{file: "go", label: name, app: name}, true
+	for _, lane := range []string{app.SimsLane, app.GoLane} {
+		if available[lane] && slices.Contains(goLaneSimulators, name) {
+			return logSource{file: lane, label: name, app: name}, true
+		}
 	}
 	file := cliToFileService(name)
 	if !available[file] {
@@ -235,7 +238,7 @@ func logSelectableNames(available []string) []string {
 		}
 		out = append(out, fileToCLIService(s))
 	}
-	if slices.Contains(available, "go") {
+	if slices.Contains(available, app.GoLane) || slices.Contains(available, app.SimsLane) {
 		for _, sim := range goLaneSimulators {
 			if !slices.Contains(out, sim) {
 				out = append(out, sim)

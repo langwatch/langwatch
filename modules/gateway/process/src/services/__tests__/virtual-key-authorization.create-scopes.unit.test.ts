@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayPermissionScope, GatewayScopePermissions } from "../../app/gateway.members.ts";

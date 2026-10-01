@@ -4,7 +4,7 @@
  * runs, their live stream, cancellation, Results and configuration history.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { MAX_ATOM_PAGE } from "./result-atoms.ts";

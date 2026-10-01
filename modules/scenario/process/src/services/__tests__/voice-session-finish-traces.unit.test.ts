@@ -40,6 +40,7 @@ function composeWithTraceCollector() {
     signingSecret: SECRET,
     voicePublicBaseUrl: undefined,
     voiceCallMaxSeconds: undefined,
+    allowLoopbackVoiceProviders: false,
     recordings: MemoryVoiceRecordingChannel.create(),
   });
   return { service, recorded };

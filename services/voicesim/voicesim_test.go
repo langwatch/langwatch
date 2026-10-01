@@ -266,11 +266,44 @@ func TestConsoleAPIListsCallsNewestFirstWithTurns(t *testing.T) {
 // @scenario "The call log is bounded"
 func TestCallLogKeepsOnlyTheMostRecentCalls(t *testing.T) {
 	var log callLog
-	for range maxCalls + 5 {
+	for range defaultMaxCalls + 5 {
 		log.open("agent")
 	}
-	if log.len() != maxCalls || log.calls[0].ID != "conv_voicesim_0006" {
+	if log.len() != defaultMaxCalls || log.calls[0].ID != "conv_voicesim_0006" {
 		t.Fatalf("log holds %d calls starting at %s", log.len(), log.calls[0].ID)
+	}
+}
+
+// @scenario "The call log is bounded"
+func TestCallLogCapsAreConfigurable(t *testing.T) {
+	log := callLog{maxCalls: 3, maxEvents: 2}
+	var last *Call
+	for range 5 {
+		last = log.open("agent")
+	}
+	for range 4 {
+		log.event(last, "in", "ping")
+	}
+	if log.len() != 3 || log.calls[0].ID != "conv_voicesim_0003" {
+		t.Fatalf("log holds %d calls starting at %s, want 3 from 0003", log.len(), log.calls[0].ID)
+	}
+	if len(last.Events) != 2 || last.DroppedEvents != 2 {
+		t.Fatalf("call kept %d events and dropped %d, want 2 and 2", len(last.Events), last.DroppedEvents)
+	}
+}
+
+// @scenario "A seeded voicesim starts with a sample call"
+func TestSeedLoadsOneFinishedCall(t *testing.T) {
+	s := newServer(Config{Seed: true}, fstest.MapFS{})
+	if s.calls.len() != 1 {
+		t.Fatalf("seeded server holds %d calls, want 1", s.calls.len())
+	}
+	call := s.calls.calls[0]
+	if call.AgentID != seedAgentID || len(call.Turns) != 2 || call.EndedAt == nil {
+		t.Fatalf("seed call = %+v", call)
+	}
+	if unseeded := newServer(Config{}, fstest.MapFS{}); unseeded.calls.len() != 0 {
+		t.Fatalf("an unseeded server holds %d calls", unseeded.calls.len())
 	}
 }
 

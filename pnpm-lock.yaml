@@ -2736,9 +2736,6 @@ importers:
 
   enterprise/modules/billing/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -2974,9 +2971,6 @@ importers:
 
   enterprise/modules/enterprise-gateway/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -3005,6 +2999,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
@@ -3072,9 +3069,6 @@ importers:
 
   enterprise/modules/enterprise-ops/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../../packages/api
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
@@ -3155,6 +3149,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../../packages/authorization
       '@langwatch/authz-browser-kit':
         specifier: workspace:*
         version: link:../../../../modules/authz/browser-kit
@@ -3349,6 +3346,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../../../modules/auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
@@ -3552,9 +3552,6 @@ importers:
 
   enterprise/modules/licensing/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -3810,6 +3807,12 @@ importers:
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../../../modules/onboarding/contract
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../../packages/prisma-client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -4034,9 +4037,6 @@ importers:
 
   enterprise/modules/scim/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -4250,9 +4250,6 @@ importers:
 
   enterprise/modules/sso/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -4540,9 +4537,6 @@ importers:
 
   modules/agent/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -4586,6 +4580,9 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -4937,6 +4934,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -5008,6 +5008,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -5214,9 +5217,6 @@ importers:
 
   modules/annotation/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -5324,6 +5324,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -5345,6 +5348,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-browser-kit':
         specifier: workspace:*
         version: link:../../authz/browser-kit
@@ -5415,12 +5421,9 @@ importers:
 
   modules/api-key/contract:
     dependencies:
-      '@langwatch/api':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../../packages/api
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -5458,6 +5461,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -5531,9 +5537,6 @@ importers:
 
   modules/audit-log/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
@@ -5638,9 +5641,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/authz-contract':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
@@ -5741,9 +5744,6 @@ importers:
 
   modules/auth/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -5911,6 +5911,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-browser-kit':
         specifier: workspace:*
         version: link:../browser-kit
@@ -5984,6 +5987,9 @@ importers:
 
   modules/authz/browser-kit:
     dependencies:
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../contract
@@ -6042,6 +6048,9 @@ importers:
       '@langwatch/actor':
         specifier: workspace:*
         version: link:../../../packages/actor
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -6082,6 +6091,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../contract
@@ -6152,6 +6164,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../contract
@@ -6182,6 +6197,9 @@ importers:
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
+      '@langwatch/webhook-contract':
+        specifier: workspace:*
+        version: link:../../webhook/contract
       '@monaco-editor/react':
         specifier: 'catalog:'
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -6216,9 +6234,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -6258,9 +6273,6 @@ importers:
 
   modules/automation/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -6279,6 +6291,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/webhook-contract':
+        specifier: workspace:*
+        version: link:../../webhook/contract
       croner:
         specifier: 'catalog:'
         version: 10.0.1
@@ -6337,9 +6352,6 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
-      '@langwatch/egress':
-        specifier: workspace:*
-        version: link:../../../packages/egress
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -6406,6 +6418,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/webhook-contract':
+        specifier: workspace:*
+        version: link:../../webhook/contract
       '@slack/webhook':
         specifier: 'catalog:'
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
@@ -6446,6 +6461,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
@@ -6483,9 +6501,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -6580,9 +6595,6 @@ importers:
 
   modules/coding-agent/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
@@ -6732,9 +6744,6 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
@@ -6800,9 +6809,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
-      '@langwatch/authz-contract':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -6888,9 +6897,6 @@ importers:
 
   modules/data-privacy/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -7059,9 +7065,6 @@ importers:
 
   modules/data-retention/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -7139,6 +7142,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -7363,9 +7369,6 @@ importers:
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -7412,6 +7415,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -7506,12 +7512,9 @@ importers:
 
   modules/entitlement/contract:
     dependencies:
-      '@langwatch/api':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../../packages/api
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -7540,9 +7543,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/authz-contract':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
@@ -7613,9 +7616,6 @@ importers:
 
   modules/evaluation/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -7977,9 +7977,6 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -8017,6 +8014,9 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -8389,12 +8389,9 @@ importers:
 
   modules/experiment/contract:
     dependencies:
-      '@langwatch/api':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../../packages/api
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -8565,6 +8562,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
@@ -8644,9 +8644,6 @@ importers:
 
   modules/feature-flag/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -8678,6 +8675,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -8745,12 +8745,12 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-browser-kit':
         specifier: workspace:*
         version: link:../../authz/browser-kit
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
@@ -8900,6 +8900,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../api-key/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -9082,9 +9085,6 @@ importers:
 
   modules/github/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -9287,9 +9287,6 @@ importers:
 
   modules/identity/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -9906,6 +9903,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -9952,6 +9952,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../api-key/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -10496,9 +10499,6 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -10618,6 +10618,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -10706,9 +10709,6 @@ importers:
 
   modules/monitor/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -10740,6 +10740,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -10816,9 +10819,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/authz-contract':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
@@ -11236,9 +11239,6 @@ importers:
 
   modules/onboarding/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -11267,6 +11267,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -11473,9 +11476,6 @@ importers:
 
   modules/ops/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -11712,6 +11712,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-browser-kit':
         specifier: workspace:*
         version: link:../../authz/browser-kit
@@ -11821,9 +11824,6 @@ importers:
 
   modules/organization/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -11867,6 +11867,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../api-key/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -12144,9 +12147,6 @@ importers:
 
   modules/presence/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -12172,9 +12172,6 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -12215,6 +12212,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -12375,9 +12375,6 @@ importers:
 
   modules/project/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
@@ -12415,6 +12412,9 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -12451,6 +12451,9 @@ importers:
       '@langwatch/share-contract':
         specifier: workspace:*
         version: link:../../share/contract
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -12748,9 +12751,6 @@ importers:
 
   modules/prompt/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -12776,6 +12776,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -12864,9 +12867,9 @@ importers:
 
   modules/role/contract:
     dependencies:
-      '@langwatch/api':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../../packages/api
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -12895,6 +12898,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -13137,9 +13143,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/authz-contract':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
@@ -13315,9 +13321,6 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
@@ -13394,6 +13397,9 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -13624,9 +13630,6 @@ importers:
 
   modules/secret/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -13768,9 +13771,6 @@ importers:
 
   modules/share/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
@@ -13998,6 +13998,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -14105,12 +14108,9 @@ importers:
 
   modules/stored-object/contract:
     dependencies:
-      '@langwatch/api':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../../packages/api
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -14145,6 +14145,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -14331,9 +14334,6 @@ importers:
 
   modules/suite/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -14441,6 +14441,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -14517,9 +14520,6 @@ importers:
 
   modules/topic/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
@@ -14539,9 +14539,6 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -14594,6 +14591,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -14962,9 +14962,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/authz-contract':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -15204,6 +15204,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
@@ -15231,6 +15234,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
@@ -15307,9 +15313,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -15401,9 +15404,6 @@ importers:
 
   modules/user/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
@@ -15544,9 +15544,6 @@ importers:
 
   modules/webhook/contract:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -15620,6 +15617,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -15660,6 +15660,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+      undici:
+        specifier: 'catalog:'
+        version: 8.10.0
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -15968,12 +15971,9 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
-      '@langwatch/api':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../../packages/api
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -16026,6 +16026,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../api-key/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -16148,9 +16151,9 @@ importers:
       '@langwatch/actor':
         specifier: workspace:*
         version: link:../actor
-      '@langwatch/authz-contract':
+      '@langwatch/authorization':
         specifier: workspace:*
-        version: link:../../modules/authz/contract
+        version: link:../authorization
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
@@ -16293,6 +16296,28 @@ importers:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/authorization:
+    dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../handled-error
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/aws-client:
     dependencies:
       '@aws-sdk/credential-providers':
@@ -16368,6 +16393,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../modules/langy/contract
@@ -16780,21 +16808,9 @@ importers:
 
   packages/egress:
     dependencies:
-      '@langwatch/automation-contract':
-        specifier: workspace:*
-        version: link:../../modules/automation/contract
-      '@langwatch/eventing':
-        specifier: workspace:*
-        version: link:../eventing
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../task
-      '@langwatch/time':
-        specifier: workspace:*
-        version: link:../time
       undici:
         specifier: 'catalog:'
         version: 8.10.0
@@ -17639,6 +17655,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../modules/auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../modules/authz/contract

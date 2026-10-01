@@ -12,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";

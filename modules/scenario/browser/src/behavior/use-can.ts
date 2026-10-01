@@ -1,4 +1,4 @@
-import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authz-contract";
+import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authorization";
 import { useCallback, useMemo } from "react";
 
 import { api } from "./scenario-api.ts";

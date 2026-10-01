@@ -3,7 +3,7 @@
  * Spec: specs/identity/org-access-cluster.feature
  */
 
-import { AUTHZ_RESOURCES } from "@langwatch/authz-contract";
+import { AUTHZ_RESOURCES } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import {

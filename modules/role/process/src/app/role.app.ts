@@ -4,13 +4,13 @@
  * their check runs against, so those checks run here, where the row is.
  */
 import { ledgerActorFor, type LedgerActor } from "@langwatch/actor";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import {
   AuthzApi,
   bindingScopeCanGrantPermission,
   builtInRoleIdSchema,
   builtinRolePermissions,
   newAuthzGrantId,
-  PermissionDeniedError,
   type AuthzPrincipalRef,
   type BuiltInRoleId,
   type GrantScopeTier,

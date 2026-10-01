@@ -1,4 +1,4 @@
-import type { OrganizationUserRole } from "@langwatch/authz-contract";
+import type { OrganizationUserRole } from "@langwatch/authorization";
 import { defineServerModule } from "@langwatch/kernel";
 
 import { EntitlementApp } from "./app/entitlement.app.ts";

@@ -3,7 +3,7 @@
  * browser's cache keys. Split across five files: the router builder caps
  * around fifty procedures per namespace, and this surface has ninety-two.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { dashboardDataSchema, queueSummaryInfoSchema } from "./ops-dashboard.ts";

@@ -4,13 +4,13 @@
  */
 
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type {
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListGrantsInput,
   AuthzManagedOrganizationBinding,
   AuthzOwnStanding,
-  AuthzPermission,
   AuthzRevokeGrantByIdInput,
   Grant,
   GrantPage,

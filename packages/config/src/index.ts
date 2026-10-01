@@ -14,6 +14,7 @@ export {
 } from "./config.ts";
 export {
   allowedProxyHosts,
+  allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   gatewayAddressOf,
   gatewayInternalUrl,

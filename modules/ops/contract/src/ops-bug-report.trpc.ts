@@ -3,7 +3,7 @@
  * product, `getById` opens one. Not an RBAC permission - a report carries
  * no tenant, so the LangWatch staff list decides instead.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 import {
   bugReportIdInputSchema,

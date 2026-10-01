@@ -71,13 +71,6 @@ import {
   INITIAL_SETTLEMENT_STATE,
   triggerSettlementStateSchema,
 } from "./trigger-settlement.process.ts";
-import { runWebhookDeliveryPrune } from "./webhook-delivery-prune.intent.ts";
-import {
-  pruneSchema,
-  WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
-  webhookDeliveryPruneStateSchema,
-  webhookDeliveryPruneWake,
-} from "./webhook-delivery-prune.process.ts";
 
 export const RecordTriggerMatchCommand = defineCommand({
   commandType: RECORD_TRIGGER_MATCH_COMMAND_TYPE,
@@ -260,17 +253,6 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           "evaluateGraph",
           sweepSchema,
           runGraphAlertSweep(deps.scheduledIntents, deps.retention),
-        ),
-    )
-    .withProcessManager("webhookDeliveryPrune", (pm) =>
-      pm
-        .state(webhookDeliveryPruneStateSchema, { lastPruneAt: null })
-        .schedule({ everyMs: WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS })
-        .onWake(webhookDeliveryPruneWake)
-        .intent(
-          "prune",
-          pruneSchema,
-          runWebhookDeliveryPrune(deps.scheduledIntents, deps.retention),
         ),
     )
     .build();

@@ -82,24 +82,39 @@ export function evaluationRanSignal({
   };
 }
 
-/** A settled evaluation, against the admin, counted across the organization. */
+/** The organization a settled evaluation was counted against, as nurturing's own store holds it. */
+type CountedOrganization = Readonly<{
+  adminUserId: string | null;
+  seeded: boolean;
+  evaluationCount: number;
+}>;
+
+/** A settled evaluation against the organization's admin; none where nurturing knows no admin. */
 export function evaluationCompletedSignal({
   data,
   aggregateId,
-}: OwnerEvent<EvaluationLifecycleCompletedEventData>): NurturingSignal {
-  return {
-    kind: "evaluation_completed",
-    sourceEventId: `${aggregateId}:${data.evaluationId}`,
-    tenantId: data.tenantId,
-    occurredAt: data.occurredAt,
-    userId: data.userId,
-    projectId: data.projectId,
-    evaluationId: data.evaluationId,
-    evaluatorType: data.evaluatorType,
-    score: data.score,
-    passed: data.passed,
-    organizationEvaluationCount: data.organizationEvaluationCount,
-  };
+  organization,
+}: OwnerEvent<EvaluationLifecycleCompletedEventData> & {
+  organization: CountedOrganization;
+}): NurturingSignal[] {
+  const { adminUserId, seeded, evaluationCount } = organization;
+  if (!adminUserId) return [];
+  return [
+    {
+      kind: "evaluation_completed",
+      sourceEventId: `${aggregateId}:${data.evaluationId}`,
+      tenantId: data.tenantId,
+      occurredAt: data.occurredAt,
+      userId: adminUserId,
+      projectId: data.projectId,
+      evaluationId: data.evaluationId,
+      evaluatorType: data.evaluatorType,
+      score: data.score,
+      passed: data.passed,
+      organizationEvaluationCount: evaluationCount,
+      first: !seeded && evaluationCount === 1,
+    },
+  ];
 }
 
 /** Every member of the organization carries whether it holds a subscription. */
