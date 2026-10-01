@@ -19,7 +19,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 
 // tRPC query returns an empty providers list to simulate a freshly
 // created project with zero configured providers.
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
+vi.mock("../../../behavior/model-provider-api.ts", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

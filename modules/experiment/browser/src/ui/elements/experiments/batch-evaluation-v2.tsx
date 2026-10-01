@@ -15,7 +15,6 @@ import {
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -23,7 +22,6 @@ import { getRunDisplayName } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 import { FormatMoney } from "@langwatch/workflow-browser-kit";
-import type { Experiment } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import React from "react";
@@ -36,6 +34,11 @@ import {
 import { useBatchEvaluationState } from "../../../behavior/experiments/use-batch-evaluation-runs.ts";
 import { VersionBox } from "../../../behavior/lent-workflow.tsx";
 import { useDejaViewLink } from "../../../behavior/use-deja-view-link.ts";
+import type {
+  ExperimentApiOutputs,
+  ExperimentApiRouter,
+  ExperimentRow,
+} from "../../../model/experiment-api-map.ts";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,
@@ -57,7 +60,7 @@ export function BatchEvaluationV2({
   experiment,
 }: {
   project: UiHostProject;
-  experiment: Experiment;
+  experiment: ExperimentRow;
 }) {
   const { batchEvaluationRuns, selectedRun, selectedRunId, setSelectedRunId, isFinished } =
     useBatchEvaluationState({
@@ -311,8 +314,8 @@ export function BatchEvaluationV2RunList({
   ...props
 }: {
   batchEvaluationRuns: UseTRPCQueryResult<
-    RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
-    TRPCClientErrorLike<WorkflowApiRouter>
+    ExperimentApiOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
+    TRPCClientErrorLike<ExperimentApiRouter>
   >;
   selectedRun: ExperimentRun | undefined;
   selectedRunId: string | undefined;

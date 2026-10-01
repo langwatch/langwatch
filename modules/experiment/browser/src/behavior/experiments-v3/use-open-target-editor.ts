@@ -4,7 +4,6 @@
 
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
 import {
   type AvailableSource,
@@ -30,6 +29,7 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 import { buildTargetAvailableSources } from "./target-available-sources.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 import { useResolveTargetName } from "./use-resolve-target-name.ts";
@@ -172,7 +172,7 @@ const comparisonEditorProps = ({
 export const useOpenTargetEditor = () => {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useUtils();
+  const trpcUtils = experimentApi.useUtils();
   const resolveTargetName = useResolveTargetName();
 
   const {

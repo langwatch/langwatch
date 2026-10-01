@@ -25,8 +25,8 @@ vi.mock("../../../../../behavior/studio-host/use-organization-team-project.ts", 
   }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     useUtils: () => ({
       agents: { getById: { setData: mockSetData } },
     }),

@@ -22,10 +22,10 @@
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
+      "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-trpc/tsconfig.build.json"
+      "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
       "path": "../../../packages/csv/tsconfig.build.json"
@@ -41,6 +41,9 @@
     },
     {
       "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
       "path": "../../evaluator/browser-kit/tsconfig.build.json"
@@ -71,6 +74,9 @@
     },
     {
       "path": "../../prompt/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../../prompt/contract/tsconfig.build.json"
     },
     {
       "path": "../../stored-object/browser-kit/tsconfig.build.json"

@@ -6,10 +6,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => {
+vi.mock("../../../behavior/workflow-api.ts", () => {
   const mutation = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
   return {
-    api: {
+    workflowApi: {
       useUtils: () => ({ workflow: { getAll: { invalidate: vi.fn() } } }),
       workflow: {
         create: { useMutation: mutation },

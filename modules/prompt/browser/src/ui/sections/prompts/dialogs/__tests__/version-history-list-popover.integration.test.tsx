@@ -18,8 +18,8 @@ vi.mock("@langwatch/browser-host/toaster", () => ({
 vi.mock("@langwatch/browser-host/errors", () => ({ showErrorToast: vi.fn() }));
 
 const mockUseQuery = vi.fn();
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../../behavior/prompt-api.ts", () => ({
+  promptApi: {
     prompts: {
       getAllVersionsForPrompt: { useQuery: (...args: unknown[]) => mockUseQuery(...args) },
     },

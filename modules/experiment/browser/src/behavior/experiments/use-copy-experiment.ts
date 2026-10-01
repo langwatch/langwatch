@@ -1,14 +1,15 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+
+import { experimentApi } from "../experiment-api.ts";
 
 /**
  * Replicates an experiment into another project.
  * Moved out of `CopyExperimentDialog` (Record 10: elements cannot fetch).
  */
 export const useCopyExperiment = () => {
-  const utils = api.useUtils();
-  const copyExperiment = api.experiments.copy.useMutation();
+  const utils = experimentApi.useUtils();
+  const copyExperiment = experimentApi.experiments.copy.useMutation();
 
   const copyExperimentTo = async ({
     experimentId,

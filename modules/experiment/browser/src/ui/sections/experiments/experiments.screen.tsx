@@ -14,7 +14,6 @@ import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -38,6 +37,7 @@ import {
   LuTrash,
 } from "react-icons/lu";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
@@ -356,7 +356,7 @@ export function ExperimentsPage() {
   const { copyExperimentTo, isCopying } = useCopyExperiment();
 
   /** One page of the project's experiments; every field is one the table renders. */
-  const experiments = api.experiments.getAllForEvaluationsList.useQuery(
+  const experiments = experimentApi.experiments.getAllForEvaluationsList.useQuery(
     {
       projectId: project?.id ?? "",
       pageOffset: navigationFooter.pageOffset,
@@ -372,7 +372,7 @@ export function ExperimentsPage() {
 
   navigationFooter.useUpdateTotalHits(experiments);
 
-  const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation({
+  const deleteExperimentMutation = experimentApi.experiments.deleteExperiment.useMutation({
     onSuccess: () => {
       void experiments.refetch();
       toaster.create({

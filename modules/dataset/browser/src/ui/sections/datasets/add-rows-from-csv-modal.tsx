@@ -1,7 +1,6 @@
 import { Box, Button, HStack, NativeSelect, Spacer, Text } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type DatasetColumns,
   type DatasetRecordEntry,
@@ -12,6 +11,7 @@ import { generate } from "@langwatch/ksuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 
+import { datasetApi } from "../../../behavior/dataset-api.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
 
@@ -36,7 +36,7 @@ export function AddRowsFromCSVModal({
   onUpdateDataset?: (entries: DatasetRecordEntry[]) => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const dataset = api.datasetRecord.getAll.useQuery(
+  const dataset = datasetApi.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
     {
       enabled: !!project && !!datasetId,
@@ -50,7 +50,7 @@ export function AddRowsFromCSVModal({
   const [csvUploaded, setCSVUploaded] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [canUpload, setCanUpload] = useState(false);
-  const uploadRecords = api.datasetRecord.create.useMutation();
+  const uploadRecords = datasetApi.datasetRecord.create.useMutation();
 
   const preprocessCSV = (csv: string[][]) => {
     setCSVHeaders(csv[0] ?? []);

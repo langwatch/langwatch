@@ -1,7 +1,6 @@
 import { HStack, type StackProps } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { slugify } from "@langwatch/design-system/slugify";
 import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
@@ -23,6 +22,7 @@ import { useEffect, useState } from "react";
 import { TraceIdPeek } from "../../../behavior/lent-trace.tsx";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { isExperimentQueryEnabled } from "../../../model/studio-evaluation-query.ts";
 import { OpenFullResultsButton } from "../../elements/optimization_studio/open-full-results-button.tsx";
 import {
@@ -74,7 +74,7 @@ export function EvaluationResults({
   const { openDrawer } = useDrawer();
   const [keepFetching, setKeepFetching] = useState(false);
 
-  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
+  const experiment = workflowApi.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
       experimentId: experimentId,
@@ -117,7 +117,7 @@ export function EvaluationResults({
   }));
 
   const polling = useBatchRunsPolling();
-  const batchEvaluationRuns = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
+  const batchEvaluationRuns = workflowApi.experiments.getExperimentBatchEvaluationRuns.useQuery(
     { projectId: project?.id ?? "", experimentId: experiment.data?.id ?? "" },
     { refetchInterval: polling.refetchInterval, enabled: !!project && !!experiment.data },
   );
@@ -136,7 +136,7 @@ export function EvaluationResults({
   });
 
   // Fetch selected run data for new table
-  const runDataQuery = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const runDataQuery = workflowApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
       projectId: project?.id ?? "",
       experimentId: experiment.data?.id ?? "",

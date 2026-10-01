@@ -2,11 +2,11 @@ import { Alert, HStack, Skeleton, Spacer, Table, Tabs, Text, VStack } from "@cha
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import type { Experiment } from "@langwatch/workflow-contract";
 import React, { useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 
 import type { useBatchEvaluationResults } from "../../../../behavior/experiments/use-batch-evaluation-run-results.ts";
+import type { ExperimentRow } from "../../../../model/experiment-api-map.ts";
 import { BatchEvaluationV2EvaluationResult } from "./batch-evaluation-v2-evaluation-result.tsx";
 
 type BatchEvaluationResults = ReturnType<typeof useBatchEvaluationResults>;
@@ -28,7 +28,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     isDownloadCSVEnabled,
   }: {
     project: UiHostProject;
-    experiment: Experiment;
+    experiment: ExperimentRow;
     runId: string | undefined;
     isFinished: boolean;
     size?: "sm" | "md";

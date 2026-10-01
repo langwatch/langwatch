@@ -10,7 +10,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
 import { SmallLabel } from "@langwatch/design-system/small-label";
@@ -34,6 +33,7 @@ import {
 } from "react-hook-form";
 import { type ZodType, z } from "zod";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
 import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
@@ -336,11 +336,11 @@ const DynamicZodForm = ({
   const { project } = useOrganizationTeamProject();
 
   // Cascade-resolved defaults for evaluator model + embeddings fields.
-  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedDefaultModel = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id },
   );
-  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedDefaultEmbeddings = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
     {
       projectId: project?.id ?? "",
       featureKey: "analytics.topic_clustering_embeddings",

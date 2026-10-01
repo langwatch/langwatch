@@ -7,7 +7,6 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -22,6 +21,7 @@ import { type ReactNode, useCallback, useMemo } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
 
+import { promptApi } from "../../../behavior/prompt-api.ts";
 import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version.ts";
 import {
   useEditorInputMappings,
@@ -207,7 +207,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const { targetId, promptId, promptVersionId, isOpen, availableSources } = opened;
 
   // The cascade-resolved model for prompts created here.
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedDefault = promptApi.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id },
   );
@@ -218,7 +218,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   });
 
   // The pinned version when one is named, else the latest.
-  const promptQuery = api.prompts.getByIdOrHandle.useQuery(
+  const promptQuery = promptApi.prompts.getByIdOrHandle.useQuery(
     {
       idOrHandle: promptId ?? "",
       projectId: project?.id ?? "",

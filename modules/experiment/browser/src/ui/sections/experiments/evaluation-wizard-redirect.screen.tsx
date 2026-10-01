@@ -1,9 +1,9 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { useEffect, useRef } from "react";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { ExperimentType } from "../../../model/prisma-types.ts";
 
 /**
@@ -16,7 +16,7 @@ export default function EvaluationWizardRedirect() {
   const hasRedirectedRef = useRef(false);
   const slug = typeof router.query.slug === "string" ? router.query.slug : undefined;
 
-  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
+  const experiment = experimentApi.experiments.getExperimentBySlugOrId.useQuery(
     { projectId: project?.id ?? "", experimentSlug: slug ?? "" },
     { enabled: !!project && !!slug },
   );

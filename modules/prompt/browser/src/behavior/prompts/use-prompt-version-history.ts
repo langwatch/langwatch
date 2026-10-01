@@ -1,4 +1,4 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { promptApi } from "../prompt-api.ts";
 
 /**
  * The version list a version-history popover renders. Moved out of the
@@ -14,7 +14,7 @@ export function usePromptVersionHistory({
   projectId: string | undefined;
   isOpen: boolean;
 }) {
-  const { data: versions = [], isLoading } = api.prompts.getAllVersionsForPrompt.useQuery(
+  const { data: versions = [], isLoading } = promptApi.prompts.getAllVersionsForPrompt.useQuery(
     {
       idOrHandle: configId,
       projectId: projectId ?? "",

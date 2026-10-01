@@ -127,8 +127,8 @@ vi.mock("@xyflow/react", async (importOriginal) => {
   };
 });
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     dataset: {
       getAll: {
         useQuery: () => ({

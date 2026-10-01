@@ -4,9 +4,13 @@
  * used. Its screens join this declaration in the declarations fan-out.
  */
 
+import { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import { defineWebModule } from "@langwatch/ui-kernel";
 
+import { evaluatorApi } from "./behavior/evaluator-api.ts";
+
 export const evaluatorWeb = defineWebModule("evaluator")
+  .withApi(evaluatorApi, { contracts: [evaluatorTrpc] })
   .withHosts({
     requires: ["EvaluatorHostApi"],
     mounts: { EvaluatorHostApi: { load: () => import("./behavior/evaluator-host-mount.tsx") } },

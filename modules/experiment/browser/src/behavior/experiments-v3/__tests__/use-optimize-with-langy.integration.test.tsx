@@ -15,8 +15,8 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({}),
     useQueries: () => [],
     prompts: {

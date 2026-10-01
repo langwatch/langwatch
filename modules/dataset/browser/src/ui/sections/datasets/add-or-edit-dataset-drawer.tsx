@@ -5,7 +5,6 @@ import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type DatasetApiUpsertOutput,
   type DatasetColumns,
@@ -21,6 +20,7 @@ import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, type Resolver, useFieldArray, useForm } from "react-hook-form";
 
+import { datasetApi } from "../../../behavior/dataset-api.ts";
 import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
@@ -191,7 +191,7 @@ function resetDrawerForm({
 
 export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const upsertDataset = api.dataset.upsert.useMutation();
+  const upsertDataset = datasetApi.dataset.upsert.useMutation();
   const { closeDrawer } = useDrawer();
   const onClose = props.onClose ?? closeDrawer;
   const isOpen = props.open ?? true;
@@ -240,7 +240,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 
-  const trpc = api.useUtils();
+  const trpc = datasetApi.useUtils();
 
   const performUpsert = (data: DatasetRecordForm) => {
     upsertDataset.mutate(

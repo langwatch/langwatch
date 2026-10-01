@@ -4,12 +4,12 @@
  */
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { generate } from "@langwatch/ksuid";
 import type { ProposalHandlers } from "@langwatch/langy-browser-kit";
 import { useMemo } from "react";
 
 import type { EvaluationsV3Store } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /** The app's KSUID resource for a workbench evaluator id (`KSUID_RESOURCES.EVALUATOR`). */
@@ -49,10 +49,10 @@ type WorkbenchProposalDeps = {
 export const useEvaluatorProposalHandlers = (): ProposalHandlers => {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const createEvaluator = api.evaluators.create.useMutation();
-  const updateEvaluator = api.evaluators.update.useMutation();
-  const deleteEvaluator = api.evaluators.delete.useMutation();
-  const utils = api.useUtils();
+  const createEvaluator = experimentApi.evaluators.create.useMutation();
+  const updateEvaluator = experimentApi.evaluators.update.useMutation();
+  const deleteEvaluator = experimentApi.evaluators.delete.useMutation();
+  const utils = experimentApi.useUtils();
   return useMemo<ProposalHandlers>(() => {
     const projectId = project?.id;
     if (!projectId) return {} as ProposalHandlers;
@@ -164,9 +164,9 @@ export const useWorkbenchProposalHandlers = ({
 /** Langy's prompt proposals, applied from this page. */
 export const usePromptProposalHandlers = (): ProposalHandlers => {
   const { project } = useOrganizationTeamProject();
-  const createPrompt = api.prompts.create.useMutation();
-  const updatePrompt = api.prompts.update.useMutation();
-  const utils = api.useUtils();
+  const createPrompt = experimentApi.prompts.create.useMutation();
+  const updatePrompt = experimentApi.prompts.update.useMutation();
+  const utils = experimentApi.useUtils();
   return useMemo<ProposalHandlers>(() => {
     const projectId = project?.id;
     const projectSlug = project?.slug;
@@ -217,9 +217,9 @@ export const usePromptProposalHandlers = (): ProposalHandlers => {
 /** Langy's dataset proposals, applied from this page. */
 export const useDatasetProposalHandlers = (): ProposalHandlers => {
   const { project } = useOrganizationTeamProject();
-  const upsertDataset = api.dataset.upsert.useMutation();
-  const createDatasetRecords = api.datasetRecord.create.useMutation();
-  const utils = api.useUtils();
+  const upsertDataset = experimentApi.dataset.upsert.useMutation();
+  const createDatasetRecords = experimentApi.datasetRecord.create.useMutation();
+  const utils = experimentApi.useUtils();
   return useMemo<ProposalHandlers>(() => {
     const projectId = project?.id;
     const projectSlug = project?.slug;

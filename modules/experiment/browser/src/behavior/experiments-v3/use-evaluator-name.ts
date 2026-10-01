@@ -1,9 +1,9 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { useMemo } from "react";
 
 import type { EvaluatorConfig } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 
 /**
  * What an evaluator with no stored name is called: the catalog's name for its type, and
@@ -33,7 +33,7 @@ export const resolveEvaluatorName = ({
 export const useEvaluatorNames = (evaluators: EvaluatorConfig[]): Map<string, string> => {
   const { project } = useOrganizationTeamProject();
 
-  const queries = api.useQueries((t) =>
+  const queries = experimentApi.useQueries((t) =>
     evaluators.map((evaluator) =>
       t.evaluators.getById(
         {
@@ -49,7 +49,7 @@ export const useEvaluatorNames = (evaluators: EvaluatorConfig[]): Map<string, st
   );
 
   // Derive a cheap string key so useMemo only recomputes when names actually
-  // change, not on every render (api.useQueries returns a new array ref).
+  // change, not on every render (experimentApi.useQueries returns a new array ref).
   const namesKey = evaluators
     .map(
       (ev, i) =>
@@ -88,7 +88,7 @@ export const useEvaluatorName = (evaluator: EvaluatorConfig): string => {
 export const useCodeEvaluatorIds = (evaluators: EvaluatorConfig[]): Set<string> => {
   const { project } = useOrganizationTeamProject();
 
-  const queries = api.useQueries((t) =>
+  const queries = experimentApi.useQueries((t) =>
     evaluators.map((evaluator) =>
       t.evaluators.getById(
         {

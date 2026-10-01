@@ -1,6 +1,7 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useRef } from "react";
+
+import { promptApi } from "../prompt-api.ts";
 
 type UseLatestPromptVersionResult = {
   /** The current version number */
@@ -46,7 +47,7 @@ export const useLatestPromptVersion = ({
     data: latestPrompt,
     isLoading,
     isFetching,
-  } = api.prompts.getByIdOrHandle.useQuery(
+  } = promptApi.prompts.getByIdOrHandle.useQuery(
     {
       idOrHandle: configId ?? "",
       projectId: project?.id ?? "",

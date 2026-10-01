@@ -4,9 +4,13 @@
  * 2026-09-18) and is deleted here, not repointed.
  */
 
+import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 import { defineWebModule } from "@langwatch/ui-kernel";
 
+import { promptApi } from "./behavior/prompt-api.ts";
+
 export const promptWeb = defineWebModule("prompt")
+  .withApi(promptApi, { contracts: [promptTrpc, promptTagTrpc] })
   .withHosts({
     requires: ["PromptHostApi"],
     mounts: { PromptHostApi: { load: () => import("./behavior/prompt-host-mount.tsx") } },

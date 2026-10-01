@@ -1,12 +1,12 @@
 /** The dataset header's actions: pick a saved one, upload a CSV, edit, or save an inline one. */
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { useMemo } from "react";
 
 import { convertInlineToRowRecords } from "../../model/experiments-v3/dataset-conversion.ts";
 import type { DatasetReference } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 import type { PendingDatasetLoad } from "./use-saved-dataset-loader.ts";
 
 export type SaveAsDatasetDraft = {
@@ -54,7 +54,7 @@ export const useWorkbenchDatasetHandlers = ({
 }) => {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useUtils();
+  const trpcUtils = experimentApi.useUtils();
 
   return useMemo(
     () => ({

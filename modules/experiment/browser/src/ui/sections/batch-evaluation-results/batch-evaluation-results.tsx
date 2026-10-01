@@ -4,7 +4,6 @@ import { Alert, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
 import {
   describeCellFailure,
@@ -27,7 +26,6 @@ import {
   BatchRunsSidebar,
   useResultsGrouping,
 } from "@langwatch/experiment-browser-kit";
-import type { Experiment } from "@langwatch/experiment-contract";
 import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import type React from "react";
@@ -39,15 +37,17 @@ import {
   useMultiRunData,
 } from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard.ts";
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { TraceIdPeek } from "../../../behavior/lent-trace.tsx";
 import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
+import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
 import { downloadCsv } from "../batch-evaluation-results.csv.ts";
 import { ComparisonCharts } from "../batch-results/comparison-charts.tsx";
 import { BatchEvaluationResultsHeader } from "./batch-evaluation-results-header.tsx";
 
 type BatchEvaluationResultsProps = {
   project?: UiHostProject;
-  experiment?: Experiment;
+  experiment?: ExperimentRow;
   /** Size variant */
   size?: "sm" | "md";
   /** External run ID selection (for controlled mode) */
@@ -253,7 +253,7 @@ const useSelectedRunData = ({
     [runs, selectedRunId],
   );
   const { refetchInterval } = useRunDataRefetch({ selectedRun, selectedRunId });
-  const runDataQuery = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const runDataQuery = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId: projectId ?? "", experimentId: experimentId ?? "", runId: selectedRunId ?? "" },
     { enabled: !!projectId && !!experimentId && !!selectedRunId, refetchInterval },
   );
@@ -388,7 +388,7 @@ export function BatchEvaluationResults({
   const { fields, toggleField, rowHeight, setRowHeight } = useResultDisplayPreferences();
 
   /** The experiment's runs, read as `BatchRunSummary` (what this file hands the sidebar). */
-  const runsQuery = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
+  const runsQuery = experimentApi.experiments.getExperimentBatchEvaluationRuns.useQuery(
     {
       projectId: project?.id ?? "",
       experimentId: experiment?.id ?? "",

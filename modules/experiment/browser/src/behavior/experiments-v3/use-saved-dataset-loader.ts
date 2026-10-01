@@ -1,5 +1,4 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { useEffect, useRef, useState } from "react";
 
@@ -8,6 +7,7 @@ import type {
   DatasetReference,
   SavedRecord,
 } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /** A saved dataset's records as the workbench holds them: every value a string. */
@@ -54,7 +54,7 @@ export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) =>
   const needsLoading = isSavedDataset && !dataset.savedRecords;
 
   // Declarative query - tRPC batches these automatically
-  const query = api.datasetRecord.getAll.useQuery(
+  const query = experimentApi.datasetRecord.getAll.useQuery(
     {
       projectId: project?.id ?? "",
       datasetId: dataset?.datasetId ?? "",
@@ -137,7 +137,7 @@ export const useDatasetSelectionLoader = ({
   const [pendingDatasetLoad, setPendingDatasetLoad] = useState<PendingDatasetLoad | null>(null);
 
   // Query to load dataset records when adding a saved dataset
-  const savedDatasetRecords = api.datasetRecord.getAll.useQuery(
+  const savedDatasetRecords = experimentApi.datasetRecord.getAll.useQuery(
     {
       projectId: projectId ?? "",
       datasetId: pendingDatasetLoad?.datasetId ?? "",

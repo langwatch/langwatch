@@ -7187,9 +7187,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/csv':
         specifier: workspace:*
         version: link:../../../packages/csv
@@ -7819,12 +7816,21 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/monitor-contract':
+        specifier: workspace:*
+        version: link:../../monitor/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/prompt-browser-kit':
         specifier: workspace:*
         version: link:../../prompt/browser-kit
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:../../secret/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -8108,12 +8114,12 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/csv':
         specifier: workspace:*
         version: link:../../../packages/csv
@@ -8132,6 +8138,9 @@ importers:
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../../../packages/error-presentation
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/evaluator-browser-kit':
         specifier: workspace:*
         version: link:../../evaluator/browser-kit
@@ -8165,6 +8174,9 @@ importers:
       '@langwatch/prompt-browser-kit':
         specifier: workspace:*
         version: link:../../prompt/browser-kit
+      '@langwatch/prompt-contract':
+        specifier: workspace:*
+        version: link:../../prompt/contract
       '@langwatch/stored-object-browser-kit':
         specifier: workspace:*
         version: link:../../stored-object/browser-kit
@@ -15684,9 +15696,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/dataset-browser':
         specifier: workspace:*
         version: link:../../dataset/browser
@@ -15732,12 +15741,18 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/prompt-browser-kit':
         specifier: workspace:*
         version: link:../../prompt/browser-kit
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:../../secret/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

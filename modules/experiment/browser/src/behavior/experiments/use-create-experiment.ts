@@ -1,11 +1,11 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { generateHumanReadableId } from "@langwatch/experiment-contract";
 import { useState } from "react";
 
 import { createInitialState } from "../../model/experiments-v3/types.ts";
 import { extractPersistedState } from "../../model/experiments-v3/types/persistence.ts";
+import { experimentApi } from "../experiment-api.ts";
 
 /**
  * Creates a new EVALUATIONS_V3 experiment and navigates to its workbench.
@@ -20,8 +20,8 @@ export const useCreateExperiment = ({
 }) => {
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
-  const utils = api.useUtils();
-  const createExperiment = api.experiments.saveEvaluationsV3.useMutation({
+  const utils = experimentApi.useUtils();
+  const createExperiment = experimentApi.experiments.saveEvaluationsV3.useMutation({
     onSuccess: (data) => {
       void utils.experiments.getAllForEvaluationsList.invalidate();
       void router.push(`/${projectSlug}/experiments/workbench/${data.slug}`);

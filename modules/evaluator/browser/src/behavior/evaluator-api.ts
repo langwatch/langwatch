@@ -4,12 +4,19 @@
  * names are load-bearing — tRPC hashes them into the query cache key.
  */
 
-import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import type { evaluationTrpc } from "@langwatch/evaluation-contract";
 import type {
   EvaluatorCascadeArchive,
   EvaluatorRelatedEntities as EvaluatorRelatedEntitiesContract,
   evaluatorTrpc,
 } from "@langwatch/evaluator-contract";
+import type { modelProviderTrpc } from "@langwatch/model-provider-contract";
+import type { monitorTrpc } from "@langwatch/monitor-contract";
+import type { projectTrpc } from "@langwatch/project-contract";
+import type { secretTrpc } from "@langwatch/secret-contract";
+import type { tracesTrpc } from "@langwatch/trace-contract";
+import type { workflowTrpc } from "@langwatch/workflow-contract";
 
 /** An evaluator and a project, the input nine of these ten procedures take. */
 export type EvaluatorIdInput = { id: string; projectId: string };
@@ -65,8 +72,16 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the declared namespace plus the borrowed two. */
-export type EvaluatorApiMap = ContractApiMap<typeof evaluatorTrpc> & BorrowedProcedures;
+/** Everything this family calls: its own namespace, the owners' contracts, and the borrowed two. */
+export type EvaluatorApiMap = ContractApiMap<typeof evaluatorTrpc> &
+  ContractApiMap<typeof evaluationTrpc> &
+  ContractApiMap<typeof modelProviderTrpc> &
+  ContractApiMap<typeof monitorTrpc> &
+  ContractApiMap<typeof projectTrpc> &
+  ContractApiMap<typeof secretTrpc> &
+  ContractApiMap<typeof tracesTrpc> &
+  ContractApiMap<typeof workflowTrpc> &
+  BorrowedProcedures;
 
 /**
  * The evaluator family's typed tRPC hooks. Same machinery, same transport and
@@ -74,3 +89,5 @@ export type EvaluatorApiMap = ContractApiMap<typeof evaluatorTrpc> & BorrowedPro
  * `createModuleApi` for why separate instances still share cache entries.
  */
 export const evaluatorApi = createModuleApi<EvaluatorApiMap>();
+
+export type RouterOutputs = OutputsFromMap<EvaluatorApiMap>;

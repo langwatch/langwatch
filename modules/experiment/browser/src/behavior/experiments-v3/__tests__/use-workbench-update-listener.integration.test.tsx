@@ -23,8 +23,8 @@ vi.mock("@langwatch/trace-browser-kit", () => ({
 }));
 
 const fetchVersion = vi.fn();
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({
       experiments: { getWorkbenchVersion: { fetch: fetchVersion } },
     }),

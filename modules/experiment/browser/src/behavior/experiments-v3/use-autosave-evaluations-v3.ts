@@ -2,7 +2,6 @@ import { isNotFoundError as isTrpcNotFound } from "@langwatch/browser-host/error
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
@@ -15,6 +14,7 @@ import {
   type PersistedEvaluationsV3State,
 } from "../../model/experiments-v3/types/persistence.ts";
 import { captureException, toError } from "../../model/posthog-error-capture.ts";
+import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
@@ -365,7 +365,7 @@ const useWorkbenchLoad = ({
   });
 
   // Load existing experiment if navigating to one
-  const existingExperiment = api.experiments.getEvaluationsV3BySlug.useQuery(
+  const existingExperiment = experimentApi.experiments.getEvaluationsV3BySlug.useQuery(
     {
       projectId: project?.id ?? "",
       experimentSlug: routerSlug ?? "",
@@ -450,7 +450,7 @@ export const useAutosaveEvaluationsV3 = () => {
 
   const stringifiedState = JSON.stringify(persistedState);
 
-  const saveExperiment = api.experiments.saveEvaluationsV3.useMutation();
+  const saveExperiment = experimentApi.experiments.saveEvaluationsV3.useMutation();
 
   // What the server last acknowledged, as the exact string this hook would
   // send. `stringifiedState !== lastSavedRef.current` is the ONE definition of
@@ -569,7 +569,7 @@ export const useAutosaveEvaluationsV3 = () => {
   // isNotFound: query completed with error AND that error is NOT_FOUND
   const isNotFound = existingExperiment.isError && isNotFoundError;
 
-  const trpcUtils = api.useUtils();
+  const trpcUtils = experimentApi.useUtils();
 
   const reset = useCallback(() => {
     loadedSlugRef.current = null;

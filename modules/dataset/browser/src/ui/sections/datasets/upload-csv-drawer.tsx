@@ -14,7 +14,6 @@ import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type {
   DatasetColumns,
   DatasetConfirmColumns,
@@ -269,7 +268,7 @@ export function DatasetUploadProcessing({
 }) {
   const [isRetrying, setIsRetrying] = useState(false);
   const retryNormalize = datasetApi.dataset.retryNormalize.useMutation();
-  const datasetQuery = api.dataset.getById.useQuery(
+  const datasetQuery = datasetApi.dataset.getById.useQuery(
     { projectId, datasetId },
     {
       enabled: !!projectId && !!datasetId,
@@ -594,7 +593,7 @@ export function UploadCSVForm({
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const trpcUtils = api.useUtils();
+  const trpcUtils = datasetApi.useUtils();
   const router = useRouter();
   const importTransport = useDatasetImportTransport();
 

@@ -18,7 +18,6 @@ import {
 } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { downloadCsv } from "@langwatch/csv/download";
 import {
   type AutosaveState,
@@ -65,6 +64,7 @@ import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useDebounce } from "use-debounce";
 import { useStore } from "zustand";
 
+import { datasetApi } from "../../../../behavior/dataset-api.ts";
 import { useDatasetRecordSync } from "../../../../behavior/datasets/editor/use-dataset-record-sync.ts";
 import {
   createDatasetEditorStore,
@@ -255,7 +255,7 @@ function useEditorDatasetPage({
   // equivalent — it is already gated on the term belonging to this dataset.)
   const requestedPage = datasetChanged ? 1 : page;
 
-  const databaseDataset = api.datasetRecord.listPaginated.useQuery(
+  const databaseDataset = datasetApi.datasetRecord.listPaginated.useQuery(
     {
       projectId: project?.id ?? "",
       datasetId: datasetId ?? "",
@@ -363,7 +363,10 @@ function editorDataToLoad({
   inMemoryDataset,
 }: {
   datasetId: string | undefined;
-  page: { columnTypes?: unknown; datasetRecords?: { id: string; entry: unknown }[] } | undefined;
+  page:
+    | { columnTypes?: unknown; datasetRecords?: { id: string; entry: unknown }[] }
+    | null
+    | undefined;
   inMemoryDataset: InMemoryDataset | undefined;
 }): { columns: EditorColumn[]; records: EditorRecord[]; dbDatasetId: string | undefined } | false {
   if (datasetId) return page ? { ...savedEditorData(page), dbDatasetId: datasetId } : false;
@@ -681,7 +684,7 @@ function useEditorCsvDownload({
   columns: EditorColumn[];
   store: ReturnType<typeof createDatasetEditorStore>;
 }) {
-  const downloadDataset = api.datasetRecord.download.useMutation();
+  const downloadDataset = datasetApi.datasetRecord.download.useMutation();
   const downloadCSV = useCallback(async () => {
     const exported = await exportedEditorData({
       datasetId,

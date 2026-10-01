@@ -1,4 +1,4 @@
-import type { RouterInputs } from "@langwatch/browser-trpc/workflow-api";
+import type { PromptCreateTrpcInput, PromptUpdateTrpcInput } from "@langwatch/prompt-contract";
 
 import type { WireVersionedPrompt } from "../../wire-versioned-prompt.ts";
 
@@ -6,7 +6,7 @@ import type { WireVersionedPrompt } from "../../wire-versioned-prompt.ts";
  * Parameters for creating a new prompt configuration
  */
 export type CreatePromptParams = {
-  data: Omit<RouterInputs["prompts"]["create"]["data"], "handle">;
+  data: Omit<PromptCreateTrpcInput["data"], "handle">;
   onSuccess?: (prompt: WireVersionedPrompt) => void;
   onError?: (error: Error) => void;
 };
@@ -25,8 +25,8 @@ export type ChangeHandleParams = {
  * Parameters for saving a version of a prompt configuration
  */
 export type SaveVersionParams = {
-  id: RouterInputs["prompts"]["update"]["id"];
-  data: Omit<RouterInputs["prompts"]["update"]["data"], "commitMessage">;
+  id: PromptUpdateTrpcInput["id"];
+  data: Omit<PromptUpdateTrpcInput["data"], "commitMessage">;
   /** Next version number to display in dialog (e.g., "Update to v5") */
   nextVersion?: number;
   onSuccess?: (prompt: WireVersionedPrompt) => void;

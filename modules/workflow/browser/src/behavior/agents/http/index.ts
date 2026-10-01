@@ -1,8 +1,13 @@
-import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import {
+  httpAgentTestInputSchema,
+  type HttpAuth,
+  type HttpHeader,
+  type HttpMethod,
+} from "@langwatch/agent-contract";
 import { useCallback } from "react";
 
 import { useOrganizationTeamProject } from "../../studio-host/use-organization-team-project.ts";
+import { workflowApi } from "../../workflow-api.ts";
 
 export function useHttpTest({
   url,
@@ -22,12 +27,18 @@ export function useHttpTest({
   timeoutMs?: number;
 }) {
   const { project } = useOrganizationTeamProject();
-  const mutation = api.httpProxy.execute.useMutation();
+  const mutation = workflowApi.httpProxy.execute.useMutation();
 
   const handleTest = useCallback(
     async (templateVariables: Record<string, unknown>) => {
       if (!project?.id) {
         return { success: false, error: "No project selected" };
+      }
+
+      const variables =
+        httpAgentTestInputSchema.shape.templateVariables.safeParse(templateVariables);
+      if (!variables.success) {
+        return { success: false, error: "Template variables must be valid JSON values" };
       }
 
       try {
@@ -41,7 +52,7 @@ export function useHttpTest({
           })),
           auth,
           bodyTemplate,
-          templateVariables,
+          templateVariables: variables.data,
           outputPath,
           timeoutMs,
         });

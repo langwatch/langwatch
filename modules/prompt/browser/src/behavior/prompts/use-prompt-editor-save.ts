@@ -1,7 +1,6 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useCallback, useRef, useState } from "react";
 
@@ -11,6 +10,7 @@ import {
   getSaveBlockerMessage,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../prompt-form.ts";
+import { promptApi } from "../prompt-api.ts";
 import { formValuesToTriggerSaveVersionParams } from "./llm-prompt-config-utils.ts";
 import type { usePromptConfigForm } from "./use-prompt-config-form.ts";
 
@@ -63,10 +63,10 @@ const versionChangeOf = (prompt: VersionChange): VersionChange => ({
 /** The create, update and rename mutations, each with its own refresh and refusal. */
 function useEditorMutations(input: EditorSaveInput) {
   const { project, promptId, onSave, onClose, setConfigValues, resetToSaved } = input;
-  const utils = api.useUtils();
+  const utils = promptApi.useUtils();
   const projectId = project?.id ?? "";
 
-  const createMutation = api.prompts.create.useMutation({
+  const createMutation = promptApi.prompts.create.useMutation({
     onSuccess: (prompt) => {
       void utils.prompts.getAllPromptsForProject.invalidate({ projectId });
       onSave?.(savedPromptPayload(prompt));
@@ -76,7 +76,7 @@ function useEditorMutations(input: EditorSaveInput) {
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create prompt" }),
   });
 
-  const updateMutation = api.prompts.update.useMutation({
+  const updateMutation = promptApi.prompts.update.useMutation({
     onSuccess: (prompt) => {
       const freshFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
       // configValues first, so the form hook's forward sync sees the form match
@@ -93,7 +93,7 @@ function useEditorMutations(input: EditorSaveInput) {
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save prompt" }),
   });
 
-  const updateHandleMutation = api.prompts.updateHandle.useMutation({
+  const updateHandleMutation = promptApi.prompts.updateHandle.useMutation({
     onSuccess: (prompt) => {
       void input.refetchPrompt();
       void utils.prompts.getAllPromptsForProject.invalidate({ projectId });

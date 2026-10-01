@@ -15,8 +15,8 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
 
 const mockMutateAsync = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({
       experiments: {
         getEvaluationsV3BySlug: {

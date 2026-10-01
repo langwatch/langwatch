@@ -46,8 +46,8 @@ vi.mock("@langwatch/workflow-browser-kit", () => ({
   },
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/experiment-api.ts", () => ({
+  experimentApi: {
     datasetRecord: {
       getAll: { useQuery: () => ({ data: datasetState.data }) },
     },

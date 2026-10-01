@@ -3,13 +3,13 @@
  */
 
 import { Button, Field, HStack, Input, Textarea, useDisclosure, VStack } from "@chakra-ui/react";
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { getRandomWorkflowIcon, useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { workflowApi } from "../../behavior/workflow-api.ts";
 import { WorkflowEmojiPicker } from "../blocks/workflow-emoji-picker.tsx";
 import {
   WorkflowCreateDialog as WorkflowCreateDialogView,

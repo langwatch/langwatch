@@ -15,7 +15,6 @@ import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -28,6 +27,7 @@ import { NextLink } from "@langwatch/workflow-browser-kit";
 import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 type Category = EvaluatorDefinition["category"];
@@ -75,12 +75,12 @@ export function EvaluatorSelection({
 
   const tab = (router.query.tab as Category | undefined) ?? "safety";
 
-  const availableEvaluators_ = api.evaluations.availableEvaluators.useQuery(
+  const availableEvaluators_ = evaluatorApi.evaluations.availableEvaluators.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
 
-  const availableCustomEvaluators = api.evaluations.availableCustomEvaluators.useQuery(
+  const availableCustomEvaluators = evaluatorApi.evaluations.availableCustomEvaluators.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );

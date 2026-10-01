@@ -14,7 +14,6 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { Switch } from "@langwatch/design-system/switch";
 import {
   AVAILABLE_EVALUATORS,
@@ -43,6 +42,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { evaluatorApi, type RouterOutputs } from "../../../behavior/evaluator-api.ts";
 import { ComparisonConfigForm } from "../../../behavior/lent-peers.tsx";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
 import {
@@ -190,7 +190,7 @@ export function useEvaluatorEditorController(
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const utils = api.useUtils();
+  const utils = evaluatorApi.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("evaluatorEditor");
@@ -231,7 +231,7 @@ export function useEvaluatorEditorController(
 
   const { isOpen } = props;
 
-  const evaluatorQuery = api.evaluators.getById.useQuery(
+  const evaluatorQuery = evaluatorApi.evaluators.getById.useQuery(
     { id: evaluatorId ?? "", projectId: project?.id ?? "" },
     { enabled: !!evaluatorId && !!project?.id && isOpen },
   );
@@ -337,7 +337,7 @@ export function useEvaluatorEditorController(
     };
   }, [form, debouncedUpdateLocalConfig]);
 
-  const createMutation = api.evaluators.create.useMutation({
+  const createMutation = evaluatorApi.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       onLocalConfigChangeRef.current?.(undefined);
@@ -353,7 +353,7 @@ export function useEvaluatorEditorController(
     },
   });
 
-  const updateMutation = api.evaluators.update.useMutation({
+  const updateMutation = evaluatorApi.evaluators.update.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       void utils.evaluators.getById.invalidate({
@@ -859,11 +859,11 @@ function useResolvedDefaultSettings({
   // embeddings_model values reflect what this project actually has
   // configured (claude-opus, gemini-pro, etc.) instead of the generic
   // DEFAULT_MODEL constant baked into the evaluator zod schemas.
-  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedDefaultModel = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id && isOpen },
   );
-  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedDefaultEmbeddings = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
     {
       projectId: project?.id ?? "",
       featureKey: "analytics.topic_clustering_embeddings",

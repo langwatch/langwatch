@@ -53,8 +53,8 @@ vi.mock("@langwatch/prompt-browser-kit", async (importOriginal) => ({
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/evaluator-api.ts", () => ({
+  evaluatorApi: {
     useUtils: () => ({
       evaluators: {
         getAll: { invalidate: vi.fn() },

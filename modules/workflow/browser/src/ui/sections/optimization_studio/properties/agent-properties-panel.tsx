@@ -17,7 +17,6 @@ import {
   getCodeFromConfig,
 } from "@langwatch/agent-contract/code-config";
 import type { UiNodeOutput } from "@langwatch/browser-host/declarations";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { type FieldMapping, type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
 import { useRegisterDrawerFooter, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import type {
@@ -40,6 +39,7 @@ import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
 import { OutputsSection } from "../../../../behavior/lent-prompt.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../../behavior/workflow-api.ts";
 import {
   buildAgentNodeData,
   nodeMatchesAgent,
@@ -152,13 +152,13 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
 
   const agentId = extractAgentId(agentRef);
 
-  const agentQuery = api.agents.getById.useQuery(
+  const agentQuery = workflowApi.agents.getById.useQuery(
     { id: agentId, projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
 
-  const updateMutation = api.agents.update.useMutation();
-  const trpcContext = api.useUtils();
+  const updateMutation = workflowApi.agents.update.useMutation();
+  const trpcContext = workflowApi.useUtils();
 
   const agentData = agentQuery.data;
   // The node's DSL snapshot is the canonical in-workflow state: it is

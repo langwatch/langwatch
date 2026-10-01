@@ -1,8 +1,8 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { modelSelectionFrom } from "@langwatch/model-provider-browser-kit";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "./studio-host/use-organization-team-project.ts";
+import { workflowApi } from "./workflow-api.ts";
 
 /** The project's pickable models for `mode`, and the chosen one among them. */
 export function useModelSelection({
@@ -15,7 +15,7 @@ export function useModelSelection({
   mode: "chat" | "embedding";
 }) {
   const { project } = useOrganizationTeamProject();
-  const providers = api.modelProvider.listAllForProjectForFrontend.useQuery(
+  const providers = workflowApi.modelProvider.listAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );

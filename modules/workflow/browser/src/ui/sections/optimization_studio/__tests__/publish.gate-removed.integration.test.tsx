@@ -45,7 +45,7 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () 
   }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => {
+vi.mock("../../../../behavior/workflow-api.ts", () => {
   const queryStub = (data: unknown) => ({
     useQuery: () => ({ data, isLoading: false, refetch: vi.fn() }),
   });
@@ -58,7 +58,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => {
     }),
   });
   return {
-    api: {
+    workflowApi: {
       useUtils: () => ({
         optimization: { getComponents: { invalidate: vi.fn() } },
       }),

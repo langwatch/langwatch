@@ -154,8 +154,8 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({}),
     useQueries: () => [],
     evaluators: {

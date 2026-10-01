@@ -1,6 +1,5 @@
 import { Button, HStack, Spacer, Spinner } from "@chakra-ui/react";
 import type { UiEvaluatorEditorValues } from "@langwatch/browser-host/declarations";
-import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -20,6 +19,7 @@ import {
 } from "../../../../behavior/lent-evaluator.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { workflowApi, type RouterOutputs } from "../../../../behavior/workflow-api.ts";
 import {
   applyMappingChange,
   buildAvailableSources,
@@ -66,7 +66,7 @@ type EvaluatorRecord = RouterOutputs["evaluators"]["getById"] | undefined;
 function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evaluatorRef: string }) {
   const { project } = useOrganizationTeamProject();
   const evaluatorId = extractEvaluatorId(evaluatorRef);
-  const evaluatorQuery = api.evaluators.getById.useQuery(
+  const evaluatorQuery = workflowApi.evaluators.getById.useQuery(
     { id: evaluatorId, projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
@@ -114,7 +114,7 @@ function DbEvaluatorForm({
       deselectAllNodes,
     })),
   );
-  const updateMutation = api.evaluators.update.useMutation();
+  const updateMutation = workflowApi.evaluators.update.useMutation();
 
   const config = evaluator?.config as {
     evaluatorType?: string;

@@ -1,9 +1,10 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type FeatureFlagTargetId,
   type FrontendFeatureFlag,
   NOT_TARGETED,
 } from "@langwatch/feature-flag-contract";
+
+import { workflowApi } from "./workflow-api.ts";
 
 // The service caches operator rows for five seconds. Refetching every mounted
 // hook at that cadence adds traffic without making a decision fresher, so the
@@ -54,7 +55,7 @@ export function useFeatureFlag(
 ): UseFeatureFlagResult {
   const queryEnabled = options.enabled ?? true;
 
-  const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
+  const { data, isLoading } = workflowApi.featureFlag.isEnabled.useQuery(
     {
       flag,
       projectId: toWireTargetId(options.projectId),

@@ -4,7 +4,6 @@ import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 
 import "@xyflow/react/dist/style.css";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { DatasetImagePreviewTable } from "@langwatch/dataset-browser-kit";
 import {
   useColorMode,
@@ -58,6 +57,7 @@ import { usePromptPickerFlow } from "../../../behavior/optimization_studio/use-p
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useAskBeforeLeaving } from "../../../behavior/use-ask-before-leaving.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import type { SocketStatus, WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { isConnectionAllowed } from "../../../model/control-flow.ts";
 import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
@@ -515,11 +515,11 @@ function StudioWorkflowNodeSelectionPanel({
   const { handlePromptDragEnd } = usePromptPickerFlow();
   const { handleEvaluatorDragEnd } = useEvaluatorPickerFlow();
   const { handleAgentDragEnd } = useAgentPickerFlow();
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+  const resolvedDefault = workflowApi.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "workflows.create_default" },
     { enabled: !!project?.id },
   );
-  const components = api.optimization.getComponents.useQuery(
+  const components = workflowApi.optimization.getComponents.useQuery(
     { projectId: project?.id ?? "" },
     {
       enabled: !!project?.id && !!workflowId,
@@ -577,8 +577,8 @@ function StudioWorkflowNodeSelectionPanel({
 function StudioWorkflowAutosave() {
   const { project } = useOrganizationTeamProject();
   const { workflow } = useLoadWorkflow();
-  const autosave = api.workflow.autosave.useMutation();
-  const trpc = api.useUtils();
+  const autosave = workflowApi.workflow.autosave.useMutation();
+  const trpc = workflowApi.useUtils();
   const onSave = useCallback(
     ({ dsl, setAsLatestVersion }: { dsl: StudioWorkflow; setAsLatestVersion: boolean }) => {
       if (!project || !workflow.data) {

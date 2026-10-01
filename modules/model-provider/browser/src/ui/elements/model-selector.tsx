@@ -10,7 +10,6 @@ import {
 } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
@@ -30,6 +29,8 @@ import {
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
+
+import { api } from "../../behavior/model-provider-api.ts";
 
 export const useModelSelectionOptions = ({
   options,

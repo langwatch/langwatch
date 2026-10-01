@@ -1,8 +1,8 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
 import { EvaluatorTypePicker } from "../../blocks/evaluator-type-picker.tsx";
 
@@ -23,7 +23,7 @@ export function EvaluatorTypeSelectorContent({
   const { openDrawer } = useDrawer();
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const availableEvaluatorsQuery = api.evaluations.availableEvaluators.useQuery(
+  const availableEvaluatorsQuery = evaluatorApi.evaluations.availableEvaluators.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );

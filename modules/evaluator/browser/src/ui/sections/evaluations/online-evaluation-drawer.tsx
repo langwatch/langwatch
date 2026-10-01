@@ -59,12 +59,12 @@ import {
 
 /** An evaluator as the drawer holds one: off a query, so its instants are strings. */
 type WireEvaluatorWithFields = WireOf<EvaluatorWithFields>;
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { MappingState } from "@langwatch/dataset-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { EvaluatorSelectionBox } from "../../elements/evaluations/evaluator-selection-box.tsx";
 import { StepRadio } from "../../elements/evaluations/step-button.tsx";
 import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
@@ -140,7 +140,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const utils = api.useUtils();
+  const utils = evaluatorApi.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave = props.onSave ?? (complexProps.onSave as OnlineEvaluationDrawerProps["onSave"]);
@@ -224,12 +224,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     onSave?.();
     onClose();
   };
-  const createMutation = api.monitors.create.useMutation({
+  const createMutation = evaluatorApi.monitors.create.useMutation({
     onSuccess: () => finishSave(undefined),
   });
 
   // Update mutation
-  const updateMutation = api.monitors.update.useMutation({
+  const updateMutation = evaluatorApi.monitors.update.useMutation({
     onSuccess: () => finishSave(monitorId),
   });
 
@@ -592,7 +592,7 @@ function invalidateMonitorQueries({
   timeZone,
   monitorId,
 }: {
-  utils: ReturnType<typeof api.useUtils>;
+  utils: ReturnType<typeof evaluatorApi.useUtils>;
   projectId: string;
   timeZone: string;
   monitorId: string | undefined;
@@ -1426,16 +1426,16 @@ function useDrawerQueries({
   isOpen: boolean;
 }) {
   const canLoad = !!projectId && isOpen;
-  const monitorQuery = api.monitors.getById.useQuery(
+  const monitorQuery = evaluatorApi.monitors.getById.useQuery(
     { id: monitorId ?? "", projectId: projectId ?? "" },
     { enabled: !!monitorId && canLoad },
   );
   const linkedEvaluatorId = monitorQuery.data?.evaluatorId;
-  const evaluatorQuery = api.evaluators.getById.useQuery(
+  const evaluatorQuery = evaluatorApi.evaluators.getById.useQuery(
     { id: linkedEvaluatorId ?? "", projectId: projectId ?? "" },
     { enabled: !!linkedEvaluatorId && canLoad },
   );
-  const pendingEvaluatorQuery = api.evaluators.getById.useQuery(
+  const pendingEvaluatorQuery = evaluatorApi.evaluators.getById.useQuery(
     { id: pendingEvaluatorId ?? "", projectId: projectId ?? "" },
     { enabled: !!pendingEvaluatorId && canLoad },
   );

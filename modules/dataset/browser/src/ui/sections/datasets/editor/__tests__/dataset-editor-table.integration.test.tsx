@@ -24,8 +24,8 @@ const updateMutate = vi.fn();
 const deleteManyMutate = vi.fn();
 const getAllQuery = vi.fn();
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../../behavior/dataset-api.ts", () => ({
+  datasetApi: {
     datasetRecord: {
       getAll: {
         useQuery: (...args: unknown[]) => getAllQuery(...args),

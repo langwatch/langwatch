@@ -10,7 +10,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
@@ -21,6 +20,7 @@ import { FormProvider, useForm } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
 import { useVersionState } from "./use-version-state.ts";
 import { NewVersionFields } from "./version-to-be-used.tsx";
@@ -89,8 +89,8 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
     form,
   });
 
-  const commitVersion = api.workflow.commitVersion.useMutation();
-  const restoreVersion = api.workflow.restoreVersion.useMutation();
+  const commitVersion = workflowApi.workflow.commitVersion.useMutation();
+  const restoreVersion = workflowApi.workflow.restoreVersion.useMutation();
 
   const onSubmit = ({ version, commitMessage }: { version: string; commitMessage: string }) => {
     if (!project || !workflowId) return;

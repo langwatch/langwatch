@@ -1,6 +1,5 @@
 import { Button } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { HandledErrorState } from "@langwatch/workflow-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { SearchX } from "lucide-react";
@@ -9,6 +8,7 @@ import { useEffect } from "react";
 import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-workflow.ts";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { _useWorkflowStore, useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import OptimizationStudio from "../optimization_studio/optimization-studio.tsx";
 import { useStudioHostBinding } from "../studio-host/binding.ts";
 
@@ -40,7 +40,7 @@ export default function Studio() {
   );
   const { clear } = _useWorkflowStore.temporal.getState();
 
-  const queryClient = api.useUtils();
+  const queryClient = workflowApi.useUtils();
   useEffect(() => {
     // Invalidate the workflow once navigating away to make sure when comming back
     // that is doesn't accidentaly renders the previous version of the workflow

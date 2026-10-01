@@ -4,8 +4,12 @@
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
+import { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow-contract";
+
+import { workflowApi } from "./behavior/workflow-api.ts";
 
 export const workflowWeb = defineWebModule("workflow")
+  .withApi(workflowApi, { contracts: [workflowTrpc, workflowOptimizationTrpc] })
   .withHosts({
     requires: ["WorkflowHostApi"],
     mounts: { WorkflowHostApi: { load: () => import("./behavior/workflow-host-mount.tsx") } },

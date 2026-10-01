@@ -42,8 +42,8 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: calls.push, replace: vi.fn(), query: {}, asPath: "/", isReady: true }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/evaluator-api.ts", () => ({
+  evaluatorApi: {
     useUtils: () => ({ evaluators: { getAll: { invalidate: vi.fn() } } }),
     workflow: {
       create: { useMutation: () => ({ mutateAsync: calls.createWorkflow, isPending: false }) },

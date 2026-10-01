@@ -1,8 +1,8 @@
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { hasDSLChanged, type Project, studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { useEffect, useMemo } from "react";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 
 function parseStudioDsl(dsl: unknown) {
   if (!dsl) return undefined;

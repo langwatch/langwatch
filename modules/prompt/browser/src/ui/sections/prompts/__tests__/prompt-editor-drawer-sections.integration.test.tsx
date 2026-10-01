@@ -82,8 +82,8 @@ vi.mock("../../../../behavior/prompts/use-latest-prompt-version.ts", () => ({
 const idleQuery = { data: void 0, isLoading: false, error: null, refetch: vi.fn() };
 const idleMutation = () => ({ mutateAsync: vi.fn(), mutate: vi.fn(), isPending: false });
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/prompt-api.ts", () => ({
+  promptApi: {
     useUtils: () => ({ prompts: { getByIdOrHandle: { invalidate: vi.fn() } } }),
     modelProvider: {
       getResolvedDefault: { useQuery: () => idleQuery },

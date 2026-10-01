@@ -39,8 +39,8 @@ vi.mock("@langwatch/workflow-browser-kit", () => ({
  * `onSuccess` with the written row. That callback is where the crash lived, so
  * a double that never calls it would prove nothing.
  */
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/dataset-api.ts", () => ({
+  datasetApi: {
     dataset: {
       upsert: {
         useMutation: () => ({

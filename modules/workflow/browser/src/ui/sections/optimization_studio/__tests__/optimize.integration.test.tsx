@@ -77,8 +77,8 @@ vi.mock("../../../elements/optimization_studio/add-model-provider-key.tsx", () =
 vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: { create: (toast: { title?: string; type?: string }) => state.toasts.push(toast) },
 }));
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     workflow: {
       commitVersion: {
         useMutation: () => ({

@@ -1,4 +1,3 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import {
   type PythonField,
@@ -12,6 +11,7 @@ import type { editor } from "monaco-editor";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
+import { workflowApi } from "../../../../behavior/workflow-api.ts";
 import { SecretsIndicator } from "../../secrets/secrets-indicator.tsx";
 
 type EditorProps = WorkflowCodeEditorContractProps & {
@@ -34,7 +34,7 @@ type EditorModalProps = WorkflowCodeEditorContractProps & {
 
 function useEditorTransport() {
   const { project } = useOrganizationTeamProject();
-  const secrets = api.secrets.list.useQuery(
+  const secrets = workflowApi.secrets.list.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: Boolean(project?.id) },
   );

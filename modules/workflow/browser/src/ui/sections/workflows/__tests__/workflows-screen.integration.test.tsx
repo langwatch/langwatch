@@ -29,7 +29,7 @@ const calls = vi.hoisted(() => ({
   invalidateAll: vi.fn(),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => {
+vi.mock("../../../../behavior/workflow-api.ts", () => {
   const mutation = (spy: (input: unknown) => unknown) => ({
     useMutation: () => ({
       isPending: false,
@@ -45,7 +45,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => {
   });
 
   return {
-    api: {
+    workflowApi: {
       useUtils: () => ({ workflow: { getAll: { invalidate: calls.invalidateAll } } }),
       workflow: {
         getAll: { useQuery: () => ({ data: state.workflows, isLoading: state.isLoading }) },

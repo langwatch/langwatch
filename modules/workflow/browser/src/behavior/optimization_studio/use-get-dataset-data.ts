@@ -1,5 +1,3 @@
-import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { datasetDatabaseRecordsToInMemoryDataset } from "@langwatch/workflow-browser-kit";
 import type { Entry } from "@langwatch/workflow-contract";
@@ -9,6 +7,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
+import { workflowApi, type RouterOutputs, type WorkflowApiRouter } from "../workflow-api.ts";
 
 type DatasetView = { records: DatasetRecordEntry[]; columnTypes: DatasetColumns };
 
@@ -79,7 +78,7 @@ export const useGetDatasetData = ({
   total: number | undefined;
 } => {
   const { project } = useOrganizationTeamProject();
-  const databaseDataset = api.datasetRecord.getHead.useQuery(
+  const databaseDataset = workflowApi.datasetRecord.getHead.useQuery(
     { projectId: project?.id ?? "", datasetId: dataset?.id ?? "" },
     {
       enabled: !!project && !!dataset?.id && dataset?.id !== "",

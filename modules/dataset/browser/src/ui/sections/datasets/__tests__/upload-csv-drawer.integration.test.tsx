@@ -18,8 +18,8 @@ const retryDatasetNormalize = vi.fn();
 const uploadStoredObject = vi.fn();
 const createFromStoredObject = vi.fn();
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/dataset-api.ts", () => ({
+  datasetApi: {
     useUtils: () => ({
       dataset: {
         findNextName: { fetch: vi.fn().mockResolvedValue("New Dataset") },
@@ -33,13 +33,6 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
           refetch: vi.fn(),
         }),
       },
-    },
-  },
-}));
-
-vi.mock("../../../../behavior/dataset-api.ts", () => ({
-  datasetApi: {
-    dataset: {
       retryNormalize: {
         useMutation: () => ({
           mutateAsync: (...args: unknown[]) => retryDatasetNormalize(...args),

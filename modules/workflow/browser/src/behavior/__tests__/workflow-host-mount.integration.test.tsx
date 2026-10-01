@@ -25,8 +25,8 @@ import type { ComponentType, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const listed = vi.fn((_input: { projectId: string }) => ({ data: [], isLoading: false }));
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../workflow-api.ts", () => ({
+  workflowApi: {
     useUtils: () => ({ workflow: { getAll: { invalidate: () => Promise.resolve() } } }),
     workflow: {
       getAll: { useQuery: (input: { projectId: string }) => listed(input) },

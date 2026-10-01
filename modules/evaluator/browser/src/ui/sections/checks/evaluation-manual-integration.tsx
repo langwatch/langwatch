@@ -1,7 +1,6 @@
 import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -11,6 +10,7 @@ import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 // Sample values for the fields a Go example can send, in the order the request
@@ -160,7 +160,7 @@ export function EvaluationManualIntegration({
 
   const { project } = useOrganizationTeamProject();
   const isOutputMandatory = evaluatorDefinition.requiredFields.includes("output");
-  const projectAPIKey = api.project.getProjectAPIKey.useQuery(
+  const projectAPIKey = evaluatorApi.project.getProjectAPIKey.useQuery(
     {
       projectId: project?.id ?? "",
     },

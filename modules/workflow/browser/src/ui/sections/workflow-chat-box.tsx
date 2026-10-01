@@ -5,7 +5,6 @@
  */
 
 import { Box, Button, Flex, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
@@ -15,6 +14,8 @@ import { useCallback, useState } from "react";
 import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+
+import { workflowApi } from "../../behavior/workflow-api.ts";
 
 /**
  * What the public workflow-run endpoint answers with. Run over that

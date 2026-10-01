@@ -31,10 +31,10 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
   }),
   useDrawerParams: () => ({}),
 }));
-vi.mock("@langwatch/browser-trpc/workflow-api", () => {
+vi.mock("../../../../behavior/evaluator-api.ts", () => {
   const mutation = () => ({ mutate: vi.fn(), isPending: false });
   return {
-    api: {
+    evaluatorApi: {
       useUtils: () => ({
         evaluators: {
           getAll: { invalidate: vi.fn() },

@@ -2,10 +2,10 @@ import { Alert, Box } from "@chakra-ui/react";
 import { isNotFoundError as isNotFound } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useLegacyBatchEvaluations } from "../../../behavior/experiments/use-legacy-batch-evaluations.ts";
 import { ExperimentType } from "../../../model/prisma-types.ts";
 import BatchEvaluation from "../../../ui/elements/experiments/batch-evaluation.tsx";
@@ -19,7 +19,7 @@ export default function ExperimentPage() {
   const { project } = useOrganizationTeamProject();
   const { experiment: experimentSlug } = router.query;
 
-  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
+  const experiment = experimentApi.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
       experimentSlug: experimentSlug as string,

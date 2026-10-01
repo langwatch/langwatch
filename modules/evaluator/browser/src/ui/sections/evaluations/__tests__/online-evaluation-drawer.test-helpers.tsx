@@ -210,7 +210,7 @@ export function createRouterMock() {
 
 export function createApiMock() {
   return {
-    api: {
+    evaluatorApi: {
       publicEnv: {
         useQuery: () => ({
           data: { IS_SAAS: false },

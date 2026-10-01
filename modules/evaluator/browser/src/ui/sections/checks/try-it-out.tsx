@@ -21,7 +21,6 @@ import {
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { InputGroup } from "@langwatch/design-system/input-group";
@@ -41,6 +40,7 @@ import { Pause, Play, RefreshCw, Search } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { FilterSidebar } from "../../../behavior/lent-peers.tsx";
 import { HoverableBigText, RedactedField } from "../../../behavior/lent-workflow.tsx";
 import { readableDate } from "../../../model/display-formatters.ts";
@@ -117,7 +117,7 @@ export function TryItOut({
     { preconditions: CheckPreconditions; evaluatorType: string } | undefined
   >(undefined);
 
-  const tracesPassingPreconditionsOnLoad = api.traces.getSampleTraces.useQuery(
+  const tracesPassingPreconditionsOnLoad = evaluatorApi.traces.getSampleTraces.useQuery(
     {
       ...filterParams,
       ...fetchingParams!,
@@ -150,7 +150,7 @@ export function TryItOut({
   >({});
   const [runningState, setRunningState] = useState<RunningState>({ state: "idle" });
 
-  const runEvaluation = api.evaluations.runEvaluation.useMutation();
+  const runEvaluation = evaluatorApi.evaluations.runEvaluation.useMutation();
 
   useEffect(() => {
     setRunningResults({});

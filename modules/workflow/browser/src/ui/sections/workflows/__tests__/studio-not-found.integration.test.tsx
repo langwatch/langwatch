@@ -41,8 +41,8 @@ vi.mock("../../optimization_studio/optimization-studio.tsx", () => ({
   default: () => <div data-testid="studio-canvas" />,
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     useUtils: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),
   },
 }));

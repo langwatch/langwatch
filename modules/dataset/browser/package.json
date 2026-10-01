@@ -37,7 +37,6 @@
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/dataset-browser-kit": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",

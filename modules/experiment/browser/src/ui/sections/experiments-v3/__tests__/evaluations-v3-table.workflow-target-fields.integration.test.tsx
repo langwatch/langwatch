@@ -70,8 +70,8 @@ vi.mock("../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({
       agents: { getById: { fetch: vi.fn() } },
       prompts: { getByIdOrHandle: { fetch: vi.fn().mockResolvedValue(null) } },

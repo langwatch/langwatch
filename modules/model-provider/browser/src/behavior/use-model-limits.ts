@@ -1,5 +1,6 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+
+import { api } from "./model-provider-api.ts";
 
 export interface UseModelLimitsParams {
   model: string | undefined;

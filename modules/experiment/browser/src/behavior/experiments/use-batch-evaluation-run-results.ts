@@ -1,19 +1,19 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { downloadCsv } from "@langwatch/csv/download";
 import { readableDate } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import type { Experiment } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 
+import type { ExperimentRow } from "../../model/experiment-api-map.ts";
 import {
   cellText,
   getEvaluationColumns,
   readKey,
 } from "../../model/experiments/BatchEvaluationV2/utils.ts";
+import { experimentApi } from "../experiment-api.ts";
 
 const collectPredictedColumns = (
   entriesPredictions: Record<string, unknown>[],
@@ -44,7 +44,7 @@ export const useBatchEvaluationResults = ({
   isFinished,
 }: {
   project: UiHostProject;
-  experiment: Experiment;
+  experiment: ExperimentRow;
   runId: string | undefined;
   isFinished: boolean;
 }) => {
@@ -55,7 +55,7 @@ export const useBatchEvaluationResults = ({
     refetchingStartedAtRef.current = nowInstant().epochMilliseconds;
   }, [project.id, experiment.id, runId]);
 
-  const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
       projectId: project.id,
       experimentId: experiment.id,
@@ -259,7 +259,7 @@ export const useBatchEvaluationDownloadCSV = ({
   isFinished,
 }: {
   project: UiHostProject;
-  experiment: Experiment;
+  experiment: ExperimentRow;
   runId: string | undefined;
   isFinished: boolean;
 }) => {
@@ -289,7 +289,8 @@ export const useBatchEvaluationDownloadCSV = ({
     }
   };
 
-  const isDownloadCSVEnabled = !!runId && !!run.data && !!datasetByIndex;
+  const runData = run.data;
+  const isDownloadCSVEnabled = !!runId && !!runData && !!datasetByIndex;
 
   const downloadCSV_ = async () => {
     if (!isDownloadCSVEnabled) {
@@ -301,7 +302,7 @@ export const useBatchEvaluationDownloadCSV = ({
       predictedColumns,
       resultsByEvaluator,
     });
-    const formattedDate = readableDate(run.data.timestamps.createdAt).toISOString().split("T")[0];
+    const formattedDate = readableDate(runData.timestamps.createdAt).toISOString().split("T")[0];
     downloadCsv({ fields, rows, fileName: `${formattedDate}_${experiment.name}_${runId}.csv` });
   };
 

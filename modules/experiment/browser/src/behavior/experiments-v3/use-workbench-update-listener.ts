@@ -1,4 +1,3 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type ExperimentUpdateSignal,
   experimentUpdateSignalSchema,
@@ -9,6 +8,7 @@ import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import type { EvaluationsV3Actions } from "../../model/experiments-v3/types.ts";
+import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /** Tab switches within this window share one staleness probe. */
@@ -259,7 +259,7 @@ const useExperimentUpdateSignal = ({
   applyServerVersion: ApplyServerVersion;
 }) => {
   useSSESubscription<{ event?: unknown; timestamp?: number }, { projectId: string }>(
-    api.experiments.onExperimentUpdate,
+    experimentApi.experiments.onExperimentUpdate,
     { projectId },
     {
       enabled: Boolean(enabled && projectId && experimentSlug),
@@ -297,7 +297,7 @@ const useVisibilityVersionProbe = ({
   experimentSlug: string | undefined;
   applyServerVersion: ApplyServerVersion;
 }) => {
-  const trpcUtils = api.useUtils();
+  const trpcUtils = experimentApi.useUtils();
   const lastProbeAtRef = useRef(0);
 
   useEffect(() => {

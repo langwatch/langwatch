@@ -5,12 +5,12 @@
  */
 
 import { Box, Card as ChakraCard } from "@chakra-ui/react";
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
 import { WorkflowChatBox } from "../workflow-chat-box.tsx";
 

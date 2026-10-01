@@ -31,8 +31,8 @@ vi.mock("../../../../behavior/use-model-selection.ts", () => ({
   useModelSelection: () => ({ modelOption: { isDisabled: false } }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     modelProvider: {
       getResolvedDefault: {
         // A configured model so the field renders without the sparkles path.

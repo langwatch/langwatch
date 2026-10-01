@@ -2,11 +2,12 @@
  * The scope reading the moved studio modules already do.
  */
 
-import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { Temporal } from "@langwatch/time";
 import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import type { Project } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
+
+import { workflowApi, type RouterOutputs } from "../workflow-api.ts";
 
 /**
  * The project row, as the studio's closure reads it.
@@ -43,7 +44,7 @@ export function useOrganizationTeamProject(
   const host = useWorkflowHost();
   const scope = host.scope();
 
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
+  const modelProviders = workflowApi.modelProvider.getAllForProject.useQuery(
     { projectId: scope.projectId ?? "" },
     { enabled: !!scope.projectId },
   );
@@ -53,7 +54,7 @@ export function useOrganizationTeamProject(
    * `apiKey` on the project row the shell already held; the host port carries an identity
    * and a slug, not a credential.
    */
-  const projectApiKey = api.project.getProjectAPIKey.useQuery(
+  const projectApiKey = workflowApi.project.getProjectAPIKey.useQuery(
     { projectId: scope.projectId ?? "" },
     { enabled: !!scope.projectId },
   );
@@ -64,7 +65,7 @@ export function useOrganizationTeamProject(
           id: scope.projectId,
           slug: scope.projectSlug ?? "",
           name: scope.projectName ?? scope.projectSlug ?? "",
-          apiKey: (projectApiKey.data as { apiKey?: string } | undefined)?.apiKey ?? "",
+          apiKey: projectApiKey.data?.apiKey ?? "",
           teamId: scope.teamId ?? "",
           language: "",
           framework: "",

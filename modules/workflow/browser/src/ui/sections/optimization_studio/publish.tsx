@@ -12,8 +12,6 @@ import {
 } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { Dataset, DatasetRecord } from "@langwatch/dataset-contract";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Menu } from "@langwatch/design-system/menu";
 import { SmallLabel } from "@langwatch/design-system/small-label";
@@ -40,6 +38,7 @@ import { FormProvider, useForm } from "react-hook-form";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi, type RouterOutputs } from "../../../behavior/workflow-api.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { useVersionState } from "./use-version-state.ts";
@@ -73,9 +72,9 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
     workflowId,
   }));
-  const trpc = api.useUtils();
+  const trpc = workflowApi.useUtils();
 
-  const toggleSaveAsComponentMutation = api.optimization.toggleSaveAsComponent.useMutation({
+  const toggleSaveAsComponentMutation = workflowApi.optimization.toggleSaveAsComponent.useMutation({
     onSuccess: () => {
       void trpc.optimization.getComponents.invalidate();
       toaster.create({
@@ -86,7 +85,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
     },
   });
 
-  const toggleSaveAsEvaluatorMutation = api.optimization.toggleSaveAsEvaluator.useMutation({
+  const toggleSaveAsEvaluatorMutation = workflowApi.optimization.toggleSaveAsEvaluator.useMutation({
     onSuccess: () => {
       void trpc.optimization.getComponents.invalidate();
       toaster.create({
@@ -175,7 +174,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
 
 const exportWorkflow = async (
   publishedWorkflow: StudioWorkflow,
-  datasetData?: Dataset & { datasetRecords: DatasetRecord[] },
+  datasetData?: RouterOutputs["datasetRecord"]["getAll"],
 ) => {
   const dsl = { ...publishedWorkflow };
   try {
@@ -234,9 +233,9 @@ function PublishMenu({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
-  const trpc = api.useUtils();
+  const trpc = workflowApi.useUtils();
 
-  const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
+  const publishedWorkflow = workflowApi.optimization.getPublishedWorkflow.useQuery(
     {
       workflowId: workflowId ?? "",
       projectId: project?.id ?? "",
@@ -258,7 +257,7 @@ function PublishMenu({
   // Add dataset fetching hooks here
   const datasetId = (workflow?.nodes[0]?.data as NodeDataWithDataset)?.dataset?.id;
 
-  const datasetRecords = api.datasetRecord.getAll.useQuery(
+  const datasetRecords = workflowApi.datasetRecord.getAll.useQuery(
     {
       datasetId: datasetId ?? "",
       projectId: project?.id ?? "",
@@ -268,7 +267,7 @@ function PublishMenu({
     },
   );
 
-  const disableAsComponentMutation = api.optimization.disableAsComponent.useMutation({
+  const disableAsComponentMutation = workflowApi.optimization.disableAsComponent.useMutation({
     onSuccess: () => {
       void trpc.optimization.getComponents.invalidate();
       toaster.create({
@@ -279,7 +278,7 @@ function PublishMenu({
     },
   });
 
-  const disableAsEvaluatorMutation = api.optimization.disableAsEvaluator.useMutation({
+  const disableAsEvaluatorMutation = workflowApi.optimization.disableAsEvaluator.useMutation({
     onSuccess: () => {
       void trpc.optimization.getComponents.invalidate();
       toaster.create({
@@ -444,12 +443,12 @@ function PublishModalContent({
   // fails form validation silently, and the button appears to hang.
   const canSave = checkCanCommitNewVersion();
 
-  const publishWorkflow = api.workflow.publish.useMutation();
+  const publishWorkflow = workflowApi.workflow.publish.useMutation();
 
   const [isPublished, setIsPublished] = useState(false);
 
-  const commitVersion = api.workflow.commitVersion.useMutation();
-  const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
+  const commitVersion = workflowApi.workflow.commitVersion.useMutation();
+  const publishedWorkflow = workflowApi.optimization.getPublishedWorkflow.useQuery(
     {
       workflowId: workflowId ?? "",
       projectId: project?.id ?? "",
@@ -655,7 +654,7 @@ export const ApiModalContent = () => {
 
   const { project } = useOrganizationTeamProject();
 
-  const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
+  const publishedWorkflow = workflowApi.optimization.getPublishedWorkflow.useQuery(
     {
       workflowId: workflowId ?? "",
       projectId: project?.id ?? "",

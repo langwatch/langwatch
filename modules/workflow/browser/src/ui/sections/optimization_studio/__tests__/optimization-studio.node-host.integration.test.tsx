@@ -103,8 +103,8 @@ vi.mock("@langwatch/browser-host/toaster", () => ({ toaster: { create: vi.fn() }
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), currentDrawer: undefined }),
 }));
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/workflow-api.ts", () => ({
+  workflowApi: {
     useUtils: () => ({ workflow: { getVersions: { refetch: vi.fn() } } }),
     workflow: { autosave: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
     modelProvider: { getResolvedDefault: { useQuery: () => ({ data: undefined }) } },

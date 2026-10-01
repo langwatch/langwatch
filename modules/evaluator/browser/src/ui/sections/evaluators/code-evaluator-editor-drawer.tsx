@@ -9,7 +9,6 @@ import {
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import {
   type CodeEvaluatorConfig,
@@ -25,6 +24,7 @@ import { rewriteCodeSignature, renderSourceTypeIcon } from "@langwatch/workflow-
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
 import {
   CodeEvaluatorEditor,
@@ -118,7 +118,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const { closeDrawer } = useDrawer();
   const drawerParams = useDrawerParams();
   const complexProps = getComplexProps();
-  const utils = api.useUtils();
+  const utils = evaluatorApi.useUtils();
 
   const evaluatorId =
     props.evaluatorId ??
@@ -142,7 +142,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     mappingsConfig?.initialMappings ?? {},
   );
 
-  const evaluatorQuery = api.evaluators.getById.useQuery(
+  const evaluatorQuery = evaluatorApi.evaluators.getById.useQuery(
     { id: evaluatorId ?? "", projectId: project?.id ?? "" },
     { enabled: isEditing && !!project?.id && isOpen },
   );
@@ -188,7 +188,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     handOffSaved({ evaluator, onSave: props.onSave, closeDrawer });
   };
 
-  const createMutation = api.evaluators.create.useMutation({
+  const createMutation = evaluatorApi.evaluators.create.useMutation({
     onSuccess: finishSave,
     onError: (error) =>
       showErrorToast({
@@ -197,7 +197,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
       }),
   });
 
-  const updateMutation = api.evaluators.update.useMutation({
+  const updateMutation = evaluatorApi.evaluators.update.useMutation({
     onSuccess: finishSave,
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save code evaluator" }),
   });

@@ -1,10 +1,11 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useBatchRunSelection, useBatchRunsPolling } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
-import type { Experiment } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
+
+import type { ExperimentRow } from "../../model/experiment-api-map.ts";
+import { experimentApi } from "../experiment-api.ts";
 
 /**
  * The batch evaluation runs list plus the currently selected run. Moved out
@@ -17,12 +18,12 @@ export const useBatchEvaluationState = ({
   setSelectedRunId,
 }: {
   project?: UiHostProject;
-  experiment?: Experiment;
+  experiment?: ExperimentRow;
   selectedRunId?: string;
   setSelectedRunId?: (runId: string) => void;
 }) => {
   const polling = useBatchRunsPolling();
-  const batchEvaluationRuns = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
+  const batchEvaluationRuns = experimentApi.experiments.getExperimentBatchEvaluationRuns.useQuery(
     { projectId: project?.id ?? "", experimentId: experiment?.id ?? "" },
     { refetchInterval: polling.refetchInterval, enabled: !!project && !!experiment },
   );

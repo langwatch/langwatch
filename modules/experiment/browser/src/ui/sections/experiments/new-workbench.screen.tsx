@@ -1,11 +1,11 @@
 import { Box, Center } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 import { useEffect, useRef } from "react";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import {
   createInitialState,
   type DatasetColumn,
@@ -62,12 +62,12 @@ export default function NewExperimentWorkbench() {
 
   const datasetId = typeof router.query.datasetId === "string" ? router.query.datasetId : undefined;
 
-  const datasetQuery = api.datasetRecord.getAll.useQuery(
+  const datasetQuery = experimentApi.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
     { enabled: !!project?.id && !!datasetId },
   );
 
-  const createExperiment = api.experiments.saveEvaluationsV3.useMutation();
+  const createExperiment = experimentApi.experiments.saveEvaluationsV3.useMutation();
 
   // Wait for the seeding dataset to load before creating the experiment.
   const isDatasetReady = !datasetId || !!datasetQuery.data;

@@ -6,7 +6,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("@langwatch/browser-trpc/workflow-api", async () =>
+vi.mock("../../../../behavior/evaluator-api.ts", async () =>
   (await import("./online-evaluation-drawer.test-helpers.tsx")).createApiMock(),
 );
 vi.mock("@langwatch/browser-host/use-organization-team-project", async () =>

@@ -24,8 +24,8 @@ const mockMutateAsync = vi.hoisted(() =>
 
 const mockStateFetch = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../experiment-api.ts", () => ({
+  experimentApi: {
     useUtils: () => ({
       experiments: {
         getEvaluationsV3BySlug: {

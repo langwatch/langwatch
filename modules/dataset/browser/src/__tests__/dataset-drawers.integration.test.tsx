@@ -21,8 +21,8 @@ vi.mock("@langwatch/workflow-browser-kit", () => ({
   tryToMapPreviousColumnsToNewColumns: (records: unknown) => records,
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../behavior/dataset-api.ts", () => ({
+  datasetApi: {
     dataset: {
       upsert: { useMutation: () => ({ isPending: false, mutate: () => void 0 }) },
       getById: { useQuery: () => ({ data: void 0 }) },

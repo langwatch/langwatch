@@ -1,17 +1,18 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { CustomEvaluator } from "@langwatch/evaluation-contract";
 import { evaluatorCatalogueWith } from "@langwatch/evaluator-browser-kit";
 import type { EvaluatorDefinition } from "@langwatch/evaluator-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
+import { evaluatorApi } from "./evaluator-api.ts";
+
 export const useAvailableEvaluators = ():
   | Readonly<Record<string, EvaluatorDefinition>>
   | undefined => {
   const { project } = useOrganizationTeamProject();
 
-  const availableCustomEvaluators = api.evaluations.availableCustomEvaluators.useQuery(
+  const availableCustomEvaluators = evaluatorApi.evaluations.availableCustomEvaluators.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );

@@ -63,8 +63,8 @@ let versionsQuery: {
   isError: boolean;
 } = { data: undefined, isLoading: true, isError: false };
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/experiment-api.ts", () => ({
+  experimentApi: {
     experiments: {
       listWorkbenchVersions: { useQuery: () => versionsQuery },
       restoreWorkbenchVersion: {

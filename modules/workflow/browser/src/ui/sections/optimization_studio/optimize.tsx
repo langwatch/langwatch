@@ -13,7 +13,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { api, api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Select } from "@langwatch/design-system/select";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
@@ -38,6 +37,7 @@ import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
 import type { WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { OPTIMIZERS } from "../../../model/optimizers.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
@@ -232,7 +232,9 @@ function withOptimizerDefaults({
   );
 }
 
-type CommitVersion = ReturnType<typeof api.workflow.commitVersion.useMutation>["mutateAsync"];
+type CommitVersion = ReturnType<
+  typeof workflowApi.workflow.commitVersion.useMutation
+>["mutateAsync"];
 
 /** Saves the workflow as a new version and makes it current, telling the user either way. */
 async function commitNewVersion(input: {
@@ -354,7 +356,7 @@ export function OptimizeModalContent({
   });
   const canSave = checkCanCommitNewVersion();
 
-  const commitVersion = api.workflow.commitVersion.useMutation();
+  const commitVersion = workflowApi.workflow.commitVersion.useMutation();
   const { startOptimizationExecution } = useOptimizationExecution();
 
   const [hasStarted, setHasStarted] = useState(false);

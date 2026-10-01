@@ -1,9 +1,10 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 /**
  * useMultiRunData - Hook for fetching multiple run data in compare mode
  */
 import { useMemo } from "react";
+
+import { experimentApi } from "../experiment-api.ts";
 
 // Run colors for comparison mode - distinct, accessible colors
 export const RUN_COLORS = [
@@ -56,35 +57,35 @@ export const useMultiRunData = ({
 }: UseMultiRunDataOptions): UseMultiRunDataReturn => {
   // We need to call hooks unconditionally, so we set up the max number
   // and enable/disable based on whether we have that many runs
-  const run0 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run0 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[0] ?? "" },
     { enabled: enabled && !!runIds[0], refetchInterval },
   );
-  const run1 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run1 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[1] ?? "" },
     { enabled: enabled && !!runIds[1], refetchInterval },
   );
-  const run2 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run2 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[2] ?? "" },
     { enabled: enabled && !!runIds[2], refetchInterval },
   );
-  const run3 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run3 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[3] ?? "" },
     { enabled: enabled && !!runIds[3], refetchInterval },
   );
-  const run4 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run4 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[4] ?? "" },
     { enabled: enabled && !!runIds[4], refetchInterval },
   );
-  const run5 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run5 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[5] ?? "" },
     { enabled: enabled && !!runIds[5], refetchInterval },
   );
-  const run6 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run6 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[6] ?? "" },
     { enabled: enabled && !!runIds[6], refetchInterval },
   );
-  const run7 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+  const run7 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[7] ?? "" },
     { enabled: enabled && !!runIds[7], refetchInterval },
   );

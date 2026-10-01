@@ -14,7 +14,6 @@ import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import {
   getRandomWorkflowIcon,
@@ -26,6 +25,8 @@ import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
+
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = UiWorkflowSelectorForEvaluatorDrawerProps;
 
@@ -44,7 +45,7 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = api.useUtils();
+  const utils = evaluatorApi.useUtils();
   const router = useRouter();
   const emojiPicker = useDisclosure();
 
@@ -76,8 +77,8 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
   const icon = watch("icon");
   const name = watch("name");
 
-  const createWorkflowMutation = api.workflow.create.useMutation();
-  const createEvaluatorMutation = api.evaluators.create.useMutation({
+  const createWorkflowMutation = evaluatorApi.workflow.create.useMutation();
+  const createEvaluatorMutation = evaluatorApi.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.({

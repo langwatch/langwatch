@@ -1,5 +1,6 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { dejaViewHref, opsScopeProbeSchema } from "@langwatch/ops-contract";
+
+import { experimentApi } from "./experiment-api.ts";
 
 /** An operator's scope does not change mid-session, so the probe is not re-asked on every open. */
 const OPS_SCOPE_STALE_TIME_MS = 5 * 60_000;
@@ -12,7 +13,7 @@ export function useDejaViewLink({
   aggregateId: string | undefined;
   tenantId: string | undefined;
 }): { href: string | null } {
-  const query = api.ops.getScope.useQuery(undefined, {
+  const query = experimentApi.ops.getScope.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: OPS_SCOPE_STALE_TIME_MS,

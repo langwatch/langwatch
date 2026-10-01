@@ -1,11 +1,11 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   getFieldsUsedByPromptTemplate,
   type PromptTemplateMessage,
 } from "@langwatch/experiment-contract/mapping-validation";
 import { type ReactNode, useCallback, useMemo } from "react";
 
+import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { PromptTemplateFieldsContext } from "../../../behavior/experiments-v3/use-prompt-template-fields.ts";
 import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
@@ -85,7 +85,7 @@ export const PromptTemplateFieldsProvider = ({ children }: { children: ReactNode
     [targets],
   );
 
-  const promptQueries = api.useQueries((t) =>
+  const promptQueries = experimentApi.useQueries((t) =>
     promptTargets.map((target) =>
       t.prompts.getByIdOrHandle(
         {
@@ -106,7 +106,7 @@ export const PromptTemplateFieldsProvider = ({ children }: { children: ReactNode
     ),
   );
 
-  // api.useQueries returns a new array every render, so key the memo on the
+  // experimentApi.useQueries returns a new array every render, so key the memo on the
   // resolved versions and declared inputs rather than on the query objects.
   const resolvedSignature = JSON.stringify(
     promptTargets.map((target, index) => [
