@@ -920,6 +920,7 @@ export function ssoSelfServe(): SsoSelfServeService {
       }),
     ),
     baseUrl: env.NEXTAUTH_URL ?? "",
+    deploymentProvider: resolveAuthProvider,
     // The evidence a test sign-in happened is the account the engine wrote,
     // read here rather than recorded anywhere: activation carries the id of
     // an account that exists, or it is refused.

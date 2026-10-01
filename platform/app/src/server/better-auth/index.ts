@@ -38,6 +38,7 @@ import { plugins } from "./config/plugins";
 import { rateLimit } from "./config/rate-limit";
 import { requestHooks } from "./config/request-hooks";
 import { secondaryStorage } from "./config/secondary-storage";
+import { noteIdTokenIssuerRefusal } from "./id-token-issuer-mismatch";
 import { resolveTrustedOrigins } from "./trustedOrigins";
 
 /**
@@ -208,6 +209,7 @@ export const auth = betterAuth({
   logger: {
     disabled: false,
     log: (level, message, ...args) => {
+      noteIdTokenIssuerRefusal([message, ...args]);
       (logger as any)[level]?.({ args }, message);
     },
   },

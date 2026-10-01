@@ -137,6 +137,22 @@ describe("resolveTrustedOrigins", () => {
     });
   });
 
+  describe("given the registered issuer is Microsoft Entra ID", () => {
+    const entra = "https://login.microsoftonline.com/tenant-id/v2.0";
+
+    it("trusts Microsoft Graph too, where Entra ID serves userinfo", () => {
+      const origins = resolve({ registeredIssuers: [entra] });
+      expect(origins).toContain("https://login.microsoftonline.com");
+      expect(origins).toContain("https://graph.microsoft.com");
+    });
+
+    it("does not trust Microsoft Graph for any other issuer", () => {
+      expect(
+        resolve({ registeredIssuers: ["https://acme.okta.com"] }),
+      ).not.toContain("https://graph.microsoft.com");
+    });
+  });
+
   describe("given the simulator haven started for this worktree", () => {
     const simulator = "https://idp.acme.langwatch.localhost";
 
