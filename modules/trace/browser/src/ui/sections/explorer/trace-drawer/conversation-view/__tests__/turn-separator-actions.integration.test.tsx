@@ -54,15 +54,15 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 }));
 
 import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../../../../behavior/annotation-queue-session.store.ts";
-import {
   openTraceDrawerAt,
   setWindowAddress,
 } from "../../../../../../__tests__/window-location-router.ts";
-import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../../behavior/annotation-queue-session.store.ts";
 import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
+import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
 import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { enterTraceEditMode } from "../../../utils/trace-edit-mode.ts";
@@ -70,6 +70,9 @@ import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const TRACE_ID = "trace-1";
 const OCCURRED_AT_MS = 1_754_640_000_000;
+const PAGE = "/my-project/traces";
+const drawerAddress = (traceId: string, extra = "") =>
+  `${PAGE}?drawer.open=traceV2Details&drawer.traceId=${traceId}${extra}`;
 
 function turn(): TraceListItem {
   return {
@@ -258,6 +261,7 @@ describe("given the drawer is closed", () => {
 describe("given an unsaved correction on another turn's trace", () => {
   function startDirtyCorrectionOn(traceId: string) {
     openTraceDrawerAt({ traceId, t: "111" });
+    setWindowAddress({ url: drawerAddress(traceId, "&drawer.t=111&drawer.edit=1") });
     enterTraceEditMode(traceId);
     useTraceEditStore.getState().setTraceOutput({
       text: "corrected",
@@ -267,6 +271,9 @@ describe("given an unsaved correction on another turn's trace", () => {
 
   beforeEach(() => {
     startDirtyCorrectionOn("other-trace");
+    mocks.openDrawer.mockImplementation(() => {
+      setWindowAddress({ url: drawerAddress(TRACE_ID, "&drawer.edit=1") });
+    });
     renderTurn();
 
     fireEvent.click(editTrace());
@@ -295,16 +302,32 @@ describe("given an unsaved correction on another turn's trace", () => {
     getTraceDrawer().setIsEditing(false);
     run?.();
 
-    expect(getTraceDrawer().isEditing).toBe(false);
     expect(useTraceEditStore.getState().editingTraceId).toBeNull();
     expect(mocks.openDrawer).toHaveBeenCalledOnce();
+    expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
+      traceId: TRACE_ID,
+      t: String(OCCURRED_AT_MS),
+      urlParams: { edit: "1" },
+    });
   });
 });
 
 describe("given the turn's own trace is already being corrected", () => {
+  beforeEach(() => {
+    mocks.openDrawer.mockImplementation(() => {
+      setWindowAddress({ url: drawerAddress(TRACE_ID, "&drawer.edit=1") });
+    });
+  });
+
   /** @scenario "Re-entering edit mode on the same trace keeps the draft" */
   it("re-opens the editor without asking and keeps the draft", () => {
     openTraceDrawerAt({ traceId: TRACE_ID, t: String(OCCURRED_AT_MS), mode: "conversation" });
+    setWindowAddress({
+      url: drawerAddress(
+        TRACE_ID,
+        `&drawer.t=${OCCURRED_AT_MS}&drawer.mode=conversation&drawer.edit=1`,
+      ),
+    });
     enterTraceEditMode(TRACE_ID);
     useTraceEditStore.getState().setTraceOutput({
       text: "corrected",

@@ -1,3 +1,4 @@
+import { useDrawerRouter } from "@langwatch/browser-host/drawer";
 /**
  * Who is offered the annotation pass.
  * @vitest-environment jsdom
@@ -56,8 +57,17 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 }));
 
 const { getTraceDrawer, useTraceEditStore } = await import("../../../../../../index.ts");
-const { openTraceDrawerAt } = await import("../../../../../../__tests__/window-location-router.ts");
+const { openTraceDrawerAt, setWindowAddress } =
+  await import("../../../../../../__tests__/window-location-router.ts");
 const { TraceOverflowMenu } = await import("../trace-overflow-menu.tsx");
+const PAGE = "/my-project/traces";
+const drawerAddress = (traceId: string, extra = "") =>
+  `${PAGE}?drawer.open=traceV2Details&drawer.traceId=${traceId}${extra}`;
+
+function RouterRegistration() {
+  useDrawerRouter();
+  return null;
+}
 
 const renderMenu = ({
   readOnly = false,
@@ -69,19 +79,22 @@ const renderMenu = ({
   onAddToAnnotationQueue?: () => void;
 } = {}) => {
   renderWithDesignSystem(
-    <TraceOverflowMenu
-      traceId={traceId}
-      conversationId={null}
-      onCopyTraceId={vi.fn()}
-      onFindSimilar={null}
-      dejaViewHref={null}
-      onOpenRawJson={vi.fn()}
-      onShowShortcuts={vi.fn()}
-      onAddToAnnotationQueue={onAddToAnnotationQueue}
-      pinned={false}
-      onTogglePinned={vi.fn()}
-      readOnly={readOnly}
-    />,
+    <>
+      <RouterRegistration />
+      <TraceOverflowMenu
+        traceId={traceId}
+        conversationId={null}
+        onCopyTraceId={vi.fn()}
+        onFindSimilar={null}
+        dejaViewHref={null}
+        onOpenRawJson={vi.fn()}
+        onShowShortcuts={vi.fn()}
+        onAddToAnnotationQueue={onAddToAnnotationQueue}
+        pinned={false}
+        onTogglePinned={vi.fn()}
+        readOnly={readOnly}
+      />
+    </>,
   );
   return { onAddToAnnotationQueue };
 };
@@ -101,6 +114,9 @@ const annotationQueueItem = () => screen.queryByText("Add to annotation queue");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.openDrawer.mockImplementation(() => {
+    setWindowAddress({ url: drawerAddress("trace-1", "&drawer.edit=1") });
+  });
   mocks.canUpdateAnnotations = true;
   useTraceEditStore.getState().discard();
   openTraceDrawerAt({ mode: "trace" });
