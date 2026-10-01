@@ -8,10 +8,13 @@
  * coding_agent_sessions is ORDER BY (TenantId, StartedAt, SessionId), which
  * leads with time. The single-session read's dedup subquery must stay
  * unwindowed for correctness (ADR-071), and with StartedAt unconstrained the
- * primary index cannot exclude a granule on SessionId. The bloom filter is what
- * makes that read cheap; the sort key cannot.
+ * primary index can exclude a granule on SessionId only when the granule's
+ * SessionId range misses the requested id. A granule whose range spans it,
+ * which is the common case once a part holds many sessions, stays eligible.
+ * The bloom filter is what excludes those; the sort key cannot.
  *
- * These assert on rows actually read rather than on `SHOW CREATE TABLE`. DDL
+ * These assert on rows actually read by the repository's own point read,
+ * taken from system.query_log, rather than on `SHOW CREATE TABLE`. DDL
  * only proves an index is attached, which stays true of an index that prunes
  * nothing, and that is exactly the state migrations 00062 and 00063 left their
  * indexes in for a month (see #5864).
@@ -59,7 +62,7 @@ const tag = `t${nanoid(8)}`;
  * hold with no skip index at all. FAR_SESSION sits in another partition so the
  * read still spans more than one.
  */
-const TENANTS = ["a", "b", "c", "d"] as const;
+const TENANTS = ["a", "b", "c", "d", "e"] as const;
 const tenantIdFor = (suffix: (typeof TENANTS)[number]) =>
   `${tag}-tenant-${suffix}`;
 
@@ -68,7 +71,11 @@ const ABSENT_SESSION = "mmmm-session-absent";
 const BRACKET_HIGH = "zzzz-session-high";
 const FAR_SESSION = "ffff-session-far";
 
-/** One week apart at most, so the bracketing pair shares a partition. */
+/**
+ * A Monday and the Tuesday after it: the same calendar week under
+ * toYearWeek, so the bracketing pair shares a partition. Dates a day apart
+ * that straddle a week boundary would not.
+ */
 const BRACKET_WEEK_A = new Date("2026-01-05T00:00:00.000Z");
 const BRACKET_WEEK_B = new Date("2026-01-06T00:00:00.000Z");
 /** A different partition, so the lookup spans more than one. */
@@ -82,14 +89,17 @@ interface SessionFixture {
   modelCalls?: number;
 }
 
-/** One call, one part. Which rows share a part decides what the primary key can prune. */
+/**
+ * One call, one part per partition it touches. Which rows share a part decides
+ * what the primary key can prune.
+ */
 async function insertSessions({ fixtures }: { fixtures: SessionFixture[] }) {
   await ch.insert({
     table: "coding_agent_sessions",
     values: fixtures.map((session) => ({
       TenantId: session.tenantId,
       SessionId: session.sessionId,
-      SessionKeySource: "session_id",
+      SessionKeySource: "provider",
       Version: "v1",
       StartedAt: session.startedAt,
       CreatedAt: session.startedAt,
@@ -103,10 +113,12 @@ async function insertSessions({ fixtures }: { fixtures: SessionFixture[] }) {
 }
 
 /**
- * Rows ClickHouse had to read to answer the query. Zero means every granule was
- * skipped, which is only possible when a skip index excluded them: the
- * time-leading primary key cannot, and a granule that is read still counts here
- * even though the row is filtered out afterwards.
+ * Rows ClickHouse read to answer the repository's own `findBySessionId`, the
+ * dedup subquery included. The repository runs its real SQL against a client
+ * that only tags each query with an id (and optionally turns skip indexes off),
+ * and the count comes from system.query_log for those ids. Zero means every
+ * granule was skipped; a granule that is read still counts here even though
+ * its rows are filtered out afterwards.
  */
 async function rowsReadForSessionLookup({
   tenantId,
@@ -117,21 +129,45 @@ async function rowsReadForSessionLookup({
   sessionId: string;
   useSkipIndexes?: boolean;
 }): Promise<number> {
+  const queryIds: string[] = [];
+  const tagged = new Proxy(ch, {
+    get(target, prop) {
+      if (prop === "query") {
+        return (params: Parameters<ClickHouseClient["query"]>[0]) => {
+          const queryId = `${tag}-${nanoid(8)}`;
+          queryIds.push(queryId);
+          return target.query({
+            ...params,
+            query_id: queryId,
+            clickhouse_settings: {
+              ...params.clickhouse_settings,
+              use_skip_indexes: useSkipIndexes ? 1 : 0,
+            },
+          });
+        };
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const measured = new CodingAgentSessionClickHouseRepository(
+    async () => tagged,
+  );
+  expect(await measured.findBySessionId({ tenantId, sessionId })).toBeNull();
+
+  await ch.command({ query: "SYSTEM FLUSH LOGS" });
   const result = await ch.query({
     query: `
-      SELECT TenantId, SessionId, max(UpdatedAt) AS UpdatedAt
-      FROM coding_agent_sessions
-      WHERE TenantId = {tenantId:String} AND SessionId = {sessionId:String}
-      GROUP BY TenantId, SessionId
+      SELECT sum(read_rows) AS rows
+      FROM system.query_log
+      WHERE type = 'QueryFinish' AND query_id IN {queryIds:Array(String)}
     `,
-    query_params: { tenantId, sessionId },
-    clickhouse_settings: { use_skip_indexes: useSkipIndexes ? 1 : 0 },
-    format: "JSON",
+    query_params: { queryIds },
+    format: "JSONEachRow",
   });
-  const body = (await result.json()) as {
-    statistics?: { rows_read?: number };
-  };
-  return body.statistics?.rows_read ?? -1;
+  const [row] = await result.json<{ rows: number | string }>();
+  expect(queryIds).toHaveLength(1);
+  return Number(row?.rows ?? -1);
 }
 
 beforeAll(async () => {
@@ -216,7 +252,23 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
       // sort key, so an absent value cannot be skipped and the rows must be
       // read and filtered. If this ever returns 0 as well, the zero above has
       // stopped meaning "the bloom filter skipped the granule".
-      const tenantId = tenantIdFor("a");
+      const tenantId = tenantIdFor("e");
+      await insertSessions({
+        fixtures: [
+          {
+            tenantId,
+            sessionId: BRACKET_LOW,
+            startedAt: BRACKET_WEEK_A,
+            updatedAt: new Date(BRACKET_WEEK_A.getTime() + 1000),
+          },
+          {
+            tenantId,
+            sessionId: FAR_SESSION,
+            startedAt: FAR_WEEK,
+            updatedAt: new Date(FAR_WEEK.getTime() + 1000),
+          },
+        ],
+      });
       const result = await ch.query({
         query: `
           SELECT count() FROM coding_agent_sessions

@@ -479,8 +479,10 @@ export class CodingAgentSessionClickHouseRepository
    * What keeps that unwindowed subquery cheap is the `idx_session_id` bloom
    * filter (migration 00101), NOT the sort key. The sort key is
    * (TenantId, StartedAt, SessionId) and leads with time, so with StartedAt
-   * unconstrained `SessionId` sits behind an unbounded second key position and
-   * the primary index cannot exclude a granule on it. `UpdatedAt` is not a
+   * unconstrained `SessionId` sits behind an unbounded second key position, so
+   * the primary index can exclude a granule on it only when the granule's
+   * SessionId range misses the requested id; any granule whose range spans it
+   * stays eligible, and with many sessions per part most do. `UpdatedAt` is not a
    * sort-key column either. Before the index this read touched a granule in
    * every part, growing with the tenant's history rather than with the session.
    *

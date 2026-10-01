@@ -13,8 +13,10 @@
 -- would let a session whose latest version's StartedAt drifted outside the
 -- window read back as a stale older version, which is a non-null result no
 -- fallback catches (ADR-071). With StartedAt unconstrained, SessionId sits
--- behind an unbounded second key position, so the primary index cannot exclude
--- a granule on it, and there is no skip index to do so instead.
+-- behind an unbounded second key position, so the primary index can exclude a
+-- granule on it only when the granule's SessionId range misses the requested
+-- id. Any granule whose range spans the id stays eligible, most do once a part
+-- holds many sessions, and there is no skip index to exclude them instead.
 --
 -- EXPLAIN PLAN indexes = 1 for a NONEXISTENT SessionId on a large tenant, so
 -- every granule reported is pure waste:
