@@ -27,11 +27,9 @@ import {
   registerLiquidLanguage,
   setModelVariables,
   setupLiquidJsonSchema,
-  type VariableInfo as MonacoVariableInfo,
+  type VariableInfo,
   validateLiquidModel,
 } from "../../../liquid-editor/index.ts";
-
-export type VariableInfo = MonacoVariableInfo;
 
 // Shared building blocks for notification config stages: Monaco Liquid editor with autocomplete
 // + validation, compact preview pieces, variable surface in hover tooltip.
@@ -51,11 +49,6 @@ function MonacoEditor(props: ComponentProps<typeof LazyMonacoEditor>) {
       <LazyMonacoEditor {...props} />
     </Suspense>
   );
-}
-
-export interface FieldDraft {
-  value: string;
-  usingDefault: boolean;
 }
 
 export function FieldHeader({

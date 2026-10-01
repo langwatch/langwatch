@@ -130,7 +130,8 @@ import type { SavedTriggerRow, SlackPreview } from "@langwatch/automation-contra
 import { AutomationHostProvider } from "../../../model/automation-host.ts";
 import { fakeAutomationHost } from "../../../testing.tsx";
 import { SLACK_BLOCK_KIT_TEMPLATES, templateOptionsFor } from "../../slack-templates/index.ts";
-import slackClient, { type SlackSlice } from "../ui/sections/slack.client.tsx";
+import type { SlackSlice } from "../model/slack-slice.ts";
+import slackClient from "../ui/sections/slack.client.tsx";
 
 /** The host the Slack step hands connection creation to; rebuilt per connection test. */
 let host = fakeAutomationHost();

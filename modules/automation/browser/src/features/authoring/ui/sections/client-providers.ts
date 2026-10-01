@@ -8,11 +8,13 @@ import {
   type NotifyPreview as ProviderNotifyPreview,
   type SliceFor as ProviderSliceFor,
 } from "../../../../model/provider-registry.ts";
+import type { DatasetSlice } from "../../model/dataset-slice.ts";
 import { createAutomationDraftModel } from "../../model/draft-reducer.ts";
+import type { SlackSlice } from "../../model/slack-slice.ts";
 import annotationQueueClient, { type AnnotationQueueSlice } from "./annotation-queue.client.tsx";
-import datasetClient, { type DatasetSlice } from "./dataset.client.tsx";
+import datasetClient from "./dataset.client.tsx";
 import emailClient, { type EmailSlice } from "./email.client.tsx";
-import slackClient, { type SlackSlice } from "./slack.client.tsx";
+import slackClient from "./slack.client.tsx";
 import webhookClient, { type WebhookSlice } from "./webhook.client.tsx";
 
 export const CLIENT_PROVIDERS = createClientProviderRegistry({

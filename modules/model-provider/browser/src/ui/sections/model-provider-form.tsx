@@ -97,8 +97,6 @@ export type EditModelProviderFormProps = {
   onFailed?: (failure: { provider: string; code: string }) => void;
 };
 
-export type { GuidedSave } from "../../behavior/use-guided-save.ts";
-
 /**
  * The current provider counts as enabled: it will be when the form saves.
  * Nothing loaded yet means one, for the same reason.

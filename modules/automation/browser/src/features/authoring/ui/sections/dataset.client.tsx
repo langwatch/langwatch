@@ -21,8 +21,6 @@ import { useMappingEditsOnly } from "../../behavior/use-mapping-edits-only.ts";
 import type { DatasetMapping, DatasetSlice, TraceMappingEntry } from "../../model/dataset-slice.ts";
 import { DatasetSelector } from "../blocks/dataset-selector.tsx";
 
-export type { DatasetSlice } from "../../model/dataset-slice.ts";
-
 const EMPTY_MAPPING: DatasetMapping = { mapping: {}, expansions: [] };
 
 /**

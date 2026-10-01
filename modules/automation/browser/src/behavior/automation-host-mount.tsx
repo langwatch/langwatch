@@ -79,6 +79,7 @@ class CapabilityAutomationHost extends AutomationHost {
       closeRegisteredDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
       organizations: readonly AutomationOrganizationGraph[];
       hasEmailProvider: boolean;
+      appBaseUrl: string;
     },
   ) {
     super();
@@ -181,9 +182,9 @@ class CapabilityAutomationHost extends AutomationHost {
     });
   }
 
-  /** No deployment-address capability exists yet; recorded gap, see the handoff. */
+  /** The deployment's public address, from the shell's injected config. */
   appBaseUrl(): string {
-    return "";
+    return this.members.appBaseUrl;
   }
 
   hasEmailProvider(): boolean {
@@ -247,6 +248,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
         closeRegisteredDrawer: closeDrawer,
         organizations,
         hasEmailProvider: deployment.hasEmailProvider,
+        appBaseUrl: deployment.appBaseUrl,
       }),
     [
       hostScope,
@@ -260,6 +262,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
       closeDrawer,
       organizations,
       deployment.hasEmailProvider,
+      deployment.appBaseUrl,
     ],
   );
 

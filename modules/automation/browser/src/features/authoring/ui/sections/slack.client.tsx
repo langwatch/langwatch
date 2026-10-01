@@ -49,8 +49,6 @@ import { ReceiveCadenceField } from "../elements/receive-cadence-field.tsx";
 import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
 import { CompactSlackPreview, FieldHeader, LiquidEditor } from "./template-authoring.tsx";
 
-export type { SlackSlice } from "../../model/slack-slice.ts";
-
 const EMPTY_FIELD: FieldDraft = { value: "", usingDefault: true };
 
 function initialSlice(): SlackSlice {
