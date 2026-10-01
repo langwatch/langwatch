@@ -110,3 +110,17 @@ export class AuditTrailDeniedError extends HandledError {
     this.name = "AuditTrailDeniedError";
   }
 }
+
+/** First-time storage setup with no secret: a stored secret may stay blank, an absent one not. */
+export class OrganizationS3SecretRequiredError extends HandledError {
+  declare readonly code: "validation_error";
+
+  constructor() {
+    super(
+      "validation_error",
+      "Enter the S3 Secret Access Key: none is stored yet, so a blank one cannot be kept",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "OrganizationS3SecretRequiredError";
+  }
+}

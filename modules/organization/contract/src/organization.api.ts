@@ -37,6 +37,7 @@ import type {
 } from "./join-request.responses.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
+  OrganizationDirectoryCounts,
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
   OrganizationInviteExtended,
@@ -594,6 +595,10 @@ export interface OrganizationApi {
     input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
     by: OrganizationCaller,
   ): Promise<OrganizationWithMembersAndTheirTeams>;
+  /** The Directory's tab badges: how many of each, never the lists. */
+  getDirectoryCounts(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationDirectoryCounts>;
   /** One member's full record, refused by name where there is none. */
   getMemberOrRefuse(
     input: Readonly<{ organizationId: string; userId: string }>,

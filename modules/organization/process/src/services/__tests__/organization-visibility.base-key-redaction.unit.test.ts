@@ -2,7 +2,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
- * Project base key in organization.getAll payload must be gated by permissions.
+ * A query never carries a credential: the organizations payload is cached, so the
+ * project base key, the LangWatchQL key and the S3 secret never travel in it.
  * @see specs/api-keys/project-key-read-access.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -15,6 +16,8 @@ import { OrganizationVisibilityService } from "../organization-visibility.servic
 
 const BASE_API_KEY = "test-base-key";
 const STORED_LWQL_KEY = "test-lwql-key";
+const STORED_S3_SECRET = "test-s3-secret";
+const STORED_LICENSE = "test-licence-key";
 const CALLER = { id: "user-1" };
 
 const T0 = Temporal.Instant.fromEpochMilliseconds(0);
@@ -30,9 +33,9 @@ function seededMembership(): MemoryOrganizationMembershipRepository {
     presenceEnabled: false,
     traceSharingEnabled: false,
     primaryIntent: null,
-    s3Endpoint: null,
-    s3AccessKeyId: null,
-    s3SecretAccessKey: null,
+    s3Endpoint: "https://s3.example.test",
+    s3AccessKeyId: "test-s3-access-key-id",
+    s3SecretAccessKey: STORED_S3_SECRET,
     s3Bucket: null,
     stripeCustomerId: null,
     createdAt: T0,
@@ -108,7 +111,11 @@ function visibility(granted: readonly string[], permissions = testPermissions(gr
   const membership = seededMembership();
   return OrganizationVisibilityService.create({
     reader: {
-      getAllForUser: (input) => membership.findAllForUser(input),
+      getAllForUser: async (input) =>
+        (await membership.findAllForUser(input)).map((organization) => ({
+          ...organization,
+          license: STORED_LICENSE,
+        })),
       findOrganizationWithMembers: (input) => membership.findOrganizationWithMembers(input),
       findMemberById: (input) => membership.findMemberById(input),
     },
@@ -116,6 +123,17 @@ function visibility(granted: readonly string[], permissions = testPermissions(gr
     secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     demoProject: { userId: "", projectId: "" },
   });
+}
+
+/** The only organization the caller belongs to. */
+async function readOrganization(granted: readonly string[]) {
+  const organizations = await visibility(granted).listVisible({ isDemo: false }, CALLER);
+  const organization = organizations[0];
+
+  if (!organization)
+    throw new Error("the redaction dropped the organization it was meant to redact");
+
+  return organization;
 }
 
 /** The only project in the only team of the only organization. */
@@ -129,39 +147,38 @@ async function readProject(granted: readonly string[]) {
 }
 
 describe("given the base key in the organizations payload", () => {
-  describe("when the caller can manage the project", () => {
-    /** @scenario The base key stays in the session payload for project admins */
-    it("includes the base key in the payload", async () => {
-      const project = await readProject(["project:manage"]);
-
-      expect(project.apiKey).toBe(BASE_API_KEY);
-    });
-  });
-
-  describe("when the caller can update but not manage the project", () => {
-    /** @scenario The base key is withheld from the session payload for project members */
-    it("withholds the base key from the payload", async () => {
-      const project = await readProject(["project:update"]);
+  describe.each([
+    ["can manage the project", ["project:manage", "organization:manage"]],
+    ["can update but not manage the project", ["project:update"]],
+    ["can only view the project", []],
+  ])("when the caller %s", (_label, granted) => {
+    /** @scenario No query carries a project key or the storage secret */
+    it("leaves the base key blank in the payload", async () => {
+      const project = await readProject(granted);
 
       expect(project.apiKey).toBe("");
     });
-  });
 
-  describe("when the caller can only view the project", () => {
-    /** @scenario The base key is withheld from the session payload for project members */
-    it("withholds the base key from the payload", async () => {
-      const project = await readProject([]);
+    /** @scenario No query carries a project key or the storage secret */
+    it("leaves the organization's S3 secret out of the payload and keeps the key id", async () => {
+      const organization = await readOrganization(granted);
 
-      expect(project.apiKey).toBe("");
+      expect(organization.s3SecretAccessKey).toBeNull();
+      expect(organization.s3AccessKeyId).toBe("test-s3-access-key-id");
+    });
+
+    /** @scenario No query carries a project key or the storage secret */
+    it("leaves the uploaded licence key out of the payload", async () => {
+      const organization = await readOrganization(granted);
+
+      expect(organization.license).toBeNull();
+      expect(JSON.stringify(organization)).not.toContain(STORED_LICENSE);
     });
   });
 
-  /**
-   * The LangWatchQL key is a control-plane secret withheld from everyone —
-   * unlike the base key, which is gated on permission. The caller who CAN
-   * manage the project is the case that matters here.
-   */
+  /** The LangWatchQL key is a control-plane secret withheld from everyone, managers included. */
   describe("when the LangWatchQL key is on the project", () => {
+    /** @scenario No query carries a project key or the storage secret */
     it.each([
       ["a caller who can manage the project", ["project:manage"]],
       ["a caller who can update but not manage the project", ["project:update"]],
@@ -170,21 +187,6 @@ describe("given the base key in the organizations payload", () => {
       const project = await readProject(granted);
 
       expect(project.lwqlKey).toBe("");
-    });
-  });
-});
-
-describe("given the project permissions behind the base key", () => {
-  describe("when the organizations payload is read", () => {
-    it("decides every project in one batched call, never one check per project", async () => {
-      const permissions = testPermissions(["project:manage"]);
-
-      await visibility(["project:manage"], permissions).listVisible({ isDemo: false }, CALLER);
-
-      expect(permissions.canBatchByIds).toHaveBeenCalledTimes(1);
-      expect(permissions.hasPermission).not.toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: expect.any(String) }),
-      );
     });
   });
 });

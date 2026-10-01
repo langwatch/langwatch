@@ -17,7 +17,10 @@ import {
 import {
   organizationAuditLogPageSchema,
   organizationCreatedSchema,
+  organizationDirectoryCountsSchema,
+  organizationMemberDirectorySchema,
   organizationMemberProvenanceByUserSchema,
+  organizationMemberRecordSchema,
   organizationMemberRoleChangedSchema,
   organizationUserRowsSchema,
   organizationWriteAckSchema,
@@ -53,9 +56,6 @@ export type OrganizationApiCreateAndAssignInput = z.infer<
  * partial one would strip fields the shell reads.
  */
 export const organizationFullyLoadedListSchema = z.array(z.unknown());
-
-/** The same reason, for the two single-aggregate reads beside it. */
-export const organizationAggregateSchema = z.unknown();
 
 export const organizationTrpc = defineTrpcContract("organization")
   /** Sign-up: the caller's first organization and its first team. */
@@ -102,11 +102,16 @@ export const organizationTrpc = defineTrpcContract("organization")
   /** The member pickers' read: names always, addresses only for an administrator. */
   .query("getOrganizationWithMembersAndTheirTeams")
   .withInput(organizationApiWithMembersInputSchema)
-  .withOutput(organizationAggregateSchema)
+  .withOutput(organizationMemberDirectorySchema)
+
+  /** The Directory's tab badges: counts only, so a closed tab loads no list. */
+  .query("getDirectoryCounts")
+  .withInput(organizationApiScopeSchema)
+  .withOutput(organizationDirectoryCountsSchema)
 
   .query("getMemberById")
   .withInput(organizationApiMemberScopeSchema)
-  .withOutput(organizationAggregateSchema)
+  .withOutput(organizationMemberRecordSchema)
 
   /** Why each member is here; a second query so a failure degrades only the chips. */
   .query("getMemberProvenance")

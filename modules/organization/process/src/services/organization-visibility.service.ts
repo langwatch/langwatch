@@ -94,16 +94,8 @@ export class OrganizationVisibilityService {
         ? await this.deps.permissions.listBindingsForSynthesis({ orgIds: organizationIds, userId })
         : [];
 
-    const manageable = await this.#manageableOrganizationIds({ organizations, userId });
-    const updatableProjects = await this.#updatableProjectIds({ organizations, userId });
-
     for (const organization of organizations) {
-      this.#redactStoredCredentials({
-        organization,
-        canManage: manageable.has(organization.id),
-        isDemo: input.isDemo,
-        updatable: updatableProjects.get(organization.id) ?? new Map<string, boolean>(),
-      });
+      this.#redactStoredCredentials(organization);
       this.#narrowToViewer({
         organization,
         userId,
@@ -175,82 +167,26 @@ export class OrganizationVisibilityService {
     });
   }
 
-  /** Which of these organizations the caller may administer. */
-  async #manageableOrganizationIds(input: {
-    organizations: readonly FullyLoadedOrganization[];
-    userId: string;
-  }): Promise<ReadonlySet<string>> {
-    const manageable = new Set<string>();
-
-    for (const organization of input.organizations) {
-      const canManage = await this.#probeOrganization({
-        userId: input.userId,
-        organizationId: organization.id,
-      });
-      if (canManage) manageable.add(organization.id);
-    }
-
-    return manageable;
-  }
-
   /**
-   * Which projects the caller may administer, per organization: one batched
-   * resolution per organization, since a per-project check re-collects the
-   * caller's grants and starves the connection pool under a page load.
+   * A query never carries a credential, because every query is cached, to the
+   * browser's disk too. The S3 secret, the project base key and the LangWatchQL
+   * key go to nobody; the base key is revealed by a mutation.
    */
-  async #updatableProjectIds(input: {
-    organizations: readonly FullyLoadedOrganization[];
-    userId: string;
-  }): Promise<ReadonlyMap<string, ReadonlyMap<string, boolean>>> {
-    const byOrganization = new Map<string, ReadonlyMap<string, boolean>>();
-
-    for (const organization of input.organizations) {
-      const projects = organization.teams.flatMap((team) =>
-        team.projects.map((project) => ({ projectId: project.id, teamId: team.id })),
-      );
-      if (projects.length === 0) continue;
-
-      const decisions = await this.deps.permissions.canBatchByIds({
-        principal: { type: "user", id: input.userId },
-        permission: "project:manage",
-        organizationId: organization.id,
-        teams: [],
-        projects,
-      });
-      byOrganization.set(organization.id, decisions.projects);
-    }
-
-    return byOrganization;
-  }
-
-  /**
-   * The stored credentials, decided per viewer. The S3 secret and project
-   * base key are write credentials: they go only to somebody who can change
-   * the thing they belong to. The LangWatchQL key goes to nobody at all.
-   */
-  #redactStoredCredentials(input: {
-    organization: FullyLoadedOrganization;
-    canManage: boolean;
-    isDemo: boolean;
-    updatable: ReadonlyMap<string, boolean>;
-  }): void {
-    const { organization, canManage, isDemo, updatable } = input;
+  #redactStoredCredentials(organization: FullyLoadedOrganization): void {
     const decrypt = (value: string) => this.deps.secrets.decrypt(value);
 
     for (const project of organization.teams.flatMap((team) => team.projects)) {
       if (project.s3AccessKeyId) project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
-      project.s3SecretAccessKey =
-        canManage && project.s3SecretAccessKey ? decrypt(project.s3SecretAccessKey) : null;
+      project.s3SecretAccessKey = null;
       if (project.s3Endpoint) project.s3Endpoint = decrypt(project.s3Endpoint);
 
-      if (isDemo || !(updatable.get(project.id) ?? false)) project.apiKey = "";
+      project.apiKey = "";
       project.lwqlKey = "";
     }
 
     if (organization.s3AccessKeyId)
       organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
-    organization.s3SecretAccessKey =
-      canManage && organization.s3SecretAccessKey ? decrypt(organization.s3SecretAccessKey) : null;
+    organization.s3SecretAccessKey = null;
     if (organization.s3Endpoint) organization.s3Endpoint = decrypt(organization.s3Endpoint);
 
     // The row still carries the retired Elasticsearch columns, kept for deploy
@@ -258,6 +194,8 @@ export class OrganizationVisibilityService {
     organization.elasticsearchNodeUrl = null;
     organization.elasticsearchApiKey = null;
     organization.useCustomElasticsearch = false;
+    // The uploaded licence key is shown once at upload and never read back.
+    organization.license = null;
   }
 
   /**

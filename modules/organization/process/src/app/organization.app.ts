@@ -110,6 +110,7 @@ import {
   type GroupListItem,
   type GroupMembershipView,
   type TeamWithProjects,
+  type OrganizationDirectoryCounts,
   type OrganizationMemberProvenance,
   type OrganizationGroupService,
   type OrganizationFounding,
@@ -295,6 +296,11 @@ export type OrganizationInfrastructure = Readonly<{
 
 /** The page size the two project lookups read an organization at. */
 const TEAM_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
+
+/** What a team read says of one project: its name and address, never its keys. */
+function teamProjectOf({ id, name, slug }: { id: string; name: string; slug: string }) {
+  return { id, name, slug };
+}
 
 /** The page size the group list is read at. */
 const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
@@ -1669,6 +1675,30 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.getAuditLogs(input);
   }
 
+  /** The Directory's tab badges: each a count, so no tab's list is read to number it. */
+  async getDirectoryCounts(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationDirectoryCounts> {
+    const { organizationId } = input;
+    const [members, invites, requests, groups, teams] = await Promise.all([
+      this.listMembers({ organizationId, includeDisabled: true, limit: 1 }),
+      this.listPendingInvitations({ organizationId }),
+      this.listPendingJoinRequests({ organizationId }),
+      this.listGroups({ organizationId, page: 1, limit: 1 }),
+      this.listTeams({ organizationId, page: 1, limit: 1 }),
+    ]);
+
+    return {
+      members: members.totalCount,
+      openInvites: invites.filter(
+        ({ displayStatus }) => displayStatus === "PENDING" || displayStatus === "EXPIRED",
+      ).length,
+      joinRequests: requests.length,
+      groups: groups.pagination.total,
+      teams: teams.pagination.total,
+    };
+  }
+
   // -- the team doors --------------------------------------------------------
 
   /** Every team the caller can see, each with the projects that sit in it. */
@@ -1687,8 +1717,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
     return teams.map((team) => ({
       ...team,
-      projects: projects.data.filter((project) => project.teamId === team.id),
-    })) as TeamWithProjects[];
+      projects: projects.data.filter((project) => project.teamId === team.id).map(teamProjectOf),
+    }));
   }
 
   /** The access matrix an administrator edits: who holds what, and through what. */
@@ -1717,7 +1747,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       teamId: team.id,
     });
 
-    return { ...team, projects } as TeamWithProjects;
+    return { ...team, projects: projects.map(teamProjectOf) };
   }
 
   async updateTeamMembers(

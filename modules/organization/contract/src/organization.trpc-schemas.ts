@@ -109,13 +109,11 @@ export const organizationApiUpdateInputSchema = z
       const hasAccessKey = !!data.s3AccessKeyId?.trim();
       const hasSecretKey = !!data.s3SecretAccessKey?.trim();
 
-      return (
-        (hasEndpoint && hasAccessKey && hasSecretKey) ||
-        (!hasEndpoint && !hasAccessKey && !hasSecretKey)
-      );
+      return (hasEndpoint && hasAccessKey) || (!hasEndpoint && !hasAccessKey && !hasSecretKey);
     },
     {
-      message: "S3 Endpoint, Access Key ID, and Secret Access Key must all be provided together",
+      message:
+        "S3 Endpoint and Access Key ID must be provided together; a blank Secret Access Key leaves the stored one unchanged",
     },
   );
 export type OrganizationApiUpdateInput = z.infer<typeof organizationApiUpdateInputSchema>;

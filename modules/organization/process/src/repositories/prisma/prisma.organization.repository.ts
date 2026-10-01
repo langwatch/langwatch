@@ -184,6 +184,15 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     return organization.signupData;
   }
 
+  async hasStoredS3Secret(organizationId: string): Promise<boolean> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { s3SecretAccessKey: true },
+    });
+
+    return !!row?.s3SecretAccessKey;
+  }
+
   async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {
     return this.database.organization.findUnique({
       where: { id: organizationId },

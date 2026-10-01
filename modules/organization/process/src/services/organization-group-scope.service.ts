@@ -32,6 +32,16 @@ export class OrganizationGroupScopeService extends OrganizationGroupServiceContr
       ...new Map(input.bindings.map((binding) => [binding.scopeId, binding])).values(),
     ];
 
+    if (uniqueBindings.some((binding) => binding.scopeType === "TEAM")) {
+      // One read names every team; a grant on an archived team is left unnamed, never an error.
+      const teams = await this.dependencies.organizations.listTeams({
+        organizationId: input.organizationId,
+        page: 1,
+        limit: 1_000,
+      });
+      for (const team of teams.data) names.set(team.id, team.name);
+    }
+
     await Promise.all(
       uniqueBindings.map(async (binding) => {
         if (binding.scopeType === "ORGANIZATION") {
@@ -42,14 +52,7 @@ export class OrganizationGroupScopeService extends OrganizationGroupServiceContr
           return;
         }
 
-        if (binding.scopeType === "TEAM") {
-          const team = await this.dependencies.organizations.getTeam({
-            organizationId: input.organizationId,
-            teamId: binding.scopeId,
-          });
-          names.set(binding.scopeId, team.name);
-          return;
-        }
+        if (binding.scopeType === "TEAM") return;
 
         const project = await this.dependencies.projects.findById(binding.scopeId);
         if (project) names.set(binding.scopeId, project.name);
