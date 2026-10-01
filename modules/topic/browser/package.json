@@ -20,11 +20,11 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/topic-contract": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*"
+    "@langwatch/topic-contract": "workspace:*"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",

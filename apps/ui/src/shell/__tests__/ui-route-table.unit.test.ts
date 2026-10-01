@@ -1,6 +1,6 @@
 import { webModules } from "@langwatch/installed-web-modules";
-import { uiRoutePageKeys } from "@langwatch/ui-kernel/feature-install";
-import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
+import { uiRoutePageKeys } from "@langwatch/browser/feature-install";
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 

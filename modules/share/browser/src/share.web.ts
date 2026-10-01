@@ -3,6 +3,6 @@
  * trace explorer mounts its share dialog and link-expiry helpers inline.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const shareWeb = defineWebModule("share");

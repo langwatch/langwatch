@@ -8,9 +8,9 @@ import {
   type UiEvaluatorEditorDrawerProps,
   useDrawer,
 } from "@langwatch/browser-host/drawer";
-import { defineWebModule } from "@langwatch/ui-kernel";
-import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
-import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
+import { defineWebModule } from "@langwatch/browser";
+import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
+import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";

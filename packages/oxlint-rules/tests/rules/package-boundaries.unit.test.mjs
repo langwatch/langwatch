@@ -189,7 +189,7 @@ describe("given package-boundaries", () => {
       const client = "modules/agent/client/src/use-agents.ts";
       expect(ids(client, 'import { useMemo } from "react";')).toEqual([]);
       expect(ids(LIBRARY, 'import { useMemo } from "react";')).toEqual(["libraryRuntime"]);
-      for (const specifier of ["react-dom", "@chakra-ui/react", "@langwatch/ui-kernel"]) {
+      for (const specifier of ["react-dom", "@chakra-ui/react", "@langwatch/browser"]) {
         expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
       }
     });

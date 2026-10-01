@@ -3,7 +3,7 @@
  * rules screen.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const dataPrivacyWeb = defineWebModule("data-privacy")
   .withHosts({

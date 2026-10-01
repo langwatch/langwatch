@@ -1,7 +1,7 @@
 Feature: Framework packages depend on no module contract
   As a maintainer
   I want a packages/* manifest edge onto a module contract reported
-  So that browser-host, ui-kernel and process-server stop knowing features
+  So that browser-host, browser and process-server stop knowing features
 
   See dev/docs/ARCHITECTURE.md §10.1 (Alex, 2026-10-01): today's edges are a shrink-only list.
 

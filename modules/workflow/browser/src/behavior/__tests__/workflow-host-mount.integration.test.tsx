@@ -17,7 +17,7 @@ import {
  * Spec: specs/ui/module-host-mounting.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { installedModuleHostMounts } from "@langwatch/ui-kernel/module-hosts";
+import { installedModuleHostMounts } from "@langwatch/browser/module-hosts";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentType, ReactNode } from "react";

@@ -3,10 +3,10 @@
  */
 
 import { webModules } from "@langwatch/installed-web-modules";
-import { createUiApplication } from "@langwatch/ui-kernel/application";
-import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
-import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
-import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
+import { createUiApplication } from "@langwatch/browser/application";
+import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/browser/feature-install";
+import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 

@@ -3,7 +3,7 @@
  * front-door screens, every one under the auth layout that mounts AuthHostApi.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const authWeb = defineWebModule("auth")
   .withScreens({

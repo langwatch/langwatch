@@ -4,7 +4,7 @@
  * budget request) and the account's Profile and Security settings screens.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 import { userTrpc } from "@langwatch/user-contract";
 
 import { personalWorkspaceApi } from "./behavior/personal-workspace-api.ts";

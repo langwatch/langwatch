@@ -21,10 +21,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/browser": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "react-icons": "catalog:"
   },
   "devDependencies": {

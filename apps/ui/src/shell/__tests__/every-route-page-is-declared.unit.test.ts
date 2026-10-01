@@ -4,8 +4,8 @@
  * real table against the real modules, so the gap read green until this test.
  */
 import { webModules } from "@langwatch/installed-web-modules";
-import { mergeUiPageLoaders, uiRoutePageKeys } from "@langwatch/ui-kernel/feature-install";
-import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
+import { mergeUiPageLoaders, uiRoutePageKeys } from "@langwatch/browser/feature-install";
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { describe, expect, it } from "vitest";
 
 import { uiRouteTable } from "../ui-route-table";

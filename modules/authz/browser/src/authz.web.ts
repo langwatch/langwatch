@@ -3,7 +3,7 @@
  * page, whose Access tab /settings/role-bindings now redirects to.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { authzApi } from "./behavior/authz-api.ts";
 

@@ -3,7 +3,7 @@
  * bar opens (`?drawer.open=<name>`).
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const agentWeb = defineWebModule("agent")
   .withHosts({

@@ -10,7 +10,7 @@ import { defineRule } from "../define-rule.mjs";
 const APPLICATION = /^apps\/[^/]+\//;
 const NODE_RUNTIME = /^node:/;
 const BROWSER_RUNTIME =
-  /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|design-system|ui-kernel)(?:\/|$))/;
+  /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|design-system|browser)(?:\/|$))/;
 const SERVER_RUNTIME =
   /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process|process-stores)(?:\/|$))/;
 /** apps/tasks' pre-serve migration steps: its `*migrat*` files and the two LangWatchQL steps. */

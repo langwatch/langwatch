@@ -1,6 +1,6 @@
 # Implementation:
 #   modules/workflow/browser/src/workflow.web.ts
-#   packages/ui-kernel/src/ui-module-screens.ts
+#   packages/browser/src/ui-module-screens.ts
 #   modules/workflow/browser/src/ui/sections/workflow-drag-preview.tsx
 
 Feature: Workflow pages are guarded as they were on main

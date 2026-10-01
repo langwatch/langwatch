@@ -4,7 +4,7 @@
  * (`?drawer.open=<name>`), under the names the product has always used.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const opsWeb = defineWebModule("ops")
   .withHosts({

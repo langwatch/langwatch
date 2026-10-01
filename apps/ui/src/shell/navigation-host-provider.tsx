@@ -16,7 +16,7 @@ import type {
   NavigationScopeWrite,
   NavigationUser,
 } from "@langwatch/navigation-browser/navigation";
-import { UiPageFailure, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
+import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
 

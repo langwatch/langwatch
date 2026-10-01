@@ -4,7 +4,7 @@
  * band. Always installed — scim refuses per-organization on entitlement, never by tier.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const scimWeb = defineWebModule("scim")
   .withHosts({

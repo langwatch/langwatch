@@ -23,6 +23,9 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -36,9 +39,6 @@
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/authz/contract/tsconfig.build.json"

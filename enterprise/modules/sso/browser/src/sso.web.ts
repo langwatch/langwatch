@@ -4,7 +4,7 @@
  * entitlement refuses per organization, a route never does.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const ssoWeb = defineWebModule("sso")
   .withHosts({

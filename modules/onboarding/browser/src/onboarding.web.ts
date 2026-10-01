@@ -3,7 +3,7 @@
  * the product-flavour flow and project creation.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { onboardingGuidedTour } from "./features/guided-onboarding/behavior/guided-tour.capability.ts";
 

@@ -8,7 +8,7 @@ import {
   UNAVAILABLE_UI_SCOPE,
   useOptionalUiCapabilities,
 } from "@langwatch/browser-host/capabilities";
-import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
+import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 
 import { UiNavigationHost } from "./navigation-host-provider";
 import type { UiRootCapabilities } from "./ui-root-capabilities";

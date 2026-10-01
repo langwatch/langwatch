@@ -4,7 +4,7 @@
  * page and dialog, importing these components directly.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 // Declares the `suite:run-history` slice at install, so scenario reads it from first paint.
 import "./behavior/use-run-history-store.ts";

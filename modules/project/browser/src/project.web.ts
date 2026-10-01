@@ -3,7 +3,7 @@
  * lands on, and the project settings page.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const projectWeb = defineWebModule("project")
   .withHosts({

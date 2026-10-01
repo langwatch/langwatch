@@ -3,7 +3,7 @@
  * screen a project runs over its live traces and threads.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const monitorWeb = defineWebModule("monitor")
   .withHosts({

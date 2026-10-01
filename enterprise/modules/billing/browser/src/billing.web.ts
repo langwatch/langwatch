@@ -4,7 +4,7 @@
  * per-organization on entitlement, it never gates itself by tier.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const billingWeb = defineWebModule("billing")
   .withHosts({

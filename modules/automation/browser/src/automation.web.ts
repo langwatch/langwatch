@@ -3,7 +3,7 @@
  * family's tabs, plus the one-click unsubscribe an email link opens.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 import { createElement } from "react";
 
 import type { AutomationSection } from "./ui/sections/automations-layout.tsx";

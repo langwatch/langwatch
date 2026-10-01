@@ -4,7 +4,7 @@
  * Always installed, so nothing here gates itself by tier or flag.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const governanceWeb = defineWebModule("governance")
   .withHosts({

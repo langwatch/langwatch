@@ -4,8 +4,8 @@
  * Spec: specs/navigation/gateway-url-move.feature
  */
 
-import { UiPrefixRedirect } from "@langwatch/ui-kernel/prefix-redirect";
-import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
+import { UiPrefixRedirect } from "@langwatch/browser/prefix-redirect";
+import { createUiRouteObjects } from "@langwatch/browser/route-objects";
 import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";

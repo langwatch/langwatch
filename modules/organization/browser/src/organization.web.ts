@@ -6,7 +6,7 @@
 
 import { planTrpc } from "@langwatch/entitlement-contract";
 import { organizationTrpc } from "@langwatch/organization-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { organizationApi } from "./behavior/organization-api.ts";
 

@@ -4,7 +4,7 @@
  * injected value these screens are allowed to read.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 import { createElement } from "react";
 import { z } from "zod";
 

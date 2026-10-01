@@ -20,12 +20,12 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/slack-contract": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-feather": "catalog:",

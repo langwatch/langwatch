@@ -4,7 +4,7 @@
  * Always installed, so nothing here gates itself by tier.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const licensingWeb = defineWebModule("licensing")
   .withHosts({

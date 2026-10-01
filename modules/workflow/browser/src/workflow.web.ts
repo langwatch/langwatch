@@ -3,7 +3,7 @@
  * Optimization Studio, and the workflow chat.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 import { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow-contract";
 
 import { workflowApi } from "./behavior/workflow-api.ts";

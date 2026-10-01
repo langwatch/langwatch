@@ -4,7 +4,7 @@
  * (`?drawer.open=<name>`) under the name the product has always used.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 // Declare the `trace:` slices at install, so langy and annotation read them from first paint.
 import "./behavior/annotation-queue-session.store.ts";

@@ -21,10 +21,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "react": "catalog:"
   },
   "devDependencies": {

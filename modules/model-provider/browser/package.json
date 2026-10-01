@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",
@@ -29,7 +30,6 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:",

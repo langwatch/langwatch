@@ -1,4 +1,4 @@
-import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
+import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { lazy, type ReactNode, Suspense } from "react";
 
 const ROUTED_PAGE = <UiRouteOutlet />;

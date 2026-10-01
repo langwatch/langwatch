@@ -5,7 +5,7 @@
  */
 
 import { evaluatorTrpc } from "@langwatch/evaluator-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { evaluatorApi } from "./behavior/evaluator-api.ts";
 

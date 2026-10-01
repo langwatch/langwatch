@@ -3,7 +3,7 @@
  * Spec: specs/langy/langy-mount-scope.feature
  */
 import { webModules } from "@langwatch/installed-web-modules";
-import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import { describe, expect, it } from "vitest";
 
 import { uiRouteTable, type UiRouteDescriptor } from "../ui-route-table";

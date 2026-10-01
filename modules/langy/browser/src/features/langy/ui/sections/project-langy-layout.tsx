@@ -1,6 +1,6 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Box } from "@langwatch/design-system/primitives";
-import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
+import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { memo, type ReactNode, useEffect } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";

@@ -1,6 +1,6 @@
 /**
  * The shape of a route table entry — composition fills it with LangWatch's
- * own pages; kept here so `ui-kernel` names no composition file (§10.1).
+ * own pages; kept here so `browser` names no composition file (§10.1).
  */
 
 export type UiRedirectDescriptor = {

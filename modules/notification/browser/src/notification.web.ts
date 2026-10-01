@@ -3,7 +3,7 @@
  * unsubscribed from a project's notifications, and undoing it.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const notificationWeb = defineWebModule("notification")
   .withHosts({

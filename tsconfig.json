@@ -130,6 +130,12 @@
       "path": "packages/aws-client/tsconfig.json"
     },
     {
+      "path": "packages/browser/tsconfig.test.json"
+    },
+    {
+      "path": "packages/browser/tsconfig.type-tests.json"
+    },
+    {
       "path": "packages/browser-host/tsconfig.json"
     },
     {
@@ -707,12 +713,6 @@
     },
     {
       "path": "apps/ui/tsconfig.test.json"
-    },
-    {
-      "path": "packages/ui-kernel/tsconfig.test.json"
-    },
-    {
-      "path": "packages/ui-kernel/tsconfig.type-tests.json"
     },
     {
       "path": "modules/user/browser/tsconfig.json"

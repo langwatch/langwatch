@@ -12,27 +12,27 @@ import { registerChunkReloadListener } from "@langwatch/browser-host/navigation"
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
 import { webModules } from "@langwatch/installed-web-modules";
-import { createUi } from "@langwatch/ui-kernel";
-import { createUiApplication, type UiApplication } from "@langwatch/ui-kernel/application";
-import { UiApplicationShell } from "@langwatch/ui-kernel/application-shell";
-import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
-import { GraphicsQualityProvider } from "@langwatch/ui-kernel/graphics-quality-provider";
-import { installedModuleApis } from "@langwatch/ui-kernel/module-apis";
-import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
+import { createUi } from "@langwatch/browser";
+import { createUiApplication, type UiApplication } from "@langwatch/browser/application";
+import { UiApplicationShell } from "@langwatch/browser/application-shell";
+import { UiErrorToaster } from "@langwatch/browser/error-toaster";
+import { GraphicsQualityProvider } from "@langwatch/browser/graphics-quality-provider";
+import { installedModuleApis } from "@langwatch/browser/module-apis";
+import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import {
   installedModuleHostMounts,
   type UiModuleHostMount,
-} from "@langwatch/ui-kernel/module-hosts";
-import { installedModuleScreens, type UiModuleScreens } from "@langwatch/ui-kernel/module-screens";
-import { UiPageFailure } from "@langwatch/ui-kernel/page-fallbacks";
-import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
-import { UiRuntime } from "@langwatch/ui-kernel/runtime";
-import { UiShell } from "@langwatch/ui-kernel/shell";
+} from "@langwatch/browser/module-hosts";
+import { installedModuleScreens, type UiModuleScreens } from "@langwatch/browser/module-screens";
+import { UiPageFailure } from "@langwatch/browser/page-fallbacks";
+import { readPublicAppConfig } from "@langwatch/browser/public-config";
+import { UiRuntime } from "@langwatch/browser/runtime";
+import { UiShell } from "@langwatch/browser/shell";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
-} from "@langwatch/ui-kernel/transport";
+} from "@langwatch/browser/transport";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
 import type { FallbackProps } from "react-error-boundary";

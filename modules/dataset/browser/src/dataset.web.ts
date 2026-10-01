@@ -4,7 +4,7 @@
  */
 
 import { SelectDatasetDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const datasetWeb = defineWebModule("dataset")
   .withHosts({

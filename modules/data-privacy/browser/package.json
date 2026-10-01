@@ -20,11 +20,11 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/redaction": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "safe-regex2": "catalog:"
   },

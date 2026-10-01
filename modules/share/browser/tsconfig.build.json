@@ -20,6 +20,9 @@
   ],
   "references": [
     {
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
@@ -27,9 +30,6 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

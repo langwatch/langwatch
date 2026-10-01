@@ -8,7 +8,7 @@ import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { toaster } from "@langwatch/design-system/toaster";
-import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
+import { UiErrorToaster } from "@langwatch/browser/error-toaster";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

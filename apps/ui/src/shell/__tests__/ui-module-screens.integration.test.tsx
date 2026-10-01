@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 
 import { webModules } from "@langwatch/installed-web-modules";
-import { createUi } from "@langwatch/ui-kernel";
-import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
-import { createUiRouteObjects, UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
+import { createUi } from "@langwatch/browser";
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
+import { createUiRouteObjects, UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";

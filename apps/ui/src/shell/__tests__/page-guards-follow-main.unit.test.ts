@@ -4,8 +4,8 @@
  * specs/ui/page-permission-guards.feature
  */
 import { webModules } from "@langwatch/installed-web-modules";
-import type { WebScreen } from "@langwatch/ui-kernel";
-import { resolveUiPageAccess } from "@langwatch/ui-kernel/page-guard";
+import type { WebScreen } from "@langwatch/browser";
+import { resolveUiPageAccess } from "@langwatch/browser/page-guard";
 import { describe, expect, it } from "vitest";
 
 const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";

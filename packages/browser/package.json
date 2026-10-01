@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/ui-kernel",
+  "name": "@langwatch/browser",
   "version": "0.1.0",
   "private": true,
   "description": "The React shell machinery every browser application composes: the application shell, providers, routing, page guards and drawer address.",

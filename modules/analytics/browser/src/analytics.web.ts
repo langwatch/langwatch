@@ -6,7 +6,7 @@
 
 import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
 import { savedViewTrpc } from "@langwatch/dashboard-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 import { createElement } from "react";
 
 import { analyticsApi } from "./behavior/analytics-api.ts";

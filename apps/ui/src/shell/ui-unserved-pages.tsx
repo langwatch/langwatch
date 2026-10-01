@@ -4,7 +4,7 @@
  * takes the whole browser down; these keep the gap at its own address.
  */
 
-import type { UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
+import type { UiPageLoaderRegistry } from "@langwatch/browser/feature-install";
 
 export function UiUnservedPage() {
   return (

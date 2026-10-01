@@ -22,6 +22,9 @@
   ],
   "references": [
     {
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -29,9 +32,6 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

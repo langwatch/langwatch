@@ -3,7 +3,7 @@
  * settings screen.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const secretWeb = defineWebModule("secret")
   .withHosts({

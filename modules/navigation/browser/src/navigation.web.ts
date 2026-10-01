@@ -5,7 +5,7 @@
  */
 
 import { featureFlagTrpc } from "@langwatch/feature-flag-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { navigationApi } from "./behavior/navigation-api.ts";
 

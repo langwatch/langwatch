@@ -3,7 +3,7 @@
  */
 
 import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { promptApi } from "./behavior/prompt-api.ts";
 

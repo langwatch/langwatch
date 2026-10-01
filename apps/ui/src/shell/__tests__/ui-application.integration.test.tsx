@@ -1,12 +1,12 @@
 import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
-import { createUiApplication, type UiApplicationInstall } from "@langwatch/ui-kernel/application";
+import { createUiApplication, type UiApplicationInstall } from "@langwatch/browser/application";
 import {
   type UiFeatureInstall,
   uiRoutePageKeys,
   type UiPageLoaderRegistry,
-} from "@langwatch/ui-kernel/feature-install";
-import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
-import type { UiFeatureApiTransport } from "@langwatch/ui-kernel/transport";
+} from "@langwatch/browser/feature-install";
+import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
+import type { UiFeatureApiTransport } from "@langwatch/browser/transport";
 import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { Outlet } from "react-router";

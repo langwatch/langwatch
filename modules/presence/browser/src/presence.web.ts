@@ -3,7 +3,7 @@
  * declares the `presence:` slices at install; the trace explorer reads and feeds them.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import "./behavior/presence-preferences-store.ts";
 import "./behavior/presence-store.ts";

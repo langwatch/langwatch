@@ -13,7 +13,7 @@ import { gatewayWebConfigSchema } from "@langwatch/gateway-contract";
 import { notificationWebConfigSchema } from "@langwatch/notification-contract";
 import { opsWebConfigSchema } from "@langwatch/ops-contract";
 import { rumWebConfigSchema } from "@langwatch/rum-contract";
-import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
+import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
 import type { output, ZodType } from "zod";
 
 /** Each owner's slice of the page's config, checked by its contract's schema before any render. */

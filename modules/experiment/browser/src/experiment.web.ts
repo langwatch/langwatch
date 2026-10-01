@@ -11,7 +11,7 @@ import { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import { experimentsTrpc } from "@langwatch/experiment-contract";
 import { opsDashboardTrpc } from "@langwatch/ops-contract";
 import { promptTrpc } from "@langwatch/prompt-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { experimentApi } from "./behavior/experiment-api.ts";
 

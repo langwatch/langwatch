@@ -5,7 +5,7 @@
  */
 
 import { modelProviderTrpc } from "@langwatch/model-provider-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { modelProviderApi } from "./behavior/model-provider-api.ts";
 

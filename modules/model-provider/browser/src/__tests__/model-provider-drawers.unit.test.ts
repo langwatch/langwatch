@@ -1,6 +1,6 @@
 /** Settings and evaluator open these editors by drawer name; each must resolve to its editor. */
 
-import { installedDrawerLoaders } from "@langwatch/ui-kernel";
+import { installedDrawerLoaders } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { modelProviderWeb } from "../model-provider.web.ts";

@@ -4,7 +4,7 @@
  * inside other modules' pages, which is why its host mounts above the tree.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 import { langyApi } from "./behavior/langy-api.ts";
 import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";

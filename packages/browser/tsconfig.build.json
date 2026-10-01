@@ -5,7 +5,7 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
-      "@langwatch/ui-kernel": ["./src/index.ts"]
+      "@langwatch/browser": ["./src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

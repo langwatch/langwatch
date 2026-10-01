@@ -4,7 +4,7 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
+import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import { screen } from "@testing-library/react";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";

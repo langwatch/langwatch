@@ -1,6 +1,6 @@
 /** What a browser installs for integration: the Integrations screen and its GitHub host. */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const integrationWeb = defineWebModule("integration")
   .withHosts({

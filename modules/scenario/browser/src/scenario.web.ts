@@ -4,7 +4,7 @@
  * bar opens (`?drawer.open=<name>`) under the names the product already uses.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const scenarioWeb = defineWebModule("scenario")
   .withHosts({

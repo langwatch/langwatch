@@ -2,7 +2,7 @@
  * The two grants the Ops pages sit behind, read through the same access decision
  * the shell's page guard makes. Spec: modules/ops/specs/admin.feature
  */
-import { resolveUiPageAccess } from "@langwatch/ui-kernel/page-guard";
+import { resolveUiPageAccess } from "@langwatch/browser/page-guard";
 import { describe, expect, it } from "vitest";
 
 import { opsWeb } from "../ops.web.ts";

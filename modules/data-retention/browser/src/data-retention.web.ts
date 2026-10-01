@@ -3,7 +3,7 @@
  * schedule screen.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineWebModule } from "@langwatch/browser";
 
 export const dataRetentionWeb = defineWebModule("data-retention")
   .withHosts({

@@ -27,6 +27,9 @@
       "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -91,9 +94,6 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"
