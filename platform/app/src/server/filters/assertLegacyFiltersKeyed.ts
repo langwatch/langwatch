@@ -2,9 +2,9 @@
  * The legacy `filters` map at the trace-search boundary: `POST
  * /api/traces/search` and the deprecated `POST /api/trace/search`.
  *
- * Some of its fields are keyed: `evaluations.passed` filters one evaluator's
- * verdict, so its values sit under that evaluator's id —
- * `{"evaluations.passed": {"<evaluatorId>": ["false"]}}`. The request schema
+ * Some of its fields are keyed: `evaluations.passed` filters one monitor's
+ * verdict, so its values sit under that monitor's id —
+ * `{"evaluations.passed": {"<monitorId>": ["false"]}}`. The request schema
  * accepts a flat list for every field, and the condition builder answers a
  * keyed field that arrives without its key with a condition that matches
  * nothing. Over REST that is a search returning zero traces with a 200, which
@@ -21,7 +21,7 @@ import {
   type FieldViolation,
   RequestValidationError,
 } from "~/server/api/validation";
-import { availableFilters } from "./registry";
+import { findUnkeyedFilterFields } from "./trigger-filter-shape";
 import type { FilterField } from "./types";
 
 /** A filter-string equivalent worth pointing at, for the fields that have one. */
@@ -66,6 +66,7 @@ export function legacyFiltersKeyedRefusal(
   return violations.map((violation) => violation.message).join(" ");
 }
 
+/** Built on the automations API's detector, so both answer the same shapes. */
 function unkeyedFilterViolations({
   filters,
   offersFilterString,
@@ -75,61 +76,15 @@ function unkeyedFilterViolations({
 }): FieldViolation[] {
   if (!filters) return [];
 
-  return Object.entries(filters).flatMap(([name, value]) => {
-    const field = name as FilterField;
-    return isUnkeyed(field, value)
-      ? [unkeyedViolation({ field, value, offersFilterString })]
-      : [];
+  return findUnkeyedFilterFields(filters).map(({ field, example }) => {
+    const hint = offersFilterString
+      ? FILTER_STRING_HINTS[field as FilterField]
+      : undefined;
+    return {
+      field: `filters.${field}`,
+      type: "filter_key_required",
+      message: `"${field}" needs its key, as in ${example}. Without the key it matches no trace.${hint ? ` The filter string is simpler: ${hint}.` : ""}`,
+      received: filters[field as FilterField],
+    };
   });
-}
-
-/** Whether a keyed field arrived shallower than its key (and subkey) require. */
-function isUnkeyed(field: FilterField, value: unknown): boolean {
-  const definition = availableFilters[field];
-  if (!definition?.requiresKey) return false;
-  // An empty list or map applies no condition at all, so nothing is lost.
-  if (isEmpty(value)) return false;
-  const requiredDepth = definition.requiresSubkey ? 2 : 1;
-  return depthOf(value) < requiredDepth;
-}
-
-function unkeyedViolation({
-  field,
-  value,
-  offersFilterString,
-}: {
-  field: FilterField;
-  value: unknown;
-  offersFilterString: boolean;
-}): FieldViolation {
-  const { requiresKey, requiresSubkey } = availableFilters[field];
-  const key = requiresKey?.filter;
-  const shape = requiresSubkey
-    ? `{"${field}": {"<${key}>": {"<${requiresSubkey.filter}>": [...]}}}`
-    : `{"${field}": {"<${key}>": [...]}}`;
-  const hint = offersFilterString ? FILTER_STRING_HINTS[field] : undefined;
-  return {
-    field: `filters.${field}`,
-    type: "filter_key_required",
-    message: `"${field}" is keyed by ${key}, so it takes ${shape}. Without the key it matches no trace.${hint ? ` The filter string is simpler: ${hint}.` : ""}`,
-    received: value,
-  };
-}
-
-function isEmpty(value: unknown): boolean {
-  if (Array.isArray(value)) return value.length === 0;
-  if (typeof value === "object" && value !== null) {
-    return Object.keys(value).length === 0;
-  }
-  return value === undefined || value === null;
-}
-
-/** How many object levels sit above the value list: 0 for a flat list. */
-function depthOf(value: unknown): number {
-  if (Array.isArray(value) || typeof value !== "object" || value === null) {
-    return 0;
-  }
-  const children = Object.values(value);
-  if (children.length === 0) return 1;
-  return 1 + Math.min(...children.map(depthOf));
 }

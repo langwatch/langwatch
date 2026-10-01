@@ -47,7 +47,11 @@ describe("assertLegacyFiltersKeyed()", () => {
       expect(error.httpStatus).toBe(422);
       expect(error.meta?.fields).toEqual(["filters.evaluations.passed"]);
       const reason = error.reasons[0] as SchemaFailure | undefined;
-      expect(String(reason?.meta?.message)).toContain("evaluatorVerdict:fail");
+      const message = String(reason?.meta?.message);
+      expect(message).toContain("evaluatorVerdict:fail");
+      expect(message).toContain(
+        '{"evaluations.passed":{"<monitorId>":["false"]}}',
+      );
     });
   });
 
@@ -93,7 +97,7 @@ describe("legacyFiltersKeyedRefusal()", () => {
       const refusal = legacyFiltersKeyedRefusal({
         "evaluations.passed": ["false"],
       });
-      expect(refusal).toContain('{"evaluations.passed": {"<');
+      expect(refusal).toContain('{"evaluations.passed":{"<monitorId>":');
       expect(refusal).not.toContain("evaluatorVerdict");
     });
   });

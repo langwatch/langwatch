@@ -22,7 +22,7 @@ annotation, including ones created through `POST /api/annotations/trace/{id}`.
 
 <Note>
 Prefer `filter` over the older `filters` map. In that map, evaluation fields are
-keyed by evaluator ID: `{"evaluations.passed": {"<evaluatorId>": ["false"]}}`.
+keyed by monitor ID: `{"evaluations.passed": {"<monitorId>": ["false"]}}`.
 A flat list such as `{"evaluations.passed": ["false"]}` is rejected with 422.
 To find failed evaluations across every evaluator, send
 `"filter": "evaluatorVerdict:fail"`.
