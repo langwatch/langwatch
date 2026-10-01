@@ -106,6 +106,13 @@ Feature: Developer seat
     And their personal project and its traces still exist
     And a request to view traces in the shared project is refused
 
+  Scenario: The access dialog offers no shared access once the seat is Developer
+    Given an administrator editing a Full member's access with team access staged
+    When they pick the Developer seat
+    Then the dialog says a Developer works in their own project only
+    And it offers no way to add team or project access
+    And the staged team access is dropped
+
   Scenario: A key on a shared project stops working after downgrade
     Given a Full member who owns a key scoped to the shared project
     And the same member owns a key scoped to their personal project
