@@ -12,7 +12,7 @@ export const serverModuleMembers = {
   agent: ["publicBaseUrl"],
   analytics: ["clickhouse", "clickhouseAdmin", "databaseTarget", "prisma", "publicBaseUrl", "rateLimiter"],
   annotation: [],
-  "api-key": ["encryption", "redis"],
+  "api-key": ["redis"],
   "audit-log": [],
   auth: ["isSaas", "nodeEnvironment", "publicBaseUrl"],
   authz: ["prisma", "redis"],
