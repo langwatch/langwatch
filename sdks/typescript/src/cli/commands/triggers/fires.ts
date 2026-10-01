@@ -63,9 +63,7 @@ export const triggerFiresCommand = async ({
       table: () => {
         if (fires.length === 0) {
           console.log(
-            options.cursor
-              ? "\n  No more fires.\n"
-              : "\n  This automation has not fired yet.\n",
+            options.cursor ? "\n  No more fires.\n" : "\n  This automation has not fired yet.\n",
           );
           return;
         }

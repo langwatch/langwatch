@@ -6,14 +6,14 @@ user-invocable: true
 
 # Simulators
 
-| Sim | Stands in for | haven | Skill | Seed env |
-| --- | --- | --- | --- | --- |
-| `llmsim` | OpenAI, Anthropic | `+llm` | `llmsim` | none (built-in corpus) |
-| `mailsim` | SMTP | default | `mailsim` | `MAILSIM_SEED` |
-| `storagesim` | S3 | default | `storagesim` | `STORAGESIM_SEED` |
-| `analyticssim` | PostHog, Customer.io | `+analytics` | `analyticssim` | `ANALYTICSSIM_SEED` |
-| `idpsim` | OIDC/SAML IdP | default | | |
-| `voicesim` | ElevenLabs voice, OpenAI audio | `+voice` | `voicesim` | `VOICESIM_SEED` |
+| Sim            | Stands in for                  | haven        | Skill          | Seed env               |
+| -------------- | ------------------------------ | ------------ | -------------- | ---------------------- |
+| `llmsim`       | OpenAI, Anthropic              | `+llm`       | `llmsim`       | none (built-in corpus) |
+| `mailsim`      | SMTP                           | default      | `mailsim`      | `MAILSIM_SEED`         |
+| `storagesim`   | S3                             | default      | `storagesim`   | `STORAGESIM_SEED`      |
+| `analyticssim` | PostHog, Customer.io           | `+analytics` | `analyticssim` | `ANALYTICSSIM_SEED`    |
+| `idpsim`       | OIDC/SAML IdP                  | default      |                |                        |
+| `voicesim`     | ElevenLabs voice, OpenAI audio | `+voice`     | `voicesim`     | `VOICESIM_SEED`        |
 
 Each has a console at `<name>.<slug>.langwatch.localhost` and logs via `haven logs <name>`.
 `haven up +llm +analytics` selects (sticky); `-mail` deselects. haven sets every `*_SEED=1`.

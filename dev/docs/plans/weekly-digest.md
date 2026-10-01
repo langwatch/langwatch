@@ -22,14 +22,14 @@ shape): each extracts bounded facts and sends digest's `recordActivity` command,
 `(projectId, isoWeek)` or `(userId, isoWeek)`, with `coalesceMaxBatch` so a burst of spans drains as one
 batched append (coding-agent's source subscribers are the precedent, ADR-056).
 
-| Owner event | Facts folded |
-| --- | --- |
-| trace span received / recorded | traces (root spans), spans, errors, tokens, cost, latency histogram, top models (capped) |
+| Owner event                                    | Facts folded                                                                                                                                                                                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| trace span received / recorded                 | traces (root spans), spans, errors, tokens, cost, latency histogram, top models (capped)                                                                                                                                      |
 | coding-agent span/log/metric facts contributed | per user: sessions (distinct `sessionId`, capped set in the fold), tokens, cost, active time; from the agents' own OTel metrics via the contract's name normalisation: lines, commits, pull requests (`*.pull_request.count`) |
-| evaluation completed | runs, passed, failed, errored, per evaluator (capped) |
-| scenario simulation run finished | runs, passed, failed per project |
-| suite run item completed | items, passed, failed |
-| plan limit | the one read at send: `EntitlementApi.getUsage`, once per enrolled organization |
+| evaluation completed                           | runs, passed, failed, errored, per evaluator (capped)                                                                                                                                                                         |
+| scenario simulation run finished               | runs, passed, failed per project                                                                                                                                                                                              |
+| suite run item completed                       | items, passed, failed                                                                                                                                                                                                         |
+| plan limit                                     | the one read at send: `EntitlementApi.getUsage`, once per enrolled organization                                                                                                                                               |
 
 Projections (fold, Postgres, five ISO weeks kept, older rows swept by the weekly wake):
 `DigestProjectWeek`, `DigestUserWeek`. Latency is a fixed bucket histogram so p50/p95 fold without
@@ -38,13 +38,13 @@ an email is rendered, never stored (nurturing's rule).
 
 ## Templates (separate, in `@langwatch/mail`)
 
-| Template id | For | Eligible when |
-| --- | --- | --- |
-| `digest-plan-pressure` | org admins | month's usage at 80% of the plan limit or more, or maxed; names what fills it (full coding-agent traces) and offers sampling, redaction and upgrade |
-| `digest-scenarios-trend` | project members | scenario failure rate this week differs from the 4-week baseline by 10 points or more, either way ("more failing than usual" or "getting better") |
-| `digest-coding-agent-week` | each person | 5 or more coding-agent sessions of theirs this week |
-| `digest-traces-week` | project members | 1,000 or more traces this week: volume, errors, cost, tokens, p50/p95 latency, top models, eval pass rates (Sentry's weekly report, for LLMs) |
-| `digest-whats-new` | anyone else | fallback: this week's update and one nudge |
+| Template id                | For             | Eligible when                                                                                                                                       |
+| -------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `digest-plan-pressure`     | org admins      | month's usage at 80% of the plan limit or more, or maxed; names what fills it (full coding-agent traces) and offers sampling, redaction and upgrade |
+| `digest-scenarios-trend`   | project members | scenario failure rate this week differs from the 4-week baseline by 10 points or more, either way ("more failing than usual" or "getting better")   |
+| `digest-coding-agent-week` | each person     | 5 or more coding-agent sessions of theirs this week                                                                                                 |
+| `digest-traces-week`       | project members | 1,000 or more traces this week: volume, errors, cost, tokens, p50/p95 latency, top models, eval pass rates (Sentry's weekly report, for LLMs)       |
+| `digest-whats-new`         | anyone else     | fallback: this week's update and one nudge                                                                                                          |
 
 Each person gets one email a week: the first eligible template in the order above (`rules/`,
 pure). Every template carries the week's "what's new" card under the hero when one is published: title,

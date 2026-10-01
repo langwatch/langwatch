@@ -20,9 +20,7 @@ export const setTriggerActiveCommand = async ({
   await resolveCredentials();
   const verb = active ? "enable" : "disable";
 
-  const spinner = createSpinner(
-    `${active ? "Resuming" : "Pausing"} trigger "${id}"...`,
-  ).start();
+  const spinner = createSpinner(`${active ? "Resuming" : "Pausing"} trigger "${id}"...`).start();
 
   try {
     const response = await triggerRequest({
@@ -35,11 +33,8 @@ export const setTriggerActiveCommand = async ({
       process.exit(1);
     }
 
-    const trigger: Pick<TriggerRecord, "id" | "name" | "active"> =
-      await response.json();
-    spinner.succeed(
-      `Trigger "${trigger.name}" is now ${trigger.active ? "running" : "paused"}`,
-    );
+    const trigger: Pick<TriggerRecord, "id" | "name" | "active"> = await response.json();
+    spinner.succeed(`Trigger "${trigger.name}" is now ${trigger.active ? "running" : "paused"}`);
 
     return {
       // The state answer carries only id, name and active, so machine output

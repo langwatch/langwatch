@@ -236,10 +236,7 @@ describe("given a distinct count over several days", () => {
         aggregation: "cardinality",
       });
 
-      expect(shape?.series.map((s) => s.name)).toEqual([
-        "gpt-5-mini",
-        "gpt-5.6-terra",
-      ]);
+      expect(shape?.series.map((s) => s.name)).toEqual(["gpt-5-mini", "gpt-5.6-terra"]);
       expect(shape?.comparison).toBeUndefined();
     });
   });

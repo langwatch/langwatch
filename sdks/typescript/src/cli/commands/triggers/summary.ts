@@ -74,9 +74,7 @@ export function summariseSlackConnection({
     return undefined;
   }
   const channel =
-    typeof actionParams.slackChannelId === "string"
-      ? ` in ${actionParams.slackChannelId}`
-      : "";
+    typeof actionParams.slackChannelId === "string" ? ` in ${actionParams.slackChannelId}` : "";
   return `${actionParams.slackIntegrationId}${channel}`;
 }
 

@@ -1,4 +1,5 @@
 import chalk from "chalk";
+
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
 import type { CommandResult } from "../../utils/output.ts";
@@ -11,9 +12,7 @@ import { triggerRequest } from "./triggerRequest.ts";
  * an operator can confirm it arrives. The destination is the saved one — there
  * is nothing to pass here, and nothing this command could send anywhere else.
  */
-export const testFireTriggerCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const testFireTriggerCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const spinner = createSpinner(`Test-firing trigger "${id}"...`).start();
@@ -53,18 +52,14 @@ export const testFireTriggerCommand = async (
         console.log(`  ${chalk.gray("Recipients:")} ${result.recipientCount}`);
         console.log(
           `  ${chalk.gray("Message:")}    ${
-            result.usedDefault
-              ? "the LangWatch default"
-              : "this automation's own template"
+            result.usedDefault ? "the LangWatch default" : "this automation's own template"
           }`,
         );
         if (result.httpStatus !== undefined) {
           console.log(`  ${chalk.gray("Answered:")}   ${result.httpStatus}`);
         }
         if (result.missingVariables.length > 0) {
-          console.log(
-            `  ${chalk.yellow("Unresolved:")} ${result.missingVariables.join(", ")}`,
-          );
+          console.log(`  ${chalk.yellow("Unresolved:")} ${result.missingVariables.join(", ")}`);
         }
         for (const error of result.errors) {
           console.log(`  ${chalk.red("Problem:")}    ${error}`);
