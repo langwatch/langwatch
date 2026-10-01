@@ -83,3 +83,10 @@ Feature: Helm install routing and disruption budgets
       When the chart renders
       Then the render fails naming the component and the field
       And percentages are resolved the way Kubernetes rounds them, so minAvailable 75% of 2 pods and maxUnavailable 0% are refused too
+
+    @unit
+    Scenario: in-cluster Redis stops on SIGTERM instead of waiting out its grace period
+      Given the chart runs Redis in the cluster with a password
+      When Kubernetes restarts the Redis pod
+      Then redis-server receives SIGTERM directly and saves before it exits
+      And the restart does not wait for the grace period to run out

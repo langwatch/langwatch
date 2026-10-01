@@ -53,7 +53,10 @@ spec:
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
           imagePullPolicy: {{ .Values.redis.image.pullPolicy | default "IfNotPresent" }}
           {{- if $authEnabled }}
-          command: ["sh", "-c", "redis-server --maxmemory-policy noeviction --requirepass \"$REDIS_PASSWORD\""]
+          # exec makes redis-server PID 1, so it receives SIGTERM, saves and
+          # exits at once. Behind a shell that does not forward the signal it
+          # would sit out terminationGracePeriodSeconds and be killed unsaved.
+          command: ["sh", "-c", "exec redis-server --maxmemory-policy noeviction --requirepass \"$REDIS_PASSWORD\""]
           {{- else }}
           command: ["redis-server", "--maxmemory-policy", "noeviction"]
           {{- end }}

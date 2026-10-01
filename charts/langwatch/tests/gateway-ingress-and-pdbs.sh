@@ -312,6 +312,18 @@ test_blocking_pass_through_pdb_is_refused() {
   fi
 }
 
+# @scenario "in-cluster Redis stops on SIGTERM instead of waiting out its grace period"
+test_redis_receives_sigterm() {
+  render redis
+  local doc
+  doc=$(doc_of redis langwatch/templates/redis/statefulset.yaml)
+  if grep -q 'command: \["sh", "-c", "exec redis-server ' <<<"$doc"; then
+    ok "redis shutdown" "redis-server is exec'd, so SIGTERM reaches it"
+  else
+    fail "redis shutdown" "redis-server runs behind a shell, so SIGTERM may never reach it and every restart waits out the grace period"
+  fi
+}
+
 test_default_install_has_no_ingress
 test_gateway_host_on_the_app_ingress
 test_nginx_settings_on_the_gateway_host
@@ -321,6 +333,7 @@ test_retired_gateway_ingress_values_are_refused
 test_gateway_pdb_under_the_umbrella
 test_pass_through_pdb_over_one_pod_is_skipped
 test_blocking_pass_through_pdb_is_refused
+test_redis_receives_sigterm
 
 if [ "$failures" -gt 0 ]; then
   echo
