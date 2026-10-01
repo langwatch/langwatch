@@ -3,6 +3,7 @@ export {
   type AuthUsageCount,
   type BrowserSessionApi,
   type CliAccessSession,
+  cliAccessSessionSchema,
   type CliSessionTokens,
   type CliTokenRecordEntry,
   type LegacySsoAccessQuery,
