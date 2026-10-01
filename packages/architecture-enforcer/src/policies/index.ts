@@ -5,6 +5,7 @@ import { lintArchitectureRecords } from "./boundaries/architecture-records.ts";
 import { lintCycles } from "./boundaries/cycles.ts";
 import { lintManifests } from "./boundaries/manifests.ts";
 import { lintPeerCycles } from "./boundaries/peer-cycles.ts";
+import { lintPlatformOperatorCalls } from "./boundaries/platform-operator-calls.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
@@ -188,6 +189,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "peer-cycles",
     spec: "specs/peer-cycles.feature",
     run: lintPeerCycles,
+  }),
+  definePolicy({
+    id: "platform-operator-calls",
+    spec: "specs/tooling/lint-platform-operator-calls.feature",
+    run: lintPlatformOperatorCalls,
   }),
   definePolicy({
     id: "eventing-table-access",
