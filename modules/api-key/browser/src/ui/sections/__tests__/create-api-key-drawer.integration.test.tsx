@@ -97,8 +97,13 @@ describe("given a member who is not an admin", () => {
       const { onCreate } = renderDrawer();
       expect(screen.queryByText("Key type")).toBeNull();
       expect(createButton()).toBeDisabled();
-      await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
-      await user.type(screen.getByPlaceholderText("What is this key used for?"), "pipeline");
+      // Set directly: on a cold, loaded run the drawer's focus trap can land mid-typing and
+      // swallow keystrokes, leaving the button disabled. This test pins the payload.
+      const nameInput = screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev");
+      fireEvent.change(nameInput, { target: { value: "CI" } });
+      const descriptionInput = screen.getByPlaceholderText("What is this key used for?");
+      fireEvent.change(descriptionInput, { target: { value: "pipeline" } });
+      expect(createButton()).toBeEnabled();
       await user.click(createButton());
       expect(onCreate.mock.calls).toEqual([
         [
