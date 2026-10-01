@@ -528,13 +528,16 @@ describe("Invite router integration", () => {
             invite: landed!,
           });
 
-          const where = {
-            organizationId,
-            userId: user.id,
-            action: "organization.member.admitted",
-          };
-          await expect(prisma.auditLog.count({ where })).resolves.toBe(1);
-          await prisma.auditLog.deleteMany({ where });
+          const audits = await prisma.auditLog.findMany({
+            where: {
+              organizationId,
+              userId: user.id,
+              action: "organization.member.admitted",
+            },
+            select: { id: true },
+          });
+          expect(audits).toHaveLength(1);
+          await prisma.auditLog.delete({ where: { id: audits[0]!.id } });
         });
       });
     });
