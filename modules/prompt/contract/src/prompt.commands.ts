@@ -10,30 +10,29 @@ import {
   type PromptConfigData,
 } from "./prompt.ts";
 
-export const promptConfigFieldsSchema = z
-  .object({
-    prompt: z.string().optional(),
-    messages: z.array(promptMessageSchema).optional(),
-    inputs: z.array(promptInputSchema).optional(),
-    outputs: z.array(promptOutputSchema).optional(),
-    model: z.string().optional(),
-    temperature: z.number().optional(),
-    maxTokens: z.number().optional(),
-    topP: z.number().optional(),
-    frequencyPenalty: z.number().optional(),
-    presencePenalty: z.number().optional(),
-    seed: z.number().optional(),
-    topK: z.number().optional(),
-    minP: z.number().optional(),
-    repetitionPenalty: z.number().optional(),
-    reasoning: z.string().optional(),
-    verbosity: z.string().optional(),
-    promptingTechnique: promptingTechniqueSchema.optional(),
-    demonstrations: z.unknown().optional(),
-    responseFormat: z.unknown().optional(),
-    parameters: z.record(z.string(), z.unknown()).optional(),
-  })
-  .strict();
+/** Plain objects as main's tRPC create/update inputs: unknown keys are stripped, not refused. */
+export const promptConfigFieldsSchema = z.object({
+  prompt: z.string().optional(),
+  messages: z.array(promptMessageSchema).optional(),
+  inputs: z.array(promptInputSchema).optional(),
+  outputs: z.array(promptOutputSchema).optional(),
+  model: z.string().optional(),
+  temperature: z.number().optional(),
+  maxTokens: z.number().optional(),
+  topP: z.number().optional(),
+  frequencyPenalty: z.number().optional(),
+  presencePenalty: z.number().optional(),
+  seed: z.number().optional(),
+  topK: z.number().optional(),
+  minP: z.number().optional(),
+  repetitionPenalty: z.number().optional(),
+  reasoning: z.string().optional(),
+  verbosity: z.string().optional(),
+  promptingTechnique: promptingTechniqueSchema.optional(),
+  demonstrations: z.unknown().optional(),
+  responseFormat: z.unknown().optional(),
+  parameters: z.record(z.string(), z.unknown()).optional(),
+});
 
 export const createPromptCommandSchema = z
   .object({
@@ -44,29 +43,23 @@ export const createPromptCommandSchema = z
     authorId: z.string().optional(),
     commitMessage: z.string().nullable().optional(),
   })
-  .safeExtend(promptConfigFieldsSchema.shape)
-  .strict();
+  .safeExtend(promptConfigFieldsSchema.shape);
 export type CreatePromptCommand = z.infer<typeof createPromptCommandSchema>;
 
-export const updatePromptCommandSchema = z
-  .object({
-    idOrHandle: z.string().min(1),
-    projectId: z.string().min(1),
-    data: z
-      .object({ authorId: z.string().optional(), commitMessage: z.string().min(1) })
-      .safeExtend(promptConfigFieldsSchema.shape)
-      .strict(),
-  })
-  .strict();
+export const updatePromptCommandSchema = z.object({
+  idOrHandle: z.string().min(1),
+  projectId: z.string().min(1),
+  data: z
+    .object({ authorId: z.string().optional(), commitMessage: z.string().min(1) })
+    .safeExtend(promptConfigFieldsSchema.shape),
+});
 export type UpdatePromptCommand = z.infer<typeof updatePromptCommandSchema>;
 
-export const updatePromptHandleCommandSchema = z
-  .object({
-    idOrHandle: z.string().min(1),
-    projectId: z.string().min(1),
-    data: z.object({ handle: promptHandleSchema, scope: promptScopeSchema }).strict(),
-  })
-  .strict();
+export const updatePromptHandleCommandSchema = z.object({
+  idOrHandle: z.string().min(1),
+  projectId: z.string().min(1),
+  data: z.object({ handle: promptHandleSchema, scope: promptScopeSchema }),
+});
 export type UpdatePromptHandleCommand = z.infer<typeof updatePromptHandleCommandSchema>;
 
 export const promptReferenceSchema = z
@@ -80,14 +73,12 @@ export const promptReferenceSchema = z
   .strict();
 export type PromptReference = z.infer<typeof promptReferenceSchema>;
 
-export const copyPromptCommandSchema = z
-  .object({
-    idOrHandle: z.string().min(1),
-    sourceProjectId: z.string().min(1),
-    targetProjectId: z.string().min(1),
-    authorId: z.string().optional(),
-  })
-  .strict();
+export const copyPromptCommandSchema = z.object({
+  idOrHandle: z.string().min(1),
+  sourceProjectId: z.string().min(1),
+  targetProjectId: z.string().min(1),
+  authorId: z.string().optional(),
+});
 export type CopyPromptCommand = z.infer<typeof copyPromptCommandSchema>;
 
 export type PromptConfigFields = z.infer<typeof promptConfigFieldsSchema> &

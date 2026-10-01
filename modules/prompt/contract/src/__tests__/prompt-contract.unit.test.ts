@@ -29,6 +29,16 @@ describe("Prompt contract", () => {
     expect(parsed.outputs[0]).toEqual({ identifier: "output", type: "str" });
   });
 
+  it("strips an unknown key from a create command, as main's tRPC create input did", () => {
+    const parsed = createPromptCommandSchema.parse({
+      projectId: "p1",
+      handle: "support-bot",
+      legacyField: 1,
+    });
+
+    expect(parsed).toEqual({ projectId: "p1", handle: "support-bot" });
+  });
+
   /** @scenario invalid handles are rejected at the contract boundary */
   it("rejects invalid handles before persistence", () => {
     expect(promptHandleSchema.validate("Invalid Handle")).toBe(false);
