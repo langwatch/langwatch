@@ -9,6 +9,7 @@ import {
   type Gauge,
   type Histogram,
   type Meter,
+  type ObservableCallback,
 } from "@opentelemetry/api";
 
 import { HISTOGRAM_BOUNDARIES } from "./histogram-boundaries.ts";
@@ -29,10 +30,11 @@ let generation = 0;
 let meter: { value: Meter; generation: number } | undefined;
 
 /**
- * Observable gauges declared at module scope, before any provider: installed on every
- * provider activated after, since a callback dies with the provider it was added to.
+ * Observable gauges declared before a provider, installed when one activates. Both lists
+ * clear on `deactivateMetrics`: a stopped graph's gauges must not outlive it (ADR-168).
  */
 const moduleScopeObservations: (() => void)[] = [];
+const installedCallbacks: (() => void)[] = [];
 let activated = false;
 
 function currentMeter(): Meter {
@@ -58,10 +60,19 @@ export function activateMetrics(): void {
  * one, and the assertions would read an empty reader.
  */
 export function resetMetricsForTests(): void {
+  deactivateMetrics();
+}
+
+/**
+ * The provider is shutting down: remove every gauge callback and forget pending ones,
+ * so nothing keeps the stopped graph (and the stores its gauges read) reachable.
+ */
+export function deactivateMetrics(): void {
   generation += 1;
   meter = void 0;
   activated = false;
   moduleScopeObservations.length = 0;
+  for (const remove of installedCallbacks.splice(0)) remove();
 }
 
 /** What every instrument declaration carries. */
@@ -171,11 +182,13 @@ export function observableGauge(
     const instrument = currentMeter().createObservableGauge(definition.name, {
       description: definition.description,
     });
-    instrument.addCallback(async (result) => {
+    const callback: ObservableCallback = async (result) => {
       await observe({
         observe: (value, attributes) => result.observe(value, attributes),
       });
-    });
+    };
+    instrument.addCallback(callback);
+    installedCallbacks.push(() => instrument.removeCallback(callback));
   };
 
   // Before activation there is no provider, so registering now would attach

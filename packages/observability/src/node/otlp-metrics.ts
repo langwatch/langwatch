@@ -17,7 +17,7 @@ import {
   PeriodicExportingMetricReader,
 } from "@opentelemetry/sdk-metrics";
 
-import { activateMetrics, metricHistogramViews } from "../metrics/index.ts";
+import { activateMetrics, deactivateMetrics, metricHistogramViews } from "../metrics/index.ts";
 import { createAuthoritativeOtlpConfiguration } from "./otlp-configuration.ts";
 import type { ProcessObservabilityFlusher } from "./process-observability.ts";
 
@@ -110,6 +110,7 @@ export function startOtlpMetricsExport(
     shutdown: async () => {
       await meterProvider.shutdown();
       metrics.disable();
+      deactivateMetrics();
     },
   };
 }
