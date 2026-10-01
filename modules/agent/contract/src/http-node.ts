@@ -80,3 +80,25 @@ export function buildHttpNodeParameters(config: HttpCallConfig): Field[] {
   }
   return parameters;
 }
+
+const CREDENTIAL_HEADER_NAMES: readonly string[] = [
+  "authorization",
+  "x-api-key",
+  "cookie",
+  "proxy-authorization",
+];
+const CREDENTIAL_HEADER_WORD = /key|token|secret|auth|password/i;
+
+/** Whether a header carries a credential: save stores it, read blanks it, a trace redacts it. */
+export function isCredentialHeader(key: string): boolean {
+  const name = key.trim().toLowerCase();
+
+  return CREDENTIAL_HEADER_NAMES.includes(name) || CREDENTIAL_HEADER_WORD.test(name);
+}
+
+const SECRET_REFERENCE_VALUE = /^((Bearer|Basic|Token) )?\{\{ secrets\.([A-Z0-9_]+) \}\}$/;
+
+/** The project secret a stored credential points at, or nothing when it is not a reference. */
+export function secretReferenceOf(value: string): string | undefined {
+  return SECRET_REFERENCE_VALUE.exec(value)?.[3];
+}
