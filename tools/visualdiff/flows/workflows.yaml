@@ -44,7 +44,7 @@ flows:
           hasText: Visual Diff QA
       - action: click
         with:
-          selector: [data-testid="workflow-history-open"]
+          selector: '[data-testid="workflow-history-open"]'
       - action: click
         with:
           text: Save new version
@@ -253,7 +253,7 @@ flows:
           min: "3"
       - action: click
         with:
-          selector: [data-testid="workflow-history-open"]
+          selector: '[data-testid="workflow-history-open"]'
       - action: click
         with:
           text: Save new version
@@ -370,7 +370,7 @@ flows:
           min: "3"
       - action: click
         with:
-          selector: [data-testid="workflow-history-open"]
+          selector: '[data-testid="workflow-history-open"]'
       - action: fill
         with:
           field: Description
@@ -549,7 +549,7 @@ flows:
           timeout: "20000"
       - action: click
         with:
-          selector: [data-testid="workflow-history-open"]
+          selector: '[data-testid="workflow-history-open"]'
       - action: fill
         with:
           field: Description

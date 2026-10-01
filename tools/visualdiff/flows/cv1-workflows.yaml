@@ -47,7 +47,7 @@ flows:
           equals: "0"
       - action: click
         with:
-          selector: [data-testid="workflow-history-open"]
+          selector: '[data-testid="workflow-history-open"]'
       - action: click
         with:
           text: Save new version
