@@ -82,16 +82,18 @@ export class BrowserSessionService {
     if (await this.pastItsWindow({ stored })) return { kind: "anonymous" };
 
     const { user, identityEmail } = await this.person({ userId: verified.user.id });
+    // Name and photo come from the stored person: Better Auth's cached copy of
+    // the user is written at sign-in and never told when the user module saves.
     const session = browserSessionSchema.parse({
       user: {
         id: verified.user.id,
-        name: verified.user.name ?? null,
+        name: (user ? user.name : verified.user.name) ?? null,
         email:
           (identityEmail?.kind === "resolved" ? identityEmail.email : null) ??
           user?.email ??
           verified.user.email ??
           null,
-        image: verified.user.image ?? null,
+        image: (user ? user.image : verified.user.image) ?? null,
         pendingSsoSetup: verified.user.pendingSsoSetup ?? false,
       },
       expires: verified.session.expiresAt.toISOString(),
@@ -352,7 +354,7 @@ export class BrowserSessionService {
     logger.info({ deleted, keepSessionId, userId }, "Revoked other browser sessions for user");
   }
 
-  /** Read before the rows go, since a deleted row no longer names its token; none without a cache. */
+  /** Read before the rows go: a deleted row no longer names its token. None without a cache. */
   private async tokensToClear({ userId }: { userId: string }): Promise<string[]> {
     return this.deps.cache ? this.deps.sessions.findTokensForUser({ userId }) : [];
   }
