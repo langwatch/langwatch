@@ -330,6 +330,16 @@ flows:
       - action: expect
         with:
           text: "example.com/vd-{uid}"
+      # A virtual key made now is a gateway event; the endpoint listens to that family, so the
+      # delivery worker records an attempt against it for the drawer to list.
+      - action: request
+        with:
+          path: /api/gateway/v1/virtual-keys
+          auth: "{orgKey}"
+          body: '{"name":"vd-whk-{uid}"}'
+      - action: go
+        with:
+          path: /gateway/webhooks
       - action: click
         with:
           selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
@@ -349,6 +359,7 @@ flows:
       - action: expect
         with:
           text: Attempt
+          timeout: "30000"
       - action: expect
         with:
           testId: webhook-dlq-badge

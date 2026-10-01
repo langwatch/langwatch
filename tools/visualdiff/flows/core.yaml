@@ -142,18 +142,15 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: fill
         with:
           field: Settle window
           value: "45"
-      - action: click
+      - action: select
         with:
-          selector: '[role="combobox"]'
-          hasText: /^\s*Immediate/
-      - action: click
-        with:
-          selector: '[role="option"]'
-          hasText: Every 15 minutes
+          label: Batch window
+          option: every 15 minutes
       - action: click
         with:
           text: /^\s*Continue\s*$/

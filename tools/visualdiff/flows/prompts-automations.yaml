@@ -409,14 +409,10 @@ flows:
         with:
           field: "Settle window"
           value: "30"
-      - action: click
+      - action: select
         with:
-          selector: '[role="combobox"]'
-          hasText: /^\s*Immediate/
-      - action: click
-        with:
-          selector: '[role="option"]'
-          hasText: Every hour
+          label: Batch window
+          option: every hour
       - action: click
         with:
           testId: automation-delivery-send-email
@@ -430,6 +426,7 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: click
         with:
           text: /^\s*Continue\s*$/
@@ -456,13 +453,13 @@ flows:
       - action: click
         with:
           text: "New automation"
+      - action: click
+        with:
+          text: A graph
       - action: fill
         with:
           field: "High latency"
           value: "vd-alert-{uid}"
-      - action: click
-        with:
-          text: A graph
       - action: select
         with:
           field: "Custom graph"
@@ -487,6 +484,7 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: click
         with:
           text: /^\s*Continue\s*$/
@@ -546,6 +544,7 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: click
         with:
           text: /^\s*Create report\s*$/
@@ -595,6 +594,7 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: click
         with:
           text: /^\s*Continue\s*$/
@@ -665,6 +665,7 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: click
         with:
           text: /^\s*Continue\s*$/
@@ -738,6 +739,7 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+          optional: "true"
       - action: click
         with:
           text: /^\s*Continue\s*$/
@@ -760,10 +762,10 @@ flows:
       - action: click
         with:
           selector: '[role="menuitem"]'
-          hasText: /^\s*Delete\s*$/
-      - action: wait
+          hasText: /^\s*Delete automation\s*$/
+      - action: click
         with:
-          millis: "1500"
+          text: /^\s*Delete\s*$/
       - action: go
         with:
           path: "/{slug}/automations/automations"

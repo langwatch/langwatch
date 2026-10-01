@@ -305,7 +305,10 @@ var neverSent = regexp.MustCompile(`TLS handshake timeout|connection refused`)
 func sendOnce(ctx context.Context, client *http.Client, spec postSpec, encoded []byte) ([]byte, error) {
 	method, body := http.MethodPost, io.Reader(bytes.NewReader(encoded))
 	if spec.method != "" {
-		method, body = spec.method, nil
+		method = spec.method
+	}
+	if method == http.MethodGet {
+		body = nil
 	}
 	outgoing, err := http.NewRequestWithContext(ctx, method, spec.url, body)
 	if err != nil {
