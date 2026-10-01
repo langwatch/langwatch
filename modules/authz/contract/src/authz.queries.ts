@@ -6,6 +6,7 @@ import {
 import { z } from "zod";
 
 import {
+  authzCanScopeRefSchema,
   authzDecisionSchema,
   authzPrincipalRefSchema,
   authzScopeRefSchema,
@@ -22,6 +23,11 @@ export const authzCheckInputSchema = z
   })
   .strict();
 export type AuthzCheckInput = z.infer<typeof authzCheckInputSchema>;
+/** `can` alone also answers at the platform, from PLATFORM-tier grants only. */
+export const authzCanInputSchema = z
+  .object({ ...authzCheckInputSchema.shape, scope: authzCanScopeRefSchema })
+  .strict();
+export type AuthzCanInput = z.infer<typeof authzCanInputSchema>;
 export const authzCheckOutputSchema = authzDecisionSchema;
 export type AuthzCheckOutput = z.infer<typeof authzCheckOutputSchema>;
 export const authzCanOutputSchema = z.boolean();

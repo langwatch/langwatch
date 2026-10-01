@@ -56,7 +56,7 @@ export interface AuthzApi {
   ): Promise<EffectivePermissions>;
   check(args: Queries.AuthzCheckInput): Promise<AuthzDecision>;
   checkDetailed(args: Queries.AuthzCheckInput): Promise<Queries.AuthzCheckDetailedOutput>;
-  can(args: Queries.AuthzCheckInput): Promise<boolean>;
+  can(args: Queries.AuthzCanInput): Promise<boolean>;
   authorize<Tier extends DeclaredScopeTier, Permission extends AuthzPermission>(args: {
     principal: AuthzPrincipalRef;
     permission: Permission;
