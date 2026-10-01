@@ -340,10 +340,10 @@ export function isDatabaseBusy(error: unknown): boolean {
 
 /** Postgres had no connection to give in time. The request did nothing wrong; retry shortly. */
 export class DatabaseBusyError extends HandledError {
-  declare readonly code: "service_unavailable";
+  declare readonly code: "database_busy";
 
   constructor() {
-    super("service_unavailable", "The service is busy. Retry shortly.", {
+    super("database_busy", "The service is busy. Retry shortly.", {
       httpStatus: 503,
       fault: "platform",
       retryable: true,

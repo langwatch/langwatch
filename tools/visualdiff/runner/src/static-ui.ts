@@ -71,9 +71,9 @@ const readBuilt = (dir: string): ((pathname: string) => Promise<Buffer | undefin
 export type ServeBuiltUi = (context: BrowserContext) => Promise<void>;
 
 /**
- * prepareBuiltUi reads the dev shell's public config once, through `context`, and answers what
- * serves any context the prebuilt shell for every document and every file the build holds from
- * memory on the page's own origin. /api and whatever the build does not hold still reach the stack.
+ * prepareBuiltUi reads the dev shell's public config once and serves the prebuilt shell for every
+ * document, and every file the build holds, on the page's own origin. /api, /sandbox and
+ * whatever the build does not hold still reach the stack.
  */
 export const prepareBuiltUi = async ({
   context,
@@ -93,7 +93,10 @@ export const prepareBuiltUi = async ({
   const read = readBuilt(dir);
   return async (target) => {
     await target.route(
-      (url) => url.origin === origin && !url.pathname.startsWith("/api/"),
+      (url) =>
+        url.origin === origin &&
+        !url.pathname.startsWith("/api/") &&
+        !url.pathname.startsWith("/sandbox/"),
       async (route) => {
         const request = route.request();
         if (request.method() !== "GET") return route.continue();

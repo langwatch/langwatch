@@ -349,10 +349,10 @@ describe("a mounted contract procedure", () => {
 
       await expect(call).rejects.toMatchObject({
         code: "SERVICE_UNAVAILABLE",
-        cause: { code: "service_unavailable", httpStatus: 503, retryable: true },
+        cause: { code: "database_busy", httpStatus: 503, retryable: true },
       });
       expect((await onTheWire(call)).data.error).toMatchObject({
-        code: "service_unavailable",
+        code: "database_busy",
         meta: { retryAfterMs: 1000 },
       });
     });

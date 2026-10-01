@@ -2721,6 +2721,12 @@ const presentations = {
     describe: () =>
       "One or more required secrets are not set on this deployment. An operator needs to provide them before the service can start.",
   },
+  database_busy: {
+    title: "We're busy right now",
+    describe: () =>
+      "Too many requests reached the database at once. Wait a few seconds and try again.",
+  },
+
   service_unavailable: {
     title: "This deployment doesn't offer that",
     describe: () =>

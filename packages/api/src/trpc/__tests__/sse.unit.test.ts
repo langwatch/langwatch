@@ -18,7 +18,7 @@ function recordingLogger(records: LogRecord[]) {
 
 describe("a live subscription whose store has no connection to give", () => {
   /** @scenario "A live subscription whose store has no connection to give ends with the handled 503" */
-  it("ends with the handled service_unavailable frame, logged as a platform fault", async () => {
+  it("ends with the handled database_busy frame, logged as a platform fault", async () => {
     const records: LogRecord[] = [];
 
     const lane = SseLane.create({
@@ -47,13 +47,13 @@ describe("a live subscription whose store has no connection to give", () => {
 
     const stream = await response.text();
 
-    expect(stream).toContain('"message":"service_unavailable"');
+    expect(stream).toContain('"message":"database_busy"');
     expect(stream).toContain('"retryable":true');
 
     expect(records).toContainEqual({
       level: "error",
       fields: expect.objectContaining({
-        handledErrorCode: "service_unavailable",
+        handledErrorCode: "database_busy",
         handledErrorFault: "platform",
       }),
       message: "SSE handler error",

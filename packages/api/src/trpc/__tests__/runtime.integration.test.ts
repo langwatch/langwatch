@@ -233,7 +233,7 @@ describe("a database with no connection to give, behind the process policy", () 
 
     expect(answer.status).toBe(503);
     expect(answer.transportCode).toBe("SERVICE_UNAVAILABLE");
-    expect(answer.handled).toMatchObject({ code: "service_unavailable", httpStatus: 503 });
+    expect(answer.handled).toMatchObject({ code: "database_busy", httpStatus: 503 });
     expect(answer.captured).toEqual([]);
   });
 

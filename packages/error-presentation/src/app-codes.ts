@@ -191,6 +191,7 @@ export const APP_ERROR_CODES = [
   "data_retention_not_on_plan",
   "data_retention_scope_target_not_found",
   "data_retention_scope_write_forbidden",
+  "database_busy",
   "dataset_attachment_reference_refused",
   "dataset_attachment_too_large",
   "dataset_attachment_type_refused",
