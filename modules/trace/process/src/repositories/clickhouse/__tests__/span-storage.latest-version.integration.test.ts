@@ -6,7 +6,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
+import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 import {
   startMigratedTraceClickHouse,
   testClickHouseConfigured,
@@ -20,7 +20,7 @@ const spanId = `span-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
 let ch: ClickHouseClient;
-let repo: TraceSpanStorageClickHouseRepository;
+let repo: SpanStorageClickHouseRepository;
 
 function versionRow({ offsetMs, version }: { offsetMs: number; version: string }) {
   return {
@@ -61,10 +61,7 @@ function versionRow({ offsetMs, version }: { offsetMs: number; version: string }
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
-  repo = TraceSpanStorageClickHouseRepository.create({
-    resolveClient: async () => ch,
-    defaultRetentionDays: 49,
-  });
+  repo = SpanStorageClickHouseRepository.create(async () => ch);
 
   // Separate inserts leave three unmerged parts; the newest is inserted first
   // so insertion order cannot be what picks the winner.
@@ -92,7 +89,7 @@ afterAll(async () => {
 });
 
 describe.skipIf(!clickHouseConfigured)(
-  "TraceSpanStorageClickHouseRepository.findNormalizedSpanById",
+  "SpanStorageClickHouseRepository.findNormalizedSpanById",
   () => {
     describe("given a span stored as several unmerged versions", () => {
       /** @scenario "The latest of several unmerged versions is the one read back" */

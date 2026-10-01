@@ -8,7 +8,7 @@ import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
 } from "../clickhouse.trace-member-client.repository.ts";
-import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
+import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 
 /** TWIN-DRIFT PINS: table name, column set, insert settings and retention
  * stamp are pinned as literals. An insert that omits a column succeeds by
@@ -83,12 +83,9 @@ class RecordingClickHouse {
   }
 }
 
-function repository(defaultRetentionDays = 49) {
+function repository() {
   const clickhouse = new RecordingClickHouse();
-  const repo = TraceSpanStorageClickHouseRepository.create({
-    resolveClient: clickhouse.resolve,
-    defaultRetentionDays,
-  });
+  const repo = SpanStorageClickHouseRepository.create(clickhouse.resolve);
   return { clickhouse, repo };
 }
 
@@ -124,7 +121,7 @@ function span(overrides: Partial<SpanInsertData> = {}): SpanInsertData {
   };
 }
 
-describe("TraceSpanStorageClickHouseRepository", () => {
+describe("SpanStorageClickHouseRepository", () => {
   describe("given a batch of spans for one tenant", () => {
     /** @scenario "The batch is one insert, not one insert per span" */
     it("issues a single insert carrying every span rather than one per span", async () => {
@@ -335,10 +332,11 @@ describe("TraceSpanStorageClickHouseRepository", () => {
 
   describe("given a retention fallback the process was configured with", () => {
     /**
+     * @scenario "A background process can build the whole write path from what it holds"
      * @scenario "A span without a retention of its own is stamped with the deployment's"
      */
     it("stamps the fallback on a span that declares none", async () => {
-      const { clickhouse, repo } = repository(7);
+      const { clickhouse, repo } = repository();
       const store = SpanStorageStore.create({ storage: repo, defaultRetentionDays: () => 49 });
 
       await store.append(createTestSpan({}), {
@@ -353,7 +351,7 @@ describe("TraceSpanStorageClickHouseRepository", () => {
      * @scenario "A span that declares no retention at all is not silently kept forever"
      */
     it("keeps a declared zero rather than substituting the fallback", async () => {
-      const { clickhouse, repo } = repository(49);
+      const { clickhouse, repo } = repository();
 
       await repo.insertSpan(span({ retentionDays: 0 }));
 
@@ -364,7 +362,7 @@ describe("TraceSpanStorageClickHouseRepository", () => {
      * @scenario "A span without a retention of its own is stamped with the deployment's"
      */
     it("keeps the span's own retention when it declares one", async () => {
-      const { clickhouse, repo } = repository(49);
+      const { clickhouse, repo } = repository();
 
       await repo.insertSpan(span({ retentionDays: 7 }));
 
@@ -435,14 +433,11 @@ function storedRow(overrides: Record<string, unknown> = {}): Row {
 
 function readRepository() {
   const clickhouse = new QueryingClickHouse();
-  const repo = TraceSpanStorageClickHouseRepository.create({
-    resolveClient: clickhouse.resolve,
-    defaultRetentionDays: 49,
-  });
+  const repo = SpanStorageClickHouseRepository.create(clickhouse.resolve);
   return { clickhouse, repo };
 }
 
-describe("TraceSpanStorageClickHouseRepository.findNormalizedSpanById", () => {
+describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
   describe("given a span reference with the span's own start time", () => {
     /** @scenario "The referenced span is read back inside its own partition window" */
     it("bounds the read to a window centred on the hint rather than scanning every partition", async () => {
@@ -458,7 +453,7 @@ describe("TraceSpanStorageClickHouseRepository.findNormalizedSpanById", () => {
 
       expect(clickhouse.queries).toHaveLength(1);
       const [read] = clickhouse.queries;
-      expect(read?.query).toContain("StartTime BETWEEN");
+      expect(read?.query).toContain("StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})");
       expect(read?.params.fromMs).toBe(1_700_000_000_000 - 2 * 24 * 60 * 60 * 1000);
       expect(read?.params.toMs).toBe(1_700_000_000_000 + 2 * 24 * 60 * 60 * 1000);
     });
@@ -521,7 +516,7 @@ describe("TraceSpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       expect(clickhouse.queries[0]?.settings).toMatchObject({
         query_plan_optimize_lazy_materialization: "1",
       });
-      expect(clickhouse.queries[0]?.query).toContain("max(UpdatedAt)");
+      expect(clickhouse.queries[0]?.query).toContain("ORDER BY UpdatedAt DESC");
       expect(clickhouse.queries[0]?.query).toContain("LIMIT 1");
     });
 
@@ -563,7 +558,9 @@ describe("TraceSpanStorageClickHouseRepository.findNormalizedSpanById", () => {
 
       expect(foundSpan).toBeNull();
       expect(clickhouse.queries).toHaveLength(1);
-      expect(clickhouse.queries[0]?.query).toContain("StartTime BETWEEN");
+      expect(clickhouse.queries[0]?.query).toContain(
+        "StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})",
+      );
     });
   });
 

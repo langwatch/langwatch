@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -132,6 +133,7 @@ const FILE_DESTINATION: ProjectStorageDestination = {
 
 describe("putSpool — given each supported storage destination", () => {
   describe("when putSpool is called", () => {
+    /** @scenario "The transient object path carries the lifecycle prefix first" */
     it.each([
       {
         name: "s3",
@@ -168,6 +170,7 @@ describe("putSpool — given each supported storage destination", () => {
 
 describe("putSpool — given a span payload body", () => {
   describe("when putSpool is called", () => {
+    /** @scenario "The transient object path carries the lifecycle prefix first" */
     it("returns a reference carrying no storage location", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
@@ -204,6 +207,7 @@ describe("putSpool — given a span payload body", () => {
 
 describe("putSpool — given an OTLP id containing a path separator", () => {
   describe("when putSpool is called", () => {
+    /** @scenario "An id that is not a safe path segment is hashed, not escaped" */
     it("reduces the id to one path component so nothing can escape the prefix", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
@@ -257,6 +261,7 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
 
 describe("putSpool — given Azure storage whose orphan retention is unconfirmed", () => {
   describe("when putSpool is called", () => {
+    /** @scenario "Azure refuses until the operator asserts the lifecycle rule" */
     it("refuses rather than writing an object no lifecycle rule will reap", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
@@ -326,6 +331,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
   }
 
   describe("when the worker reads a span spooled before the flip", () => {
+    /** @scenario "Azure refuses until the operator asserts the lifecycle rule" */
     it("still returns the payload", async () => {
       const objectStore = fakeObjectStore();
       const body = Buffer.from("the full oversized payload", "utf-8");
@@ -344,6 +350,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
   });
 
   describe("when the worker deletes a span spooled before the flip", () => {
+    /** @scenario "Azure refuses until the operator asserts the lifecycle rule" */
     it("still removes the object", async () => {
       const objectStore = fakeObjectStore();
       const spoolRef = await TraceBlobStoreService.create({
@@ -392,6 +399,7 @@ describe("putSpool — given S3 storage with retention unconfirmed", () => {
 
 describe("putSpool — given the project's storage is the local filesystem", () => {
   describe("when putSpool is called", () => {
+    /** @scenario "A write refuses a destination that cannot reap an orphan" */
     it("refuses rather than writing an object nothing will ever reap", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
@@ -453,6 +461,7 @@ describe("getSpool — given a spool object written by putSpool", () => {
 
 describe("getSpool — given a reference naming another tenant's object", () => {
   describe("when getSpool is called", () => {
+    /** @scenario "The spool object path is derived from the command, never read from it" */
     it("reads the location derived from the command, ignoring the reference", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
@@ -486,6 +495,7 @@ describe("getSpool — given a reference naming another tenant's object", () => 
 
 describe("getSpool — given a v1-shaped reference naming another tenant", () => {
   describe("when getSpool is called", () => {
+    /** @scenario "A legacy reference is pinned to the command's own tenant" */
     it("refuses rather than reading across the tenant boundary", async () => {
       const fake = fakeS3();
       const victimKey = "trace-blobs/spool/victim-org/trace-1/span-1";
@@ -532,6 +542,7 @@ describe("getSpool — given a v1 reference written before this deployment", () 
 
 describe("getSpool — given a v1 object larger than the read cap", () => {
   describe("when getSpool is called", () => {
+    /** @scenario "A spool object larger than the cap is refused rather than buffered" */
     it("rejects instead of buffering it whole", async () => {
       const legacyKey = "trace-blobs/spool/orgA/trace-1/span-1";
       const oversizedS3 = {
@@ -569,6 +580,7 @@ describe("getSpool — given a v1 object larger than the read cap", () => {
 
 describe("getSpool — given an object larger than the read cap", () => {
   describe("when getSpool is called", () => {
+    /** @scenario "A spool object larger than the cap is refused rather than buffered" */
     it("rejects instead of buffering it whole", async () => {
       const objectStore = fakeObjectStore();
       // Emitted lazily in 1 MB chunks — the cap should trip long before
@@ -666,6 +678,32 @@ describe("deleteSpool — given the storage backend rejects the delete", () => {
       await expect(
         store.deleteSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords }),
       ).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe("deleteSpool — given a v1 reference naming another tenant", () => {
+  describe("when deleteSpool is called", () => {
+    /** @scenario "A legacy reference is pinned to the command's own tenant" */
+    it("refuses the delete and says so, rather than swallowing it", async () => {
+      const fake = fakeS3();
+      const victimKey = "trace-blobs/spool/victim-org/trace-1/span-1";
+      fake.objects.set(`test-bucket/${victimKey}`, Buffer.from("another tenant's payload"));
+      const { logger, lines } = createTestLogger();
+      const store = TraceBlobStoreService.create({
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: resolverFor(fake) }),
+        spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
+        logger,
+      });
+
+      await store.deleteSpool({ spoolRef: victimKey, ...spoolCoords });
+
+      expect(fake.objects.size).toBe(1);
+      expect(lines.findLine("warn", "Refused a cross-tenant v1 spool delete")).toMatchObject({
+        projectId: "orgA",
+        traceId: "trace-1",
+        spanId: "span-1",
+      });
     });
   });
 });

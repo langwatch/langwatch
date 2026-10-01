@@ -3,6 +3,7 @@
  * threshold nothing is written, over it the payload is spooled, and a spool
  * that refuses falls open to the inline route.
  */
+import { createTestLogger } from "@langwatch/test-harness";
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -108,6 +109,44 @@ describe("the ingestion edge's oversize protection", () => {
         expect(warn).toHaveBeenCalledOnce();
         expect(warn.mock.calls[0]?.[1]).toContain("oversize protection skipped");
       });
+    });
+  });
+});
+
+describe("the ingestion edge's blob offload flag", () => {
+  const oversized = () => commandCarrying({ outputBytes: COMMAND_INLINE_THRESHOLD + 1024 });
+  const spoolWith = (isEnabled: () => Promise<boolean>) => {
+    const putSpool = vi.fn(async () => SPOOL_REF);
+    const { logger, lines } = createTestLogger();
+    const service = TraceEdgeSpoolService.create({
+      spool: { putSpool },
+      logger,
+      featureFlags: { isEnabled: vi.fn(isEnabled) },
+    });
+    return { service, putSpool, lines };
+  };
+
+  describe("given the flag is off for the project", () => {
+    /** @scenario "With the flag off, ingestion and reads behave exactly as before" */
+    it("sends an oversized command inline, writing no spool object", async () => {
+      const { service, putSpool } = spoolWith(async () => false);
+      const command = oversized();
+
+      expect(await service.prepare(command)).toBe(command);
+      expect(putSpool).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the flag lookup fails", () => {
+    it("falls back to the inline route", async () => {
+      const { service, putSpool, lines } = spoolWith(async () => {
+        throw new Error("flag store down");
+      });
+      const command = oversized();
+
+      expect(await service.prepare(command)).toBe(command);
+      expect(putSpool).not.toHaveBeenCalled();
+      expect(lines.findLine("warn", "blob offload flag lookup failed")).toBeDefined();
     });
   });
 });

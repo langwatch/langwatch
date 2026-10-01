@@ -293,6 +293,7 @@ export function composeTraceAppDependencies(
   const edgeSpool = TraceEdgeSpoolService.create({
     spool: options.blobStore,
     logger: createLogger("langwatch:traces:edge-spool"),
+    featureFlags: options.featureFlags,
   });
   const payloads = options.featureFlags
     ? TraceEdgeMediaPayloadService.create({
