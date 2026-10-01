@@ -8,6 +8,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { CachedView } from "@langwatch/design-system/cached-view";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
+import { Delayed } from "@langwatch/design-system/delayed";
 import {
   Badge,
   Box,
@@ -51,8 +52,8 @@ import type {
 } from "recharts/types/component/DefaultTooltipContent";
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";
-import { useDashboardRefetchInterval } from "../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
+import { useDashboardRefetchInterval } from "../../behavior/use-dashboard-auto-refresh.ts";
 import { useFilterParams } from "../../behavior/use-filter-params.ts";
 import { useGetRotatingColorForCharts } from "../../behavior/use-rotating-chart-color.ts";
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
@@ -74,7 +75,6 @@ import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/serie
 import { resolveSeriesValueFormat } from "../../model/series-value-format.ts";
 import { ChartErrorState } from "../elements/chart-error-state.tsx";
 import { ChartTooltip } from "../elements/chart-tooltip.tsx";
-import { Delayed } from "../elements/delayed.tsx";
 import { SummaryMetric } from "../elements/summary-metric.tsx";
 
 export type { CustomGraphInput };

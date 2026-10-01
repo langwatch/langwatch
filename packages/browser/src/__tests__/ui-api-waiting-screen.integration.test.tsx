@@ -4,7 +4,8 @@
  * Spec: specs/ui/api-boot-wait.feature
  */
 
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UiApiWaitingScreen } from "../ui-api-waiting-screen.tsx";
@@ -41,7 +42,7 @@ describe("given the reader has asked for less motion", () => {
         .spyOn(HTMLCanvasElement.prototype, "getContext")
         .mockImplementation(() => null);
 
-      const view = render(
+      const view = renderWithDesignSystem(
         <UiApiWaitingScreen
           endpoint="http://localhost:5560/api/health"
           isDevelopment

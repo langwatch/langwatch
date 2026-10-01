@@ -49,9 +49,12 @@ export type AnalyticsFailureNotice = {
   id?: string;
 };
 
-/** Alert authoring for one saved graph; `automationId` edits the alert it already has. */
+/**
+ * Automation authoring: `graphId` prefills one saved graph, `automationId` edits the alert it
+ * already has; neither opens it over the current filters, as main's filter sidebar did.
+ */
 export type AnalyticsAlertAuthoring = {
-  graphId: string;
+  graphId?: string;
   automationId?: string;
   seriesName?: string;
 };

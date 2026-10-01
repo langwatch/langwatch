@@ -5,8 +5,8 @@
  */
 
 import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
-import { savedViewTrpc } from "@langwatch/dashboard-contract";
 import { defineBrowserModule } from "@langwatch/browser";
+import { savedViewTrpc } from "@langwatch/dashboard-contract";
 import { createElement } from "react";
 
 import { analyticsApi } from "./behavior/analytics-api.ts";
@@ -87,7 +87,7 @@ export const analyticsWeb = defineBrowserModule("analytics")
     },
     filterSidebar: {
       load: async () => ({
-        default: (await import("./ui/sections/filters/filter-sidebar.tsx")).FilterSidebar,
+        default: (await import("./ui/sections/filter-sidebar.tsx")).FilterSidebar,
       }),
     },
   });

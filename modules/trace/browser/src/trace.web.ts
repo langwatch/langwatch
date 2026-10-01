@@ -35,6 +35,13 @@ export const traceWeb = defineBrowserModule("trace")
           .AddDatasetRecordDrawer,
       }),
     },
+    // Kept so links naming the removed legacy drawer still resolve to the Trace Explorer one.
+    traceDetails: {
+      load: async () => ({
+        default: (await import("./ui/sections/legacy-trace-drawer-redirect.tsx"))
+          .LegacyTraceDrawerRedirect,
+      }),
+    },
   })
   /** Trace UI that reads trace's own data, lent to the modules that show it (§3.4 rule 7). */
   .withCapabilities({

@@ -1,7 +1,7 @@
 /**
  * SaveAsViewButton -- button next to "Filters" heading that opens a dialog to save the current
- * filter state as a named custom view. Rendered by QueryStringFieldsFilters only when filters
- * are active and ClickHouse is enabled.
+ * filter state as a named custom view. Rendered by QueryStringFieldsFilters when filters are
+ * active; renders nothing where no SavedViewsProvider is mounted (a borrowed sidebar).
  */
 
 import { Menu } from "@langwatch/design-system/menu";
@@ -11,10 +11,11 @@ import { Check, ChevronDown, User, Users } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
 
-import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../../../behavior/use-saved-views.tsx";
+import { MAX_VIEW_NAME_LENGTH, useSavedViewsIfMounted } from "../../behavior/use-saved-views.tsx";
 
 export function SaveAsViewButton() {
-  const { saveView } = useSavedViews();
+  const savedViews = useSavedViewsIfMounted();
+  const saveView = savedViews?.saveView;
   const [isOpen, setIsOpen] = useState(false);
   const [viewName, setViewName] = useState("");
   const [scope, setScope] = useState<"project" | "myself">("project");
@@ -29,7 +30,7 @@ export function SaveAsViewButton() {
 
   const handleConfirm = useCallback(() => {
     const trimmed = viewName.trim();
-    if (!trimmed) return;
+    if (!trimmed || !saveView) return;
     saveView(trimmed, scope);
     setIsOpen(false);
     setViewName("");
@@ -43,6 +44,8 @@ export function SaveAsViewButton() {
     },
     [handleConfirm],
   );
+
+  if (!saveView) return null;
 
   return (
     <>

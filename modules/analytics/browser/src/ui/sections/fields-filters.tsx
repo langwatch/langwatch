@@ -24,6 +24,7 @@ import { Search } from "lucide-react";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, X } from "react-feather";
+import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 
 import type { AnalyticsFilterOption } from "../../behavior/analytics-api.ts";
@@ -32,7 +33,9 @@ import { useFilterParams } from "../../behavior/use-filter-params.ts";
 import { availableFilters } from "../../model/analytics-filter-catalogue.ts";
 import type { FilterDefinition, FilterField } from "../../model/analytics-filter-definition.ts";
 import { filterOutEmptyFilters, type FilterParam } from "../../model/analytics-filter-params.ts";
+import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { OverflownTextWithTooltip } from "../elements/overflown-text.tsx";
+import { SaveAsViewButton } from "./save-as-view-button.tsx";
 
 /** An unparsable bound falls back to the slider's own end of the range. */
 function numberOrBound({
@@ -52,18 +55,36 @@ function numberOrBound({
   return isNaN(parsed) ? bound : parsed;
 }
 
-/**
- * The filter editor, bound to the address. TWO BUTTONS DID NOT TRAVEL WITH IT, and both are
- * somebody else's overlay: - "Save as view" opened the saved-views dialog.
- */
+/** The filter editor, bound to the address, with main's "Save as view" and "Add Automation". */
 export function QueryStringFieldsFilters() {
   const { nonEmptyFilters, setFilters, filterParams } = useFilterParams();
+  const host = useAnalyticsHost();
+
+  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
   return (
     <FieldsFilters
       filters={nonEmptyFilters}
       setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
       negated={!!filterParams.negateFilters}
+      actionButton={
+        <HStack gap={1}>
+          {hasAnyFilters && <SaveAsViewButton />}
+          {host.hasPermission("triggers:manage") && (
+            <Tooltip content="Create a filter to add an automation.">
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => host.openAutomationDrawer({})}
+                disabled={!hasAnyFilters}
+              >
+                <LuZap />
+                Add Automation
+              </Button>
+            </Tooltip>
+          )}
+        </HStack>
+      }
     />
   );
 }

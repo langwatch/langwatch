@@ -545,3 +545,8 @@ export function useSavedViews(): SavedViewsContextValue {
   }
   return context;
 }
+
+/** The saved views, or null where no provider is mounted (a peer borrowing the filter sidebar). */
+export function useSavedViewsIfMounted(): SavedViewsContextValue | null {
+  return useContext(SavedViewsContext);
+}

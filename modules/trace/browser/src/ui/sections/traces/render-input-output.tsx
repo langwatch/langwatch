@@ -1,4 +1,5 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { CopyIcon } from "@langwatch/design-system/copy-icon";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -11,7 +12,6 @@ import type { CollapsedFieldProps } from "@microlink/react-json-view";
 import React, { lazy, Suspense } from "react";
 
 import { TraceInputOutput, type TraceJsonViewOptions } from "../../blocks/trace-input-output.tsx";
-import { CopyIcon } from "../../elements/icons/copy.tsx";
 import { showErrorToast } from "../errors/index.ts";
 import { TraceMediaPart } from "./trace-media-part.tsx";
 

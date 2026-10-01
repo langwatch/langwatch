@@ -14,6 +14,7 @@ import {
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { slugify } from "@langwatch/design-system/slugify";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
@@ -26,7 +27,6 @@ import {
 import { useOrganizationMembersWithTeams } from "../../behavior/reads/use-organization-members.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useCreateOrUpdateAnnotationQueue } from "../../behavior/writes/use-trace-writes.ts";
-import { slugify } from "../../model/slugify.ts";
 import { RandomColorAvatar } from "../blocks/random-color-avatar.tsx";
 import { FullWidthFormControl } from "../elements/full-width-form-control.tsx";
 import { Drawer } from "./drawer.tsx";

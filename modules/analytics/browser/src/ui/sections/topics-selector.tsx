@@ -1,4 +1,6 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { Delayed } from "@langwatch/design-system/delayed";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import {
   EmptyState,
   Heading,
@@ -18,8 +20,6 @@ import {
   toggleTopic,
   toListParam,
 } from "../../model/topic-selection.ts";
-import { Delayed } from "../elements/delayed.tsx";
-import { OverflownTextWithTooltip } from "../elements/overflown-text.tsx";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const host = useAnalyticsHost();
