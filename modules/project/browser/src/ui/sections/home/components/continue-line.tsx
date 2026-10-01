@@ -1,7 +1,6 @@
+import { LangyMark } from "@langwatch/design-system/langy-mark";
 import { chakra, Text, VStack } from "@langwatch/design-system/primitives";
 import { LuArrowRight } from "react-icons/lu";
-
-import { LangyMark } from "../../langy/langy-mark.tsx";
 
 /**
  * The home's composer slot while a conversation is open: a way back rather than a

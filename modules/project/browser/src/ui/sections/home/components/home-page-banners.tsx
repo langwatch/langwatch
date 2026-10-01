@@ -1,4 +1,5 @@
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { LangyMark } from "@langwatch/design-system/langy-mark";
 import {
   Box,
   Button,
@@ -33,7 +34,6 @@ import { LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
-import { LangyMark } from "../../langy/langy-mark.tsx";
 
 // ---- Timing knobs -------------------------------------------------------
 

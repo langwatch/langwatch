@@ -1,3 +1,4 @@
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import {
   Box,
   Button,
@@ -20,7 +21,6 @@ import { ErrorActions } from "../../../behavior/errors.tsx";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error.ts";
 import { useAiGeneration } from "../../../behavior/use-ai-generation.ts";
 import { CARD } from "../../../model/langy/asaplangy-tokens.ts";
-import { LangyMark, LangyMarkGradientDefs } from "../langy/langy-mark.tsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

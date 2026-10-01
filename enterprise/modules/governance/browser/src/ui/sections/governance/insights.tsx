@@ -1,3 +1,4 @@
+import { LangyMark } from "@langwatch/design-system/langy-mark";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
@@ -19,7 +20,6 @@ import {
   withGovernanceSection,
 } from "../../../ui/sections/governance-section-gate.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
-import { LangyMark } from "../langy/langy-mark.tsx";
 import { LangyPanelSurface } from "../langy/langy-panel-surface.tsx";
 
 /**

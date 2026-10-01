@@ -21,7 +21,7 @@ const langyState = {
   activeConversationId: null as string | null,
   pendingPrompt: null as string | null,
 };
-vi.mock("../../../langy/langy-mark.tsx", () => ({ LangyMark: () => null }));
+vi.mock("@langwatch/design-system/langy-mark", () => ({ LangyMark: () => null }));
 
 vi.mock("../../../../../behavior/langy/langy.store.ts", () => ({
   useLangyStore: (selector: (s: typeof langyState) => unknown) => selector(langyState),

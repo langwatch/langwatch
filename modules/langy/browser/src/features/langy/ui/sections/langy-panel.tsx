@@ -2,6 +2,7 @@ import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { Kbd } from "@langwatch/design-system/kbd";
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
@@ -54,7 +55,6 @@ import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.t
 import { LANGY_DODGE_STAGGER_MS } from "../../../../model/langy-panel-layout.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
-import { LangyMark, LangyMarkGradientDefs } from "../../../../ui/sections/langy-mark.tsx";
 import {
   guidedPathInProgress,
   guidedPullRequestFromMessages,

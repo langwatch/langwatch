@@ -1,5 +1,6 @@
-import { Box } from "@langwatch/design-system/primitives";
-import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
+import { Box } from "@chakra-ui/react";
+
+import { useReducedMotion } from "../use-reduced-motion.ts";
 
 /**
  * Langy's mark: LangWatch's own logo, repainted in the brand gradient.
@@ -15,7 +16,7 @@ export const LANGY_ACTION_SHADOW = "0 6px 18px -4px rgba(168, 85, 247, 0.35)";
 const MARK_VIEWBOX_WIDTH = 38;
 const MARK_VIEWBOX_HEIGHT = 52;
 
-// Verbatim from `~/components/icons/LogoIcon` — the silhouette + wireframe
+// Verbatim from `./logo-icon.tsx`: the silhouette + wireframe
 // compound path. Duplicated rather than imported because that component hard-
 // codes its own fills, and it is shared with the app chrome.
 const MARK_PATH =

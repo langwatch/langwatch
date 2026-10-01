@@ -20,7 +20,7 @@ vi.mock("../../../../../behavior/langy/langy.store.ts", () => ({
   useLangyStore: (selector: (s: unknown) => unknown) => selector({ askLangy }),
 }));
 
-vi.mock("../../../langy/langy-mark.tsx", () => ({ LangyMark: () => null }));
+vi.mock("@langwatch/design-system/langy-mark", () => ({ LangyMark: () => null }));
 
 vi.mock("../../../../../model/langy/asaplangy-tokens.ts", () => ({ SERIF: "serif" }));
 

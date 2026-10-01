@@ -1,3 +1,4 @@
+import { LangyMark } from "@langwatch/design-system/langy-mark";
 import { Box, chakra, Text, VStack } from "@langwatch/design-system/primitives";
 import { ChevronRight, GitCompare, ScanSearch, ShieldCheck } from "lucide-react";
 import { type ComponentType, useMemo } from "react";
@@ -7,7 +8,6 @@ import { type ComponentType, useMemo } from "react";
 import { GitHub } from "react-feather";
 
 import { emptyStateMetrics } from "../../model/langy-empty-state-metrics.ts";
-import { LangyMark } from "./langy-mark.tsx";
 
 /** Structural, so a lucide icon and a react-feather one can sit in one list. */
 export type SuggestionIcon = ComponentType<{ size?: string | number }>;

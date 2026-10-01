@@ -114,6 +114,10 @@
       "types": "./dist/components/logo-icon.d.ts",
       "default": "./src/components/logo-icon.tsx"
     },
+    "./langy-mark": {
+      "types": "./dist/components/langy-mark.d.ts",
+      "default": "./src/components/langy-mark.tsx"
+    },
     "./personal-access-token-banner": {
       "types": "./dist/components/personal-access-token-banner.d.ts",
       "default": "./src/components/personal-access-token-banner.tsx"

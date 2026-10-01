@@ -9,6 +9,8 @@ import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
+import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import type {
   NavigationAccountMenu,
@@ -16,7 +18,6 @@ import type {
   NavigationScopeWrite,
   NavigationUser,
 } from "@langwatch/navigation-browser/navigation";
-import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
 
@@ -33,7 +34,6 @@ import {
 } from "./navigation-host-graph";
 import type { UiRootCapabilities } from "./ui-root-capabilities";
 import { useUiShellFailure } from "./ui-shell-failure";
-import { LangyMark, LangyMarkGradientDefs } from "./ui/sections/langy/langy-mark.tsx";
 
 /** The gradient the palette's own Langy mark paints with. */
 const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
