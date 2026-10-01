@@ -12,6 +12,7 @@ export {
   type TrpcContractMember,
   type TrpcContractMembers,
   type TrpcContractOutputBuilder,
+  type TrpcProjectionSource,
   type TrpcReadInvalidation,
   type TrpcReadOptions,
 } from "./trpc-contract.ts";

@@ -3,7 +3,7 @@
  * Composition names no pipeline, projection or subscriber, keeping
  * `@langwatch/eventing` and the Prisma/ioredis/ClickHouse graph off this package.
  */
-import type { TrpcContract } from "./contract/trpc-contract.ts";
+import type { TrpcContract, TrpcContractMember } from "./contract/trpc-contract.ts";
 import type { ServerRole } from "./feature-installer.ts";
 import type { ResourceOwnership } from "./resource-scope.ts";
 import type { RuntimeService } from "./runtime-lifecycle.ts";
@@ -211,6 +211,8 @@ export interface EventingHost {
   maintenancePipelines?(): readonly unknown[];
   /** The one subscriber turning committed events into read hints; absent where none can publish. */
   readHintPipeline?(hinted: ReadHintMap): unknown;
+  /** Every projection name the registered pipelines declare; absent where none can be listed. */
+  projectionNames?(): ReadonlySet<string>;
   /** Keeps what registration would start idle until `startConsumers`. */
   holdConsumers?(): void;
   /** Starts consuming; the kernel calls it when the booted runtime starts. */
@@ -252,6 +254,66 @@ export function readHintsOf({ contracts }: { contracts: readonly TrpcContract[] 
     }
   }
   return hinted;
+}
+
+/** A read a projection's cursor answers, and the input field addressing the key row, if any. */
+export type ProjectionReadTarget = Readonly<{ path: string; key?: string }>;
+
+/** Projection name to the reads served from it (projection-cursor-reads.feature). */
+export type ProjectionReadMap = ReadonlyMap<string, readonly ProjectionReadTarget[]>;
+
+/** A cursor-backed read the installed contracts cannot honour, refused at boot. */
+export class ProjectionReadError extends Error {
+  override readonly name = "ProjectionReadError";
+
+  constructor(
+    readonly code: "read_cursor_and_hints" | "read_unknown_projection",
+    readonly paths: readonly string[],
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/** The (projection, target) pairs one read declares; refuses a read that also declares hints. */
+function projectionSourcesOf({
+  path,
+  member,
+}: {
+  path: string;
+  member: TrpcContractMember;
+}): [string, ProjectionReadTarget][] {
+  if (member.fromProjection === void 0) return [];
+  if (member.invalidatedBy !== void 0) {
+    throw new ProjectionReadError(
+      "read_cursor_and_hints",
+      [path],
+      `Read "${path}" declares both fromProjection and invalidatedBy; its hints come from the cursor advance.`,
+    );
+  }
+  return member.fromProjection.map((source) =>
+    typeof source === "string"
+      ? [source, { path }]
+      : [source.projection, { path, key: source.key }],
+  );
+}
+
+/** Every installed read served from a projection, keyed by that projection. */
+export function projectionReadsOf({
+  contracts,
+}: {
+  contracts: readonly TrpcContract[];
+}): ProjectionReadMap {
+  const served = new Map<string, ProjectionReadTarget[]>();
+  const reads = contracts.flatMap(({ namespace, members }) =>
+    Object.entries(members).map(([name, member]) => ({ path: `${namespace}.${name}`, member })),
+  );
+  for (const read of reads) {
+    for (const [projection, target] of projectionSourcesOf(read)) {
+      served.set(projection, [...(served.get(projection) ?? []), target]);
+    }
+  }
+  return served;
 }
 
 function isTrpcContract(value: unknown): value is TrpcContract {
@@ -296,6 +358,33 @@ export function installReadHints({
 }
 
 /**
+ * Refuses a cursor-backed read naming a projection no installed pipeline declares, as a read
+ * hint naming an undeclared event is refused. A runtime that cannot list projections skips it.
+ */
+export function installProjectionReads({
+  eventing,
+  declared,
+}: {
+  eventing: EventingHost | undefined;
+  declared: readonly DeclaredTransports[];
+}): void {
+  const reads = projectionReadsOf({ contracts: trpcContractsOf(declared) });
+  const known = eventing?.projectionNames?.();
+  if (reads.size === 0 || known === void 0) return;
+  const unknown = [...reads].filter(([projection]) => !known.has(projection));
+  if (unknown.length === 0) return;
+  throw new ProjectionReadError(
+    "read_unknown_projection",
+    unknown.flatMap(([, targets]) => targets.map(({ path }) => path)),
+    `A read names a projection no installed pipeline declares: ${unknown
+      .map(
+        ([projection, targets]) => `${projection} (${targets.map(({ path }) => path).join(", ")})`,
+      )
+      .join("; ")}`,
+  );
+}
+
+/**
  * The eventing runtime a process holds, or nothing. Read by name, the way a
  * repository tier reads `prisma`, so a process running none ignores every
  * declaration. Participation follows the role unless the member states its own.
@@ -323,6 +412,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
       : {}),
     ...(typeof host.readHintPipeline === "function"
       ? { readHintPipeline: host.readHintPipeline.bind(candidate) }
+      : {}),
+    ...(typeof host.projectionNames === "function"
+      ? { projectionNames: host.projectionNames.bind(candidate) }
       : {}),
     ...(typeof host.holdConsumers === "function" && typeof host.startConsumers === "function"
       ? {

@@ -31,7 +31,15 @@ export type TrpcContractMember<
   readonly cache?: TrpcCachePolicy;
   /** Committed events that make this read stale; the framework hints on each. */
   readonly invalidatedBy?: readonly TrpcReadInvalidation[];
+  /** Projections this read is served from; the host answers `unchanged` by their cursors. */
+  readonly fromProjection?: readonly TrpcProjectionSource[];
 }>;
+
+/**
+ * A projection a read is served from. A bare name is tenant-wide; `key` names the field of the
+ * read's input whose value addresses the projection's key row.
+ */
+export type TrpcProjectionSource = string | Readonly<{ projection: string; key: string }>;
 
 /**
  * An event that makes a read stale. A bare event type hints under the tenant the event was
@@ -39,10 +47,11 @@ export type TrpcContractMember<
  */
 export type TrpcReadInvalidation = string | Readonly<{ event: string; scope: string }>;
 
-/** A read's declared options: its cache policy and the committed events that make it stale. */
+/** A read's declared options: its cache policy, and what makes it stale (events or cursors). */
 export type TrpcReadOptions = Readonly<{
   cache?: TrpcCachePolicy;
   invalidatedBy?: readonly TrpcReadInvalidation[];
+  fromProjection?: readonly TrpcProjectionSource[];
 }>;
 
 /** The procedures of one namespace, keyed by the wire name. */
@@ -79,7 +88,10 @@ export interface TrpcContractBuilder<
   Namespace extends string,
   Members extends TrpcContractMembers,
 > {
-  /** A read; `cache` declares whether the browser mirrors it, `invalidatedBy` its stale events. */
+  /**
+   * A read; `cache` declares whether the browser mirrors it, `invalidatedBy` its stale events,
+   * `fromProjection` the projections whose cursors answer it (never beside `invalidatedBy`).
+   */
   query<Name extends string>(
     name: Name,
     options?: TrpcReadOptions,
@@ -146,6 +158,7 @@ function contractBuilder<Namespace extends string, Members extends TrpcContractM
       const cached = {
         ...(read.cache ? { cache: read.cache } : {}),
         ...(read.invalidatedBy ? { invalidatedBy: read.invalidatedBy } : {}),
+        ...(read.fromProjection ? { fromProjection: read.fromProjection } : {}),
       };
       const declared = { ...members, [name]: { kind, input, output: undefined, ...cached } };
 

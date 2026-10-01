@@ -34,6 +34,7 @@ import {
   buildModuleEventing,
   eventingHostFrom,
   installEventingMaintenance,
+  installProjectionReads,
   installReadHints,
   eventingConsumers,
   type EventingHost,
@@ -519,6 +520,7 @@ export class ApplicationBuilder<
       }
       installEventingMaintenance(eventing);
       installReadHints({ eventing, declared });
+      installProjectionReads({ eventing, declared });
       apis.ready();
       scope.own("feature API bindings", () => apis.close());
       // After every application exists, so a handler reaching a peer through

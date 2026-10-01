@@ -143,3 +143,28 @@ describe("a read naming the events that make it stale", () => {
     expect("invalidatedBy" in contract.members.getOrganizationWithMembers).toBe(false);
   });
 });
+
+describe("a read naming the projections it is served from", () => {
+  const contract = defineTrpcContract("runs")
+    .query("get", { fromProjection: [{ projection: "runState", key: "runId" }] })
+    .withInput(z.object({ projectId: z.string(), runId: z.string() }))
+    .withOutput(z.unknown())
+    .query("list", { fromProjection: ["runState"] })
+    .withInput(z.object({ projectId: z.string() }))
+    .withOutput(z.unknown())
+    .query("count")
+    .withInput(z.object({ projectId: z.string() }))
+    .withOutput(z.number())
+    .build();
+
+  /** @scenario "A read declares the projections it is served from" */
+  it("carries the projection with its key field, or without one for the tenant", () => {
+    expect(contract.members.get.fromProjection).toEqual([{ projection: "runState", key: "runId" }]);
+    expect(contract.members.list.fromProjection).toEqual(["runState"]);
+  });
+
+  /** @scenario "A read declares the projections it is served from" */
+  it("leaves a read that declares none without projections", () => {
+    expect("fromProjection" in contract.members.count).toBe(false);
+  });
+});

@@ -59,6 +59,10 @@ export {
   type PriorEventsQuery,
   type PriorEventsRead,
   readHintsOf,
+  projectionReadsOf,
+  ProjectionReadError,
+  type ProjectionReadMap,
+  type ProjectionReadTarget,
   type ReadHintMap,
   type ReadHintTarget,
 } from "./module-eventing.ts";
