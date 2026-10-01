@@ -37,7 +37,7 @@ describe("binding a server to a contract", () => {
   /** @scenario "A hand-rolled procedure middleware cannot claim a permission check" */
   it("refuses an unknown name, a repeat, an omission, a missing or doubled decision, a hand-rolled check and a wrong answer", () => {
     const directory = mkdtempSync(join(process.cwd(), ".tmp-trpc-router-"));
-    const contract = join(process.cwd(), "src/contract/index.ts");
+    const contract = join(process.cwd(), "../kernel/src/contract/index.ts");
     const router = join(process.cwd(), "src/trpc/runtime.ts");
     const path = join(directory, "refusals.ts");
 
