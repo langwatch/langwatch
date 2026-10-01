@@ -17,28 +17,10 @@ export const NUMERIC_OVERRIDE_FIELDS: NumericOverrideField[] = [
   "maxMessagesPerMonth",
 ];
 
-type MinimalUser = {
-  id?: string;
-  email?: string | null;
-  name?: string | null;
-  impersonator?: {
-    email?: string | null;
-  };
-};
-
-const isAdmin = (adminEmails: ReadonlySet<string>, user?: { email?: string | null }) => {
-  if (!user?.email) {
-    return false;
-  }
-
-  return adminEmails.has(user.email);
-};
-
 export class SaaSPlanProviderService extends BillingService {
   private constructor(
     private readonly subscriptions: BillingSubscriptionRepository,
     private readonly isSaas: boolean,
-    private readonly adminEmails: ReadonlySet<string>,
   ) {
     super();
   }
@@ -46,19 +28,13 @@ export class SaaSPlanProviderService extends BillingService {
   static create(options: {
     subscriptions: BillingSubscriptionRepository;
     isSaas: boolean;
-    adminEmails?: string | readonly string[];
   }): SaaSPlanProviderService {
-    const emails =
-      typeof options.adminEmails === "string"
-        ? options.adminEmails.split(",").map((value) => value.trim())
-        : (options.adminEmails ?? []);
-
-    return new SaaSPlanProviderService(options.subscriptions, options.isSaas, new Set(emails));
+    return new SaaSPlanProviderService(options.subscriptions, options.isSaas);
   }
 
-  async getActivePlan(organizationId: string, user?: MinimalUser): Promise<PlanInfo> {
-    const overrideAddingLimitations =
-      !!user?.impersonator && isAdmin(this.adminEmails, user.impersonator);
+  async getActivePlan(organizationId: string): Promise<PlanInfo> {
+    // BillingApp lifts the limits for an impersonating operator; this source never does.
+    const overrideAddingLimitations = false;
 
     // Unreachable through the wiring: a self-hosted deployment resolves its plan from the
     // license provider, and this one is only constructed on the SaaS branch. It answers the

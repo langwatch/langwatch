@@ -28,12 +28,6 @@ export type DeploymentPlanSourcesOptions = Readonly<{
    * The Stripe subscription rows a hosted paid plan is read from.
    */
   subscriptions?: BillingSubscriptionRepository;
-  /**
-   * The operator allow-list, for the ONE thing the subscription source does with it: an
-   * impersonating staff member sees the organization's real limitations rather than the
-   * override.
-   */
-  adminEmails?: readonly string[];
 }>;
 
 /** The plan sources a process resolves every allowance through. */
@@ -81,7 +75,6 @@ export class DeploymentPlanSourcesService {
       subscription: SubscriptionEntitlementSource.create({
         subscriptions: options.subscriptions,
         isSaas: options.isSaas,
-        adminEmails: options.adminEmails ?? [],
       }),
     };
   }
@@ -94,13 +87,11 @@ class SubscriptionEntitlementSource implements EntitlementSource {
   static create(options: {
     subscriptions: BillingSubscriptionRepository;
     isSaas: boolean;
-    adminEmails: readonly string[];
   }): SubscriptionEntitlementSource {
     return new SubscriptionEntitlementSource(
       SaaSPlanProviderService.create({
         subscriptions: options.subscriptions,
         isSaas: options.isSaas,
-        adminEmails: options.adminEmails,
       }),
     );
   }
@@ -110,7 +101,7 @@ class SubscriptionEntitlementSource implements EntitlementSource {
   async resolve(input: ResolvePlanInput): Promise<EntitlementGrant> {
     return {
       granted: true,
-      plan: await this.plans.getActivePlan(input.organizationId, input.user),
+      plan: await this.plans.getActivePlan(input.organizationId),
     };
   }
 }

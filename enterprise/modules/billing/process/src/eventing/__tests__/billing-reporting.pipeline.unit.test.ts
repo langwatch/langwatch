@@ -22,7 +22,7 @@ import {
 
 const peers: ConnectedBillingPeers = {
   licensing: createApiFixture<ConnectedBillingPeers["licensing"]>({}),
-  operators: { isAdmin: () => false },
+  authorization: { can: async () => false },
   auditLog: createApiFixture<ConnectedBillingPeers["auditLog"]>({}),
   organizations: createApiFixture<ConnectedBillingPeers["organizations"]>({}),
   gateway: createApiFixture<ConnectedBillingPeers["gateway"]>({}),

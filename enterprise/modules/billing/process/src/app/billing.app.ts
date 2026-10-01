@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   BillingApi,
@@ -40,7 +41,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
+import { AdminSurfaceHiddenError, type OpsOperatorPermission } from "@langwatch/ops-contract";
 import { OrganizationApi, type OrganizationCaller } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
@@ -137,7 +138,7 @@ type ConnectedLicensing = Pick<
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
 export type ConnectedBillingPeers = Readonly<{
   licensing: ConnectedLicensing;
-  operators: Pick<OpsApi, "isAdmin">;
+  authorization: Pick<AuthzApi, "can">;
   auditLog: Pick<AuditLogApi, "record">;
   organizations: ConnectedCustomerPeers["organizations"];
   gateway: ConnectedCustomerPeers["gateway"];
@@ -187,8 +188,8 @@ export class BillingApp
   static readonly dependencies = {
     /** The commit and the contract budget live on the license, not here. */
     licensing: LicensingApi,
-    /** The staff list the backoffice commands are checked against. */
-    operators: OpsApi,
+    /** The platform-operator grant the backoffice commands are checked against. */
+    authorization: AuthzApi,
     /** Which organizations are connected customers, and their projects. */
     organizations: OrganizationApi,
     /** The spend ledger a statement sums. */
@@ -383,7 +384,7 @@ export class BillingApp
       licensing: peers.licensing,
     });
     const gate = {
-      operators: peers.operators,
+      authorization: peers.authorization,
       auditLog: peers.auditLog,
       overview,
       subscriptionPlans: SaaSPlanProviderService.create({
@@ -695,7 +696,7 @@ export class BillingApp
   readonly #stripeWebhook: StripeWebhookReceiptService;
   readonly #subscriptions: SubscriptionDoor | undefined;
   readonly #connected: ConnectedBilling | undefined;
-  readonly #operators: Pick<OpsApi, "isAdmin">;
+  readonly #authorization: Pick<AuthzApi, "can">;
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #overview: ConnectedBillingOverviewService;
   readonly #subscriptionPlans: SaaSPlanProviderService;
@@ -711,7 +712,7 @@ export class BillingApp
     stripeWebhook,
     subscriptions,
     connected,
-    operators,
+    authorization,
     auditLog,
     overview,
     subscriptionPlans,
@@ -727,7 +728,7 @@ export class BillingApp
     stripeWebhook: StripeWebhookReceiptService;
     subscriptions: SubscriptionDoor | undefined;
     connected: ConnectedBilling | undefined;
-    operators: Pick<OpsApi, "isAdmin">;
+    authorization: Pick<AuthzApi, "can">;
     auditLog: Pick<AuditLogApi, "record">;
     overview: ConnectedBillingOverviewService;
     subscriptionPlans: SaaSPlanProviderService;
@@ -741,7 +742,7 @@ export class BillingApp
     this.#stripeWebhook = stripeWebhook;
     this.#subscriptions = subscriptions;
     this.#connected = connected;
-    this.#operators = operators;
+    this.#authorization = authorization;
     this.#auditLog = auditLog;
     this.#overview = overview;
     this.#subscriptionPlans = subscriptionPlans;
@@ -886,11 +887,14 @@ export class BillingApp
     organizationId,
     user,
   }: SubscriptionPlanInput): Promise<PlanInfo> {
-    const plan = await this.#subscriptionPlans.getActivePlan(organizationId, user);
+    const plan = await this.#subscriptionPlans.getActivePlan(organizationId);
+    const impersonatorId = user?.impersonator?.id;
 
     return {
       ...plan,
-      overrideAddingLimitations: !!user?.impersonator && this.#operators.isAdmin(user.impersonator),
+      overrideAddingLimitations:
+        !!impersonatorId &&
+        (await this.#isOperator({ userId: impersonatorId, permission: "ops:view" })),
     };
   }
 
@@ -898,7 +902,7 @@ export class BillingApp
     input: { organizationId: string },
     by: BillingStaff | null,
   ): Promise<ConnectedBillingOverview> {
-    const staff = this.#admitStaff(by);
+    const staff = await this.#admitStaff({ by, permission: "ops:view" });
     await this.#record({
       staff,
       action: "connectedBilling.get",
@@ -912,7 +916,7 @@ export class BillingApp
     input: ConnectedOnboardRequest,
     by: BillingStaff | null,
   ): Promise<ConnectedBillingAccountView> {
-    const staff = this.#admitStaff(by);
+    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const account = await this.#connectedBilling().billing.onboard({
       ...input,
       termStartsAt: Temporal.Instant.from(input.termStartsAt),
@@ -937,7 +941,7 @@ export class BillingApp
     input: ConnectedAddCommitRequest,
     by: BillingStaff | null,
   ): Promise<ConnectedCreditGrantView> {
-    const staff = this.#admitStaff(by);
+    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const grant = await this.#connectedBilling().billing.addCommit({
       ...input,
       operatorId: staff.id,
@@ -955,7 +959,7 @@ export class BillingApp
     input: ConnectedRenewRequest,
     by: BillingStaff | null,
   ): Promise<ConnectedBillingAccountView> {
-    const staff = this.#admitStaff(by);
+    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const account = await this.#connectedBilling().billing.renew({
       ...input,
       termStartsAt: Temporal.Instant.from(input.termStartsAt),
@@ -979,7 +983,7 @@ export class BillingApp
     input: { organizationId: string },
     by: BillingStaff | null,
   ): Promise<RenewalCompletion> {
-    const staff = this.#admitStaff(by);
+    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     const outcome = await this.#connectedBilling().billing.completeRenewalIfDue(input);
     await this.#record({
       staff,
@@ -994,7 +998,7 @@ export class BillingApp
     input: { stripeInvoiceId: string },
     by: BillingStaff | null,
   ): Promise<void> {
-    const staff = this.#admitStaff(by);
+    const staff = await this.#admitStaff({ by, permission: "ops:manage" });
     await this.#connectedBilling().billing.markPaidOutOfBand(input);
     await this.#auditLog.record({
       userId: staff.id,
@@ -1038,9 +1042,31 @@ export class BillingApp
   }
 
   /** The staff member, or a 404 that says nothing about why. */
-  #admitStaff(by: BillingStaff | null): BillingStaff {
-    if (!by || !this.#operators.isAdmin({ email: by.email })) throw new AdminSurfaceHiddenError();
+  async #admitStaff({
+    by,
+    permission,
+  }: {
+    by: BillingStaff | null;
+    permission: OpsOperatorPermission;
+  }): Promise<BillingStaff> {
+    if (!by || !(await this.#isOperator({ userId: by.id, permission }))) {
+      throw new AdminSurfaceHiddenError();
+    }
     return by;
+  }
+
+  #isOperator({
+    userId,
+    permission,
+  }: {
+    userId: string;
+    permission: OpsOperatorPermission;
+  }): Promise<boolean> {
+    return this.#authorization.can({
+      principal: { type: "user", id: userId },
+      permission,
+      scope: { type: "platform" },
+    });
   }
 
   /** Off Cloud nothing is invoiced; on Cloud a missing payment key is a deployment fault. */

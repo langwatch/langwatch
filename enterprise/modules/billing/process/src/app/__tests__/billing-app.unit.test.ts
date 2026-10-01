@@ -15,6 +15,7 @@ import { type ConnectedBillingPeers, BillingApp } from "../billing.app.ts";
 
 const ACME = "org-acme";
 const STAFF = { id: "user-operator", email: "ops@langwatch.example" };
+const VIEWER = { id: "user-viewer", email: "view@langwatch.example" };
 const CUSTOMER_ADMIN = { id: "user-customer", email: "admin@acme.example" };
 
 /** The license registry as billing reads it: terms agreed at a fixed commit. */
@@ -51,7 +52,14 @@ function licensedAt(commitUsdCents: number) {
         },
       ],
     }),
-    operators: { isAdmin: ({ email }) => email === STAFF.email },
+    authorization: {
+      can: async ({ principal, permission, scope }) =>
+        principal.type === "user" &&
+        scope.type === "platform" &&
+        ((principal.id === STAFF.id &&
+          (permission === "ops:manage" || permission === "ops:view")) ||
+          (principal.id === VIEWER.id && permission === "ops:view")),
+    },
     auditLog: createApiFixture<ConnectedBillingPeers["auditLog"]>({
       record: async (command) => {
         audited.push(command);
@@ -170,7 +178,7 @@ describe("the installed billing application", () => {
   });
 
   describe("given the backoffice", () => {
-    it("answers a caller off the staff list not found, saying nothing about why", async () => {
+    it("answers a caller without the platform-operator grant not found, saying nothing about why", async () => {
       const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
 
       await expect(
@@ -208,6 +216,37 @@ describe("the installed billing application", () => {
           },
         ],
       });
+    });
+
+    /** @scenario "A view-only operator reads the billing overview but is refused on every billing write" */
+    it("lets a view-only operator read the overview and refuses every write", async () => {
+      const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
+      const refused = { code: "not_found" };
+
+      await expect(
+        app.getConnectedBillingOverview({ organizationId: ACME }, VIEWER),
+      ).resolves.toMatchObject({ account: null });
+      await expect(
+        app.onboardConnectedCustomer(
+          {
+            ...renewal(100_00),
+            organizationName: "Acme",
+            billingEmail: "finance@acme.example",
+            bankTransfer: null,
+          },
+          VIEWER,
+        ),
+      ).rejects.toMatchObject(refused);
+      await expect(
+        app.addConnectedCommit({ organizationId: ACME, amountUsdCents: 100 }, VIEWER),
+      ).rejects.toMatchObject(refused);
+      await expect(app.renewConnectedTerm(renewal(100_00), VIEWER)).rejects.toMatchObject(refused);
+      await expect(
+        app.completeConnectedRenewalIfDue({ organizationId: ACME }, VIEWER),
+      ).rejects.toMatchObject(refused);
+      await expect(
+        app.markConnectedInvoicePaidOutOfBand({ stripeInvoiceId: "in_1" }, VIEWER),
+      ).rejects.toMatchObject(refused);
     });
 
     it("records who read a customer's billing, as main's backoffice did", async () => {
@@ -268,9 +307,15 @@ describe("the subscription plan billing answers entitlement", () => {
     await expect(
       app.getActiveSubscriptionPlan({
         organizationId: ACME,
-        user: { ...CUSTOMER_ADMIN, impersonator: { email: STAFF.email } },
+        user: { ...CUSTOMER_ADMIN, impersonator: { id: STAFF.id, email: STAFF.email } },
       }),
     ).resolves.toMatchObject({ type: "LAUNCH", free: false, overrideAddingLimitations: true });
+    await expect(
+      app.getActiveSubscriptionPlan({
+        organizationId: ACME,
+        user: { ...CUSTOMER_ADMIN, impersonator: { id: VIEWER.id, email: VIEWER.email } },
+      }),
+    ).resolves.toMatchObject({ overrideAddingLimitations: true });
     await expect(
       app.getActiveSubscriptionPlan({ organizationId: ACME, user: CUSTOMER_ADMIN }),
     ).resolves.toMatchObject({ type: "LAUNCH", overrideAddingLimitations: false });
