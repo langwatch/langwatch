@@ -66,7 +66,6 @@ export class MemorySecretRepository implements SecretRepository {
       id: generate(SECRET_KSUID_RESOURCE).toString(),
       projectId: input.projectId,
       name: input.name,
-      boundOrigin: input.boundOrigin ?? null,
       createdAt: now,
       updatedAt: now,
       createdBy: { name: null },
@@ -84,7 +83,6 @@ export class MemorySecretRepository implements SecretRepository {
 
     const secret = secretSchema.parse({
       ...row.secret,
-      boundOrigin: input.boundOrigin ?? row.secret.boundOrigin,
       updatedAt: toDate(nowInstant()),
     });
     this.#rows.set(secret.id, { secret, encryptedValue: input.encryptedValue });

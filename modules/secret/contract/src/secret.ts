@@ -39,16 +39,12 @@ export const secretValueSchema = z
 
 export const secretActorSchema = z.object({ name: z.string().nullable() }).strict();
 
-/** The one origin (scheme://host:port) an HTTP credential was saved for; absent resolves anywhere. */
-export const secretBoundOriginSchema = z.string().min(1);
-
 /** Safe metadata. The encrypted value is deliberately absent. */
 export const secretSchema = z
   .object({
     id: secretIdSchema,
     projectId: secretProjectIdSchema,
     name: storedSecretNameSchema,
-    boundOrigin: secretBoundOriginSchema.nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
     createdBy: secretActorSchema,
@@ -70,7 +66,6 @@ export const createSecretInputSchema = z
     projectId: secretProjectIdSchema,
     name: secretNameSchema,
     value: secretValueSchema,
-    boundOrigin: secretBoundOriginSchema.optional(),
     actorId: secretActorIdSchema,
   })
   .strict();
@@ -92,7 +87,6 @@ export const updateSecretInputSchema = z
     projectId: secretProjectIdSchema,
     id: secretIdSchema,
     value: secretValueSchema,
-    boundOrigin: secretBoundOriginSchema.optional(),
     actorId: secretActorIdSchema,
   })
   .strict();

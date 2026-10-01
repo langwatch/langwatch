@@ -16,7 +16,6 @@ const safeSecretSelect = {
   id: true,
   projectId: true,
   name: true,
-  boundOrigin: true,
   createdAt: true,
   updatedAt: true,
   createdBy: { select: { name: true } },
@@ -66,7 +65,6 @@ export class PrismaSecretRepository
           projectId: input.projectId,
           name: input.name,
           encryptedValue: input.encryptedValue,
-          boundOrigin: input.boundOrigin,
           createdById: input.actorId,
           updatedById: input.actorId,
         },
@@ -87,7 +85,6 @@ export class PrismaSecretRepository
         where: { id: input.id, projectId: input.projectId },
         data: {
           encryptedValue: input.encryptedValue,
-          boundOrigin: input.boundOrigin,
           updatedById: input.actorId,
         },
         select: safeSecretSelect,

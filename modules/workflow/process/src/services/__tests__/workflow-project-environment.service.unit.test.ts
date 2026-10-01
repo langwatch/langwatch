@@ -5,9 +5,9 @@ import { WorkflowProjectEnvironmentService } from "../workflow-project-environme
 
 type ProjectSecretQuery = {
   where: { projectId: string };
-  select: { name: true; encryptedValue: true; boundOrigin: true };
+  select: { name: true; encryptedValue: true };
 };
-type StoredSecret = { name: string; encryptedValue: string; boundOrigin: string | null };
+type StoredSecret = { name: string; encryptedValue: string };
 
 function projectEnvironment(input: { projectSecrets: StoredSecret[] }) {
   const projectSecretQueries: ProjectSecretQuery[] = [];
@@ -36,16 +36,11 @@ function projectEnvironment(input: { projectSecrets: StoredSecret[] }) {
 }
 
 describe("WorkflowProjectEnvironmentService over the Prisma repository", () => {
-  /** @scenario "A workflow run sends a saved credential only to the address it was saved for" */
-  it("decrypts each project-scoped secret and names the origin each bound one may reach", async () => {
+  it("decrypts each project-scoped secret", async () => {
     const environmentSeam = projectEnvironment({
       projectSecrets: [
-        { name: "OPENAI_API_KEY", encryptedValue: "encrypted-openai", boundOrigin: null },
-        {
-          name: "HTTP_AGENT_AUTH_TOKEN",
-          encryptedValue: "encrypted-agent",
-          boundOrigin: "https://agent.example.com",
-        },
+        { name: "OPENAI_API_KEY", encryptedValue: "encrypted-openai" },
+        { name: "HTTP_AGENT_AUTH_TOKEN", encryptedValue: "encrypted-agent" },
       ],
     });
 
@@ -54,7 +49,7 @@ describe("WorkflowProjectEnvironmentService over the Prisma repository", () => {
     expect(environmentSeam.projectSecretQueries).toEqual([
       {
         where: { projectId: "project-1" },
-        select: { name: true, encryptedValue: true, boundOrigin: true },
+        select: { name: true, encryptedValue: true },
       },
     ]);
     expect(environmentSeam.decryptedValues).toEqual(["encrypted-openai", "encrypted-agent"]);
@@ -63,7 +58,6 @@ describe("WorkflowProjectEnvironmentService over the Prisma repository", () => {
         OPENAI_API_KEY: "decrypted:encrypted-openai",
         HTTP_AGENT_AUTH_TOKEN: "decrypted:encrypted-agent",
       },
-      secretOrigins: { HTTP_AGENT_AUTH_TOKEN: "https://agent.example.com" },
     });
   });
 
@@ -72,7 +66,6 @@ describe("WorkflowProjectEnvironmentService over the Prisma repository", () => {
 
     await expect(environmentSeam.port.get({ projectId: "project-1" })).resolves.toEqual({
       secrets: {},
-      secretOrigins: {},
     });
     expect(environmentSeam.decryptedValues).toEqual([]);
   });

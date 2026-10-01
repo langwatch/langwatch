@@ -400,7 +400,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentCode:
 		return e.runCode(ctx, node, newNodeRun(req, inputs, ns))
 	case dsl.ComponentHTTP:
-		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets, req.Workflow.SecretOrigins)
+		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
 		return e.runSignature(ctx, node, inputs, ns)
 	case dsl.ComponentPromptingTechnique:
@@ -618,7 +618,7 @@ func nodeTimeout(params []dsl.Field) time.Duration {
 	return blocktimeout.FromMillis(paramInt(params, "timeout_ms"))
 }
 
-func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets, secretOrigins map[string]string) (map[string]any, *NodeError) {
+func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
 	if e.http == nil {
 		return nil, &NodeError{Type: "http_executor_unavailable", Message: "no http executor configured"}
 	}
@@ -626,12 +626,6 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 	headers := paramStringMap(node.Data.Parameters, "headers")
 	auth := paramAuth(node.Data.Parameters)
 	url := resolveSecretRefs(rawURL, secrets)
-	if sendsBoundSecretElsewhere(sentSecretTexts(rawURL, headers, auth), url, secretOrigins) {
-		return nil, &NodeError{
-			Type:    "agent_stored_credentials_destination_mismatch",
-			Message: "A stored credential is only sent to the address it was saved for. Enter the credentials again for this address.",
-		}
-	}
 	// Resolve `{{ secrets.NAME }}` in the URL, headers, and auth at
 	// request-build time. BodyTemplate is deliberately left unresolved:
 	// it is rendered against inputs and surfaced in execution events, so
@@ -1129,7 +1123,7 @@ func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	agentType := paramString(node.Data.Parameters, "agent_type")
 	switch agentType {
 	case "http":
-		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets, req.Workflow.SecretOrigins)
+		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "code":
 		return e.runCode(ctx, node, newNodeRun(req, inputs, ns))
 	case "workflow":

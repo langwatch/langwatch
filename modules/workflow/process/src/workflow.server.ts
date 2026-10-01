@@ -42,7 +42,6 @@ export const workflowServer = defineServerModule("workflow")
       agents: dependencies.agents,
       workflows: repositories.workflows,
       httpSecrets: WorkflowHttpSecretsService.create(dependencies.secrets),
-      secrets: dependencies.secrets,
     }),
   ])
   .withTransportFacts(({ dependencies }) => [

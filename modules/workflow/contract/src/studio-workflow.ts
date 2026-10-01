@@ -655,8 +655,6 @@ export type ServerWorkflow = StudioWorkflow & {
   workflow_id: string;
   project_id: string;
   secrets?: Record<string, string>;
-  /** The one origin each HTTP-minted secret may be sent to; the engine refuses any other. */
-  secret_origins?: Record<string, string>;
 };
 
 // Agent authoring contracts are owned by modules/agent/contract.

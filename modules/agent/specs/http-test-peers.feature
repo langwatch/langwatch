@@ -94,3 +94,10 @@ Feature: HTTP tests use the owning execution and trace APIs
     When it is updated to another scheme, host or port with a credential left blank
     Then the update is refused as a handled error and the agent is unchanged
     And the same update with every credential entered again is accepted
+
+  @unit
+  Scenario: A test call resolves only the secrets the saved agent references
+    Given a saved HTTP agent and other secrets in its project
+    When a test call for it references a secret its saved config does not
+    Then only the secrets the saved config references are sent to resolve the call
+    And the new reference resolves only once the agent is saved with it

@@ -11,11 +11,10 @@ import { WorkflowHttpSecretsService } from "../workflow-http-secrets.service.ts"
 
 const TOKEN = "tok_live_partner_123";
 
-const secretRow = (name: string, boundOrigin: string | null) => ({
+const secretRow = (name: string) => ({
   id: name,
   projectId: "project-1",
   name,
-  boundOrigin,
   createdAt: new Date(0),
   updatedAt: new Date(0),
   createdBy: { name: null },
@@ -24,21 +23,18 @@ const secretRow = (name: string, boundOrigin: string | null) => ({
 
 function build() {
   const values: Record<string, string> = {};
-  const origins: Record<string, string> = {};
   const writers: (string | undefined)[] = [];
-  const secrets: Pick<SecretApi, "getValues" | "list" | "create"> = {
+  const secrets: Pick<SecretApi, "getValues" | "create"> = {
     getValues: async () => ({ ...values }),
-    list: async () => Object.keys(values).map((name) => secretRow(name, origins[name] ?? null)),
     create: async (input, by) => {
       values[input.name] = input.value;
-      if (input.boundOrigin) origins[input.name] = input.boundOrigin;
       writers.push(by?.id);
 
-      return secretRow(input.name, input.boundOrigin ?? null);
+      return secretRow(input.name);
     },
   };
 
-  return { service: WorkflowHttpSecretsService.create(secrets), values, origins, writers };
+  return { service: WorkflowHttpSecretsService.create(secrets), values, writers };
 }
 
 function graphWithHttpNode(token: string): StudioWorkflow {
@@ -128,15 +124,6 @@ describe("a token typed into an HTTP node of a graph being saved", () => {
 
     expect(JSON.stringify(read)).not.toContain(TOKEN);
     expect(JSON.stringify(read)).toContain("{{ secrets.HTTP_PARTNER_API_AUTH_TOKEN }}");
-  });
-
-  /** @scenario "Saving an HTTP node's credential binds its secret to the node's address" */
-  it("binds the secret to the scheme, host and port the node calls", async () => {
-    const { service, origins } = build();
-
-    await store(service, TOKEN);
-
-    expect(origins).toEqual({ HTTP_PARTNER_API_AUTH_TOKEN: "https://partner.example" });
   });
 
   it("is stored once however often the same graph is saved", async () => {

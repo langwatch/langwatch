@@ -1531,10 +1531,9 @@ export interface WorkflowDslMigration {
   migrate(dsl: WorkflowDsl): WorkflowDsl;
 }
 
-/** A run's decrypted secrets, and the one origin each HTTP-minted secret may be sent to. */
+/** A run's decrypted secrets. */
 export type WorkflowRunEnvironment = {
   secrets: Record<string, string>;
-  secretOrigins: Record<string, string>;
 };
 
 /** Project credentials and decrypted secrets are application members. */

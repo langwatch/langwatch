@@ -31,20 +31,6 @@ func sameOrigin(a, b *url.URL) bool {
 	return aScheme == bScheme && aHost == bHost && aPort == bPort
 }
 
-// SameOrigin reports whether rawURL calls origin (scheme://host[:port]). A URL
-// that does not parse, or whose host still holds a template, calls no origin.
-func SameOrigin(rawURL, origin string) bool {
-	u, err := url.Parse(rawURL)
-	if err != nil || u.Host == "" || strings.ContainsAny(u.Host, "{}") {
-		return false
-	}
-	o, err := url.Parse(origin)
-	if err != nil || o.Host == "" {
-		return false
-	}
-	return sameOrigin(u, o)
-}
-
 // carriesCredentials reports whether a request sends anything a redirect
 // target must not receive: an auth config or any header beyond trace context.
 func carriesCredentials(req Request) bool {

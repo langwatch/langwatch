@@ -22,12 +22,11 @@ class FakeProjectEnvironment implements WorkflowProjectEnvironment {
 
   constructor(
     private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" },
-    private readonly secretOrigins: Record<string, string> = {},
   ) {}
 
   async get(input: { projectId: string }): Promise<WorkflowRunEnvironment> {
     this.projectIds.push(input.projectId);
-    return { secrets: this.secrets, secretOrigins: this.secretOrigins };
+    return { secrets: this.secrets };
   }
 }
 
@@ -278,20 +277,6 @@ describe("StudioWorkflowEventEnricherService", () => {
     if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
 
     expect(result.payload.workflow.secrets).toEqual({});
-  });
-
-  /** @scenario "A workflow run sends a saved credential only to the address it was saved for" */
-  it("tells the engine the one origin each bound secret may be sent to", async () => {
-    const projectEnvironment = new FakeProjectEnvironment(
-      { HTTP_AGENT_AUTH_TOKEN: "agent-token" },
-      { HTTP_AGENT_AUTH_TOKEN: "https://agent.example.com" },
-    );
-    const result = await createEnricher({}, projectEnvironment).enrich({ event: event(), projectId });
-    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
-
-    expect(result.payload.workflow).toMatchObject({
-      secret_origins: { HTTP_AGENT_AUTH_TOKEN: "https://agent.example.com" },
-    });
   });
 
   it("uses the requested project when loading multiple secrets", async () => {

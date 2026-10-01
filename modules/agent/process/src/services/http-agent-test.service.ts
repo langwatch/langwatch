@@ -21,7 +21,7 @@ import {
 } from "@langwatch/workflow-contract";
 
 import { httpSecretsKeepingStored, movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
-import { sendsBoundSecretElsewhere, withSecretValues } from "../rules/agent-test-destination.rules.ts";
+import { referencedSecretValues, withSecretValues } from "../rules/agent-test-destination.rules.ts";
 import {
   buildAgentTestTrace,
   buildTraceparentHeader,
@@ -44,14 +44,14 @@ type HttpAgentTestPeers = {
   workflows: WorkflowApi;
   traces: TraceApi;
   agents: Pick<AgentService, "getById">;
-  secrets: Pick<SecretApi, "getValues" | "list">;
+  secrets: Pick<SecretApi, "getValues">;
 };
 
 export class HttpAgentTestService {
   readonly #workflows: WorkflowApi;
   readonly #traces: TraceApi;
   readonly #agents: Pick<AgentService, "getById">;
-  readonly #secrets: Pick<SecretApi, "getValues" | "list">;
+  readonly #secrets: Pick<SecretApi, "getValues">;
 
   static create(peers: HttpAgentTestPeers): HttpAgentTestService {
     return new HttpAgentTestService(peers);
@@ -67,7 +67,6 @@ export class HttpAgentTestService {
   async execute(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {
     const values = await this.#secrets.getValues({ projectId: input.projectId });
     const { call: filled, secrets } = await this.#withStoredCredentials({ input, values });
-    await this.#refuseBoundSecretsElsewhere({ call: filled, values });
     const { projectId, agentId, bodyTemplate, templateVariables = {}, ...call } = filled;
     const traceIds = agentId ? generateTraceIds() : void 0;
     const traceparent = traceIds
@@ -133,8 +132,9 @@ export class HttpAgentTestService {
   }
 
   /**
-   * A saved agent's stored credentials fill the test's blank ones, and its project's secrets
-   * resolve the references, only where the address, references resolved, is the saved one.
+   * A saved agent's stored credentials fill the test's blank ones, and only the secrets its
+   * saved config references resolve, only where the address, references resolved, is the
+   * saved one.
    */
   async #withStoredCredentials<T extends HttpAgentTestInput>({
     input,
@@ -157,27 +157,8 @@ export class HttpAgentTestService {
 
     return {
       call: httpSecretsKeepingStored({ stored: stored.config, incoming: input }),
-      secrets: values,
+      secrets: referencedSecretValues({ referencing: stored.config, values }),
     };
-  }
-
-  /** A secret bound to one origin is never sent to another, whoever typed its reference. */
-  async #refuseBoundSecretsElsewhere({
-    call,
-    values,
-  }: {
-    call: HttpAgentTestInput;
-    values: Record<string, string>;
-  }): Promise<void> {
-    const origins: Record<string, string> = {};
-    for (const { name, boundOrigin } of await this.#secrets.list({ projectId: call.projectId })) {
-      if (boundOrigin) origins[name] = boundOrigin;
-    }
-    const sent = { url: call.url, headers: call.headers, auth: call.auth };
-    const url = withSecretValues({ text: call.url, values });
-    if (sendsBoundSecretElsewhere({ sent, url, origins })) {
-      throw new AgentStoredCredentialsDestinationError();
-    }
   }
 
   async #executeNode(input: {

@@ -70,7 +70,7 @@ const dsl = {
 const withAuthValue = (value: string) => ({
   nodes: [
     {
-      data: { parameters: [{}, {}, {}, { identifier: "auth_value", value }] },
+      data: { parameters: [{}, {}, {}, { identifier: "auth_value", value }, {}] },
     },
   ],
 });

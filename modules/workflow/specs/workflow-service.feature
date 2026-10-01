@@ -396,25 +396,3 @@ Feature: Workflow service boundary
     Given the credentials backfill has read a workflow version
     When a user saves that version before the backfill writes it
     Then the backfill skips the version and logs its id only
-
-  @unit
-  Scenario: A workflow run sends a saved credential only to the address it was saved for
-    Given a project secret was minted from an HTTP credential saved for one address
-    When Workflow enriches a Studio event for the project
-    Then the run tells the engine that address beside the secret's value
-    And the engine refuses an HTTP node that would send the secret anywhere else
-
-  @unit
-  Scenario: Saving an HTTP node's credential binds its secret to the node's address
-    Given a graph has an HTTP node with a credential typed in and a fixed address
-    When the graph is saved
-    Then the credential is stored as a project secret bound to that address
-    And a secret already holding the same value for another address is not reused
-
-  @unit
-  Scenario: The backfill binds each HTTP secret to the one address that sends it
-    Given a project secret minted from an HTTP credential, saved before secrets were bound
-    When the credentials backfill runs
-    Then the secret is bound to the one origin every agent and graph referencing it calls
-    And a secret sent to two origins, or to an address with no fixed origin, stays unbound and is logged by id only
-    And a secret created from the secrets screen is never bound

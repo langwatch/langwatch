@@ -22,7 +22,7 @@ async function savedHttpAgent(options: Parameters<typeof createAgentAppFixture>[
   const fixture = createAgentAppFixture({ secrets: store.secrets, ...options });
   const agent = await fixture.app.create({ projectId, name: "http", type: "http", config });
 
-  return { ...fixture, agent, values: store.values, origins: store.origins };
+  return { ...fixture, agent, values: store.values };
 }
 
 describe("AgentApp HTTP agent credentials", () => {
@@ -51,15 +51,6 @@ describe("AgentApp HTTP agent credentials", () => {
       headers: before.type === "http" ? before.config.headers : [],
       auth: before.type === "http" ? before.config.auth : {},
     });
-  });
-
-  /** @scenario A credential typed into an HTTP agent is bound to the agent's address */
-  it("binds each secret it stores to the agent's origin", async () => {
-    const { values, origins } = await savedHttpAgent();
-
-    expect(Object.keys(values)).toHaveLength(2);
-    expect(Object.keys(origins).sort()).toEqual(Object.keys(values).sort());
-    expect(new Set(Object.values(origins))).toEqual(new Set(["https://agent.test"]));
   });
 
   /** @scenario "Saving an HTTP agent with a new credential replaces the stored one" */
@@ -173,6 +164,22 @@ describe("AgentApp HTTP agent credentials", () => {
       expect(sent[0]).toContain("tenant-secret");
     });
 
+    /** @scenario A test call resolves only the secrets the saved agent references */
+    it("sends only the secrets the saved config references, never the rest of the project", async () => {
+      const { app, agent, sent, values } = await testingSavedAgent();
+      values.UNSAVED = "unsaved-secret";
+
+      await app.executeHttpTest({
+        ...blank,
+        agentId: agent.id,
+        url: config.url,
+        headers: [{ key: "X-Extra", value: "{{ secrets.UNSAVED }}" }],
+      });
+
+      expect(sent[0]).toContain("token-secret");
+      expect(sent[0]).not.toContain("unsaved-secret");
+    });
+
     /** @scenario A test call never traces a stored credential */
     it("traces the headers as typed, never the stored values", async () => {
       const { app, agent, spans } = await testingSavedAgent();
@@ -225,26 +232,6 @@ describe("AgentApp HTTP agent credentials", () => {
 
       expect(sent[0]).toContain("token-secret");
       expect(sent[0]).toContain("tenant-secret");
-    });
-
-    /** @scenario An agent test refuses to send a bound secret to another address */
-    it("refuses a typed reference to a bound secret at another address, saved agent or not", async () => {
-      const { app, agent, sent, values } = await testingSavedAgent();
-      const name = Object.keys(values).find((secret) => secret.endsWith("AUTH_TOKEN"));
-      const call = {
-        ...blank,
-        url: "https://elsewhere.test/chat",
-        auth: { type: "bearer" as const, token: `{{ secrets.${name} }}` },
-      };
-
-      await expect(app.executeHttpTest(call)).rejects.toMatchObject({
-        code: "agent_stored_credentials_destination_mismatch",
-        httpStatus: 422,
-      });
-      await expect(app.executeHttpTest({ ...call, agentId: agent.id })).rejects.toMatchObject({
-        code: "agent_stored_credentials_destination_mismatch",
-      });
-      expect(sent).toEqual([]);
     });
 
     /** @scenario "A test call with no saved agent fills nothing, and typed credentials are used as typed" */

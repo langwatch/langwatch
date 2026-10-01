@@ -181,8 +181,6 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
       ...this.config.workflow,
       api_key: this.projectApiKey,
       secrets: { ...existingSecrets, ...this.config.secrets },
-      // Replaced, never merged: the engine refuses an HTTP node sending a bound secret elsewhere.
-      secret_origins: this.config.secretOrigins ?? {},
       params: this.turnParameters(),
     };
 

@@ -215,31 +215,6 @@ function httpNodeOf(node: unknown) {
   return isHttp ? parsed.data : null;
 }
 
-const SECRET_REFERENCE_NAME = /\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
-
-/** Each secret an HTTP call references, paired with the origin the call sends it to; "" where
- * the address has no fixed origin. */
-export function secretReferralsOf(call: { url: unknown; fields: unknown }): [string, string][] {
-  const origin = typeof call.url === "string" ? (findOrigins(call.url)[0] ?? "") : "";
-  const text = JSON.stringify(call.fields) ?? "";
-
-  return [...text.matchAll(SECRET_REFERENCE_NAME)].flatMap(([, name]): [string, string][] =>
-    name ? [[name, origin]] : [],
-  );
-}
-
-/** Each secret a graph's HTTP nodes reference, paired with the origin each node sends it to. */
-export function httpNodeSecretReferralsOf(nodes: readonly unknown[]): [string, string][] {
-  return nodes.flatMap((node) => {
-    const http = httpNodeOf(node);
-    if (!http) return [];
-    const { parameters } = http.data;
-    const url = parameters.find(({ identifier }) => identifier === "url")?.value;
-
-    return secretReferralsOf({ url, fields: parameters });
-  });
-}
-
 /**
  * A graph with every HTTP node's literal credential stored as a project secret and
  * replaced by its `{{ secrets.NAME }}` reference.
@@ -258,12 +233,10 @@ export async function dslStoringHttpSecrets<Dsl extends { nodes?: unknown }>(inp
       stored.push(node);
       continue;
     }
-    const url = http.data.parameters.find(({ identifier }) => identifier === "url")?.value;
     const parameters = await httpNodeParametersStoringSecrets({
       parameters: http.data.parameters,
       // A saved agent's node names its secrets from the agent's id, as the agent does.
       owner: httpAgentNodeOf(node)?.agentId ?? http.data.name ?? http.id ?? "node",
-      origin: typeof url === "string" ? findOrigins(url)[0] : undefined,
       reference: input.reference,
     });
     stored.push({ ...http, data: { ...http.data, parameters } });

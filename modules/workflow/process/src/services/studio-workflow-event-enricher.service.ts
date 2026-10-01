@@ -123,7 +123,6 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
         api_key: apiKey,
         project_id: input.projectId,
         secrets: environment.secrets,
-        secret_origins: environment.secretOrigins,
         nodes: await this.enrichNodes({
           nodes: await this.withStoredAgentSecrets({
             nodes: studioWorkflow.nodes,

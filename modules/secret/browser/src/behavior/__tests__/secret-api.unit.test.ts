@@ -11,7 +11,6 @@ const ROW = {
   id: "secret-1",
   projectId: "proj-1",
   name: "OPENAI_API_KEY",
-  boundOrigin: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   createdBy: { name: "Jane" },

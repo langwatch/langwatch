@@ -6,18 +6,17 @@ import {
   type UpdateAgentCommand,
 } from "@langwatch/agent-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import { findOrigins } from "@langwatch/workflow-contract";
 
 import { nextAgentId } from "../rules/agent-id.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 
 type AgentHttpSecretsOptions = {
-  secrets: Pick<SecretApi, "getValues" | "list" | "create">;
+  secrets: Pick<SecretApi, "getValues" | "create">;
   agents: Pick<AgentService, "getById">;
 };
 
-/** Stores the token typed into an HTTP agent as a project secret named from the agent's id and
- * bound to the agent's origin, leaving its reference. */
+/** Stores the token typed into an HTTP agent as a project secret named from the agent's id,
+ * leaving its reference. */
 export class AgentHttpSecretsService {
   static create(options: AgentHttpSecretsOptions): AgentHttpSecretsService {
     return new AgentHttpSecretsService(options);
@@ -56,19 +55,10 @@ export class AgentHttpSecretsService {
     const { headers, auth } = await httpAgentConfigStoringSecrets({
       config: parsed.data,
       owner,
-      origin: findOrigins(parsed.data.url)[0],
       reference: createSecretReferencer({
         values: () => this.options.secrets.getValues({ projectId }),
-        origins: async () => {
-          const origins: Record<string, string> = {};
-          for (const { name, boundOrigin } of await this.options.secrets.list({ projectId })) {
-            if (boundOrigin) origins[name] = boundOrigin;
-          }
-
-          return origins;
-        },
-        create: async ({ name, value, boundOrigin }) => {
-          await this.options.secrets.create({ projectId, name, value, boundOrigin });
+        create: async ({ name, value }) => {
+          await this.options.secrets.create({ projectId, name, value });
         },
       }),
     });

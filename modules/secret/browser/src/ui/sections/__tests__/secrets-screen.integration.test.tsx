@@ -70,7 +70,6 @@ function secretRow(overrides: Record<string, unknown> = {}) {
     id: "secret-1",
     projectId: "proj-1",
     name: "OPENAI_API_KEY",
-    boundOrigin: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-02-01T00:00:00Z"),
     createdBy: { name: "Jane" },

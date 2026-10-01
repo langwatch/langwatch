@@ -30,10 +30,3 @@ func TestSameOrigin(t *testing.T) {
 		})
 	}
 }
-
-func TestSameOriginOfRawURL(t *testing.T) {
-	assert.True(t, SameOrigin("https://AGENT.test:443/chat?x=1", "https://agent.test"))
-	assert.False(t, SameOrigin("https://agent.test.evil.test/chat", "https://agent.test"))
-	assert.False(t, SameOrigin("https://{{host}}.agent.test/chat", "https://agent.test"))
-	assert.False(t, SameOrigin("not a url", "https://agent.test"))
-}

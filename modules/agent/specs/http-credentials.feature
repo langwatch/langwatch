@@ -49,15 +49,8 @@ Feature: HTTP agent credentials
     Then every credential value is blank and every other header is answered as typed
 
   @unit
-  Scenario: A credential typed into an HTTP agent is bound to the agent's address
-    Given an HTTP agent saved with a token typed inline and a fixed address
-    When the agent is created or updated
-    Then the token's project secret is bound to the address's scheme, host and port
-    And a secret holding the same token for another address is not reused
-    And an address with no fixed origin leaves the secret unbound
-
-  @unit
-  Scenario: An agent test refuses to send a bound secret to another address
-    Given a project secret bound to the address an HTTP agent was saved for
-    When a test call would send that secret to another scheme, host or port
-    Then the call is refused with agent_stored_credentials_destination_mismatch before any request
+  Scenario: A credential that only wraps secret references is kept as references
+    Given an HTTP credential such as "ApiKey {{ secrets.K }}", "key={{ secrets.K }}" or "{{ secrets.U }}:{{ secrets.P }}"
+    When the agent or graph holding it is saved
+    Then no new project secret is stored for it and it is kept as typed
+    And at run time each reference inside it resolves to its secret's value

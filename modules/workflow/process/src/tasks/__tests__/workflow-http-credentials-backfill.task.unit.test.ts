@@ -12,19 +12,17 @@ import { WorkflowHttpCredentialsBackfillTask } from "../workflow-http-credential
 const TOKEN = "tok_live_old_123";
 const at = new Date(0);
 
-const node = (id: string, token: string, url?: string) => ({
+const node = (id: string, token: string) => ({
   id,
   type: "http",
   data: {
     name: "Partner API",
     parameters: [
-      ...(url ? [{ identifier: "url", type: "str", value: url }] : []),
       { identifier: "auth_type", type: "str", value: "bearer" },
       { identifier: "auth_token", type: "str", value: token },
     ],
   },
 });
-const PARTNER_REFERENCE = "{{ secrets.HTTP_PARTNER_API_AUTH_TOKEN }}";
 
 const versionOf = (id: string, nodes: unknown[]): WorkflowVersion => ({
   id,
@@ -54,30 +52,20 @@ function build(
   } = {},
 ) {
   const secrets: Record<string, string> = { ...options.secrets };
-  const origins: Record<string, string> = {};
   const rewritten: VersionWrite[] = [];
   const attempted: VersionWrite[] = [];
   const agentUpdates: unknown[] = [];
   const latest = versionOf("v-latest", options.latestNodes ?? [node("n1", TOKEN)]);
   const published = versionOf("v-published", options.publishedNodes ?? [node("n1", TOKEN)]);
   const rowOf = (name: string) =>
-    createApiFixture<SecretRow>({ id: `id-${name}`, name, boundOrigin: origins[name] ?? null });
+    createApiFixture<SecretRow>({ id: `id-${name}`, name });
   const secretApi = createApiFixture<SecretApi>({
     getValues: async () => ({ ...secrets }),
-    list: async () => Object.keys(secrets).map(rowOf),
     create: async (input) => {
       if (Object.keys(secrets).length >= (options.limit ?? 50)) throw new Error("secret limit");
       secrets[input.name] = input.value;
-      if (input.boundOrigin) origins[input.name] = input.boundOrigin;
 
       return rowOf(input.name);
-    },
-    update: async (input) => {
-      const name = input.id.replace(/^id-/, "");
-      secrets[name] = input.value;
-      if (input.boundOrigin) origins[name] = input.boundOrigin;
-
-      return rowOf(name);
     },
   });
   const task = WorkflowHttpCredentialsBackfillTask.create({
@@ -127,10 +115,9 @@ function build(
       },
     },
     httpSecrets: WorkflowHttpSecretsService.create(secretApi),
-    secrets: secretApi,
   });
 
-  return { task, secrets, origins, rewritten, attempted, agentUpdates };
+  return { task, secrets, rewritten, attempted, agentUpdates };
 }
 
 const run = (task: WorkflowHttpCredentialsBackfillTask) =>
@@ -177,35 +164,5 @@ describe("moving credentials typed inline before they became project secrets", (
 
     expect(attempted.map((write) => write.updatedAt)).toEqual([at, at]);
     expect(rewritten).toEqual([]);
-  });
-
-  /** @scenario "The backfill binds each HTTP secret to the one address that sends it" */
-  it("binds an existing HTTP secret to the one origin every node sends it to", async () => {
-    const { task, origins, secrets } = build({
-      secrets: { HTTP_PARTNER_API_AUTH_TOKEN: TOKEN },
-      latestNodes: [node("n1", PARTNER_REFERENCE, "https://partner.example/v1")],
-      publishedNodes: [node("n1", PARTNER_REFERENCE, "https://partner.example/v2")],
-    });
-
-    await run(task);
-
-    expect(origins).toEqual({ HTTP_PARTNER_API_AUTH_TOKEN: "https://partner.example" });
-    expect(secrets).toEqual({ HTTP_PARTNER_API_AUTH_TOKEN: TOKEN });
-  });
-
-  /** @scenario "The backfill binds each HTTP secret to the one address that sends it" */
-  it("leaves unbound a secret two origins send, and one the secrets screen named", async () => {
-    const { task, origins } = build({
-      secrets: { HTTP_PARTNER_API_AUTH_TOKEN: TOKEN, PARTNER_TOKEN: "typed on the screen" },
-      latestNodes: [node("n1", PARTNER_REFERENCE, "https://partner.example")],
-      publishedNodes: [
-        node("n1", PARTNER_REFERENCE, "https://other.example"),
-        node("n2", "{{ secrets.PARTNER_TOKEN }}", "https://partner.example"),
-      ],
-    });
-
-    await run(task);
-
-    expect(origins).toEqual({});
   });
 });

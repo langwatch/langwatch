@@ -8,7 +8,6 @@
 export type StoredProjectSecret = Readonly<{
   name: string;
   encryptedValue: string;
-  boundOrigin: string | null;
 }>;
 
 /** A project's stored run environment, before any value is decrypted. */

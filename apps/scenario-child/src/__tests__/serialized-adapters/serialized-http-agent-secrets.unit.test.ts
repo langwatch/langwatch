@@ -504,32 +504,4 @@ describe("SerializedHttpAgentAdapter run parameters", () => {
       expect(requestedBody()).toBe('{"tier": "platinum"}');
     });
   });
-
-  describe("given a project secret bound to the address it was saved for", () => {
-    const bound = {
-      headers: [{ key: "Authorization", value: "Bearer {{ secrets.AGENT_TOKEN }}" }],
-      secretOrigins: { AGENT_TOKEN: "https://api.example.com" },
-    };
-
-    /** @scenario "A scenario run sends a saved credential only to the address it was saved for" */
-    it("refuses a turn that would send it to another origin, before any request", async () => {
-      const adapter = createMockHttpAgentAdapter({
-        config: config({ ...bound, url: "https://elsewhere.example.com/chat" }),
-      });
-
-      await expect(adapter.call(input)).rejects.toMatchObject({
-        code: "agent_stored_credentials_destination_mismatch",
-      });
-      expect(mockSsrfSafeFetch).not.toHaveBeenCalled();
-    });
-
-    /** @scenario "A scenario run sends a saved credential only to the address it was saved for" */
-    it("sends it to its own origin", async () => {
-      const adapter = createMockHttpAgentAdapter({ config: config(bound) });
-
-      await adapter.call(input);
-
-      expect(requestedHeaders().Authorization).toBe(`Bearer ${SECRET_VALUE}`);
-    });
-  });
 });

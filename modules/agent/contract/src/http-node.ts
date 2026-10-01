@@ -134,16 +134,19 @@ function inReferenceSpelling(value: string): string {
   return `${scheme}{{ secrets.${match[2]} }}`;
 }
 
-const SECRET_REFERENCE = /\{\{\s*secrets\.[A-Z][A-Z0-9_]*\s*\}\}/g;
-const AUTH_SCHEME = /^(bearer|basic|token)?$/i;
+const REFERENCE = String.raw`\{\{\s*secrets\.[A-Z][A-Z0-9_]*\s*\}\}`;
+/** References joined only by separators, behind at most one scheme word (`ApiKey `, `key=`). */
+const SCHEMED_REFERENCES = new RegExp(
+  String.raw`^(?:[A-Za-z]{1,20}[\s:=]+)?${REFERENCE}(?:[\s:=]*${REFERENCE})*$`,
+);
 
-/** A value that is not blank and holds more than `{{ secrets.NAME }}` references and a scheme. */
+/** A value that is not blank and holds more than `{{ secrets.NAME }}` references, a scheme
+ * word and separators (`:`, `=`, spaces). */
 export function holdsLiteralCredential(value: string): boolean {
   const text = value.trim();
   if (text === "" || secretReferenceOf(inReferenceSpelling(text)) !== undefined) return false;
-  const rest = text.replace(SECRET_REFERENCE, "").trim();
 
-  return rest === text || !AUTH_SCHEME.test(rest);
+  return !SCHEMED_REFERENCES.test(text);
 }
 
 /** The value as a read may answer it: a reference, in its stored spelling, never a credential. */
@@ -259,21 +262,11 @@ export function httpNodeParametersKeepingStored<Parameter extends NodeParameter>
 
 export type SecretWriter = {
   values(): Promise<Readonly<Record<string, string>>>;
-  /** The origin each bound secret was saved for; a secret that resolves anywhere is absent. */
-  origins(): Promise<Readonly<Record<string, string>>>;
-  create(input: { name: string; value: string; boundOrigin?: string }): Promise<void>;
+  create(input: { name: string; value: string }): Promise<void>;
 };
 
-/** Stores one credential as a project secret, bound to `origin` when there is one, and answers
- * the reference that replaces it. */
-export type SecretReferencer = (input: {
-  owner: string;
-  field: string;
-  value: string;
-  origin?: string;
-}) => Promise<string>;
-
-type StoredSecret = { value: string; origin: string | undefined };
+/** Stores one credential as a project secret and answers the reference that replaces it. */
+export type SecretReferencer = (input: { owner: string; field: string; value: string }) => Promise<string>;
 
 function upperSnake(text: string): string {
   return text
@@ -284,18 +277,10 @@ function upperSnake(text: string): string {
 
 const MAX_NAME_ATTEMPTS = 3;
 
-function holds(stored: StoredSecret | undefined, wanted: StoredSecret): boolean {
-  return stored?.value === wanted.value && stored.origin === wanted.origin;
-}
-
-/** The base name, or the first numbered one that is free or already holds the value for the origin. */
-function freeName(input: {
-  names: ReadonlyMap<string, StoredSecret>;
-  base: string;
-  wanted: StoredSecret;
-}): string {
+/** The base name, or the first numbered one that is free or already holds the value. */
+function freeName(input: { names: ReadonlyMap<string, string>; base: string; value: string }): string {
   let name = input.base;
-  for (let suffix = 2; input.names.has(name) && !holds(input.names.get(name), input.wanted); suffix++) {
+  for (let suffix = 2; input.names.has(name) && input.names.get(name) !== input.value; suffix++) {
     name = `${input.base}_${suffix}`;
   }
 
@@ -304,63 +289,48 @@ function freeName(input: {
 
 /**
  * Names each secret HTTP_<OWNER>_<FIELD>, with a numeric suffix where the name is taken. A name
- * holding the same value for the same origin is reused, so saving the same token stores nothing.
+ * already holding the same value is reused, so saving the same token stores nothing.
  */
 export function createSecretReferencer(writer: SecretWriter): SecretReferencer {
-  let known: Map<string, StoredSecret> | undefined;
-  const reread = async (): Promise<Map<string, StoredSecret>> => {
-    const [values, origins] = await Promise.all([writer.values(), writer.origins()]);
-    known = new Map(
-      Object.entries(values).map(([name, value]): [string, StoredSecret] => [
-        name,
-        { value, origin: Object.hasOwn(origins, name) ? origins[name] : undefined },
-      ]),
-    );
+  let known: Map<string, string> | undefined;
+  const reread = async (): Promise<Map<string, string>> => {
+    known = new Map(Object.entries(await writer.values()));
 
     return known;
   };
-  const store = async (input: {
-    base: string;
-    wanted: StoredSecret;
-    attempt: number;
-  }): Promise<string> => {
+  const store = async (input: { base: string; value: string; attempt: number }): Promise<string> => {
     const names = known ?? (await reread());
-    const name = freeName({ names, base: input.base, wanted: input.wanted });
-    if (holds(names.get(name), input.wanted)) return `{{ secrets.${name} }}`;
-    const { value, origin } = input.wanted;
+    const name = freeName({ names, base: input.base, value: input.value });
+    if (names.get(name) === input.value) return `{{ secrets.${name} }}`;
     try {
-      await writer.create({ name, value, ...(origin ? { boundOrigin: origin } : {}) });
+      await writer.create({ name, value: input.value });
     } catch (error) {
       // A concurrent first save may have taken the name: re-read, then reuse it or number on.
       if (input.attempt >= MAX_NAME_ATTEMPTS || !(await reread()).has(name)) throw error;
 
       return store({ ...input, attempt: input.attempt + 1 });
     }
-    names.set(name, input.wanted);
+    names.set(name, input.value);
 
     return `{{ secrets.${name} }}`;
   };
 
-  return ({ owner, field, value, origin }) =>
+  return ({ owner, field, value }) =>
     store({
       base: ["HTTP", upperSnake(owner), upperSnake(field)].filter(Boolean).join("_"),
-      wanted: { value, origin },
+      value,
       attempt: 1,
     });
 }
 
 type CredentialStorer = (field: string, value: string) => Promise<string>;
 
-function credentialStorer(input: {
-  owner: string;
-  origin?: string;
-  reference: SecretReferencer;
-}): CredentialStorer {
-  const { owner, origin, reference } = input;
+function credentialStorer(input: { owner: string; reference: SecretReferencer }): CredentialStorer {
+  const { owner, reference } = input;
 
   return async (field, value) =>
     holdsLiteralCredential(value)
-      ? reference({ owner, field, value, origin })
+      ? reference({ owner, field, value })
       : inReferenceSpelling(value);
 }
 
@@ -412,12 +382,10 @@ async function parameterStoringSecrets<Parameter extends NodeParameter>(input: {
   return { ...parameter, value: Object.fromEntries(stored) };
 }
 
-/** An HTTP node's parameters with each literal credential stored as a project secret, bound to
- * `origin` when the node's address has one. */
+/** An HTTP node's parameters with each literal credential stored as a project secret. */
 export async function httpNodeParametersStoringSecrets<Parameter extends NodeParameter>(input: {
   parameters: readonly Parameter[];
   owner: string;
-  origin?: string;
   reference: SecretReferencer;
 }): Promise<Parameter[]> {
   const store = credentialStorer(input);
@@ -446,14 +414,12 @@ async function authStoringSecrets(input: {
   }
 }
 
-/** An HTTP agent's config with each literal credential stored as a project secret, bound to
- * `origin` when the agent's address has one. */
+/** An HTTP agent's config with each literal credential stored as a project secret. */
 export async function httpAgentConfigStoringSecrets<
   Config extends Pick<HttpAgentConfig, "headers" | "auth">,
 >(input: {
   config: Config;
   owner: string;
-  origin?: string;
   reference: SecretReferencer;
 }): Promise<Config> {
   const store = credentialStorer(input);

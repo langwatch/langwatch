@@ -28,7 +28,6 @@ function row(input: Partial<Secret> = {}): Secret {
     id: "secret-1",
     projectId: "project-1",
     name: "OPENAI_API_KEY",
-    boundOrigin: null,
     createdAt: NOW,
     updatedAt: NOW,
     createdBy: { name: "Alex" },
@@ -187,25 +186,6 @@ describe("SecretService", () => {
       encryptedValue: "encrypted(rotated)",
       actorId: "user-2",
     });
-  });
-
-  /** @scenario "A secret minted from an HTTP credential keeps the address it was saved for" */
-  it("hands the address a credential was saved for to persistence", async () => {
-    const { repository, service } = createService();
-
-    await service.create(
-      {
-        projectId: "project-1",
-        name: "HTTP_AGENT_TOKEN",
-        value: "value",
-        boundOrigin: "https://agent.example.com",
-      },
-      { id: "user-2" },
-    );
-
-    expect(repository.createCall).toHaveBeenCalledWith(
-      expect.objectContaining({ boundOrigin: "https://agent.example.com" }),
-    );
   });
 
   describe("when no caller is named, as for a legacy project key", () => {

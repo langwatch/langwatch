@@ -12,24 +12,18 @@ import {
   withoutLiteralCredential,
 } from "../http-node.ts";
 
-function secretStore(
-  initial: Record<string, string> = {},
-  initialOrigins: Record<string, string> = {},
-) {
+function secretStore(initial: Record<string, string> = {}) {
   const values = { ...initial };
-  const origins = { ...initialOrigins };
   const created: string[] = [];
   const reference = createSecretReferencer({
     values: async () => values,
-    origins: async () => origins,
-    create: async ({ name, value, boundOrigin }) => {
+    create: async ({ name, value }) => {
       created.push(name);
       values[name] = value;
-      if (boundOrigin) origins[name] = boundOrigin;
     },
   });
 
-  return { reference, values, origins, created };
+  return { reference, values, created };
 }
 
 describe("a credential typed into an HTTP node", () => {
@@ -38,6 +32,27 @@ describe("a credential typed into an HTTP node", () => {
       expect(holdsLiteralCredential("")).toBe(false);
       expect(holdsLiteralCredential("{{ secrets.PARTNER_TOKEN }}")).toBe(false);
       expect(holdsLiteralCredential("Bearer {{secrets.PARTNER_TOKEN}}")).toBe(false);
+    });
+
+    /** @scenario A credential that only wraps secret references is kept as references */
+    it("treats references behind a scheme word or joined by separators as references", () => {
+      expect(holdsLiteralCredential("ApiKey {{ secrets.K }}")).toBe(false);
+      expect(holdsLiteralCredential("key={{ secrets.K }}")).toBe(false);
+      expect(holdsLiteralCredential("{{ secrets.U }}:{{ secrets.P }}")).toBe(false);
+      expect(holdsLiteralCredential("Basic {{ secrets.U }}:{{ secrets.P }}")).toBe(false);
+    });
+
+    /** @scenario A credential that only wraps secret references is kept as references */
+    it("stores nothing for such a value and keeps it as typed", async () => {
+      const { reference, created } = secretStore();
+      const config = await httpAgentConfigStoringSecrets({
+        config: { headers: [{ key: "Authorization", value: "ApiKey {{ secrets.K }}" }] },
+        owner: "api",
+        reference,
+      });
+
+      expect(created).toEqual([]);
+      expect(config.headers).toEqual([{ key: "Authorization", value: "ApiKey {{ secrets.K }}" }]);
     });
 
     it("treats a token, even beside a reference, as a literal", () => {
@@ -189,7 +204,6 @@ describe("a credential typed into an HTTP node", () => {
       let raced = false;
       const reference = createSecretReferencer({
         values: async () => ({ ...values }),
-        origins: async () => ({}),
         create: async ({ name, value }) => {
           if (!raced) {
             raced = true;
@@ -218,34 +232,6 @@ describe("a credential typed into an HTTP node", () => {
       expect(first).toBe("{{ secrets.HTTP_API_AUTH_TOKEN_2 }}");
       expect(again).toBe(first);
       expect(created).toEqual(["HTTP_API_AUTH_TOKEN_2"]);
-    });
-  });
-
-  describe("when the credential is saved for an address", () => {
-    /** @scenario A credential typed into an HTTP agent is bound to the agent's address */
-    it("binds the secret to the address and never reuses one bound elsewhere", async () => {
-      const { reference, origins, created } = secretStore(
-        { HTTP_API_AUTH_TOKEN: "mine" },
-        { HTTP_API_AUTH_TOKEN: "https://other.example.com" },
-      );
-      const origin = "https://agent.example.com";
-
-      const first = await reference({ owner: "api", field: "auth_token", value: "mine", origin });
-      const again = await reference({ owner: "api", field: "auth_token", value: "mine", origin });
-
-      expect(first).toBe("{{ secrets.HTTP_API_AUTH_TOKEN_2 }}");
-      expect(again).toBe(first);
-      expect(created).toEqual(["HTTP_API_AUTH_TOKEN_2"]);
-      expect(origins.HTTP_API_AUTH_TOKEN_2).toBe(origin);
-    });
-
-    it("leaves a secret unbound when the address has no origin to bind to", async () => {
-      const { reference, origins, created } = secretStore();
-
-      await reference({ owner: "api", field: "auth_token", value: "mine" });
-
-      expect(created).toEqual(["HTTP_API_AUTH_TOKEN"]);
-      expect(origins).toEqual({});
     });
   });
 

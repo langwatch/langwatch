@@ -182,20 +182,6 @@ export class ScenarioTargetPrefetchService {
     };
   }
 
-  /** The one origin each project secret minted from an HTTP credential may be sent to; a value
-   * the run supplies under the same name is the run's own, and unbound. */
-  private async secretOrigins(
-    projectId: string,
-    runSecretValues: Record<string, string>,
-  ): Promise<Record<string, string>> {
-    const origins: Record<string, string> = {};
-    for (const { name, boundOrigin } of await this.options.secrets.list({ projectId })) {
-      if (boundOrigin && !Object.hasOwn(runSecretValues, name)) origins[name] = boundOrigin;
-    }
-
-    return origins;
-  }
-
   private async fetchPromptTarget(
     projectId: string,
     promptId: string,
@@ -264,7 +250,6 @@ export class ScenarioTargetPrefetchService {
       sessionPath: config.sessionPath,
       scenarioMappings: config.scenarioMappings,
       secrets: secretValues,
-      secretOrigins: await this.secretOrigins(projectId, runSecretValues),
     };
   }
 
@@ -381,7 +366,6 @@ export class ScenarioTargetPrefetchService {
       scenarioMappings: config.scenarioMappings,
       scenarioOutputField: config.scenarioOutputField,
       secrets: secretValues,
-      secretOrigins: await this.secretOrigins(projectId, runSecretValues),
     };
 
     this.workflowMappings.validate(data);

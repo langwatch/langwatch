@@ -27,10 +27,9 @@ export class WorkflowProjectEnvironmentService implements WorkflowProjectEnviron
 
   async get(input: { projectId: string }): Promise<WorkflowRunEnvironment> {
     const stored = await this.options.repository.findEnvironment(input);
-    const environment: WorkflowRunEnvironment = { secrets: {}, secretOrigins: {} };
-    for (const { name, encryptedValue, boundOrigin } of stored.secrets) {
+    const environment: WorkflowRunEnvironment = { secrets: {} };
+    for (const { name, encryptedValue } of stored.secrets) {
       environment.secrets[name] = this.options.encryption.decrypt(encryptedValue);
-      if (boundOrigin) environment.secretOrigins[name] = boundOrigin;
     }
 
     return environment;

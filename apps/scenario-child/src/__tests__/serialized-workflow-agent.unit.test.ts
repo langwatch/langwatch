@@ -248,27 +248,6 @@ describe("SerializedWorkflowAgentAdapter", () => {
       });
     });
 
-    /** @scenario "A scenario run sends a saved credential only to the address it was saved for" */
-    it("tells the engine the one origin each bound secret may reach, replacing any the DSL holds", async () => {
-      const adapter = new HttpSerializedWorkflowAgentChannel({
-        config: {
-          ...defaultConfig,
-          workflow: { ...defaultDsl, secret_origins: { HTTP_AGENT_TOKEN: "https://elsewhere.test" } },
-          secrets: { HTTP_AGENT_TOKEN: "tok" },
-          secretOrigins: { HTTP_AGENT_TOKEN: "https://agent.test" },
-        },
-        nlpServiceUrl,
-        projectApiKey: apiKey,
-      });
-
-      await adapter.call(defaultInput);
-
-      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
-      expect(callBody.payload.workflow.secret_origins).toEqual({
-        HTTP_AGENT_TOKEN: "https://agent.test",
-      });
-    });
-
     it("passes the pre-fetched workflow DSL through unchanged", async () => {
       const adapter = new HttpSerializedWorkflowAgentChannel({
         config: defaultConfig,

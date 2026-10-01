@@ -54,10 +54,10 @@ describe("saved HTTP agent nodes in a graph", () => {
     const blanked = dslWithoutHttpAgentSecrets(dsl);
 
     expect(blanked.nodes[0]).toMatchObject({
-      data: { parameters: [{}, { value: "bearer" }, { identifier: "auth_token", value: "" }] },
+      data: { parameters: [{}, { value: "bearer" }, { identifier: "auth_token", value: "" }, {}] },
     });
     expect(blanked.nodes[1]).toMatchObject({
-      data: { parameters: [{}, {}, { identifier: "auth_token", value: "" }] },
+      data: { parameters: [{}, {}, { identifier: "auth_token", value: "" }, {}] },
     });
   });
 
@@ -91,10 +91,10 @@ describe("saved HTTP agent nodes in a graph", () => {
     });
 
     expect(filled.nodes[0]).toMatchObject({
-      data: { parameters: [{}, {}, { identifier: "auth_token", value: "stored-token" }] },
+      data: { parameters: [{}, {}, { identifier: "auth_token", value: "stored-token" }, {}] },
     });
     expect(filled.nodes[1]).toMatchObject({
-      data: { parameters: [{}, {}, { identifier: "auth_token", value: "" }] },
+      data: { parameters: [{}, {}, { identifier: "auth_token", value: "" }, {}] },
     });
   });
 

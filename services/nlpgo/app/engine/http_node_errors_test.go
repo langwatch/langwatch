@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,7 +55,6 @@ func TestRunHTTP_RefusedDestinationReportsItsOwnCode(t *testing.T) {
 		map[string]any{},
 		ns,
 		nil,
-		nil,
 	)
 
 	require.NotNil(t, nodeErr)
@@ -86,7 +84,6 @@ func TestRunHTTP_RecordsWhatTheEndpointAnswered(t *testing.T) {
 		map[string]any{},
 		ns,
 		nil,
-		nil,
 	)
 
 	require.Nil(t, nodeErr)
@@ -95,44 +92,4 @@ func TestRunHTTP_RecordsWhatTheEndpointAnswered(t *testing.T) {
 	assert.Equal(t, "OK", ns.HTTP.StatusText)
 	assert.Contains(t, ns.HTTP.ResponseHeaders["Content-Type"], "application/json",
 		"response headers reach the author")
-}
-
-// A secret minted from an HTTP credential is bound to the origin it was saved
-// for. A node that would send it anywhere else is refused before any dial.
-func TestRunHTTP_RefusesABoundSecretSentToAnotherOrigin(t *testing.T) {
-	var dialed atomic.Bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		dialed.Store(true)
-		_, _ = w.Write([]byte(`{}`))
-	}))
-	defer srv.Close()
-
-	eng := New(Options{
-		HTTP: httpblock.New(httpblock.Options{
-			SSRF: httpblock.SSRFOptions{AllowLocal: true},
-		}),
-	})
-	node := httpNode(srv.URL + "/?key={{ secrets.HTTP_AGENT_KEY }}")
-	secrets := map[string]string{"HTTP_AGENT_KEY": "k-123"}
-
-	t.Run("when the node calls another origin it refuses by code", func(t *testing.T) {
-		ns := &NodeState{ID: "http"}
-		origins := map[string]string{"HTTP_AGENT_KEY": "https://agent.example.com"}
-
-		_, nodeErr := eng.runHTTP(context.Background(), node, map[string]any{}, ns, secrets, origins)
-
-		require.NotNil(t, nodeErr)
-		assert.Equal(t, "agent_stored_credentials_destination_mismatch", nodeErr.Type)
-		assert.False(t, dialed.Load(), "the endpoint is never dialed")
-	})
-
-	t.Run("when the node calls the bound origin it sends the request", func(t *testing.T) {
-		ns := &NodeState{ID: "http"}
-		origins := map[string]string{"HTTP_AGENT_KEY": srv.URL}
-
-		_, nodeErr := eng.runHTTP(context.Background(), node, map[string]any{}, ns, secrets, origins)
-
-		require.Nil(t, nodeErr)
-		assert.True(t, dialed.Load())
-	})
 }

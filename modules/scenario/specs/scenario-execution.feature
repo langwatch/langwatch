@@ -107,11 +107,3 @@ Feature: Isolated Scenario execution
     Then the sandbox gets a key for the run's starter, or the system, holding only agentCache:manage
     And no key is shared across the project's runs or kept in Redis
     And a run whose sandbox key cannot be minted still runs without the agent cache
-
-  @unit
-  Scenario: A scenario run sends a saved credential only to the address it was saved for
-    Given a project secret minted from an HTTP credential, bound to the address it was saved for
-    When a scenario run prepares an HTTP or workflow agent target
-    Then the child payload carries that address beside the secret's value
-    And a value the run supplies under the same name is not bound
-    And the HTTP target refuses a turn that would send the secret to another scheme, host or port
