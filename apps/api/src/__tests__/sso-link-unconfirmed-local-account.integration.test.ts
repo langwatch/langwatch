@@ -118,7 +118,7 @@ async function bootInstallation({ cloud }: { cloud: boolean }) {
         idempotency: { claim: async () => true },
         rateLimiter: { check: async () => ({ allowed: true }) },
         eventing,
-        redis: memoryRedisDouble(),
+        redis: rateLimitingRedis(),
         publicBaseUrl: config.process.baseHost,
         serviceVersion: "test",
         telemetryExporter: {
@@ -130,7 +130,6 @@ async function bootInstallation({ cloud }: { cloud: boolean }) {
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        adminEmails: config.process.adminEmails,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-api",
         storageResolver: void 0,
@@ -159,9 +158,9 @@ async function bootInstallation({ cloud }: { cloud: boolean }) {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -476,6 +475,17 @@ async function setUp({
     issuer,
   });
   return { user, providerId };
+}
+
+/**
+ * The in-process Redis, with the one script Better Auth's rate limiter runs: an increment
+ * that sets the expiry, which an in-process store never enforces anyway.
+ */
+function rateLimitingRedis(): ReturnType<typeof memoryRedisDouble> {
+  const redis: ReturnType<typeof memoryRedisDouble> = memoryRedisDouble({
+    script: { eval: async (...args: unknown[]) => redis.incr(String(args[2])) },
+  });
+  return redis;
 }
 
 const startedSchema = z.object({ url: z.string() });
