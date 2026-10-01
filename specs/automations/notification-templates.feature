@@ -90,6 +90,20 @@ Feature: Liquid templates for trigger notifications
       Then the section and divider blocks are kept
       And the interactive actions block is removed
 
+  Rule: Email Markdown is sanitized to a closed allowlist
+
+    @regression @unit
+    Scenario: An SVG animation whose URI list ends in javascript: is stripped
+      Given a custom body template that emits an SVG animate element whose values list starts with a safe fragment and ends in a javascript: URL
+      When the email body is rendered
+      Then the body contains no animate element and no javascript: URL
+
+    @regression @unit
+    Scenario: Markup smuggled after a literal textarea close with a solidus is stripped
+      Given a custom body template that emits a textarea closed as "</textarea/>" followed by an img tag with an onerror handler
+      When the email body is rendered
+      Then the body contains no img element and no onerror handler
+
   Rule: Template failures fall back to the default and are surfaced
 
     Scenario: A template that throws falls back to the default

@@ -71,12 +71,14 @@ describe("markdownToEmailHtml", () => {
   });
 
   describe("when the Markdown carries a published sanitize-html bypass payload", () => {
+    /** @scenario "An SVG animation whose URI list ends in javascript: is stripped" */
     it("strips an SVG SMIL animate whose URI list ends in javascript:", () => {
       const html = markdownToEmailHtml(SMIL_URI_LIST_PAYLOAD);
       expect(html).not.toContain("javascript:");
       expect(html).not.toContain("<animate");
     });
 
+    /** @scenario "Markup smuggled after a literal textarea close with a solidus is stripped" */
     it("strips markup smuggled after a literal </textarea/> close", () => {
       const html = markdownToEmailHtml(TEXTAREA_SOLIDUS_PAYLOAD);
       expect(html).not.toContain("<img");
