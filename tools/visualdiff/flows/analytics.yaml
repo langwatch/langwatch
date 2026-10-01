@@ -1192,11 +1192,9 @@ flows:
         with:
           selector: "input:focus"
           value: vd-life-renamed-{uid}
-      - action: type
+      - action: click
         with:
-          selector: "input:focus"
-          text: ""
-          submit: "true"
+          text: /^\s*Custom\s*$/
       - action: expect
         with:
           api: /api/dashboards
