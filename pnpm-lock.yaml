@@ -4275,6 +4275,9 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../../../modules/audit-log/contract
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/authz/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
@@ -4296,9 +4299,6 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
-      '@langwatch/user-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/user/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
@@ -4622,6 +4622,9 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:../../secret/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -5997,6 +6000,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../identity/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
@@ -6021,6 +6027,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
@@ -8186,6 +8195,9 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
+      '@langwatch/presence-contract':
+        specifier: workspace:*
+        version: link:../../presence/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -10523,9 +10535,6 @@ importers:
       '@aws-sdk/client-ses':
         specifier: 'catalog:'
         version: 3.1108.0
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../../packages/aws-client
@@ -10544,9 +10553,6 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
-      '@langwatch/presence-contract':
-        specifier: workspace:*
-        version: link:../../presence/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -10566,9 +10572,6 @@ importers:
         specifier: 'catalog:'
         version: 8.10.0
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -11893,9 +11896,6 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
-      '@langwatch/langy-contract':
-        specifier: workspace:*
-        version: link:../../langy/contract
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
@@ -14603,6 +14603,9 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract
@@ -14627,9 +14630,6 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
-      '@langwatch/ops-contract':
-        specifier: workspace:*
-        version: link:../../ops/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -15139,6 +15139,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -15148,12 +15151,21 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:../../secret/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
