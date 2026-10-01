@@ -3,7 +3,7 @@ import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createUiQueryClient } from "../query-client.ts";
+import { createUiQueryClient, resetUiQueries } from "../query-client.ts";
 
 function recordingHost() {
   const failed: UiFailureNotice[] = [];
@@ -208,5 +208,24 @@ describe("createUiQueryClient", () => {
 
       expect(sessionRead).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("resetUiQueries", () => {
+  it("cancels in-flight reads and clears every read but the session read", async () => {
+    const client = createUiQueryClient();
+    const sessionKey = ["session"];
+    client.setQueryData(sessionKey, { cacheKey: "k" });
+    client.setQueryData(["other"], ["held"]);
+    const inFlight = client
+      .fetchQuery({ queryKey: ["slow"], queryFn: () => new Promise(() => {}), retry: false })
+      .catch(() => "cancelled");
+
+    resetUiQueries({ queryClient: client, sessionQueryKey: sessionKey });
+
+    expect(await inFlight).toBe("cancelled");
+    expect(client.getQueryData(["other"])).toBeUndefined();
+    expect(client.getQueryData(["slow"])).toBeUndefined();
+    expect(client.getQueryData(sessionKey)).toEqual({ cacheKey: "k" });
   });
 });

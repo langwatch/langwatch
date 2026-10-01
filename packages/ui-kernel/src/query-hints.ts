@@ -20,7 +20,7 @@ export type UiQueryHintStream = (handlers: {
   onHint: (hint: unknown) => void;
 }) => () => void;
 
-/** `notification.onReadHints` for the session's user, organisation and project. */
+/** `presence.onProjectReadHints`, or `presence.onOrganizationReadHints` with no project. */
 export function readHintStreamOver({
   rpc,
   organizationId,
@@ -31,14 +31,14 @@ export function readHintStreamOver({
   projectId: string | null;
 }): UiQueryHintStream {
   return ({ onOpen, onHint }) => {
-    const input = projectId === null ? { organizationId } : { organizationId, projectId };
+    const handlers = { onStarted: onOpen, onData: onHint };
     // Hints are optional (the safety refetch covers staleness), so a runtime
     // with no stream stays quiet.
     try {
-      const subscription = rpc.subscribe("notification.onReadHints", input, {
-        onStarted: onOpen,
-        onData: onHint,
-      });
+      const subscription =
+        projectId === null
+          ? rpc.subscribe("presence.onOrganizationReadHints", { organizationId }, handlers)
+          : rpc.subscribe("presence.onProjectReadHints", { organizationId, projectId }, handlers);
       return () => subscription.unsubscribe();
     } catch {
       return () => {};

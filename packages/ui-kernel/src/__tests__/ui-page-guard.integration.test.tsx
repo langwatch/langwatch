@@ -3,7 +3,6 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   BrowserUiDocumentTitle,
   UiCapabilityContextProvider,
@@ -15,6 +14,7 @@ import {
   type UiCapabilities,
   UiFeedback,
 } from "@langwatch/browser-host/capabilities";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -299,14 +299,12 @@ describe("given a module declaring a screen that requires a grant", () => {
     if (!load) throw new Error(`no loader for ${page}`);
     const { default: Screen } = await load();
 
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <UiCapabilityContextProvider
-          value={capabilities(new AnsweringSession({ flags, permissions, settled: true }))}
-        >
-          <Screen />
-        </UiCapabilityContextProvider>
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <UiCapabilityContextProvider
+        value={capabilities(new AnsweringSession({ flags, permissions, settled: true }))}
+      >
+        <Screen />
+      </UiCapabilityContextProvider>,
     );
   }
 

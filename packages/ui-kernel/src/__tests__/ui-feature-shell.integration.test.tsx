@@ -11,8 +11,8 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { render, waitFor } from "@testing-library/react";
-import { createContext, useContext, type ReactNode } from "react";
+import { act, render, waitFor } from "@testing-library/react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -391,6 +391,44 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         expect(key?.startsWith("lw-query:user_1:")).toBe(true);
         expect(JSON.stringify([...store.entries.values()])).not.toContain("getAll");
         expect(JSON.stringify([...store.entries.values()])).not.toContain("getMemberById");
+      });
+    });
+
+    describe("given the signed-in actor changes", () => {
+      /** @scenario "A session change starts a fresh cache" */
+      it("clears the held reads but keeps the session read", async () => {
+        const host = new QueryClient();
+        host.setQueryData(TEST_SESSION_QUERY_KEY, {
+          cacheKey: SEALING_KEY,
+          previousCacheKey: null,
+        });
+        host.setQueryData(orgGraph, ["org"]);
+        let signInAs: (id: string) => void = () => {};
+        const actor = (id: string) =>
+          new (class extends StubSession {
+            override currentUser() {
+              return { id, name: id, email: `${id}@example.com`, image: null };
+            }
+          })();
+        const shell = createUiFeatureShell({
+          sessionQueryKey: TEST_SESSION_QUERY_KEY,
+          apis: [tieredBinding()],
+          capabilities: {},
+          transport: createUiFeatureApiClient(),
+          session: () => {
+            const [id, setId] = useState("user_1");
+            signInAs = setId;
+            return { session: actor(id), scope: new StubScope() };
+          },
+          queryStore: memoryStore(),
+        });
+
+        renderShell(shell, <div />, host);
+        expect(host.getQueryData(orgGraph)).toEqual(["org"]);
+        act(() => signInAs("user_2"));
+
+        await waitFor(() => expect(host.getQueryData(orgGraph)).toBeUndefined());
+        expect(host.getQueryData(TEST_SESSION_QUERY_KEY)).toBeDefined();
       });
     });
 

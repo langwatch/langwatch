@@ -204,7 +204,7 @@ class RecordingRpc extends UiRpc {
 
 describe("readHintStreamOver", () => {
   /** @scenario "A hint refetches the mounted reads of its procedure and no others" */
-  it("opens notification.onReadHints for where the tab stands and relays its frames", () => {
+  it("opens presence.onProjectReadHints for where the tab stands and relays its frames", () => {
     const rpc = new RecordingRpc();
     const opens: number[] = [];
     const hints: unknown[] = [];
@@ -218,14 +218,14 @@ describe("readHintStreamOver", () => {
     close();
 
     expect(rpc.opened.map(({ path, input }) => ({ path, input }))).toEqual([
-      { path: "notification.onReadHints", input: { organizationId: "acme", projectId: "p1" } },
+      { path: "presence.onProjectReadHints", input: { organizationId: "acme", projectId: "p1" } },
     ]);
     expect(opens).toEqual([1]);
     expect(hints).toEqual([{ path: "organization.getScopeGraph" }]);
     expect(rpc.closed).toBe(1);
   });
 
-  it("names no project on a page outside one", () => {
+  it("opens presence.onOrganizationReadHints, naming no project, on a page outside one", () => {
     const rpc = new RecordingRpc();
 
     readHintStreamOver({ rpc, organizationId: "acme", projectId: null })({
@@ -233,6 +233,7 @@ describe("readHintStreamOver", () => {
       onHint: () => undefined,
     });
 
+    expect(rpc.opened[0]?.path).toBe("presence.onOrganizationReadHints");
     expect(rpc.opened[0]?.input).toEqual({ organizationId: "acme" });
   });
 });

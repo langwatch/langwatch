@@ -15,6 +15,7 @@ import {
   MutationCache,
   QueryCache,
   QueryClient,
+  type Query,
 } from "@tanstack/react-query";
 
 let focusGateInstalled = false;
@@ -94,6 +95,23 @@ export function createUiQueryClient({
   }
 
   return queryClient;
+}
+
+/**
+ * A different signed-in actor or session starts a fresh cache: in-flight reads are cancelled and
+ * every read goes, but the session read, which carries the key the next mirror is sealed under.
+ */
+export function resetUiQueries({
+  queryClient,
+  sessionQueryKey,
+}: {
+  queryClient: QueryClient;
+  sessionQueryKey: readonly unknown[];
+}): void {
+  const sessionHash = hashKey(sessionQueryKey);
+  const others = { predicate: (query: Query) => query.queryHash !== sessionHash };
+  void queryClient.cancelQueries(others);
+  queryClient.removeQueries(others);
 }
 
 function defaultMutationErrorReporter(error: unknown): void {

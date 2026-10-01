@@ -38,13 +38,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentType,
   type ReactNode,
 } from "react";
 
 import { BrowserUiRpc } from "./browser-rpc.ts";
-import { createUiQueryClient } from "./query-client.ts";
+import { createUiQueryClient, resetUiQueries } from "./query-client.ts";
 import { readHintStreamOver, startUiQueryHints } from "./query-hints.ts";
 import {
   createUiFeatureApiClient,
@@ -119,6 +120,26 @@ function sealingKeysOf(answer: unknown): {
   return { cacheKey, previousCacheKey };
 }
 
+type SeenSession = { userId: string | undefined; cacheKey: string | undefined };
+
+/** Another actor, or a session that is not the held one's next epoch, holds nothing of the last. */
+function isAnotherSession({
+  was,
+  userId,
+  cacheKey,
+  previousCacheKey,
+}: {
+  was: SeenSession;
+  userId: string | undefined;
+  cacheKey: string | undefined;
+  previousCacheKey: string | undefined;
+}): boolean {
+  if (was.userId === undefined) return false;
+  if (was.userId !== userId) return true;
+  if (cacheKey === undefined || was.cacheKey === undefined) return false;
+  return cacheKey !== was.cacheKey && was.cacheKey !== previousCacheKey;
+}
+
 /** A composition that installed no module host mounts. */
 function UiNoModuleHosts({ children }: { children?: ReactNode }) {
   return <>{children}</>;
@@ -175,6 +196,18 @@ export function createUiFeatureShell({
     const userId =
       live.session === UNAVAILABLE_UI_SESSION ? void 0 : live.session.currentUser()?.id;
     const { cacheKey, previousCacheKey } = sealingKeysOf(queryClient.getQueryData(sessionQueryKey));
+    const seen = useRef<SeenSession>({ userId: void 0, cacheKey: void 0 });
+    // Declared ahead of the mirror: its cleanup has run, so nothing cleared is written back.
+    useEffect(() => {
+      const was = seen.current;
+      seen.current = {
+        userId,
+        cacheKey: cacheKey ?? (userId === was.userId ? was.cacheKey : void 0),
+      };
+      if (!isAnotherSession({ was, userId, cacheKey, previousCacheKey })) return;
+      resetUiQueries({ queryClient, sessionQueryKey });
+      reads.versions.clear();
+    }, [queryClient, userId, cacheKey, previousCacheKey]);
     // The marked reads are mirrored per user, sealed under the session read's keys, and every
     // tab syncs their versions. No key, no mirror.
     useEffect(() => {

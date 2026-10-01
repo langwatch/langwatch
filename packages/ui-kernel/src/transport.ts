@@ -19,7 +19,6 @@ import { hashKey, type QueryClient } from "@tanstack/react-query";
 import {
   createTRPCClient,
   getUntypedClient,
-  httpBatchStreamLink,
   httpLink,
   loggerLink,
   splitLink,
@@ -50,12 +49,6 @@ function subscriptionOrigin(): string {
   return typeof window === "undefined" ? "http://localhost" : window.location.origin;
 }
 
-/**
- * The batch link refuses a URL longer than this and the request would fail; a
- * query with a large input is sent on its own instead. Matches the host.
- */
-const MAX_BATCHED_URL_LENGTH = 4000;
-
 /** The untyped client every feature Provider is handed. */
 export type UiFeatureApiTransport = ModuleApiClient<ModuleApiMap>;
 
@@ -85,20 +78,12 @@ function uiFeatureApiLinks({
   versionedReads,
   isDevelopment = false,
 }: UiFeatureApiClientOptions) {
-  const batchRouting = splitLink({
-    condition: (operation) => operation.context.skipBatch === true,
-    true: httpLink({ url, ...(fetch ? { fetch } : {}) }),
-    false: httpBatchStreamLink({
-      url,
-      maxURLLength: MAX_BATCHED_URL_LENGTH,
-      ...(fetch ? { fetch } : {}),
-    }),
-  });
+  // One request per call: the server does not batch (Alex, 2026-10-01).
+  const plainRouting = httpLink({ url, ...(fetch ? { fetch } : {}) });
   // A write sent moments before the document goes away ("Not now" on a
   // dialog, then a navigation) opts in with `context: { keepalive: true }`:
-  // the browser would otherwise cancel it and the answer is lost. Unbatched,
-  // so one answer is never held behind an unrelated call; bodies are capped
-  // at 64 KB across keepalive requests, so this is for answers, not payloads.
+  // the browser would otherwise cancel it and the answer is lost. Bodies are
+  // capped at 64 KB across keepalive requests, so this is for answers only.
   const keepaliveRouting = httpLink({
     url,
     fetch: (input, init) => (fetch ?? globalThis.fetch)(input, { ...init, keepalive: true }),
@@ -106,7 +91,7 @@ function uiFeatureApiLinks({
   const httpRouting = splitLink({
     condition: (operation) => operation.context.keepalive === true,
     true: keepaliveRouting,
-    false: batchRouting,
+    false: plainRouting,
   });
 
   return [
