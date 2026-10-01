@@ -66,7 +66,7 @@ function transport(bodies: unknown[] = []): Wiring {
     }
   };
 
-  const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const fetch = (async (input: RequestInfo | URL) => {
     requests.push(requestUrl(input));
     const body = queue.shift();
     return new Response(JSON.stringify(body), {

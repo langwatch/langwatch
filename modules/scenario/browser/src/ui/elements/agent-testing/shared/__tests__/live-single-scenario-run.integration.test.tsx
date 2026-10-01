@@ -7,7 +7,6 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";

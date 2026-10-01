@@ -10,7 +10,7 @@ const drawerFooterSlot = readSlice<DrawerFooterSlot>({
   absent: { register: () => void 0 },
 });
 
-/** Lets drawer content register actions in the studio drawer's footer, read from `workflow:drawer-footer`. */
+/** Lets drawer content register actions in the studio drawer's footer slice. */
 export function useRegisterDrawerFooter(footer: ReactNode): void {
   const register = drawerFooterSlot((state) => state.register);
   useEffect(() => {

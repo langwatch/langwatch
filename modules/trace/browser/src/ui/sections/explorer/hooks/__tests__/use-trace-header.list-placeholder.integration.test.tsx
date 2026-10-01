@@ -33,7 +33,7 @@ const row = (traceId: string): TraceListItem => ({
   totalCost: 0,
   nonBilledCost: 0,
   totalTokens: 7,
-  models: ["gpt-4o"],
+  models: ["gpt-5-mini"],
   labels: [],
   status: "ok",
   spanCount: 3,

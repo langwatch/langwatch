@@ -1,7 +1,7 @@
 /**
- * Shared harness for the scenario evaluator editor tests: the design-system wrapper, the fixtures, and a
- * chip-like button that opens the editor through scenario's own hook. `vi.mock` calls stay per
- * test file, since they hoist above its imports.
+ * Shared harness for the scenario evaluator editor tests: the design-system wrapper, the fixtures,
+ * and a chip-like button that opens the editor through scenario's own hook. `vi.mock` calls stay
+ * per test file, since they hoist above its imports.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";

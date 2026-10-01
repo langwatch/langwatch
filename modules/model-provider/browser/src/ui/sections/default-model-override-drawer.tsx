@@ -12,7 +12,6 @@ import {
   ProviderModelSelector,
 } from "@langwatch/design-system/provider-model-selector";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { modelSelectorOptions } from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
@@ -20,6 +19,7 @@ import {
   LATEST_ALIAS_PROVIDERS,
   modelDisplayLabel,
   modelPickerOption,
+  modelSelectorOptions,
   type ModelDefaultInheritedValues,
   type ModelDefaultSnapshot,
 } from "@langwatch/model-provider-contract";

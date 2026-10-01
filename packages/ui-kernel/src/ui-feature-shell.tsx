@@ -33,6 +33,7 @@ import {
   QueryClientContext,
   QueryClientProvider,
   useQueryClient,
+  type QueryClient,
 } from "@tanstack/react-query";
 import {
   useContext,
@@ -160,6 +161,79 @@ const useUnavailableUiSession: UiSessionSource = () => ({
   scope: UNAVAILABLE_UI_SCOPE,
 });
 
+/** Mirrors the planned reads onto the sealed disk and syncs tabs; returns the stop. */
+function startQueryMirror({
+  queryClient,
+  plan,
+  userId,
+  cacheKey,
+  previousCacheKey,
+  watch,
+  store,
+  sessionQueryKey,
+  versions,
+}: {
+  queryClient: QueryClient;
+  plan: ReturnType<typeof cachePlanFor>;
+  userId: string;
+  cacheKey: string | undefined;
+  previousCacheKey: string | undefined;
+  watch: SessionVersionWatch;
+  store: UiQueryStore<unknown>;
+  sessionQueryKey: readonly unknown[];
+  versions: UiQueryVersions;
+}): () => void {
+  const sealed =
+    cacheKey !== void 0 && plan.persisted.size > 0
+      ? sealedUiQueryStore({ store, cacheKey, previousCacheKey })
+      : void 0;
+  const unsubscribe = sealed
+    ? persistUiQueries({
+        queryClient,
+        plan,
+        userId,
+        store: sealed,
+        sessionQueryKey,
+        versions,
+        servedSchemaHashFor: (path) => watch.servedSchemaHashFor(path),
+      }).unsubscribe
+    : () => void 0;
+  const stopSync = startUiQuerySync({
+    queryClient,
+    plan,
+    store: sealed ?? EMPTY_QUERY_STORE,
+    userId,
+    versions,
+  });
+  return () => {
+    unsubscribe();
+    stopSync();
+  };
+}
+
+/** A newer session version marks every read stale; returns the stop. */
+function refetchOnNewerSession({
+  watch,
+  queryClient,
+}: {
+  watch: SessionVersionWatch;
+  queryClient: QueryClient;
+}): () => void {
+  let pending: ReturnType<typeof setTimeout> | undefined;
+  const stop = watch.onNewer(() => {
+    void queryClient.invalidateQueries({ refetchType: "none" });
+    pending ??= setTimeout(() => {
+      pending = void 0;
+      if (!focusManager.isFocused()) return;
+      void queryClient.refetchQueries({ type: "active", stale: true });
+    }, Math.random() * SESSION_BUMP_JITTER_MS);
+  });
+  return () => {
+    stop();
+    clearTimeout(pending);
+  };
+}
+
 export function createUiFeatureShell({
   apis,
   capabilities,
@@ -222,36 +296,17 @@ export function createUiFeatureShell({
     // mirror. Sync runs for any signed-in user: the focus pass revalidates stale mounted reads.
     useEffect(() => {
       if (!userId) return;
-      const sealed =
-        cacheKey !== void 0 && cachePlan.persisted.size > 0
-          ? sealedUiQueryStore({
-              store: queryStore ?? indexedDbQueryStore,
-              cacheKey,
-              previousCacheKey,
-            })
-          : void 0;
-      const unsubscribe = sealed
-        ? persistUiQueries({
-            queryClient,
-            plan: cachePlan,
-            userId,
-            store: sealed,
-            sessionQueryKey,
-            versions,
-            servedSchemaHashFor: (path) => watch.servedSchemaHashFor(path),
-          }).unsubscribe
-        : () => void 0;
-      const stopSync = startUiQuerySync({
+      return startQueryMirror({
         queryClient,
         plan: cachePlan,
-        store: sealed ?? EMPTY_QUERY_STORE,
         userId,
+        cacheKey,
+        previousCacheKey,
+        watch,
+        store: queryStore ?? indexedDbQueryStore,
+        sessionQueryKey,
         versions,
       });
-      return () => {
-        unsubscribe();
-        stopSync();
-      };
     }, [queryClient, userId, cacheKey, previousCacheKey, watch]);
     const resolved = useMemo(
       () =>
@@ -328,21 +383,7 @@ export function createUiFeatureShell({
     );
     // A newer session version marks every read stale at once; the mounted ones refetch after a
     // jitter, one pending refetch per tab, and a hidden tab leaves them to its pass when shown.
-    useEffect(() => {
-      let pending: ReturnType<typeof setTimeout> | undefined;
-      const stop = watch.onNewer(() => {
-        void queryClient.invalidateQueries({ refetchType: "none" });
-        pending ??= setTimeout(() => {
-          pending = void 0;
-          if (!focusManager.isFocused()) return;
-          void queryClient.refetchQueries({ type: "active", stale: true });
-        }, Math.random() * SESSION_BUMP_JITTER_MS);
-      });
-      return () => {
-        stop();
-        clearTimeout(pending);
-      };
-    }, [watch, queryClient]);
+    useEffect(() => refetchOnNewerSession({ watch, queryClient }), [watch, queryClient]);
 
     // The by-path dispatcher a screen too wide for a procedure map asks for.
     // Built here because this is where both halves of it are: the transport and

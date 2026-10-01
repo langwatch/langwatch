@@ -7,7 +7,6 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { cleanup, screen } from "@testing-library/react";
-import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

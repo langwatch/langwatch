@@ -9,7 +9,6 @@ import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { useCallback, useState } from "react";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
-import { api } from "../../../../behavior/scenario-api.ts";
 import { useSuite } from "../../../../behavior/suites/use-suite.ts";
 import { readScenarioTarget } from "../../use-scenario-target.ts";
 import { useRunStartedHandler } from "../cases/use-case-run-actions.ts";

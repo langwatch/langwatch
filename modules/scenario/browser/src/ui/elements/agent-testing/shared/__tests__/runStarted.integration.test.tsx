@@ -10,7 +10,6 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";

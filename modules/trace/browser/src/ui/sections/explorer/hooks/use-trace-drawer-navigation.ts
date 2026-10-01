@@ -6,6 +6,54 @@ import { getTraceDrawer, useTraceDrawer } from "../../../../behavior/trace-drawe
 import { type DrawerViewMode, TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
 import { guardTraceEditExit } from "../utils/trace-edit-mode.ts";
 
+type NavigateToTraceInput = {
+  fromTraceId: string;
+  fromViewMode: DrawerViewMode;
+  /**
+   * The trace we're navigating *away from* — its occurredAt rides on the stack
+   * entry so going back can forward the partition-pruning hint to drawer queries.
+   */
+  fromTimestamp?: number;
+  toTraceId: string;
+  /** Trace's actual occurredAt (ms). */
+  toTimestamp?: number;
+  toViewMode?: DrawerViewMode;
+  /**
+   * When false, apply `toViewMode` for this navigation only without
+   * persisting it as the remembered default — e.g. peeking at a
+   * conversation turn's Summary shouldn't make Summary the user's tab.
+   */
+  persistViewMode?: boolean;
+};
+
+function openTrace({
+  openDrawer,
+  input,
+}: {
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  input: NavigateToTraceInput;
+}): void {
+  const { fromViewMode, fromTimestamp, toTraceId, toTimestamp, toViewMode } = input;
+  const leaving = getTraceDrawer();
+  // The entry the trace becomes records the view it was left on.
+  leaving.setViewModeTransient(fromViewMode);
+  if (fromTimestamp !== undefined) leaving.backfillOccurredAtMs(fromTimestamp);
+  if (toViewMode && (input.persistViewMode ?? true)) {
+    drawerChrome.getState().rememberViewMode(toViewMode);
+  }
+  openDrawer(
+    TRACE_DRAWER_NAME,
+    {
+      traceId: toTraceId,
+      ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
+      ...(leaving.projectId !== null ? { projectId: leaving.projectId } : {}),
+      mode: toViewMode ?? fromViewMode,
+      viz: leaving.vizTab,
+    },
+    { replace: false },
+  );
+}
+
 /**
  * Trace-to-trace navigation inside the v2 drawer. Each trace the reader leaves
  * stays beneath the open one in the drawer stack, so Back, the back button and
@@ -16,56 +64,14 @@ export function useTraceDrawerNavigation() {
   const traceBackStack = useTraceDrawer((s) => s.traceBackStack);
 
   const navigateToTrace = useCallback(
-    ({
-      fromTraceId,
-      fromViewMode,
-      fromTimestamp,
-      toTraceId,
-      toTimestamp,
-      toViewMode,
-      persistViewMode = true,
-    }: {
-      fromTraceId: string;
-      fromViewMode: DrawerViewMode;
-      /**
-       * The trace we're navigating *away from* — its occurredAt rides on the stack
-       * entry so going back can forward the partition-pruning hint to drawer queries.
-       */
-      fromTimestamp?: number;
-      toTraceId: string;
-      /** Trace's actual occurredAt (ms). */
-      toTimestamp?: number;
-      toViewMode?: DrawerViewMode;
-      /**
-       * When false, apply `toViewMode` for this navigation only without
-       * persisting it as the remembered default — e.g. peeking at a
-       * conversation turn's Summary shouldn't make Summary the user's tab.
-       */
-      persistViewMode?: boolean;
-    }) => {
+    (input: NavigateToTraceInput) => {
+      const { fromTraceId, fromViewMode, toTraceId, toViewMode } = input;
       if (fromTraceId === toTraceId && (toViewMode == null || toViewMode === fromViewMode)) {
         return;
       }
       // Moving to another trace leaves the correction behind, so an unsaved
       // one asks first and the navigation waits on the answer.
-      guardTraceEditExit(() => {
-        const leaving = getTraceDrawer();
-        // The entry the trace becomes records the view it was left on.
-        leaving.setViewModeTransient(fromViewMode);
-        if (fromTimestamp !== undefined) leaving.backfillOccurredAtMs(fromTimestamp);
-        if (toViewMode && persistViewMode) drawerChrome.getState().rememberViewMode(toViewMode);
-        openDrawer(
-          TRACE_DRAWER_NAME,
-          {
-            traceId: toTraceId,
-            ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
-            ...(leaving.projectId !== null ? { projectId: leaving.projectId } : {}),
-            mode: toViewMode ?? fromViewMode,
-            viz: leaving.vizTab,
-          },
-          { replace: false },
-        );
-      });
+      guardTraceEditExit(() => openTrace({ openDrawer, input }));
     },
     [openDrawer],
   );

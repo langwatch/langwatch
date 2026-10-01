@@ -4,12 +4,12 @@ import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
 } from "@langwatch/design-system/provider-model-selector";
-import { modelSelectorOptions } from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
   LATEST_ALIAS_PROVIDERS,
   modelDisplayLabel,
   modelPickerOption,
+  modelSelectorOptions,
 } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 

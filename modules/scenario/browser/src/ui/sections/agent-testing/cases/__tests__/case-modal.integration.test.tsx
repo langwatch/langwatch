@@ -9,7 +9,6 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AgentTestingCaseEditorDrawer } from "../agent-testing-case-editor-drawer.tsx";

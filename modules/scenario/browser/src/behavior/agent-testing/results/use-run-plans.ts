@@ -8,7 +8,6 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { useMemo } from "react";
 
 import type { Period } from "../../../ui/elements/analytics/period-selector.tsx";
-import { api } from "../../scenario-api.ts";
 import { useExternalSetSummaries, useSuiteSummaries } from "../../suites/use-set-summaries.ts";
 import { useSuites } from "../../suites/use-suites.ts";
 import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans.ts";

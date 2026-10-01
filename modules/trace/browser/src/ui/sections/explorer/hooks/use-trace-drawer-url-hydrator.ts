@@ -18,10 +18,9 @@ interface OpenTrace {
 }
 
 /**
- * Settles what follows from the address naming a trace: the correction state
- * a new trace starts from, the edit session its link asks for, and what a
- * close takes with it. The address is the one truth; nothing is copied from it.
- * Lives at the page level so one mount serves every page the drawer opens over.
+ * Settles what follows from the address naming a trace: the correction state a new trace
+ * starts from, the edit session its link asks for, and what a close takes with it. The address
+ * is the one truth. Lives at the page level so one mount serves every page the drawer opens over.
  */
 export function useTraceDrawerUrlHydrator(): void {
   const { openDrawer, closeDrawer } = useDrawer();

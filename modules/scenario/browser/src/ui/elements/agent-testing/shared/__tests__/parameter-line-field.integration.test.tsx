@@ -6,7 +6,6 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

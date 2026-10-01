@@ -90,7 +90,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-// Mocking the module rather than the barrel keeps the rest of the package real for the hook under test.
+// Mocking the module rather than the barrel keeps the rest of the package real for the hook.
 vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
   getTraceDrawer: () => ({ traceId: null, occurredAtMs: null }),
   useTraceDrawer: (selector: (s: unknown) => unknown) =>

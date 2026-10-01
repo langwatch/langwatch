@@ -124,11 +124,7 @@ export function EvaluationResults({
   );
   const router = useRouter();
   const runs: ExperimentRun[] | undefined = batchEvaluationRuns.data?.runs;
-  const {
-    selectedRun,
-    isFinished,
-    selectedRunId: selectedRunId_,
-  } = useBatchRunSelection({
+  const { selectedRun, selectedRunId: selectedRunId_ } = useBatchRunSelection({
     runs,
     selectedRunId,
     routerRunId: typeof router.query.runId === "string" ? router.query.runId : undefined,

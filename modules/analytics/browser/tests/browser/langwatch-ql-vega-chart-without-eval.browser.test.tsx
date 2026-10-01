@@ -4,6 +4,8 @@
  * after every module import, since the harness itself evals from source text.
  */
 
+/* oxlint-disable no-eval -- this test stubs eval to prove the chart never calls it */
+
 import {
   buildLangWatchQLVegaSpec,
   type LangWatchQLDatasetColumn,

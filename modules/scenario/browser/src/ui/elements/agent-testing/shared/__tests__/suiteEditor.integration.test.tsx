@@ -9,7 +9,6 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSuiteEditorStore } from "../../../../../behavior/agent-testing/suite/suite-editor-store.ts";

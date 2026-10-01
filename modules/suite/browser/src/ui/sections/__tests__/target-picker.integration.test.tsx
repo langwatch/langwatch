@@ -9,7 +9,6 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TargetPicker, type TargetPickerProps } from "../../elements/pickers/target-picker.tsx";

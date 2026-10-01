@@ -2,8 +2,7 @@
 
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { getUsedFields } from "@langwatch/experiment-contract/mapping-validation";
-import { type FieldMapping as VariableFieldMapping } from "@langwatch/workflow-contract";
-import type { Field } from "@langwatch/workflow-contract";
+import type { Field, FieldMapping as VariableFieldMapping } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
 import { buildTargetAvailableSources } from "../../../../behavior/experiments-v3/target-available-sources.ts";

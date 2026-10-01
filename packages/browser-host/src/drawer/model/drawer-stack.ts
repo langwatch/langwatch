@@ -23,14 +23,14 @@ function toEntry(value: unknown): DrawerStackEntry | undefined {
   return { drawer: value.drawer, params };
 }
 
-/** The drawers beneath the open one, read from a location's `state`; anything malformed is empty. */
+/** The drawers beneath the open one, read from a location's `state`; malformed is empty. */
 export function readDrawerAncestors(state: unknown): DrawerStackEntry[] {
   if (typeof state !== "object" || state === null) return [];
   if (!("drawerStack" in state) || !Array.isArray(state.drawerStack)) return [];
   return state.drawerStack.flatMap((entry) => toEntry(entry) ?? []);
 }
 
-/** The `state` that carries these ancestors; `null` when there are none, so a clean address stays clean. */
+/** The `state` that carries these ancestors; `null` when there are none, so a clean URL stays. */
 export function drawerAncestorsState(
   ancestors: readonly DrawerStackEntry[],
 ): { drawerStack: DrawerStackEntry[] } | null {

@@ -1,6 +1,6 @@
 import { modelProviderApi } from "./model-provider-api.ts";
 
-/** The model a feature key resolves to for the project, by cascade; `data` is null when none is set. */
+/** The model a feature key resolves to for the project, by cascade; `data` is null if none. */
 export function useResolvedDefaultModel({
   projectId,
   featureKey,

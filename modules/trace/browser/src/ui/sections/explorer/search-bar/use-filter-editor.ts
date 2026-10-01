@@ -30,7 +30,7 @@ const FILTER_CHIP_CONTROL_SELECTORS = [
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
-  highlightedRow,
+  pickHighlightedRow,
   navigateSuggestion,
   removeNodeAtLocation,
   swapOperatorAtLocation,
@@ -665,7 +665,7 @@ function handleEditorKeyDown({
   const triggerState = trigger !== null ? suggestionFromTrigger(text, cursorPos, trigger) : null;
   const liveState = triggerState ?? searchBarSuggestionState(text, cursorPos);
   const dismissed = ctx.dismissedRef.current;
-  const highlighted = dismissed ? null : highlightedRow(ctx.suggestionRef.current);
+  const highlighted = dismissed ? null : pickHighlightedRow(ctx.suggestionRef.current);
   const action = handleKey(
     {
       text,

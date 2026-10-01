@@ -1,6 +1,7 @@
 /**
- * Mirroring every planned read across a reload, one sealed object per query, per user and per
- * schema hash, over an in-memory store. ARCHITECTURE.md §10.2; specs/ui/browser-query-caching.feature.
+ * Mirroring every planned read across a reload, one sealed object per query, per user and
+ * per schema hash, over an in-memory store.
+ * ARCHITECTURE.md §10.2; specs/ui/browser-query-caching.feature.
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
@@ -29,8 +30,10 @@ function planOf({
   const persisted = new Set(DECLARED.filter((path) => !excluded.includes(path)));
   return {
     persisted,
-    schemaHashFor: (path) =>
-      persisted.has(path) ? (moved.includes(path) ? "schema-2" : "schema-1") : undefined,
+    schemaHashFor: (path) => {
+      if (!persisted.has(path)) return undefined;
+      return moved.includes(path) ? "schema-2" : "schema-1";
+    },
   };
 }
 

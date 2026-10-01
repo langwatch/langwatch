@@ -25,7 +25,7 @@ function useCasesInvalidate(projectId: string): () => void {
   return useCallback(() => {
     void scenarioUtils.scenarios.getAll.invalidate({ projectId });
     void utils.suites.testSuites.getAll.invalidate({ projectId });
-  }, [utils, projectId]);
+  }, [utils, scenarioUtils.scenarios.getAll, projectId]);
 }
 
 export type SuiteMutations = {

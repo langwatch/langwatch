@@ -5,7 +5,6 @@
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
-import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {

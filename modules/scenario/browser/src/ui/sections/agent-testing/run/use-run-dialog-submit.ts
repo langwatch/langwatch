@@ -7,7 +7,6 @@ import { useCallback } from "react";
 
 import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
-import { api } from "../../../../behavior/scenario-api.ts";
 import type { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { ParameterFieldError } from "./parameter-suggestions.ts";

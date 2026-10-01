@@ -259,7 +259,7 @@ function useCaseWrites({
   const invalidate = useCallback(() => {
     void scenarioUtils.scenarios.getAll.invalidate({ projectId });
     void utils.suites.testSuites.getAll.invalidate({ projectId });
-  }, [utils, projectId]);
+  }, [utils, scenarioUtils.scenarios.getAll, projectId]);
 
   const createMutation = scenarioClient.scenarios.create.useMutation({
     onSuccess: (saved) => {

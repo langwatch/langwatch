@@ -37,6 +37,5 @@ export * from "./model-cost-preview.ts";
 export * from "./catalog/tier-targets.ts";
 export * from "./model-provider.config.ts";
 export * from "./model-provider-availability.ts";
-export * from "./clamp-max-tokens.ts";
 export * from "./model-selection.ts";
 export * from "./model-options.ts";

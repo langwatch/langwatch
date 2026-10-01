@@ -13,7 +13,6 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { useSession } from "../../../../behavior/auth-session.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
-import { api } from "../../../../behavior/scenario-api.ts";
 import { useFilteredAgents } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import { useScenarios } from "../../../../behavior/scenarios/use-scenarios.ts";
 import {
@@ -349,10 +348,9 @@ function targetLabelOf({
 }
 
 /**
- * The block as the dialog shows it: a line the dialog wrote itself loses the
- * plain overrides nothing in the run declares, and a block that held remembered
- * values alone has nothing left to say, so it folds away and the chip offers it
- * again. Only a line the dialog wrote may be shortened, never one that was typed.
+ * The block as the dialog shows it: a line the dialog wrote itself loses the plain overrides
+ * nothing in the run declares, and a block holding remembered values alone folds away so the
+ * chip offers it again. Only a line the dialog wrote may be shortened, never one typed.
  */
 function shownParameterBlock({
   fields,

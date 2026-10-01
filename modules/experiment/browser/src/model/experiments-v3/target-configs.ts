@@ -9,8 +9,11 @@ import {
   toComparisonConfig,
 } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
-import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
+import type {
+  Field,
+  FieldMapping as UIFieldMapping,
+  HttpComponentConfig,
+} from "@langwatch/workflow-contract";
 
 import { convertFromUIMapping } from "./field-mapping-converters.ts";
 import { buildInputsFromBodyTemplate, convertHttpComponentConfig } from "./http-agent-utils.ts";

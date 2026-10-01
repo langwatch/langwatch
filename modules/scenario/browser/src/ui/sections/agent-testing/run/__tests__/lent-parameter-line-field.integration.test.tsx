@@ -6,7 +6,6 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LentParameterLineField } from "../lent-parameter-line-field.tsx";

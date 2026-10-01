@@ -54,11 +54,7 @@ import {
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 
-import {
-  analyticsApi,
-  type AnalyticsApiMap,
-  type AnalyticsFilterOption,
-} from "../../../behavior/analytics-api.ts";
+import { analyticsApi, type AnalyticsApiMap } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsPeriod } from "../../../behavior/use-analytics-period.ts";
 import { useStoredGraph } from "../../../behavior/use-dashboards.ts";
 import { useFilterOptions } from "../../../behavior/use-filter-options.ts";

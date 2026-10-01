@@ -1,6 +1,7 @@
 /**
- * Epoch ms of the dashboard's last scheduled refresh, or undefined before the first. Widgets read
- * it through {@link useDashboardRefreshedAt}; the schedule is `behavior/use-dashboard-auto-refresh.ts`.
+ * Epoch ms of the dashboard's last scheduled refresh, or undefined before the first. Widgets
+ * read it through {@link useDashboardRefreshedAt}; the schedule is
+ * `behavior/use-dashboard-auto-refresh.ts`.
  * @see specs/analytics/dashboard-widget-resilience.feature
  */
 

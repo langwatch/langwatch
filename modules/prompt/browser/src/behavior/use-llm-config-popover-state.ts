@@ -1,6 +1,6 @@
+import { computeClampedMaxTokens } from "@langwatch/model-provider-contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { clampMaxTokens } from "../model/clamp-max-tokens.ts";
 import { getMaxTokenLimit } from "../model/max-token-limit.ts";
 import { type LLMConfigValues } from "../ui/sections/llm-parameters/llm-config-values.types.ts";
 import {
@@ -54,7 +54,7 @@ function useMaxTokensClamp({
     if (!hasMetadata) return;
     const currentMaxTokens = getParamValue(values, "max_tokens");
     if (typeof currentMaxTokens !== "number") return;
-    const clamped = clampMaxTokens(currentMaxTokens, maxTokenLimit);
+    const clamped = computeClampedMaxTokens(currentMaxTokens, maxTokenLimit);
     if (clamped !== undefined && clamped !== currentMaxTokens) {
       onChange(normalizeMaxTokens(values, clamped));
     }

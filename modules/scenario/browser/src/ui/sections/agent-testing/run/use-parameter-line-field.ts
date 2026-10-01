@@ -5,7 +5,7 @@
  */
 
 import {
-  highlightedRow,
+  pickHighlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
 } from "@langwatch/trace-contract";
@@ -85,7 +85,7 @@ function handleListKey({
   const action = KEY_ACTIONS[event.key];
   if (!action) return;
   if (action === "accept") {
-    const row = highlightedRow(ui);
+    const row = pickHighlightedRow(ui);
     if (!row) return;
     event.preventDefault();
     onAccept(row);

@@ -10,7 +10,6 @@ import { useEffect } from "react";
 
 import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { useAgentTestingStore } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
-import { api } from "../../../behavior/scenario-api.ts";
 import { useTestSuites } from "../../../behavior/suites/use-test-suites.ts";
 import { useOpenNewRunPlan } from "./run/run-plan-dialog-host.tsx";
 

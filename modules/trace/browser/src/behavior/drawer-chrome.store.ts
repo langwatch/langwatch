@@ -67,7 +67,7 @@ export interface DrawerChromeState {
   toggleSnapMaximize: (viewportWidth: number) => void;
   togglePaneCollapsed: (id: PaneId) => void;
   togglePaneMaximized: (id: PaneId) => void;
-  /** Re-open the span detail pane, so a newly selected span is not selected behind a collapsed one. */
+  /** Re-open the span detail pane, so a newly selected span is not hidden by a collapsed one. */
   expandSpanDetail: () => void;
   setShortcutsOpen: (value: boolean) => void;
   setPinned: (value: boolean) => void;
@@ -78,6 +78,48 @@ export interface DrawerChromeState {
   expectSpanCount: (hint: { traceId: string; count: number }) => void;
   /** The drawer closed: what only made sense while it was open goes. */
   reset: () => void;
+}
+
+function snapMaximized({
+  state,
+  viewportWidth,
+}: {
+  state: DrawerChromeState;
+  viewportWidth: number;
+}): Partial<DrawerChromeState> {
+  const snapWidth = Math.max(DRAWER_MIN_WIDTH_PX, viewportWidth - DRAWER_MAXIMIZE_EDGE_PX);
+  const isAtSnap = state.widthPx !== null && Math.abs(state.widthPx - snapWidth) < 2;
+  if (isAtSnap) {
+    const restore = state.preMaximizeWidthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
+    return { widthPx: restore, preMaximizeWidthPx: null, isMaximized: false };
+  }
+  return {
+    preMaximizeWidthPx: state.widthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
+    widthPx: snapWidth,
+    isMaximized: true,
+  };
+}
+
+/** Exactly one pane can be maximized at a time; maximizing demotes every sibling. */
+function maximizedPaneState({ s, id }: { s: DrawerChromeState; id: PaneId }) {
+  const currentlyMaximized = s.paneState[id].maximizedWithinGroup;
+  const demote = (key: PaneId): PaneState => ({
+    ...s.paneState[key],
+    maximizedWithinGroup: key === id ? !currentlyMaximized : false,
+    collapsed: key === id ? false : s.paneState[key].collapsed,
+  });
+  return {
+    conversationContext: demote("conversationContext"),
+    visualization: demote("visualization"),
+    spanDetail: demote("spanDetail"),
+  };
+}
+
+function expandedSpanDetail(s: DrawerChromeState): Partial<DrawerChromeState> {
+  if (!s.paneState.spanDetail.collapsed) return {};
+  return {
+    paneState: { ...s.paneState, spanDetail: { ...s.paneState.spanDetail, collapsed: false } },
+  };
 }
 
 export const drawerChrome = defineSlice<DrawerChromeState>({
@@ -101,20 +143,7 @@ export const drawerChrome = defineSlice<DrawerChromeState>({
 
     setWidthPx: (px) => set({ widthPx: px === null ? null : Math.max(DRAWER_MIN_WIDTH_PX, px) }),
 
-    toggleSnapMaximize: (viewportWidth) =>
-      set((s) => {
-        const snapWidth = Math.max(DRAWER_MIN_WIDTH_PX, viewportWidth - DRAWER_MAXIMIZE_EDGE_PX);
-        const isAtSnap = s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
-        if (isAtSnap) {
-          const restore = s.preMaximizeWidthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
-          return { widthPx: restore, preMaximizeWidthPx: null, isMaximized: false };
-        }
-        return {
-          preMaximizeWidthPx: s.widthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth),
-          widthPx: snapWidth,
-          isMaximized: true,
-        };
-      }),
+    toggleSnapMaximize: (viewportWidth) => set((s) => snapMaximized({ state: s, viewportWidth })),
 
     togglePaneCollapsed: (id) =>
       set((s) => ({
@@ -129,30 +158,9 @@ export const drawerChrome = defineSlice<DrawerChromeState>({
         },
       })),
 
-    togglePaneMaximized: (id) =>
-      set((s) => {
-        const currentlyMaximized = s.paneState[id].maximizedWithinGroup;
-        // Exactly one pane can be maximized at a time; maximizing demotes every sibling.
-        const demote = (key: PaneId): PaneState => ({
-          ...s.paneState[key],
-          maximizedWithinGroup: key === id ? !currentlyMaximized : false,
-          collapsed: key === id ? false : s.paneState[key].collapsed,
-        });
-        return {
-          paneState: {
-            conversationContext: demote("conversationContext"),
-            visualization: demote("visualization"),
-            spanDetail: demote("spanDetail"),
-          },
-        };
-      }),
+    togglePaneMaximized: (id) => set((s) => ({ paneState: maximizedPaneState({ s, id }) })),
 
-    expandSpanDetail: () =>
-      set((s) =>
-        s.paneState.spanDetail.collapsed
-          ? { paneState: { ...s.paneState, spanDetail: { ...s.paneState.spanDetail, collapsed: false } } }
-          : {},
-      ),
+    expandSpanDetail: () => set((s) => expandedSpanDetail(s)),
 
     setShortcutsOpen: (value) => set({ shortcutsOpen: value }),
     setPinned: (value) => set({ pinned: value }),

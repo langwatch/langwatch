@@ -5,7 +5,6 @@
  */
 
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Badge,
   Box,
@@ -77,7 +76,6 @@ function VersionCriteria({ criteria }: { criteria: string[] }) {
 
 /** What one version held, read-only. */
 function VersionContent({ scenarioId, version }: { scenarioId: string; version: number }) {
-  const { project } = useOrganizationTeamProject();
   const { data, isLoading } = useScenarioVersion({ scenarioId, version });
 
   if (isLoading) {

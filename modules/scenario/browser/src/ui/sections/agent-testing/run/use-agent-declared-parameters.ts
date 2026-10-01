@@ -9,7 +9,6 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { useMemo } from "react";
 
 import { useAgents } from "../../../../behavior/agents/use-agents.ts";
-import { api } from "../../../../behavior/scenario-api.ts";
 import {
   type DeclaredParameter,
   unionParameterDefinitions,

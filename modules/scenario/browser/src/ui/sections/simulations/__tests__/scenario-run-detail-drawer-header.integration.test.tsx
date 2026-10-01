@@ -6,7 +6,6 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { cleanup, screen, within } from "@testing-library/react";
-import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";

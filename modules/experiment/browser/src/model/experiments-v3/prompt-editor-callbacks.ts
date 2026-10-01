@@ -2,8 +2,7 @@
  * Helper to create type-safe prompt editor callbacks for experiments-v3.
  */
 
-import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
-import type { Field } from "@langwatch/workflow-contract";
+import type { Field, FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 
 import { convertFromUIMapping } from "./field-mapping-converters.ts";
 import { type PromptOutputField, toTargetOutputFields } from "./target-output-fields.ts";

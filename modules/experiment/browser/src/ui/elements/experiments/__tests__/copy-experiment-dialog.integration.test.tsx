@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Experiment's Replicate dialog lists the targets workflow's host answers
- * through the `workflow:host` slice, with no provider above it.
- * Spec: specs/ui/browser-global-store.feature
+ * Experiment's Replicate dialog lists the targets workflow's host answers through the
+ * `workflow:host` slice, with no provider above it. Spec: specs/ui/browser-global-store.feature
  */
 import { defineSlice } from "@langwatch/browser-host/global-store";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";

@@ -4,7 +4,6 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
@@ -39,7 +38,6 @@ export function ScenarioVersionList({
   isCompact?: boolean;
 }) {
   const { can } = useCan();
-  const { project } = useOrganizationTeamProject();
   const [openVersion, setOpenVersion] = useState<number | null>(null);
   const restore = useVersionRestore({ scenarioId });
 

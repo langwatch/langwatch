@@ -1,0 +1,134 @@
+/**
+ * @vitest-environment jsdom
+ * The drawer navigator's writes: they survive a sibling navigator unmounting, a
+ * blocked navigation leaves no phantom drawer, in-drawer Back leaves history
+ * where the browser Back expects it, and a write keeps the address fragment.
+ */
+
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  type NavigateFunction,
+  RouterProvider,
+  useBlocker,
+  useLocation,
+  useNavigate,
+} from "react-router";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { drawerRouterRef, useDrawerRouter } from "../drawer-router.ts";
+import { getTopDrawer, navigateToDrawer, updateDrawerParams, useDrawer } from "../use-drawer.ts";
+
+afterEach(() => {
+  cleanup();
+  window.history.replaceState(null, "", "/");
+  drawerRouterRef.current = undefined;
+});
+
+function Navigator() {
+  useDrawerRouter();
+  return null;
+}
+
+function Probe() {
+  const { search, hash } = useLocation();
+  return <div data-testid="address">{`${search}${hash}`}</div>;
+}
+
+describe("given two mounted drawer navigators", () => {
+  describe("when the one registered last unmounts", () => {
+    it("still writes a drawer param through the navigator that remains", async () => {
+      const tree = (withSecond: boolean) => (
+        <MemoryRouter
+          initialEntries={["/acme/traces?drawer.open=traceV2Details&drawer.traceId=t1"]}
+        >
+          <Navigator />
+          {withSecond && <Navigator />}
+          <Probe />
+        </MemoryRouter>
+      );
+      const view = render(tree(true));
+      view.rerender(tree(false));
+
+      await act(async () => {
+        updateDrawerParams({ spanId: "s1" });
+      });
+
+      expect(screen.getByTestId("address")).toHaveTextContent("drawer.spanId=s1");
+    });
+  });
+});
+
+describe("given a navigation that a blocker refuses", () => {
+  describe("when a drawer is opened from module-level code", () => {
+    it("leaves no drawer open", async () => {
+      function Blocked() {
+        useBlocker(true);
+        useDrawerRouter();
+        return null;
+      }
+      const router = createMemoryRouter([{ path: "/acme/traces", element: <Blocked /> }], {
+        initialEntries: ["/acme/traces"],
+      });
+      render(<RouterProvider router={router} />);
+
+      await act(async () => {
+        navigateToDrawer("traceV2Details");
+      });
+
+      await waitFor(() => expect(getTopDrawer()).toBeUndefined());
+      expect(router.state.location.search).toBe("");
+    });
+  });
+});
+
+describe("given a drawer opened over another", () => {
+  describe("when the reader goes back inside the drawer, then presses the browser Back", () => {
+    it("returns to the drawer they left rather than repeating the address", async () => {
+      let drawers: ReturnType<typeof useDrawer> | undefined;
+      let navigate: NavigateFunction | undefined;
+      function Host() {
+        drawers = useDrawer();
+        navigate = useNavigate();
+        return <Probe />;
+      }
+      render(
+        <MemoryRouter initialEntries={["/acme/traces"]}>
+          <Host />
+        </MemoryRouter>,
+      );
+
+      await act(async () => drawers?.openDrawer("first"));
+      await act(async () => drawers?.openDrawer("second"));
+      await act(async () => drawers?.goBack());
+      expect(screen.getByTestId("address")).toHaveTextContent("drawer.open=first");
+
+      await act(async () => {
+        void navigate?.(-1);
+      });
+
+      expect(screen.getByTestId("address")).toHaveTextContent("drawer.open=second");
+    });
+  });
+});
+
+describe("given an address with a fragment", () => {
+  describe("when a drawer is opened from module-level code", () => {
+    it("keeps the fragment", async () => {
+      window.history.replaceState(null, "", "/acme/traces#lens");
+      render(
+        <MemoryRouter initialEntries={["/acme/traces#lens"]}>
+          <Navigator />
+          <Probe />
+        </MemoryRouter>,
+      );
+
+      await act(async () => {
+        navigateToDrawer("traceV2Details");
+      });
+
+      expect(screen.getByTestId("address")).toHaveTextContent("?drawer.open=traceV2Details#lens");
+    });
+  });
+});
