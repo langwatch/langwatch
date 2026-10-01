@@ -87,34 +87,39 @@ const chooseOption = async ({
   if (!chosen) await page.keyboard.press("Escape");
 };
 
+/**
+ * createAutomation opens the Add automation wizard from the traces toolbar and names it. `kind:
+ * alert` picks the "A graph" watch. `cadence` and `settleWindow` live on the Delivery step, so
+ * either one moves the wizard there (the subject must already be set) and leaves it open.
+ */
 export const createAutomation: Action = async (context) => {
+  const { page } = context.side;
   await goTo({ context, path: "/{slug}/traces" });
-  await clickText({ context, text: "Automate" });
+  await dismissTour(context);
+  await clickText({ context, text: String.raw`/^\s*Automate\s*$/` });
   await context.snapshot("automation drawer");
+  const name = page.getByTestId("automation-name-input");
+  await name.waitFor({ state: "visible", timeout: 10_000 });
+  await name.fill(argument({ context, name: "name" }), { timeout: 6000 });
   if (context.args.kind === "alert") {
-    await required(context, "Watch a metric");
+    await clickText({ context, text: "A graph" });
     await context.snapshot("alert form");
-  } else {
-    // Choosing the type re-renders the form, so it comes before the name.
-    await required(context, "Act on each matching trace");
   }
-  // By its label: the placeholder names an example, and each kind shows its own.
-  await fillField({ context, target: "/^Name$/", value: argument({ context, name: "name" }) });
   const cadence = context.args.cadence;
-  if (cadence !== undefined) await chooseOption({ context, option: cadence });
   const settleWindow = context.args.settleWindow;
-  if (settleWindow !== undefined) {
-    const root = await scope(context.side.page);
-    await root
-      .locator('input[type="number"]')
-      .locator("visible=true")
-      .first()
-      .fill(settleWindow, { timeout: 6000 });
+  if (cadence !== undefined || settleWindow !== undefined) {
+    await clickText({ context, text: String.raw`/^\s*Continue\s*$/` });
+    await page
+      .getByTestId("automation-delivery-send-email")
+      .waitFor({ state: "visible", timeout: 10_000 });
+    if (cadence !== undefined) await chooseOption({ context, option: cadence });
+    if (settleWindow !== undefined) {
+      await fillField({ context, target: "Settle window", value: settleWindow });
+    }
   }
   await context.snapshot("automation filled in");
-  // submit "none" leaves the drawer open for the steps that set its subject.
-  const fallback = context.args.kind === "alert" ? "Create alert" : "Create automation";
-  const submit = argument({ context, name: "submit", fallback });
+  // submit "none" leaves the wizard open for the steps that set the subject and delivery.
+  const submit = argument({ context, name: "submit", fallback: "none" });
   if (submit !== "none") await required(context, submit);
   await context.snapshot("after create");
 };
@@ -141,16 +146,20 @@ export const openTrace: Action = async (context) => {
   await context.snapshot("spans tab");
 };
 
+/** annotate opens the trace drawer by its address and comments on the trace input. */
 export const annotate: Action = async (context) => {
+  const { page } = context.side;
   await goTo({ context, path: `/{slug}/traces/${argument({ context, name: "traceId" })}` });
-  await required(context, "/^(Annotate|Add annotation|Annotations)/");
+  const control = page.getByTestId("anchor-comment-button").first();
+  await control.waitFor({ state: "visible", timeout: 15_000 });
+  await control.click({ timeout: 6000 });
   await context.snapshot("annotation form");
   const comment = argument({ context, name: "comment", fallback: "Visual diff note" });
-  await context.side.page
-    .locator("textarea")
-    .last()
+  await page
+    .locator('textarea[placeholder="Optional"]')
+    .first()
     .fill(`${comment} (${context.side.name})`, { timeout: 8000 });
-  await required(context, "/^(Save|Add|Submit|Comment)/");
+  await page.locator('button:text-is("Save")').first().click({ timeout: 6000 });
   await context.snapshot("after annotating");
 };
 
