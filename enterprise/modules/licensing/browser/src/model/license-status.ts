@@ -50,15 +50,6 @@ export function licenseMetersSeats(
 }
 
 /**
- * Normalizes a license key for activation.
- * Trims whitespace and returns null for empty/whitespace-only keys.
- */
-export function normalizeKeyForActivation(key: string): string | null {
-  const trimmed = key.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-/**
  * Formats an ISO date string for display.
  * Returns the original string if parsing fails.
  */

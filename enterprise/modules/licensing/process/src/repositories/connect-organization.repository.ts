@@ -20,6 +20,9 @@ export interface ConnectOrganizationRepository {
   /** Every organization on this install that holds a license, of any kind. */
   findLicensedOrganizationIds(): Promise<string[]>;
 
+  /** Every organization on this install with its stored license, oldest first. */
+  findAllOldestFirst(): Promise<{ organizationId: string; license: string | null }[]>;
+
   setServicesDisabled(params: {
     organizationId: string;
     servicesDisabled: readonly string[];

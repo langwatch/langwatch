@@ -14,10 +14,9 @@ import { ssoSelfServeAvailability } from "../rules/sso-self-serve-availability.r
 /**
  * What the installation's licence may authorize (D05 tier 2).
  *
- * The answer is the same gate a sign-in asks, frozen for the same reason: a
- * licence activated while the installation runs does not change what it
- * federates until it restarts. Two readings of "licensed" would eventually
- * disagree, and the disagreement would be about who gets single sign-on.
+ * The answer is the same gate a sign-in asks (ADR-027 v9: a deny is read again
+ * within a minute). Two readings of "licensed" would eventually disagree, and
+ * the disagreement would be about who gets single sign-on.
  *
  * On the hosted service the answer is always no: no instance licence speaks
  * for the installation, and the claim queue is right beside it.
@@ -32,7 +31,7 @@ export class LicenseDomainClaimAuthority {
   async licenseAuthorizesDomainClaims(): Promise<boolean> {
     if (this.deps.isHosted()) return false;
 
-    return this.deps.licensedAtStartup();
+    return this.deps.licenseGate();
   }
 
   /** The count the guards ask too, so the screen and the rule agree on it. */
@@ -45,14 +44,14 @@ export class LicenseDomainClaimAuthority {
 
 export interface LicenseDomainClaimAuthorityDeps {
   isHosted: () => boolean;
-  licensedAtStartup: () => Promise<boolean>;
+  licenseGate: () => Promise<boolean>;
   licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
 }
 
 /**
  * Whether a genuine licence is active RIGHT NOW, asked afresh rather than
- * through the frozen gate — that difference is the whole point, and it is what
- * tells somebody who has just activated a licence to restart.
+ * through the gate's memo: it is what tells somebody who has just activated a
+ * licence that single sign-on turns on within a minute.
  *
  * Expiry is deliberately irrelevant, exactly as it is for the sign-in gate
  * (ADR-027 decision 1): once a customer, never blocked.
@@ -121,7 +120,7 @@ export class SsoSelfServeContextService {
     return {
       deployment,
       licensed,
-      licenseActivatedSinceStart:
+      licenseActivationPending:
         deployment === "self-hosted" && !licensed
           ? await this.deps.licenseProof.holdsGenuineLicense()
           : false,
@@ -149,8 +148,8 @@ export class SsoSelfServeContextService {
       );
     }
     throw new SsoLicenseRequiredError(
-      availability.refusal === "license_restart_required"
-        ? `organization ${organizationId}: a license was activated after this process started`
+      availability.refusal === "license_activation_pending"
+        ? `organization ${organizationId}: a license was activated and has not reached this process's gate yet`
         : `organization ${organizationId}: the installation holds no genuine license`,
     );
   }

@@ -3040,7 +3040,7 @@ const presentations = {
   sso_license_required: {
     title: "Single sign-on needs an active licence",
     describe: () =>
-      "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+      "Activate an enterprise licence on this installation, and you can set single sign-on up here. A licence activated a moment ago reaches every server within a minute.",
   },
   sso_self_serve_unavailable: {
     title: "Setting single sign-on up yourself isn't switched on yet",

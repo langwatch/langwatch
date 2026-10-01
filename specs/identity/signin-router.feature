@@ -422,10 +422,11 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then that provider is not one of the offered methods
 
   @unit
-  Scenario: The license gate still freezes at startup
-    Given the license gate resolved at startup
-    When a license is activated mid-process
-    Then routing decisions do not change until the next restart
+  Scenario: The license gate re-reads a deny after a minute
+    Given the license gate denied federation
+    When another replica stores a license
+    Then routing decisions do not change for up to one minute
+    And then federation is offered without a restart
 
   # ── Callback linking ───────────────────────────────────────────────────
 

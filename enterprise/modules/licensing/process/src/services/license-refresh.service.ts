@@ -113,10 +113,20 @@ export class LicenseRefreshService {
    * credential for this one call and is never stored; what comes back is an
    * ordinary signed license, validated and stored like a pasted one.
    */
-  async redeemActivationCode({ code }: { code: string }): Promise<{ licenseKey: string }> {
+  async redeemActivationCode({
+    code,
+    signal,
+  }: {
+    code: string;
+    signal?: AbortSignal;
+  }): Promise<{ licenseKey: string }> {
     const host = this.deps.host;
     if (!host) throw new ConnectDisabledError();
-    const answer = await host.activate({ code, instanceId: await this.deps.instanceId() });
+    const answer = await host.activate({
+      code,
+      instanceId: await this.deps.instanceId(),
+      ...(signal ? { signal } : {}),
+    });
     return { licenseKey: answer.license };
   }
 

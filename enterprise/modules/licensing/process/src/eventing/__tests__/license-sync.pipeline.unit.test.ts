@@ -2,12 +2,15 @@
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { JsonValue } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
+import { ORGANIZATION_SIGNED_UP_EVENT_TYPE } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { licensingServer } from "../../licensing.server.ts";
 import { LICENSE_SYNC_PROCESS_NAME } from "../license-sync.intent.ts";
 import {
   buildLicenseSync,
+  CONFIGURED_LICENSE_ON_SIGN_UP,
+  configuredLicenseOnSignUp,
   LICENSE_SYNC_PIPELINE_NAME,
   licenseSyncEventing,
 } from "../license-sync.pipeline.ts";
@@ -81,7 +84,7 @@ describe("given the license sync's eventing declaration", () => {
       const definition = buildLicenseSync({
         participation: "consume",
         repositories: undefined,
-        app: { syncLicenses },
+        app: { syncLicenses, activateConfiguredLicense: vi.fn() },
         processStore,
         bootedAt: BOOTED_AT,
       });
@@ -110,7 +113,10 @@ describe("given the license sync's eventing declaration", () => {
       const definition = buildLicenseSync({
         participation: "consume",
         repositories: undefined,
-        app: { syncLicenses: async () => Promise.reject(new Error("host down")) },
+        app: {
+          syncLicenses: async () => Promise.reject(new Error("host down")),
+          activateConfiguredLicense: vi.fn(),
+        },
         processStore: InMemoryProcessStore.createForTesting(),
       });
       const process = definition.processManagers.get(LICENSE_SYNC_PROCESS_NAME);
@@ -128,6 +134,37 @@ describe("given the license sync's eventing declaration", () => {
           },
         ),
       ).rejects.toThrow("host down");
+    });
+  });
+
+  describe("when an organization signs up", () => {
+    /** @scenario "an activation code on a fresh install waits for the first organization" */
+    it("asks the app to redeem a configured activation code", async () => {
+      const activateConfiguredLicense = vi.fn(async () => ({ outcome: "not_configured" as const }));
+      const definition = buildLicenseSync({
+        participation: "consume",
+        repositories: undefined,
+        app: { syncLicenses: vi.fn(), activateConfiguredLicense },
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
+      const subscriber = configuredLicenseOnSignUp({ activateConfiguredLicense });
+
+      await subscriber.handle(
+        {
+          tenantId: "org-1",
+          organizationId: "org-1",
+          userId: "user-1",
+          occurredAt: 1,
+          organizationName: "ACME",
+        },
+        { tenantId: "org-1", aggregateId: "org-1", occurredAt: 1 },
+      );
+
+      expect(subscriber.eventType).toBe(ORGANIZATION_SIGNED_UP_EVENT_TYPE);
+      expect(definition.globalProjections?.map(({ name }) => name)).toContain(
+        `${LICENSE_SYNC_PIPELINE_NAME}.${CONFIGURED_LICENSE_ON_SIGN_UP}`,
+      );
+      expect(activateConfiguredLicense).toHaveBeenCalledTimes(1);
     });
   });
 });

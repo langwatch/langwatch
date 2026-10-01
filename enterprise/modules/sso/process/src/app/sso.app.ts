@@ -231,7 +231,7 @@ export class SsoApp implements SsoApiContract {
     this.#selfServeContext = SsoSelfServeContextService.create({
       authority: LicenseDomainClaimAuthority.create({
         isHosted,
-        licensedAtStartup: () => gate.platformAllowed(),
+        licenseGate: () => gate.platformAllowed(),
         licensing: dependencies.licensing,
       }),
       // The same staff list the back office gates on (ADMIN_EMAILS).
