@@ -105,7 +105,6 @@ export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickH
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        adminEmails: config.process.adminEmails,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-api",
         storageResolver: void 0,
