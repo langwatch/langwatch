@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Freshness and authenticity for the Auth0 SCIM webhook, in the header shape
- * `packages/egress/src/webhook/signature.ts` already publishes:
+ * `modules/webhook/process/src/rules/webhook-signature.rules.ts` already publishes:
  *
  *   X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256 of "<t>.<body>">
  *
