@@ -88,7 +88,7 @@ describe("the voicesim console", () => {
     expect(within(timeline).getAllByTestId("call-turn")[0]?.textContent).toContain(
       "How can I help you today?",
     );
-    expect(timeline.textContent).toContain("32 caller frames · 60 agent frames");
+    expect(timeline.textContent).toContain("32 caller · 60 agent");
     expect(timeline.textContent).toContain("conversation_initiation_metadata");
   });
 

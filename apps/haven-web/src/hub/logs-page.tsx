@@ -14,7 +14,7 @@ import {
 import { useEffect, useState, type KeyboardEvent } from "react";
 
 import { getJson } from "../shared/api.ts";
-import { logsSchema, type CapturedLine, type Logs } from "../shared/contract.ts";
+import { logsSchema, type CapturedLine, type HubStack, type Logs } from "../shared/contract.ts";
 import { formatClock, formatCount } from "../shared/format.ts";
 import { HavenTopBar } from "../shared/haven-top-bar.tsx";
 import { usePoll } from "../shared/use-poll.ts";
@@ -32,6 +32,8 @@ export type LogsPageProps = {
   onSelect: (selection: { stack: string; lane: string }) => void;
   /** Bumped by the `/` shortcut; each bump focuses the filter. */
   focusRequest: number;
+  /** The machine's stacks, for the top bar's consoles. */
+  hubStacks?: HubStack[];
 };
 
 const optionsOf = ({
@@ -87,7 +89,14 @@ const statusOf = ({
     .join(" · ");
 };
 
-export const LogsPage = ({ stacks, stack, lane, onSelect, focusRequest }: LogsPageProps) => {
+export const LogsPage = ({
+  stacks,
+  stack,
+  lane,
+  onSelect,
+  focusRequest,
+  hubStacks,
+}: LogsPageProps) => {
   const [search, setSearch] = useState("");
   const [muted, setMuted] = useState<string[]>([]);
   const [paused, setPaused] = useState(false);
@@ -155,7 +164,7 @@ export const LogsPage = ({ stacks, stack, lane, onSelect, focusRequest }: LogsPa
   return (
     <Page
       width="full"
-      nav={<HavenTopBar current="logs" hubHref="/" />}
+      nav={<HavenTopBar current="logs" hubHref="/" stacks={hubStacks} />}
       title="Logs"
       subtitle={stack === "" ? "Captured output of every stack on this machine." : status}
     >

@@ -1,10 +1,18 @@
-import { List, ListItem } from "@langwatch/design-system-internal";
+import { List, ListItem, Panel } from "@langwatch/design-system-internal";
 import type { KeyboardEvent, ReactNode } from "react";
 
 export type SimListProps<T> = {
   items: T[];
   rowKey: (item: T) => string;
   renderRow: (item: T) => ReactNode;
+  /** A row's second line, under its title. */
+  rowDescription?: (item: T) => ReactNode;
+  /** Right-aligned beside the row, as a time or a count. */
+  rowMeta?: (item: T) => ReactNode;
+  /** Given, the list sits in a titled panel: `meta` beside the title, `actions` at its end. */
+  title?: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
   selectedKey?: string;
   /** Without it the rows are read-only. */
   onSelect?: (key: string) => void;
@@ -33,32 +41,46 @@ export const SimList = <T,>({
   items,
   rowKey,
   renderRow,
+  rowDescription,
+  rowMeta,
+  title,
+  meta,
+  actions,
   selectedKey,
   onSelect,
   empty,
 }: SimListProps<T>) => {
-  if (items.length === 0) return <>{empty}</>;
+  const body =
+    items.length === 0 ? (
+      <>{empty}</>
+    ) : (
+      <div
+        className="sim-list"
+        role="presentation"
+        onKeyDown={onSelect === undefined ? undefined : (event) => moveFocus({ event })}
+      >
+        <List>
+          {items.map((item) => {
+            const key = rowKey(item);
+            const row = {
+              title: renderRow(item),
+              description: rowDescription?.(item),
+              meta: rowMeta?.(item),
+              current: key === selectedKey,
+            };
+            return onSelect === undefined ? (
+              <ListItem key={key} {...row} />
+            ) : (
+              <ListItem key={key} {...row} onSelect={() => onSelect(key)} />
+            );
+          })}
+        </List>
+      </div>
+    );
+  if (title === undefined) return body;
   return (
-    <div
-      className="sim-list"
-      role="presentation"
-      onKeyDown={onSelect === undefined ? undefined : (event) => moveFocus({ event })}
-    >
-      <List>
-        {items.map((item) => {
-          const key = rowKey(item);
-          return onSelect === undefined ? (
-            <ListItem key={key} title={renderRow(item)} current={key === selectedKey} />
-          ) : (
-            <ListItem
-              key={key}
-              title={renderRow(item)}
-              current={key === selectedKey}
-              onSelect={() => onSelect(key)}
-            />
-          );
-        })}
-      </List>
-    </div>
+    <Panel title={title} meta={meta} actions={actions}>
+      {body}
+    </Panel>
   );
 };

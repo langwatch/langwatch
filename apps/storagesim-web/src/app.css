@@ -1,18 +1,23 @@
 /* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
 
-.analytics-search {
+.storage-search {
   flex: 1 1 16rem;
   min-width: 0;
 }
 
-.analytics-kind {
-  flex: 0 1 14rem;
+.storage-bucket {
+  flex: 0 1 18rem;
   min-width: 0;
 }
 
+.storage-preview {
+  display: block;
+  max-width: 100%;
+}
+
 @media (max-width: 719px) {
-  .analytics-search,
-  .analytics-kind {
+  .storage-search,
+  .storage-bucket {
     flex-basis: 100%;
   }
 }

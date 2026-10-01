@@ -7,18 +7,18 @@ const LABEL = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const MACHINE_WIDE = new Set(["hub", "idp", "observability", "telemetry", "langwatch"]);
 
 /** Each console of a stack: `null` is the stack home, `<slug>.langwatch.localhost`. */
-const CONSOLES: { label: string; service: string | null }[] = [
+const CONSOLES: { label: string; service: string | null; group?: string }[] = [
   { label: "Home", service: null },
   { label: "Hub", service: "hub" },
   { label: "App", service: "app" },
-  { label: "Mail", service: "mail" },
-  { label: "IdP", service: "idp" },
-  { label: "Storage", service: "storage" },
-  { label: "Voice", service: "voice" },
-  { label: "LLM", service: "llm" },
-  { label: "Analytics", service: "analytics" },
-  { label: "Design system", service: "design-system" },
-  { label: "Mail room", service: "mail-room" },
+  { label: "Mail", service: "mail", group: "Sims" },
+  { label: "IdP", service: "idp", group: "Sims" },
+  { label: "Storage", service: "storage", group: "Sims" },
+  { label: "Voice", service: "voice", group: "Sims" },
+  { label: "LLM", service: "llm", group: "Sims" },
+  { label: "Analytics", service: "analytics", group: "Sims" },
+  { label: "Design system", service: "design-system", group: "Tools" },
+  { label: "Mail room", service: "mail-room", group: "Tools" },
 ];
 
 export type ConsoleLocation = Pick<Location, "protocol" | "hostname" | "port">;
@@ -66,7 +66,10 @@ export const consoleLinks = ({ location }: { location: ConsoleLocation }): Conso
     if (service === null) return `${slug}.${DOMAIN}`;
     return service === "hub" ? `hub.${DOMAIN}` : `${service}.${slug}.${DOMAIN}`;
   };
-  const links = CONSOLES.map(({ label, service }) => linkTo({ label, host: hostOf({ service }) }));
+  const links = CONSOLES.map(({ label, service, group }) => {
+    const link = linkTo({ label, host: hostOf({ service }) });
+    return group === undefined ? link : { ...link, group };
+  });
   const homeHref = `${location.protocol}//${hostOf({ service: null })}${port}`;
   return { slug, homeHref, hubHref: hub.href, links };
 };

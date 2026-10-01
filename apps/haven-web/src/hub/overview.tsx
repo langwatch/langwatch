@@ -63,7 +63,7 @@ export const Overview = ({ poll }: { poll: Poll<Hub> }) => {
   const now = updatedAt ?? nowMs();
   return (
     <Page
-      nav={<HavenTopBar current="hub" hubHref="/" />}
+      nav={<HavenTopBar current="hub" hubHref="/" stacks={hub?.stacks} />}
       title="What this machine is running"
       subtitle={hub === undefined ? "Reading the machine…" : summaryOf({ hub })}
       actions={

@@ -1,4 +1,5 @@
-import { SimEmpty, SimList, SimSplit, SimTime } from "@langwatch/sim-console";
+import { Inline, Input, List, ListItem, Panel, Select } from "@langwatch/design-system-internal";
+import { SimEmpty, SimSplit, SimTime } from "@langwatch/sim-console";
 import { useState } from "react";
 
 import { formatSize } from "./format.ts";
@@ -19,43 +20,81 @@ export const ObjectsTab = ({
   onBucket: (bucket: string) => void;
 }) => {
   const [selected, setSelected] = useState("");
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const shown = objects.filter(
+    (object) =>
+      (bucket === "" || object.bucket === bucket) &&
+      (needle === "" || objectKey(object).toLowerCase().includes(needle)),
+  );
+  const filtered = bucket !== "" || needle !== "";
   const open = objects.find((object) => objectKey(object) === selected);
   return (
     <>
-      <label>
-        Bucket{" "}
-        <select value={bucket} onChange={(event) => onBucket(event.target.value)}>
-          <option value="">All buckets</option>
-          {buckets.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Inline gap={3} wrap>
+        <div className="storage-search">
+          <Input
+            label="Search objects"
+            hideLabel
+            type="search"
+            placeholder="Key or bucket"
+            autoComplete="off"
+            value={query}
+            onChange={setQuery}
+          />
+        </div>
+        <div className="storage-bucket">
+          <Select
+            label="Bucket"
+            hideLabel
+            value={bucket}
+            onChange={onBucket}
+            options={[
+              { value: "", label: "All buckets" },
+              ...buckets.map((name) => ({ value: name, label: name })),
+            ]}
+          />
+        </div>
+      </Inline>
       <SimSplit
         list={
-          <SimList
-            items={objects}
-            rowKey={objectKey}
-            selectedKey={selected}
-            onSelect={setSelected}
-            renderRow={(object) => (
-              <span>
-                <strong>{object.key}</strong> {formatSize({ bytes: object.size })}{" "}
-                <span>{object.contentType}</span> <code>{object.etag}</code>{" "}
-                <SimTime at={object.lastModified} />
-              </span>
+          <Panel
+            title="Objects"
+            meta={filtered ? `${shown.length} of ${objects.length}` : String(objects.length)}
+          >
+            {shown.length === 0 ? (
+              <SimEmpty
+                title={filtered ? "No objects match" : "No objects"}
+                hint={
+                  filtered
+                    ? "Try another search or bucket."
+                    : "Objects the stack uploads are listed here."
+                }
+              />
+            ) : (
+              <List label="Stored objects">
+                {shown.map((object) => (
+                  <ListItem
+                    key={objectKey(object)}
+                    current={objectKey(object) === selected}
+                    onSelect={() => setSelected(objectKey(object))}
+                    title={object.key}
+                    description={`${object.bucket} · ${formatSize({ bytes: object.size })}`}
+                    meta={<SimTime at={object.lastModified} />}
+                  />
+                ))}
+              </List>
             )}
-            empty={<SimEmpty title="No objects" hint="Uploaded objects are listed here." />}
-          />
+          </Panel>
         }
         detail={open ? <ObjectDetail object={open} /> : null}
         emptyDetail={
-          <SimEmpty
-            title="Select an object"
-            hint="Its headers, preview and download appear here."
-          />
+          <Panel>
+            <SimEmpty
+              title="Select an object"
+              hint="Its metadata, headers, preview and download appear here."
+            />
+          </Panel>
         }
       />
     </>

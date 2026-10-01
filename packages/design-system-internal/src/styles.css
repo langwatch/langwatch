@@ -356,6 +356,13 @@ a.ds-topbar-brand {
   gap: var(--space-1);
   margin-left: auto;
   min-width: 0;
+}
+
+.ds-topbar-scroll {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -373,12 +380,14 @@ a.ds-topbar-brand {
   white-space: nowrap;
 }
 
-.ds-topbar-link:hover {
+.ds-topbar-link:hover,
+.ds-topbar-group > .ds-menu > .ds-button:hover {
   color: var(--ink-900);
   background: var(--paper-soft);
 }
 
-.ds-topbar-link[aria-current="page"] {
+.ds-topbar-link[aria-current="page"],
+.ds-topbar-group[data-current] > .ds-menu > .ds-button {
   color: var(--ink-900);
   background: var(--paper-soft);
 }
@@ -387,16 +396,28 @@ a.ds-topbar-brand {
   outline-offset: -2px;
 }
 
+/* A group's trigger reads as one more nav link, not as a form button. */
+.ds-topbar-group > .ds-menu > .ds-button {
+  gap: var(--space-1);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 /* More links past an edge: that edge fades, so no label ends mid-word with no hint. */
-.ds-topbar-nav[data-more-end] {
+.ds-topbar-scroll[data-more-end] {
   mask-image: linear-gradient(to right, #000 calc(100% - var(--space-8)), transparent);
 }
 
-.ds-topbar-nav[data-more-start] {
+.ds-topbar-scroll[data-more-start] {
   mask-image: linear-gradient(to left, #000 calc(100% - var(--space-8)), transparent);
 }
 
-.ds-topbar-nav[data-more-start][data-more-end] {
+.ds-topbar-scroll[data-more-start][data-more-end] {
   mask-image: linear-gradient(
     to right,
     transparent,

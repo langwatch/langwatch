@@ -16,10 +16,18 @@ export const SimCode = ({ text, language }: { text: string; language?: string })
   </div>
 );
 
-/** A value as indented JSON: folds away, and the block copies. */
-export const SimJson = ({ value }: { value: unknown }) => (
-  <details className="sim-json" open>
-    <summary>JSON</summary>
+/** A value as indented JSON: folds away (open unless `open` is false), and the block copies. */
+export const SimJson = ({
+  value,
+  label = "JSON",
+  open = true,
+}: {
+  value: unknown;
+  label?: string;
+  open?: boolean;
+}) => (
+  <details className="sim-json" open={open}>
+    <summary>{label}</summary>
     <CodeBlock code={JSON.stringify(value, null, 2)} label="JSON" wrap />
   </details>
 );
@@ -36,4 +44,11 @@ export const SimTime = ({ at }: { at: TimeInput }) => {
       {formatDistanceToNow(at, { addSuffix: true })}
     </time>
   );
+};
+
+/** The time from `from` to `to` in seconds, as "12.3 s"; "live" while `to` is absent. */
+export const SimDuration = ({ from, to }: { from: TimeInput; to?: TimeInput }) => {
+  if (to === undefined) return <>live</>;
+  const seconds = (toEpochMs(to) - toEpochMs(from)) / 1_000;
+  return <>{Number.isNaN(seconds) ? "unknown" : `${seconds.toFixed(1)} s`}</>;
 };

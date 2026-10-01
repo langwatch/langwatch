@@ -22,3 +22,10 @@ export const previewKind = ({ contentType }: { contentType: string }): Preview =
 /** `storage.<slug>.langwatch.localhost` names its stack; any other host has none. */
 export const stackFromHost = ({ hostname }: { hostname: string }) =>
   /^storage\.(.+)\.langwatch\.localhost$/u.exec(hostname)?.[1] ?? "";
+
+/** 2xx reads ok, 4xx a refusal worth a look, 5xx an error; redirects stay neutral. */
+export const statusTone = ({ status }: { status: number }) => {
+  if (status >= 500) return "error";
+  if (status >= 400) return "warn";
+  return status >= 200 && status < 300 ? "ok" : "neutral";
+};

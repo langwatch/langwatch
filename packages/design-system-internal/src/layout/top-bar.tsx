@@ -1,11 +1,13 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 import { flag } from "../class-names.ts";
+import { Menu } from "../overlays/menu.tsx";
 import { useScrollEdges } from "../surfaces/use-scroll-edges.ts";
 import { ThemeToggle } from "../theme/theme-toggle.tsx";
 import { tokens } from "../tokens.ts";
 
-export type ConsoleLink = { label: string; href: string; current?: boolean };
+/** A link with a `group` sits in that group's menu ("Sims", "Tools"), not flat in the bar. */
+export type ConsoleLink = { label: string; href: string; current?: boolean; group?: string };
 
 export type TopBarProps = {
   /** The console's name, e.g. "haven" or "IdP simulator". */
@@ -53,30 +55,64 @@ const revealCurrent = ({ nav }: { nav: HTMLElement }) => {
   if (inner.left < outer.left + FADE) nav.scrollLeft -= outer.left + FADE - inner.left;
 };
 
-/** Scrolls sideways when the links outgrow the bar; a faded edge says there is more. */
+/** One menu per group; its trigger names the link this page is on, e.g. "Sims · Voice". */
+const ConsoleMenu = ({ group, links }: { group: string; links: ConsoleLink[] }) => {
+  const current = links.find((link) => link.current);
+  return (
+    <div className="ds-topbar-group" data-current={flag({ on: current !== undefined })}>
+      <Menu
+        label={current === undefined ? group : `${group} · ${current.label}`}
+        align="end"
+        size="sm"
+        items={links.map(({ label, href }) => ({
+          label,
+          onSelect: () => window.location.assign(href),
+        }))}
+      />
+    </div>
+  );
+};
+
+const groupsOf = ({ links }: { links: ConsoleLink[] }) => {
+  const groups = new Map<string, ConsoleLink[]>();
+  for (const link of links) {
+    if (link.group !== undefined) groups.set(link.group, [...(groups.get(link.group) ?? []), link]);
+  }
+  return [...groups];
+};
+
+/**
+ * Flat links scroll sideways when they outgrow the bar (a faded edge says there
+ * is more); the menus sit outside the scroller, so their lists are never clipped.
+ */
 const ConsoleNav = ({ links }: { links: ConsoleLink[] }) => {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (ref.current !== null) revealCurrent({ nav: ref.current });
   }, [links]);
   const edges = useScrollEdges({ ref, axis: "x", watch: links });
+  const flat = links.filter((link) => link.group === undefined);
   return (
-    <nav
-      ref={ref}
-      className="ds-topbar-nav"
-      aria-label="Consoles"
-      data-more-start={flag({ on: edges.start })}
-      data-more-end={flag({ on: edges.end })}
-    >
-      {links.map((link) => (
-        <a
-          key={link.href}
-          className="ds-topbar-link"
-          href={link.href}
-          aria-current={link.current ? "page" : undefined}
-        >
-          {link.label}
-        </a>
+    <nav className="ds-topbar-nav" aria-label="Consoles">
+      <div
+        ref={ref}
+        className="ds-topbar-scroll"
+        data-more-start={flag({ on: edges.start })}
+        data-more-end={flag({ on: edges.end })}
+      >
+        {flat.map((link) => (
+          <a
+            key={link.href}
+            className="ds-topbar-link"
+            href={link.href}
+            aria-current={link.current ? "page" : undefined}
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+      {groupsOf({ links }).map(([group, members]) => (
+        <ConsoleMenu key={group} group={group} links={members} />
       ))}
     </nav>
   );

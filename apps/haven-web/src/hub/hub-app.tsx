@@ -48,7 +48,7 @@ export const HubApp = ({ route, navigate }: { route: HubRoute; navigate: Navigat
   useSlashShortcut({ onSlash });
 
   if (route.page === "overview") return <Overview poll={poll} />;
-  if (route.page === "settings") return <SettingsPage />;
+  if (route.page === "settings") return <SettingsPage hubStacks={poll.data?.stacks} />;
   const stacks = (poll.data?.stacks ?? []).map((stack) => stack.slug);
   const [only] = stacks;
   const stack =
@@ -59,6 +59,7 @@ export const HubApp = ({ route, navigate }: { route: HubRoute; navigate: Navigat
       stack={stack}
       lane={route.lane}
       focusRequest={focusRequest}
+      hubStacks={poll.data?.stacks}
       onSelect={(selection) => navigate({ path: logsPath(selection), replace: true })}
     />
   );

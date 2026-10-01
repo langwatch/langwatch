@@ -96,6 +96,7 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	mux.HandleFunc("POST /flags/", s.handlePostHogFlags)
 	mux.HandleFunc("POST /decide/", s.handlePostHogFlags)
 	mux.HandleFunc("GET /array/", s.handlePostHogRemoteConfig)
+	mux.HandleFunc("GET /static/", handlePostHogExtension)
 	// Customer.io: the CDP API nurturing posts to, and the Track API.
 	mux.HandleFunc("POST /v1/{call}", s.handleCustomerIOCDP)
 	mux.HandleFunc("PUT /api/v1/customers/{id}", s.handleCustomerIOTrack)
@@ -199,6 +200,14 @@ func (s *Server) handlePostHogCapture(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDiscard(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(io.Discard, http.MaxBytesReader(w, r.Body, maxBody))
 	writeJSON(w, http.StatusOK, map[string]int{"status": 1})
+}
+
+// handlePostHogExtension answers posthog-js's lazy extension scripts
+// (exception autocapture, surveys, recorder) with an empty one, so the page
+// logs no 404 and loads no real extension.
+func handlePostHogExtension(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript")
+	w.WriteHeader(http.StatusOK)
 }
 
 // handlePostHogFlags answers every flag question with no flags, so both clients

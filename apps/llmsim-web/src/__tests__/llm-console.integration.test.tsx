@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LlmConsole } from "../llm-console.tsx";
@@ -50,7 +50,7 @@ const json = ({ body, status = 200 }: { body: unknown; status?: number }) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 /** llmsim's console API as the page calls it; PUT /settings echoes what it was sent. */
-const fakeSim = () => {
+const fakeSim = ({ listed = calls }: { listed?: typeof calls } = {}) => {
   const fetch = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(input, "http://llm.test");
     if (url.pathname === "/_sim/api/info") {
@@ -63,7 +63,7 @@ const fakeSim = () => {
         },
       });
     }
-    if (url.pathname === "/_sim/api/calls") return json({ body: { calls } });
+    if (url.pathname === "/_sim/api/calls") return json({ body: { calls: listed } });
     if (url.pathname.startsWith("/_sim/api/calls/")) {
       return json({ body: details[url.pathname.split("/").pop() ?? ""] });
     }
@@ -86,7 +86,11 @@ describe("the llmsim console", () => {
     fakeSim();
     render(<LlmConsole />);
 
-    await waitFor(() => expect(screen.getAllByTestId("call-row")).toHaveLength(2));
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("list", { name: "Recent calls" })).getAllByRole("listitem"),
+      ).toHaveLength(2),
+    );
     await waitFor(() =>
       expect(screen.getByTestId("call-detail").textContent).toContain(
         "The model reads the question.",
@@ -100,6 +104,14 @@ describe("the llmsim console", () => {
         'search_traces({"query":"x"})',
       ),
     );
+  });
+
+  it("explains how to produce calls when there are none", async () => {
+    fakeSim({ listed: [] });
+    render(<LlmConsole />);
+
+    expect(await screen.findByText("No calls yet")).toBeTruthy();
+    expect(screen.getByText("haven up +llm")).toBeTruthy();
   });
 
   it("saves a forced error from the settings tab", async () => {

@@ -1,3 +1,4 @@
+import { IconButton, IconRefresh, Panel, Section } from "@langwatch/design-system-internal";
 import {
   SimConsole,
   SimEmpty,
@@ -12,9 +13,7 @@ import { useState } from "react";
 import { CallTimeline } from "./call-timeline.tsx";
 import { fetchCalls, fetchStatus } from "./voice-api.ts";
 
-const CALLS_TAB = "calls";
-
-/** The voice simulator's console: recent simulated calls, each with its turn timeline. */
+/** The voice simulator's console: recent simulated calls, each with its conversation. */
 export const CallsConsole = () => {
   const status = useSimPoll({ fetch: fetchStatus });
   const calls = useSimPoll({ fetch: fetchCalls });
@@ -28,9 +27,8 @@ export const CallsConsole = () => {
       sim="voice"
       title="Voice"
       stackSlug={status.data?.stack ?? ""}
-      tabs={[{ id: CALLS_TAB, label: "Calls", count: items.length }]}
-      activeTab={CALLS_TAB}
-      // One tab, so there is nothing to switch to.
+      tabs={[]}
+      activeTab=""
       onTab={() => undefined}
       status={
         failure
@@ -38,37 +36,55 @@ export const CallsConsole = () => {
           : { tone: "ok", text: `ElevenLabs at ${status.data?.elevenLabsBaseUrl ?? "…"}` }
       }
     >
-      {calls.error ? (
-        <SimRefusal message={calls.error.message} />
-      ) : (
-        <SimSplit
-          list={
-            <SimList
-              items={items}
-              rowKey={(call) => call.id}
-              selectedKey={selected?.id}
-              onSelect={setSelectedId}
-              renderRow={(call) => (
-                <span className="voice-row" data-testid="call-row">
-                  <strong>{call.agentId || call.id}</strong>
-                  <span>
-                    {call.turns.length} turns · {call.endedAt ? "ended" : "live"}
-                  </span>
-                  <SimTime at={call.startedAt} />
-                </span>
-              )}
-              empty={
+      <Section
+        title="Calls"
+        description="Every voice-agent call this stack places is answered here by a scripted agent; nothing reaches ElevenLabs or OpenAI."
+      >
+        {calls.error ? (
+          <SimRefusal message={calls.error.message} />
+        ) : (
+          <SimSplit
+            list={
+              <SimList
+                title="Calls"
+                meta={String(items.length)}
+                actions={
+                  <IconButton
+                    label="Refresh"
+                    icon={<IconRefresh />}
+                    size="sm"
+                    onClick={() => void calls.refresh()}
+                  />
+                }
+                items={items}
+                rowKey={(call) => call.id}
+                selectedKey={selected?.id}
+                onSelect={setSelectedId}
+                renderRow={(call) => <span data-testid="call-row">{call.agentId || call.id}</span>}
+                rowDescription={(call) =>
+                  `${call.turns.length} turns · ${call.endedAt ? "ended" : "live"}`
+                }
+                rowMeta={(call) => <SimTime at={call.startedAt} />}
+                empty={
+                  <SimEmpty
+                    title="No calls yet"
+                    hint="Talk to a voice agent in the app and its call lands here."
+                  />
+                }
+              />
+            }
+            detail={selected ? <CallTimeline call={selected} /> : undefined}
+            emptyDetail={
+              <Panel>
                 <SimEmpty
-                  title="No calls yet"
-                  hint="Run a scenario against a voice agent; its calls land here."
+                  title="Select a call"
+                  hint="Its facts, transcript and protocol events open here."
                 />
-              }
-            />
-          }
-          detail={selected ? <CallTimeline call={selected} /> : undefined}
-          emptyDetail={<SimEmpty title="No call selected" hint="Pick a call to see its turns." />}
-        />
-      )}
+              </Panel>
+            }
+          />
+        )}
+      </Section>
     </SimConsole>
   );
 };

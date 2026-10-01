@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatSize, previewKind, stackFromHost } from "../format.ts";
+import { formatSize, previewKind, stackFromHost, statusTone } from "../format.ts";
 
 describe("formatSize", () => {
   it("scales bytes to the largest whole unit", () => {
@@ -24,5 +24,16 @@ describe("stackFromHost", () => {
       "feature-one",
     );
     expect(stackFromHost({ hostname: "127.0.0.1" })).toBe("");
+  });
+});
+
+describe("statusTone", () => {
+  it("reads 2xx as ok, 3xx neutral, 4xx warn and 5xx error", () => {
+    expect([200, 302, 404, 503].map((status) => statusTone({ status }))).toEqual([
+      "ok",
+      "neutral",
+      "warn",
+      "error",
+    ]);
   });
 });
