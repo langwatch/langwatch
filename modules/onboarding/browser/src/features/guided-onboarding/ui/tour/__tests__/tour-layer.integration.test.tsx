@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/features/onboarding/guided-tour.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const emitMock = vi.fn();
@@ -112,12 +112,10 @@ const SETTLE = 350;
 const TRAVEL = 850;
 
 function renderLayer() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <OnboardingHostProvider value={new TourTestHost()}>
-        <TourLayer />
-      </OnboardingHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <OnboardingHostProvider value={new TourTestHost()}>
+      <TourLayer />
+    </OnboardingHostProvider>,
   );
 }
 
