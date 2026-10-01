@@ -1,6 +1,7 @@
 export { apiKeyClient, type ApiKeyInputs, type ApiKeyOutputs } from "./api-key-client.ts";
 export {
   personalTokenInput,
+  PROJECT_READ_PERMISSIONS,
   SETUP_AGENT_PERMISSIONS,
   type TokenPermission,
   tokenScopeNote,

@@ -52,7 +52,12 @@ function renderScreen() {
       <ActiveProjectProvider
         value={{
           project: { id: "project-1", slug: "project-1", name: "Project" },
-          freshToken: API_KEY,
+          mcpMinting: {
+            token: API_KEY,
+            isMinting: false,
+            scopeNote: "",
+            mint: async () => API_KEY,
+          },
         }}
       >
         <ViaClaudeCodeScreen />

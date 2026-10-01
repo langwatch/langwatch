@@ -1,4 +1,4 @@
-import { SETUP_AGENT_PERMISSIONS, useMintPersonalToken } from "@langwatch/api-key-client";
+import { PROJECT_READ_PERMISSIONS, useMintPersonalToken } from "@langwatch/api-key-client";
 import { Box } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -15,7 +15,6 @@ import { ActiveProjectProvider } from "./active-project-context.tsx";
 import { useCreateProductScreens } from "./create-product-screens.tsx";
 
 const PRODUCT_BOUNDARY = "onboarding_product";
-const AGENT_SCREENS = new Set(["via-claude-code", "via-claude-desktop"]);
 
 export const ProductScreen: React.FC = () => {
   const { currentScreenIndex, flow, navigation, canGoBack, handleSelectProduct } = useProductFlow();
@@ -50,13 +49,17 @@ export const ProductScreen: React.FC = () => {
     [flow.visibleScreens, currentScreenIndex],
   );
   const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
-  const minting = useMintPersonalToken({
+  const tokenScope = {
     organizationId: organization?.id,
     projectId: resolvedProject?.id,
     userId: host.currentUser()?.id,
-    name: "Personal access token",
-    // Ingestion by default; a screen handing the token to a coding agent or MCP may read too.
-    permissions: AGENT_SCREENS.has(currentScreen?.id ?? "") ? SETUP_AGENT_PERMISSIONS : undefined,
+  };
+  // Two tokens, each minted only on its own click: ingestion for `.env`, project reads for MCP.
+  const minting = useMintPersonalToken({ ...tokenScope, name: "Personal access token" });
+  const mcpMinting = useMintPersonalToken({
+    ...tokenScope,
+    name: "MCP access token",
+    permissions: PROJECT_READ_PERMISSIONS,
   });
   if (!currentScreen) {
     return null;
@@ -86,6 +89,7 @@ export const ProductScreen: React.FC = () => {
               organization,
               freshToken: minting.token,
               minting,
+              mcpMinting,
             }}
           >
             {!isLoading && currentScreen.component ? (

@@ -248,7 +248,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
         | the onboarding API card       | traces:create, as a CLI "login --project" key   | can only send data             |
         | the personal workspace setup  | traces:create                                   | can only send data             |
         | the traces integrate drawer   | traces:create and the MCP and skills read grants | can send traces and read data  |
-        | the onboarding product setup  | traces:create and the MCP and skills read grants | can send traces and read data  |
+        | the onboarding MCP config     | the project read grants only                    | can read this project's data   |
         | the prompt API dialog         | prompts:view                                    | can read prompts               |
         | the evaluator API integration | evaluations:manage                              | can manage evaluations         |
         | the workflow publish dialog   | workflows:manage                                | can manage workflows           |
@@ -294,6 +294,35 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Given the secret panel is open and "I've stored this key" is not ticked
       When "ada" closes the drawer
       Then she is asked to confirm that the key will not be shown again
+
+  Rule: a setup token holds the least its screen needs (Alex, 2026-10-01)
+
+    @integration
+    Scenario: A coding-agent setup mints its MCP token with project reads only, apart from the ingestion token
+      When "ada" creates a token on the onboarding manual setup for project "alpha"
+      Then that token holds only traces:create
+      When she creates a token on the coding-agent setup's MCP tab
+      Then a second token on project "alpha" is minted holding only the project read grants
+      And the MCP config is filled with that second token, never the ingestion one
+
+    @unimplemented
+    Scenario: The traces integrate screens mint an ingestion token for .env and a reads token for MCP
+      When "ada" opens the traces integrate pane or drawer for project "alpha"
+      Then the env block's token holds only traces:create
+      And the MCP config's token holds only the project read grants
+
+    @unimplemented
+    Scenario: A setup skill that creates something gets its own token holding exactly that create permission
+      When "ada" sets up a skill that creates scenarios in project "alpha"
+      Then a token for that skill alone is minted holding only the create permission it calls
+      And the skill is handed no other setup token
+
+    @unimplemented
+    Scenario: The authorize page mints the device-flow default set, capped at what the person holds
+      Given "max" holds only some of the device-flow default permissions on project "alpha"
+      When "max" opens "/authorize" and creates a personal access token
+      Then the token holds the device-flow defaults that "max" holds, and no others
+      And no token with every permission ("permissionMode: all") is minted
 
   Rule: the CLI and MCP flows mint a key rather than hand out the project key
 

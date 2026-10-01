@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * The manual setup card mints a personal access token on the project resolved from
  * `projectSlug` only when the reader asks: no key is on the page before.
- * Spec: specs/features/onboarding/manual-setup-api-key.feature
+ * Spec: specs/features/onboarding/manual-setup-api-key.feature and specs/api-keys/api-keys-v2.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -36,15 +36,22 @@ vi.mock("../../../behavior/use-product-flow.ts", () => ({
 // The hook's own suite covers scoping; this double records the project and holds the token.
 const minted = vi.hoisted(() => ({
   projects: [] as (string | undefined)[],
+  permissions: [] as (readonly string[] | undefined)[],
   tokens: {} as Record<string, string>,
 }));
+const PROJECT_READS = vi.hoisted(() => ["project:view", "traces:view"]);
 vi.mock("@langwatch/api-key-client", () => ({
-  SETUP_AGENT_PERMISSIONS: [],
-  useMintPersonalToken: ({ projectId }: { projectId: string | undefined }) =>
-    useMintDouble(projectId),
+  PROJECT_READ_PERMISSIONS: PROJECT_READS,
+  useMintPersonalToken: ({
+    projectId,
+    permissions,
+  }: {
+    projectId: string | undefined;
+    permissions?: readonly string[];
+  }) => useMintDouble(projectId, permissions),
 }));
 
-function useMintDouble(projectId: string | undefined) {
+function useMintDouble(projectId: string | undefined, permissions: readonly string[] | undefined) {
   const [token, setToken] = useState<string>();
   return {
     token,
@@ -52,6 +59,7 @@ function useMintDouble(projectId: string | undefined) {
     scopeNote: "",
     mint: async () => {
       minted.projects.push(projectId);
+      minted.permissions.push(permissions);
       const answer = projectId ? minted.tokens[projectId] : undefined;
       if (!answer) throw new Error("refused");
       setToken(answer);
@@ -60,10 +68,13 @@ function useMintDouble(projectId: string | undefined) {
   };
 }
 
-// Read at render time, after the top-level import below has bound it.
+// Read at render time, after the top-level imports below have bound them.
+const shown = vi.hoisted(() => ({ screen: "manually" }));
 vi.mock("../create-product-screens.tsx", () => ({
   useCreateProductScreens: () => [
-    { id: "manually", heading: "Manual Setup", component: ApiIntegrationInfoCard },
+    shown.screen === "manually"
+      ? { id: "manually", heading: "Manual Setup", component: ApiIntegrationInfoCard }
+      : { id: "via-claude-code", heading: "Coding agent", component: ViaClaudeCodeScreen },
   ],
 }));
 
@@ -82,6 +93,7 @@ import {
 } from "../../../model/onboarding-host.ts";
 import { ApiIntegrationInfoCard } from "../observability/api-integration-info-card.tsx";
 import { ProductScreen } from "../product-screen.tsx";
+import { ViaClaudeCodeScreen } from "../via-claude-code-screen.tsx";
 
 const SAAS_DEPLOYMENT: UiDeployment = {
   isDevelopment: false,
@@ -172,7 +184,9 @@ class ProductTestHost extends OnboardingHostApi {
 afterEach(() => {
   cleanup();
   minted.projects = [];
+  minted.permissions = [];
   minted.tokens = {};
+  shown.screen = "manually";
 });
 
 function renderManualSetup(host: ProductTestHost) {
@@ -239,6 +253,32 @@ describe("ProductScreen manual setup", () => {
         "<YOUR_LANGWATCH_API_KEY>",
       );
       expect(host.copies).toEqual([]);
+    });
+  });
+});
+
+describe("ProductScreen coding-agent setup", () => {
+  describe("when the reader creates a token on each setup screen", () => {
+    /** @scenario A coding-agent setup mints its MCP token with project reads only, apart from the ingestion token */
+    it("mints ingestion only for the manual snippets and project reads only for the MCP config", async () => {
+      const host = new ProductTestHost();
+      minted.tokens = { proj_agent: TEST_TOKEN };
+      renderManualSetup(host);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Create a personal access token" }),
+      );
+      await waitFor(() => expect(minted.permissions).toEqual([undefined]));
+      cleanup();
+
+      shown.screen = "via-claude-code";
+      renderManualSetup(host);
+      fireEvent.click(await screen.findByRole("button", { name: "MCP" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Create a personal access token" }),
+      );
+
+      await waitFor(() => expect(minted.permissions).toEqual([undefined, PROJECT_READS]));
+      expect(minted.projects).toEqual(["proj_agent", "proj_agent"]);
     });
   });
 });

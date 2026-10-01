@@ -7,11 +7,10 @@ import type { ApiKeyInputs } from "./api-key-client.ts";
 export type TokenPermission = (typeof INGESTION_PERMISSIONS)[number];
 
 /**
- * What the setup agent's MCP server and skills need: send traces, and read (never change) the
- * project data their read tools reach. Secrets, model providers and keys are left out on purpose.
+ * What an MCP config needs: read (never send or change) the project data its read tools reach.
+ * Secrets, model providers and keys are left out on purpose.
  */
-export const SETUP_AGENT_PERMISSIONS: readonly TokenPermission[] = [
-  ...INGESTION_PERMISSIONS,
+export const PROJECT_READ_PERMISSIONS: readonly TokenPermission[] = [
   "traces:view",
   "analytics:view",
   "prompts:view",
@@ -23,6 +22,12 @@ export const SETUP_AGENT_PERMISSIONS: readonly TokenPermission[] = [
   "annotations:view",
   "triggers:view",
   "project:view",
+];
+
+/** One token for both `.env` and MCP; goes once the trace integrate screens mint two. */
+export const SETUP_AGENT_PERMISSIONS: readonly TokenPermission[] = [
+  ...INGESTION_PERMISSIONS,
+  ...PROJECT_READ_PERMISSIONS,
 ];
 
 const PHRASES: Partial<Record<TokenPermission, string>> = {
@@ -42,6 +47,9 @@ export function tokenScopeNote({
 }): string {
   if (sameSet(permissions, INGESTION_PERMISSIONS)) {
     return "This token can only send data to this project. It can't read or change anything.";
+  }
+  if (sameSet(permissions, PROJECT_READ_PERMISSIONS)) {
+    return "This token can read this project's data. It can't send or change anything.";
   }
   if (sameSet(permissions, SETUP_AGENT_PERMISSIONS)) {
     return "This token can send traces and read this project's data. It can't change anything.";

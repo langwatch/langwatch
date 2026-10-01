@@ -17,6 +17,8 @@ export interface ActiveProjectContextValue {
   freshToken?: string;
   /** Mints `freshToken` for every tab; dropped when the project, organisation or user changes. */
   minting?: PersonalTokenMint;
+  /** Mints the MCP config's own token, project reads only; `freshToken` stays for `.env`. */
+  mcpMinting?: PersonalTokenMint;
 }
 
 const ActiveProjectContext = createContext<ActiveProjectContextValue | undefined>(undefined);

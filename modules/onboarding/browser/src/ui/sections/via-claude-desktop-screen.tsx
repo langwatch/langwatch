@@ -52,7 +52,9 @@ const APPS: {
 ];
 
 export function ViaMcpClientScreen(): React.ReactElement {
-  const { project, freshToken, minting } = useActiveProject();
+  // The MCP config takes its own project-reads token, never the `.env` ingestion one.
+  const { project, mcpMinting: minting } = useActiveProject();
+  const freshToken = minting?.token;
   const { appBaseUrl } = useUiDeployment();
   const [activeApp, setActiveApp] = useState<AppKey>("claude-desktop");
 

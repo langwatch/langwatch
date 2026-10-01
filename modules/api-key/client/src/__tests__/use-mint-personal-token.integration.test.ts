@@ -6,6 +6,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PROJECT_READ_PERMISSIONS } from "../personal-token-scope.ts";
 import { useMintPersonalToken } from "../use-mint-personal-token.ts";
 
 const mints = vi.hoisted(() => ({
@@ -95,6 +96,23 @@ describe("useMintPersonalToken", () => {
       });
       expect(result.current.scopeNote).toBe(
         "This token can read prompts in this project and nothing else.",
+      );
+    });
+  });
+
+  describe("when a coding-agent setup mints the MCP config's token", () => {
+    it("holds project reads only, sends and changes nothing, and says so", async () => {
+      const { result } = renderMint({ ...ALPHA, permissions: PROJECT_READ_PERMISSIONS });
+
+      act(() => void result.current.mint());
+      await answer(0, "sk-lw-mcp");
+
+      expect(mints.calls[0]?.input.permissions).toEqual([...PROJECT_READ_PERMISSIONS]);
+      expect(PROJECT_READ_PERMISSIONS.every((permission) => permission.endsWith(":view"))).toBe(
+        true,
+      );
+      expect(result.current.scopeNote).toBe(
+        "This token can read this project's data. It can't send or change anything.",
       );
     });
   });
