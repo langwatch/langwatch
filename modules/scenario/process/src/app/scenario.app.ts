@@ -524,6 +524,7 @@ export class ScenarioModule implements ScenarioApi {
       lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,
       simulationProcessing: SimulationProcessingRuntimeAdapter.create({
+        pool: { slotBudget: config.slotBudget, consumed: config.consumedResourceClasses },
         runs: setup.repositories.simulationRunProcessing,
         cancellations,
         traces: setup.dependencies.traces,

@@ -67,14 +67,11 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
   async start(): Promise<{ close: () => Promise<void> }> {
     this.options.pool.connect(this);
     const unsubscribe = await this.options.cancellations.subscribe((message) => {
-      const child = this.options.pool.runningChildren.get(message.scenarioRunId);
-      if (child) {
-        logger.info(
-          { scenarioRunId: message.scenarioRunId, pid: child.pid },
-          "Killing child process via cancellation broadcast",
-        );
-        child.kill("SIGTERM");
-      }
+      logger.info(
+        { scenarioRunId: message.scenarioRunId },
+        "Stopping child process via cancellation broadcast",
+      );
+      this.options.pool.stop(message.scenarioRunId);
 
       this.options.pool.markCancelled(message.scenarioRunId);
     });

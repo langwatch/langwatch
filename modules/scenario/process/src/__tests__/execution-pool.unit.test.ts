@@ -5,6 +5,7 @@
 
 import { ChildProcess } from "child_process";
 
+import { TARGET_STOP_SIGNAL } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -241,6 +242,15 @@ describe("ScenarioExecutionPoolService", () => {
       expect(pool.pendingCount).toBe(0);
       expect(childKills.get("run-1")).toHaveBeenCalledWith("SIGTERM");
       expect(childKills.get("run-2")).toHaveBeenCalledWith("SIGTERM");
+    });
+
+    /** @scenario Each runtime declares how its child is stopped */
+    it("stops a run's child with its runtime's declared signal, and reports a missing child", () => {
+      pool.submit(makeJob("run-1"));
+
+      expect(pool.stop("run-1")).toBe(true);
+      expect(childKills.get("run-1")).toHaveBeenCalledWith(TARGET_STOP_SIGNAL.http);
+      expect(pool.stop("run-unknown")).toBe(false);
     });
   });
 

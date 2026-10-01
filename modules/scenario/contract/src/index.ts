@@ -18,6 +18,7 @@ export * from "./scenario.version.ts";
 export * from "./scenario-execution-data.ts";
 export * from "./scenario-execution.constants.ts";
 export * from "./scenario-execution.service.ts";
+export * from "./scenario-resource-class.ts";
 export * from "./scenario.ids.ts";
 export * from "./scenario-run.ts";
 export * from "./scenario-run-parameter.error.ts";

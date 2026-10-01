@@ -14,6 +14,8 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   voicePublicBaseUrl: void 0,
   voiceTunnel: false,
   voiceWorkerOnly: false,
+  consumedResourceClasses: ["light", "voice"],
+  slotBudget: 3,
   voiceCallMaxSeconds: void 0,
   allowLoopbackVoiceProviders: false,
   blockLocalHttpCalls: true,

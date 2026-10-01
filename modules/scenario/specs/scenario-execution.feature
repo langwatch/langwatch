@@ -107,3 +107,36 @@ Feature: Isolated Scenario execution
     Then the sandbox gets a key for the run's starter, or the system, holding only agentCache:manage
     And no key is shared across the project's runs or kept in Redis
     And a run whose sandbox key cannot be minted still runs without the agent cache
+
+  @unit
+  Scenario: Admission weighs each run by its runtime class
+    Given an execution pool with a budget of slots
+    And each runtime declares a resource class with a slot weight
+    When light and voice runs are submitted
+    Then each run takes its class's weight in slots and a run that does not fit waits
+    And a freed run admits every waiting run that now fits, in order
+    And a run heavier than the whole budget still runs, alone
+    And a class's per-project budget holds back only that project's runs of that class
+
+  @unit
+  Scenario: Each runtime is one row in the child's declared table
+    Given the child's runtime table
+    When an adapter is built for a target
+    Then the row for its type supplies the input schema, the factory and the resource class
+    And every target type has a row
+    And a row's resource class is the one the contract declares for that type
+
+  @unit
+  Scenario: A worker only admits runtime classes it consumes
+    Given a worker configured with the set of runtime classes it consumes
+    When a job is submitted whose target's runtime class is outside that set
+    Then the pool refuses it so a worker that consumes the class takes it
+    And a job whose class is in the set starts as usual
+    And a worker with no configured set consumes every class
+
+  @unit
+  Scenario: Each runtime declares how its child is stopped
+    Given the child's runtime table
+    When a run is cancelled or its worker drains
+    Then its child is stopped with the signal its runtime row declares
+    And a runtime that declares nothing else is stopped with SIGTERM
