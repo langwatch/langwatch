@@ -30,7 +30,6 @@ import {
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
-  recordScimCredential,
   RestHost,
   SessionReader,
   type RestCaller,
@@ -49,7 +48,6 @@ import {
 import { AuditLogApi, recordAuditLogCommandSchema } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { ExposedSurface, TransportPeers } from "@langwatch/kernel";
 import {
   ModelNotConfiguredError,
@@ -195,7 +193,7 @@ class ApiSurface {
         organization: this.#organizationDoor(),
         apiKey: this.#keyDoor(),
         browser: this.#browserDoor(),
-        scimToken: this.#directoryDoor(peers.find(ScimApi)),
+        scimToken: unboundDirectoryDoor(),
         "instance-admin": this.composition.instanceAdmin,
       },
       bearers: (namespace) =>
@@ -348,31 +346,6 @@ class ApiSurface {
     });
   }
 
-  #directoryDoor(scim: ScimApi | undefined): RestIdentity {
-    const identify = async ({ request }: { request: Request }): Promise<RestCaller> => {
-      if (!scim) throw new SurfaceUnverifiedError("scimToken");
-      const directory = await scim.authenticateDirectory({
-        authorization: request.headers.get("authorization"),
-        method: request.method,
-        path: new URL(request.url).pathname,
-      });
-
-      recordScimCredential(request, directory);
-
-      return {
-        actor: { type: "api_key", id: directory.id },
-        scope: { tier: "organization", id: directory.organizationId },
-      };
-    };
-
-    return {
-      authenticate: () => {
-        throw new Error("The SCIM door asks no permission of the bearer it was opened on.");
-      },
-      identify,
-    };
-  }
-
   async #adminActor(request: Request) {
     const caller = await this.sessions.read(request);
     if (!caller?.userId) return null;
@@ -513,6 +486,16 @@ export function instanceAdminDoor(options: {
   isSaas: boolean;
 }): RestIdentity {
   return bearerDoor({ name: "instance-admin", token: options.isSaas ? void 0 : options.token });
+}
+
+/** The scim module binds this door on its own families (§4); unbound, it admits nobody. */
+function unboundDirectoryDoor(): RestIdentity {
+  return {
+    authenticate: () => {
+      throw new Error("The SCIM door asks no permission of the bearer it was opened on.");
+    },
+    identify: () => Promise.reject(new SurfaceUnverifiedError("scimToken")),
+  };
 }
 
 /** Every key door's one actor: the key's owning user, or none for a key no person owns (§8). */

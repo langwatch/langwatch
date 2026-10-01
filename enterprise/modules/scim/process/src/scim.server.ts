@@ -5,6 +5,7 @@
  * depends on; a process that supplies both installs this and mounts what it wants.
  */
 import {
+  bindRestCredential,
   bindRestMiddleware,
   organizationCredentialOfRequest,
   scimCredentialOfRequest,
@@ -37,22 +38,27 @@ export const scimServer = defineServerModule("scim")
   )
   // Who a management key stands for: the member it acts as, or the key itself
   // where it acts as nobody - one stable string per credential either way.
-  .withTransportFacts(() => [
-    bindRestMiddleware(scimTokenRestActor, (context) => {
-      const credential = organizationCredentialOfRequest(context.req.raw);
+  .withTransportFacts(({ app }) => {
+    if (!(app instanceof ScimApp))
+      throw new TypeError("SCIM transport requires its constructed application");
+    return [
+      bindRestMiddleware(scimTokenRestActor, (context) => {
+        const credential = organizationCredentialOfRequest(context.req.raw);
 
-      return { actorId: credential.userId ?? `apikey:${credential.apiKeyId}` };
-    }),
-    bindRestMiddleware(scimRestCredential, (context) => {
-      const credential = scimCredentialOfRequest(context.req.raw);
+        return { actorId: credential.userId ?? `apikey:${credential.apiKeyId}` };
+      }),
+      bindRestMiddleware(scimRestCredential, (context) => {
+        const credential = scimCredentialOfRequest(context.req.raw);
 
-      return { connectionId: credential.connectionId };
-    }),
-    bindRestMiddleware(scimWebhookDelivery, (context) => ({
-      signature: context.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER) ?? null,
-      authorization: context.req.header("authorization") ?? null,
-    })),
-  ])
+        return { connectionId: credential.connectionId };
+      }),
+      bindRestMiddleware(scimWebhookDelivery, (context) => ({
+        signature: context.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER) ?? null,
+        authorization: context.req.header("authorization") ?? null,
+      })),
+      bindRestCredential("scimToken", () => app.directoryDoor),
+    ];
+  })
   .withEventing(scimEventing)
   .withEventing(scimDirectoryEventing)
   .withEventing(scimSyncEventing);

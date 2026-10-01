@@ -7,7 +7,13 @@
  * The /Schemas discovery copy is what an identity-provider administrator reads
  * when wiring provisioning, so it must name the right resource.
  */
-import { bindRestMiddleware, RestHost, type RestIdentity } from "@langwatch/api/rest";
+import {
+  bindRestCredential,
+  bindRestMiddleware,
+  RestHost,
+  scimCredentialOfRequest,
+  type RestIdentity,
+} from "@langwatch/api/rest";
 import {
   ScimProtocolError,
   ScimWriteOutsideConnectionError,
@@ -109,31 +115,10 @@ function mount(
 ) {
   const scim = options.scim ?? new DirectoryFake();
   const { app } = scimTestApp({ scim, connections: options.connections });
-  const directories = new WeakMap<Request, { connectionId: string | null }>();
   const closed: RestIdentity = {
     authenticate: () => {
       throw new Error("Only the directory door answers this family.");
     },
-  };
-  const door: RestIdentity = {
-    authenticate: () => {
-      throw new Error("This family resolves its own credential.");
-    },
-    identify: ({ request }) =>
-      app
-        .authenticateDirectory({
-          authorization: request.headers.get("authorization"),
-          method: request.method,
-          path: new URL(request.url).pathname,
-        })
-        .then((directory) => {
-          directories.set(request, { connectionId: directory.connectionId });
-
-          return {
-            actor: { type: "api_key" as const, id: directory.id },
-            scope: { tier: "organization" as const, id: directory.organizationId },
-          };
-        }),
   };
 
   const host = RestHost.create({
@@ -141,7 +126,7 @@ function mount(
       project: closed,
       organization: closed,
       apiKey: closed,
-      scimToken: door,
+      scimToken: closed,
       "instance-admin": closed,
       browser: closed,
     },
@@ -151,12 +136,10 @@ function mount(
 
   host.mount(scimProtocolRest.router(), () => app, {
     facts: [
-      bindRestMiddleware(scimRestCredential, (c) => {
-        const directory = directories.get(c.req.raw);
-        if (!directory) throw new Error("The directory door resolved no credential");
-
-        return directory;
-      }),
+      bindRestCredential("scimToken", () => app.directoryDoor),
+      bindRestMiddleware(scimRestCredential, (c) => ({
+        connectionId: scimCredentialOfRequest(c.req.raw).connectionId,
+      })),
     ],
   });
 

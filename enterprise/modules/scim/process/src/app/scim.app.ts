@@ -17,6 +17,7 @@
  * is returned once and never again — and a rule about which tenant a push
  * provisions have one place to live rather than four.
  */
+import { recordScimCredential, type RestIdentity } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
@@ -465,6 +466,29 @@ export class ScimApp implements ScimApiContract {
   }
 
   // ── The directory credential ─────────────────────────────────────────────
+
+  /** The `scimToken` door, bound to this module's own families (ARCHITECTURE.md §4). */
+  get directoryDoor(): RestIdentity {
+    return {
+      authenticate: () => {
+        throw new Error("The SCIM door asks no permission of the bearer it was opened on.");
+      },
+      identify: async ({ request }) => {
+        const directory = await this.authenticateDirectory({
+          authorization: request.headers.get("authorization"),
+          method: request.method,
+          path: new URL(request.url).pathname,
+        });
+
+        recordScimCredential(request, directory);
+
+        return {
+          actor: { type: "api_key", id: directory.id },
+          scope: { tier: "organization", id: directory.organizationId },
+        };
+      },
+    };
+  }
 
   async authenticateDirectory(input: {
     authorization: string | null;
