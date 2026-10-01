@@ -9,12 +9,12 @@ import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-c
 import { useMemo } from "react";
 
 import type { ViewMode } from "../../../behavior/suite/use-run-history-store.ts";
+import { useNow } from "../../../behavior/use-now.ts";
 import type { BatchRun, BatchRunSummary } from "../../../model/suite/run-history-transforms.ts";
 import {
   computeBatchRunSummary,
   computeIterationMap,
 } from "../../../model/suite/run-history-transforms.ts";
-import { useNow } from "../../elements/suite/runs/now-provider.tsx";
 import type { ScenarioRunContextRenderer } from "../../elements/suite/runs/scenario-target-row.tsx";
 import { ScenarioRunContent } from "./scenario-run-content.tsx";
 

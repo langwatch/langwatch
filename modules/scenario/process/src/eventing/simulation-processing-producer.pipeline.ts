@@ -235,6 +235,11 @@ function buildSimulationProcessingProducerPipeline(input: {
       computeRunMetrics: () =>
         Promise.reject(producerOnly(processName, "compute a run's trace metrics")),
     },
+    traceSpanMetricsSync: {
+      findSummary: () => Promise.reject(producerOnly(processName, "read a trace summary")),
+      computeRunMetrics: () =>
+        Promise.reject(producerOnly(processName, "compute a run's trace metrics")),
+    },
   });
 }
 

@@ -2661,8 +2661,8 @@ describe("the evaluators of a run", () => {
 
     await user.click(screen.getByTestId("evaluator-pill-att_sql"));
 
-    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
-      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
     });
   });
 
@@ -2776,8 +2776,8 @@ describe("the evaluators of a run", () => {
     await user.click(run);
 
     expect(mockSuitesRunPlan).not.toHaveBeenCalled();
-    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
-      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
     });
   });
 
@@ -2798,8 +2798,8 @@ describe("the evaluators of a run", () => {
     const alert = await screen.findByTestId("run-dialog-error");
     expect(alert).toHaveTextContent("missing required mappings");
     await user.click(within(alert).getByRole("button", { name: "Configure the evaluator" }));
-    expect(mockOpenDrawer).toHaveBeenCalledWith("suiteEditor", {
-      urlParams: { suiteId: "suite_refunds", attachmentId: "att_sql" },
+    expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingSuiteEditor", {
+      testSuiteId: "suite_refunds",
     });
   });
 });

@@ -262,31 +262,35 @@ describe("<SuiteSidebar/> External Sets", () => {
       const now = new Date("2025-01-15T12:00:00Z").getTime();
       vi.setSystemTime(now);
 
-      const NowWrapper = ({ children }: { children: React.ReactNode }) => (
-        <NowContext value={Date.now()}>{children}</NowContext>
+      const sidebarAt = ({ at }: { at: number }) => (
+        <NowContext value={at}>
+          <SuiteSidebar
+            {...defaultProps}
+            externalSets={[
+              makeExternalSet({
+                scenarioSetId: "ci-smoke-tests",
+                passedCount: 15,
+                totalCount: 20,
+                lastRunTimestamp: now - 30 * 60 * 1000,
+              }),
+            ]}
+          />
+        </NowContext>
       );
+      const recencyText = () =>
+        screen
+          .getAllByTestId("external-set-list-item")
+          .map((el) => el.textContent)
+          .join(" ");
 
       try {
-        renderWithDesignSystem(
-          <NowWrapper>
-            <SuiteSidebar
-              {...defaultProps}
-              externalSets={[
-                makeExternalSet({
-                  scenarioSetId: "ci-smoke-tests",
-                  passedCount: 15,
-                  totalCount: 20,
-                  lastRunTimestamp: now - 30 * 60 * 1000,
-                }),
-              ]}
-            />
-          </NowWrapper>,
-        );
+        const { rerender } = renderWithDesignSystem(sidebarAt({ at: now }));
 
         expect(screen.getByText(/15 passed/)).toBeInTheDocument();
-        const extSetItems = screen.getAllByTestId("external-set-list-item");
-        const texts = extSetItems.map((el) => el.textContent).join(" ");
-        expect(texts).toMatch(/30m ago/);
+        expect(recencyText()).toMatch(/30m ago/);
+
+        rerender(sidebarAt({ at: now + 60 * 1000 }));
+        expect(recencyText()).toMatch(/31m ago/);
       } finally {
         vi.useRealTimers();
       }
@@ -533,7 +537,6 @@ describe("<SuiteSidebar/>", () => {
         const NowWrapper = ({ children }: { children: React.ReactNode }) => (
           <NowContext value={Date.now()}>{children}</NowContext>
         );
-        // Override the NowProvider with FIXED_NOW so time is deterministic
         vi.useFakeTimers();
         vi.setSystemTime(FIXED_NOW);
         try {

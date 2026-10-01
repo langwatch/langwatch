@@ -2,14 +2,20 @@ import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-co
 import { AlertTriangle, Check, Clock, type LucideIcon, XCircle } from "lucide-react";
 
 export interface ScenarioRunStatusConfig {
+  /** Chakra colorPalette token */
   colorPalette: string;
+  /** Human-readable label for badges */
   label: string;
+  /** Whether the run is in a terminal state */
   isComplete: boolean;
+  /** Chakra semantic color token for icon/text */
   fgColor: string;
 }
 
 /**
  * What every status of a scenario run reads as, everywhere it is drawn.
+ * Only a verdict carries a warm colour — queued/in-progress reads blue, so
+ * a scan of a run list sees red or amber only where something went wrong.
  */
 export const SCENARIO_RUN_STATUS_CONFIG: Record<ScenarioRunStatus, ScenarioRunStatusConfig> = {
   [ScenarioRunStatus.SUCCESS]: {

@@ -6,6 +6,7 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   isSimulationRunFinishedEvent,
 } from "@langwatch/scenario-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:simulation-processing:trace-metrics-sync");
 
@@ -60,5 +61,33 @@ export function createTraceMetricsSyncSubscriber(
         }
       }
     },
+  };
+}
+
+/** Main's 60s settle window on trace's span events, keyed per trace. */
+export const TRACE_SPAN_METRICS_SETTLE_MS = 60_000;
+
+export interface TraceSpanMetricsSyncDeps {
+  findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
+  computeRunMetrics: (data: ComputeRunMetricsCommandData) => Promise<void>;
+}
+
+/** Only simulation traces with something to aggregate; role metrics are derived on compute. */
+export function hasSimulationMetrics(summary: TraceSummaryData): boolean {
+  if (!summary.attributes["scenario.run_id"]) return false;
+  return !(summary.spanCount === 0 && summary.totalCost === null);
+}
+
+/** Peer reaction to a settled trace (§9): reads trace's fold, then records its own metrics. */
+export function createTraceSpanMetricsSyncHandler(
+  deps: TraceSpanMetricsSyncDeps,
+): (input: { tenantId: string; traceId: string; occurredAt: number }) => Promise<void> {
+  return async ({ tenantId, traceId, occurredAt }) => {
+    const summary = await deps.findSummary({ projectId: tenantId, traceId });
+    if (!summary || !hasSimulationMetrics(summary)) return;
+    const scenarioRunId = summary.attributes["scenario.run_id"];
+    if (!scenarioRunId) return;
+    logger.debug({ traceId, tenantId, scenarioRunId }, "Trace settled; computing run metrics");
+    await deps.computeRunMetrics({ tenantId, scenarioRunId, traceId, retryCount: 0, occurredAt });
   };
 }

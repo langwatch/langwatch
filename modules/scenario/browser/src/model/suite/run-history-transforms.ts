@@ -7,6 +7,7 @@ import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunData as ScenarioRunData,
 } from "@langwatch/scenario-contract";
+import type { RunGroupType } from "@langwatch/suite-contract";
 
 type SuiteRunSummary = {
   passedCount: number;
@@ -81,12 +82,6 @@ function extractSuiteId(id: string): string | null {
   const start = SUITE_SET_PREFIX.length;
   return id.slice(start, -SUITE_SET_MARKER.length) || null;
 }
-
-/** Valid values for the grouping dimension. */
-export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
-
-/** The grouping dimension applied to scenario runs. */
-export type RunGroupType = (typeof RUN_GROUP_TYPES)[number];
 
 /** Identifies which view is rendering, to determine available group-by options. */
 export type RunViewContext = "suite" | "external" | "all-runs";

@@ -11,16 +11,20 @@ import { Box, Input, Skeleton, Text, VStack } from "@langwatch/design-system/pri
 
 import { useFocusOnMount } from "../../../../behavior/use-focus-on-mount.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
-  CASE_EDITOR_DRAWER_SIZE,
-  SUITE_EDITOR_DRAWER,
-} from "../../../sections/agent-testing/cases/drawer-keys.ts";
-import { CustomizeChips } from "../shared/customize-chips.tsx";
-import { DIALOG_FIELD_STYLE, FieldError, FieldLabel } from "../shared/dialog-fields.tsx";
-import { SmallButton } from "../shared/small-button.tsx";
-import { SuiteEvaluatorsSection } from "./suite-evaluators-section.tsx";
-import { SuiteFieldsSection } from "./suite-fields-section.tsx";
-import { type SuiteEditorModel, useSuiteEditor } from "./use-suite-editor.ts";
+  DIALOG_FIELD_STYLE,
+  FieldError,
+  FieldLabel,
+} from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import { SuiteEvaluatorsSection } from "../../../elements/agent-testing/suite/suite-evaluators-section.tsx";
+import { SuiteFieldsSection } from "../../../elements/agent-testing/suite/suite-fields-section.tsx";
+import {
+  type SuiteEditorModel,
+  useSuiteEditor,
+} from "../../../elements/agent-testing/suite/use-suite-editor.ts";
+import { CASE_EDITOR_DRAWER_SIZE, SUITE_EDITOR_DRAWER } from "../cases/drawer-keys.ts";
 
 export { SUITE_EDITOR_DRAWER };
 

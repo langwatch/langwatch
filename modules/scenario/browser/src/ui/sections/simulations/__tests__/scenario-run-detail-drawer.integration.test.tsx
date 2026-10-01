@@ -10,7 +10,7 @@ import { act, cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/suite/scenario-run-status-config.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { AgentTestingRunDrawer } from "../../agent-testing/drawers/agent-testing-run-drawer.tsx";
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
 

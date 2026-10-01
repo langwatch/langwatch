@@ -28,6 +28,7 @@ import {
   SimulationRunDeletedEventSchema,
   SimulationSetArchivedEventSchema,
 } from "@langwatch/scenario-contract";
+import { SPAN_RECEIVED_EVENT_TYPE, spanReceivedEventDataSchema } from "@langwatch/trace-contract";
 
 import type { ScenarioModule } from "../app/scenario.app.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
@@ -53,7 +54,10 @@ import {
 } from "./suite-run-sync.subscriber.ts";
 import {
   createTraceMetricsSyncSubscriber,
+  createTraceSpanMetricsSyncHandler,
+  TRACE_SPAN_METRICS_SETTLE_MS,
   type TraceMetricsSyncSubscriberDeps,
+  type TraceSpanMetricsSyncDeps,
 } from "./trace-metrics-sync.subscriber.ts";
 
 export interface SimulationProcessingPipelineDeps {
@@ -74,6 +78,7 @@ export interface SimulationProcessingPipelineDeps {
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
   suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
+  traceSpanMetricsSync: TraceSpanMetricsSyncDeps;
   /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
 }
@@ -82,6 +87,7 @@ function buildSimulationProcessingPipelineDefinition(
   deps: SimulationProcessingPipelineDeps,
 ): SimulationProcessingPipelineDefinition {
   const commands = SimulationProcessingCommandsAdapter.create();
+  const traceSpanMetricsSync = createTraceSpanMetricsSyncHandler(deps.traceSpanMetricsSync);
 
   const pipeline = definePipeline({
     name: "simulation_processing",
@@ -119,6 +125,25 @@ function buildSimulationProcessingPipelineDefinition(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
     )
+    .withPeerSubscriber("traceSpanMetricsSync", {
+      eventType: SPAN_RECEIVED_EVENT_TYPE,
+      // Reads no span field: the folded summary is read through TraceApi at handling.
+      data: spanReceivedEventDataSchema.pick({}),
+      options: {
+        delay: TRACE_SPAN_METRICS_SETTLE_MS,
+        deduplication: {
+          makeId: (event) =>
+            `subscriber:traceSpanMetricsSync:${event.tenantId}:${String(event.aggregateId)}`,
+          ttlMs: TRACE_SPAN_METRICS_SETTLE_MS,
+        },
+      },
+      handle: (_data, context) =>
+        traceSpanMetricsSync({
+          tenantId: String(context.tenantId),
+          traceId: String(context.aggregateId),
+          occurredAt: context.occurredAt,
+        }),
+    })
     .withProcessManager(deps.scenarioRunExecution.name, deps.scenarioRunExecution.process)
     .withProcessManager(deps.scenarioEvaluations.name, deps.scenarioEvaluations.process)
     .withCommandInstance({

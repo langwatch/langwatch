@@ -56,6 +56,12 @@ export const scenarioWeb = defineBrowserModule("scenario")
         ).AgentTestingCaseEditorDrawer,
       }),
     },
+    agentTestingSuiteEditor: {
+      load: async () => ({
+        default: (await import("./ui/sections/agent-testing/drawers/suite-editor-drawer.tsx"))
+          .SuiteEditorDrawer,
+      }),
+    },
   })
   /** The call panel and parameter line lent to agent, the media renderer to trace (§3.4 rule 7). */
   .withCapabilities({

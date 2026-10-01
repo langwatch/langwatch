@@ -11,10 +11,10 @@ import {
   Spinner,
   Text,
 } from "@langwatch/design-system/primitives";
+import { RUN_GROUP_TYPES, type RunGroupType } from "@langwatch/suite-contract";
 import { Download, LayoutGrid, List, X } from "lucide-react";
 
 import type { ViewMode } from "../../../behavior/suite/use-run-history-store.ts";
-import { RUN_GROUP_TYPES, type RunGroupType } from "../../../model/suite/run-history-transforms.ts";
 
 /** Display labels for each group-by option. */
 const GROUP_BY_LABELS: Record<RunGroupType, string> = {

@@ -13,10 +13,8 @@ import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import Parse from "papaparse";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  SimulationExecutionRepository as SimulationExecution,
-  NullSimulationRepository,
-} from "../../index.ts";
+import { SimulationExecutionRepository as SimulationExecution } from "../../repositories/simulation-execution.repository.ts";
+import { NullSimulationRepository } from "../../repositories/simulation.repository.ts";
 import { ScenarioRunExportService } from "../scenario-run-export.service.ts";
 import { SimulationService as SimulationServiceClass } from "../simulation.service.ts";
 

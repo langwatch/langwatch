@@ -12,11 +12,11 @@ import {
 import { Square } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { formatRunStatusLabel } from "../../../../model/suite/format-run-status-label.ts";
 import { formatCost, formatLatency } from "../../../../model/suite/formatters.ts";
 import { buildDisplayTitle } from "../../../../model/suite/run-history-transforms.ts";
 import { isCancellableStatus } from "../../../../model/suite/run-status.ts";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/suite/scenario-run-status-config.ts";
 
 /**
  * Wraps one rendered scenario row. `children` is the single row element, not

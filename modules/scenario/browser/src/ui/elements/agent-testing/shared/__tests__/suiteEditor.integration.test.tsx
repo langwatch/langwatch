@@ -12,12 +12,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSuiteEditorStore } from "../../../../../behavior/agent-testing/suite/suite-editor-store.ts";
-// DANGLING: `SuiteEditorDrawer` / `useSuiteEditorStore` do not exist anywhere
-// in this tree - the whole never-ported suite-editor surface (also
-// SuiteEvaluatorsSection, useOpenSuiteEditor, evaluators/attachment-rules,
-// useOpenScenarioEvaluatorEditor, useProjectEvaluators). See handoff
-// merge-scenario-dangling-imports.
-import { SUITE_EDITOR_DRAWER, SuiteEditorDrawer } from "../../suite/suite-editor-drawer.tsx";
+import {
+  SUITE_EDITOR_DRAWER,
+  SuiteEditorDrawer,
+} from "../../../../sections/agent-testing/drawers/suite-editor-drawer.tsx";
 
 const mockSuiteGetById = vi.hoisted(() => vi.fn());
 const mockEvaluatorsGetAll = vi.hoisted(() => vi.fn());

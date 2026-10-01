@@ -3,13 +3,9 @@
  * available to all descendants via `useNow()`.
  */
 import { nowInstant } from "@langwatch/time";
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-export const NowContext = createContext<number>(nowInstant().epochMilliseconds);
-
-export function useNow(): number {
-  return useContext(NowContext);
-}
+import { NowContext } from "../../../../behavior/use-now.ts";
 
 const DEFAULT_INTERVAL_MS = 60_000;
 

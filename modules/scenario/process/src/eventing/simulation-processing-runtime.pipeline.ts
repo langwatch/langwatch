@@ -187,6 +187,10 @@ export class SimulationProcessingRuntimeAdapter {
       snapshotUpdateBroadcast: this.input.snapshotUpdates,
       suiteRunSync: this.input.suiteRuns,
       traceMetricsSync: { computeRunMetrics: (data) => commands.computeRunMetrics(data) },
+      traceSpanMetricsSync: {
+        findSummary: (input) => traces.findSummary(input),
+        computeRunMetrics: (data) => commands.computeRunMetrics(data),
+      },
       retention: {
         resolve: (tenantId) => retention.getResolvedForProject({ projectId: tenantId }),
       },

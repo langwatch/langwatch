@@ -4,7 +4,7 @@ import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-co
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
-} from "../../../../model/suite/scenario-run-status-config.ts";
+} from "../../../../model/scenario-run-status-config.ts";
 import { SimulationStatusOverlay } from "./simulation-status-overlay.tsx";
 
 export interface SimulationCardMessage {
