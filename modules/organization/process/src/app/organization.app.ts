@@ -116,6 +116,8 @@ import {
   type OrganizationMemberSeats,
   type LimitCheckResult,
   type LimitType,
+  type OrganizationApiScopeGraphInput,
+  type ScopeGraphAnswer,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import { type MembersRead } from "@langwatch/process-stores/members";
@@ -154,6 +156,10 @@ import type {
   OrganizationLifecycleSenders,
 } from "../services/organization-lifecycle-notice.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
+import {
+  OrganizationScopeGraphService,
+  type OrganizationScopeGraphReader,
+} from "../services/organization-scope-graph.service.ts";
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import {
@@ -435,6 +441,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       secrets: members.settingsSecrets,
       demoProject: members.demoProject,
     });
+    application.#scopeGraph = OrganizationScopeGraphService.create({
+      reader: setup.repositories.scopeGraph,
+      permissions: setup.dependencies.permissions,
+    });
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.repositories.personalTeamScope,
     );
@@ -478,6 +488,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     members: OrganizationInfrastructure;
     /** Defaults to a reader that finds no personal team in any scope. */
     personalTeamScope?: PersonalTeamScopeReader;
+    /** Defaults to a reader that finds no organizations. */
+    scopeGraph?: OrganizationScopeGraphReader;
     memberProvenance: MemberProvenanceService;
   }): ServerOrganizationApp {
     const { groups, ...dependencies } = setup.dependencies;
@@ -508,6 +520,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       permissions: dependencies.permissions,
       secrets: members.settingsSecrets,
       demoProject: members.demoProject,
+    });
+    application.#scopeGraph = OrganizationScopeGraphService.create({
+      reader: setup.scopeGraph ?? { findScopeGraphForUser: async () => [] },
+      permissions: dependencies.permissions,
     });
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.personalTeamScope ?? {
@@ -556,6 +572,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   /** The peer the worker's seat-limit subscriber tells; absent only in a test's app. */
   #billing: Pick<BillingApi, "notifyResourceLimitReached"> | undefined;
   #visibility!: OrganizationVisibilityService;
+  #scopeGraph!: OrganizationScopeGraphService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
   #joinDoor!: OrganizationJoinDoorService | null;
@@ -1445,6 +1462,14 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     by: OrganizationCaller,
   ): Promise<FullyLoadedOrganization[]> {
     return this.#visibility.listVisible(input, by);
+  }
+
+  /** The caller's scope graph, narrowed and versioned; `unchanged` when `since` is current. */
+  getScopeGraph(
+    input: OrganizationApiScopeGraphInput,
+    by: OrganizationCaller,
+  ): Promise<ScopeGraphAnswer> {
+    return this.#scopeGraph.getScopeGraph(input, by);
   }
 
   getOrganizationWithMembersForPicker(

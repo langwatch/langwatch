@@ -24,6 +24,7 @@ import {
   organizationApiWithMembersInputSchema,
 } from "./organization.trpc-schemas.ts";
 import { organizationIntentSchema } from "./organization.ts";
+import { organizationApiScopeGraphInputSchema, scopeGraphAnswerSchema } from "./scope-graph.ts";
 
 /** The first organization a person creates, and the name they gave it. */
 export const organizationApiCreateAndAssignInputSchema = z.object({
@@ -68,6 +69,11 @@ export const organizationTrpc = defineTrpcContract("organization")
   .query("getAll", { cache: { tier: "session", persist: true } })
   .withInput(organizationApiGetAllInputSchema)
   .withOutput(organizationFullyLoadedListSchema)
+
+  /** The shell's scope skeleton, narrowed to the caller; `since` answers `unchanged`. */
+  .query("getScopeGraph", { cache: { tier: "session", persist: true } })
+  .withInput(organizationApiScopeGraphInputSchema)
+  .withOutput(scopeGraphAnswerSchema)
 
   .mutation("update")
   .withInput(organizationApiUpdateInputSchema)

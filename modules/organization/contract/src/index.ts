@@ -33,3 +33,4 @@ export * from "./license-limit-type.ts";
 export * from "./license-enforcement.trpc.ts";
 export * from "./personal-workspace-features.trpc.ts";
 export * from "./ui-scope.ts";
+export * from "./scope-graph.ts";

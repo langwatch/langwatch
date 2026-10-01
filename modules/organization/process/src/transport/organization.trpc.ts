@@ -129,6 +129,12 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
       .then((organizations) => organizations.map(fullyLoadedOrganizationOnWire)),
   )
 
+  /** The shell's scope skeleton: what every page resolves its scope against. */
+  .procedure("getScopeGraph")
+  .withFacts(organizationSessionPersonFact)
+  .noPermission(BEFORE_MEMBERSHIP)
+  .handle(({ app, input, actor }, person) => app.getScopeGraph(input, callerOf(actor, person)))
+
   .procedure("update")
   .withPermission("organization:manage")
   .handle(async ({ app, input }) => {
