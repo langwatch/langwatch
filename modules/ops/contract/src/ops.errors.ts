@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 import type { OpsOperatorPermission } from "./ops.responses.ts";
 
@@ -193,12 +193,19 @@ export class BugReportRateLimitedError extends HandledError {
   }
 }
 
-/** The Operators page and the recovery task grant existing, active accounts only. */
-export class PlatformOperatorUserNotFoundError extends NotFoundError {
+/**
+ * The page and the task grant existing, active accounts only (the page: verified ones too).
+ * Never echoes the address: logs and responses carry the account id when there is one.
+ */
+export class PlatformOperatorUserNotFoundError extends HandledError {
   declare readonly code: "platform_operator_user_not_found";
 
-  constructor(email: string) {
-    super("platform_operator_user_not_found", { resource: "Active user", id: email });
+  constructor({ userId }: { userId?: string } = {}) {
+    super("platform_operator_user_not_found", "No active account holds that address", {
+      httpStatus: 404,
+      fault: "customer",
+      ...(userId ? { meta: { userId } } : {}),
+    });
     this.name = "PlatformOperatorUserNotFoundError";
   }
 }

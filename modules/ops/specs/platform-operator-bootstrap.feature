@@ -142,6 +142,19 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     Then the refusal is platform_operator_last_holder
 
   @unit @operators-page
+  Scenario: The page refuses an account whose address was never verified
+    Given a signed-in operator
+    When they grant the role to an address whose account never verified it
+    Then the refusal is platform_operator_user_not_found and nothing is granted
+    And the recovery task still grants that account
+
+  @unit @operators-page
+  Scenario: A refused grant never carries the address
+    Given a signed-in operator
+    When they grant the role to an address nobody active holds
+    Then the refusal names no address, and carries the account id when one exists
+
+  @unit @operators-page
   Scenario: An impersonated session cannot change who operates
     Given an operator impersonating a customer
     When they grant or revoke the role

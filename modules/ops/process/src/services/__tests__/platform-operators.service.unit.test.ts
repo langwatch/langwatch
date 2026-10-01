@@ -420,6 +420,36 @@ describe("PlatformOperatorsService", () => {
       });
     });
 
+    /** @scenario "The page refuses an account whose address was never verified" */
+    it("refuses an unverified account on the page, while the task still grants it", async () => {
+      const { service, granted } = world({
+        users: [user("ana"), user("squatter", { emailVerified: false })],
+      });
+
+      await expect(service.grant({ email: "squatter@acme.com", operator })).rejects.toMatchObject({
+        code: "platform_operator_user_not_found",
+      });
+      expect(granted).toEqual([]);
+      await service.grantAsSystem({ email: "squatter@acme.com" });
+      expect(granted.map(({ principal }) => principal.id)).toEqual(["squatter"]);
+    });
+
+    /** @scenario "A refused grant never carries the address" */
+    it("names no address in the refusal, and carries the account id when there is one", async () => {
+      const { service } = world({
+        users: [user("ana"), user("gone", { deactivatedAt: new Date("2024-01-01T00:00:00Z") })],
+      });
+
+      for (const email of ["nobody@acme.com", "gone@acme.com"]) {
+        const refusal: unknown = await service.grant({ email, operator }).catch((error) => error);
+        expect(refusal).toBeInstanceOf(Error);
+        expect(String(refusal) + JSON.stringify(refusal)).not.toContain(email);
+      }
+      await expect(service.grant({ email: "gone@acme.com", operator })).rejects.toMatchObject({
+        meta: { userId: "gone" },
+      });
+    });
+
     /** @scenario "An impersonated session cannot change who operates" */
     it("refuses grant and revoke from an impersonated session", async () => {
       const { service, granted, authz } = world({ users: [user("ana"), user("bo")] });

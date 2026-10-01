@@ -31,6 +31,7 @@ const ops = createApiFixture<OpsApi>({
     if (!operator || operator.email !== OPS_STAFF_ADDRESS) throw new AdminSurfaceHiddenError();
     return operator;
   },
+  admitOperator: async () => undefined,
 });
 
 const operator: OpsOperator = { id: "user_olive", email: OPS_STAFF_ADDRESS };

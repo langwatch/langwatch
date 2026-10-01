@@ -45,8 +45,8 @@ describe("GrantPlatformOperatorTask", () => {
     it("fails with the not-found code", async () => {
       const task = GrantPlatformOperatorTask.create({
         operators: {
-          grantPlatformOperatorAsSystem: async ({ email }) => {
-            throw new PlatformOperatorUserNotFoundError(email);
+          grantPlatformOperatorAsSystem: async () => {
+            throw new PlatformOperatorUserNotFoundError();
           },
         },
       });

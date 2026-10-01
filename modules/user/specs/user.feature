@@ -51,6 +51,12 @@ Feature: Canonical user lifecycle
     And an operator is deactivated while another active operator remains
 
   @unit
+  Scenario: An impersonated session cannot deactivate another account or reactivate any
+    Given a platform operator impersonating a customer
+    When they deactivate another account, or reactivate a deactivated one
+    Then it is refused with code forbidden and the account is unchanged
+
+  @unit
   Scenario: Deactivation and reactivation are recorded as user's facts
     When the User service deactivates and then reactivates an account
     Then each change is recorded on user's pipeline as "lw.user.deactivated" and "lw.user.reactivated"

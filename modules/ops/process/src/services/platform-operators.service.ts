@@ -97,6 +97,8 @@ export class PlatformOperatorsService {
   }): Promise<OpsPlatformOperator> {
     const granter = signedInOperator(operator);
     const user = await this.#activeUserOf(email);
+    // The page never grants an unclaimed address: whoever registered it first would operate.
+    if (!user.emailVerified) throw new PlatformOperatorUserNotFoundError({ userId: user.id });
     const held = await this.options.authz.grantPlatformOperator({
       principal: { type: "user", id: user.id },
       caller: { type: "user", id: granter.id },
@@ -234,7 +236,7 @@ export class PlatformOperatorsService {
       return await this.options.users.findByEmail({ email });
     } catch (error) {
       if (!(error instanceof UserEmailAmbiguousError)) throw error;
-      logger.warn({ email }, "ADMIN_EMAILS names an address several accounts share; skipped");
+      logger.warn("ADMIN_EMAILS names an address several accounts share; skipped");
       return null;
     }
   }
@@ -264,7 +266,9 @@ export class PlatformOperatorsService {
 
   async #activeUserOf(email: string): Promise<UserProfile> {
     const user = await this.options.users.findByEmail({ email });
-    if (!user || user.deactivatedAt !== null) throw new PlatformOperatorUserNotFoundError(email);
+    if (!user) throw new PlatformOperatorUserNotFoundError();
+    if (user.deactivatedAt !== null)
+      throw new PlatformOperatorUserNotFoundError({ userId: user.id });
     return user;
   }
 }

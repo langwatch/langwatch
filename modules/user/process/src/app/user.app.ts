@@ -728,14 +728,19 @@ export class UserApp implements UserApi {
     userId: string;
     caller: UserCaller;
   }): Promise<void> {
-    if (userId !== caller.id && !(await this.isOperator({ userId: caller.operatorId }))) {
+    // Retiring someone else may revoke an operator, so it is never done while impersonating.
+    const isOthers = userId !== caller.id;
+    if (
+      isOthers &&
+      (caller.impersonated || !(await this.isOperator({ userId: caller.operatorId })))
+    ) {
       throw new UserAccountAccessDeniedError();
     }
 
     await this.#users.deactivate({ id: userId });
   }
 
-  /** Restoring is an operator's call alone. */
+  /** An operator's call alone, never while impersonating: it can restore an operator's grant. */
   async reactivateAccount({
     userId,
     caller,
@@ -743,7 +748,7 @@ export class UserApp implements UserApi {
     userId: string;
     caller: UserCaller;
   }): Promise<void> {
-    if (!(await this.isOperator({ userId: caller.operatorId }))) {
+    if (caller.impersonated || !(await this.isOperator({ userId: caller.operatorId }))) {
       throw new UserAccountAccessDeniedError();
     }
 

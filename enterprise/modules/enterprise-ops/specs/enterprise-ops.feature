@@ -20,6 +20,12 @@ Feature: Enterprise operator views
     Then the call is refused with not_found and nothing is audited
 
   @unit
+  Scenario: A license registry write needs ops:manage, not ops:view
+    Given Cloud admin staff who hold ops:view but not ops:manage
+    When they read a registry and then revoke an activation code
+    Then the read is answered and the write is refused with permission_denied, unaudited
+
+  @unit
   Scenario: Cloud admin refuses as not found where ops's cloud-ops capability is off
     Given Cloud admin staff where ops's cloud-ops capability is off
     When they read a self-hosted instance

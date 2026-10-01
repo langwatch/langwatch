@@ -18,12 +18,12 @@ export class EnterpriseOpsApp implements EnterpriseOpsApiContract {
   static readonly contract = EnterpriseOpsApi;
   static readonly dependencies = { ops: OpsApi, licensing: LicensingApi, auditLog: AuditLogApi };
 
-  readonly #ops: Pick<OpsApi, "admitCloudAdmin">;
+  readonly #ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
   readonly #licenses: LicenseRegistryAuditService;
   readonly #instances: SelfHostedInstanceAuditService;
 
   private constructor(deps: {
-    ops: Pick<OpsApi, "admitCloudAdmin">;
+    ops: Pick<OpsApi, "admitCloudAdmin" | "admitOperator">;
     licenses: LicenseRegistryAuditService;
     instances: SelfHostedInstanceAuditService;
   }) {
@@ -50,40 +50,40 @@ export class EnterpriseOpsApp implements EnterpriseOpsApiContract {
     this.#licenses.getById({ id, operatorId: await this.#staff(operator) });
 
   issueLicense: EnterpriseOpsApiContract["issueLicense"] = async ({ operator, ...rest }) =>
-    this.#licenses.issue({ ...rest, operatorId: await this.#staff(operator) });
+    this.#licenses.issue({ ...rest, operatorId: await this.#manager(operator) });
 
   registerLegacyLicense: EnterpriseOpsApiContract["registerLegacyLicense"] = async ({
     operator,
     ...rest
-  }) => this.#licenses.registerLegacy({ ...rest, operatorId: await this.#staff(operator) });
+  }) => this.#licenses.registerLegacy({ ...rest, operatorId: await this.#manager(operator) });
 
   revokeIssuedLicense: EnterpriseOpsApiContract["revokeIssuedLicense"] = async ({
     operator,
     ...rest
-  }) => this.#licenses.revoke({ ...rest, operatorId: await this.#staff(operator) });
+  }) => this.#licenses.revoke({ ...rest, operatorId: await this.#manager(operator) });
 
   reissueLicense: EnterpriseOpsApiContract["reissueLicense"] = async ({ operator, ...rest }) =>
-    this.#licenses.reissue({ ...rest, operatorId: await this.#staff(operator) });
+    this.#licenses.reissue({ ...rest, operatorId: await this.#manager(operator) });
 
   changeLicenseSeats: EnterpriseOpsApiContract["changeLicenseSeats"] = async ({
     operator,
     ...rest
-  }) => this.#licenses.changeSeats({ ...rest, operatorId: await this.#staff(operator) });
+  }) => this.#licenses.changeSeats({ ...rest, operatorId: await this.#manager(operator) });
 
   resetLicenseInstanceBinding: EnterpriseOpsApiContract["resetLicenseInstanceBinding"] = async ({
     operator,
     id,
-  }) => this.#licenses.resetInstanceBinding({ id, operatorId: await this.#staff(operator) });
+  }) => this.#licenses.resetInstanceBinding({ id, operatorId: await this.#manager(operator) });
 
   updateLicenseTerms: EnterpriseOpsApiContract["updateLicenseTerms"] = async ({
     operator,
     ...rest
-  }) => this.#licenses.updateTerms({ ...rest, operatorId: await this.#staff(operator) });
+  }) => this.#licenses.updateTerms({ ...rest, operatorId: await this.#manager(operator) });
 
   linkLicenseToOrganization: EnterpriseOpsApiContract["linkLicenseToOrganization"] = async ({
     operator,
     ...rest
-  }) => this.#licenses.linkToOrganization({ ...rest, operatorId: await this.#staff(operator) });
+  }) => this.#licenses.linkToOrganization({ ...rest, operatorId: await this.#manager(operator) });
 
   listActivationCodes: EnterpriseOpsApiContract["listActivationCodes"] = async ({
     operator,
@@ -93,12 +93,12 @@ export class EnterpriseOpsApp implements EnterpriseOpsApiContract {
   issueActivationCode: EnterpriseOpsApiContract["issueActivationCode"] = async ({
     operator,
     ...rest
-  }) => this.#licenses.issueActivationCode({ ...rest, operatorId: await this.#staff(operator) });
+  }) => this.#licenses.issueActivationCode({ ...rest, operatorId: await this.#manager(operator) });
 
   revokeActivationCode: EnterpriseOpsApiContract["revokeActivationCode"] = async ({
     operator,
     id,
-  }) => this.#licenses.revokeActivationCode({ id, operatorId: await this.#staff(operator) });
+  }) => this.#licenses.revokeActivationCode({ id, operatorId: await this.#manager(operator) });
 
   listSelfHostedInstances: EnterpriseOpsApiContract["listSelfHostedInstances"] = async ({
     operator,
@@ -113,5 +113,12 @@ export class EnterpriseOpsApp implements EnterpriseOpsApiContract {
   /** The staff member's id, or not-found; ops admits only where its cloud-ops capability is on (§3.5). */
   async #staff(operator: OpsOperator | null): Promise<string> {
     return (await this.#ops.admitCloudAdmin(operator)).id;
+  }
+
+  /** A registry write: staff as above who also hold `ops:manage`; `ops:view` only reads. */
+  async #manager(operator: OpsOperator | null): Promise<string> {
+    const id = await this.#staff(operator);
+    await this.#ops.admitOperator(operator, "ops:manage");
+    return id;
   }
 }

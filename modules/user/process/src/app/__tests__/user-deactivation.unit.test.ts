@@ -101,6 +101,46 @@ describe("user.deactivate", () => {
     });
   });
 
+  describe("given a platform operator impersonating a customer", () => {
+    /** @scenario "An impersonated session cannot deactivate another account or reactivate any" */
+    it("refuses deactivating another account and reactivating one, and changes neither", async () => {
+      const operators = new Set<string>();
+      const app = createUserTestApp({
+        dependencies: { authz: createUserTestAuthorization(operators) },
+      });
+      const customer = await account(app);
+      const op = await app.createCredentialUser({
+        name: "Op",
+        email: "op@example.test",
+        passwordHash: "hashed:first",
+      });
+      const other = await app.createCredentialUser({
+        name: "B",
+        email: "b@example.test",
+        passwordHash: "hashed:first",
+      });
+      const gone = await app.createCredentialUser({
+        name: "C",
+        email: "c@example.test",
+        passwordHash: "hashed:first",
+      });
+      operators.add(op.id);
+      await app.deactivate({ id: gone.id });
+      const caller = { id: customer.id, operatorId: op.id, impersonated: true };
+
+      await expect(app.deactivateAccount({ userId: other.id, caller })).rejects.toBeInstanceOf(
+        UserAccountAccessDeniedError,
+      );
+      await expect(app.reactivateAccount({ userId: gone.id, caller })).rejects.toBeInstanceOf(
+        UserAccountAccessDeniedError,
+      );
+      await expect(app.findById({ id: other.id })).resolves.toMatchObject({ deactivatedAt: null });
+      await expect(app.findById({ id: gone.id })).resolves.toMatchObject({
+        deactivatedAt: expect.any(Date),
+      });
+    });
+  });
+
   describe("given the account is the last active platform operator", () => {
     /** @scenario "Deactivating the last active platform operator is refused" */
     it("refuses with user_last_platform_operator, and writes and records nothing", async () => {

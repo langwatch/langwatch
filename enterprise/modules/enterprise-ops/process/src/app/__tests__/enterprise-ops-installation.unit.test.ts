@@ -6,7 +6,12 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
-import { AdminSurfaceHiddenError, type OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import {
+  AdminSurfaceHiddenError,
+  OpsOperatorRequiredError,
+  type OpsApi,
+  type OpsOperator,
+} from "@langwatch/ops-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -20,9 +25,11 @@ const customerAdmin: OpsOperator = { id: "user_mallory", email: "admin@customer.
 function boot({
   audited,
   cloudOps = true,
+  manages = true,
 }: {
   audited: RecordAuditLogCommand[];
   cloudOps?: boolean;
+  manages?: boolean;
 }) {
   const { logger } = createTestLogger();
   return createApp({ role: "api" })
@@ -35,6 +42,10 @@ function boot({
           if (!cloudOps || !operator || operator.email !== staff.email)
             throw new AdminSurfaceHiddenError();
           return operator;
+        },
+        admitOperator: async (_operator, permission) => {
+          if (permission === "ops:manage" && !manages)
+            throw new OpsOperatorRequiredError(permission);
         },
       }),
       licensing: createApiFixture<LicensingApi>({
@@ -72,6 +83,27 @@ describe("enterprise ops installation", () => {
           app.listSelfHostedInstances({ page: 0, pageSize: 25, operator: staff }),
         ).resolves.toEqual({ instances: [], total: 3 });
         expect(audited).toMatchObject([{ userId: staff.id, action: "selfHostedInstances.getAll" }]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("given Cloud admin staff who hold ops:view but not ops:manage", () => {
+    /** @scenario "A license registry write needs ops:manage, not ops:view" */
+    it("still reads, but refuses a write with permission_denied and records nothing", async () => {
+      const audited: RecordAuditLogCommand[] = [];
+      const runtime = await boot({ audited, manages: false });
+
+      try {
+        const app = runtime.service(EnterpriseOpsApi);
+        await expect(
+          app.listSelfHostedInstances({ page: 0, pageSize: 25, operator: staff }),
+        ).resolves.toEqual({ instances: [], total: 3 });
+        await expect(
+          app.revokeActivationCode({ id: "code_1", operator: staff }),
+        ).rejects.toMatchObject({ code: "permission_denied" });
+        expect(audited.map(({ action }) => action)).toEqual(["selfHostedInstances.getAll"]);
       } finally {
         await runtime.stop();
       }
