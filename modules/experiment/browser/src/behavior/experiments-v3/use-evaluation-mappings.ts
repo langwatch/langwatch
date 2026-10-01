@@ -6,12 +6,12 @@ import { setComplexProps, useDrawer, useDrawerParams } from "@langwatch/browser-
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-browser-kit";
-import { datasetColumnTypeToFieldType } from "@langwatch/workflow-browser-kit";
+} from "@langwatch/workflow-contract";
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { convertToUIMapping } from "../../model/experiments-v3/field-mapping-converters.ts";
+import { datasetColumnTypeToFieldType } from "../../model/workflow/studio-dataset.utils.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 type UseEvaluationMappingsResult = {

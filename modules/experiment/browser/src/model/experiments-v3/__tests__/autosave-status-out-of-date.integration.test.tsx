@@ -4,19 +4,15 @@
  *   ("The toolbar names the reason a save was refused")
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
 import { AUTOSAVE_OUT_OF_DATE_REASON } from "../constants.ts";
 
 const renderStatus = (props: Parameters<typeof AutosaveStatus>[0]) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AutosaveStatus {...props} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<AutosaveStatus {...props} />);
 
 describe("given the workbench save status", () => {
   afterEach(() => {

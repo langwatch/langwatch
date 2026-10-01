@@ -4,32 +4,8 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Alert, Box, Card, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
-import {
-  describeCellFailure,
-  useResultDisplayPreferences,
-  getRunDisplayName,
-  isRunFinished,
-  TableSkeleton,
-  transformBatchEvaluationData,
-  type BatchEvaluationData,
-  BatchEvaluationResultsTable,
-  ColumnVisibilityButton,
-  DEFAULT_HIDDEN_COLUMNS,
-  FieldsButton,
-  GroupRowsButton,
-  RowHeightButton,
-  type BatchRunSummary,
-  type RenderBatchEvaluatorResult,
-  type RenderDatasetImage,
-  type RenderTracePeek,
-  BatchRunsSidebar,
-  useResultsGrouping,
-} from "@langwatch/experiment-browser-kit";
-import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
-import { nowInstant } from "@langwatch/time";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   RUN_COLORS,
@@ -40,9 +16,34 @@ import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation
 import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { TraceIdPeek } from "../../../behavior/lent-trace.tsx";
 import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
+import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences.ts";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
+import { describeCellFailure } from "../../../model/cell-failure.ts";
 import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
+import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
+import { EvaluatorResultChip } from "../../elements/evaluator/evaluator-result-chip.tsx";
 import { downloadCsv } from "../batch-evaluation-results.csv.ts";
+import {
+  transformBatchEvaluationData,
+  type BatchEvaluationData,
+} from "../batch-evaluation-results.types.ts";
+import {
+  BatchEvaluationResultsTable,
+  ColumnVisibilityButton,
+  DEFAULT_HIDDEN_COLUMNS,
+  FieldsButton,
+  GroupRowsButton,
+  RowHeightButton,
+} from "../batch-results/batch-evaluation-results-table.tsx";
+import { type BatchRunSummary, BatchRunsSidebar } from "../batch-results/batch-runs-sidebar.tsx";
 import { ComparisonCharts } from "../batch-results/comparison-charts.tsx";
+import {
+  type RenderBatchEvaluatorResult,
+  type RenderDatasetImage,
+  type RenderTracePeek,
+} from "../batch-results/presentation.tsx";
+import { StoredObjectImage } from "../stored-object/stored-object-image.tsx";
+import { useResultsGrouping } from "../use-results-grouping.ts";
 import { BatchEvaluationResultsHeader } from "./batch-evaluation-results-header.tsx";
 
 type BatchEvaluationResultsProps = {
@@ -55,9 +56,6 @@ type BatchEvaluationResultsProps = {
   /** Callback when run selection changes (for controlled mode) */
   onSelectRunId?: (runId: string) => void;
 };
-
-/** Grace period after run finishes to continue refetching for final results */
-const REFETCH_GRACE_PERIOD_MS = 3000; // 3 seconds
 
 type RouterQuery = Record<string, string | string[] | undefined>;
 
@@ -88,54 +86,6 @@ const useColumnVisibility = () => {
     });
   }, []);
   return { hiddenColumns, toggleColumn };
-};
-
-/**
- * How often the selected run's data refetches: every second while it runs and for a
- * grace period after it finishes (to catch its final results), then never.
- */
-const useRunDataRefetch = ({
-  selectedRun,
-  selectedRunId,
-}: {
-  selectedRun: BatchRunSummary | undefined;
-  selectedRunId: string | undefined;
-}): { isFinished: boolean; refetchInterval: number | false } => {
-  // null: not finished yet; -1: the grace period ran out; otherwise when it finished.
-  const [finishedAt, setFinishedAt] = useState<number | null>(null);
-  const isFinished = !!selectedRun && isRunFinished(selectedRun.timestamps);
-
-  useEffect(() => {
-    if (!isFinished) setFinishedAt(null);
-    else if (finishedAt === null) setFinishedAt(nowInstant().epochMilliseconds);
-  }, [isFinished, finishedAt]);
-  useEffect(() => {
-    setFinishedAt(null);
-  }, [selectedRunId]);
-  useEffect(() => {
-    if (finishedAt === null) return;
-    const remaining = REFETCH_GRACE_PERIOD_MS - (nowInstant().epochMilliseconds - finishedAt);
-    if (remaining <= 0) return;
-    const timer = setTimeout(() => setFinishedAt(-1), remaining);
-    return () => clearTimeout(timer);
-  }, [finishedAt]);
-
-  const isInGracePeriod =
-    isFinished &&
-    finishedAt !== null &&
-    finishedAt > 0 &&
-    nowInstant().epochMilliseconds - finishedAt < REFETCH_GRACE_PERIOD_MS;
-  return { isFinished, refetchInterval: !isFinished || isInGracePeriod ? 1000 : false };
-};
-
-/** Keeps `setIsSomeRunning` in step with whether any run is still going. */
-const useTrackSomeRunning = (
-  runs: BatchRunSummary[] | undefined,
-  setIsSomeRunning: (running: boolean) => void,
-) => {
-  useEffect(() => {
-    setIsSomeRunning(!!runs?.some((r) => !isRunFinished(r.timestamps)));
-  }, [runs, setIsSomeRunning]);
 };
 
 /** The runs as the sidebar lists them. */
@@ -236,26 +186,22 @@ const comparisonDataOf = (
     isLoading: run.isLoading,
   }));
 
-/** The selected run's results, refetched while it runs. */
+/** The selected run's results. */
 const useSelectedRunData = ({
   projectId,
   experimentId,
-  runs,
   selectedRunId,
 }: {
   projectId?: string;
   experimentId?: string;
-  runs: BatchRunSummary[] | undefined;
   selectedRunId: string | undefined;
 }) => {
-  const selectedRun = useMemo(
-    () => runs?.find((r) => r.runId === selectedRunId),
-    [runs, selectedRunId],
-  );
-  const { refetchInterval } = useRunDataRefetch({ selectedRun, selectedRunId });
   const runDataQuery = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId: projectId ?? "", experimentId: experimentId ?? "", runId: selectedRunId ?? "" },
-    { enabled: !!projectId && !!experimentId && !!selectedRunId, refetchInterval },
+    {
+      enabled: !!projectId && !!experimentId && !!selectedRunId,
+      // needs a read hint: batch evaluation run result recorded
+    },
   );
   const transformedData: BatchEvaluationData | null = useMemo(
     () => (runDataQuery.data ? transformBatchEvaluationData(runDataQuery.data) : null),
@@ -381,9 +327,6 @@ export function BatchEvaluationResults({
   const { openDrawer } = useDrawer();
   const showComparisonLeaderboard = useShowComparisonLeaderboard();
 
-  // Track if any run is still in progress
-  const [isSomeRunning, setIsSomeRunning] = useState(false);
-
   const { hiddenColumns, toggleColumn } = useColumnVisibility();
   const { fields, toggleField, rowHeight, setRowHeight } = useResultDisplayPreferences();
 
@@ -395,7 +338,7 @@ export function BatchEvaluationResults({
     },
     {
       enabled: !!project && !!experiment,
-      refetchInterval: isSomeRunning ? 3000 : 10000,
+      // needs a read hint: batch evaluation run started or finished
     },
   ) as { data?: { runs: BatchRunSummary[] }; error?: unknown; isLoading: boolean };
 
@@ -408,10 +351,8 @@ export function BatchEvaluationResults({
   const { runDataQuery, transformedData } = useSelectedRunData({
     projectId: project?.id,
     experimentId: experiment?.id,
-    runs: runsQuery.data?.runs,
     selectedRunId,
   });
-  useTrackSomeRunning(runsQuery.data?.runs, setIsSomeRunning);
 
   // Transform runs list for sidebar
   const sidebarRuns = useMemo(() => sidebarRunsOf(runsQuery.data?.runs), [runsQuery.data?.runs]);

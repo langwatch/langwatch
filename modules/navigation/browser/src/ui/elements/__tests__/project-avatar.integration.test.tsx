@@ -3,8 +3,8 @@
  *
  * Avatar bubble with emoji project names: full grapheme, not char(0) only.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ProjectAvatar } from "../project-avatar.tsx";
@@ -12,11 +12,7 @@ import { ProjectAvatar } from "../project-avatar.tsx";
 afterEach(cleanup);
 
 function renderAvatar(name: string) {
-  const { container } = render(
-    <ChakraProvider value={defaultSystem}>
-      <ProjectAvatar name={name} />
-    </ChakraProvider>,
-  );
+  const { container } = renderWithDesignSystem(<ProjectAvatar name={name} />);
   return container;
 }
 

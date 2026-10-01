@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/prompts/prompt-studio-page.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -56,17 +56,15 @@ const projects = [
 ];
 
 function renderDialog(onCopy: (targetProjectId: string) => Promise<void>) {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptReplicateDialog
-        open
-        promptName="pizza-prompt"
-        projects={projects}
-        isLoading={false}
-        onClose={() => undefined}
-        onCopy={onCopy}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <PromptReplicateDialog
+      open
+      promptName="pizza-prompt"
+      projects={projects}
+      isLoading={false}
+      onClose={() => undefined}
+      onCopy={onCopy}
+    />,
   );
 }
 

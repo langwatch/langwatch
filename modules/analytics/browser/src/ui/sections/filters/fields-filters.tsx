@@ -2,10 +2,7 @@ import {
   availableFilters,
   type FilterDefinition,
   type FilterField,
-  filterOutEmptyFilters,
-  type FilterParam,
-  useFilterParams,
-} from "@langwatch/analytics-browser-kit";
+} from "@langwatch/analytics-filters";
 import type { OutputsFromMap, RouterFromMap } from "@langwatch/api/web";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -47,6 +44,8 @@ import {
   type AnalyticsApiMap,
   type AnalyticsFilterOption,
 } from "../../../behavior/analytics-api.ts";
+import { useFilterParams } from "../../../behavior/use-filter-params.ts";
+import { filterOutEmptyFilters, type FilterParam } from "../../../model/analytics-filter-params.ts";
 import { SaveAsViewButton } from "./save-as-view-button.tsx";
 
 /** An unparsable bound falls back to the slider's own end of the range. */
@@ -741,7 +740,6 @@ function ListSelection({
     },
     {
       refetchOnMount: false,
-      refetchOnWindowFocus: false,
       placeholderData: keepPreviousData,
       enabled: queryOpts.enabled,
     },

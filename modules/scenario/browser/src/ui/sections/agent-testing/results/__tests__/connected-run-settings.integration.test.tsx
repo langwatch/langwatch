@@ -5,21 +5,16 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { TargetIdentity } from "../../../../../behavior/use-target-name-map.ts";
 import { RunSettingsBlock } from "../run-settings-block.tsx";
 import { readRunSettings } from "../run-settings.ts";
 import { batchTargetsOf } from "../use-batch-targets.ts";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function runAgainst({
   referenceId,
@@ -69,14 +64,13 @@ function renderSettings(scenarioRuns: ScenarioRunData[]) {
     targetIdentities: IDENTITIES,
   });
   if (!settings) throw new Error("the batch carries no runs");
-  return render(
+  return renderWithDesignSystem(
     <RunSettingsBlock
       settings={settings}
       targets={targets}
       startedLabel={null}
       startedByLabel={null}
     />,
-    { wrapper: Wrapper },
   );
 }
 

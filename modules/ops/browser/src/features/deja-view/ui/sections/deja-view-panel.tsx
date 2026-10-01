@@ -111,7 +111,6 @@ export function DejaViewContent() {
     },
     {
       enabled: !!currentAggregateType && !!state.selectedAggregate,
-      refetchInterval: 15_000,
     },
   );
 

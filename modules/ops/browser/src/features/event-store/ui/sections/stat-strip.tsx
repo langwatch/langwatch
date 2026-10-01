@@ -22,7 +22,6 @@ export function StatStrip({ data }: { data: DashboardData }) {
   // (specs/ops/dead-letter-recovery.feature). Same source the navigation
   // badge and the DLQ card poll, so the figures can never disagree.
   const outboxDeadQuery = api.ops.listDeadLetterCounts.useQuery(undefined, {
-    refetchInterval: 30_000,
   });
   const outboxDead = (outboxDeadQuery.data ?? []).reduce((sum, row) => sum + row.count, 0);
 

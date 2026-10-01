@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
@@ -13,10 +13,6 @@ import {
   type SlackBlockKitTemplateOption,
   templateOptionsFor,
 } from "../ui/elements/registry.ts";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const pickerElement = (props: Partial<Parameters<typeof SlackBlockKitTemplatePicker>[0]> = {}) => (
   <SlackBlockKitTemplatePicker
@@ -31,7 +27,7 @@ const pickerElement = (props: Partial<Parameters<typeof SlackBlockKitTemplatePic
 );
 
 const renderPicker = (props: Partial<Parameters<typeof SlackBlockKitTemplatePicker>[0]> = {}) =>
-  render(pickerElement(props), { wrapper: Wrapper });
+  renderWithDesignSystem(pickerElement(props));
 
 /** The layouts in the order the list renders them, by registry id. */
 const layouts = () => within(screen.getByRole("group", { name: "Message layout" }));

@@ -8,10 +8,10 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { LuArrowRight, LuRocket } from "react-icons/lu";
 
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import { Link } from "../elements/personal-link.tsx";
 
 // Amber → orange → violet palette so the governance hero visually rhymes with

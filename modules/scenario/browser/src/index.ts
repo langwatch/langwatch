@@ -23,7 +23,6 @@ export * from "./ui/sections/media-part.tsx";
 export * from "./ui/sections/simulations/scenario-message-renderer.tsx";
 export * from "./ui/elements/simulation-results.tsx";
 export * from "./ui/elements/thinking-indicator.tsx";
-export * from "./model/run-state-polling.ts";
 export * from "./model/scenario-run-status.utils.ts";
 export * from "./model/scenario-run-status-config.ts";
 export * from "./behavior/use-sequential-audio-playback.ts";

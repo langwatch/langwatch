@@ -16,11 +16,13 @@ vi.mock("posthog-js", () => ({
 
 // The Langy announcement starts its conversation in place rather than routing.
 const askLangy = vi.fn();
-vi.mock("@langwatch/langy-browser-kit", () => ({
+vi.mock("../../../../../behavior/langy/langy.store.ts", () => ({
   useLangyStore: (selector: (s: unknown) => unknown) => selector({ askLangy }),
-  LangyMark: () => null,
-  SERIF: "serif",
 }));
+
+vi.mock("../../../langy/langy-mark.tsx", () => ({ LangyMark: () => null }));
+
+vi.mock("../../../../../model/langy/asaplangy-tokens.ts", () => ({ SERIF: "serif" }));
 
 import {
   ProjectHomeHostProvider,

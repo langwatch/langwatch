@@ -1,6 +1,7 @@
 import type { agentTrpc, httpProxyTrpc } from "@langwatch/agent-contract";
 import { createModuleApi, type ContractApiMap, type ModuleApi } from "@langwatch/api/web";
-import type { blankTemplate } from "@langwatch/workflow-browser-kit";
+
+import type { blankTemplate } from "../model/workflow/templates/blank.template.ts";
 
 /** Model-provider's procedures this package still calls until a kit or capability offers them. */
 type BorrowedProcedures = {

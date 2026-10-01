@@ -4,8 +4,8 @@
  * reloading the saved caller values into the form.
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 // The Voice picker reaches tRPC and the project context; stub it so this test
 // exercises the form group in isolation.
@@ -33,20 +33,18 @@ afterEach(() => {
 });
 
 function renderForm() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ScenarioForm
-        callerVoiceGroup={(control) => <CallerVoiceGroup control={control} />}
-        defaultValues={{
-          name: "Angry cancellation",
-          callerVoice: {
-            voiceModel: null,
-            interruptProbability: 0.2,
-            effects: "phone_line",
-          },
-        }}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ScenarioForm
+      callerVoiceGroup={(control) => <CallerVoiceGroup control={control} />}
+      defaultValues={{
+        name: "Angry cancellation",
+        callerVoice: {
+          voiceModel: null,
+          interruptProbability: 0.2,
+          effects: "phone_line",
+        },
+      }}
+    />,
   );
 }
 

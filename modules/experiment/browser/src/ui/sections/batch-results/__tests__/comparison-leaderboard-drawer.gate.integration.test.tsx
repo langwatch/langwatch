@@ -5,8 +5,8 @@ import "@testing-library/jest-dom/vitest";
  * chart's expand affordance.
  * @see specs/experiments/comparison-leaderboard.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const rollout = vi.hoisted(() => ({ enabled: true }));
@@ -19,8 +19,10 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn() }),
 }));
 
-import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-browser-kit";
-
+import type {
+  BatchComparisonColumn,
+  BatchResultRow,
+} from "../../batch-evaluation-results.types.ts";
 import { ComparisonLeaderboardDrawer } from "../comparison-leaderboard-drawer.tsx";
 
 const VARIANTS = ["target-1", "target-2", "target-3"];
@@ -61,14 +63,9 @@ const rows: BatchResultRow[] = Array.from({ length: 6 }, (_, index) => ({
   ),
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const renderDrawer = () =>
-  render(
+  renderWithDesignSystem(
     <ComparisonLeaderboardDrawer evaluatorId={column.evaluatorId} column={column} rows={rows} />,
-    { wrapper: Wrapper },
   );
 
 /**
@@ -77,9 +74,7 @@ const renderDrawer = () =>
  * query string cannot carry — so they were passing on a path no reader takes.
  */
 const renderDrawerFromUrlAlone = () =>
-  render(<ComparisonLeaderboardDrawer evaluatorId={column.evaluatorId} />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(<ComparisonLeaderboardDrawer evaluatorId={column.evaluatorId} />);
 
 describe("the expanded comparison leaderboard, opened straight from a URL", () => {
   afterEach(() => {

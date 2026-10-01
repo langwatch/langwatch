@@ -11,7 +11,7 @@ import { Check, ChevronDown, User, Users } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
 
-import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../use-saved-views.tsx";
+import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../../../behavior/use-saved-views.tsx";
 
 export function SaveAsViewButton() {
   const { saveView } = useSavedViews();

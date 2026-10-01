@@ -3,9 +3,9 @@
  * Spec: specs/coding-agent/project-menu-links.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal, nowInstant } from "@langwatch/time";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NavigationProject } from "../../../model/navigation-host.ts";
@@ -29,24 +29,22 @@ function renderMenu(
   project: NavigationProject,
   options: { pathname?: string; permissions?: string[]; codingAgentEnabled?: boolean } = {},
 ) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          project,
-          pathname: options.pathname ?? "/[project]",
-          permissions: options.permissions ?? ["traces:view"],
-          flags: {
-            release_ui_ai_governance_enabled: {
-              enabled: options.codingAgentEnabled ?? true,
-              isLoading: false,
-            },
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        project,
+        pathname: options.pathname ?? "/[project]",
+        permissions: options.permissions ?? ["traces:view"],
+        flags: {
+          release_ui_ai_governance_enabled: {
+            enabled: options.codingAgentEnabled ?? true,
+            isLoading: false,
           },
-        }}
-      >
-        <MainMenuSections showExpanded />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+        },
+      }}
+    >
+      <MainMenuSections showExpanded />
+    </WithStubNavigationHost>,
   );
 }
 

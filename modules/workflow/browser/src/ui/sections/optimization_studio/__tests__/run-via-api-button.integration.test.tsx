@@ -3,17 +3,12 @@
  * Run via API button opens a dialog with copyable snippets (Python default,
  * TypeScript, Go, Shell) for triggering this workflow via evaluations-v3.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RunViaApiButton } from "../run-via-api-button.tsx";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const openDialog = async () => {
   const user = userEvent.setup();
@@ -39,14 +34,13 @@ describe("RunViaApiButton", () => {
   describe("when the button is clicked", () => {
     /** @scenario The run-via-API dialog shows a copyable snippet for this workflow */
     it("opens a dialog defaulting to a Python snippet that runs this workflow", async () => {
-      render(
+      renderWithDesignSystem(
         <RunViaApiButton
           workflowId="workflow_abc123"
           entryFields={[{ identifier: "input", type: "str" }]}
           datasetColumns={["input"]}
           datasetName="My Dataset"
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = await openDialog();
@@ -61,14 +55,13 @@ describe("RunViaApiButton", () => {
     describe("when the Shell language is selected", () => {
       /** @scenario The run-via-API dialog shows a copyable snippet for this workflow */
       it("shows a curl snippet posting to this workflow's evaluate endpoint", async () => {
-        render(
+        renderWithDesignSystem(
           <RunViaApiButton
             workflowId="workflow_abc123"
             entryFields={[{ identifier: "input", type: "str" }]}
             datasetColumns={["input"]}
             datasetName="My Dataset"
           />,
-          { wrapper: Wrapper },
         );
 
         await openDialog();
@@ -84,14 +77,13 @@ describe("RunViaApiButton", () => {
     describe("when the Go language is selected", () => {
       /** @scenario The run-via-API dialog shows a copyable snippet for this workflow */
       it("shows a net/http snippet posting to this workflow's evaluate endpoint", async () => {
-        render(
+        renderWithDesignSystem(
           <RunViaApiButton
             workflowId="workflow_abc123"
             entryFields={[{ identifier: "input", type: "str" }]}
             datasetColumns={["input"]}
             datasetName="My Dataset"
           />,
-          { wrapper: Wrapper },
         );
 
         await openDialog();
@@ -110,7 +102,7 @@ describe("RunViaApiButton", () => {
   describe("when the entry point has a field the dataset does not provide", () => {
     /** @scenario The parameters example mirrors the entry point fields the dataset does not provide */
     it("maps that field into the parameters and omits the dataset-backed ones", async () => {
-      render(
+      renderWithDesignSystem(
         <RunViaApiButton
           workflowId="workflow_abc123"
           entryFields={[
@@ -120,7 +112,6 @@ describe("RunViaApiButton", () => {
           datasetColumns={["input"]}
           datasetName="My Dataset"
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = await openDialog();
@@ -133,13 +124,12 @@ describe("RunViaApiButton", () => {
   describe("when the entry point has an image field the dataset does not provide", () => {
     /** @scenario An image entry field gets a base64 data-url example */
     it("shows a base64 data-url example for the image field", async () => {
-      render(
+      renderWithDesignSystem(
         <RunViaApiButton
           workflowId="workflow_abc123"
           entryFields={[{ identifier: "screenshot", type: "image" }]}
           datasetColumns={[]}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = await openDialog();
@@ -152,14 +142,13 @@ describe("RunViaApiButton", () => {
   describe("when the dataset already provides every entry field", () => {
     /** @scenario With every entry field already provided by the dataset the snippet shows an illustrative flag */
     it("falls back to an illustrative feature-flag example", async () => {
-      render(
+      renderWithDesignSystem(
         <RunViaApiButton
           workflowId="workflow_abc123"
           entryFields={[{ identifier: "input", type: "str" }]}
           datasetColumns={["input"]}
           datasetName="My Dataset"
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = await openDialog();
@@ -170,7 +159,7 @@ describe("RunViaApiButton", () => {
 
   describe("when switching between data sources", () => {
     it("updates the snippet body for inline data and dataset id", async () => {
-      render(
+      renderWithDesignSystem(
         <RunViaApiButton
           workflowId="workflow_abc123"
           entryFields={[
@@ -180,7 +169,6 @@ describe("RunViaApiButton", () => {
           datasetColumns={["input"]}
           datasetName="My Dataset"
         />,
-        { wrapper: Wrapper },
       );
 
       await openDialog();

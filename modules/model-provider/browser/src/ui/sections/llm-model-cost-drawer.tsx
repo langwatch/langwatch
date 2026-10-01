@@ -4,7 +4,6 @@
  * suggestion. Scope is a single organization's (ADR-021): editing keeps the
  */
 
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { applyHandledErrorToForm } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -20,6 +19,7 @@ import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { toLLMModelCostRow, type LLMModelCostRow } from "../../model/llm-model-cost-row.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { exactModelMatchRegex, isSafeRegex } from "../../model/safe-regex.ts";
+import { ScopeChipPicker, type ScopeTriadEntry } from "./authz/scope-picker/scope-chip-picker.tsx";
 import {
   LLMModelCostMatchingSpans,
   type MatchingSpansPreviewInput,

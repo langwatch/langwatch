@@ -26,6 +26,8 @@ export type HttpConfigEditorProps = {
   onTest: (templateVariables: Record<string, unknown>) => Promise<HttpTestResult>;
   /** Horizontal padding for the endpoint and tab content areas. Defaults to 4. */
   paddingX?: number | string;
+  /** The saved agent's credentials are shown as "Stored on the agent" and cannot be edited. */
+  credentialsReadOnly?: boolean;
 };
 
 /**
@@ -48,6 +50,7 @@ export function HttpConfigEditor({
   onHeadersChange,
   onTest,
   paddingX = 4,
+  credentialsReadOnly = false,
 }: HttpConfigEditorProps) {
   const [activeTab, setActiveTab] = useState("body");
 
@@ -102,11 +105,15 @@ export function HttpConfigEditor({
         </Tabs.Content>
 
         <Tabs.Content value="auth" paddingX={paddingX} paddingY={3}>
-          <AuthConfigSection value={auth} onChange={onAuthChange} />
+          <AuthConfigSection value={auth} onChange={onAuthChange} readOnly={credentialsReadOnly} />
         </Tabs.Content>
 
         <Tabs.Content value="headers" paddingX={paddingX} paddingY={3}>
-          <HeadersConfigSection value={headers} onChange={onHeadersChange} />
+          <HeadersConfigSection
+            value={headers}
+            onChange={onHeadersChange}
+            readOnly={credentialsReadOnly}
+          />
         </Tabs.Content>
 
         <Tabs.Content value="test" paddingX={paddingX} paddingY={3}>

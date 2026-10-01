@@ -1,5 +1,6 @@
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetColumns,
   type DatasetRecordEntry,
@@ -18,7 +19,6 @@ import { generate } from "@langwatch/ksuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 
-import { datasetApi } from "../../../behavior/dataset-api.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
 
@@ -43,7 +43,7 @@ export function AddRowsFromCSVModal({
   onUpdateDataset?: (entries: DatasetRecordEntry[]) => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const dataset = datasetApi.datasetRecord.getAll.useQuery(
+  const dataset = datasetClient.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
     {
       enabled: !!project && !!datasetId,
@@ -56,7 +56,7 @@ export function AddRowsFromCSVModal({
   const [hasErrors, setErrors] = useState<string[]>([]);
   const [csvUploaded, setCSVUploaded] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
-  const uploadRecords = datasetApi.datasetRecord.create.useMutation();
+  const uploadRecords = datasetClient.datasetRecord.create.useMutation();
 
   const preprocessCSV = (csv: string[][]) => {
     setCSVHeaders(csv[0] ?? []);

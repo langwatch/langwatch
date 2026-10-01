@@ -1,7 +1,14 @@
+import { useMintPersonalToken } from "@langwatch/api-key-client";
+import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Menu } from "@langwatch/design-system/menu";
+import {
+  API_KEY_PLACEHOLDER,
+  PersonalAccessTokenBanner,
+} from "@langwatch/design-system/personal-access-token-banner";
 import {
   Alert,
   Box,
@@ -18,11 +25,6 @@ import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
-import {
-  datasetDatabaseRecordsToInMemoryDataset,
-  inMemoryDatasetToNodeDataset,
-  RenderCode,
-} from "@langwatch/workflow-browser-kit";
 import {
   getEntryInputs,
   type NodeDataset,
@@ -42,7 +44,12 @@ import {
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi, type RouterOutputs } from "../../../behavior/workflow-api.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
+import {
+  datasetDatabaseRecordsToInMemoryDataset,
+  inMemoryDatasetToNodeDataset,
+} from "../../../model/studio-dataset.utils.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
+import { RenderCode } from "../code/render-code.tsx";
 import { useVersionState } from "./use-version-state.ts";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";
 
@@ -654,11 +661,15 @@ export const ApiModalContent = () => {
     workflowId,
   }));
 
-  const { project } = useOrganizationTeamProject();
-  const projectApiKey = workflowApi.project.getProjectAPIKey.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const { project, organization } = useOrganizationTeamProject();
+  const minting = useMintPersonalToken({
+    organizationId: organization?.id,
+    projectId: project?.id,
+    userId: useOptionalUiCapabilities()?.session.currentUser()?.id,
+    name: "Personal access token",
+    permissions: ["workflows:manage"],
+  });
+  const token = minting.token ?? null;
 
   const publishedWorkflow = workflowApi.optimization.getPublishedWorkflow.useQuery(
     {
@@ -704,7 +715,7 @@ export const ApiModalContent = () => {
         <Box padding={4} backgroundColor={"#272822"}>
           <RenderCode
             code={`# Set your API key
-LANGWATCH_API_KEY="${projectApiKey.data?.apiKey ?? "your_langwatch_api_key"}"
+LANGWATCH_API_KEY="${token ?? API_KEY_PLACEHOLDER}"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "${langwatchEndpoint()}/api/workflows/${workflowId}/run" \\
@@ -716,13 +727,25 @@ EOF`}
             language="bash"
           />
         </Box>
-        <Text marginTop={4}>
-          To retrieve your API key, click{" "}
-          <Link href={`/${project?.slug}/setup`} textDecoration="underline" isExternal>
-            here
-          </Link>
-          .
-        </Text>
+        {project?.id && organization && (
+          <Box marginTop={4}>
+            <PersonalAccessTokenBanner
+              token={token}
+              isCreating={minting.isMinting}
+              scopeNote={minting.scopeNote}
+              onCreate={() =>
+                void minting
+                  .mint()
+                  .catch((error: unknown) =>
+                    showErrorToast({
+                      error,
+                      fallbackTitle: "Couldn't create the personal access token",
+                    }),
+                  )
+              }
+            />
+          </Box>
+        )}
         <Text marginTop={4}>
           To access the API details and view more information, please refer to the official
           documentation{" "}

@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * Upload CSV drawer pieces. Binds specs/datasets/dataset-upload-dropzone.feature.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -20,6 +20,15 @@ const createFromStoredObject = vi.fn();
 
 vi.mock("../../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
+    useUtils: () => ({
+      dataset: {
+        findNextName: { fetch: vi.fn().mockResolvedValue("New Dataset") },
+      },
+    }),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
     useUtils: () => ({
       dataset: {
         findNextName: { fetch: vi.fn().mockResolvedValue("New Dataset") },
@@ -74,8 +83,7 @@ import {
   UploadCSVForm,
 } from "../upload-csv-drawer.tsx";
 
-const wrap = (ui: React.ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+const wrap = (ui: React.ReactElement) => renderWithDesignSystem(ui);
 
 const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
 
@@ -176,14 +184,12 @@ describe("the upload dropzone", () => {
 
       // The host computes the validation and passes it down.
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <CSVReaderComponent
-            parse={false}
-            onUploadAccepted={vi.fn()}
-            onRawFile={vi.fn()}
-            fileError="File is too large"
-          />
-        </ChakraProvider>,
+        <CSVReaderComponent
+          parse={false}
+          onUploadAccepted={vi.fn()}
+          onRawFile={vi.fn()}
+          fileError="File is too large"
+        />,
       );
 
       expect(screen.getByTestId("upload-error")).toHaveTextContent(/file is too large/i);
@@ -207,15 +213,13 @@ describe("the upload dropzone", () => {
       await user.upload(fileInput(), new File(["x"], "uploading.csv", { type: "text/csv" }));
 
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <CSVReaderComponent
-            parse={false}
-            onUploadAccepted={vi.fn()}
-            onRawFile={vi.fn()}
-            uploadStatus="uploading"
-            onCancel={onCancel}
-          />
-        </ChakraProvider>,
+        <CSVReaderComponent
+          parse={false}
+          onUploadAccepted={vi.fn()}
+          onRawFile={vi.fn()}
+          uploadStatus="uploading"
+          onCancel={onCancel}
+        />,
       );
 
       const cancel = screen.getByRole("button", { name: /cancel upload/i });
@@ -276,14 +280,12 @@ describe("DatasetUploadProcessing", () => {
 
       // A re-render with the same ready data must not fire onReady again.
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <DatasetUploadProcessing
-            projectId="proj_1"
-            datasetId="dataset_1"
-            onReady={onReady}
-            onViewDataset={onViewDataset}
-          />
-        </ChakraProvider>,
+        <DatasetUploadProcessing
+          projectId="proj_1"
+          datasetId="dataset_1"
+          onReady={onReady}
+          onViewDataset={onViewDataset}
+        />,
       );
       expect(onReady).toHaveBeenCalledTimes(1);
     });
@@ -348,16 +350,14 @@ describe("UploadCSVForm cancel", () => {
         }),
       );
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <UploadCSVForm
-            setUploadedDataset={vi.fn()}
-            uploadedDataset={undefined}
-            uploadCSVData={vi.fn()}
-            enableDirectUpload={true}
-            onDirectUploadComplete={vi.fn()}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <UploadCSVForm
+          setUploadedDataset={vi.fn()}
+          uploadedDataset={undefined}
+          uploadCSVData={vi.fn()}
+          enableDirectUpload={true}
+          onDirectUploadComplete={vi.fn()}
+        />,
       );
 
       await user.upload(fileInput(), new File(["x"], "racey.csv", { type: "text/csv" }));

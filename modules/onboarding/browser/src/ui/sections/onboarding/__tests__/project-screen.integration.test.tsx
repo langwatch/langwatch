@@ -38,7 +38,7 @@ vi.mock("../../../../model/onboarding-host.ts", () => ({
   useOnboardingHost: () => ({ signOut: state.signOut }),
 }));
 
-vi.mock("@langwatch/onboarding-browser-kit", () => ({
+vi.mock("../../../blocks/tech-stack.tsx", () => ({
   TechStackSelector: () => null,
 }));
 
@@ -46,7 +46,9 @@ vi.mock("../../../../behavior/onboarding-api.ts", () => ({
   api: {
     team: {
       getBySlug: { useQuery: () => ({ data: state.teamBySlug, isFetched: true }) },
-      getTeamsWithMembers: { useQuery: () => ({ data: state.teams }) },
+    },
+    organization: {
+      getScopeGraph: { useQuery: () => ({ data: [{ id: "org_1", teams: state.teams }] }) },
     },
     project: {
       create: {

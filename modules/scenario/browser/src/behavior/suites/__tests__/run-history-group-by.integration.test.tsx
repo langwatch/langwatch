@@ -3,28 +3,23 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/run-history-group-by.feature - @integration scenarios
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import {
-  computeGroupSummary,
-  GroupRow,
-  type RunGroup,
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "@langwatch/suite-browser-kit";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { computeGroupSummary, type RunGroup } from "../../../model/suite/run-history-transforms.ts";
+import { GroupRow } from "../../../ui/sections/suite/group-row.tsx";
+import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
+} from "../../../ui/sections/suite/run-history-filters.tsx";
 import { makeScenarioRunData } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const scenarioOptions = [
   { id: "scen_1", name: "Login" },
@@ -45,7 +40,7 @@ describe("Group-by selector", () => {
   describe("when the run history list renders", () => {
     /** @scenario "Group-by selector renders with correct options" */
     it("renders a group-by selector with correct options", () => {
-      render(
+      renderWithDesignSystem(
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={emptyFilters}
@@ -53,7 +48,6 @@ describe("Group-by selector", () => {
           groupBy="none"
           onGroupByChange={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const selector = screen.getByLabelText("Group by");
@@ -65,7 +59,7 @@ describe("Group-by selector", () => {
     });
 
     it("has None selected by default", () => {
-      render(
+      renderWithDesignSystem(
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={emptyFilters}
@@ -73,7 +67,6 @@ describe("Group-by selector", () => {
           groupBy="none"
           onGroupByChange={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const selector = screen.getByLabelText("Group by") as HTMLSelectElement;
@@ -86,7 +79,7 @@ describe("Group-by selector", () => {
       const user = userEvent.setup();
       const onGroupByChange = vi.fn();
 
-      render(
+      renderWithDesignSystem(
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={emptyFilters}
@@ -94,7 +87,6 @@ describe("Group-by selector", () => {
           groupBy="none"
           onGroupByChange={onGroupByChange}
         />,
-        { wrapper: Wrapper },
       );
 
       const selector = screen.getByLabelText("Group by");
@@ -113,7 +105,7 @@ describe("Group-by selector", () => {
         passFailStatus: "",
       };
 
-      render(
+      renderWithDesignSystem(
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={activeFilters}
@@ -121,7 +113,6 @@ describe("Group-by selector", () => {
           groupBy="none"
           onGroupByChange={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       // The scenario filter should still reflect "scen_1"
@@ -172,7 +163,7 @@ describe("<GroupRow/>", () => {
       const group = makeGroup({ groupLabel: "Login" });
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -181,7 +172,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Login")).toBeInTheDocument();
@@ -191,7 +181,7 @@ describe("<GroupRow/>", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -200,7 +190,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getAllByText("2 runs").length).toBeGreaterThanOrEqual(1);
@@ -212,7 +201,7 @@ describe("<GroupRow/>", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -221,7 +210,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("run-metrics-summary")).toBeInTheDocument();
@@ -237,7 +225,7 @@ describe("<GroupRow/>", () => {
       });
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -246,7 +234,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("My Agent")).toBeInTheDocument();
@@ -274,7 +261,7 @@ describe("<GroupRow/>", () => {
       });
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -283,7 +270,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("67%")).toBeInTheDocument();
@@ -296,7 +282,7 @@ describe("<GroupRow/>", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -305,7 +291,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       // Expanded should show scenario run details
@@ -338,7 +323,7 @@ describe("<GroupRow/>", () => {
       };
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -347,7 +332,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       const batchHeaders = screen.getAllByTestId("batch-sub-header");
@@ -372,7 +356,7 @@ describe("<GroupRow/>", () => {
       };
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -381,7 +365,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       const batchHeader = screen.getByTestId("batch-sub-header");
@@ -396,7 +379,7 @@ describe("<GroupRow/>", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={group}
           summary={summary}
@@ -405,7 +388,6 @@ describe("<GroupRow/>", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       const header = screen.getByRole("button", { name: /Login/ });

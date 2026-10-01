@@ -19,7 +19,6 @@ import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { TechStackSelector } from "@langwatch/onboarding-browser-kit";
 import isEqual from "lodash-es/isEqual";
 import { Lock } from "lucide-react";
 import { useState } from "react";
@@ -41,6 +40,7 @@ import {
 } from "../../../model/project-host.ts";
 import { ProjectTechStackIcon } from "../../../ui/blocks/tech-stack.tsx";
 import { HorizontalFormControl } from "../../../ui/elements/horizontal-form-control.tsx";
+import { TechStackSelector } from "../../blocks/onboarding/tech-stack.tsx";
 
 type OrganizationFormData = {
   name: string;
@@ -192,6 +192,46 @@ export default function ProjectSettingsScreen() {
   return <SettingsForm organization={organization} project={sharedProject} />;
 }
 
+function S3StorageField({
+  canManage,
+  hasStoredKey,
+  register,
+}: {
+  canManage: boolean;
+  hasStoredKey: boolean;
+  register: UseFormRegister<OrganizationFormData>;
+}) {
+  return (
+    <HorizontalFormControl
+      label="S3 Storage"
+      helper="Configure S3 storage to host data on your own members. Leave empty to use LangWatch's managed storage."
+    >
+      {canManage ? (
+        <VStack width="full" align="start" gap={3}>
+          <Input width="full" type="text" placeholder="S3 Endpoint" {...register("s3Endpoint")} />
+          <Input
+            width="full"
+            type="text"
+            placeholder="Access Key ID"
+            {...register("s3AccessKeyId")}
+          />
+          <Input
+            width="full"
+            type="password"
+            placeholder={
+              hasStoredKey ? "Stored; enter a new value to replace it" : "Secret Access Key"
+            }
+            {...register("s3SecretAccessKey")}
+          />
+          <Input width="full" type="text" placeholder="S3 Bucket Name" {...register("s3Bucket")} />
+        </VStack>
+      ) : (
+        <Text>S3 storage configuration is only visible to organization managers</Text>
+      )}
+    </HorizontalFormControl>
+  );
+}
+
 function SettingsForm({
   organization,
   project,
@@ -213,7 +253,7 @@ function SettingsForm({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
     s3AccessKeyId: organization.s3AccessKeyId ?? "",
-    s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
+    s3SecretAccessKey: "",
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
     traceSharingEnabled: organization.traceSharingEnabled,
@@ -402,41 +442,11 @@ function SettingsForm({
               </HorizontalFormControl>
 
               {organization.useCustomS3 && (
-                <HorizontalFormControl
-                  label="S3 Storage"
-                  helper="Configure S3 storage to host data on your own members. Leave empty to use LangWatch's managed storage."
-                >
-                  {hasPermission("organization:manage") ? (
-                    <VStack width="full" align="start" gap={3}>
-                      <Input
-                        width="full"
-                        type="text"
-                        placeholder="S3 Endpoint"
-                        {...register("s3Endpoint")}
-                      />
-                      <Input
-                        width="full"
-                        type="text"
-                        placeholder="Access Key ID"
-                        {...register("s3AccessKeyId")}
-                      />
-                      <Input
-                        width="full"
-                        type="password"
-                        placeholder="Secret Access Key"
-                        {...register("s3SecretAccessKey")}
-                      />
-                      <Input
-                        width="full"
-                        type="text"
-                        placeholder="S3 Bucket Name"
-                        {...register("s3Bucket")}
-                      />
-                    </VStack>
-                  ) : (
-                    <Text>S3 storage configuration is only visible to organization managers</Text>
-                  )}
-                </HorizontalFormControl>
+                <S3StorageField
+                  canManage={hasPermission("organization:manage")}
+                  hasStoredKey={Boolean(defaultValues.s3AccessKeyId)}
+                  register={register}
+                />
               )}
             </VStack>
 
@@ -557,7 +567,7 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
     userLinkTemplate: project.userLinkTemplate ?? "",
     s3Endpoint: project.s3Endpoint ?? "",
     s3AccessKeyId: project.s3AccessKeyId ?? "",
-    s3SecretAccessKey: project.s3SecretAccessKey ?? "",
+    s3SecretAccessKey: "",
     s3Bucket: project.s3Bucket ?? "",
     traceSharingEnabled: project.traceSharingEnabled,
     presenceEnabled: project.presenceEnabled,
@@ -766,7 +776,11 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
                 <Input
                   width="full"
                   type="password"
-                  placeholder="Secret Access Key"
+                  placeholder={
+                    defaultValues.s3AccessKeyId
+                      ? "Stored; enter a new value to replace it"
+                      : "Secret Access Key"
+                  }
                   {...register("s3SecretAccessKey")}
                 />
                 <Input

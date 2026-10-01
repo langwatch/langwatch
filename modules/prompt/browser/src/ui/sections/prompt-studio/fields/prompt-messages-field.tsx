@@ -6,14 +6,8 @@ import {
   type StackProps,
   VStack,
 } from "@langwatch/design-system/primitives";
-import {
-  type AvailableSource,
-  PromptTextAreaWithVariables,
-  useLayoutMode,
-  type Variable,
-} from "@langwatch/prompt-browser-kit";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
+import { type AvailableSource } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
@@ -22,7 +16,11 @@ import {
   useFormContext,
 } from "react-hook-form";
 
+import { useLayoutMode } from "../../../../model/layout-mode.ts";
 import { VerticalFormControl } from "../../../elements/vertical-form-control.tsx";
+import { renderSourceTypeIcon } from "../../../elements/workflow/workflow-icons.tsx";
+import { PromptTextAreaWithVariables } from "../../variables/prompt-textarea/prompt-textarea-with-variables.tsx";
+import { type Variable } from "../../variables/variables-section.tsx";
 import {
   EditingModeTitle,
   getDefaultEditingMode,

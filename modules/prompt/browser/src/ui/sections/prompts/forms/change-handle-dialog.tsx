@@ -15,7 +15,7 @@ import { Building, Check, ChevronDown, Users } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 
-import { usePromptHandleCheck } from "../../../../behavior/prompts/use-prompt-handle-check.ts";
+import { usePromptHandleCheck } from "../../../../behavior/use-prompt-handle-check.ts";
 import {
   type ChangeHandleFormValues,
   createChangeHandleFormSchema,

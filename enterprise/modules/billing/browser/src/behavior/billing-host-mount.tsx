@@ -115,7 +115,7 @@ export default function BillingHostMount({ children }: { children?: ReactNode })
   const { feedback, navigation, route } = useUiCapabilities();
   const { organizationId, projectId } = useUiScope().activeScope();
   const deployment = useUiDeployment();
-  const organizations = billingApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = billingApi.organization.getScopeGraph.useQuery({});
 
   const org = useMemo<BillingHostOrganization | undefined>(() => {
     const found = (organizations.data ?? []).find((candidate) => candidate.id === organizationId);

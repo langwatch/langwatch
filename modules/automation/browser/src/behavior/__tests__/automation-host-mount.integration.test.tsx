@@ -26,8 +26,8 @@ const ORGANIZATION_GRAPH = {
 
 const answer = vi.fn(() => ({ data: [ORGANIZATION_GRAPH] }));
 vi.mock("../automation-api.ts", () => ({
-  automationApi: { organization: { getAll: { useQuery: () => answer() } } },
-  api: { organization: { getAll: { useQuery: () => answer() } } },
+  automationApi: { organization: { getScopeGraph: { useQuery: () => answer() } } },
+  api: { organization: { getScopeGraph: { useQuery: () => answer() } } },
 }));
 
 // The drawer machinery is the router's, not this port's.

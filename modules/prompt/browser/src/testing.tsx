@@ -4,8 +4,7 @@
  * asked. Tab storage is an in-memory double, so tests don't leak state.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
 import type { PromptBrowserStorage, PromptTabsCapabilities } from "./model/browser-capabilities.ts";
@@ -84,7 +83,6 @@ export class FakePromptHost extends PromptHostApi {
       teamId: "team-1",
       projectId: "proj-1",
       projectSlug: "web-app",
-      projectApiKey: "test-api-key",
       ...this.options.scope,
     };
   }
@@ -158,11 +156,7 @@ export function renderWithPromptHost(
 ) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <PromptHostProvider value={host}>{element}</PromptHostProvider>
-      </ChakraProvider>,
-    ),
+    ...renderWithDesignSystem(<PromptHostProvider value={host}>{element}</PromptHostProvider>),
   };
 }
 

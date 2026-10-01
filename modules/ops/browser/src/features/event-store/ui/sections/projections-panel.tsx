@@ -9,7 +9,6 @@ export function ProjectionsCard() {
     staleTime: 10 * 60 * 1000,
   });
   const dashboard = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    refetchInterval: 15_000,
   });
 
   const rows = useMemo(

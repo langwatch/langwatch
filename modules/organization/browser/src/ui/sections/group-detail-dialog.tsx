@@ -17,7 +17,6 @@ import { useEffect, useRef, useState } from "react";
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import {
   GrantInputRow,
   type GrantInputRowHandle,
@@ -27,6 +26,7 @@ import {
   StagedGrantRow,
   toggled,
 } from "./group-grant-input-row.tsx";
+import { MemberAvatar } from "./member-avatar.tsx";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 type PendingAddition = { userId: string; label: string; image: string | null };
@@ -52,7 +52,7 @@ function GroupMemberRow({
   const label = member.name ?? member.email;
   return (
     <HStack py={1} fontSize="sm" opacity={markedForRemoval ? 0.4 : 1} transition="opacity 0.15s">
-      <RandomColorAvatar name={label ?? "?"} image={member.image} size="xs" />
+      <MemberAvatar name={label ?? "?"} image={member.image} size="xs" />
       <Text flex={1} textDecoration={markedForRemoval ? "line-through" : undefined}>
         {label}
       </Text>
@@ -74,7 +74,7 @@ function GroupMemberRow({
 function StagedMemberRow({ addition, onUndo }: { addition: PendingAddition; onUndo: () => void }) {
   return (
     <HStack py={1} fontSize="sm" opacity={0.7}>
-      <RandomColorAvatar name={addition.label} image={addition.image} size="xs" />
+      <MemberAvatar name={addition.label} image={addition.image} size="xs" />
       <Text flex={1} color="green.600">
         {addition.label}
       </Text>
@@ -238,7 +238,7 @@ export function GroupDetailDialog({
   );
 
   const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId },
+    { organizationId, includeDeactivated: false },
     { enabled: open && canManage },
   );
 

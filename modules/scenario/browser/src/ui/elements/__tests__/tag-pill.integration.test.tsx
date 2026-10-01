@@ -3,23 +3,19 @@
  * @vitest-environment jsdom
  * @see specs/features/tag-management.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TagPill } from "../tag-pill.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("<TagPill/>", () => {
   afterEach(cleanup);
 
   describe("given a label", () => {
     it("displays the label text", () => {
-      render(<TagPill label="critical" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<TagPill label="critical" />);
 
       expect(screen.getByText("critical")).toBeInTheDocument();
     });
@@ -27,9 +23,7 @@ describe("<TagPill/>", () => {
 
   describe("when onRemove is provided", () => {
     it("displays a remove button", () => {
-      render(<TagPill label="billing" onRemove={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagPill label="billing" onRemove={vi.fn()} />);
 
       expect(screen.getByRole("button", { name: "Remove billing tag" })).toBeInTheDocument();
     });
@@ -38,9 +32,7 @@ describe("<TagPill/>", () => {
       const user = userEvent.setup();
       const onRemove = vi.fn();
 
-      render(<TagPill label="billing" onRemove={onRemove} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagPill label="billing" onRemove={onRemove} />);
 
       await user.click(screen.getByRole("button", { name: "Remove billing tag" }));
       expect(onRemove).toHaveBeenCalledOnce();
@@ -49,7 +41,7 @@ describe("<TagPill/>", () => {
 
   describe("when onRemove is not provided", () => {
     it("does not display a remove button", () => {
-      render(<TagPill label="readonly" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<TagPill label="readonly" />);
 
       expect(screen.queryByRole("button", { name: /Remove/ })).not.toBeInTheDocument();
     });

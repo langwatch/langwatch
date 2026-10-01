@@ -2,7 +2,7 @@
  * The in-progress half of a capability card.
  */
 import { Box, HStack, Text, VStack, keyframes } from "@langwatch/design-system/primitives";
-import { useReducedMotion, type LangyProgressSample } from "@langwatch/langy-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import type { CapabilitySurface } from "@langwatch/langy-contract";
 
 import {
@@ -11,6 +11,7 @@ import {
 } from "../../../../../model/langy-activity-ownership.ts";
 import { type CapabilityCommand } from "../../../../../model/langy-capability-digest.ts";
 import { langyThinkingShimmerStyles } from "../../../../../model/values/langy-shimmer.ts";
+import { type LangyProgressSample } from "../../../../../model/values/langy-turn.ts";
 import { LangyInterruptedNote } from "../../../../../ui/elements/langy-interrupted-note.tsx";
 import { useProjectedProgress } from "../../../../../ui/sections/streaming-status-line.tsx";
 import { useCapabilityData } from "../../../behavior/use-capability-data.ts";

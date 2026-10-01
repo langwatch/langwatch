@@ -22,10 +22,10 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
-      "path": "../browser-kit/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../filters/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
@@ -50,9 +50,6 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../prompt/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

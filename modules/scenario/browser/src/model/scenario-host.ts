@@ -18,8 +18,6 @@ export type ScenarioHostProject = {
   name: string;
   /** Whether anything has ever been ingested — the empty states lead on it. */
   firstMessage?: boolean;
-  /** The ingestion key the "connect your agent" pane prints. */
-  apiKey?: string;
 };
 
 /** The team the project belongs to, and the two facts that decide a personal workspace. */

@@ -1,11 +1,11 @@
 import { HStack, Icon, Link, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { NextLink } from "@langwatch/workflow-browser-kit";
 import type React from "react";
 import { Lock } from "react-feather";
 
 import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project.ts";
 import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
+import { default as NextLink } from "../elements/next-link.tsx";
 
 export interface RedactedFieldProps {
   field: "input" | "output";

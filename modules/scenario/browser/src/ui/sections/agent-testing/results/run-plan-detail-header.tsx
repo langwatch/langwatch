@@ -6,18 +6,19 @@
 
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
-import { type RunGroupSummary, RunMetricsSummary } from "@langwatch/suite-browser-kit";
 import { Download, MoreVertical, Pencil, Play, Square, Settings2 } from "lucide-react";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type { AgentTestingViewMode } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { type RunGroupSummary } from "../../../../model/suite/run-history-transforms.ts";
 import {
   EvaluatorPill,
   readingOfSummary,
 } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
+import { RunMetricsSummary } from "../../../elements/suite/runs/run-metrics-summary.tsx";
 import type { EvaluatorSummary } from "./evaluation-summaries.ts";
 import { ViewModeToggle } from "./view-mode-toggle.tsx";
 

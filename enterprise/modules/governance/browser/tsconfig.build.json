@@ -27,9 +27,6 @@
       "path": "../../../../packages/authorization/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/authz/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
@@ -37,9 +34,6 @@
     },
     {
       "path": "../../../../modules/coding-agent/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/coding-agent/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/config/tsconfig.build.json"
@@ -63,10 +57,7 @@
       "path": "../../../../dev/tsconfig.web-declarations.json"
     },
     {
-      "path": "../../../../modules/langy/browser-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/model-provider/browser-kit/tsconfig.build.json"
+      "path": "../../../../modules/langy/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
@@ -82,9 +73,6 @@
     },
     {
       "path": "../../../../modules/user/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/user/browser-kit/tsconfig.build.json"
     }
   ]
 }

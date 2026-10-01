@@ -1,10 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Profiler } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -13,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PromptHostProvider } from "../../../../../../model/prompt-host.ts";
 import type * as promptTabContextModule from "../../../../../../model/prompt-tab-context.tsx";
 import { FakePromptHost } from "../../../../../../testing.tsx";
+import { type Variable, VariablesSection } from "../../../../variables/variables-section.tsx";
 import {
   clearStoreInstances,
   PromptPlaygroundChatProvider,
@@ -87,23 +87,21 @@ const renderVariablesSection = (props: {
   const onChange = props.onChange ?? vi.fn();
   const onValueChange = props.onValueChange ?? vi.fn();
 
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptHostProvider value={testHost}>
-        <VariablesSection
-          variables={props.variables}
-          onChange={onChange}
-          values={props.values ?? {}}
-          onValueChange={onValueChange}
-          showMappings={false}
-          canAddRemove={true}
-          readOnly={false}
-          title="Variables"
-          lockedVariables={LOCKED_VARIABLES}
-          variableInfo={VARIABLE_INFO}
-        />
-      </PromptHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <PromptHostProvider value={testHost}>
+      <VariablesSection
+        variables={props.variables}
+        onChange={onChange}
+        values={props.values ?? {}}
+        onValueChange={onValueChange}
+        showMappings={false}
+        canAddRemove={true}
+        readOnly={false}
+        title="Variables"
+        lockedVariables={LOCKED_VARIABLES}
+        variableInfo={VARIABLE_INFO}
+      />
+    </PromptHostProvider>,
   );
 };
 
@@ -329,19 +327,17 @@ describe("PromptTabbedSection Store Integration", () => {
       expect(tabData?.variableValues.name).toBe("Updated value");
     });
 
-    it("persists variable values to localStorage", () => {
-      const tabId = store.getState().addTab({
+    it("keeps variable values out of storage", () => {
+      store.getState().addTab({
         data: createTabData({
-          variableValues: { name: "Persisted" },
+          form: { currentValues: { configId: "prompt-1" } },
+          variableValues: { name: "Typed value" },
         }),
       });
 
-      // Tab data (including variableValues) is persisted under its own
-      // per-tab key, not the top-level window/tab-order index key.
-      const tabStorageKey = `${TEST_PROJECT_ID}:tab:${tabId}`;
-      const storedData = localStorage.getItem(tabStorageKey);
-      expect(storedData).toBeDefined();
-      expect(storedData).toContain("Persisted");
+      const stored = localStorage.getItem(`${TEST_PROJECT_ID}:draggable-tabs-browser-store`);
+      expect(stored).toContain("prompt-1");
+      expect(stored).not.toContain("Typed value");
     });
 
     it("each tab maintains separate variable values", () => {
@@ -479,16 +475,14 @@ const renderPromptTabbedSection = (
     ...props,
   };
 
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptHostProvider value={host}>
-        <PromptPlaygroundChatProvider>
-          <FormWrapper defaultValues={formValues}>
-            <PromptTabbedSection {...defaultProps} />
-          </FormWrapper>
-        </PromptPlaygroundChatProvider>
-      </PromptHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <PromptHostProvider value={host}>
+      <PromptPlaygroundChatProvider>
+        <FormWrapper defaultValues={formValues}>
+          <PromptTabbedSection {...defaultProps} />
+        </FormWrapper>
+      </PromptPlaygroundChatProvider>
+    </PromptHostProvider>,
   );
 };
 
@@ -621,29 +615,27 @@ describe("PromptTabbedSection Layout Modes", () => {
       tabIdRef.current = tabId!;
 
       let renderCount = 0;
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <PromptHostProvider value={testHost}>
-            <PromptPlaygroundChatProvider>
-              <FormWrapper>
-                <Profiler
-                  id="PromptTabbedSection"
-                  onRender={() => {
-                    renderCount += 1;
-                  }}
-                >
-                  <PromptTabbedSection
-                    layoutMode="vertical"
-                    isPromptExpanded={true}
-                    onPositionChange={vi.fn()}
-                    onDragEnd={vi.fn()}
-                    onToggle={vi.fn()}
-                  />
-                </Profiler>
-              </FormWrapper>
-            </PromptPlaygroundChatProvider>
-          </PromptHostProvider>
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <PromptHostProvider value={testHost}>
+          <PromptPlaygroundChatProvider>
+            <FormWrapper>
+              <Profiler
+                id="PromptTabbedSection"
+                onRender={() => {
+                  renderCount += 1;
+                }}
+              >
+                <PromptTabbedSection
+                  layoutMode="vertical"
+                  isPromptExpanded={true}
+                  onPositionChange={vi.fn()}
+                  onDragEnd={vi.fn()}
+                  onToggle={vi.fn()}
+                />
+              </Profiler>
+            </FormWrapper>
+          </PromptPlaygroundChatProvider>
+        </PromptHostProvider>,
       );
 
       const renderCountAfterMount = renderCount;

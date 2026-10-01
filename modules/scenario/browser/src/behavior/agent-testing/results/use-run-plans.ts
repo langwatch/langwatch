@@ -4,11 +4,13 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useMemo } from "react";
 
+import type { Period } from "../../../ui/elements/analytics/period-selector.tsx";
 import { api } from "../../scenario-api.ts";
-import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
+import { useExternalSetSummaries, useSuiteSummaries } from "../../suites/use-set-summaries.ts";
+import { useSuites } from "../../suites/use-suites.ts";
 import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans.ts";
 
 export type UseRunPlansResult = {
@@ -30,21 +32,18 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
 
   // Both kinds: the run plan rows are the plans, and the test suites are read only
   // for the names a plan's scope may point at.
-  const { data: suites, isLoading: isSuitesLoading } = api.suites.getAll.useQuery(
-    { projectId, kinds: ["run_plan", "test_suite"] },
-    { enabled: !!project },
-  );
+  const { data: suites, isLoading: isSuitesLoading } = useSuites({
+    projectId,
+    kinds: ["run_plan", "test_suite"],
+  });
 
-  const { data: suiteSummaries } = api.suites.getSummaries.useQuery(
-    { projectId, startDate, endDate },
-    { enabled: !!project },
-  );
+  const { data: suiteSummaries } = useSuiteSummaries({ projectId, startDate, endDate });
 
-  const { data: externalSets, isLoading: isExternalLoading } =
-    api.scenarios.getExternalSetSummaries.useQuery(
-      { projectId, startDate, endDate },
-      { enabled: !!project },
-    );
+  const { data: externalSets, isLoading: isExternalLoading } = useExternalSetSummaries({
+    projectId,
+    startDate,
+    endDate,
+  });
 
   const storedPlans = useMemo(() => toRunPlanSuites(suites ?? []), [suites]);
 

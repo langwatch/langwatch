@@ -3,9 +3,9 @@
  *
  * Field editor uses shared FieldTypeSelect UI; picked type writes back through node.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Component } from "@langwatch/workflow-contract";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -40,10 +40,8 @@ const renderFields = ({
   const workflowNode = node(inputs);
   _useWorkflowStore.getState().setNodes([workflowNode]);
 
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <FieldsDefinition node={workflowNode} field="inputs" title="Results" readOnly={readOnly} />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <FieldsDefinition node={workflowNode} field="inputs" title="Results" readOnly={readOnly} />,
   );
 };
 

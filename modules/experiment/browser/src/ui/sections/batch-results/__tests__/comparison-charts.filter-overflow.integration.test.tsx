@@ -4,17 +4,13 @@ import "@testing-library/jest-dom/vitest";
  * Regression test for issue #4631: experiment comparison filter dropdowns (Group by,
  * Metrics) get clipped by overflow:hidden ancestors in BatchEvaluationResults.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { ComparisonRunData } from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { ComparisonRunData } from "../../batch-evaluation-results.types.ts";
 import { ComparisonCharts } from "../comparison-charts.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const EVALUATORS = [
   { id: "accuracy", name: "Accuracy" },
@@ -85,9 +81,9 @@ const HEAVY_FIXTURE: ComparisonRunData[] = [
 ];
 
 const renderHeavyComparison = () => {
-  const result = render(<ComparisonCharts comparisonData={HEAVY_FIXTURE} isVisible={true} />, {
-    wrapper: Wrapper,
-  });
+  const result = renderWithDesignSystem(
+    <ComparisonCharts comparisonData={HEAVY_FIXTURE} isVisible={true} />,
+  );
   const chartsRoot = result.container.firstElementChild;
   if (!chartsRoot) {
     throw new Error("ComparisonCharts rendered nothing");

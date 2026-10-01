@@ -155,19 +155,6 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     };
   };
 
-  /**
-   * THE FIVE LISTS QUICK SEARCH READS, and the reason the command bar is not a feature of its
-   * own.
-   */
-  prompts: {
-    getAllPromptsForProject: {
-      query: {
-        input: { projectId: string };
-        output: { id: string; handle?: string | null; version?: number }[];
-      };
-    };
-  };
-
   agents: {
     /**
      * Every agent in the project, with the one field that decides its address.
@@ -180,19 +167,7 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     };
   };
 
-  dataset: {
-    getAll: {
-      query: { input: { projectId: string }; output: { id: string; name: string }[] };
-    };
-  };
-
   workflow: {
-    getAll: {
-      query: { input: { projectId: string }; output: { id: string; name: string }[] };
-    };
-  };
-
-  evaluators: {
     getAll: {
       query: { input: { projectId: string }; output: { id: string; name: string }[] };
     };

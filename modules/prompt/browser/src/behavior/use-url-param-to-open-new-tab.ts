@@ -1,7 +1,8 @@
+import { promptClient } from "@langwatch/prompt-client";
 import { useEffect } from "react";
 
 import { computeInitialFormValuesForPrompt } from "../model/prompt-form/index.ts";
-import { promptApi } from "./prompt-api.ts";
+import { usePromptDefaultModel } from "./use-prompt-default-model.ts";
 import { usePromptIdQueryParam } from "./use-prompt-id-query-param.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
@@ -14,15 +15,12 @@ export function useUrlParamToOpenNewTab() {
   const { project } = usePromptProject();
   const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
   const { selectedPromptId } = usePromptIdQueryParam();
-  const trpc = promptApi.useUtils();
+  const trpc = promptClient.useUtils();
 
   // Cascade-resolved model for new prompts. The query subscribes lazily
   // so the effect can read the cached value without firing a second
   // request when the URL changes.
-  const resolvedDefault = promptApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
+  const resolvedDefault = usePromptDefaultModel();
   const resolvedDefaultModel = resolvedDefault.data?.model;
 
   useEffect(() => {

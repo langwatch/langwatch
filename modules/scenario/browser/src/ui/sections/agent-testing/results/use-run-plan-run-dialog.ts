@@ -4,12 +4,13 @@
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { useCallback, useState } from "react";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useSuite } from "../../../../behavior/suites/use-suite.ts";
 import { readScenarioTarget } from "../../use-scenario-target.ts";
 import { useRunStartedHandler } from "../cases/use-case-run-actions.ts";
 import { storedPlanSubject } from "../run/plan-scope.ts";
@@ -38,10 +39,11 @@ export function useRunPlanRunDialog({
   const onRunStarted = useRunStartedHandler();
 
   const suiteId = plan.kind === "suite" ? plan.suiteId : null;
-  const { data: suite } = api.suites.getById.useQuery(
-    { projectId, id: suiteId ?? "" },
-    { enabled: !!projectId && !!suiteId && canManage },
-  );
+  const { data: suite } = useSuite({
+    projectId,
+    id: suiteId ?? undefined,
+    enabled: canManage,
+  });
 
   const runPlan = useCallback(() => {
     if (!suite) return;

@@ -4,10 +4,11 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+
 import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { useRunPlanDialogStore } from "../../../../behavior/run-plan-dialog.store.ts";
-import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useSuite } from "../../../../behavior/suites/use-suite.ts";
 import { storedPlanSubject } from "./plan-scope.ts";
 import type { RunDialogSubject } from "./run-dialog-types.ts";
 import { RunDialog } from "./run-dialog.tsx";
@@ -30,10 +31,7 @@ export function RunPlanDialogHost() {
   const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
 
   const suiteId = openOn?.kind === "plan" ? openOn.suiteId : "";
-  const { data: suite } = api.suites.getById.useQuery(
-    { projectId, id: suiteId },
-    { enabled: !!projectId && !!suiteId },
-  );
+  const { data: suite } = useSuite({ projectId, id: suiteId });
 
   const subject = ((): RunDialogSubject | null => {
     if (!openOn) return null;

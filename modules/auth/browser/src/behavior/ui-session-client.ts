@@ -6,6 +6,7 @@
 
 import type { UiActor } from "@langwatch/browser-host/capabilities";
 import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
+import { clearReaderUiStorage, clearSessionUiStorage } from "@langwatch/browser-host/storage";
 import { HandledError } from "@langwatch/handled-error";
 import { createAuthClient } from "better-auth/react";
 
@@ -89,6 +90,8 @@ function toUiCacheKeys(payload: unknown): Pick<UiSessionReading, "cacheKey" | "p
  * leaves them signed in, which the next session read reports on its own.
  */
 export async function signOutUi(client: UiAuthClient = uiAuthClient()): Promise<void> {
+  clearReaderUiStorage();
+  clearSessionUiStorage();
   await Promise.all([client.signOut(), clearPersistedUiQueries()]);
 }
 

@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -18,11 +18,7 @@ function renderBetaPill({
   message?: React.ReactNode;
   children?: React.ReactNode;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <BetaPill message={message}>{children}</BetaPill>
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<BetaPill message={message}>{children}</BetaPill>);
 }
 
 describe("<BetaPill />", () => {

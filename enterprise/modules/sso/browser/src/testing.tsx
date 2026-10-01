@@ -2,7 +2,7 @@
 // Test harness for mounting single sign-on sections: a fake host that records
 // what it was told. Internal only, not exported from the package.
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
@@ -91,9 +91,9 @@ export class FakeSsoHost extends SsoHostApi {
  */
 export function renderWithSsoHost(element: ReactElement, host: FakeSsoHost = new FakeSsoHost()) {
   const wrap = (child: ReactElement) => (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <SsoHostProvider value={host}>{child}</SsoHostProvider>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
   const rendered = render(wrap(element));
 

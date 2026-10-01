@@ -11,8 +11,7 @@ vi.mock("../../../../../model/shared/langy/langy-skills.ts", () => ({
   findSkill: () => ({ summary: "Open pull requests on GitHub" }),
 }));
 
-import type { LangyContextChip, LangySkillChip } from "@langwatch/langy-browser-kit";
-
+import type { LangyContextChip, LangySkillChip } from "../../../../../behavior/langy.store.ts";
 import { LangySkillChipView } from "../langy-skill-chip.tsx";
 
 const chip: LangySkillChip = {

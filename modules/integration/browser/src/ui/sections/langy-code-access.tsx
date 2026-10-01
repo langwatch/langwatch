@@ -4,9 +4,9 @@
  */
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { LangyCodeAccessPreference } from "@langwatch/langy-browser-kit";
 
 import { langyApi } from "../../behavior/langy-api.ts";
+import { LangyCodeAccessPreference } from "./langy/langy-code-access-preference.tsx";
 
 export function LangyCodeAccess({ standalone = false }: { standalone?: boolean }) {
   const { project } = useOrganizationTeamProject();

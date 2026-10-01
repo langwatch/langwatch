@@ -19,9 +19,6 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../authz/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -31,13 +28,7 @@
       "path": "../../github/contract/tsconfig.build.json"
     },
     {
-      "path": "../../langy/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../langy/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../slack/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../slack/contract/tsconfig.build.json"

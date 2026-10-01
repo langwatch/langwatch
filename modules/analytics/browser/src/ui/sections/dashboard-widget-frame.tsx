@@ -4,7 +4,6 @@
  * row IS the widget, so the dashboard's list query already has it live.
  */
 
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
@@ -15,6 +14,7 @@ import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-
 import { useFrameDiagnostic } from "../../behavior/use-frame-diagnostic.ts";
 import { dashboardWidgetDefinitionSchema } from "../../model/dashboard-widget-definition.ts";
 import { declaredParamDefaults } from "../../model/dashboard-widget/params-snapshot.ts";
+import { usePeriodSelector } from "../elements/period-selector.tsx";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";

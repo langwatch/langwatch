@@ -13,7 +13,7 @@ vi.mock("../../use-model-limits.ts", () => ({
 }));
 
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../model/prompt-form/versioned-prompt-form-values.ts";
-import { usePromptConfigForm } from "../use-prompt-config-form.ts";
+import { usePromptConfigForm } from "../../use-prompt-config-form.ts";
 
 /**
  * A prompt as the seeder writes one: a system prompt, one input, one output, and no

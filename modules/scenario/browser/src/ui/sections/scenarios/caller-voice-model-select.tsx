@@ -1,8 +1,12 @@
-import { INHERIT_SENTINEL, ProviderModelSelector } from "@langwatch/model-provider-browser-kit";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import {
+  INHERIT_SENTINEL,
+  ProviderModelSelector,
+} from "@langwatch/design-system/provider-model-selector";
+import { modelDisplayLabel, modelPickerOption } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
-import { api } from "../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useProjectModelProviders } from "../../../behavior/scenarios/use-scenario-models.ts";
 import { callerVoiceOptions } from "./caller-voice-model-options";
 
 /**
@@ -22,21 +26,25 @@ export function CallerVoiceModelSelect({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const projectProviders = api.modelProvider.listAllForProjectForFrontend.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnMount: false },
-  );
+  const projectProviders = useProjectModelProviders({ projectId });
 
   const { options, displayNames } = useMemo(
     () => callerVoiceOptions({ providers: projectProviders.data ?? [] }),
     [projectProviders.data],
   );
+  const query = useMemo(
+    () => ({
+      data: options.map((modelValue) => modelPickerOption({ displayNames, modelValue })),
+      isLoading: projectProviders.isLoading,
+    }),
+    [options, displayNames, projectProviders.isLoading],
+  );
 
   return (
     <ProviderModelSelector
       model={value ?? ""}
-      options={options}
-      displayNames={displayNames}
+      query={query}
+      labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
       size={size}
       onChange={(model) => onChange(model === INHERIT_SENTINEL ? null : model)}
       inheritOption={{ label: "Project default" }}

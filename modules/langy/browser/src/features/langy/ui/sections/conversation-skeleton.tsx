@@ -1,5 +1,5 @@
 import { Box, Skeleton, VStack } from "@langwatch/design-system/primitives";
-import { useReducedMotion } from "@langwatch/langy-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 
 /**
  * How many placeholder turns are worth drawing. The column only shows a few

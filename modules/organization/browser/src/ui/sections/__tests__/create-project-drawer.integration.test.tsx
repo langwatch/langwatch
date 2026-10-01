@@ -60,13 +60,12 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
       },
       limits: { getUsage: invalidator("limits.getUsage") },
       team: {
-        getTeamsWithMembers: invalidator("team.getTeamsWithMembers"),
         getTeamWithMembers: invalidator("team.getTeamWithMembers"),
         getTeamsWithGrants: invalidator("team.getTeamsWithGrants"),
       },
     }),
-    team: {
-      getTeamsWithMembers: { useQuery: () => ({ data: mockTeams.current }) },
+    organization: {
+      getScopeGraph: { useQuery: () => ({ data: [{ id: "org-1", teams: mockTeams.current }] }) },
     },
     project: {
       create: {
@@ -143,7 +142,6 @@ describe("given the create-project drawer", () => {
         "organization.getAll",
         "organization.getScopeGraph",
         "limits.getUsage",
-        "team.getTeamsWithMembers",
         "team.getTeamWithMembers",
         "team.getTeamsWithGrants",
       ]);

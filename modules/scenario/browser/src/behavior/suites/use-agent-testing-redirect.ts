@@ -1,3 +1,5 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 /**
@@ -6,8 +8,6 @@ import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
  */
 import { useEffect } from "react";
 
-import { useFeatureFlag } from "../use-feature-flag.ts";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { toAgentTestingAddress } from "./use-suite-routing.ts";
 
 export function useAgentTestingRedirect({

@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/page-structure.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -15,20 +15,15 @@ import {
   ContentColumn,
 } from "../content-column.tsx";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 describe("the content column", () => {
   afterEach(cleanup);
 
   /** @scenario The content is held to a column and centred on the page */
   it("holds the content to one readable centred column beside any rail", () => {
-    render(
+    renderWithDesignSystem(
       <ContentColumn railWidth={260}>
         <div>the content</div>
       </ContentColumn>,
-      { wrapper: Wrapper },
     );
 
     const column = screen.getByText("the content").parentElement!;
@@ -51,11 +46,10 @@ describe("the content column", () => {
 
   /** @scenario "A surface with no rail takes the width the rail would have used" */
   it("takes the wider column and pays nothing back when it has no rail", () => {
-    render(
+    renderWithDesignSystem(
       <ContentColumn columnMaxWidth={CONTENT_COLUMN_WIDE_MAX_WIDTH}>
         <div>the content</div>
       </ContentColumn>,
-      { wrapper: Wrapper },
     );
 
     const column = screen.getByText("the content").parentElement!;

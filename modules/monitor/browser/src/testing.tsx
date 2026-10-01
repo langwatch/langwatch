@@ -3,8 +3,7 @@
  * zone is fixed for deterministic assertions.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
 import {
@@ -88,10 +87,6 @@ export function renderWithMonitorHost(
 ) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <MonitorHostProvider value={host}>{element}</MonitorHostProvider>
-      </ChakraProvider>,
-    ),
+    ...renderWithDesignSystem(<MonitorHostProvider value={host}>{element}</MonitorHostProvider>),
   };
 }

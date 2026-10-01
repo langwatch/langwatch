@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -58,11 +58,23 @@ vi.mock("../../../behavior/agent-api.ts", () => {
   };
 });
 
-vi.mock("@langwatch/workflow-browser-kit", () => ({
+vi.mock("../../../model/workflow/templates/blank.template.ts", () => ({
   blankTemplate: { name: "Blank", nodes: [] },
+}));
+
+vi.mock("../../../model/workflow/random-workflow-icon.ts", () => ({
   getRandomWorkflowIcon: () => "🧩",
+}));
+
+vi.mock("../workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx", () => ({
   EmojiPickerModal: () => null,
+}));
+
+vi.mock("../workflow/code/render-code.tsx", () => ({
   RenderCode: ({ code }: { code: string }) => <pre>{code}</pre>,
+}));
+
+vi.mock("../../elements/workflow/code/workflow-code-editor.tsx", () => ({
   WorkflowCodeEditorModal: () => null,
 }));
 
@@ -101,7 +113,7 @@ const {
 } = await import("../routed-agent-drawers.tsx");
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 afterEach(() => {

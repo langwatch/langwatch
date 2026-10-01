@@ -70,21 +70,18 @@ function ownEntryOf({
  */
 function seedFor({
   subject,
-  subjectKey,
   entries,
   isLoaded,
   fields,
   planFields,
 }: {
   subject: RunDialogSubject;
-  subjectKey: string;
   entries: readonly RunConfigurationEntry[];
   isLoaded: boolean;
   fields: RunDialogFields;
   planFields: RunPlanFields;
 }): Seed {
-  // The fields hold the previous subject until their own reset has run.
-  if (fields.resetFor !== subjectKey || !isLoaded) return { kind: "wait" };
+  if (!isLoaded) return { kind: "wait" };
 
   if (broughtOwnConfiguration(subject)) {
     const own = ownEntryOf({ subject, entries });
@@ -142,7 +139,6 @@ export function useRunHistorySeed({
 
     const seed = seedFor({
       subject,
-      subjectKey,
       entries,
       isLoaded,
       fields,

@@ -4,8 +4,8 @@
  * Avatar menu navigation-mode picker (moved from platform/app; mocks replaced with stub host).
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,19 +28,17 @@ const rememberScopeMock = vi.fn();
 const navigateMock = vi.fn();
 
 const renderMenu = (readings: Partial<StubNavigationReadings> = {}) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          currentUser: { id: "user-1", name: "Ada", email: "ada@example.com", image: null },
-          organization: { id: "org-1", name: "Acme", teams: [] },
-          ...readings,
-        }}
-        actions={{ rememberScope: rememberScopeMock, navigate: navigateMock }}
-      >
-        <AppHeaderUserMenu />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        currentUser: { id: "user-1", name: "Ada", email: "ada@example.com", image: null },
+        organization: { id: "org-1", name: "Acme", teams: [] },
+        ...readings,
+      }}
+      actions={{ rememberScope: rememberScopeMock, navigate: navigateMock }}
+    >
+      <AppHeaderUserMenu />
+    </WithStubNavigationHost>,
   );
 
 afterEach(() => {

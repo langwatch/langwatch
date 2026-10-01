@@ -37,7 +37,7 @@ const MESH_PULSE_CSS = `
 
 export function ReplayProgressContent({ runId }: { runId: string }) {
   const statusQuery = useReplayStatus();
-  const historyQuery = api.ops.getReplayRun.useQuery({ runId }, { refetchInterval: false });
+  const historyQuery = api.ops.getReplayRun.useQuery({ runId });
   const cancelMutation = api.ops.cancelReplay.useMutation({
     onSuccess: () => {
       void statusQuery.refetch();

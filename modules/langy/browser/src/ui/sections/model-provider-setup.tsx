@@ -4,7 +4,7 @@
  * Spec: specs/langy/langy-inline-model-setup.feature
  */
 import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { useCallback, useRef, useState } from "react";
 
 import { LentEditModelProviderForm } from "../../behavior/lent-edit-model-provider-form.tsx";

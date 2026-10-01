@@ -3,25 +3,21 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  GroupRow,
-  type RunGroup,
-  type RunGroupSummary,
-  RunRow,
-} from "@langwatch/suite-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  type RunGroup,
+  type RunGroupSummary,
+} from "../../../model/suite/run-history-transforms.ts";
+import { GroupRow } from "../../../ui/sections/suite/group-row.tsx";
+import { RunRow } from "../../../ui/sections/suite/run-row.tsx";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function makeGroup(overrides: Partial<RunGroup> = {}): RunGroup {
   return {
@@ -65,7 +61,7 @@ describe("<RunRow/> borderless styling", () => {
     /** @scenario "Run history rows span the full container width" */
     /** @scenario "Run history rows have no rounded corners" */
     it("renders header as a direct child without wrapper Box", () => {
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
@@ -74,7 +70,6 @@ describe("<RunRow/> borderless styling", () => {
           resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       // The toggle sits straight inside the header, since 494f28125e split them.
@@ -84,7 +79,7 @@ describe("<RunRow/> borderless styling", () => {
 
     /** @scenario "Run row headers are sticky when scrolling" */
     it("has a sticky header with position sticky", () => {
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
@@ -93,7 +88,6 @@ describe("<RunRow/> borderless styling", () => {
           resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const header = screen.getByRole("button", { name: /Run from/ });
@@ -104,7 +98,7 @@ describe("<RunRow/> borderless styling", () => {
 
   describe("when expanded in list view", () => {
     it("renders scenario rows spanning full width", () => {
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
@@ -114,7 +108,6 @@ describe("<RunRow/> borderless styling", () => {
           onScenarioRunClick={vi.fn()}
           viewMode="list"
         />,
-        { wrapper: Wrapper },
       );
 
       const scenarioRow = screen.getByLabelText(
@@ -132,7 +125,7 @@ describe("<GroupRow/> borderless styling", () => {
 
   describe("when rendered", () => {
     it("renders header as a direct child without wrapper Box", () => {
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={makeGroup()}
           summary={makeGroupSummary()}
@@ -141,7 +134,6 @@ describe("<GroupRow/> borderless styling", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       const header = screen.getByRole("button", {
@@ -152,7 +144,7 @@ describe("<GroupRow/> borderless styling", () => {
     });
 
     it("has a sticky header", () => {
-      render(
+      renderWithDesignSystem(
         <GroupRow
           group={makeGroup()}
           summary={makeGroupSummary()}
@@ -161,7 +153,6 @@ describe("<GroupRow/> borderless styling", () => {
           onScenarioRunClick={vi.fn()}
           resolveTargetName={() => null}
         />,
-        { wrapper: Wrapper },
       );
 
       const header = screen.getByRole("button", {

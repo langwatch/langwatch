@@ -1,7 +1,6 @@
-import { Popover as ChakraPopover } from "@chakra-ui/react";
+import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack } from "@langwatch/design-system/primitives";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
 import type { ModelOption } from "@langwatch/topic-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { ChevronDown } from "lucide-react";
@@ -71,7 +70,7 @@ export function LLMConfigField({
         {/* Use Anchor (not Trigger) for positioning only — avoids Zag.js
             installing an onClick handler that fights with the Drawer's
             dismissable layer. See #2390. */}
-        <ChakraPopover.Anchor asChild>
+        <Popover.Anchor asChild>
           <HStack
             width="full"
             paddingY={2}
@@ -91,7 +90,7 @@ export function LLMConfigField({
               <ChevronDown size={16} />
             </Box>
           </HStack>
-        </ChakraPopover.Anchor>
+        </Popover.Anchor>
 
         <LLMConfigPopover
           values={llmConfig}

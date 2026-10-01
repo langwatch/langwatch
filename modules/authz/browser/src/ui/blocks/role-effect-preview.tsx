@@ -1,11 +1,6 @@
 // What the role will do while it is written, in sentences; the scope picker is a
 // lens, since organization-tier grants do nothing from a team (ADR-021; main's RoleEffectPreview).
 
-import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-  type ScopeTriadType,
-} from "@langwatch/authz-browser-kit";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
@@ -15,6 +10,11 @@ import {
   permissionTakesEffectAt,
 } from "../../model/role-permissions.ts";
 import { PermissionToken } from "../elements/permission-token.tsx";
+import {
+  ScopeChipPicker,
+  type ScopeTriadEntry,
+  type ScopeTriadType,
+} from "../sections/scope-picker/scope-chip-picker.tsx";
 
 export function RoleEffectPreview({
   permissions,

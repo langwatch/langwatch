@@ -1,9 +1,9 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type { LangyEventCursor, LangyMessageDto } from "@langwatch/langy-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 export interface LangyMessagesResult {
@@ -52,19 +52,6 @@ export interface LangyMessagesResult {
   error: unknown;
 }
 
-/** How often the durable turn state is re-checked while a turn is in flight. */
-const TURN_IN_FLIGHT_POLL_MS = 3_000;
-
-/**
- * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md): while the fold says a
- * turn is in flight, re-check so the settled state lands even if the freshness signal is lost.
- */
-export function langyMessagesPollInterval(
-  data: { isTurnInFlight: boolean } | undefined,
-): number | false {
-  return data?.isTurnInFlight ? TURN_IN_FLIGHT_POLL_MS : false;
-}
-
 /**
  * HEAVY, on-demand message history for one conversation (`langy.messages`).
  */
@@ -81,7 +68,7 @@ export function useLangyMessages(conversationId: string | null): LangyMessagesRe
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       placeholderData: keepPreviousData,
-      refetchInterval: (query) => langyMessagesPollInterval(query.state.data),
+      // needs a read hint: langy turn settled (the freshness signal can be lost)
     },
   );
 

@@ -6,11 +6,14 @@
 import { createModuleApi } from "@langwatch/api/web";
 
 import type { ProjectHostOrganization, ProjectHostProject } from "../model/project-host.ts";
+import type { ProjectSwitchOrganization } from "../model/project-switch.ts";
 
 export type ProjectApiMap = {
   organization: {
-    /** The shell's scope read; invalidated beside getAll after a save. Output unread here. */
-    getScopeGraph: { query: { input: Record<string, never>; output: unknown } };
+    /** The shell's scope read, as the switcher reads it; invalidated beside getAll after a save. */
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: ProjectSwitchOrganization[] };
+    };
     /**
      * Application shell's organization graph; also defaults for forms; refetched
      * after save.

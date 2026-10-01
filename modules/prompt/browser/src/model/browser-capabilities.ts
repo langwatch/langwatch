@@ -4,11 +4,7 @@
  * screen runs against real Web Storage in the product and an in-memory double in tests.
  */
 
-/**
- * A key-value store with the shape of Web Storage, including enumeration:
- * prompt tab state is written under one key per tab, and cleaning a project up
- * means scanning for the keys that belong to it.
- */
+/** A key-value store with the shape of Web Storage; in the product, the reader's own. */
 export interface PromptBrowserStorage {
   readonly length: number;
   key(index: number): string | null;

@@ -7,12 +7,12 @@ import { createLogger } from "@langwatch/observability/browser";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
-  VariablesSection,
-} from "@langwatch/prompt-browser-kit";
-import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
+} from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectSpanNames } from "../../../behavior/use-project-span-names.ts";
+import { VariablesSection } from "../../sections/prompt/variables/variables-section.tsx";
+import { renderSourceTypeIcon } from "../workflow/workflow-icons.tsx";
 
 const logger = createLogger("EvaluatorMappingsSection");
 

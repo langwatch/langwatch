@@ -1,10 +1,3 @@
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "@langwatch/authz-browser-kit";
-import {
-  ASSISTANT_KINDS,
-  ASSISTANT_OPTIONS,
-  ASSISTANT_PRESETS,
-  type AssistantKind,
-} from "@langwatch/coding-agent-browser-kit";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Alert,
@@ -30,7 +23,17 @@ import {
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
 import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
+import {
+  ASSISTANT_KINDS,
+  ASSISTANT_OPTIONS,
+  ASSISTANT_PRESETS,
+  type AssistantKind,
+} from "../../../../model/coding-agent/assistant-presets.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 import type { AiToolTileType } from "../../model/ai-tool-tile.ts";
 import {
   isToolPresetAsset,

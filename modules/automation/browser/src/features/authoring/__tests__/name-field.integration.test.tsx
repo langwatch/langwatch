@@ -4,24 +4,22 @@
  * #6716: a blank name used to block Save with no visible reason. The error shows nowhere on an
  * untouched draft, and right on the field once the rest of the setup is done.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AutomationNameField } from "../ui/elements/name-field.tsx";
 
 const renderField = ({ configComplete }: { configComplete: boolean }) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AutomationNameField
-        source="trace"
-        value=""
-        isEdit={false}
-        configComplete={configComplete}
-        noun="automation"
-        onChange={vi.fn()}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <AutomationNameField
+      source="trace"
+      value=""
+      isEdit={false}
+      configComplete={configComplete}
+      noun="automation"
+      onChange={vi.fn()}
+    />,
   );
 
 describe("AutomationNameField", () => {

@@ -10,6 +10,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { toaster } from "@langwatch/design-system/toaster";
 import {
   parseEvaluatorAttachments,
@@ -17,8 +18,8 @@ import {
 } from "@langwatch/scenario-contract";
 import { useCallback, useMemo } from "react";
 
-import { api, type Scenario } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { type Scenario } from "../../../../behavior/scenario-api.ts";
+import { useTestSuites } from "../../../../behavior/suites/use-test-suites.ts";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import { CaseModal } from "./case-modal.tsx";
 // The key lives in a component-free module so a static importer never pulls
@@ -30,10 +31,7 @@ import { useCaseEditor } from "./use-case-editor.ts";
 export { CASE_EDITOR_DRAWER };
 
 function useEditorSuites(projectId: string): TestSuiteEntry[] {
-  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
+  const { data: testSuites } = useTestSuites({ projectId });
 
   return useMemo<TestSuiteEntry[]>(
     () =>

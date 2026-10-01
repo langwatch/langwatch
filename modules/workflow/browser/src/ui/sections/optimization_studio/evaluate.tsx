@@ -13,7 +13,6 @@ import { Select } from "@langwatch/design-system/select";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { trainTestSplit } from "@langwatch/workflow-browser-kit";
 import type { Entry } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -33,6 +32,7 @@ import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";
+import { trainTestSplit } from "../../../model/studio-dataset.utils.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { useEvaluationExecution } from "./use-evaluation-execution.ts";
 import { VersionToBeUsed } from "./version-to-be-used.tsx";

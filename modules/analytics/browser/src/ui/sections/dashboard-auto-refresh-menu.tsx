@@ -11,7 +11,7 @@ import {
   DASHBOARD_AUTO_REFRESH_LABEL,
   DASHBOARD_AUTO_REFRESH_OPTIONS,
   type DashboardAutoRefreshOption,
-} from "./use-dashboard-auto-refresh";
+} from "../../behavior/use-dashboard-auto-refresh.ts";
 
 export function DashboardAutoRefreshMenu({
   option,

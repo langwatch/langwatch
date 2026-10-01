@@ -1,16 +1,16 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
+import { type RefObject, useEffect, useRef, useState } from "react";
+
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
+import { useLangyPeekProximity } from "../../../../behavior/use-langy-peek-proximity.ts";
+import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
 import {
   LANGY_DODGE_STAGGER_MS,
   langyRestingFloorPx,
   resolveFloatingPanelWidth,
-  useLangyStore,
-  useReducedMotion,
-} from "@langwatch/langy-browser-kit";
-import { type RefObject, useEffect, useRef, useState } from "react";
-
-import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
-import { useLangyPeekProximity } from "../../../../behavior/use-langy-peek-proximity.ts";
-import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
+} from "../../../../model/langy-panel-layout.ts";
 import { type LangyPeekPhase, resolvePeekTranslate } from "../../../../model/langy-peek-dock.ts";
 
 /** The viewport's width, kept current across resizes. */

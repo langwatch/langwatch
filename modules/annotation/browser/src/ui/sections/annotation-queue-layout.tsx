@@ -2,7 +2,7 @@
 
 import type { PropsWithChildren } from "react";
 
-import { annotationApi } from "../../behavior/annotation-api.ts";
+import { useAnnotationSidebarCounts } from "../../behavior/use-annotation-reads.ts";
 import { useAnnotationHost } from "../../model/annotation-host.ts";
 import { AnnotationSidebar } from "./annotation-sidebar.tsx";
 
@@ -11,20 +11,7 @@ export default function AnnotationsLayout({ children }: PropsWithChildren) {
   const project = host.project();
   const reviewer = host.currentUser();
 
-  const pendingCount = annotationApi.annotation.getPendingItemsCount.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
-
-  const assignedCount = annotationApi.annotation.getAssignedItemsCount.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
-
-  const queueBadges = annotationApi.annotation.getQueueItemsCounts.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const sidebarCounts = useAnnotationSidebarCounts({ projectId: project?.id });
 
   return (
     <AnnotationSidebar
@@ -32,9 +19,9 @@ export default function AnnotationsLayout({ children }: PropsWithChildren) {
       projectSlug={project?.slug}
       reviewerName={reviewer?.name ?? null}
       reviewerImage={reviewer?.image ?? null}
-      pendingCount={pendingCount.data?.count}
-      assignedCount={assignedCount.data?.count}
-      queues={queueBadges.data ?? []}
+      pendingCount={sidebarCounts.pendingCount}
+      assignedCount={sidebarCounts.assignedCount}
+      queues={sidebarCounts.queues}
       activeQueueSlug={undefined}
       canManageQueues={!host.isLiteMember()}
       onCreateQueue={() => host.navigate(`/${project?.slug}/annotations`)}

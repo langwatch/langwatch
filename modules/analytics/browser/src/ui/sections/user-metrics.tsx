@@ -1,4 +1,3 @@
-import { analyticsMetrics } from "@langwatch/analytics-browser-kit";
 import {
   Card,
   EmptyState,
@@ -9,6 +8,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 
+import { analyticsMetrics } from "../../model/analytics-registry.ts";
 import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
 import { TopicsSelector } from "./topics-selector.tsx";
 

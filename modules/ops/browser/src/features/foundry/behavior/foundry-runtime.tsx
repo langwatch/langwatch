@@ -7,14 +7,13 @@ export type FoundryProject = {
   id: string;
   name: string;
   slug: string;
-  apiKey: string;
+  organizationId: string;
   orgName: string;
   teamName: string;
 };
 
 export type FoundryCurrentProject = {
   id: string;
-  apiKey: string;
 };
 
 export type FoundryTransport = {

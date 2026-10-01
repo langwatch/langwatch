@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  * @see specs/scenarios/scenario-model-selection.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -25,16 +25,12 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: vi.fn(() => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
   })),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("<ScenarioRunModelDialog/>", () => {
   afterEach(() => cleanup());
@@ -46,7 +42,7 @@ describe("<ScenarioRunModelDialog/>", () => {
         const onConfirm = vi.fn();
         const user = userEvent.setup();
 
-        render(
+        renderWithDesignSystem(
           <ScenarioRunModelDialog
             open={true}
             onOpenChange={vi.fn()}
@@ -57,7 +53,6 @@ describe("<ScenarioRunModelDialog/>", () => {
             onConfirm={onConfirm}
             isRunning={false}
           />,
-          { wrapper: Wrapper },
         );
 
         expect(screen.getByText("User simulator")).toBeInTheDocument();
@@ -72,7 +67,7 @@ describe("<ScenarioRunModelDialog/>", () => {
 
   describe("given the dialog is closed", () => {
     it("does not render the pickers", () => {
-      render(
+      renderWithDesignSystem(
         <ScenarioRunModelDialog
           open={false}
           onOpenChange={vi.fn()}
@@ -83,7 +78,6 @@ describe("<ScenarioRunModelDialog/>", () => {
           onConfirm={vi.fn()}
           isRunning={false}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByText("User simulator")).not.toBeInTheDocument();

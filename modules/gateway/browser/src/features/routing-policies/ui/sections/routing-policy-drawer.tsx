@@ -1,8 +1,3 @@
-import {
-  ProviderScopeChips,
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "@langwatch/authz-browser-kit";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
@@ -23,6 +18,11 @@ import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { ProviderScopeChips } from "../../../../ui/sections/authz/scope-picker/provider-scope-chips.tsx";
+import {
+  ScopeChipPicker,
+  type ScopeTriadEntry,
+} from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-drawer-form.ts";
 import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations.ts";
 import type { ModelTier } from "../../model/model-tier-presets.ts";

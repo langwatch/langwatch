@@ -5,10 +5,10 @@ import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-
 import { Box, Button, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { RenderCode } from "@langwatch/workflow-browser-kit";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { RenderCode } from "../../sections/workflow/code/render-code.tsx";
 import { EvaluatorSelectionBox } from "./evaluator-selection-box.tsx";
 
 export type GuardrailsDrawerProps = {

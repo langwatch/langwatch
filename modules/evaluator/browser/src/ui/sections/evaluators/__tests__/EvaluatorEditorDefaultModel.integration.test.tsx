@@ -31,8 +31,11 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
   }),
   useDrawerParams: () => ({}),
 }));
+const { mutation } = vi.hoisted(() => ({
+  mutation: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 vi.mock("../../../../behavior/evaluator-api.ts", () => {
-  const mutation = () => ({ mutate: vi.fn(), isPending: false });
   return {
     evaluatorApi: {
       useUtils: () => ({
@@ -41,13 +44,6 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => {
           getById: { invalidate: vi.fn() },
         },
       }),
-      evaluators: {
-        getById: {
-          useQuery: () => ({ data: undefined, isLoading: false }),
-        },
-        create: { useMutation: mutation },
-        update: { useMutation: mutation },
-      },
       modelProvider: {
         getResolvedDefault: {
           useQuery: ({ featureKey }: { featureKey: string }) => queries[featureKey],
@@ -56,6 +52,23 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => {
     },
   };
 });
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      evaluators: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    evaluators: {
+      getById: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+      create: { useMutation: mutation },
+      update: { useMutation: mutation },
+    },
+  },
+}));
 
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 

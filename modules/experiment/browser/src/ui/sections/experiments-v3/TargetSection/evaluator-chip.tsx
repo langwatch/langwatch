@@ -11,7 +11,6 @@ import {
   keyframes,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { EVALUATION_STATUS_COLORS, getStatusLabel } from "@langwatch/evaluator-browser-kit";
 import { parseEvaluationResult } from "@langwatch/evaluator-contract";
 import { useState } from "react";
 import {
@@ -29,6 +28,10 @@ import { useEvaluatorName } from "../../../../behavior/experiments-v3/use-evalua
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
 import type { EvaluatorConfig } from "../../../../model/experiments-v3/types.ts";
 import { parseLLMError } from "../../../../model/format-llm-error.ts";
+import {
+  EVALUATION_STATUS_COLORS,
+  getStatusLabel,
+} from "../../../elements/evaluator/evaluator-result-chip.tsx";
 
 // Pulsing animation for alert icon
 const pulseAnimation = keyframes`

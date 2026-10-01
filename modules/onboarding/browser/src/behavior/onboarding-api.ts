@@ -134,14 +134,6 @@ export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> &
           output: { id: string; name: string; slug: string } | null;
         };
       };
-
-      /** Every team the reader may put the new project in. */
-      getTeamsWithMembers: {
-        query: {
-          input: { organizationId: string };
-          output: { id: string; name: string; projects: { id: string }[] }[];
-        };
-      };
     };
 
     project: {
@@ -194,7 +186,7 @@ export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> &
       };
       /**
        * Organization graph: path-plus-input cache key matches app shell. Row is
-       * a wire view (membership, teams, projects, apiKey with redaction).
+       * a wire view (membership, teams, projects).
        */
       getAll: {
         query: {
@@ -211,7 +203,6 @@ export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> &
                 id: string;
                 name: string;
                 slug: string;
-                apiKey?: string | null;
                 createdAt?: TimeInput | null;
               }[];
             }[];

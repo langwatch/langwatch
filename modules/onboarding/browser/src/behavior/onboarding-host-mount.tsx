@@ -94,7 +94,6 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
         options?: { replace?: boolean },
       ) => void;
       featureFlag: (flag: string) => boolean | undefined;
-      projectApiKey: (projectId: string | undefined) => string | undefined;
       succeeded: (notice: OnboardingSuccessNotice) => void;
       failed: (failure: OnboardingFailureNotice) => void;
       langy: OnboardingLangyCapability;
@@ -166,10 +165,6 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
     const ok = await writeToClipboard(input.text);
     if (ok) this.deps.succeeded(input.succeeded);
     return ok;
-  }
-
-  revealProjectApiKey(projectId?: string): string | undefined {
-    return this.deps.projectApiKey(projectId);
   }
 
   prefersReducedMotion(): boolean {
@@ -250,10 +245,6 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
         replace: (to) => navigation.replace(to),
         setQuery: (next, options) => route.setQuery(next, options),
         featureFlag: (flag) => session.featureFlag(flag),
-        projectApiKey: (projectId) => {
-          const id = projectId ?? graph.activeProject?.project.id;
-          return id ? graph.projectApiKey(id) : void 0;
-        },
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
         langy,
@@ -271,7 +262,6 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
       reading.query,
       navigation,
       route,
-      graph,
       feedback,
       joinOffers,
       langy,

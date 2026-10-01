@@ -1,14 +1,16 @@
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 /**
  * @vitest-environment jsdom
  * Session overview against real folded session; tidy fixture would hide
  * that real numbers need compacting and that MCP tools show up at all.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { type CodingAgentSessionDisplay, SessionView } from "@langwatch/coding-agent-browser-kit";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+
+import { type CodingAgentSessionDisplay } from "../model/trace/session-display.ts";
+import { SessionView } from "../ui/elements/trace/session-view.tsx";
 
 afterEach(cleanup);
 
@@ -132,10 +134,8 @@ const REAL_SESSION: CodingAgentSessionDisplay & Record<string, unknown> = {
 };
 
 function renderSession(over: Partial<CodingAgentSessionDisplay> = {}, entries?: TranscriptEntry[]) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SessionView session={{ ...REAL_SESSION, ...over }} entries={entries} />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <SessionView session={{ ...REAL_SESSION, ...over }} entries={entries} />,
   );
 }
 

@@ -15,7 +15,7 @@ export function useProjectSpanNames({ projectId }: { projectId: string | undefin
   const startDate = useMemo(() => endDate - 30 * 24 * 60 * 60 * 1000, [endDate]);
   const fieldNames = evaluatorApi.traces.getFieldNames.useQuery(
     { projectId: projectId ?? "", startDate, endDate },
-    { enabled: !!projectId, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 },
+    { enabled: !!projectId },
   );
   const data: DistinctFieldNamesResult | undefined = fieldNames.data;
 

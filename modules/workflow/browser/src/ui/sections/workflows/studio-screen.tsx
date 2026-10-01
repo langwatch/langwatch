@@ -1,6 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Button } from "@langwatch/design-system/primitives";
-import { HandledErrorState } from "@langwatch/workflow-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { SearchX } from "lucide-react";
 import { useEffect } from "react";
@@ -9,6 +8,7 @@ import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { _useWorkflowStore, useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";
+import { HandledErrorState } from "../../elements/studio-host/errors.tsx";
 import OptimizationStudio from "../optimization_studio/optimization-studio.tsx";
 import { useStudioHostBinding } from "../studio-host/binding.ts";
 

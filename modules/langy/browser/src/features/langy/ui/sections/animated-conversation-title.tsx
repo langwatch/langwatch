@@ -1,5 +1,5 @@
 import { chakra } from "@langwatch/design-system/primitives";
-import { useReducedMotion } from "@langwatch/langy-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo } from "react";
 

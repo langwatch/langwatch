@@ -1,11 +1,11 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { useBatchRunSelection, useBatchRunsPolling } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { useCallback } from "react";
 
 import type { ExperimentRow } from "../../model/experiment-api-map.ts";
 import { experimentApi } from "../experiment-api.ts";
+import { useBatchRunSelection } from "../use-batch-run-selection.ts";
 
 /**
  * The batch evaluation runs list plus the currently selected run. Moved out
@@ -22,10 +22,12 @@ export const useBatchEvaluationState = ({
   selectedRunId?: string;
   setSelectedRunId?: (runId: string) => void;
 }) => {
-  const polling = useBatchRunsPolling();
   const batchEvaluationRuns = experimentApi.experiments.getExperimentBatchEvaluationRuns.useQuery(
     { projectId: project?.id ?? "", experimentId: experiment?.id ?? "" },
-    { refetchInterval: polling.refetchInterval, enabled: !!project && !!experiment },
+    {
+      enabled: !!project && !!experiment,
+      // needs a read hint: batch evaluation run started or finished
+    },
   );
   const router = useRouter();
   const runs: ExperimentRun[] | undefined = batchEvaluationRuns.data?.runs;
@@ -44,7 +46,6 @@ export const useBatchEvaluationState = ({
     selectedRunId,
     routerRunId: typeof router.query.runId === "string" ? router.query.runId : undefined,
     selectRun,
-    polling,
   });
   return { batchEvaluationRuns, ...selection };
 };

@@ -53,7 +53,8 @@ export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.Rea
         {
           onSuccess: () => {
             void queryClient.team.getTeamsWithGrants.invalidate();
-            void queryClient.team.getTeamsWithMembers.invalidate();
+            void queryClient.organization.getDirectoryCounts.invalidate();
+            void queryClient.organization.getScopeGraph.invalidate();
             toaster.create({
               title: "Team created successfully",
               type: "success",

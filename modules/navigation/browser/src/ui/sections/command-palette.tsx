@@ -1,4 +1,5 @@
 import { Box } from "@langwatch/design-system/primitives";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -10,7 +11,6 @@ import { useEasterEggEffects } from "../../behavior/use-easter-egg-effects.ts";
 import { useFilteredCommands } from "../../behavior/use-filtered-commands.ts";
 import { useFilteredProjects } from "../../behavior/use-filtered-projects.ts";
 import { useRecentItems } from "../../behavior/use-recent-items.ts";
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import { useScrollIntoView } from "../../behavior/use-scroll-into-view.ts";
 import type { Command } from "../../model/command-bar-types.ts";
 import { findEasterEgg, type EasterEgg } from "../../model/command-easter-eggs.ts";

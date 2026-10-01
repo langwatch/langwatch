@@ -33,7 +33,7 @@ const GRAPH = [
 ];
 
 vi.mock("../../../behavior/project-api.ts", () => ({
-  api: { organization: { getAll: { useQuery: () => ({ data: GRAPH }) } } },
+  api: { organization: { getScopeGraph: { useQuery: () => ({ data: GRAPH }) } } },
 }));
 
 import ProjectSwitcher from "../project-switcher.tsx";

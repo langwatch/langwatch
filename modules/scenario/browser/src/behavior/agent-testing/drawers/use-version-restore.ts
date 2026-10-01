@@ -5,20 +5,19 @@
  */
 
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { toaster } from "@langwatch/design-system/toaster";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { useState } from "react";
-
-import { api } from "../../scenario-api.ts";
-import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
 
 export type VersionRestore = ReturnType<typeof useVersionRestore>;
 
 export function useVersionRestore({ scenarioId }: { scenarioId: string }) {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useUtils();
+  const utils = scenarioClient.useUtils();
   const [confirmingVersion, setConfirmingVersion] = useState<number | null>(null);
 
-  const mutation = api.scenarios.restoreVersion.useMutation({
+  const mutation = scenarioClient.scenarios.restoreVersion.useMutation({
     onSuccess: (_result, variables) => {
       void utils.scenarios.listVersions.invalidate();
       void utils.scenarios.getAll.invalidate();

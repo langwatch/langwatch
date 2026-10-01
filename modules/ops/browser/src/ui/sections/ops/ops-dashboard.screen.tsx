@@ -25,7 +25,6 @@ function describeSnapshotConnection({
 export default function OpsDashboardScreen() {
   const payloadStore = useOpsOverlay("payloadStore");
   const snapshot = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    refetchInterval: 5000,
   });
 
   const data = snapshot.data ?? null;

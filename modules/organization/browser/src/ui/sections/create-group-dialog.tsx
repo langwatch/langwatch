@@ -17,13 +17,13 @@ import { useState } from "react";
 
 import { api } from "../../behavior/organization-api.ts";
 import { useShowErrorToast } from "../../behavior/organization-feedback.ts";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import {
   GrantInputRow,
   type PendingGrant,
   roleBadgeColor,
   scopeTypeLabel,
 } from "./group-grant-input-row.tsx";
+import { MemberAvatar } from "./member-avatar.tsx";
 
 export function CreateGroupDialog({
   organizationId,
@@ -43,7 +43,7 @@ export function CreateGroupDialog({
   const [memberSearch, setMemberSearch] = useState("");
 
   const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId },
+    { organizationId, includeDeactivated: false },
     { enabled: open },
   );
 
@@ -72,6 +72,7 @@ export function CreateGroupDialog({
         memberIds: pendingMemberIds,
       });
       void queryClient.group.listAll.invalidate();
+      void queryClient.organization.getDirectoryCounts.invalidate();
       reset();
       onClose();
     } catch (e) {
@@ -165,7 +166,7 @@ export function CreateGroupDialog({
                     const member = orgMembers.data?.members.find((m) => m.userId === userId);
                     return (
                       <HStack key={userId} py={1} fontSize="sm">
-                        <RandomColorAvatar
+                        <MemberAvatar
                           name={member?.user.name ?? member?.user.email ?? "?"}
                           image={member?.user.image}
                           size="xs"

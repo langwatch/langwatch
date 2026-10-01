@@ -1,3 +1,4 @@
+import { promptClient } from "@langwatch/prompt-client";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import cloneDeep from "lodash-es/cloneDeep";
 import { useCallback } from "react";
@@ -12,7 +13,6 @@ import { usePromptHost } from "../model/prompt-host.ts";
 import { formValuesToTriggerSaveVersionParams } from "../model/prompt-node-conversion.ts";
 import { useTabId } from "../model/prompt-tab-context.tsx";
 import type { WireVersionedPrompt } from "../model/wire-versioned-prompt.ts";
-import { promptApi } from "./prompt-api.ts";
 import type { TabData } from "./prompt-tabs-store.ts";
 import { useLatestPromptVersion } from "./use-latest-prompt-version.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
@@ -29,7 +29,7 @@ export function useHandleSavePrompt() {
   const currentVersion = methods.watch("versionMetadata.versionNumber");
   const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
   const tabId = useTabId();
-  const utils = promptApi.useUtils();
+  const utils = promptClient.useUtils();
   const host = usePromptHost();
 
   // Get the latest version from DB for accurate "Update to vX" display

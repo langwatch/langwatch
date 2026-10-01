@@ -1,4 +1,3 @@
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
@@ -19,6 +18,7 @@ import { Link } from "../../../ui/elements/gateway-link.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import type { ScopeTriadEntry } from "../authz/scope-picker/scope-chip-picker.tsx";
 
 /**
  * Routing policy editor uses drawer registry (drawer.open=routingPolicy), not its own query key.

@@ -21,9 +21,6 @@
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../analytics/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
@@ -37,6 +34,9 @@
     },
     {
       "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/client/tsconfig.build.json"
     },
     {
       "path": "../../evaluator/contract/tsconfig.build.json"
@@ -54,10 +54,7 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
-      "path": "../../langy/browser-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../../model-provider/browser-kit/tsconfig.build.json"
+      "path": "../../langy/contract/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
@@ -72,19 +69,19 @@
       "path": "../../organization/contract/tsconfig.build.json"
     },
     {
-      "path": "../../prompt/browser-kit/tsconfig.build.json"
+      "path": "../../prompt/client/tsconfig.build.json"
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"
     },
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../stored-object/browser-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../../suite/browser-kit/tsconfig.build.json"
+      "path": "../../stored-object/contract/tsconfig.build.json"
     },
     {
       "path": "../../suite/contract/tsconfig.build.json"
@@ -93,16 +90,10 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../trace/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../../workflow/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

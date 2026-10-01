@@ -68,9 +68,6 @@ class TourTestHost extends OnboardingHostApi {
   async copyToClipboard() {
     return true;
   }
-  revealProjectApiKey() {
-    return undefined;
-  }
   prefersReducedMotion() {
     return false;
   }
@@ -125,18 +122,13 @@ function renderLayer() {
 }
 
 /**
- * The fill an element gets on each ground, read from the rules Chakra emitted
- * for its class: jsdom computes no styles, and a colour-mode condition only
- * exists as a `.dark` rule.
+ * The colour token an element is filled with, read from the rule Chakra emitted
+ * for its class (jsdom computes no styles). `logo.*` carries the light and dark values.
  */
-function fillOf(el: Element | undefined) {
+function fillTokenOf(el: Element | undefined) {
   const cls = el?.getAttribute("class") ?? "";
   const css = [...document.querySelectorAll("style")].map((style) => style.textContent).join("\n");
-  const light = css.match(new RegExp(`(?:^|})\\s*\\.${cls}\\{fill:([^;}]+)`))?.[1];
-  const dark = css
-    .match(new RegExp(`\\.dark \\.${cls}[^{]*\\{fill:([^;}]+)`))?.[1]
-    ?.replace(/^var\(--chakra-colors-(.+)\)$/, "$1");
-  return { light, dark };
+  return css.match(new RegExp(`\\.${cls}\\{[^}]*fill:var\\(--chakra-colors-([^)]+)\\)`))?.[1];
 }
 
 /** From a step's start to its caption being on screen. */
@@ -302,12 +294,10 @@ describe("TourLayer", () => {
         useGuidedTourStore.getState().start("llmops");
       });
       landStep(true);
-      const logo = [...screen.getByTestId("tour-caption").querySelectorAll("svg")].find(
-        (svg) => svg.getAttribute("viewBox") === "0 0 38 52",
-      );
+      const logo = screen.getByTestId("tour-caption").querySelector("svg");
       const [plate, lines] = [...(logo?.querySelectorAll("path") ?? [])];
-      expect(fillOf(plate)).toEqual({ light: "#fff", dark: "transparent" });
-      expect(fillOf(lines)).toEqual({ light: "#213B41", dark: "#F1F5F9" });
+      expect(fillTokenOf(plate)).toBe("logo-face");
+      expect(fillTokenOf(lines)).toBe("logo-mark");
     });
 
     /** @scenario the step counter doubles as Back */

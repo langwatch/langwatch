@@ -5,9 +5,9 @@
  * from the status it is given.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -42,9 +42,7 @@ class TestHost extends LicensingHostApi {
 }
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
-    <LicensingHostProvider value={new TestHost()}>{children}</LicensingHostProvider>
-  </ChakraProvider>
+  <LicensingHostProvider value={new TestHost()}>{children}</LicensingHostProvider>
 );
 
 const counts = {
@@ -70,9 +68,11 @@ const valid: LicenseStatus = {
 type InstalledLicense = Extract<LicenseStatus, { hasLicense: true }>;
 
 const renderCard = (status: InstalledLicense) =>
-  render(<LicenseDetailsCard status={status} onRemove={vi.fn()} isRemoving={false} />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(
+    <Wrapper>
+      <LicenseDetailsCard status={status} onRemove={vi.fn()} isRemoving={false} />
+    </Wrapper>,
+  );
 
 beforeAll(() => {
   // jsdom has no ResizeObserver, which the segmented control measures with.
@@ -141,7 +141,11 @@ describe("the License page", () => {
   describe("given the status could not be read", () => {
     /** @scenario The page offers a retry when the status cannot be read */
     it("offers a retry and no activation form", () => {
-      render(<LicenseLoadError onRetry={vi.fn()} />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <LicenseLoadError onRetry={vi.fn()} />
+        </Wrapper>,
+      );
 
       expect(screen.getByText("Unable to load license")).toBeDefined();
       expect(screen.getByRole("button", { name: "Retry" })).toBeDefined();
@@ -151,17 +155,18 @@ describe("the License page", () => {
 
 describe("the no-license card", () => {
   const renderCard = (overrides?: { activationCode?: string; onCodeActivate?: () => void }) =>
-    render(
-      <NoLicenseCard
-        licenseKey=""
-        onLicenseKeyChange={vi.fn()}
-        onActivate={vi.fn()}
-        activationCode={overrides?.activationCode ?? ""}
-        onActivationCodeChange={vi.fn()}
-        onCodeActivate={overrides?.onCodeActivate ?? vi.fn()}
-        isActivating={false}
-      />,
-      { wrapper: Wrapper },
+    renderWithDesignSystem(
+      <Wrapper>
+        <NoLicenseCard
+          licenseKey=""
+          onLicenseKeyChange={vi.fn()}
+          onActivate={vi.fn()}
+          activationCode={overrides?.activationCode ?? ""}
+          onActivationCodeChange={vi.fn()}
+          onCodeActivate={overrides?.onCodeActivate ?? vi.fn()}
+          isActivating={false}
+        />
+      </Wrapper>,
     );
 
   /** @scenario Without a license the page offers three ways to activate one */

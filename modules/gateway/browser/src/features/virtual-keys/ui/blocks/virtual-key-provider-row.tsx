@@ -1,10 +1,10 @@
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Box, Button, HStack, Text, VStack, Wrap } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
+import { ProviderScopeChips } from "../../../../ui/sections/authz/scope-picker/provider-scope-chips.tsx";
 import type {
   EligibleModelProvider,
   OrgModelProvider,

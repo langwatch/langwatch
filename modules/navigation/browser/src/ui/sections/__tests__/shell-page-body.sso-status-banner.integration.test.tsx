@@ -4,8 +4,8 @@
  * so the banner sends them to sign out. Spec: specs/auth/sso-wrong-provider-recovery.feature.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
@@ -32,22 +32,20 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 function renderBody({ signOut = vi.fn() }: { signOut?: () => void } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          pathname: "/acme",
-          currentUserId: "user_1",
-          organization: { id: "org_1", name: "Acme", teams: [] },
-          organizationRole: "ADMIN",
-        }}
-        actions={{ signOut }}
-      >
-        <ShellPageBody>
-          <p>Project content</p>
-        </ShellPageBody>
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        pathname: "/acme",
+        currentUserId: "user_1",
+        organization: { id: "org_1", name: "Acme", teams: [] },
+        organizationRole: "ADMIN",
+      }}
+      actions={{ signOut }}
+    >
+      <ShellPageBody>
+        <p>Project content</p>
+      </ShellPageBody>
+    </WithStubNavigationHost>,
   );
 }
 

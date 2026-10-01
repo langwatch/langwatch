@@ -1,7 +1,7 @@
 /** Edits a queue through the annotation feature API. */
 
-import { Popover } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Button,
   type ButtonProps,
@@ -19,6 +19,11 @@ import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";
+import {
+  useActiveScoreTypes,
+  useAnnotationQueue,
+  useOrganizationMembers,
+} from "../../behavior/use-annotation-reads.ts";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 
 /** What the server said about individual fields, if it named any. */
@@ -93,20 +98,9 @@ export function AnnotationQueueEditor({
   onSaved: (queueName: string) => void;
   onFailed: (error: unknown) => void;
 }) {
-  const queue = annotationApi.annotation.getQueueBySlugOrId.useQuery(
-    { projectId: projectId ?? "", queueId: queueId ?? "" },
-    { enabled: !!projectId && !!queueId },
-  );
-
-  const scores = annotationApi.annotationScore.getAllActive.useQuery(
-    { projectId: projectId ?? "" },
-    { enabled: !!projectId },
-  );
-
-  const organization = annotationApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId },
-  );
+  const queue = useAnnotationQueue({ projectId, queueId });
+  const scores = useActiveScoreTypes({ projectId });
+  const organization = useOrganizationMembers({ organizationId });
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");

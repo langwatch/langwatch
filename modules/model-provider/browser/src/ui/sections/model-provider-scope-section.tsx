@@ -1,4 +1,3 @@
-import { ProviderScopeChips, ScopeChipPicker } from "@langwatch/authz-browser-kit";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 
@@ -9,6 +8,8 @@ import type {
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
 import { SmallLabel } from "../elements/small-label.tsx";
+import { ProviderScopeChips } from "./authz/scope-picker/provider-scope-chips.tsx";
+import { ScopeChipPicker } from "./authz/scope-picker/scope-chip-picker.tsx";
 
 const SCOPE_DESCRIPTION_SINGLE: Record<ModelProviderScopeType, string> = {
   PROJECT: "Only this project can use this provider.",

@@ -1,12 +1,12 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
-import { readableDate } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 import numeral from "numeral";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
+import { readableDate } from "../../model/display-formatters.ts";
 import type { ExperimentRow } from "../../model/experiment-api-map.ts";
 import {
   cellText,
@@ -41,15 +41,11 @@ export const useBatchEvaluationResults = ({
   project,
   experiment,
   runId,
-  isFinished,
 }: {
   project: UiHostProject;
   experiment: ExperimentRow;
   runId: string | undefined;
-  isFinished: boolean;
 }) => {
-  const [keepRefetching, setKeepRefetching] = useState(true);
-
   const refetchingStartedAtRef = useRef<number>(nowInstant().epochMilliseconds);
   useEffect(() => {
     refetchingStartedAtRef.current = nowInstant().epochMilliseconds;
@@ -63,24 +59,11 @@ export const useBatchEvaluationResults = ({
     },
     {
       enabled: !!runId,
-      refetchInterval: keepRefetching ? 1000 : false,
+      // needs a read hint: batch evaluation run result recorded
       refetchOnMount: false,
       refetchOnWindowFocus: false,
     },
   );
-
-  useEffect(() => {
-    if (isFinished) {
-      const stopRefetchingTimeout = setTimeout(() => {
-        setKeepRefetching(false);
-      }, 2_000);
-      return () => clearTimeout(stopRefetchingTimeout);
-    }
-    setKeepRefetching(true);
-    // `apps/ui` compiles this package under `noImplicitReturns`: an effect with
-    // a cleanup on one branch has to say so on the other.
-    return undefined;
-  }, [isFinished]);
 
   const runData: ExperimentRunWithItems | null | undefined = run.data;
   const datasetByIndex = runData?.dataset.reduce<
@@ -256,12 +239,10 @@ export const useBatchEvaluationDownloadCSV = ({
   project,
   experiment,
   runId,
-  isFinished,
 }: {
   project: UiHostProject;
   experiment: ExperimentRow;
   runId: string | undefined;
-  isFinished: boolean;
 }) => {
   const {
     run,
@@ -274,7 +255,6 @@ export const useBatchEvaluationDownloadCSV = ({
     project,
     experiment,
     runId,
-    isFinished,
   });
 
   const downloadCSV = async () => {

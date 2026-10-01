@@ -1,10 +1,3 @@
-/**
- * @vitest-environment jsdom
- *
- * Tests that the privacy rule drawer handles "Inherit" correctly: new rules
- * start with all fields inherited and show resolved values for inherited fields.
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   type DataPrivacyRule,
   type DataPrivacyScopeAvailable,
@@ -12,6 +5,13 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+/**
+ * @vitest-environment jsdom
+ *
+ * Tests that the privacy rule drawer handles "Inherit" correctly: new rules
+ * start with all fields inherited and show resolved values for inherited fields.
+ */
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +19,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PrivacyRuleDrawer } from "../privacy-rule-drawer.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 const PROJECT_ID = "proj-1";

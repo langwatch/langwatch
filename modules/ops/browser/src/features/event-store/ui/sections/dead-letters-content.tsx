@@ -41,7 +41,7 @@ export function DeadLettersContent() {
 
   const query = api.ops.listDeadLetters.useQuery(
     { processName, page, pageSize: PAGE_SIZE },
-    { refetchInterval: 30_000 },
+    {},
   );
 
   if (query.isPending) {

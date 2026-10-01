@@ -1,12 +1,13 @@
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { useCallback } from "react";
 
+import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { ParameterFieldError } from "./parameter-suggestions.ts";
@@ -98,10 +99,10 @@ export type RunDialogSubmitInput = {
 /** Whether the project has anything at all to run a scenario against. */
 function useHasAnyTarget(subject: RunDialogSubject | null) {
   const { project } = useOrganizationTeamProject();
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project && !!subject },
-  );
+  const { data: agents } = useAgents({
+    projectId: project?.id,
+    enabled: !!subject,
+  });
   const { data: prompts } = useAllPromptsForProject();
   const hasAgent = (agents ?? []).length > 0;
   const hasPublishedPrompt = (prompts ?? []).some((prompt) => prompt.version > 0);

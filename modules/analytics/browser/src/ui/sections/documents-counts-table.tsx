@@ -1,13 +1,11 @@
 import { Box, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import { analyticsApi } from "../../behavior/analytics-api.ts";
-import { useFilterParams } from "../../behavior/use-filter-params.ts";
+import { useTopUsedDocuments } from "../../behavior/use-analytics-documents.ts";
 import { SummaryMetricValue } from "../elements/summary-metric.tsx";
 
 export const DocumentsCountsTable = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = analyticsApi.analytics.topUsedDocuments.useQuery(filterParams, queryOpts);
+  const documents = useTopUsedDocuments();
 
   if (documents.isLoading) return <Box>Loading...</Box>;
   if (documents.error) return <Box>An error occurred</Box>;
@@ -60,8 +58,7 @@ export const DocumentsCountsTable = () => {
 };
 
 export const DocumentsCountsSummary = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = analyticsApi.analytics.topUsedDocuments.useQuery(filterParams, queryOpts);
+  const documents = useTopUsedDocuments();
 
   const count = documents.data?.totalUniqueDocuments;
 

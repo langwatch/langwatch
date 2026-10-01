@@ -2,11 +2,13 @@
  * Target reference ids, resolved to what a person calls them.
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useMemo } from "react";
 
 import type { TargetKind } from "../model/target-kind.ts";
+import { useAgents } from "./agents/use-agents.ts";
+import { useAllPromptsForProject } from "./prompts/use-all-prompts-for-project.ts";
 import { api } from "./scenario-api.ts";
-import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**
  * What a target reference id stands for: the name it reads as, the kind of
@@ -38,14 +40,8 @@ function agentKind(type: string): TargetKind {
 export function useTargetIdentityMap(): Map<string, TargetIdentity> {
   const { project } = useOrganizationTeamProject();
 
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
-  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
+  const { data: agents } = useAgents({ projectId: project?.id });
+  const { data: prompts } = useAllPromptsForProject();
 
   return useMemo(() => {
     const map = new Map<string, TargetIdentity>();

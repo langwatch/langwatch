@@ -4,9 +4,9 @@
  * @see specs/scenarios/scenario-input-mapping.feature (UI section, @integration)
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { FieldMapping } from "@langwatch/prompt-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { FieldMapping } from "@langwatch/workflow-contract";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,10 +20,6 @@ import {
 
 // -- Helpers --
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 function renderSection(overrides: Partial<ScenarioInputMappingSectionProps> = {}) {
   const defaults: ScenarioInputMappingSectionProps = {
     inputs: [
@@ -34,9 +30,7 @@ function renderSection(overrides: Partial<ScenarioInputMappingSectionProps> = {}
     onMappingChange: vi.fn(),
   };
 
-  return render(<ScenarioInputMappingSection {...defaults} {...overrides} />, {
-    wrapper: Wrapper,
-  });
+  return renderWithDesignSystem(<ScenarioInputMappingSection {...defaults} {...overrides} />);
 }
 
 describe("ScenarioInputMappingSection", () => {

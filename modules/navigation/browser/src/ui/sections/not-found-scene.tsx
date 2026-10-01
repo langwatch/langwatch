@@ -14,11 +14,11 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { ArrowLeft, Home, Settings } from "lucide-react";
 import { type Dispatch, type SetStateAction, useMemo, useRef, useState } from "react";
 
 import { useNotFoundCanvas } from "../../behavior/use-not-found-canvas.ts";
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
   type CanvasColors,

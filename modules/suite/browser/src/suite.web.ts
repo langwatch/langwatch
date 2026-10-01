@@ -6,4 +6,7 @@
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
+// Declares the `suite:run-history` slice at install, so scenario reads it from first paint.
+import "./behavior/use-run-history-store.ts";
+
 export const suiteWeb = defineWebModule("suite");

@@ -13,7 +13,7 @@ vi.mock("../../use-model-limits.ts", () => ({
 
 import { hasNonEmptySystemMessage } from "@langwatch/prompt-contract";
 
-import { usePromptConfigForm } from "../use-prompt-config-form.ts";
+import { usePromptConfigForm } from "../../use-prompt-config-form.ts";
 
 interface MutationCall {
   systemContent: string | undefined;

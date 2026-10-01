@@ -154,232 +154,105 @@ const PersistedStateSchema = z.object({
 type PersistedTopLevelState = Pick<DraggableTabsBrowserState, "windows" | "activeWindowId">;
 
 /**
- * Shape written under the main storage key: tab identity/order only, no data.
- * `data` is optional purely to read the LEGACY single-key format, where each
- * tab's full `data` was embedded in the index instead of a per-tab key.
+ * What a tab keeps on disk: its place and the prompt id to read it back by. Never its
+ * contents: messages, form values and variables came from the server or a span (§10.2).
  */
-interface LightTab {
-  id: string;
-  data?: TabData;
-}
-interface LightWindow {
-  id: string;
-  tabs: LightTab[];
-  activeTabId: string;
-}
-interface LightPersistedState {
-  windows: LightWindow[];
-  activeWindowId: string | null;
-}
+const StoredTabSchema = z.object({
+  id: z.string(),
+  configId: z.string(),
+  title: z.string().nullable(),
+  versionNumber: z.number().optional(),
+  scope: z.enum(["PROJECT", "ORGANIZATION"]).optional(),
+});
+type StoredTab = z.infer<typeof StoredTabSchema>;
 
-function getTabStorageKey(projectId: string, tabId: string) {
-  return `${projectId}:tab:${tabId}`;
-}
+const StoredLayoutSchema = z.object({
+  state: z.object({
+    windows: z.array(
+      z.object({ id: z.string(), activeTabId: z.string(), tabs: z.array(StoredTabSchema) }),
+    ),
+    activeWindowId: z.string().nullable(),
+  }),
+  version: z.number().optional(),
+});
 
-/** The light index key holding tab identity/order (not per-tab data). */
+/** The key the tab layout is kept under, in the reader's own storage. */
 function getStorageKey(projectId: string) {
   return `${projectId}:draggable-tabs-browser-store`;
 }
 
-/**
- * Removes every persisted key belonging to a project's draggable tabs browser store: each
- * per-tab `${projectId}:tab:${tabId}` key plus the light index key itself.
- */
 function clearAllPersistedDataForProject(
   projectId: string,
   { storage, logger }: PromptTabsCapabilities,
 ) {
-  const storageKey = getStorageKey(projectId);
-  const tabKeyPrefix = `${projectId}:tab:`;
   try {
-    const tabKeysToRemove: string[] = [];
-    for (let i = 0; i < storage.length; i++) {
-      const key = storage.key(i);
-      if (key?.startsWith(tabKeyPrefix)) {
-        tabKeysToRemove.push(key);
-      }
-    }
-    for (const key of tabKeysToRemove) {
-      storage.removeItem(key);
-    }
-
-    storage.removeItem(storageKey);
+    storage.removeItem(getStorageKey(projectId));
   } catch (error) {
     logger.error({ error, projectId }, "Failed to clear persisted store");
   }
 }
 
-/**
- * Strips transient UI flags before writing tab data to storage so they
- * don't re-trigger on page reload.
- */
-function stripTransientFlags(data: TabData): TabData {
+/** A tab with no saved prompt behind it cannot be read back, so it is not kept. */
+function storedTabOf(tab: Tab): StoredTab[] {
+  const configId = tab.data.form.currentValues?.configId;
+  if (!configId) return [];
+  const { title, versionNumber, scope } = tab.data.meta;
+  return [{ id: tab.id, configId, title, versionNumber, scope }];
+}
+
+/** A kept tab comes back loading; `useRestorePromptTabs` reads its prompt by id. */
+function restoredTabOf({ id, configId, title, versionNumber, scope }: StoredTab): Tab {
   return {
-    ...data,
-    meta: {
-      ...data.meta,
-      openHistoryOnLoad: undefined,
-    },
+    id,
+    data: TabDataSchema.parse({
+      loading: true,
+      form: { currentValues: { configId } },
+      meta: { title, versionNumber, scope },
+    }),
   };
 }
 
-/** The last-persisted `data` reference per tab, so unchanged (immer-shared) tabs skip a write. */
-type PersistedTabRefs = Map<string, TabData>;
-
-/**
- * A tab's data from its own per-tab key, else the legacy embedded `data` (old single-key
- * format, so upgrading users keep their open tabs); a tab neither reads is dropped.
- */
-function rehydrateTab({
-  projectId,
-  capabilities: { storage, logger },
-  tab,
-  refs,
-}: {
-  projectId: string;
-  capabilities: PromptTabsCapabilities;
-  tab: LightTab;
-  refs: PersistedTabRefs;
-}): { id: string; data: TabData }[] {
-  const tabRaw = storage.getItem(getTabStorageKey(projectId, tab.id));
-  if (tabRaw) {
-    let data: TabData;
-    try {
-      data = JSON.parse(tabRaw) as TabData;
-    } catch (parseError) {
-      logger.warn(
-        { tabId: tab.id, error: parseError },
-        "Corrupt per-tab data during rehydration, dropping tab",
-      );
-      return [];
-    }
-    refs.set(tab.id, data);
-    return [{ id: tab.id, data }];
-  }
-  // Legacy payload: not seeded into refs, so the next persist writes the tab's own key.
-  if (tab.data) return [{ id: tab.id, data: tab.data }];
-  logger.warn({ tabId: tab.id }, "Missing per-tab data key during rehydration, dropping tab");
-  return [];
-}
-
-/**
- * Reference equality is enough only because this store is wrapped in Immer, which keeps an
- * unedited tab's `data` reference across `set()` calls; outside Immer it degrades to always-write.
- */
-function persistTabIfChanged({
-  projectId,
-  storage,
-  tab,
-  refs,
-}: {
-  projectId: string;
-  storage: PromptTabsCapabilities["storage"];
-  tab: { id: string; data: TabData };
-  refs: PersistedTabRefs;
-}): void {
-  if (refs.get(tab.id) === tab.data) return;
-  storage.setItem(
-    getTabStorageKey(projectId, tab.id),
-    JSON.stringify(stripTransientFlags(tab.data)),
-  );
-  refs.set(tab.id, tab.data);
-}
-
-/** Removes the per-tab keys of tabs that were closed since the last persist. */
-function dropClosedTabs({
-  projectId,
-  storage,
-  currentTabIds,
-  refs,
-}: {
-  projectId: string;
-  storage: PromptTabsCapabilities["storage"];
-  currentTabIds: Set<string>;
-  refs: PersistedTabRefs;
-}): void {
-  for (const tabId of refs.keys()) {
-    if (currentTabIds.has(tabId)) continue;
-    storage.removeItem(getTabStorageKey(projectId, tabId));
-    refs.delete(tabId);
-  }
-}
-
-/**
- * Custom persist storage that splits the heavy per-tab `data` out of the single
- * windows/tabs storage key into its own key per tab (`${projectId}:tab:${tabId}`).
- */
-function createTabAwarePersistStorage(
-  projectId: string,
+/** Keeps the tab layout and each tab's prompt id, and nothing a tab displays. */
+function createLayoutPersistStorage(
   capabilities: PromptTabsCapabilities,
 ): PersistStorage<PersistedTopLevelState> {
   const { storage, logger } = capabilities;
-  const refs: PersistedTabRefs = new Map();
 
   return {
     getItem: (name) => {
       try {
         const raw = storage.getItem(name);
         if (!raw) return null;
-
-        const parsed = JSON.parse(raw) as {
-          state: LightPersistedState;
-          version?: number;
-        };
-
-        const windows: Window[] = parsed.state.windows.map((w) => ({
-          id: w.id,
-          activeTabId: w.activeTabId,
-          tabs: w.tabs.flatMap((tab) => rehydrateTab({ projectId, capabilities, tab, refs })),
-        }));
-
+        const { state, version } = StoredLayoutSchema.parse(JSON.parse(raw));
         return {
           state: {
-            windows,
-            activeWindowId: parsed.state.activeWindowId,
+            windows: state.windows.map((w) => ({ ...w, tabs: w.tabs.map(restoredTabOf) })),
+            activeWindowId: state.activeWindowId,
           },
-          version: parsed.version,
+          version,
         };
       } catch (error) {
         logger.error({ error }, "Failed to read persisted store");
+        storage.removeItem(name);
         return null;
       }
     },
 
     setItem: (name, value: StorageValue<PersistedTopLevelState>) => {
       try {
-        const currentTabIds = new Set<string>();
-
-        const lightWindows: LightWindow[] = value.state.windows.map((w) => ({
+        const windows = value.state.windows.map((w) => ({
           id: w.id,
           activeTabId: w.activeTabId,
-          tabs: w.tabs.map((tab) => {
-            currentTabIds.add(tab.id);
-            persistTabIfChanged({ projectId, storage, tab, refs });
-            return { id: tab.id };
-          }),
+          tabs: w.tabs.flatMap(storedTabOf),
         }));
-
-        dropClosedTabs({ projectId, storage, currentTabIds, refs });
-
-        const lightState: LightPersistedState = {
-          windows: lightWindows,
-          activeWindowId: value.state.activeWindowId,
-        };
-
-        storage.setItem(name, JSON.stringify({ state: lightState, version: value.version }));
+        const state = { windows, activeWindowId: value.state.activeWindowId };
+        storage.setItem(name, JSON.stringify({ state, version: value.version }));
       } catch (error) {
         logger.error({ error }, "Failed to persist store");
       }
     },
 
-    removeItem: () => {
-      // Delegate to the prefix-scan cleanup so this doesn't rely on the
-      // in-memory ref map being populated — otherwise per-tab keys written
-      // by another store instance (e.g. the same project open in a second
-      // browser tab) would be orphaned. Also drop our own tracked refs.
-      clearAllPersistedDataForProject(projectId, capabilities);
-      refs.clear();
-    },
+    removeItem: (name) => storage.removeItem(name),
   };
 }
 
@@ -754,14 +627,11 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
       })),
       {
         name: storageKey,
-
-        // Per-tab `data` persists under its own key, so editing one tab does not
-        // rewrite every other open tab (see createTabAwarePersistStorage).
         partialize: (state) => ({
           windows: state.windows,
           activeWindowId: state.activeWindowId,
         }),
-        storage: createTabAwarePersistStorage(projectId, capabilities),
+        storage: createLayoutPersistStorage(capabilities),
 
         onRehydrateStorage: () => (state, error) =>
           repairRehydratedState({ state, error, clearPersisted, logger }),

@@ -4,6 +4,7 @@ import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetApiUpsertOutput,
   type DatasetColumns,
@@ -23,14 +24,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-browser-kit";
 import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, type Resolver, useFieldArray, useForm } from "react-hook-form";
 
-import { datasetApi } from "../../../behavior/dataset-api.ts";
 import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
+import { tryToMapPreviousColumnsToNewColumns } from "../../../model/workflow/studio-dataset.utils.ts";
 import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
 
 export interface AddDatasetDrawerProps {
@@ -199,7 +199,7 @@ function resetDrawerForm({
 
 export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const upsertDataset = datasetApi.dataset.upsert.useMutation();
+  const upsertDataset = datasetClient.dataset.upsert.useMutation();
   const { closeDrawer } = useDrawer();
   const onClose = props.onClose ?? closeDrawer;
   const isOpen = props.open ?? true;
@@ -248,7 +248,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 
-  const trpc = datasetApi.useUtils();
+  const trpc = datasetClient.useUtils();
 
   const performUpsert = (data: DatasetRecordForm) => {
     upsertDataset.mutate(

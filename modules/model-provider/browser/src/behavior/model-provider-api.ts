@@ -10,20 +10,9 @@ import type {
   translateTrpc,
 } from "@langwatch/model-provider-contract";
 
-type BorrowedProcedures = {
-  organization: {
-    /**
-     * Declared for its cache entry. Deleting a provider changes the
-     * organization graph the shell holds, so it must be invalidated.
-     */
-    getAll: { query: { input: { isDemo?: boolean }; output: unknown } };
-  };
-};
-
 export type ModelProviderApiMap = ContractApiMap<typeof modelProviderTrpc> &
   ContractApiMap<typeof llmModelCostTrpc> &
-  ContractApiMap<typeof translateTrpc> &
-  BorrowedProcedures;
+  ContractApiMap<typeof translateTrpc>;
 
 export const modelProviderApi = createModuleApi<ModelProviderApiMap>();
 

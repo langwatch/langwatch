@@ -1,6 +1,7 @@
 import { narrateWorkbenchRun } from "@langwatch/experiment-contract";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useEffect } from "react";
+
+import { useLangyStore } from "../langy/langy.store.ts";
 
 /**
  * Tell the Langy panel what this page is doing, so its status line can say so.

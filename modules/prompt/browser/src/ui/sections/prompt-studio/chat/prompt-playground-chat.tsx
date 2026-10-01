@@ -1,7 +1,7 @@
 import { Box, type BoxProps, HStack, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PromptConfigFormValues, runtimeInputsSchema } from "@langwatch/prompt-contract";
-import { type DisplayPart, flattenMessages } from "@langwatch/trace-browser-kit";
+import { type DisplayPart, flattenMessages } from "@langwatch/trace-contract/conversation";
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from "react";
 import { LuCopy, LuTrash2 } from "react-icons/lu";
 import type { z } from "zod";

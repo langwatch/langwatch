@@ -3,7 +3,7 @@
  * The list's "Watches" and "Delivery" cells: the trace-filter cell shows the
  * notice its caller decides on; an email address wraps at its seams.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -20,10 +20,8 @@ const renderCell = ({
   filterQuery: string | null;
   filters: unknown;
 }) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceFilterCell notice={notice} checks={null} filterQuery={filterQuery} filters={filters} />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <TraceFilterCell notice={notice} checks={null} filterQuery={filterQuery} filters={filters} />,
   );
 
 describe("TraceFilterCell", () => {

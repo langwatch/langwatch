@@ -1,3 +1,6 @@
+import { differenceInCalendarDays, type Instant } from "@langwatch/time";
+
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 /**
  * The window the Results tab reads, in the two forms the surface uses.
  * @see specs/features/agent-testing/results-tabs.feature
@@ -9,10 +12,7 @@ import {
   type PeriodMode,
   PeriodSelector,
   type RelativePresetKey,
-} from "@langwatch/analytics-browser-kit";
-import { differenceInCalendarDays, type Instant } from "@langwatch/time";
-
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+} from "../../analytics/period-selector.tsx";
 
 /**
  * How many days the window spans, counted the way the shared period control

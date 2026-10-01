@@ -5,8 +5,8 @@
  * would compile silently — these tests are what makes that fail instead.
  * @see specs/model-providers/custom-model-display-name.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -16,7 +16,7 @@ import { ModelChip } from "../model-chip.tsx";
 afterEach(() => cleanup());
 
 function renderChip(ui: ReactElement) {
-  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  return renderWithDesignSystem(ui);
 }
 
 const MODEL_ID = "gpt-5.1";

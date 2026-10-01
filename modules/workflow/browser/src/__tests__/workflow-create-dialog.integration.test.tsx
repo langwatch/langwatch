@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -31,25 +31,13 @@ describe("WorkflowCreateDialog", () => {
       renderTemplateCard: (card: WorkflowTemplateCardProps) => <TemplateCard {...card} />,
     };
 
-    const result = render(
-      <ChakraProvider value={defaultSystem}>
-        <WorkflowCreateDialog {...props} open />
-      </ChakraProvider>,
-    );
+    const result = renderWithDesignSystem(<WorkflowCreateDialog {...props} open />);
 
     fireEvent.click(screen.getByTestId("new-workflow-card-blank"));
     expect(screen.getByTestId("workflow-form").textContent).toBe("New Workflow");
 
-    result.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <WorkflowCreateDialog {...props} open={false} />
-      </ChakraProvider>,
-    );
-    result.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <WorkflowCreateDialog {...props} open />
-      </ChakraProvider>,
-    );
+    result.rerender(<WorkflowCreateDialog {...props} open={false} />);
+    result.rerender(<WorkflowCreateDialog {...props} open />);
 
     expect(screen.getByTestId("new-workflow-card-blank")).not.toBeNull();
   });

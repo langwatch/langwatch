@@ -14,8 +14,9 @@ import type {
   UiSessionReading,
   UiSessionSnapshot,
 } from "@langwatch/browser-host/session";
+import { setUiStorageReader } from "@langwatch/browser-host/storage";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 
 import {
   readUiActor,
@@ -177,6 +178,12 @@ export function useUiSessionReading({
   });
   const actor = session.data?.actor ?? null;
   const failure = session.data?.failure ?? null;
+  const isAnswered = session.isSuccess && session.data.unreachable !== true;
+
+  // Remembered preferences are the answered reader's own; before paint, so none flash.
+  useLayoutEffect(() => {
+    if (isAnswered) setUiStorageReader(actor?.id);
+  }, [isAnswered, actor?.id]);
 
   // Once, per failed read, rather than once per render: the query holds its
   // answer, so the effect only re-runs when a re-read failed again.

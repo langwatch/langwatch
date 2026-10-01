@@ -5,9 +5,10 @@
  */
 
 import { useUiCapabilities, useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { isLangyDemoProject, useReducedMotion } from "@langwatch/langy-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { useMemo, type ReactNode } from "react";
 
+import { isLangyDemoProject } from "../model/langy/langy-demo-project.ts";
 import {
   ProjectHomeHost,
   ProjectHomeHostProvider,

@@ -15,7 +15,6 @@ export function ProcessesContent() {
   const instance = useOpsOverlay("processInstance");
   const instanceParts = readOverlayParts(instance.value, 3);
   const fleet = api.ops.listProcessFleet.useQuery(undefined, {
-    refetchInterval: 15_000,
   });
 
   if (fleet.isPending) {

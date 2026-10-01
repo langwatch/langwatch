@@ -29,6 +29,10 @@ import type {
 import { useState } from "react";
 
 import { topicApi } from "../../behavior/topic-api.ts";
+import {
+  useClusteringRunHistory,
+  useClusteringStatus,
+} from "../../behavior/use-topic-clustering.ts";
 import { useTopicHost } from "../../model/topic-host.ts";
 
 /**
@@ -86,16 +90,6 @@ export default function TopicClusteringScreen() {
     </>
   );
 }
-
-/**
- * How long a just-requested run keeps the status card polling. Nothing is recorded at the
- * instant a run begins, so the card cannot see the run until the request itself reaches the
- * read model; without this window the card would settle on the pre-click answer and sit there.
- */
-const REQUEST_SETTLE_WINDOW_MS = 30_000;
-
-/** Poll cadence while a run is underway; the query stops itself once it settles. */
-const RUNNING_POLL_MS = 5_000;
 
 function TopicClusteringCard({ project }: { project: { id: string } }) {
   const host = useTopicHost();
@@ -283,21 +277,7 @@ function ClusteringStatusCard({
   projectId: string;
   lastTriggeredAt: number | null;
 }) {
-  const status = topicApi.topics.getClusteringStatus.useQuery(
-    { projectId },
-    {
-      refetchInterval: (query) => {
-        if (query.state.data?.isRunInFlight) return RUNNING_POLL_MS;
-        if (
-          lastTriggeredAt !== null &&
-          nowInstant().epochMilliseconds - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS
-        ) {
-          return RUNNING_POLL_MS;
-        }
-        return false;
-      },
-    },
-  );
+  const status = useClusteringStatus({ projectId, lastTriggeredAt });
 
   return (
     <Card.Root width="full">
@@ -404,13 +384,7 @@ function RunHistoryBody({
 }
 
 function RunHistoryCard({ projectId }: { projectId: string }) {
-  const history = topicApi.topics.getClusteringRunHistory.useQuery(
-    { projectId },
-    {
-      refetchInterval: (query) =>
-        query.state.data?.some((run) => run.outcome === "running") ? RUNNING_POLL_MS : false,
-    },
-  );
+  const history = useClusteringRunHistory({ projectId });
 
   return (
     <Card.Root width="full" overflow="hidden">

@@ -36,6 +36,9 @@
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/client/tsconfig.build.json"
+    },
+    {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
@@ -43,9 +46,6 @@
     },
     {
       "path": "../../monitor/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../slack/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../slack/contract/tsconfig.build.json"

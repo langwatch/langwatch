@@ -3,17 +3,13 @@
  * Condition builder tests: verify rendering and editing updates; uses plain inputs
  * (Chakra Select menus unreliable in jsdom).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ConditionBuilder } from "../ui/blocks/condition-builder.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function Harness({
   initial,
@@ -42,9 +38,7 @@ afterEach(cleanup);
 describe("ConditionBuilder", () => {
   describe("given an existing structured query", () => {
     it("renders one row per clause with an AND separator between them", () => {
-      render(<Harness initial="status:error AND cost:>0.1" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<Harness initial="status:error AND cost:>0.1" />);
 
       // The range clause renders a number input carrying its value.
       expect(screen.getByDisplayValue("0.1")).toBeTruthy();
@@ -56,9 +50,7 @@ describe("ConditionBuilder", () => {
   describe("when a value is edited", () => {
     it("emits the updated query string", () => {
       const onChangeSpy = vi.fn();
-      render(<Harness initial="cost:>0.1" onChangeSpy={onChangeSpy} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<Harness initial="cost:>0.1" onChangeSpy={onChangeSpy} />);
 
       fireEvent.change(screen.getByDisplayValue("0.1"), {
         target: { value: "0.5" },
@@ -71,14 +63,14 @@ describe("ConditionBuilder", () => {
   describe("given an empty query", () => {
     /** @scenario "A fresh trace automation starts with one editable condition" */
     it("starts with one empty, editable condition row already there", () => {
-      render(<Harness initial="" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Harness initial="" />);
 
       expect(screen.getByText("Field…")).toBeTruthy();
     });
 
     it("does not emit a query for the seeded, untouched row", () => {
       const onChangeSpy = vi.fn();
-      render(<Harness initial="" onChangeSpy={onChangeSpy} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Harness initial="" onChangeSpy={onChangeSpy} />);
 
       expect(onChangeSpy).not.toHaveBeenCalled();
     });
@@ -86,7 +78,7 @@ describe("ConditionBuilder", () => {
     describe("when a second condition is added", () => {
       it("shows a second field picker joined by AND", async () => {
         const user = userEvent.setup();
-        render(<Harness initial="" />, { wrapper: Wrapper });
+        renderWithDesignSystem(<Harness initial="" />);
 
         await user.click(screen.getByText("Add AND condition"));
 
@@ -98,7 +90,7 @@ describe("ConditionBuilder", () => {
 
   describe("given a custom-attribute condition from the code editor", () => {
     it("renders a key sub-input alongside the attribute field", () => {
-      render(<Harness initial="trace.attribute.user_id:premium" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Harness initial="trace.attribute.user_id:premium" />);
 
       expect(screen.getByDisplayValue("user_id")).toBeTruthy();
       expect(screen.getByDisplayValue("premium")).toBeTruthy();
@@ -108,9 +100,9 @@ describe("ConditionBuilder", () => {
   describe("when the user edits an existing attribute condition's key", () => {
     it("emits the composed field without touching the value", () => {
       const onChangeSpy = vi.fn();
-      render(<Harness initial="trace.attribute.user_id:premium" onChangeSpy={onChangeSpy} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <Harness initial="trace.attribute.user_id:premium" onChangeSpy={onChangeSpy} />,
+      );
 
       fireEvent.change(screen.getByDisplayValue("user_id"), { target: { value: "plan" } });
 
@@ -121,12 +113,11 @@ describe("ConditionBuilder", () => {
   describe("when a completed attribute key cannot round-trip", () => {
     it("reports invalid rows until the key is fixed", () => {
       const onInvalidRowsChange = vi.fn();
-      render(
+      renderWithDesignSystem(
         <Harness
           initial="trace.attribute.user_id:premium"
           onInvalidRowsChange={onInvalidRowsChange}
         />,
-        { wrapper: Wrapper },
       );
       expect(onInvalidRowsChange).toHaveBeenLastCalledWith(false);
 

@@ -1,8 +1,8 @@
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
-import type { FieldMapping } from "@langwatch/prompt-browser-kit";
 import {
   type Component,
   type Field,
+  type FieldMapping,
   fieldSchema,
   type Signature,
 } from "@langwatch/workflow-contract";

@@ -29,7 +29,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("../../scenario-api.ts", () => ({
-  api: {
+  api: {},
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
     scenarios: {
       getSuiteRunData: {
         useInfiniteQuery: (input: unknown, options: unknown) => {
@@ -49,7 +53,7 @@ vi.mock("../../scenario-api.ts", () => ({
     },
   },
 }));
-vi.mock("../../use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1" } }),
 }));
 vi.mock("../use-suite-run-freshness.ts", () => ({

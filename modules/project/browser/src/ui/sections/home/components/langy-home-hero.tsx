@@ -1,9 +1,10 @@
 import { AskChip } from "@langwatch/design-system/ask-chip";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { selectLangySuggestions, useLangyStore } from "@langwatch/langy-browser-kit";
 
+import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { GuidedOnboardingOffer } from "../../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { selectLangySuggestions } from "../../langy/langy-home-suggestions.ts";
 
 import "./homeHeroScroll.css";
 import { ContinueLine } from "./continue-line.tsx";

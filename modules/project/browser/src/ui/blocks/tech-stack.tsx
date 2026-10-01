@@ -5,13 +5,10 @@
  */
 
 import { Box, HStack } from "@langwatch/design-system/primitives";
-import {
-  techStackFrameworkOptions,
-  techStackLanguageOptions,
-} from "@langwatch/onboarding-browser-kit";
 import type { PropsWithChildren } from "react";
 
 import type { ProjectHostProject as Project } from "../../model/project-host.ts";
+import { techStackFrameworkOptions, techStackLanguageOptions } from "./onboarding/tech-stack.tsx";
 
 export const getTechStack = (project: Project) => {
   const languageKey = project.language as keyof typeof techStackLanguageOptions;

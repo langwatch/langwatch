@@ -4,7 +4,7 @@
  * every read here is a one-shot ClickHouse aggregate.
  */
 
-import { URL_QS_PARSE_OPTIONS } from "@langwatch/analytics-browser-kit";
+import { readUiStorage } from "@langwatch/browser-host/storage";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
@@ -14,9 +14,11 @@ import {
   countFilters,
   isFilterQueryKey,
   readFiltersFromQuery,
+  readSavedViewFilters,
   type FilterParam,
 } from "../model/analytics-filter-params.ts";
 import { useAnalyticsHost } from "../model/analytics-host.ts";
+import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
 import type { AnalyticsReadScope } from "./analytics-api.ts";
 import { useAnalyticsPeriod } from "./use-analytics-period.ts";
 
@@ -53,7 +55,13 @@ export function useFilterParams() {
   } = useAnalyticsPeriod();
 
   const queryParams = useMemo(() => parseQuery(query), [query]);
-  const filters = useMemo(() => readFiltersFromQuery(queryParams), [queryParams]);
+  const filters = useMemo(
+    () => ({
+      ...readFiltersFromQuery(queryParams),
+      ...readSavedViewFilters({ queryParams, projectId: project?.id, readStorage: readUiStorage }),
+    }),
+    [queryParams, project?.id],
+  );
 
   /**
    * A keyset cursor describes a position in the PREVIOUS result set; carrying
@@ -157,7 +165,6 @@ export function useFilterParams() {
       enabled: !!project,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
-      trpc: { context: { skipBatch: true } },
     },
   };
 }

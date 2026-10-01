@@ -1,13 +1,13 @@
+import { isHandledByMissingModelHandler } from "@langwatch/browser-host/model-error";
 /**
  * @vitest-environment jsdom
  * The interceptor that turns a failed call's serialised refusal into the toast.
  * Its installation on the shell's failure seam is not proven here.
  * @see specs/model-providers/missing-model-popup.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
-import { isHandledByMissingModelHandler } from "@langwatch/model-provider-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createModelErrorInterceptor } from "../model-error-interceptor.ts";
@@ -36,11 +36,7 @@ function interceptor() {
 describe("the model error interceptor", () => {
   describe("given a failed call that carries MODEL_NOT_CONFIGURED", () => {
     it("opens the toast and marks the failure handled so no generic error toast follows", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <Toaster />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<Toaster />);
       const error = failedCall({
         code: "MODEL_NOT_CONFIGURED",
         featureKey: "traces.ai_search",

@@ -1,17 +1,16 @@
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import {
-  type TurnDivider,
-  statusLineCostLabel,
-  TerminalView,
-} from "@langwatch/coding-agent-browser-kit";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { type TurnDivider } from "../model/trace/terminal-session-scrollback.ts";
+import { statusLineCostLabel, TerminalView } from "../ui/elements/trace/terminal-view.tsx";
 
 /** How tall a laid-out row is, so a test can say what moved in whole rows. */
 const ROW_HEIGHT = 150;
@@ -94,11 +93,7 @@ const entries: TranscriptEntry[] = [
 ];
 
 function renderView(props: Partial<React.ComponentProps<typeof TerminalView>> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TerminalView entries={entries} {...props} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<TerminalView entries={entries} {...props} />);
 }
 
 describe("TerminalView", () => {
@@ -1181,9 +1176,9 @@ type ViewProps = Partial<React.ComponentProps<typeof TerminalView>>;
 
 function renderScrollback(props: ViewProps = {}) {
   const tree = (extra: ViewProps) => (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <TerminalView entries={OPENED_TURN} rowKeys={OPENED_KEYS} {...props} {...extra} />
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
   const view = render(tree({}));
   return {

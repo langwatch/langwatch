@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -55,23 +55,21 @@ function renderSettingsSidebar({
   hasCloudOps?: boolean;
   permissions?: string[];
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          organization: ORGANIZATION,
-          organizations: [ORGANIZATION],
-          pathname,
-          permissions,
-          plan: { isEnterprise, isLoading: false, isLiteMember },
-          opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
-          deployment: { isSaaS, hasCloudOps },
-          commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
-        }}
-      >
-        <SidebarContent surface="settings" showExpanded />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        organization: ORGANIZATION,
+        organizations: [ORGANIZATION],
+        pathname,
+        permissions,
+        plan: { isEnterprise, isLoading: false, isLiteMember },
+        opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
+        deployment: { isSaaS, hasCloudOps },
+        commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
+      }}
+    >
+      <SidebarContent surface="settings" showExpanded />
+    </WithStubNavigationHost>,
   );
 }
 
@@ -91,18 +89,16 @@ function readySettingsShellState(): NavigationShellReadyState {
 }
 
 function renderSettingsTopBar() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <NavigationHostProvider
-        value={StubNavigationHost.create({
-          organization: ORGANIZATION,
-          organizations: [ORGANIZATION],
-          currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
-        })}
-      >
-        <ShellTopBar state={readySettingsShellState()} shouldShowProductCluster />
-      </NavigationHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <NavigationHostProvider
+      value={StubNavigationHost.create({
+        organization: ORGANIZATION,
+        organizations: [ORGANIZATION],
+        currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+      })}
+    >
+      <ShellTopBar state={readySettingsShellState()} shouldShowProductCluster />
+    </NavigationHostProvider>,
   );
 }
 

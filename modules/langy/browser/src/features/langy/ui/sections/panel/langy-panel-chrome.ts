@@ -5,7 +5,7 @@ import {
   LANGY_TRANSITION,
   PANEL_LAYOUT_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
-} from "@langwatch/langy-browser-kit";
+} from "../../../../../model/langy-panel-layout.ts";
 
 /** How much of the viewport the floating card may claim once its conversation has earned it. */
 const FLOATING_MAX_VIEWPORT_DVH = 90;

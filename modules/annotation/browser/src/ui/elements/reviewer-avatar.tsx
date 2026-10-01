@@ -3,7 +3,7 @@
  * Local copy (see platform/app/src/components/RandomColorAvatar.tsx).
  */
 
-import { Avatar } from "@chakra-ui/react";
+import { Avatar } from "@langwatch/design-system/avatar";
 import { type AvatarRootProps } from "@langwatch/design-system/primitives";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { useState } from "react";

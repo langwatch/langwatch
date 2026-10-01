@@ -9,7 +9,6 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { LangyMark, useLangyStore } from "@langwatch/langy-browser-kit";
 import { MeshGradient } from "@paper-design/shaders-react";
 import {
   motion,
@@ -32,7 +31,9 @@ import {
 import type { IconType } from "react-icons";
 import { LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 
+import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
+import { LangyMark } from "../../langy/langy-mark.tsx";
 
 // ---- Timing knobs -------------------------------------------------------
 

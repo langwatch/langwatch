@@ -1,7 +1,6 @@
-import { blankTemplate } from "@langwatch/workflow-browser-kit";
-
 import type { AgentBrowser } from "../model/agent-client.ts";
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
+import { blankTemplate } from "../model/workflow/templates/blank.template.ts";
 import type { CreateWorkflowAgentInput } from "../ui/sections/workflow-selector-drawer.tsx";
 import { agentApi } from "./agent-api.ts";
 

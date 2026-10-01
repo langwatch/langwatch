@@ -88,10 +88,8 @@ export function MigrationsContent() {
   const canManage = scope?.kind === "platform";
 
   const query = api.ops.listSystemMigrations.useQuery(undefined, {
-    refetchInterval: 30_000,
   });
   const enrollmentsQuery = api.ops.listMigrationEnrollments.useQuery(undefined, {
-    refetchInterval: 30_000,
   });
   const utils = api.useUtils();
   const runPass = api.ops.runSystemMigrationPass.useMutation({

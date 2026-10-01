@@ -23,6 +23,7 @@ import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { annotationScoresApi } from "../../behavior/annotation-scores-api.ts";
+import { useScoreSettings } from "../../behavior/use-annotation-score-settings.ts";
 import { AnnotationScoreDataType } from "../../model/annotation-score-data-type.ts";
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
 
@@ -189,12 +190,7 @@ export default function AnnotationScoresScreen() {
   const project = host.project();
   const canManage = !host.isLiteMember();
 
-  const getAllAnnotationScores = annotationScoresApi.annotationScore.getAll.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    { enabled: !!project },
-  );
+  const getAllAnnotationScores = useScoreSettings({ projectId: project?.id });
 
   const toggleAnnotationScore = annotationScoresApi.annotationScore.toggle.useMutation();
 

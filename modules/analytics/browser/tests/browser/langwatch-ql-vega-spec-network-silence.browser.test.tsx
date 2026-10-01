@@ -5,8 +5,8 @@
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
@@ -147,8 +147,7 @@ function recordNetwork(): NetworkRecorder {
   };
 }
 
-const withChakra = (element: ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
+const withChakra = (element: ReactElement) => renderWithDesignSystem(element);
 
 function chartOf(spec: unknown): ReactElement {
   return (

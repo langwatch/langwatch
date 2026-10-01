@@ -3,16 +3,9 @@ import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-con
 
 type SeatChange = ConnectedBillingOverview["seatChanges"][number];
 
-/** How often the Billing section rereads while a seat change is not settled yet. */
-export const UNSETTLED_SEAT_CHANGE_POLL_MS = 5_000;
-
 /** A change billing has not decided yet, or one still waiting for the payment provider. */
 export function isSeatChangeUnsettled(change: SeatChange): boolean {
   return change.state === "awaiting" || change.state === "intent";
-}
-
-export function hasUnsettledSeatChange(overview: ConnectedBillingOverview | undefined): boolean {
-  return overview?.seatChanges.some(isSeatChangeUnsettled) ?? false;
 }
 
 /** The badge one seat change carries, in main's words where main had them. */

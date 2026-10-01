@@ -60,7 +60,7 @@ class CapabilityOpsHost extends OpsHostApi {
     return this.deps.cloudOps;
   }
 
-  /** No capability carries a project's own API key, so the Foundry gate stays closed. */
+  /** No capability lends the active project to this host yet, so the Foundry gate stays closed. */
   project(): OpsProject | undefined {
     return void 0;
   }

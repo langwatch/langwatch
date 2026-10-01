@@ -1,10 +1,10 @@
 import { isInternalHref } from "@langwatch/browser-host/markdown";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Box, Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
-import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "@langwatch/langy-browser-kit";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type { KeyboardEvent, MouseEvent } from "react";
 
+import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "../../../../ui/sections/langy-mark.tsx";
 import { useSpaLinkClick } from "../../behavior/logic/spa-link.ts";
 
 export interface LangyProposal {

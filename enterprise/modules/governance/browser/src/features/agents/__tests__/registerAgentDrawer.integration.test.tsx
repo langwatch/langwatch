@@ -5,8 +5,8 @@
  * `RenderCode` is mocked.
  * @see specs/ai-governance/dashboard/agents-page.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,11 +32,7 @@ vi.mock("@langwatch/browser-host/markdown", () => ({
 import { RegisterAgentDrawer } from "../register-agent-drawer";
 
 function renderDrawer() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <RegisterAgentDrawer />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<RegisterAgentDrawer />);
 }
 
 beforeEach(() => {

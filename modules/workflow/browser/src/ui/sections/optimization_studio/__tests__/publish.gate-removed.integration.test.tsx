@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -109,7 +109,6 @@ vi.mock("../../../../behavior/workflow-api.ts", () => {
     },
   };
 });
-
 vi.mock("../../../../behavior/optimization_studio/use-model-provider-keys.ts", () => ({
   useModelProviderKeys: () => ({
     hasProvidersWithoutCustomKeys: false,
@@ -195,11 +194,7 @@ vi.mock("@langwatch/browser-host/link", () => ({
 const { Publish } = await import("../publish.tsx");
 
 function renderPublish() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <Publish isDisabled={false} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<Publish isDisabled={false} />);
 }
 
 describe("given the studio Publish menu is rendered", () => {

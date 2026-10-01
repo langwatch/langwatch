@@ -78,7 +78,7 @@ export function useAnnotationQueues({
       allQueueItems,
       ...dateRangeInput({ startDate, endDate }),
     },
-    { enabled: !!projectId && enabled, refetchOnWindowFocus: false },
+    { enabled: !!projectId && enabled },
   );
 
   return useMemo(

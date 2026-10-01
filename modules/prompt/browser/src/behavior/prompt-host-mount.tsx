@@ -1,7 +1,6 @@
 /**
  * Prompt's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability. `projectApiKey` reads honestly empty:
- * no key capability exists yet; organization lends `copyTargets`. §10.1.
+ * `@langwatch/browser-host` capability; organization lends `copyTargets`. §10.1.
  */
 
 import {
@@ -14,6 +13,7 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { readerUiStorage } from "@langwatch/browser-host/storage";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
 import { useMemo, type ReactNode } from "react";
 
@@ -37,19 +37,31 @@ const promptBrowserLogger: PromptBrowserLogger = {
   error: (...args: unknown[]) => console.error(...args),
 };
 
-/** Web Storage's own shape, read directly: the mount is the composition side of ADR-004. */
+/** The reader's own storage, so open tabs are theirs alone and sign-out forgets them. */
 const promptTabsCapabilities: PromptTabsCapabilities = {
-  storage: {
-    get length() {
-      return window.localStorage.length;
-    },
-    key: (index) => window.localStorage.key(index),
-    getItem: (key) => window.localStorage.getItem(key),
-    setItem: (key, value) => window.localStorage.setItem(key, value),
-    removeItem: (key) => window.localStorage.removeItem(key),
-  },
+  storage: readerUiStorage,
   logger: promptBrowserLogger,
 };
+
+/** Tabs and their contents were once kept device-wide under these; nothing reads them now. */
+const DEVICE_WIDE_TAB_KEY = /^[^:]+:(tab:.+|draggable-tabs-browser-store)$/;
+let deviceWideTabsSwept = false;
+
+function sweepDeviceWideTabs(): void {
+  if (deviceWideTabsSwept) return;
+  deviceWideTabsSwept = true;
+  try {
+    const keys = Array.from({ length: window.localStorage.length }, (_, i) =>
+      window.localStorage.key(i),
+    );
+    for (const key of keys) {
+      if (key && DEVICE_WIDE_TAB_KEY.test(key)) window.localStorage.removeItem(key);
+    }
+  } catch {
+    // A device that refuses storage kept nothing to sweep.
+    return;
+  }
+}
 
 /** The API always mounts the execution door the Conversation tab posts to. */
 const PLAYGROUND_CHAT_AVAILABILITY: PromptPlaygroundChatAvailability = { available: true };
@@ -142,6 +154,7 @@ class CapabilityPromptHost extends PromptHostApi {
   }
 
   tabCapabilities(): PromptTabsCapabilities {
+    sweepDeviceWideTabs();
     return promptTabsCapabilities;
   }
 
@@ -175,7 +188,6 @@ export default function PromptHostMount({ children }: { children?: ReactNode }) 
       teamId: scopeHost?.team()?.id,
       projectId: projectId ?? undefined,
       projectSlug: scopeHost?.project()?.slug,
-      projectApiKey: undefined,
     }),
     [organizationId, projectId, scopeHost],
   );

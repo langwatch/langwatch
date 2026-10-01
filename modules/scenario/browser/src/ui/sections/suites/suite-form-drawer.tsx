@@ -8,6 +8,7 @@ import {
   describeError,
   showErrorToast,
 } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   Box,
   Button,
@@ -22,22 +23,24 @@ import {
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import {
-  ScenarioPicker,
-  type SuiteFormData,
-  TargetPicker,
-  useSuiteForm,
-} from "@langwatch/suite-browser-kit";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
+import { useAgents } from "../../../behavior/agents/use-agents.ts";
 import { FormServerError } from "../../../behavior/errors.tsx";
+import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project.ts";
 import { api, type SimulationSuite } from "../../../behavior/scenario-api.ts";
+import { useScenarios } from "../../../behavior/scenarios/use-scenarios.ts";
+import { useSuiteForm } from "../../../behavior/suite/use-suite-form.ts";
 import { useSuiteFormDraft } from "../../../behavior/suites/suite-form-draft.ts";
 import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution.ts";
 import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useSuite } from "../../../behavior/suites/use-suite.ts";
+import { useTestSuites } from "../../../behavior/suites/use-test-suites.ts";
+import { type SuiteFormData } from "../../../model/suite/suite-form.types.ts";
+import { ScenarioPicker } from "../../elements/suite/pickers/scenario-picker.tsx";
+import { TargetPicker } from "../../elements/suite/pickers/target-picker.tsx";
 import { PromptTargetMappingSection } from "../../elements/suites/prompt-target-mapping-section.tsx";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
 import { SimulationModelSelect } from "../scenarios/simulation-model-select.tsx";
@@ -82,33 +85,31 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
   const onRunRequested = props.onRunRequested ?? callbacks?.onRunRequested;
 
   // Fetch suite data when editing
-  const { data: suite, isLoading: isSuiteLoading } = api.suites.getById.useQuery(
-    { projectId: project?.id ?? "", id: suiteId ?? "" },
-    { enabled: !!project && !!suiteId && isOpen },
-  );
+  const { data: suite, isLoading: isSuiteLoading } = useSuite({
+    projectId: project?.id,
+    id: suiteId,
+    enabled: isOpen,
+  });
 
   // Fetch available scenarios and targets
-  const { data: scenarios } = api.scenarios.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project && isOpen },
-  );
+  const { data: scenarios } = useScenarios({
+    projectId: project?.id,
+    enabled: isOpen,
+  });
 
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project && isOpen },
-  );
+  const { data: agents } = useAgents({
+    projectId: project?.id,
+    enabled: isOpen,
+  });
 
-  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project && isOpen },
-  );
+  const { data: prompts } = useAllPromptsForProject({ enabled: isOpen });
 
   // A project that uses test suites reads its scenarios under the suite names in
   // the picker. A project with no suite reads the flat list it always did.
-  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project && isOpen },
-  );
+  const { data: testSuites } = useTestSuites({
+    projectId: project?.id,
+    enabled: isOpen,
+  });
 
   const isEditMode = !!suiteId;
   const title = isEditMode ? "Edit Run Plan" : "New Run Plan";

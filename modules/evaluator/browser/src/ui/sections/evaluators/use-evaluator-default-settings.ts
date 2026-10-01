@@ -1,12 +1,12 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser-kit";
 import { useEffect, useEffectEvent } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
-import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
+import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
 
 type SettingsForm = UseFormReturn<{ settings: Record<string, unknown> }>;
 
@@ -40,14 +40,9 @@ export function useEvaluatorDefaultSettings({
   enabled: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
-  const resolvedDefaultModel = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
-  const resolvedDefaultEmbeddings = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "analytics.topic_clustering_embeddings" },
-    { enabled: !!project?.id },
-  );
+  const { resolvedDefaultModel, resolvedDefaultEmbeddings } = useEvaluatorDefaultModels({
+    projectId: project?.id,
+  });
   const availableEvaluators = useAvailableEvaluators();
 
   const fillDefaults = useEffectEvent(() => {

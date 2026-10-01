@@ -3,8 +3,8 @@
  * Spec: specs/navigation/product-sidebars.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -13,16 +13,14 @@ import { SupportMenu } from "../support-menu.tsx";
 
 function renderMenu({ withChat = true }: { withChat?: boolean } = {}) {
   const openSupportChat = vi.fn();
-  const view = render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          supportChat: withChat ? { open: openSupportChat } : null,
-        }}
-      >
-        <SupportMenu />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  const view = renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        supportChat: withChat ? { open: openSupportChat } : null,
+      }}
+    >
+      <SupportMenu />
+    </WithStubNavigationHost>,
   );
   return { ...view, openSupportChat };
 }

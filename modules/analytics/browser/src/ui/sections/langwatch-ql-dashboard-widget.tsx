@@ -4,7 +4,6 @@
  * every dashboard showing it; a too-fine step asks to coarsen, not refuse.
  */
 
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
@@ -14,6 +13,7 @@ import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run.ts";
 import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice.ts";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { usePeriodSelector } from "../elements/period-selector.tsx";
 import { LazyLangWatchQLWidgetChart } from "./lazy-langwatch-ql-widget-chart.tsx";
 import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
 

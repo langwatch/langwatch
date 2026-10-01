@@ -5,7 +5,6 @@
  * Spec: specs/agents/agent-management.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type {
   Agent,
   AgentCopy,
@@ -14,7 +13,8 @@ import type {
   AgentOverview,
   RelatedAgentEntities,
 } from "@langwatch/agent-contract";
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -253,13 +253,11 @@ async function mountScreen(query: Record<string, string | undefined> = {}) {
   const browser = new TestAgentBrowser();
   const host = new TestHost(browser, query);
   const content = () => (
-    <ChakraProvider value={defaultSystem}>
-      <AgentManagementHostProvider value={host}>
-        <AgentManagementScreen />
-      </AgentManagementHostProvider>
-    </ChakraProvider>
+    <AgentManagementHostProvider value={host}>
+      <AgentManagementScreen />
+    </AgentManagementHostProvider>
   );
-  const view = render(content());
+  const view = renderWithDesignSystem(content());
   return { host, browser, rerender: () => view.rerender(content()) };
 }
 

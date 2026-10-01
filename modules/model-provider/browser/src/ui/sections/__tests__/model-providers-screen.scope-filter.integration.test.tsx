@@ -3,13 +3,13 @@
  * Spec: specs/model-providers/scope-filter.feature
  */
 
-import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MODEL_PROVIDER_SCOPE_QUERY_KEY } from "../../../model/model-provider-host.ts";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import type * as actualModule from "../authz/scope-picker/scope-filter.tsx";
 
 const { mockState } = vi.hoisted(() => ({
   mockState: { providers: [] as Record<string, unknown>[] },
@@ -50,9 +50,9 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 // The picker itself is `@langwatch/authz-browser`'s and has its own suite; what
 // this file is about is what the SCREEN does with the value it hands back, so
 // the menu is replaced by two buttons that call `onChange` directly.
-vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof authzBrowserKitModule>(
-    "@langwatch/authz-browser-kit",
+vi.mock("../authz/scope-picker/scope-filter.tsx", async () => {
+  const actual = await vi.importActual<typeof actualModule>(
+    "../authz/scope-picker/scope-filter.tsx",
   );
   return {
     ...actual,

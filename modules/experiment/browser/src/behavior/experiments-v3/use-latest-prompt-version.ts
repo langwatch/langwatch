@@ -1,7 +1,6 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { promptClient } from "@langwatch/prompt-client";
 import { useRef } from "react";
-
-import { experimentApi } from "../experiment-api.ts";
 
 type UseLatestPromptVersionResult = {
   /** The current version number */
@@ -41,7 +40,7 @@ export const useLatestPromptVersion = ({
     data: latestPrompt,
     isLoading,
     isFetching,
-  } = experimentApi.prompts.getByIdOrHandle.useQuery(
+  } = promptClient.prompts.getByIdOrHandle.useQuery(
     {
       idOrHandle: configId ?? "",
       projectId: project?.id ?? "",

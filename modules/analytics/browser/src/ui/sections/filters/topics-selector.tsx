@@ -1,4 +1,3 @@
-import { useFilterParams } from "@langwatch/analytics-browser-kit";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Delayed } from "@langwatch/design-system/delayed";
@@ -19,6 +18,7 @@ import {
   type AnalyticsSubtopicCount,
   type AnalyticsTopicCount,
 } from "../../../behavior/analytics-api.ts";
+import { useFilterParams } from "../../../behavior/use-filter-params.ts";
 import {
   orderByCountThenName,
   readListParam,

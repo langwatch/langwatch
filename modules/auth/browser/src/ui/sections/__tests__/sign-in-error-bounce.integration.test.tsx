@@ -4,7 +4,7 @@
  * never follows a target that is not a connection identifier.
  * @see specs/identity/native-social-at-a-claimed-domain.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -27,11 +27,11 @@ import { SignInErrorScreen } from "../sign-in-error-screen.tsx";
 function renderErrorRoute(query: Record<string, string>) {
   return render(
     <MemoryRouter initialEntries={["/auth/error"]}>
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <WithTestAuthHost route={{ pathname: "/auth/error", query }}>
           <SignInErrorScreen />
         </WithTestAuthHost>
-      </ChakraProvider>
+      </DesignSystemProvider>
     </MemoryRouter>,
   );
 }

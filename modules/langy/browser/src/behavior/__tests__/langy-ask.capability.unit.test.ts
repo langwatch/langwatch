@@ -1,11 +1,11 @@
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { langyAsk } from "../langy-ask.capability.ts";
 /**
  * The ask capability: what another module's question becomes on the panel,
  * proven against the store it writes.
  */
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-import { beforeEach, describe, expect, it } from "vitest";
-
-import { langyAsk } from "../langy-ask.capability.ts";
+import { useLangyStore } from "../langy.store.ts";
 
 const view = {
   kind: "filter" as const,

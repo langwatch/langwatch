@@ -1,8 +1,7 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { datasetClient } from "@langwatch/dataset-client";
 import { useEffect, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
-
-import { datasetApi } from "../dataset-api.ts";
 
 const DEBOUNCE_TIME = 500;
 const MAX_WAIT_TIME = 1000;
@@ -56,7 +55,7 @@ export function useDatasetSlugValidation({ name, datasetId }: UseDatasetSlugVali
   const projectId = project?.id;
 
   // Fetch existing dataset slug from DB if editing
-  const { data: existingDataset } = datasetApi.dataset.getById.useQuery(
+  const { data: existingDataset } = datasetClient.dataset.getById.useQuery(
     {
       projectId: projectId ?? "",
       datasetId: datasetId ?? "",
@@ -69,7 +68,7 @@ export function useDatasetSlugValidation({ name, datasetId }: UseDatasetSlugVali
   const dbSlug = existingDataset?.slug;
 
   // API query for slug validation
-  const validateDatasetName = datasetApi.dataset.validateDatasetName.useQuery(
+  const validateDatasetName = datasetClient.dataset.validateDatasetName.useQuery(
     {
       projectId: projectId ?? "",
       proposedName: name,

@@ -7,9 +7,7 @@ import { formatMoney } from "@langwatch/design-system/format-money";
  * bottom while streaming, click-to-expand cells, error/skipped tinting.
  */
 import { Box, Button, HStack } from "@langwatch/design-system/primitives";
-import { cellPictureUrl } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,6 +19,8 @@ import {
   getEvaluationColumns,
   readKey,
 } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
+import { cellPictureUrl } from "../../../sections/batch-results/presentation.tsx";
+import { StoredObjectImage } from "../../../sections/stored-object/stored-object-image.tsx";
 import { ExpandedTextDialog } from "../../expanded-text-dialog.tsx";
 
 type EvaluationRowData = {

@@ -16,7 +16,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../personal-workspace-api.ts", () => ({
-  personalWorkspaceApi: { organization: { getAll: { useQuery: () => ({ data: [] }) } } },
+  personalWorkspaceApi: { organization: { getScopeGraph: { useQuery: () => ({ data: [] }) } } },
 }));
 
 import {

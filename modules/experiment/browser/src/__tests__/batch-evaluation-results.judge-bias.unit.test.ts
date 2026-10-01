@@ -1,4 +1,3 @@
-import type { BatchResultRow } from "@langwatch/experiment-browser-kit";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +5,7 @@ import {
   computeVerbosityProfile,
   modelFamily,
 } from "../ui/sections/batch-evaluation-results.judge-bias.ts";
+import type { BatchResultRow } from "../ui/sections/batch-evaluation-results.types.ts";
 
 const row = (index: number, outputs: Record<string, string | null>): BatchResultRow => ({
   index,

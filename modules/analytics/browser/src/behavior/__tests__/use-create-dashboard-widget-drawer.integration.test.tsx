@@ -13,7 +13,7 @@ const { periodMock, previewMock } = vi.hoisted(() => ({
   previewMock: vi.fn<(args: { timeWindow?: { start: number; end: number } }) => void>(),
 }));
 
-vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => ({
+vi.mock("../../ui/elements/period-selector.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   usePeriodSelector: () => periodMock(),
 }));

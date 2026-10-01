@@ -1,8 +1,8 @@
 import { Dialog } from "@langwatch/design-system/dialog";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { useState } from "react";
 
 import { useCommandBar } from "../../behavior/command-bar-context.ts";
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import {
   COMMAND_BAR_MAX_WIDTH,
   COMMAND_BAR_TOP_MARGIN,

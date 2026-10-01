@@ -13,9 +13,9 @@ import type { dataRetentionTrpc } from "@langwatch/data-retention-contract";
  */
 type BorrowedProcedures = {
   organization: {
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: {
           id: string;
           name: string;

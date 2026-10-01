@@ -69,7 +69,6 @@ import {
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
 } from "../../../features/ingestion-sources/model/pull-cadence.ts";
-import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
 import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sample-ingestion-sources.ts";
 import { CatalogLayoutControl } from "../../../features/ingestion-sources/toolCatalog/catalog-layout-control.tsx";
 import { InventoryCatalogPane } from "../../../features/ingestion-sources/toolCatalog/inventory-catalog-pane.tsx";
@@ -599,7 +598,10 @@ function useIngestionSourcesPage() {
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && canRead, ...SOURCE_HEALTH_REFRESH },
+    {
+      enabled: !!orgId && canRead,
+      // needs a read hint: ingestion source pulled (health changes only on a pull)
+    },
   );
 
   const panes = useInventoryPanes({ orgId, canManageTools });

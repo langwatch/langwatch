@@ -1,7 +1,7 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type { UIMessage } from "ai";
 import { type RefObject, useEffect } from "react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { toEngineParts } from "../../model/langy-engine-parts.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 

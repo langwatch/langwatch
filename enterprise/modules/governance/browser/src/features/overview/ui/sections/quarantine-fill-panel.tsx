@@ -7,8 +7,6 @@ export function QuarantineFillAlert({ organizationId }: { organizationId: string
     { organizationId },
     {
       enabled: !!organizationId,
-      refetchInterval: 60_000,
-      refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
     },
   );

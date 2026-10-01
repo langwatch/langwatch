@@ -15,10 +15,10 @@ import { GrantInputRow } from "../../sections/group-grant-input-row.tsx";
 
 vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
-    team: {
-      getTeamsWithMembers: {
+    organization: {
+      getScopeGraph: {
         useQuery: () => ({
-          data: [{ id: "team-1", name: "Team One", projects: [] }],
+          data: [{ id: "org-1", teams: [{ id: "team-1", name: "Team One", projects: [] }] }],
           isLoading: false,
         }),
       },

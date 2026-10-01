@@ -147,3 +147,24 @@ describe("given the application mounts a project switcher", () => {
     expect(screen.getByText("the project switcher")).toBeTruthy();
   });
 });
+
+describe("when the reader manages an organization whose storage is configured", () => {
+  /** @scenario The storage secret field is write-only */
+  it("never fills the secret field, and says a stored secret is replaced by typing a new one", () => {
+    renderWithProjectHost(
+      <ProjectSettingsScreen />,
+      new FakeProjectHost({
+        organization: anOrganization({
+          useCustomS3: true,
+          s3Endpoint: "https://s3.example",
+          s3AccessKeyId: "AKIA",
+          s3SecretAccessKey: null,
+        }),
+      }),
+    );
+
+    const secret = screen.getByPlaceholderText("Stored; enter a new value to replace it");
+
+    expect(secret).toHaveProperty("value", "");
+  });
+});

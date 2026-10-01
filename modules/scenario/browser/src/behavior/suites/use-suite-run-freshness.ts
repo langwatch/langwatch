@@ -2,12 +2,10 @@
  * Freshness probe for the run history views.
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient } from "@langwatch/scenario-client";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { getAdaptivePollingInterval } from "@langwatch/suite-browser-kit";
 import { useEffect, useRef } from "react";
-
-import { api } from "../scenario-api.ts";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 interface UseSuiteRunFreshnessOptions {
   /** When provided, scopes the probe to a single scenario set. */
@@ -25,14 +23,12 @@ export function useSuiteRunFreshness({
   scenarioSetId,
   startDateMs,
   endDateMs,
-  runs,
   enabled,
-  sseConnected,
 }: UseSuiteRunFreshnessOptions) {
   const { project } = useOrganizationTeamProject();
-  const utils = api.useUtils();
+  const utils = scenarioClient.useUtils();
 
-  const { data } = api.scenarios.getSuiteRunFreshness.useQuery(
+  const { data } = scenarioClient.scenarios.getSuiteRunFreshness.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId,
@@ -41,8 +37,7 @@ export function useSuiteRunFreshness({
     },
     {
       enabled: !!project && enabled,
-      refetchInterval: sseConnected ? false : getAdaptivePollingInterval({ runs }),
-      trpc: { context: { skipBatch: true } },
+      // needs a read hint: scenario suite run updated (the SSE fallback)
     },
   );
 

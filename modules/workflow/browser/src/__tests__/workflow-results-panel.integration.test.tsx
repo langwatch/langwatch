@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,7 @@ import {
 } from "../ui/elements/workflow-results-panel.tsx";
 
 function Wrapper({ children }: { children: ReactNode }) {
-  return <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>;
+  return <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>;
 }
 
 describe("WorkflowResultsPanel", () => {

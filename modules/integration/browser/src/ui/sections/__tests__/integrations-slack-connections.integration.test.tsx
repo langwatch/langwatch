@@ -6,8 +6,8 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,11 +53,7 @@ vi.mock("../../../behavior/slack-api.ts", () => ({
 }));
 
 function renderCard() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SlackCard />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<SlackCard />);
 }
 
 const connection = (overrides: Record<string, unknown>) => ({

@@ -19,7 +19,7 @@ export default function ProjectSwitcher() {
   const { navigation, route } = useUiCapabilities();
   const { projectId } = useUiScope().activeScope();
   const [isOpen, setIsOpen] = useState(false);
-  const organizations = api.organization.getAll.useQuery({ isDemo: false });
+  const organizations = api.organization.getScopeGraph.useQuery({});
 
   const groups = useMemo(() => projectSwitchGroups(organizations.data ?? []), [organizations.data]);
   const current = groups

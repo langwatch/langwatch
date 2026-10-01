@@ -1,10 +1,3 @@
-import {
-  AgentLabel,
-  EmptySection,
-  Section,
-  MISSING_VALUE,
-  type DetailPayload,
-} from "@langwatch/coding-agent-browser-kit";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Table } from "@langwatch/design-system/primitives";
@@ -12,6 +5,10 @@ import numeral from "numeral";
 import type React from "react";
 
 import { ContributorName } from "./contributor-name.tsx";
+import { type DetailPayload } from "./model/pull-request-detail.ts";
+import { AgentLabel } from "./ui/elements/agent-label.tsx";
+import { MISSING_VALUE } from "./ui/elements/cells/missing-value.tsx";
+import { EmptySection, Section } from "./ui/elements/detail-section.tsx";
 
 /** Who worked on the pull request, and what each of them consumed. */
 export const ContributorsSection: React.FC<{

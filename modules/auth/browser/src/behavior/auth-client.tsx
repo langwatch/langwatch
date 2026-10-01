@@ -2,6 +2,7 @@
 
 import { passkeyClient } from "@better-auth/passkey/client";
 import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
+import { clearReaderUiStorage, clearSessionUiStorage } from "@langwatch/browser-host/storage";
 import { looksLikeSsoConnectionId } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
@@ -385,7 +386,9 @@ export const signOut = async (opts?: {
   // Clear module-level session cache so the next useSession mount
   // doesn't serve stale data after logout.
   _cachedSession = null;
-  // The reads persisted to disk were this user's; the next one never sees them.
+  // The reads and preferences persisted to disk were this user's; the next one never sees them.
+  clearReaderUiStorage();
+  clearSessionUiStorage();
   await clearPersistedUiQueries();
 
   if (opts?.redirect === false) {
@@ -457,8 +460,6 @@ export const SessionProvider = ({
 }: {
   children: ReactNode;
   session?: unknown;
-  /** NextAuth-compat — ignored by BetterAuth's push-based client. */
-  refetchInterval?: number;
   /** NextAuth-compat — ignored by BetterAuth's push-based client. */
   refetchOnWindowFocus?: boolean;
 }): ReactElement => {

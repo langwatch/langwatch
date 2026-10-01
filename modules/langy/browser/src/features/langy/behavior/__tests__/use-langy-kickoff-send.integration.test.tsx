@@ -1,11 +1,11 @@
+import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 /**
  * @vitest-environment jsdom
  * @see specs/langy/langy-guided-onboarding.feature
  */
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyKickoffSend } from "../panel/use-langy-kickoff-send.ts";
 
 const KICKOFF_PART = { type: "guided-onboarding-kickoff", path: "llmops", paths: ["llmops"] };

@@ -76,6 +76,10 @@ export const opsWeb = defineWebModule("ops")
       requires: "ops:view",
       load: () => import("./ui/sections/ops/ops-replay-progress.screen.tsx"),
     },
+    "pages/ops/operators": {
+      requires: "ops:manage",
+      load: () => import("./ui/sections/ops/ops-operators.screen.tsx"),
+    },
     "pages/ops/users": {
       requires: "ops:manage",
       load: async () => ({

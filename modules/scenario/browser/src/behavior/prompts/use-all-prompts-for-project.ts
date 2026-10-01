@@ -1,23 +1,13 @@
-import { api } from "../scenario-api.ts";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { promptClient } from "@langwatch/prompt-client";
 
-/**
- * useAllPromptsForProject
- * Single Responsibility: Fetch all prompts for the current project.
- * @returns Query result containing prompts for the project
- */
-export function useAllPromptsForProject() {
+/** The project's prompts; the one read every scenario surface shares. */
+export function useAllPromptsForProject({ enabled = true }: { enabled?: boolean } = {}) {
   const { projectId = "" } = useOrganizationTeamProject();
-  return api.prompts.getAllPromptsForProject.useQuery(
+  return promptClient.prompts.getAllPromptsForProject.useQuery(
+    { projectId },
     {
-      projectId: projectId,
-    },
-    {
-      enabled: !!projectId,
-      // The prompt catalog is regularly the slowest query on a screen, and
-      // in a batched request every sibling call waits for the slowest
-      // member. This one travels alone so it cannot hold anything else up.
-      trpc: { context: { skipBatch: true } },
+      enabled: !!projectId && enabled,
     },
   );
 }

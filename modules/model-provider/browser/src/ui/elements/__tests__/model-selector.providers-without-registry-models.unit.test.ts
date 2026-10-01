@@ -1,4 +1,4 @@
-import { providersWithoutRegistryModels } from "@langwatch/model-provider-browser-kit";
+import { providersWithoutRegistryModels } from "@langwatch/model-provider-contract";
 /**
  * The Agent Platform door serves chat but not embeddings (verified live:
  * `:batchEmbedContents` 404s on aiplatform.googleapis.com), so embedding

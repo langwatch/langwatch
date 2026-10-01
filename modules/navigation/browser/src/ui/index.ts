@@ -19,7 +19,6 @@ export { SideMenuDensityProvider, useSideMenuDensity } from "./elements/side-men
 export { ProductSwitcherMenu } from "./sections/product-switcher-menu.tsx";
 export { ProjectSwitcherCombobox } from "./blocks/project-switcher-combobox.tsx";
 export { ProjectAvatar } from "./elements/project-avatar.tsx";
-export { LogoIcon } from "./elements/logo-icon.tsx";
 export {
   resolvePickOutcome,
   useProjectPickItems,

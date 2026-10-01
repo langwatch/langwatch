@@ -1,8 +1,8 @@
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { useMemo } from "react";
 
-import { api } from "../../../behavior/scenario-api.ts";
 import type { VoiceSessionClient, VoiceSessionFailure } from "../model/voice-call.ts";
 
 /** A refusal read by its handled code, worded from the presentation registry. */
@@ -17,8 +17,8 @@ export function describeVoiceSessionFailure(error: unknown): VoiceSessionFailure
 
 /** The voice-session doors over scenario's own tRPC procedures. */
 export function useVoiceSessionClient(): VoiceSessionClient {
-  const mint = api.scenarios.mintVoiceSession.useMutation();
-  const finish = api.scenarios.finishVoiceSession.useMutation();
+  const mint = scenarioClient.scenarios.mintVoiceSession.useMutation();
+  const finish = scenarioClient.scenarios.finishVoiceSession.useMutation();
   const mintAsync = mint.mutateAsync;
   const finishAsync = finish.mutateAsync;
   return useMemo(

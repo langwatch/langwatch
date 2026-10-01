@@ -1,4 +1,4 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 
 /** Puts the cursor in the panel's composer, once the panel is open. */
 export function focusPanelComposer(): void {

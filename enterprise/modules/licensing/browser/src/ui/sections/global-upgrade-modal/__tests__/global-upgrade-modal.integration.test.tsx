@@ -1,20 +1,16 @@
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 /**
  * @vitest-environment jsdom
  * @see specs/licensing/proration-preview.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { GlobalUpgradeModal } from "../global-upgrade-modal.tsx";
 
 const renderGate = (isSaaS: boolean) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <GlobalUpgradeModal isSaaS={isSaaS} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<GlobalUpgradeModal isSaaS={isSaaS} />);
 
 describe("<GlobalUpgradeModal/>", () => {
   afterEach(() => {

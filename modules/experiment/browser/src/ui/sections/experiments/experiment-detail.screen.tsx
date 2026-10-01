@@ -3,7 +3,6 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Alert, Box } from "@langwatch/design-system/primitives";
-import { HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 
 import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useLegacyBatchEvaluations } from "../../../behavior/experiments/use-legacy-batch-evaluations.ts";
@@ -12,6 +11,7 @@ import BatchEvaluation from "../../../ui/elements/experiments/batch-evaluation.t
 // BatchEvaluationV2 kept for reference but no longer used.
 import { DSPyExperiment } from "../../../ui/elements/experiments/ds-py-experiment.tsx";
 import { BatchEvaluationResults } from "../../../ui/sections/batch-evaluation-results/index.ts";
+import { HandledErrorAlert } from "../../elements/workflow/studio-host/errors.tsx";
 
 export default function ExperimentPage() {
   const router = useRouter();

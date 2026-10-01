@@ -1,6 +1,6 @@
 /** Test host and harness for public annotation surfaces. */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -115,9 +115,9 @@ export function AnnotationTestHarness({
   children: ReactNode;
 }) {
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <AnnotationHostProvider value={host}>{children}</AnnotationHostProvider>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

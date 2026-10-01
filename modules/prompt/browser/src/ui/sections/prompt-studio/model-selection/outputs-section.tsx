@@ -11,19 +11,24 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "@langwatch/prompt-browser-kit";
 import {
   outputsSchema,
   generateUniqueIdentifier,
   normalizeIdentifier,
 } from "@langwatch/prompt-contract";
-import { WorkflowCodeEditor } from "@langwatch/workflow-browser-kit";
 import type { Field } from "@langwatch/workflow-contract";
 import Ajv from "ajv";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LuBraces } from "react-icons/lu";
 import { fromZodError } from "zod-validation-error";
+
+import { WorkflowCodeEditor } from "../../../elements/workflow/code/workflow-code-editor.tsx";
+import { FieldTypeSelect } from "../../variables/variable-type/field-type-select.tsx";
+import {
+  TYPE_LABELS,
+  VariableTypeIcon,
+} from "../../variables/variable-type/variable-type-icon.tsx";
 
 // ============================================================================
 // Types

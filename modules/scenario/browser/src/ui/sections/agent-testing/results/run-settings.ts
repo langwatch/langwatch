@@ -5,7 +5,8 @@
  */
 
 import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
-import { targetKeyOfRun } from "@langwatch/suite-browser-kit";
+
+import { targetKeyOfRun } from "../../../../model/suite/run-history-transforms.ts";
 
 /** One resolved run parameter, as the block prints it. */
 export type RunSettingParameter = {

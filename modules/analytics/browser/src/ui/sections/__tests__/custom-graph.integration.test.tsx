@@ -6,6 +6,7 @@
  * user; a failed read must render retry, not an empty "no traffic" plot.
  */
 
+import { Temporal, type Instant } from "@langwatch/time";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -13,6 +14,15 @@ const timeseries = vi.hoisted(() => ({
   data: undefined as unknown,
   error: null as unknown,
   isLoading: false,
+}));
+
+const freshness = vi.hoisted((): { asOf: Instant | null; confirmed: boolean } => ({
+  asOf: null,
+  confirmed: true,
+}));
+
+vi.mock("@langwatch/browser-host/read-freshness", () => ({
+  useReadFreshness: () => freshness,
 }));
 
 vi.mock("../../../behavior/analytics-api.ts", () => ({
@@ -65,6 +75,8 @@ afterEach(() => {
   timeseries.data = undefined;
   timeseries.error = null;
   timeseries.isLoading = false;
+  freshness.asOf = null;
+  freshness.confirmed = true;
 });
 
 /** A grouped leaderboard, which is where the unknown bucket shows up. */
@@ -177,6 +189,66 @@ describe("the analytics chart", () => {
         expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
         // The wire message is the code slug; it must never reach the reader.
         expect(screen.queryByText("query_timeout")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a chart restored from the browser's saved copy", () => {
+    const restoredAt1042 = () =>
+      Temporal.Now.zonedDateTimeISO().with({ hour: 10, minute: 42, second: 0 }).toInstant();
+
+    function restoredChart() {
+      timeseries.data = bucketed();
+      freshness.asOf = restoredAt1042();
+      freshness.confirmed = false;
+      return renderGraph(leaderboard);
+    }
+
+    /** The note sits beside the chart's own wrapper, which carries the dimming. */
+    function dimmedOpacity() {
+      const wrapper = screen.getByRole("status").parentElement?.firstElementChild;
+      if (!wrapper) throw new Error("the chart has no wrapper");
+      return Number(getComputedStyle(wrapper).opacity);
+    }
+
+    describe("when the network has not yet confirmed it", () => {
+      /** @scenario "A chart restored from the browser's saved copy is dimmed and says when it is from" */
+      it("dims the chart and says when it is from", () => {
+        const { container } = restoredChart();
+
+        expect(dimmedOpacity()).toBeLessThan(1);
+        expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+        expect(screen.getByText("Showing data from 10:42 · updating")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the network confirms it", () => {
+      /** @scenario "A restored chart returns to full strength when the network answers" */
+      it("shows the chart at full strength with no note", () => {
+        const { container, rerender } = restoredChart();
+
+        // The chart is memoised on its input, so a changed height is what makes it read again.
+        freshness.confirmed = true;
+        rerender(
+          <AnalyticsTestHarness host={new StubAnalyticsHost()}>
+            <CustomGraph input={{ ...leaderboard, height: 301 }} />
+          </AnalyticsTestHarness>,
+        );
+
+        expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+        expect(screen.queryByText(/Showing data from/)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the refresh fails", () => {
+      /** @scenario "A restored chart whose refresh failed says it could not refresh" */
+      it("keeps the chart dimmed and says it could not refresh", () => {
+        timeseries.error = { message: "network" };
+
+        restoredChart();
+
+        expect(dimmedOpacity()).toBeLessThan(1);
+        expect(screen.getByText("From 10:42 · couldn't refresh")).toBeInTheDocument();
       });
     });
   });

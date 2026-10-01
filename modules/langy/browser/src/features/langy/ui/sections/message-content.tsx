@@ -1,6 +1,5 @@
 import { Markdown } from "@langwatch/browser-host/markdown";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type {
   LangyChoiceSelection,
   LangyChoicesLockState,
@@ -12,14 +11,10 @@ import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
 } from "@langwatch/langy-contract";
-import {
-  type GuidedPullRequest,
-  guidedKickoffPartOf,
-  guidedPathCompletedIn,
-} from "@langwatch/onboarding-browser-kit";
 import type { UIMessage } from "ai";
 import { memo, useMemo } from "react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   hasLangyBlockParts,
@@ -65,6 +60,11 @@ import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.t
 import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
 import { LangySecretSnippetCard } from "../../../../ui/sections/derived-cards/langy-secret-snippet-card.tsx";
+import {
+  type GuidedPullRequest,
+  guidedPathCompletedIn,
+} from "../../../guided-onboarding/model/guided-conversation.ts";
+import { guidedKickoffPartOf } from "../../../guided-onboarding/model/kickoff.ts";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { LangyGuidedPrCard } from "../elements/github/langy-guided-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";

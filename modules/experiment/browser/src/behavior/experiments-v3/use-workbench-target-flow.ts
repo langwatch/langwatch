@@ -7,8 +7,9 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -62,7 +63,7 @@ const recordPendingMapping =
 export const useWorkbenchTargetSelection = () => {
   const { openDrawer, closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = experimentApi.useUtils();
+  const trpcUtils = evaluatorClient.useUtils();
   const { addTarget, removeTarget, updateTarget, setTargetMapping, removeTargetMapping } =
     useEvaluationsV3Store(
       useShallow((state) => ({

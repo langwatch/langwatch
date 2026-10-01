@@ -1,5 +1,4 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { RowHeightMode } from "@langwatch/dataset-browser-kit";
 import { Popover } from "@langwatch/design-system/popover";
 /**
  * TableSettingsMenu - "Run Options" popover menu for the workbench toolbar.
@@ -20,6 +19,7 @@ import React, { useState } from "react";
 import { LuGauge } from "react-icons/lu";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import type { RowHeightMode } from "../../../model/dataset/dataset-table-context.tsx";
 import { DEFAULT_CONCURRENCY } from "../../../model/experiments-v3/types.ts";
 import { RunViaApiDialogContainer } from "./run-via-api-button.tsx";
 

@@ -3,13 +3,14 @@
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, Verdict, type ScenarioRunData } from "@langwatch/scenario-contract";
 import { getSuiteSetId, targetKeyOf } from "@langwatch/suite-contract";
 import { Temporal } from "@langwatch/time";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
+import { useMemo, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
@@ -23,6 +24,24 @@ import { RunPlanDetail } from "../run-plan-detail.tsx";
 import { PROJECT_DEFAULT_MODEL } from "../run-settings-block.tsx";
 
 const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
+
+/** A single-page result in the infinite-query shape; one per source, so identity holds. */
+const toInfinite = vi.hoisted(() => {
+  const cache = new WeakMap<object, unknown>();
+  return (result: { data: unknown }) => {
+    if (typeof result !== "object" || !result || "fetchNextPage" in result) return result;
+    if (!cache.has(result)) {
+      cache.set(result, {
+        ...result,
+        data: { pages: [result.data] },
+        hasNextPage: false,
+        fetchNextPage: vi.fn(),
+        isFetchingNextPage: false,
+      });
+    }
+    return cache.get(result);
+  };
+});
 const mockGetBatchRunCount = vi.hoisted(() => vi.fn());
 const mockFreshnessQuery = vi.hoisted(() => vi.fn());
 const mockCancelJob = vi.hoisted(() => vi.fn());
@@ -70,39 +89,7 @@ const mockGetAgents = vi.hoisted(() =>
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    // The run dialog reads the saved evaluators for the ones a run carries.
-    evaluators: {
-      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
-    },
-    useUtils: () => ({
-      scenarios: {
-        getSuiteRunData: { invalidate: vi.fn() },
-        getScenarioSetBatchHistory: { invalidate: vi.fn() },
-        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
-      },
-    }),
-    scenarios: {
-      getAll: { useQuery: vi.fn(() => ({ data: [], isLoading: false })) },
-      run: {
-        useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
-      },
-      getSuiteRunData: { useQuery: mockGetSuiteRunData },
-      getRunConfigurations: { useQuery: vi.fn(() => ({ data: [] })) },
-      getSuiteRunFreshness: { useQuery: mockFreshnessQuery },
-      getScenarioSetBatchRunCount: { useQuery: mockGetBatchRunCount },
-      cancelJob: {
-        useMutation: vi.fn(() => ({
-          mutate: mockCancelJob,
-          isPending: false,
-        })),
-      },
-      cancelBatchRun: {
-        useMutation: vi.fn(() => ({
-          mutate: mockCancelBatchRun,
-          isPending: false,
-        })),
-      },
-    },
+    useUtils: () => ({}),
     agents: { getAll: { useQuery: mockGetAgents } },
     suites: {
       getAll: { useQuery: () => ({ data: [] }) },
@@ -121,9 +108,6 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
       },
     },
-    prompts: {
-      getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
-    },
     modelProvider: {
       getAllForProjectForFrontend: {
         useQuery: vi.fn(() => ({ data: [], isLoading: false })),
@@ -140,12 +124,65 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
     },
   },
 }));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({}),
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: {
+      getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
+      },
+    }),
+    scenarios: {
+      getAll: { useQuery: vi.fn(() => ({ data: [], isLoading: false })) },
+      run: {
+        useMutation: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+      },
+      getSuiteRunData: {
+        useInfiniteQuery: (input: unknown) => toInfinite(mockGetSuiteRunData(input)),
+      },
+      getRunConfigurations: { useQuery: vi.fn(() => ({ data: [] })) },
+      getSuiteRunFreshness: { useQuery: mockFreshnessQuery },
+      getScenarioSetBatchRunCount: { useQuery: mockGetBatchRunCount },
+      cancelJob: {
+        useMutation: vi.fn(() => ({
+          mutate: mockCancelJob,
+          isPending: false,
+        })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({
+          mutate: mockCancelBatchRun,
+          isPending: false,
+        })),
+      },
+    },
+  },
+}));
 
 vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -193,10 +230,6 @@ vi.mock("../../../../../behavior/lent-model-provider.tsx", () => ({
     </span>
   ),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const NOW = 1_700_000_000_000;
 const SUITE_SET_ID = getSuiteSetId("suite_1");
@@ -291,7 +324,7 @@ function renderDetail(overrides: Partial<React.ComponentProps<typeof RunPlanDeta
     isSseConnected: true,
     ...overrides,
   };
-  const view = render(<RunPlanDetail {...props} />, { wrapper: Wrapper });
+  const view = renderWithDesignSystem(<RunPlanDetail {...props} />);
   return { props, view };
 }
 
@@ -399,37 +432,41 @@ describe("<RunPlanDetail/>", () => {
   it("offers a control that adds the older runs below", async () => {
     const user = userEvent.setup();
     const firstPage = {
-      data: {
-        runs: threeBatches(),
-        scenarioSetIds: {},
-        hasMore: true,
-        nextCursor: "cursor_2",
-        changed: true,
-      },
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
+      runs: threeBatches(),
+      scenarioSetIds: {},
+      hasMore: true,
+      nextCursor: "cursor_2",
+      changed: true,
     };
     const secondPage = {
-      data: {
-        runs: [
-          makeRun({
-            batchRunId: "batch_0",
-            scenarioRunId: "run_0",
-            timestamp: NOW - 5 * 86_400_000,
-          }),
-        ],
-        scenarioSetIds: {},
-        hasMore: false,
-        changed: true,
-      },
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
+      runs: [
+        makeRun({
+          batchRunId: "batch_0",
+          scenarioRunId: "run_0",
+          timestamp: NOW - 5 * 86_400_000,
+        }),
+      ],
+      scenarioSetIds: {},
+      hasMore: false,
+      changed: true,
     };
-    mockGetSuiteRunData.mockImplementation((input: { cursor?: string }) =>
-      input.cursor ? secondPage : firstPage,
-    );
+    const refetch = vi.fn();
+    mockGetSuiteRunData.mockImplementation(() => {
+      const [loaded, setLoaded] = useState(1);
+      const data = useMemo(
+        () => ({ pages: loaded > 1 ? [firstPage, secondPage] : [firstPage] }),
+        [loaded],
+      );
+      return {
+        data,
+        isLoading: false,
+        error: null,
+        refetch,
+        hasNextPage: loaded === 1,
+        fetchNextPage: () => setLoaded(2),
+        isFetchingNextPage: false,
+      };
+    });
 
     renderDetail();
 
@@ -479,20 +516,18 @@ describe("<RunPlanDetail/>", () => {
 
     setRuns([makeRun({ scenarioRunId: "run_live" })]);
     view.rerender(
-      <Wrapper>
-        <RunPlanDetail
-          plan={suitePlan}
-          batchRunId={null}
-          onSelectRun={vi.fn()}
-          onBack={vi.fn()}
-          onEditPlan={vi.fn()}
-          period={period}
-          periodMode="relative"
-          setPeriod={vi.fn()}
-          setRelativePeriod={vi.fn()}
-          isSseConnected
-        />
-      </Wrapper>,
+      <RunPlanDetail
+        plan={suitePlan}
+        batchRunId={null}
+        onSelectRun={vi.fn()}
+        onBack={vi.fn()}
+        onEditPlan={vi.fn()}
+        period={period}
+        periodMode="relative"
+        setPeriod={vi.fn()}
+        setRelativePeriod={vi.fn()}
+        isSseConnected
+      />,
     );
 
     expect(
@@ -770,20 +805,18 @@ describe("<RunPlanDetail/>", () => {
       }),
     ]);
     view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <RunPlanDetail
-          plan={suitePlan}
-          batchRunId={null}
-          onSelectRun={vi.fn()}
-          onBack={vi.fn()}
-          onEditPlan={vi.fn()}
-          period={period}
-          periodMode="relative"
-          setPeriod={vi.fn()}
-          setRelativePeriod={vi.fn()}
-          isSseConnected
-        />
-      </ChakraProvider>,
+      <RunPlanDetail
+        plan={suitePlan}
+        batchRunId={null}
+        onSelectRun={vi.fn()}
+        onBack={vi.fn()}
+        onEditPlan={vi.fn()}
+        period={period}
+        periodMode="relative"
+        setPeriod={vi.fn()}
+        setRelativePeriod={vi.fn()}
+        isSseConnected
+      />,
     );
 
     expect(screen.getByText("Passed (1/1)")).toBeInTheDocument();
@@ -830,20 +863,18 @@ describe("<RunPlanDetail/>", () => {
       }),
     ]);
     view.rerender(
-      <Wrapper>
-        <RunPlanDetail
-          plan={suitePlan}
-          batchRunId={null}
-          onSelectRun={vi.fn()}
-          onBack={vi.fn()}
-          onEditPlan={vi.fn()}
-          period={period}
-          periodMode="relative"
-          setPeriod={vi.fn()}
-          setRelativePeriod={vi.fn()}
-          isSseConnected
-        />
-      </Wrapper>,
+      <RunPlanDetail
+        plan={suitePlan}
+        batchRunId={null}
+        onSelectRun={vi.fn()}
+        onBack={vi.fn()}
+        onEditPlan={vi.fn()}
+        period={period}
+        periodMode="relative"
+        setPeriod={vi.fn()}
+        setRelativePeriod={vi.fn()}
+        isSseConnected
+      />,
     );
 
     const table = screen.getByTestId("run-results-table");
@@ -859,14 +890,11 @@ describe("<RunPlanDetail/>", () => {
     ).toHaveTextContent("0%");
   });
 
-  /** @scenario "When the live connection drops the results still update" */
-  it("keeps refreshing on the fallback cadence when the live stream is down", () => {
+  /** @scenario "When the live connection drops the results set no timer" */
+  it("sets no timer when the live stream is down; a read hint drives the freshness probe", () => {
     renderDetail({ isSseConnected: false });
 
-    const options = mockFreshnessQuery.mock.calls.at(-1)?.[1] as {
-      refetchInterval: number | false;
-    };
-    expect(typeof options.refetchInterval).toBe("number");
+    expect(mockFreshnessQuery.mock.calls.at(-1)?.[1]).not.toHaveProperty("refetchInterval");
     expect(screen.queryByText(/reload/i)).not.toBeInTheDocument();
   });
 
@@ -1230,7 +1258,7 @@ describe("<RunPlanDetail/>", () => {
     expect(started).not.toHaveTextContent("You");
     expect(started).not.toHaveTextContent("user_omar");
     expect(mockGetOrganizationMembers).toHaveBeenCalledWith(
-      { organizationId: "org_1" },
+      { organizationId: "org_1", includeDeactivated: false },
       expect.objectContaining({ enabled: true }),
     );
   });
@@ -1852,7 +1880,7 @@ describe("<RunsSidebarEntry/>", () => {
 
   /** @scenario "The runs sidebar reads a pass rate on the same scale as the tables" */
   it("reads a pass rate on the colour scale the whole surface shares", () => {
-    render(
+    renderWithDesignSystem(
       <>
         <RunsSidebarEntry
           title="Run #2"
@@ -1873,7 +1901,6 @@ describe("<RunsSidebarEntry/>", () => {
           testId="entry-60"
         />
       </>,
-      { wrapper: Wrapper },
     );
 
     const colorOf = (element: Element) => window.getComputedStyle(element).color;

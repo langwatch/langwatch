@@ -1,17 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { TerminalOutput } from "@langwatch/coding-agent-browser-kit";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-afterEach(cleanup);
+import { TerminalOutput } from "../ui/elements/trace/terminal-output.tsx";
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+afterEach(cleanup);
 
 // A real `git status` fragment: "main" is green, the modified line is red.
 const GIT_STATUS = "On branch \x1b[32mmain\x1b[0m\n\x1b[31m\tmodified:   file.ts\x1b[0m";
@@ -19,9 +16,7 @@ const GIT_STATUS = "On branch \x1b[32mmain\x1b[0m\n\x1b[31m\tmodified:   file.ts
 describe("TerminalOutput", () => {
   describe("given output containing ANSI escape codes", () => {
     it("renders the clean text without any escape codes leaking through", () => {
-      const { container } = render(<TerminalOutput text={GIT_STATUS} />, {
-        wrapper,
-      });
+      const { container } = renderWithDesignSystem(<TerminalOutput text={GIT_STATUS} />);
       // Escape bytes and SGR fragments must not reach the DOM text.
       expect(container.textContent).not.toContain("\x1b");
       expect(container.textContent).not.toContain("[32m");
@@ -30,7 +25,7 @@ describe("TerminalOutput", () => {
     });
 
     it("wraps a coloured run in its own styled span", () => {
-      render(<TerminalOutput text={GIT_STATUS} />, { wrapper });
+      renderWithDesignSystem(<TerminalOutput text={GIT_STATUS} />);
       // "main" was green, so it renders as its own <span> (coloured runs get a
       // wrapper; plain runs stay bare text nodes).
       const greenRun = screen.getByText("main");
@@ -40,9 +35,9 @@ describe("TerminalOutput", () => {
 
   describe("given a plain (non-ANSI) tool output", () => {
     it("renders it verbatim as monospace text, with no box chrome around it", () => {
-      const { container } = render(<TerminalOutput text={"just plain lines\nsecond line"} />, {
-        wrapper,
-      });
+      const { container } = renderWithDesignSystem(
+        <TerminalOutput text={"just plain lines\nsecond line"} />,
+      );
       expect(container.textContent).toContain("just plain lines");
       expect(container.textContent).toContain("second line");
       // No card — the header bar / copy button this used to render.
@@ -52,7 +47,7 @@ describe("TerminalOutput", () => {
 
   describe("given output short enough to fit on screen", () => {
     it("shows it all, with no fold marker", () => {
-      render(<TerminalOutput text={"line 1\nline 2\nline 3"} />, { wrapper });
+      renderWithDesignSystem(<TerminalOutput text={"line 1\nline 2\nline 3"} />);
       expect(screen.queryByText(/click to expand/)).toBeNull();
     });
   });
@@ -61,18 +56,14 @@ describe("TerminalOutput", () => {
     const LONG_OUTPUT = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join("\n");
 
     it("shows only the first few lines and a fold marker naming how many are hidden", () => {
-      const { container } = render(<TerminalOutput text={LONG_OUTPUT} />, {
-        wrapper,
-      });
+      const { container } = renderWithDesignSystem(<TerminalOutput text={LONG_OUTPUT} />);
       expect(container.textContent).toContain("line 1");
       expect(container.textContent).not.toContain("line 20");
       expect(screen.getByText(/… \+14 lines \(click to expand\)/)).toBeInTheDocument();
     });
 
     it("shows the rest when the fold marker is clicked", () => {
-      const { container } = render(<TerminalOutput text={LONG_OUTPUT} />, {
-        wrapper,
-      });
+      const { container } = renderWithDesignSystem(<TerminalOutput text={LONG_OUTPUT} />);
       fireEvent.click(screen.getByText(/click to expand/));
       expect(container.textContent).toContain("line 20");
       expect(screen.getByText("▲ show less")).toBeInTheDocument();
@@ -85,7 +76,7 @@ describe("TerminalOutput", () => {
     const BLOB = `{"data":"${"x".repeat(50_000)}"}`;
 
     it("collapses it by size with a fold marker naming the hidden volume", () => {
-      const { container } = render(<TerminalOutput text={BLOB} />, { wrapper });
+      const { container } = renderWithDesignSystem(<TerminalOutput text={BLOB} />);
       expect(container.textContent!.length).toBeLessThan(11_000);
       expect(screen.getByText(/… \+40k chars \(click to expand\)/)).toBeInTheDocument();
     });
@@ -96,14 +87,14 @@ describe("TerminalOutput", () => {
         value: { writeText },
         configurable: true,
       });
-      const { container } = render(<TerminalOutput text={BLOB} />, { wrapper });
+      const { container } = renderWithDesignSystem(<TerminalOutput text={BLOB} />);
       fireEvent.click(container.firstChild as Element);
       expect(writeText).toHaveBeenCalledWith(BLOB);
     });
 
     it("caps what expanding renders and says the copy is still complete", () => {
       const huge = "y".repeat(600_000);
-      const { container } = render(<TerminalOutput text={huge} />, { wrapper });
+      const { container } = renderWithDesignSystem(<TerminalOutput text={huge} />);
       fireEvent.click(screen.getByText(/click to expand/));
       expect(container.textContent!.length).toBeLessThan(510_000);
       expect(
@@ -124,9 +115,7 @@ describe("TerminalOutput", () => {
     });
 
     it("copies the de-ANSI'd text, not the escape codes", () => {
-      const { container } = render(<TerminalOutput text={GIT_STATUS} />, {
-        wrapper,
-      });
+      const { container } = renderWithDesignSystem(<TerminalOutput text={GIT_STATUS} />);
       fireEvent.click(container.firstChild as Element);
       expect(writeText).toHaveBeenCalledWith("On branch main\n\tmodified:   file.ts");
     });
@@ -134,9 +123,9 @@ describe("TerminalOutput", () => {
 
   describe("given an error stream", () => {
     it("still renders the output text", () => {
-      const { container } = render(<TerminalOutput text={"npm ERR! boom"} isError />, {
-        wrapper,
-      });
+      const { container } = renderWithDesignSystem(
+        <TerminalOutput text={"npm ERR! boom"} isError />,
+      );
       expect(container.textContent).toContain("npm ERR! boom");
     });
   });

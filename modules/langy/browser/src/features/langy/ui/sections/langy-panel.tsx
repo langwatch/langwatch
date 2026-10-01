@@ -14,26 +14,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import {
-  mergeContextChips,
-  removeContextChip,
-  attachedContextToChip,
-  type LangyPanelEffect,
-  type LangyPanelMode,
-  useLangyStore,
-  useReducedMotion,
-  LANGY_DODGE_STAGGER_MS,
-  LangyMark,
-  LangyMarkGradientDefs,
-  type LangyUiActionHandlers,
-} from "@langwatch/langy-browser-kit";
-import {
-  guidedKickoffPartOf,
-  guidedPathInProgress,
-  guidedPullRequestFromMessages,
-  isGuidedConversation,
-} from "@langwatch/onboarding-browser-kit";
 import {
   AppWindow,
   Braces,
@@ -52,6 +34,14 @@ import {
 } from "lucide-react";
 import { Profiler, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { mergeContextChips } from "../../../../behavior/langy-context-chips.ts";
+import { removeContextChip } from "../../../../behavior/langy-context-target.store.ts";
+import {
+  attachedContextToChip,
+  type LangyPanelEffect,
+  type LangyPanelMode,
+  useLangyStore,
+} from "../../../../behavior/langy.store.ts";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
 import { useLangyContextDropZone } from "../../../../behavior/use-langy-context-drop-zone.ts";
@@ -61,7 +51,16 @@ import { useLangyTurnSignals } from "../../../../behavior/use-langy-turn-signals
 import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.ts";
+import { LANGY_DODGE_STAGGER_MS } from "../../../../model/langy-panel-layout.ts";
+import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
+import { LangyMark, LangyMarkGradientDefs } from "../../../../ui/sections/langy-mark.tsx";
+import {
+  guidedPathInProgress,
+  guidedPullRequestFromMessages,
+  isGuidedConversation,
+} from "../../../guided-onboarding/model/guided-conversation.ts";
+import { guidedKickoffPartOf } from "../../../guided-onboarding/model/kickoff.ts";
 import { useLangyConversationList } from "../../behavior/data/use-langy-conversation-list.ts";
 import { useLangyMessages } from "../../behavior/data/use-langy-messages.ts";
 import {

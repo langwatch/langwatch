@@ -21,7 +21,6 @@ import {
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
-import { type NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import { toEpochMs } from "@langwatch/time";
 import { useMemo, useState } from "react";
 import { Calendar, Edit2, Eye, Filter, MoreVertical, Plus, Trash, Zap } from "react-feather";
@@ -29,7 +28,12 @@ import { Calendar, Edit2, Eye, Filter, MoreVertical, Plus, Trash, Zap } from "re
 import { api, type RouterOutputs } from "../../behavior/automation-api.ts";
 import { useAutomationToaster, useShowErrorToast } from "../../behavior/automation-feedback.ts";
 import { useOrganizationTeamProject } from "../../behavior/automation-session.ts";
-import { slackApi } from "../../behavior/slack-api.ts";
+import {
+  useAutomationOverviewReads,
+  useProjectDatasets,
+  useProjectGraphs,
+  useSlackConnections,
+} from "../../behavior/use-automation-reads.ts";
 import {
   type ConditionSource,
   presetLabels,
@@ -61,6 +65,7 @@ import {
 import { AutomationUseCaseStrip } from "../../features/overview/ui/elements/automation-use-case-strip.tsx";
 import { useAutomationHost } from "../../model/automation-host.ts";
 import { formatTimeAgo } from "../../model/relative-time.ts";
+import { type NamedSlackConnection } from "../../model/slack/slack-connection-name.ts";
 import { ClampedText } from "../elements/clamped-text.tsx";
 import { AutomationsLayout, type AutomationSection } from "./automations-layout.tsx";
 
@@ -281,37 +286,19 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
   const [pendingDelete, setPendingDelete] = useState<EnhancedTrigger | undefined>(undefined);
 
   // One query for the whole table: every Slack row names its connection from it (ADR-093 §5a).
-  const slackConnections = slackApi.slackIntegration.list.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnWindowFocus: false },
-  );
-  const triggers = api.automation.getTriggers.useQuery({ projectId }, { enabled: !!projectId });
+  const slackConnections = useSlackConnections({ projectId });
   // Fire-history rollup for the metric columns; triggers that never fired have no entry.
-  const triggerStats = api.automation.getTriggerStats.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
+  // Throttle counters live in Redis: an outage costs these badges, not the list.
+  // The scheduler owns a report's real instants; the cron only describes them.
+  const { triggers, triggerStats, capStatus, reportSchedules, activity } =
+    useAutomationOverviewReads({ projectId });
   const statsByTriggerId = useMemo(
     () => new Map((triggerStats.data ?? []).map((s) => [s.triggerId, s])),
     [triggerStats.data],
   );
-  // Throttle counters live in Redis: an outage costs these badges, not the list.
-  const capStatus = api.automation.getDailyCapStatus.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
-  // The scheduler owns a report's real instants; the cron only describes them.
-  const reportSchedules = api.automation.getReportSchedules.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
   const scheduleByTriggerId = useMemo(
     () => new Map((reportSchedules.data ?? []).map((s) => [s.triggerId, s])),
     [reportSchedules.data],
-  );
-  const activity = api.automation.getRecentActivity.useQuery(
-    { projectId },
-    { enabled: !!projectId },
   );
 
   // One table for everything that watches something (ADR-093 §1); reports keep their own tab.
@@ -326,10 +313,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
   const graphAutomationCount = automations.filter((t) => !!t.customGraphId).length;
   // Gated on the list holding a dataset automation; an empty projectId trips the permission check.
   const hasDatasetTriggers = (triggers.data ?? []).some((t) => t.action === "ADD_TO_DATASET");
-  const getDatasets = api.dataset.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId && hasDatasetTriggers },
-  );
+  const getDatasets = useProjectDatasets({ projectId, enabled: hasDatasetTriggers });
 
   const reportsUseGraph = useMemo(
     () =>
@@ -341,13 +325,10 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
   );
 
   // Graph rows name their series from the graph's JSON; report rows need the graph's name.
-  const graphsQuery = api.graphs.getAll.useQuery(
-    { projectId },
-    {
-      enabled: !!projectId && (graphAutomationCount > 0 || reportsUseGraph),
-      retry: false,
-    },
-  );
+  const graphsQuery = useProjectGraphs({
+    projectId,
+    enabled: graphAutomationCount > 0 || reportsUseGraph,
+  });
   const graphJsonById = useMemo(
     () => new Map<string, unknown>((graphsQuery.data ?? []).map((g) => [g.id, g.graph as unknown])),
     [graphsQuery.data],

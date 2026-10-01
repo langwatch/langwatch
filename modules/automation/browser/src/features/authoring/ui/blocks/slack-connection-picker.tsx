@@ -9,18 +9,20 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import {
-  findSlackConnection,
-  NEW_CONNECTION,
-  type SlackConnection,
-  type SlackConnectionList,
-  type SlackConnectionSaved,
-  useSlackConnectionCollection,
-} from "@langwatch/slack-browser-kit";
 import type { SlackConnectionKind } from "@langwatch/slack-contract";
 import { Plus } from "lucide-react";
 
+import {
+  NEW_CONNECTION,
+  useSlackConnectionCollection,
+} from "../../../../behavior/slack/use-slack-connection-collection.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
+import { findSlackConnection } from "../../../../model/slack/slack-connection-name.ts";
+import {
+  type SlackConnection,
+  type SlackConnectionList,
+  type SlackConnectionSaved,
+} from "../../../../model/slack/slack-connection-types.ts";
 import { announceSubFlowDeparture, keepDraftOnSubFlowReturn } from "../../behavior/sub-flow.ts";
 import type { SlackSlice } from "../../model/slack-slice.ts";
 

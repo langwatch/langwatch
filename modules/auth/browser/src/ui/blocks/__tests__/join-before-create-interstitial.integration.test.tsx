@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * Join-before-create interstitial: no org created without user choice.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { JoinBeforeCreateInterstitial } from "../join-before-create-interstitial.tsx";
@@ -15,16 +15,14 @@ const renderStep = (
   const onCreateWorkspace = vi.fn();
   const onJoinOrganization = vi.fn();
   const onAlreadyJoined = vi.fn();
-  const result = render(
-    <ChakraProvider value={defaultSystem}>
-      <JoinBeforeCreateInterstitial
-        verifiedEmail="sam@acme.com"
-        onCreateWorkspace={onCreateWorkspace}
-        onJoinOrganization={onJoinOrganization}
-        onAlreadyJoined={onAlreadyJoined}
-        {...props}
-      />
-    </ChakraProvider>,
+  const result = renderWithDesignSystem(
+    <JoinBeforeCreateInterstitial
+      verifiedEmail="sam@acme.com"
+      onCreateWorkspace={onCreateWorkspace}
+      onJoinOrganization={onJoinOrganization}
+      onAlreadyJoined={onAlreadyJoined}
+      {...props}
+    />,
   );
   return { ...result, onCreateWorkspace, onJoinOrganization, onAlreadyJoined };
 };

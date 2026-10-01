@@ -1,6 +1,7 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+import { promptClient } from "@langwatch/prompt-client";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useCallback, useRef, useState } from "react";
 
@@ -11,8 +12,8 @@ import {
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../prompt-form.ts";
 import { promptApi } from "../prompt-api.ts";
+import type { usePromptConfigForm } from "../use-prompt-config-form.ts";
 import { formValuesToTriggerSaveVersionParams } from "./llm-prompt-config-utils.ts";
-import type { usePromptConfigForm } from "./use-prompt-config-form.ts";
 
 type SavedPrompt = {
   id: string;
@@ -66,7 +67,7 @@ function useEditorMutations(input: EditorSaveInput) {
   const utils = promptApi.useUtils();
   const projectId = project?.id ?? "";
 
-  const createMutation = promptApi.prompts.create.useMutation({
+  const createMutation = promptClient.prompts.create.useMutation({
     onSuccess: (prompt) => {
       void utils.prompts.getAllPromptsForProject.invalidate({ projectId });
       onSave?.(savedPromptPayload(prompt));
@@ -76,7 +77,7 @@ function useEditorMutations(input: EditorSaveInput) {
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create prompt" }),
   });
 
-  const updateMutation = promptApi.prompts.update.useMutation({
+  const updateMutation = promptClient.prompts.update.useMutation({
     onSuccess: (prompt) => {
       const freshFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
       // configValues first, so the form hook's forward sync sees the form match
@@ -93,7 +94,7 @@ function useEditorMutations(input: EditorSaveInput) {
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save prompt" }),
   });
 
-  const updateHandleMutation = promptApi.prompts.updateHandle.useMutation({
+  const updateHandleMutation = promptClient.prompts.updateHandle.useMutation({
     onSuccess: (prompt) => {
       void input.refetchPrompt();
       void utils.prompts.getAllPromptsForProject.invalidate({ projectId });

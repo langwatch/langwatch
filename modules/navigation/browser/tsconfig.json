@@ -28,7 +28,13 @@
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/client/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"
@@ -43,13 +49,16 @@
       "path": "../../ops/contract/tsconfig.build.json"
     },
     {
+      "path": "../../prompt/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
-      "path": "../../user/browser-kit/tsconfig.build.json"
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"

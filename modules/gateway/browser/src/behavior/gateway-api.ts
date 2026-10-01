@@ -438,7 +438,6 @@ export type PersonalWorkspaceContext = {
       id: string;
       name: string;
       slug: string;
-      apiKey: string;
       createdAtMs: number;
     };
     created: boolean;
@@ -834,9 +833,9 @@ export type GatewayApiMap = ContractApiMap<typeof routingPolicyTrpc> & {
     /**
      * The organization graph the section's scope is resolved out of.
      */
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: GatewayOrganizationGraph[];
       };
     };

@@ -3,10 +3,9 @@
  * The evaluator editor's Required to pass switch and its remove action.
  * @see specs/features/agent-testing/suite-editor.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,10 +35,6 @@ import {
   REQUIRED_TO_PASS_COPY,
   SCORE_ONLY_COPY,
 } from "../evaluator-editor-shared.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 /** The parts of the controller that stay the same across every fixture. */
 const STATIC_CONTROLLER_FIXTURE: Omit<
@@ -184,13 +179,12 @@ describe("the evaluator editor gate", () => {
     it("reads the Required to pass switch under the mappings and writes a flip back", async () => {
       const user = userEvent.setup();
       const onRequiredChange = vi.fn();
-      render(
+      renderWithDesignSystem(
         <Harness
           gate={{ required: true, canRequire: true }}
           required={true}
           onRequiredChange={onRequiredChange}
         />,
-        { wrapper: Wrapper },
       );
 
       const section = screen.getByTestId("evaluator-gate-section");
@@ -213,13 +207,12 @@ describe("the evaluator editor gate", () => {
   describe("given a score only evaluator", () => {
     /** @scenario "A score only evaluator cannot be required" */
     it("holds the switch off and disabled, and says scores do not gate", () => {
-      render(
+      renderWithDesignSystem(
         <Harness
           gate={{ required: false, canRequire: false }}
           required={false}
           onRequiredChange={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const section = screen.getByTestId("evaluator-gate-section");
@@ -233,9 +226,7 @@ describe("the evaluator editor gate", () => {
   describe("given the editor is opened without a gate", () => {
     /** @scenario "An evaluator editor without a gate offers no Required to pass switch" */
     it("shows no Required to pass section and no remove action", () => {
-      render(<Harness gate={undefined} required={false} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<Harness gate={undefined} required={false} />);
 
       expect(screen.queryByTestId("evaluator-gate-section")).not.toBeInTheDocument();
       expect(screen.queryByTestId("evaluator-remove-button")).not.toBeInTheDocument();
@@ -247,9 +238,8 @@ describe("the evaluator editor gate", () => {
     it("offers Remove evaluator in the footer", async () => {
       const user = userEvent.setup();
       const onRemove = vi.fn();
-      render(
+      renderWithDesignSystem(
         <Harness gate={{ required: true, canRequire: true }} required={true} onRemove={onRemove} />,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("evaluator-remove-button"));

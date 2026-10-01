@@ -26,7 +26,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 
-import { analyticsApi, type AnalyticsFilterOption } from "../../behavior/analytics-api.ts";
+import type { AnalyticsFilterOption } from "../../behavior/analytics-api.ts";
+import { useFilterOptions } from "../../behavior/use-filter-options.ts";
 import { useFilterParams } from "../../behavior/use-filter-params.ts";
 import { availableFilters } from "../../model/analytics-filter-catalogue.ts";
 import type { FilterDefinition, FilterField } from "../../model/analytics-filter-definition.ts";
@@ -703,25 +704,7 @@ function ListSelection({
 }) {
   const filter = availableFilters[filterId];
 
-  const { filterParams, queryOpts } = useFilterParams();
-  const filterData = analyticsApi.analytics.dataForFilter.useQuery(
-    {
-      ...filterParams,
-      field: filterId,
-      key: keys?.[0],
-      subkey: keys?.[1],
-    },
-    {
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      // Keeps the previous answer on screen while the next one loads. The
-      // React Query sentinel would mean importing the query library, which a
-      // governed screen may not; the identity function is what that sentinel
-      // does.
-      placeholderData: (previous: { options: AnalyticsFilterOption[] } | undefined) => previous,
-      enabled: queryOpts.enabled,
-    },
-  );
+  const filterData = useFilterOptions({ field: filterId, key: keys?.[0], subkey: keys?.[1] });
 
   const options = useMemo(() => {
     const sortingFn = (a: { count: number }, b: { count: number }) => (a.count > b.count ? -1 : 1);

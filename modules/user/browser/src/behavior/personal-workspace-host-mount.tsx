@@ -275,7 +275,7 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
-  const organizations = personalWorkspaceApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = personalWorkspaceApi.organization.getScopeGraph.useQuery({});
   const graph = organizations.data ?? NO_ORGANIZATIONS;
 
   const organization = useMemo(

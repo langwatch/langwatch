@@ -4,14 +4,15 @@
  * can't name. Specs: datasets-list-page, rbac/lite-member-restrictions.feature.
  */
 
-import { InputGroup } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
+import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
   datasetDisplayRecordCount,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -249,7 +250,7 @@ export default function DatasetsScreen() {
   const bulkUploadModal = useDisclosure();
   const utils = datasetApi.useUtils();
 
-  const datasets = datasetApi.dataset.getAll.useQuery(
+  const datasets = datasetClient.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
@@ -272,7 +273,7 @@ export default function DatasetsScreen() {
     return datasets.data.filter((dataset) => dataset.name.toLowerCase().includes(query));
   }, [datasets.data, search]);
 
-  const datasetDelete = datasetApi.dataset.deleteById.useMutation();
+  const datasetDelete = datasetClient.dataset.deleteById.useMutation();
   const [editDataset, setEditDataset] = useState<
     { datasetId: string; name: string; columnTypes: DatasetColumns } | undefined
   >();

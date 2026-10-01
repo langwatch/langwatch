@@ -3,14 +3,6 @@
  * with URL state managed via ?rule=new or ?rule=<tier>:<id>:<personal>.
  */
 
-import {
-  ScopeChipPicker,
-  ScopeFilter,
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-  type ScopeChipPickerScopeType,
-  type ScopeFilterValue,
-} from "@langwatch/authz-browser-kit";
 import type {
   DataPrivacyConfig,
   DataPrivacyRule,
@@ -21,6 +13,10 @@ import { Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primiti
 import { useMemo } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
+import {
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
@@ -37,6 +33,11 @@ import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { NoPrivacyRules } from "../blocks/no-privacy-rules.tsx";
 import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 import { PrivacyRulesTable } from "../blocks/privacy-rules-table.tsx";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerScopeType,
+} from "./authz/scope-picker/scope-chip-picker.tsx";
+import { ScopeFilter, type ScopeFilterValue } from "./authz/scope-picker/scope-filter.tsx";
 
 export default function DataPrivacyScreen() {
   const host = useDataPrivacyHost();

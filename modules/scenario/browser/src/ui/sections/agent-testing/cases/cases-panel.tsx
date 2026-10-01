@@ -4,14 +4,13 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit";
-
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import {
   CONTENT_COLUMN_GUTTER,
   ContentColumn,
 } from "../../../elements/agent-testing/shared/content-column.tsx";
+import type { Period } from "../../../elements/analytics/period-selector.tsx";
 import { CasesPanelBody } from "./cases-panel-body.tsx";
 import { CasesPanelHeader } from "./cases-panel-header.tsx";
 import type { CaseLastResult } from "./cases-table.tsx";

@@ -4,8 +4,7 @@
  * Internal only—not exported.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement } from "react";
 
 import {
@@ -83,10 +82,8 @@ export function renderWithEvaluatorHost(
 ) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <EvaluatorHostProvider value={host}>{element}</EvaluatorHostProvider>
-      </ChakraProvider>,
+    ...renderWithDesignSystem(
+      <EvaluatorHostProvider value={host}>{element}</EvaluatorHostProvider>,
     ),
   };
 }

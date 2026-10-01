@@ -266,12 +266,10 @@ export function DlqRow({
 export function DlqCard({ queueNames: _queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
   const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, {
-    refetchInterval: 10000,
   });
   /** Process-manager intents that retired. Different mechanism from a DLQ
    *  group, same question for the reader: what has permanently stopped. */
   const processDeadQuery = api.ops.listDeadLetterCounts.useQuery(undefined, {
-    refetchInterval: 30_000,
   });
 
   const [filterText, setFilterText] = useState("");

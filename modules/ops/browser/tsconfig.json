@@ -25,6 +25,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -41,6 +44,9 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../prompt/client/tsconfig.build.json"
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"

@@ -1,1 +1,1 @@
-export * from "./behavior/prompts/use-latest-prompt-version.ts";
+export * from "./behavior/use-latest-prompt-version.ts";

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -40,7 +40,7 @@ const annotation = ({
 });
 
 function withChakra(view: ReactNode) {
-  return render(<ChakraProvider value={defaultSystem}>{view}</ChakraProvider>);
+  return renderWithDesignSystem(view);
 }
 
 describe("annotation presentation", () => {

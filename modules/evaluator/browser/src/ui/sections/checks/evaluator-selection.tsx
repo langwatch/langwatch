@@ -23,11 +23,11 @@ import {
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import { NextLink } from "@langwatch/workflow-browser-kit";
 import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
+import { default as NextLink } from "../../elements/workflow/next-link.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 type Category = EvaluatorDefinition["category"];

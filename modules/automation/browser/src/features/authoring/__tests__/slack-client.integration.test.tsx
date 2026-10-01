@@ -3,8 +3,8 @@
  * The Slack step: connection picker, channel, receive chooser and template tiers. Monaco is
  * stubbed; the editors are asserted through their wrapper test ids.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -136,9 +136,7 @@ import slackClient, { type SlackSlice } from "../ui/sections/slack.client.tsx";
 let host = fakeAutomationHost();
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
-    <AutomationHostProvider value={host}>{children}</AutomationHostProvider>
-  </ChakraProvider>
+  <AutomationHostProvider value={host}>{children}</AutomationHostProvider>
 );
 
 function makeCtx(
@@ -200,15 +198,14 @@ const renderForm = (
     onChangeSpy?: (next: SlackSlice) => void;
   } = {},
 ) =>
-  render(
-    <Harness
-      ctx={props.ctx ?? makeCtx()}
-      initial={props.initial}
-      onChangeSpy={props.onChangeSpy}
-    />,
-    {
-      wrapper: Wrapper,
-    },
+  renderWithDesignSystem(
+    <Wrapper>
+      <Harness
+        ctx={props.ctx ?? makeCtx()}
+        initial={props.initial}
+        onChangeSpy={props.onChangeSpy}
+      />
+    </Wrapper>,
   );
 
 const botSlice = (overrides: Partial<SlackSlice> = {}): SlackSlice => ({
@@ -283,7 +280,11 @@ describe("SlackConfigForm authoring tiers", () => {
     /** @scenario "The receive choice decides which layouts are offered" */
     it("filters the layout list to the chosen mode", async () => {
       const user = userEvent.setup();
-      render(<CadenceHarness />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <CadenceHarness />
+        </Wrapper>,
+      );
 
       expect(screen.getByRole("button", { name: /compact notice/i })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /digest: compact/i })).not.toBeInTheDocument();

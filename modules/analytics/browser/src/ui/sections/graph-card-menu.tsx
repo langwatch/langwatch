@@ -9,6 +9,7 @@ import { Clock, Edit, LayoutDashboard, MoreVertical, Trash2 } from "lucide-react
 
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
+import { useFirstDashboard } from "../../behavior/use-dashboards.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget.tsx";
 
@@ -40,10 +41,10 @@ function useAddToDashboardHandler({
 }: AddToDashboardHandlerProps) {
   const utils = api.useUtils();
   const showErrorToast = useShowErrorToast();
-  const dashboard = api.dashboards.getOrCreateFirst.useQuery(
-    { projectId },
-    { enabled: showAddToDashboard && isDashboardWidget },
-  );
+  const dashboard = useFirstDashboard({
+    projectId,
+    enabled: showAddToDashboard && isDashboardWidget,
+  });
   const assignDashboard = api.dashboardWidgets.assignDashboard.useMutation();
   const alreadyOnDashboard = !!dashboard.data && dashboardId === dashboard.data.id;
 

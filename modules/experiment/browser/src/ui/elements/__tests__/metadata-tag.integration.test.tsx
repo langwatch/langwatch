@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -19,12 +19,7 @@ vi.mock("@langwatch/browser-host/link", () => ({
 
 const { MetadataTag } = await import("../metadata-tag.tsx");
 
-const renderTag = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <MetadataTag label="user_id" value="user-42" />
-    </ChakraProvider>,
-  );
+const renderTag = () => renderWithDesignSystem(<MetadataTag label="user_id" value="user-42" />);
 
 describe("MetadataTag", () => {
   afterEach(cleanup);

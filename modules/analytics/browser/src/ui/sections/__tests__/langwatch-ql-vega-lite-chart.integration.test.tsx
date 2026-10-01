@@ -4,8 +4,6 @@
  * feed, and that every failure has its own state. What Vega draws is Vega's.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import "@testing-library/jest-dom/vitest";
 import {
   LangWatchQLVegaLoadBlockedError,
   langwatchVegaConfig,
@@ -14,8 +12,10 @@ import {
   type LangWatchQLDataset,
   type LangWatchQLDatasetColumn,
 } from "@langwatch/analytics-contract/visualization";
+import "@testing-library/jest-dom/vitest";
 import type * as visualizationModule from "@langwatch/analytics-contract/visualization";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -145,8 +145,7 @@ const ROWS: LangWatchQLDataset = [
   { model: "claude", total: 5, latency: 30 },
 ];
 
-const withChakra = (element: ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
+const withChakra = (element: ReactElement) => renderWithDesignSystem(element);
 
 const chart = ({
   spec = barOverQueryResult as unknown,
@@ -316,16 +315,14 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
         const reloaded: LangWatchQLDataset = [{ model: "gpt-5-mini", total: 9 }];
         rerender(
-          <ChakraProvider value={defaultSystem}>
-            <LangWatchQLVegaLiteChart
-              spec={barOverQueryResult}
-              datasets={{ query_result: reloaded }}
-              columnsByDataset={{ query_result: COLUMNS }}
-              themeConfig={THEME_CONFIGS[colorModeHarness.mode]}
-              pinnedConfig={PINNED_CONFIG}
-              colorMode={colorModeHarness.mode}
-            />
-          </ChakraProvider>,
+          <LangWatchQLVegaLiteChart
+            spec={barOverQueryResult}
+            datasets={{ query_result: reloaded }}
+            columnsByDataset={{ query_result: COLUMNS }}
+            themeConfig={THEME_CONFIGS[colorModeHarness.mode]}
+            pinnedConfig={PINNED_CONFIG}
+            colorMode={colorModeHarness.mode}
+          />,
         );
 
         await waitFor(() => expect(vega.state.data).toHaveLength(1));
@@ -348,11 +345,9 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
 
         rerender(
-          <ChakraProvider value={defaultSystem}>
-            {chart({
-              spec: { ...(barOverQueryResult as object), height: 300 },
-            })}
-          </ChakraProvider>,
+          chart({
+            spec: { ...(barOverQueryResult as object), height: 300 },
+          }),
         );
 
         await waitFor(() => expect(vega.state.calls).toHaveLength(2));
@@ -368,7 +363,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         const light = chartConfig(vega.state.calls[0]!.options);
 
         colorModeHarness.mode = "dark";
-        rerender(<ChakraProvider value={defaultSystem}>{chart()}</ChakraProvider>);
+        rerender(chart());
 
         await waitFor(() => expect(vega.state.calls).toHaveLength(2));
         const dark = chartConfig(vega.state.calls[1]!.options);
@@ -406,11 +401,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         const { rerender } = withChakra(chart());
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
 
-        rerender(
-          <ChakraProvider value={defaultSystem}>
-            {chart({ spec: inlineDataValues })}
-          </ChakraProvider>,
-        );
+        rerender(chart({ spec: inlineDataValues }));
 
         await screen.findByTestId("lwql-chart-failure");
         expect(failureCode()).toBe("policy-rejection");
@@ -561,11 +552,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       await screen.findByTestId("lwql-chart-failure");
 
       vega.state.failWith = null;
-      rerender(
-        <ChakraProvider value={defaultSystem}>
-          {chart({ spec: { ...(barOverQueryResult as object), height: 240 } })}
-        </ChakraProvider>,
-      );
+      rerender(chart({ spec: { ...(barOverQueryResult as object), height: 240 } }));
 
       // The refusal outlives the render that clears it, so the mount point has
       // to survive it: without that, this is a chart that never comes back.

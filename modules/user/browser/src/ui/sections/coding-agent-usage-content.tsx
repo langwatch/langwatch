@@ -1,9 +1,9 @@
-import { formatDurationSeconds } from "@langwatch/coding-agent-browser-kit";
 import { Box, SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import numeral from "numeral";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
+import { formatDurationSeconds } from "../../model/coding-agent/duration.ts";
 
 /**
  * Personal coding-agent usage figures (ADR-056): cost, tokens, active time

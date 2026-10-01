@@ -4,8 +4,8 @@
  * @see specs/features/scenarios/workflow-agent-mapping-layer.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -73,6 +73,48 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [] }),
+      },
+      getById: {
+        // useQuery not used by ScenarioFormDrawer directly — only via utils.fetch
+      },
+    },
+    useUtils: () => ({
+      agents: {
+        getById: {
+          fetch: mocks.mockAgentsGetByIdFetch,
+        },
+      },
+    }),
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      agents: {
+        getById: {
+          fetch: mocks.mockAgentsGetByIdFetch,
+        },
+      },
+    }),
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn(), setData: vi.fn() },
+      },
+    }),
     scenarios: {
       create: {
         useMutation: ({
@@ -120,30 +162,6 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         }),
       },
     },
-    agents: {
-      getAll: {
-        useQuery: () => ({ data: [] }),
-      },
-      getById: {
-        // useQuery not used by ScenarioFormDrawer directly — only via utils.fetch
-      },
-    },
-    prompts: {
-      getAllPromptsForProject: {
-        useQuery: () => ({ data: [] }),
-      },
-    },
-    useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn(), setData: vi.fn() },
-      },
-      agents: {
-        getById: {
-          fetch: mocks.mockAgentsGetByIdFetch,
-        },
-      },
-    }),
   },
 }));
 
@@ -160,7 +178,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
@@ -207,10 +225,6 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 // Helpers
 
 /** Render the drawer pre-loaded with an existing scenario and a persisted target. */
@@ -231,9 +245,7 @@ function renderWithTarget(target: { type: string; id: string }) {
     labels: [],
   });
 
-  return render(<ScenarioFormDrawer open={true} scenarioId="scenario-1" />, {
-    wrapper: Wrapper,
-  });
+  return renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-1" />);
 }
 
 describe("<ScenarioFormDrawer /> mapping gate", () => {

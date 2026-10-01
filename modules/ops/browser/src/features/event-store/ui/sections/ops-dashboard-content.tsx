@@ -25,14 +25,12 @@ import { StatStrip } from "./stat-strip.tsx";
  */
 export function OpsDashboardContent({ data }: { data: DashboardData }) {
   const queuesQuery = api.ops.listQueues.useQuery(undefined, {
-    refetchInterval: 10000,
   });
   const queueNames = useMemo(() => (queuesQuery.data ?? []).map((q) => q.name), [queuesQuery.data]);
 
   // Read here as well as in AnomaliesCard so the health line can collapse both
   // all-clear states into one row. React Query serves both from one fetch.
   const anomaliesQuery = api.ops.listAnomalies.useQuery(undefined, {
-    refetchInterval: 30_000,
   });
   // "We could not check" is not "all clear". Until this query has actually
   // answered, the health line must not claim anomalies are clear — collapsing

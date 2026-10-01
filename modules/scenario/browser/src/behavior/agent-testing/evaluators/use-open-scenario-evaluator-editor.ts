@@ -5,7 +5,6 @@
  */
 
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import {
   type EvaluatorAttachment,
   type ScenarioMapping,
@@ -13,6 +12,7 @@ import {
   scenarioMappingSchema,
   scenarioMappingSources,
 } from "@langwatch/scenario-contract";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 
 import {

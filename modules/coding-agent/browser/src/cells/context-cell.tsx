@@ -1,10 +1,10 @@
-import { MissingValue } from "@langwatch/coding-agent-browser-kit";
 import { formatTokens } from "@langwatch/design-system/display-formatters";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
 import type { SessionListRow } from "../session-list-row.ts";
+import { MissingValue } from "../ui/elements/cells/missing-value.tsx";
 import { ComparisonBar } from "./comparison-bar.tsx";
 
 // Total tokens (sorts column) with bar comparing to heaviest session; peak

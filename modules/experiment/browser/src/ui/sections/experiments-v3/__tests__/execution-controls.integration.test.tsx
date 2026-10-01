@@ -3,8 +3,8 @@
  *
  * Tests for ExecutionControls component.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -35,11 +35,7 @@ let mockProgress = { completed: 0, total: 0 };
 let mockError: string | null = null;
 
 const renderControls = (props = {}) => {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ExecutionControls {...props} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<ExecutionControls {...props} />);
 };
 
 const renderMiniButton = (props: {
@@ -47,11 +43,7 @@ const renderMiniButton = (props: {
   isRunning?: boolean;
   disabled?: boolean;
 }) => {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <MiniRunButton {...props} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<MiniRunButton {...props} />);
 };
 
 describe("ExecutionControls", () => {
@@ -217,11 +209,7 @@ describe("MiniRunButton", () => {
     const parentClick = vi.fn();
     document.body.addEventListener("click", parentClick);
 
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <MiniRunButton onClick={onClick} />
-      </ChakraProvider>,
-    );
+    renderWithDesignSystem(<MiniRunButton onClick={onClick} />);
 
     const button = screen.getByRole("button");
     await user.click(button);

@@ -3,8 +3,8 @@
  * Marks a presence-less connected agent unpickable, with why on hover; an
  * HTTP agent, having no such presence, stays pickable.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -37,7 +37,7 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn();
 });
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
@@ -68,11 +68,7 @@ describe("given an offline connected agent", () => {
     it("draws the offline agent disabled and keeps the HTTP agent pickable", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn<(value: TargetValue) => void>();
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TargetSelector value={null} onChange={onChange} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<TargetSelector value={null} onChange={onChange} />);
 
       await user.click(screen.getByTestId("target-selector-trigger"));
       await waitFor(() => {
@@ -99,10 +95,8 @@ describe("given a voice target is selected", () => {
 
   describe("when the selector renders", () => {
     it("names the selected voice agent", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TargetSelector value={{ type: "voice", id: "agent-voice" }} onChange={vi.fn()} />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <TargetSelector value={{ type: "voice", id: "agent-voice" }} onChange={vi.fn()} />,
       );
 
       const trigger = screen.getByTestId("target-selector-trigger");

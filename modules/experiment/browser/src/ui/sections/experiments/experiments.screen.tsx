@@ -20,9 +20,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/experiment-browser-kit";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
-import { LangyContextTarget, experimentContextChip } from "@langwatch/langy-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import type { TimeInput } from "@langwatch/time";
 import { keepPreviousData } from "@tanstack/react-query";
@@ -40,12 +38,15 @@ import {
 import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
+import { experimentContextChip } from "../../../behavior/langy/langy-context-chips.ts";
+import { readableDate } from "../../../model/display-formatters.ts";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { formatEvaluationSummary } from "../../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
 import { CopyExperimentDialog } from "../../../ui/elements/experiments/copy-experiment-dialog.tsx";
 import { CreateExperimentButton } from "../../../ui/elements/experiments/create-experiment-button.tsx";
 import { NavigationFooter, useNavigationFooter } from "../../../ui/elements/navigation-footer.tsx";
 import { FullWidthListPageContent } from "../../../ui/elements/ui/layouts/full-width-list-page-content.tsx";
+import { LangyContextTarget } from "../langy/langy-context-target.tsx";
 
 /** One row of the experiments list, as this table renders it. */
 type ExperimentListRow = {

@@ -1,0 +1,159 @@
+/**
+ * Token Utilities
+ *
+ * Helper functions for managing max_tokens normalization and model change handling.
+ */
+
+import type { ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
+
+import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
+import type { LLMConfigValues } from "./llm-config-values.types.ts";
+import { parameterRegistry as defaultRegistry } from "./parameter-registry.ts";
+
+/**
+ * Calculate sensible default values for all parameters.
+ * Uses registry defaults, with special handling for dynamic parameters like max_tokens.
+ *
+ * @param modelMetadata - Optional model metadata for dynamic calculations
+ * @param registry - Parameter registry (defaults to singleton)
+ * @returns Record of parameter formKeys to their default values
+ */
+export function calculateSensibleDefaults(
+  modelMetadata?: ModelMetadataForFrontend,
+  registry: typeof defaultRegistry = defaultRegistry,
+): Record<string, number | string | undefined> {
+  const defaults: Record<string, number | string | undefined> = {};
+
+  for (const paramName of registry.getAllNames()) {
+    const config = registry.getConfig(paramName);
+    if (!config) continue;
+
+    const formKey = registry.getFormKey(paramName);
+
+    if (paramName === "max_tokens" && config.type === "slider") {
+      // Default to model's absolute maximum
+      if (modelMetadata) {
+        const maxLimit = getMaxTokenLimit(modelMetadata);
+        // Set both camelCase and snake_case for compatibility with different consumers
+        defaults[formKey] = maxLimit;
+        defaults[paramName] = maxLimit;
+      }
+      // If no metadata, leave undefined (backward compat - Python will use its fallback)
+    } else if (config.type === "slider") {
+      // Use registry default for other sliders
+      defaults[formKey] = config.default;
+    } else if (config.type === "select" && config.default) {
+      // Use registry default for selects (reasoning, verbosity)
+      defaults[formKey] = config.default;
+    }
+    // Leave undefined for params without defaults
+  }
+
+  return defaults;
+}
+
+/**
+ * A value that sat at the previous model's maximum stays maxed on the new one;
+ * a customised value is capped at the new model's maximum. Without previous
+ * metadata the value is assumed to have been at the maximum.
+ */
+function carryMaxTokens({
+  newModelMetadata,
+  previousModelMetadata,
+  previousValues,
+}: {
+  newModelMetadata?: ModelMetadataForFrontend;
+  previousModelMetadata?: ModelMetadataForFrontend;
+  previousValues?: LLMConfigValues;
+}): number | undefined {
+  if (!previousValues || !newModelMetadata) return undefined;
+
+  const previousMaxTokens =
+    (previousValues.maxTokens as number | undefined) ??
+    (previousValues.max_tokens as number | undefined);
+  if (previousMaxTokens === undefined) return undefined;
+
+  const previousMax = previousModelMetadata
+    ? getMaxTokenLimit(previousModelMetadata)
+    : previousMaxTokens;
+  const newMax = getMaxTokenLimit(newModelMetadata);
+  const wasAtMax = previousMaxTokens >= previousMax;
+
+  return wasAtMax ? newMax : Math.min(previousMaxTokens, newMax);
+}
+
+export function buildModelChangeValues({
+  newModel,
+  registry = defaultRegistry,
+  newModelMetadata,
+  previousValues,
+  previousModelMetadata,
+}: {
+  newModel: string;
+  registry?: typeof defaultRegistry;
+  newModelMetadata?: ModelMetadataForFrontend;
+  /** The config before the change, for carrying `max_tokens` across. */
+  previousValues?: LLMConfigValues;
+  previousModelMetadata?: ModelMetadataForFrontend;
+}): LLMConfigValues {
+  const result: LLMConfigValues = { model: newModel };
+  const resultRecord = result as Record<string, unknown>;
+
+  // First clear all parameters (to remove stale values from previous model)
+  for (const paramName of registry.getAllNames()) {
+    resultRecord[paramName] = undefined;
+    const formKey = registry.getFormKey(paramName);
+    if (formKey !== paramName) {
+      resultRecord[formKey] = undefined;
+    }
+  }
+
+  // Then apply sensible defaults so form state matches what UI displays
+  const defaults = calculateSensibleDefaults(newModelMetadata, registry);
+  for (const [key, value] of Object.entries(defaults)) {
+    if (value !== undefined) {
+      resultRecord[key] = value;
+    }
+  }
+
+  const carriedMaxTokens = carryMaxTokens({
+    newModelMetadata,
+    previousModelMetadata,
+    previousValues,
+  });
+  if (carriedMaxTokens !== undefined) {
+    // Both spellings, for consumers that read either one.
+    resultRecord.maxTokens = carriedMaxTokens;
+    resultRecord.max_tokens = carriedMaxTokens;
+  }
+
+  return result;
+}
+
+/**
+ * Ensures only one of maxTokens or max_tokens is set in the config.
+ * Preserves the naming convention the caller was using.
+ */
+export function normalizeMaxTokens(
+  values: Record<string, unknown>,
+  tokenValue: number,
+): LLMConfigValues {
+  const usesCamelCase = Object.hasOwn(values, "maxTokens");
+  const model = (values.model ?? "") as string;
+
+  const {
+    maxTokens: _sunkMaxTokens,
+    max_tokens: _sunkMaxTokens2,
+    model: _sunkModel,
+    ...rest
+  } = values;
+
+  const result: LLMConfigValues = usesCamelCase
+    ? { model, ...rest, maxTokens: tokenValue }
+    : { model, ...rest, max_tokens: tokenValue };
+
+  return result;
+}
+
+/** Re-exported from the package model, where `behavior` can reach it too. */
+export { getMaxTokenLimit };

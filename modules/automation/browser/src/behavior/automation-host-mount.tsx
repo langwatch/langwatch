@@ -17,7 +17,6 @@ import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import type { SlackConnectionSaved } from "@langwatch/slack-browser-kit";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -33,6 +32,7 @@ import {
   type AutomationSuccessNotice,
   type AutomationTeam,
 } from "../model/automation-host.ts";
+import type { SlackConnectionSaved } from "../model/slack/slack-connection-types.ts";
 import { automationApi } from "./automation-api.ts";
 
 /** Writes a registered drawer's address, clearing every stale `drawer.*` key. */
@@ -227,7 +227,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
-  const graph = automationApi.organization.getAll.useQuery({ isDemo: false });
+  const graph = automationApi.organization.getScopeGraph.useQuery({});
   const organizations = graph.data ?? NO_ORGANIZATIONS;
 
   const host = useMemo(

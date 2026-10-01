@@ -1,13 +1,12 @@
-/**
- * @vitest-environment jsdom
- * @see specs/model-providers/custom-model-display-name.feature
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+/**
+ * @vitest-environment jsdom
+ * @see specs/model-providers/custom-model-display-name.feature
+ */
+import type * as actualModule from "../authz/scope-picker/scope-chip-picker.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 
 const mockCloseDrawer = vi.fn();
@@ -30,9 +29,9 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 }));
 
 // Orthogonal to display-name threading and pulls in its own data hooks.
-vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof authzBrowserKitModule>(
-    "@langwatch/authz-browser-kit",
+vi.mock("../authz/scope-picker/scope-chip-picker.tsx", async () => {
+  const actual = await vi.importActual<typeof actualModule>(
+    "../authz/scope-picker/scope-chip-picker.tsx",
   );
   return {
     ...actual,
@@ -108,12 +107,7 @@ const PROVIDER_ROW = {
 
 function renderDrawer(editingId = "cfg_1") {
   const host = new FakeModelProviderHost();
-  return renderWithModelProviderHost(
-    <ChakraProvider value={defaultSystem}>
-      <DefaultModelOverrideDrawer editingId={editingId} />
-    </ChakraProvider>,
-    host,
-  );
+  return renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId={editingId} />, host);
 }
 
 function roleRow(role: "default" | "fast" | "embeddings") {

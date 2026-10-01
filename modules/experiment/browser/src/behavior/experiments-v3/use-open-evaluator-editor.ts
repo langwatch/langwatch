@@ -5,10 +5,7 @@
 
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
-import type {
-  AvailableSource,
-  FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-browser-kit";
+import type { AvailableSource, FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 

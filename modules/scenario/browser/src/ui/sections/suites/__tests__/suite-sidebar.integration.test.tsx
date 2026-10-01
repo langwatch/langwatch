@@ -6,9 +6,9 @@
  * @see specs/features/suites/remove-redundant-suites-label.feature
  * @see specs/components/search-input.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ExternalSetSummary } from "@langwatch/scenario-contract";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,10 +23,6 @@ import {
 } from "../../../../behavior/suites/use-suite-routing.ts";
 import { NowContext } from "../../../../behavior/use-now.ts";
 import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../suite-sidebar.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 type RunPlan = SimulationSuite & { kind: "run_plan" };
 
@@ -82,9 +78,7 @@ describe("<SuiteSidebar/> External Sets", () => {
   describe("given no external sets exist", () => {
     /** @scenario "External Sets section is hidden when no external sets exist" */
     it("does not display the External Sets section header", () => {
-      render(<SuiteSidebar {...defaultProps} suites={[makeSuite()]} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={[makeSuite()]} />);
 
       expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
     });
@@ -103,9 +97,7 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     /** @scenario "External sets section appears with SDK-submitted scenario runs" */
     it("displays the External Sets section header", () => {
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       expect(screen.getByTestId("external-sets-header")).toHaveTextContent("EXTERNAL SETS");
     });
@@ -113,9 +105,7 @@ describe("<SuiteSidebar/> External Sets", () => {
     /** @scenario "External set batch entry displays the set name" */
     /** @scenario "External set uses scenarioSetId as its display name" */
     it("displays external set names", () => {
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       expect(screen.getByText("nightly-regression")).toBeInTheDocument();
       expect(screen.getByText("ci-smoke-tests")).toBeInTheDocument();
@@ -123,17 +113,13 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     /** @scenario "External set entry shows pass rate and recency" */
     it("displays pass/fail summary for external sets", () => {
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       expect(screen.getByText(/15 passed/)).toBeInTheDocument();
     });
 
     it("does not display a Run button on external set items", () => {
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       const externalItems = screen.getAllByTestId("external-set-list-item");
       for (const item of externalItems) {
@@ -144,12 +130,11 @@ describe("<SuiteSidebar/> External Sets", () => {
     describe("when all runs pass in an external set", () => {
       /** @scenario "External set shows correct status indicator" */
       it("displays 100% pass rate", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={[makeExternalSet({ passedCount: 10, totalCount: 10 })]}
           />,
-          { wrapper: Wrapper },
         );
 
         const items = screen.getAllByTestId("external-set-list-item");
@@ -159,12 +144,11 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     describe("when some runs fail in an external set", () => {
       it("displays pass rate reflecting failures", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={[makeExternalSet({ passedCount: 7, totalCount: 10 })]}
           />,
-          { wrapper: Wrapper },
         );
 
         const items = screen.getAllByTestId("external-set-list-item");
@@ -177,13 +161,12 @@ describe("<SuiteSidebar/> External Sets", () => {
         const user = userEvent.setup();
         const onSelectSuite = vi.fn();
 
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={externalSets}
             onSelectSuite={onSelectSuite}
           />,
-          { wrapper: Wrapper },
         );
 
         await user.click(screen.getByText("nightly-regression"));
@@ -193,13 +176,12 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     describe("when an external set is selected", () => {
       it("highlights the selected external set", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={externalSets}
             selectedSuiteSlug={toExternalSetSelection("nightly-regression")}
           />,
-          { wrapper: Wrapper },
         );
 
         const listItems = screen.getAllByTestId("external-set-list-item");
@@ -211,13 +193,12 @@ describe("<SuiteSidebar/> External Sets", () => {
       });
 
       it("does not highlight unselected external sets", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={externalSets}
             selectedSuiteSlug={toExternalSetSelection("nightly-regression")}
           />,
-          { wrapper: Wrapper },
         );
 
         const listItems = screen.getAllByTestId("external-set-list-item");
@@ -243,9 +224,9 @@ describe("<SuiteSidebar/> External Sets", () => {
 
       beforeEach(() => {
         user = userEvent.setup();
-        render(<SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />,
+        );
         return user.type(screen.getByPlaceholderText("Search..."), "billing");
       });
 
@@ -262,9 +243,9 @@ describe("<SuiteSidebar/> External Sets", () => {
       it("hides both sections and shows no matching message", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />,
+        );
 
         await user.type(screen.getByPlaceholderText("Search..."), "zzz-no-match");
         expect(screen.queryByText("Billing Tests")).not.toBeInTheDocument();
@@ -282,25 +263,24 @@ describe("<SuiteSidebar/> External Sets", () => {
       vi.setSystemTime(now);
 
       const NowWrapper = ({ children }: { children: React.ReactNode }) => (
-        <ChakraProvider value={defaultSystem}>
-          <NowContext value={Date.now()}>{children}</NowContext>
-        </ChakraProvider>
+        <NowContext value={Date.now()}>{children}</NowContext>
       );
 
       try {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            externalSets={[
-              makeExternalSet({
-                scenarioSetId: "ci-smoke-tests",
-                passedCount: 15,
-                totalCount: 20,
-                lastRunTimestamp: now - 30 * 60 * 1000,
-              }),
-            ]}
-          />,
-          { wrapper: NowWrapper },
+        renderWithDesignSystem(
+          <NowWrapper>
+            <SuiteSidebar
+              {...defaultProps}
+              externalSets={[
+                makeExternalSet({
+                  scenarioSetId: "ci-smoke-tests",
+                  passedCount: 15,
+                  totalCount: 20,
+                  lastRunTimestamp: now - 30 * 60 * 1000,
+                }),
+              ]}
+            />
+          </NowWrapper>,
         );
 
         expect(screen.getByText(/15 passed/)).toBeInTheDocument();
@@ -313,12 +293,11 @@ describe("<SuiteSidebar/> External Sets", () => {
     });
 
     it("does not show a three-dot menu button", () => {
-      render(
+      renderWithDesignSystem(
         <SuiteSidebar
           {...defaultProps}
           externalSets={[makeExternalSet({ scenarioSetId: "ci-smoke-tests" })]}
         />,
-        { wrapper: Wrapper },
       );
 
       const items = screen.getAllByTestId("external-set-list-item");
@@ -340,9 +319,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         }),
       ];
 
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       const items = screen.getAllByTestId("external-set-list-item");
       expect(items[0]!.textContent).toContain("recent-set");
@@ -361,17 +338,13 @@ describe("<SuiteSidebar/>", () => {
   describe("given no suites exist", () => {
     /** @scenario "Empty state when no run plans exist" */
     it("displays empty state message", () => {
-      render(<SuiteSidebar {...defaultProps} suites={[]} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={[]} />);
 
       expect(screen.getByText("No run plans yet")).toBeInTheDocument();
     });
 
     it("displays the All Runs link", () => {
-      render(<SuiteSidebar {...defaultProps} suites={[]} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={[]} />);
 
       expect(screen.getByText("All Runs")).toBeInTheDocument();
     });
@@ -390,18 +363,14 @@ describe("<SuiteSidebar/>", () => {
 
     /** @scenario "Sidebar does not display a redundant SUITES label" */
     it("does not render a SUITES section header above the suite list", () => {
-      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
       expect(screen.queryAllByText(/^SUITES$/)).toHaveLength(0);
     });
 
     /** @scenario "Sidebar still shows suite names and action buttons after label removal" */
     it("displays all suite names", () => {
-      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
       expect(screen.getByText("Critical Path")).toBeInTheDocument();
       expect(screen.getByText("Billing Edge")).toBeInTheDocument();
@@ -410,9 +379,8 @@ describe("<SuiteSidebar/>", () => {
 
     describe("when a suite is selected", () => {
       it("highlights the selected suite", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar {...defaultProps} suites={suites} selectedSuiteSlug="billing-edge" />,
-          { wrapper: Wrapper },
         );
 
         // All suites are rendered; the selected one has distinct bg via isSelected
@@ -425,9 +393,9 @@ describe("<SuiteSidebar/>", () => {
         const user = userEvent.setup();
         const onSelectSuite = vi.fn();
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} onSelectSuite={onSelectSuite} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} onSelectSuite={onSelectSuite} />,
+        );
 
         await user.click(screen.getByText("Critical Path"));
         expect(onSelectSuite).toHaveBeenCalledWith("critical-path");
@@ -439,9 +407,9 @@ describe("<SuiteSidebar/>", () => {
         const user = userEvent.setup();
         const onRunSuite = vi.fn();
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} onRunSuite={onRunSuite} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} onRunSuite={onRunSuite} />,
+        );
 
         const runButtons = screen.getAllByText("Run");
         // Click the first suite's Run button
@@ -455,9 +423,9 @@ describe("<SuiteSidebar/>", () => {
         const user = userEvent.setup();
         const onContextMenu = vi.fn();
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} onContextMenu={onContextMenu} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} onContextMenu={onContextMenu} />,
+        );
 
         const suiteItem = screen.getByText("Critical Path");
         await user.pointer({ keys: "[MouseRight]", target: suiteItem });
@@ -467,9 +435,7 @@ describe("<SuiteSidebar/>", () => {
 
     describe("when looking at the search field", () => {
       it("labels the search field, its leading icon decorative", () => {
-        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
         // The icon itself is aria-hidden; the input carries the "Search"
         // accessible name instead — see specs/components/search-input.feature.
@@ -482,9 +448,7 @@ describe("<SuiteSidebar/>", () => {
       it("filters to only show Billing Edge", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
         const searchInput = screen.getByPlaceholderText("Search...");
         await user.type(searchInput, "billing");
@@ -500,9 +464,7 @@ describe("<SuiteSidebar/>", () => {
       it("displays no matching suites message", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
         const searchInput = screen.getByPlaceholderText("Search...");
         await user.type(searchInput, "nonexistent");
@@ -523,9 +485,7 @@ describe("<SuiteSidebar/>", () => {
     ];
 
     it("does not display suite labels as tag pills", () => {
-      render(<SuiteSidebar {...defaultProps} suites={suitesWithLabels} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suitesWithLabels} />);
 
       expect(screen.queryByText("nightly")).not.toBeInTheDocument();
       expect(screen.queryByText("regression")).not.toBeInTheDocument();
@@ -554,34 +514,34 @@ describe("<SuiteSidebar/>", () => {
       ]);
 
       it("displays pass count", () => {
-        render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />,
+        );
 
         expect(screen.getByText(/8 passed/)).toBeInTheDocument();
       });
 
       it("displays pass rate with circle", () => {
-        render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />,
+        );
 
         expect(screen.getByText("100%")).toBeInTheDocument();
       });
 
       it("displays compact recency text", () => {
         const NowWrapper = ({ children }: { children: React.ReactNode }) => (
-          <ChakraProvider value={defaultSystem}>
-            <NowContext value={Date.now()}>{children}</NowContext>
-          </ChakraProvider>
+          <NowContext value={Date.now()}>{children}</NowContext>
         );
         // Override the NowProvider with FIXED_NOW so time is deterministic
         vi.useFakeTimers();
         vi.setSystemTime(FIXED_NOW);
         try {
-          render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
-            wrapper: NowWrapper,
-          });
+          renderWithDesignSystem(
+            <NowWrapper>
+              <SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />
+            </NowWrapper>,
+          );
 
           const suiteItems = screen.getAllByTestId("suite-list-item");
           const texts = suiteItems.map((el) => el.textContent).join(" ");
@@ -606,17 +566,17 @@ describe("<SuiteSidebar/>", () => {
       ]);
 
       it("displays pass count", () => {
-        render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />,
+        );
 
         expect(screen.getByText(/9 passed/)).toBeInTheDocument();
       });
 
       it("displays pass rate reflecting failures", () => {
-        render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />,
+        );
 
         expect(screen.getByText("75%")).toBeInTheDocument();
       });
@@ -624,17 +584,13 @@ describe("<SuiteSidebar/>", () => {
 
     describe("when a suite has no run data", () => {
       it("does not display a run summary line", () => {
-        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
         expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
       });
 
       it("does not display a status icon", () => {
-        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
         expect(screen.queryByTestId("status-icon-pass")).not.toBeInTheDocument();
         expect(screen.queryByTestId("status-icon-fail")).not.toBeInTheDocument();
@@ -655,9 +611,8 @@ describe("<SuiteSidebar/>", () => {
           ],
         ]);
 
-        const { rerender } = render(
+        const { rerender } = renderWithDesignSystem(
           <SuiteSidebar {...defaultProps} suites={suites} runSummaries={initialSummaries} />,
-          { wrapper: Wrapper },
         );
 
         expect(screen.getByText(/7 passed/)).toBeInTheDocument();
@@ -675,9 +630,7 @@ describe("<SuiteSidebar/>", () => {
         ]);
 
         rerender(
-          <Wrapper>
-            <SuiteSidebar {...defaultProps} suites={suites} runSummaries={updatedSummaries} />
-          </Wrapper>,
+          <SuiteSidebar {...defaultProps} suites={suites} runSummaries={updatedSummaries} />,
         );
 
         expect(screen.getByText(/8 passed/)).toBeInTheDocument();
@@ -691,9 +644,7 @@ describe("<SuiteSidebar/>", () => {
       const user = userEvent.setup();
       const onSelectSuite = vi.fn();
 
-      render(<SuiteSidebar {...defaultProps} onSelectSuite={onSelectSuite} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} onSelectSuite={onSelectSuite} />);
 
       await user.click(screen.getByText("All Runs"));
       expect(onSelectSuite).toHaveBeenCalledWith(ALL_RUNS_ID);
@@ -713,14 +664,13 @@ describe("<SuiteSidebar/>", () => {
         ],
       ]);
 
-      render(
+      renderWithDesignSystem(
         <SuiteSidebar
           {...defaultProps}
           suites={suites}
           runSummaries={runSummaries}
           selectedSuiteSlug={ALL_RUNS_ID}
         />,
-        { wrapper: Wrapper },
       );
 
       const allRunsButton = screen.getByText("All Runs");
@@ -737,9 +687,7 @@ describe("<SuiteSidebar/>", () => {
       it("shows a three-dot menu button", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
         const suiteItem = screen
           .getByText("Critical Path")
@@ -752,9 +700,7 @@ describe("<SuiteSidebar/>", () => {
 
     describe("when not hovering over a suite item", () => {
       it("renders the three-dot menu button in the DOM", () => {
-        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
         expect(screen.getByTestId("suite-menu-button")).toBeInTheDocument();
       });
@@ -765,9 +711,9 @@ describe("<SuiteSidebar/>", () => {
         const user = userEvent.setup();
         const onContextMenu = vi.fn();
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} onContextMenu={onContextMenu} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <SuiteSidebar {...defaultProps} suites={suites} onContextMenu={onContextMenu} />,
+        );
 
         const suiteItem = screen
           .getByText("Critical Path")
@@ -793,34 +739,26 @@ describe("<SuiteSidebar/>", () => {
     ];
 
     it("does not display a SUITES section header", () => {
-      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
       expect(screen.queryByText(/^SUITES$/)).not.toBeInTheDocument();
     });
 
     it("displays suite names", () => {
-      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
       expect(screen.getByText("Critical Path")).toBeInTheDocument();
       expect(screen.getByText("Billing Edge")).toBeInTheDocument();
     });
 
     it("displays the search box", () => {
-      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
       expect(screen.getByPlaceholderText("Search...")).toBeInTheDocument();
     });
 
     it("displays the collapse button", () => {
-      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
       expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
     });
@@ -844,7 +782,7 @@ describe("<SuiteSidebar/>", () => {
         onSelectSuite: vi.fn(),
       };
 
-      render(<SuiteSidebar {...props} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SuiteSidebar {...props} />);
 
       return { user, props };
     }
@@ -946,9 +884,7 @@ describe("<SuiteSidebar/>", () => {
       it("reads collapsed state from localStorage on mount", () => {
         localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, "true");
 
-        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={suites} />);
 
         expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
         expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
@@ -983,9 +919,7 @@ describe("<SuiteSidebar/>", () => {
 
     describe("when rendered in the expanded sidebar", () => {
       it("sorts external sets by most recent run first", () => {
-        render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
         const items = screen.getAllByTestId("external-set-list-item");
         const labels = items.map((el) => el.textContent);

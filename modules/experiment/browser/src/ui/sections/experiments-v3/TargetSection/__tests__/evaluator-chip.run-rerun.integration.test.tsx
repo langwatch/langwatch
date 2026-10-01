@@ -4,8 +4,8 @@
  * @see specs/features/evaluations-v3/evaluator-run-rerun-enhancements.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -25,10 +25,6 @@ const evaluator: EvaluatorConfig = {
   mappings: {},
 };
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 /** Renders the chip and opens its menu, which is where every item lives. */
 async function openMenu(props: {
   result?: unknown;
@@ -36,7 +32,7 @@ async function openMenu(props: {
   hasTargetOutput?: boolean;
   hasAnyTargetOutputs?: boolean;
 }) {
-  render(
+  renderWithDesignSystem(
     <EvaluatorChip
       evaluator={evaluator}
       result={props.result ?? null}
@@ -48,7 +44,6 @@ async function openMenu(props: {
       onRerun={vi.fn()}
       onRunOnAllRows={vi.fn()}
     />,
-    { wrapper: Wrapper },
   );
 
   await userEvent.click(screen.getByRole("button"));

@@ -1,4 +1,3 @@
-import { readableDate } from "@langwatch/coding-agent-browser-kit";
 import { Badge } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { IconType } from "react-icons";
@@ -9,6 +8,7 @@ import {
   LuGitPullRequestDraft,
 } from "react-icons/lu";
 
+import { readableDate } from "./model/short-date.ts";
 import { PULL_REQUEST_STATUS_LABELS, type PullRequestStatus } from "./pull-request-status.ts";
 
 /**

@@ -7,11 +7,11 @@
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { Box, Card as ChakraCard } from "@langwatch/design-system/primitives";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 
 import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
+import { useWorkflowHost } from "../../../model/workflow-host.ts";
 import { WorkflowChatBox } from "../workflow-chat-box.tsx";
 
 export default function WorkflowChatScreen() {

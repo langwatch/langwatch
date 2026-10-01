@@ -23,8 +23,6 @@ export function useFieldRedaction({
     { projectId: projectId ?? "" },
     {
       enabled: !!projectId && canRead,
-      staleTime: 2 * 60 * 1000,
-      refetchOnWindowFocus: false,
       refetchOnMount: false,
     },
   );

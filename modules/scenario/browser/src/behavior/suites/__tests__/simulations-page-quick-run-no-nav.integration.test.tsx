@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/quick-run-stay-in-place.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -109,7 +109,7 @@ vi.mock("../use-run-suite.ts", () => ({
   },
 }));
 
-vi.mock("../../use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
     hasAnyPermission: () => true,
@@ -145,10 +145,6 @@ vi.mock("../../scenario-api.ts", () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
         getSummaries: { invalidate: mockGetSummariesInvalidate },
-      },
-      scenarios: {
-        getSuiteRunData: { invalidate: vi.fn() },
-        getExternalSetSummaries: { invalidate: vi.fn() },
       },
     }),
     suites: {
@@ -187,6 +183,37 @@ vi.mock("../../scenario-api.ts", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      suites: {
+        getAll: { invalidate: vi.fn() },
+        getSummaries: { invalidate: mockGetSummariesInvalidate },
+      },
+    }),
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getExternalSetSummaries: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       getSuiteRunData: {
         useQuery: () => ({
@@ -208,16 +235,6 @@ vi.mock("../../scenario-api.ts", () => ({
         useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
       },
     },
-    agents: {
-      getAll: {
-        useQuery: () => ({ data: [] }),
-      },
-    },
-    prompts: {
-      getAllPromptsForProject: {
-        useQuery: () => ({ data: [] }),
-      },
-    },
   },
 }));
 
@@ -225,14 +242,10 @@ vi.mock("../../scenario-api.ts", () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 let SimulationsPage: React.ComponentType;
 
 function renderSimulationsPage() {
-  render(<SimulationsPage />, { wrapper: Wrapper });
+  renderWithDesignSystem(<SimulationsPage />);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,283 @@
+/**
+ * Row inside an expanded run showing a scenario x target pair result.
+ * @see specs/features/suites/cancel-queued-running-jobs.feature
+ */
+
+import { Box, chakra, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  SimulationRunStatus as ScenarioRunStatus,
+  type SimulationRunData as ScenarioRunData,
+} from "@langwatch/scenario-contract";
+import { Square } from "lucide-react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
+
+import { formatRunStatusLabel } from "../../../../model/suite/format-run-status-label.ts";
+import { formatCost, formatLatency } from "../../../../model/suite/formatters.ts";
+import { buildDisplayTitle } from "../../../../model/suite/run-history-transforms.ts";
+import { isCancellableStatus } from "../../../../model/suite/run-status.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/suite/scenario-run-status-config.ts";
+
+/**
+ * Wraps one rendered scenario row. `children` is the single row element, not
+ * arbitrary nodes: the app's wrapper `cloneElement`s it to add `className` and
+ * `style`, so the element type has to say those props are accepted.
+ */
+export type ScenarioRunContextRenderer = (input: {
+  scenarioRunId: string;
+  name: string;
+  children: ReactElement<{ className?: string; style?: CSSProperties }>;
+}) => ReactNode;
+
+type ScenarioTargetRowProps = {
+  scenarioRun: ScenarioRunData;
+  targetName: string | null;
+  onClick: () => void;
+  iteration?: number;
+  onCancel?: () => void;
+  isCancelling?: boolean;
+  onPrefetch?: () => void;
+  renderScenarioContext?: ScenarioRunContextRenderer;
+};
+
+const STATUS_CIRCLE_COLORS: Record<string, string> = {
+  [ScenarioRunStatus.SUCCESS]: "green.500",
+  [ScenarioRunStatus.FAILED]: "red.500",
+  [ScenarioRunStatus.ERROR]: "red.500",
+  [ScenarioRunStatus.STALLED]: "yellow.500",
+  [ScenarioRunStatus.CANCELLED]: "gray.400",
+  [ScenarioRunStatus.IN_PROGRESS]: "orange.400",
+  [ScenarioRunStatus.PENDING]: "gray.400",
+  [ScenarioRunStatus.QUEUED]: "blue.400",
+  [ScenarioRunStatus.RUNNING]: "orange.400",
+};
+
+function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
+  const roleCosts = scenarioRun.roleCosts ?? {};
+  const roleLatencies = scenarioRun.roleLatencies ?? {};
+  const latencyRoles = Object.keys(roleLatencies).filter(
+    (role) => roleLatencies[role] && roleLatencies[role]!.length > 0,
+  );
+  const costRoles = Object.keys(roleCosts).filter(
+    (role) => roleCosts[role] && roleCosts[role]!.length > 0,
+  );
+
+  return (
+    <VStack align="stretch" gap={0} fontSize="12px" minWidth="180px" color="fg">
+      <VStack align="stretch" gap={2} padding={2}>
+        {/* Total duration */}
+        {scenarioRun.durationInMs > 0 && (
+          <HStack justify="space-between">
+            <Text color="fg.muted">Duration</Text>
+            <Text fontWeight="medium">{formatLatency(scenarioRun.durationInMs)}</Text>
+          </HStack>
+        )}
+
+        {/* Total cost */}
+        {scenarioRun.totalCost != null && (
+          <HStack justify="space-between">
+            <Text color="fg.muted">Total Cost</Text>
+            <Text fontWeight="medium">{formatCost(scenarioRun.totalCost)}</Text>
+          </HStack>
+        )}
+
+        {/* Latency per role */}
+        {latencyRoles.length > 0 && (
+          <>
+            <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
+            <Text color="fg" fontWeight="semibold">
+              Latency
+            </Text>
+            {latencyRoles.map((role) => {
+              const latencies = roleLatencies[role]!;
+              const avg = latencies.reduce((a, b) => a + b, 0) / latencies.length;
+              return (
+                <HStack key={`lat-${role}`} justify="space-between" paddingLeft={2}>
+                  <Text color="fg.muted">{role}</Text>
+                  <Text fontWeight="medium">{formatLatency(avg)}</Text>
+                </HStack>
+              );
+            })}
+          </>
+        )}
+
+        {/* Cost per role */}
+        {costRoles.length > 0 && (
+          <>
+            {latencyRoles.length === 0 && (
+              <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
+            )}
+            <Text color="fg" fontWeight="semibold">
+              Cost
+            </Text>
+            {costRoles.map((role) => {
+              const costs = roleCosts[role]!;
+              const total = costs.reduce((a, b) => a + b, 0);
+              return (
+                <HStack key={`cost-${role}`} justify="space-between" paddingLeft={2}>
+                  <Text color="fg.muted">{role}</Text>
+                  <Text fontWeight="medium">{formatCost(total)}</Text>
+                </HStack>
+              );
+            })}
+          </>
+        )}
+      </VStack>
+    </VStack>
+  );
+}
+
+function StatusCircle({ status }: { status: ScenarioRunStatus }) {
+  if (status === ScenarioRunStatus.QUEUED || status === ScenarioRunStatus.RUNNING) {
+    return <Spinner size="xs" data-testid="queued-spinner" />;
+  }
+
+  return (
+    <Box
+      width="10px"
+      height="10px"
+      borderRadius="full"
+      bg={STATUS_CIRCLE_COLORS[status] ?? "gray.400"}
+      flexShrink={0}
+    />
+  );
+}
+
+export function ScenarioTargetRow({
+  scenarioRun,
+  targetName,
+  onClick,
+  iteration,
+  onCancel,
+  isCancelling = false,
+  onPrefetch,
+  renderScenarioContext,
+}: ScenarioTargetRowProps) {
+  const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
+  const displayName = buildDisplayTitle({
+    scenarioName,
+    targetName,
+    iteration,
+  });
+
+  const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
+
+  const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
+  const hasMetrics = scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
+  const handlePrefetch = () => onPrefetch?.();
+
+  const content = (
+    // Armed, the run can be handed to Langy. Same chip id the run drawer
+    // derives, so the row and the drawer opened from it are one chip.
+    <Box
+      position="relative"
+      className="group"
+      borderRadius="lg"
+      borderBottom="1px solid"
+      _last={{ border: "none" }}
+      borderColor="border.subtle"
+      _hover={{ borderColor: "transparent" }}
+    >
+      <HStack
+        position="relative"
+        width="full"
+        paddingX={4}
+        paddingY={2}
+        gap={4}
+        _hover={{ bg: "bg.muted/80" }}
+        borderRadius="lg"
+        cursor="pointer"
+      >
+        {/* The row's overlay makes the whole row open the run; stop and metrics sit above it. */}
+        <chakra.button
+          display="flex"
+          alignItems="center"
+          type="button"
+          gap={4}
+          minWidth={0}
+          cursor="pointer"
+          onClick={onClick}
+          onMouseEnter={handlePrefetch}
+          onFocus={handlePrefetch}
+          aria-label={`View details for ${displayName}`}
+          _before={{ content: '""', position: "absolute", inset: 0, borderRadius: "lg" }}
+        >
+          <StatusCircle status={scenarioRun.status} />
+          <Text
+            fontSize="xs"
+            fontWeight="semibold"
+            color={config.fgColor}
+            minWidth="43px"
+            textAlign="left"
+            whiteSpace="nowrap"
+          >
+            {formatRunStatusLabel({
+              status: scenarioRun.status,
+              results: scenarioRun.results ?? undefined,
+            })}
+          </Text>
+          <Text fontSize="sm" textAlign="left" truncate>
+            {displayName}
+          </Text>
+        </chakra.button>
+        {hasCancelButton && (
+          <chakra.button
+            display="flex"
+            alignItems="center"
+            type="button"
+            position="relative"
+            zIndex={1}
+            disabled={isCancelling}
+            gap={1}
+            paddingX={2}
+            paddingY={0.5}
+            borderRadius="md"
+            border="1px solid"
+            borderColor="gray.300"
+            fontSize="xs"
+            color="fg.default"
+            cursor={isCancelling ? "default" : "pointer"}
+            opacity={isCancelling ? 0.6 : 1}
+            flexShrink={0}
+            _hover={isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
+            onClick={() => onCancel?.()}
+            aria-label="Stop run"
+            data-testid="cancel-run-button"
+          >
+            {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
+            <Text fontSize="xs">Stop</Text>
+          </chakra.button>
+        )}
+        <Box flex={1} />
+        {hasMetrics && (
+          <Tooltip
+            content={<MetricsTooltipContent scenarioRun={scenarioRun} />}
+            contentProps={{ padding: 0 }}
+            positioning={{ placement: "bottom" }}
+            interactive
+          >
+            <HStack position="relative" zIndex={1} gap={2} flexShrink={0} color="fg.subtle">
+              {scenarioRun.durationInMs > 0 && (
+                <Text fontSize="11px">{formatLatency(scenarioRun.durationInMs)}</Text>
+              )}
+              {scenarioRun.totalCost != null && (
+                <>
+                  <Text color="gray.300">{"⋅"}</Text>
+                  <Text fontSize="xs">{formatCost(scenarioRun.totalCost)}</Text>
+                </>
+              )}
+            </HStack>
+          </Tooltip>
+        )}
+      </HStack>
+    </Box>
+  );
+
+  return renderScenarioContext
+    ? renderScenarioContext({
+        scenarioRunId: scenarioRun.scenarioRunId,
+        name: displayName,
+        children: content,
+      })
+    : content;
+}

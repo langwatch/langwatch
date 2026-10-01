@@ -34,8 +34,8 @@ const ORGANIZATION_GRAPH = {
 
 const answer = vi.fn(() => ({ data: [ORGANIZATION_GRAPH] }));
 vi.mock("../personal-workspace-api.ts", () => ({
-  personalWorkspaceApi: { organization: { getAll: { useQuery: () => answer() } } },
-  api: { organization: { getAll: { useQuery: () => answer() } } },
+  personalWorkspaceApi: { organization: { getScopeGraph: { useQuery: () => answer() } } },
+  api: { organization: { getScopeGraph: { useQuery: () => answer() } } },
 }));
 
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";

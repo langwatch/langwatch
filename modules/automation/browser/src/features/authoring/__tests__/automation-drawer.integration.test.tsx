@@ -1,8 +1,8 @@
+import { TriggerAction } from "@langwatch/automation-contract";
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TriggerAction } from "@langwatch/automation-contract";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
@@ -107,9 +107,6 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
-    dataset: {
-      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
-    },
     team: {
       getTeamWithMembers: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
@@ -129,6 +126,23 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
         getById: { invalidate: mockGraphsGetByIdInvalidate },
       },
     }),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({
+      automation: {
+        getTriggers: { invalidate: mockInvalidate },
+        getTriggerById: { invalidate: mockGetTriggerByIdInvalidate },
+      },
+      graphs: {
+        getAll: { invalidate: mockGraphsGetAllInvalidate },
+        getById: { invalidate: mockGraphsGetByIdInvalidate },
+      },
+    }),
+    dataset: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
   },
 }));
 
@@ -157,9 +171,9 @@ vi.mock("../../../behavior/slack-api.ts", () => ({
 let host = fakeAutomationHost();
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <AutomationHostProvider value={host}>{children}</AutomationHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 const renderDrawer = (

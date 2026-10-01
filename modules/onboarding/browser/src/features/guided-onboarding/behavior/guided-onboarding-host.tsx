@@ -1,4 +1,3 @@
-import type { GuidedKickoffTourStatus } from "@langwatch/onboarding-browser-kit";
 /**
  * Mounted once above every guided landing: docks the panel, runs or skips
  * the current path's tour, records the outcome and queues the kickoff.
@@ -11,6 +10,7 @@ import { type MutableRefObject, useEffect, useMemo, useRef } from "react";
 import { onboardingApi } from "../../../behavior/onboarding-api.ts";
 import { useRequiredSession } from "../../../behavior/use-required-session.ts";
 import { useOnboardingHost, type OnboardingHostApi } from "../../../model/onboarding-host.ts";
+import type { GuidedKickoffTourStatus } from "../model/kickoff.ts";
 import {
   buildKickoff,
   firstNameOf,

@@ -7,6 +7,7 @@
 
 import { getDrawerStack, useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { toaster } from "@langwatch/design-system/toaster";
 import { generate } from "@langwatch/ksuid";
 import {
@@ -24,7 +25,7 @@ import {
   useSuiteEditorStore,
 } from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useSuite } from "../../../../behavior/suites/use-suite.ts";
 import { useProjectSpanNames } from "../../../../behavior/use-project-span-names.ts";
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import { SUITE_EDITOR_DRAWER } from "../../../sections/agent-testing/cases/drawer-keys.ts";
@@ -302,10 +303,11 @@ export function useSuiteEditor({
   const update = useSuiteEditorStore((state) => state.update);
   const clear = useSuiteEditorStore((state) => state.clear);
 
-  const { data: suite, isLoading: isSuiteLoading } = api.suites.getById.useQuery(
-    { projectId, id: testSuiteId ?? "" },
-    { enabled: isOpen && !!projectId && !!testSuiteId },
-  );
+  const { data: suite, isLoading: isSuiteLoading } = useSuite({
+    projectId,
+    id: testSuiteId ?? undefined,
+    enabled: isOpen,
+  });
 
   const draft = useSuiteDraft({ testSuiteId, isOpen, suite });
 

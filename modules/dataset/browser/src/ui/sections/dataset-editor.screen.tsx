@@ -1,12 +1,13 @@
 // Dataset editor respecting I-READY gate; dataset ID from host route (screen decides readiness).
 
+import { datasetClient } from "@langwatch/dataset-client";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Alert, Button, Spinner, Text } from "@langwatch/design-system/primitives";
-import { datasetContextChip, useRegisterLangyPageContext } from "@langwatch/langy-browser-kit";
 import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 
-import { datasetApi } from "../../behavior/dataset-api.ts";
+import { datasetContextChip } from "../../behavior/langy/langy-context-chips.ts";
+import { useRegisterLangyPageContext } from "../../behavior/langy/langy-page-context.store.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DatasetEditorTable } from "./datasets/editor/dataset-editor-table.tsx";
 
@@ -17,28 +18,18 @@ import { DatasetEditorTable } from "./datasets/editor/dataset-editor-table.tsx";
  */
 const EXPERIMENT_PERMISSION = "evaluations:manage";
 
-/** How often a preparing dataset is re-read while the normalize job runs. */
-const PREPARING_POLL_MS = 3000;
-
 export default function DatasetEditorScreen() {
   const host = useDatasetHost();
   const project = host.project();
   const datasetId = host.route().params.id ?? "";
   const [isRetrying, setIsRetrying] = useState(false);
-  const retryNormalize = datasetApi.dataset.retryNormalize.useMutation();
+  const retryNormalize = datasetClient.dataset.retryNormalize.useMutation();
 
-  const datasetQuery = datasetApi.dataset.getById.useQuery(
+  const datasetQuery = datasetClient.dataset.getById.useQuery(
     { projectId: project?.id ?? "", datasetId },
     {
       enabled: !!project && !!datasetId,
-      // Poll only while preparing; the functional form lets the query schedule
-      // its own stop once the status settles.
-      refetchInterval: (query) => {
-        const status = query.state.data?.status;
-        const isPreparing = status === "processing" || status === "uploading";
-
-        return isPreparing ? PREPARING_POLL_MS : false;
-      },
+      // needs a read hint: dataset normalisation finished (ready or failed)
     },
   );
 

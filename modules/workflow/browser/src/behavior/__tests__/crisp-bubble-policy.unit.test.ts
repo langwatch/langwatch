@@ -1,13 +1,14 @@
-import {
-  assertCrispChatHidden,
-  installCrispBubblePolicy,
-  toggleSupportChat,
-} from "@langwatch/workflow-browser-kit";
 /**
  * @vitest-environment jsdom
  * Spec: specs/support/crisp-bubble-suppression.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  assertCrispChatHidden,
+  installCrispBubblePolicy,
+  toggleSupportChat,
+} from "../crisp-bubble-policy.ts";
 
 const SUPPRESSED_ATTRIBUTE = "data-crisp-suppressed";
 
@@ -17,7 +18,11 @@ type FakeCrisp = {
   trigger: (event: string) => void;
 };
 
-const crispGlobals = () => window;
+type CrispGlobals = {
+  $crisp?: { push: (args: unknown[]) => unknown };
+  CRISP_READY_TRIGGER?: () => void;
+};
+const crispGlobals = (): CrispGlobals => window;
 
 function installFakeCrisp(): FakeCrisp {
   const handlers = new Map<string, () => void>();

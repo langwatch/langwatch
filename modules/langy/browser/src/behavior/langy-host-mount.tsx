@@ -13,9 +13,9 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
-import { isLangyDemoProject } from "@langwatch/langy-browser-kit";
 import { useMemo, type ReactNode } from "react";
 
+import { isLangyDemoProject } from "../model/langy-demo-project.ts";
 import {
   LangyHostApi,
   LangyHostProvider,

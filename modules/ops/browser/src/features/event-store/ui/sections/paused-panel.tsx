@@ -40,7 +40,7 @@ export function PausedCard({
 function ParkedGroupList({ queueName, tenantId }: { queueName: string; tenantId: string }) {
   const query = api.ops.listParkedGroups.useQuery(
     { queueName, tenantId, page: 1, pageSize: 20 },
-    { refetchInterval: 10_000 },
+    {},
   );
 
   return (

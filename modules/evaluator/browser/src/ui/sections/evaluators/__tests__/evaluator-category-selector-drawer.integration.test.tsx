@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -68,10 +68,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getComplexProps: () => ({}),
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 describe("EvaluatorCategorySelectorDrawer", () => {
   const mockOnSelectCategory = vi.fn();
   const mockOnClose = vi.fn();
@@ -85,14 +81,13 @@ describe("EvaluatorCategorySelectorDrawer", () => {
   });
 
   const renderDrawer = (props = {}) => {
-    return render(
+    return renderWithDesignSystem(
       <EvaluatorCategorySelectorDrawer
         open={true}
         onClose={mockOnClose}
         onSelectCategory={mockOnSelectCategory}
         {...props}
       />,
-      { wrapper: Wrapper },
     );
   };
 
@@ -244,13 +239,12 @@ describe("EvaluatorCategorySelectorDrawer", () => {
   describe("when the drawer is closed and re-opened", () => {
     it("resets the view back to the category step", async () => {
       const user = userEvent.setup();
-      const { rerender } = render(
+      const { rerender } = renderWithDesignSystem(
         <EvaluatorCategorySelectorDrawer
           open={true}
           onClose={mockOnClose}
           onSelectCategory={mockOnSelectCategory}
         />,
-        { wrapper: Wrapper },
       );
 
       // Drill into the type step

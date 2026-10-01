@@ -1,5 +1,5 @@
 import type { SimulationMessage } from "@langwatch/scenario-contract";
-import { type DisplayPart, flattenMessages } from "@langwatch/trace-browser-kit";
+import { type DisplayPart, flattenMessages } from "@langwatch/trace-contract/conversation";
 import { useMemo } from "react";
 
 import { ConversationThread } from "../../../behavior/lent-trace.tsx";

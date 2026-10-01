@@ -4,13 +4,14 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { useEffect } from "react";
 
 import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { useAgentTestingStore } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { api } from "../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useTestSuites } from "../../../behavior/suites/use-test-suites.ts";
 import { useOpenNewRunPlan } from "./run/run-plan-dialog-host.tsx";
 
 /** The id of the suite the address names, or nothing for any other selection. */
@@ -19,10 +20,7 @@ export function useSelectedSuiteTestSuiteId(selection: AgentTestingSelection): s
 
   // The rail reads the same list, so this is the cached copy rather than a
   // second read. It is only here to turn the address of a suite into its id.
-  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const { data: testSuites } = useTestSuites({ projectId: project?.id });
 
   if (selection.kind !== "suite") return null;
   return testSuites?.find((testSuite) => testSuite.slug === selection.slug)?.id ?? null;

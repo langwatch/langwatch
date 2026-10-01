@@ -4,11 +4,11 @@
  * editor, header line and run dialog all resolve an attachment through it.
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { useMemo } from "react";
 
 import type { AttachableEvaluator } from "../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { api } from "../../scenario-api.ts";
-import { useOrganizationTeamProject } from "../../use-organization-team-project.ts";
 
 export function useProjectEvaluators({
   enabled = true,
@@ -20,7 +20,7 @@ export function useProjectEvaluators({
 } {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const { data, isLoading } = api.evaluators.getAll.useQuery(
+  const { data, isLoading } = evaluatorClient.evaluators.getAll.useQuery(
     { projectId },
     { enabled: enabled && !!projectId },
   );

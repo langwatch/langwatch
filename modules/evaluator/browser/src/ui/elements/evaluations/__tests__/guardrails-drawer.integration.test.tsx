@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * @see specs/monitors/guardrails-drawer.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -58,12 +58,7 @@ describe("GuardrailsDrawer", () => {
     cleanup();
   });
 
-  const renderDrawer = () =>
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <GuardrailsDrawer open={true} />
-      </ChakraProvider>,
-    );
+  const renderDrawer = () => renderWithDesignSystem(<GuardrailsDrawer open={true} />);
 
   describe("given the evaluator list is open for guardrail setup", () => {
     describe("when I select an evaluator with a slug", () => {

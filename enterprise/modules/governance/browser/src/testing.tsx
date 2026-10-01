@@ -26,9 +26,9 @@
  * importing the real `hasPermissionWithHierarchy`, kept across the move.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
-import { render, type RenderResult } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import type { GovernanceToast, GovernanceToaster } from "./behavior/governance-feedback.ts";
@@ -329,10 +329,8 @@ export function renderWithGovernanceHost(
   { host }: { host: FakeGovernanceHost },
 ): RenderResult {
   installBrowserApisJsdomLacks();
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <GovernanceHostHarness host={host}>{element}</GovernanceHostHarness>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <GovernanceHostHarness host={host}>{element}</GovernanceHostHarness>,
   );
 }
 

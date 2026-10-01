@@ -22,9 +22,6 @@
       "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {
-      "path": "../browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../contract/tsconfig.build.json"
     },
     {

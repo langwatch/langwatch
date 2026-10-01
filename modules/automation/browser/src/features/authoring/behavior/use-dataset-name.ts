@@ -1,7 +1,7 @@
 import { TriggerAction } from "@langwatch/automation-contract";
 import { useEffect } from "react";
 
-import { api } from "../../../behavior/automation-api.ts";
+import { useProjectDatasets } from "../../../behavior/use-automation-reads.ts";
 import { type DatasetNamedDraft, withDatasetName } from "../model/dataset-name.ts";
 import type { DatasetSlice } from "../model/dataset-slice.ts";
 
@@ -24,10 +24,7 @@ export function useDatasetName({
     draft.action === TriggerAction.ADD_TO_DATASET &&
     !!draft.slices[TriggerAction.ADD_TO_DATASET].datasetId;
   // Same input as the dataset step's own query, so the two share one cache.
-  const list = api.dataset.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId && isDataset, refetchOnWindowFocus: false },
-  );
+  const list = useProjectDatasets({ projectId, enabled: isDataset });
   useEffect(() => {
     const named = withDatasetName({ draft, datasets: list.data });
     if (named === draft) return;

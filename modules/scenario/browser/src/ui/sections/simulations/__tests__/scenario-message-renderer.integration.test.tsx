@@ -2,14 +2,14 @@
  * Integration test for ScenarioMessageRenderer's content coercion.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
-vi.mock("@langwatch/stored-object-browser-kit", () => ({
+vi.mock("../../../../behavior/stored-object/use-stored-object-url.ts", () => ({
   useStoredObjectUrl: ({ reference }: { reference: string }) => ({
     status: "ready",
     url: reference,
@@ -34,25 +34,17 @@ vi.mock("../run-turn-separator.tsx", () => ({
   ),
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const PROJECT_ID = "proj_test";
 
 const renderWith = (messages: SimulationMessage[]): void => {
-  render(
-    <Wrapper>
-      <ScenarioMessageRenderer messages={messages} variant="drawer" projectId={PROJECT_ID} />
-    </Wrapper>,
+  renderWithDesignSystem(
+    <ScenarioMessageRenderer messages={messages} variant="drawer" projectId={PROJECT_ID} />,
   );
 };
 
 const renderWithGrid = (messages: SimulationMessage[]): void => {
-  render(
-    <Wrapper>
-      <ScenarioMessageRenderer messages={messages} variant="grid" projectId={PROJECT_ID} />
-    </Wrapper>,
+  renderWithDesignSystem(
+    <ScenarioMessageRenderer messages={messages} variant="grid" projectId={PROJECT_ID} />,
   );
 };
 

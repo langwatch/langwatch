@@ -3,11 +3,11 @@
  * @vitest-environment jsdom
  * @see specs/model-providers/custom-model-display-name.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
@@ -44,15 +44,13 @@ import { SimulationModelSelect } from "../simulation-model-select.tsx";
 afterEach(() => cleanup());
 
 function renderPicker() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SimulationModelSelect
-        label="User simulator"
-        value={null}
-        onChange={() => undefined}
-        featureKey="scenarios.user_simulator"
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <SimulationModelSelect
+      label="User simulator"
+      value={null}
+      onChange={() => undefined}
+      featureKey="scenarios.user_simulator"
+    />,
   );
 }
 

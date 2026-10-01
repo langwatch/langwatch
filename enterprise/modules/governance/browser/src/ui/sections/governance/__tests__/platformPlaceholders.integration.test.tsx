@@ -5,7 +5,12 @@
  * not claim. Real pages over the fake host; the API is a boundary that answers nothing.
  * @see specs/governance/governance-platform-placeholders.feature
  */
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { defineSlice } from "@langwatch/browser-host/global-store";
+import {
+  LANGY_ABSENT_SURFACE,
+  LANGY_STORE_SLICE,
+  type LangySliceSurface,
+} from "@langwatch/langy-contract";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -52,9 +57,15 @@ function open(page: ReactElement) {
   });
 }
 
+// Stands in for Langy, the owner of the slice, which this package only reads.
+const langy = defineSlice<LangySliceSurface>({
+  name: LANGY_STORE_SLICE,
+  create: (set) => ({ ...LANGY_ABSENT_SURFACE, openPanel: () => set({ isOpen: true }) }),
+});
+
 afterEach(() => {
   cleanup();
-  useLangyStore.setState({ isOpen: false });
+  langy.setState({ isOpen: false });
 });
 
 describe("the Insights screen on first open", () => {
@@ -101,11 +112,11 @@ describe("the Insights screen on first open", () => {
   /** @scenario "Open Langy opens the Langy panel" */
   it("opens the Langy panel when Open Langy is pressed", async () => {
     open(<InsightsScreen />);
-    expect(useLangyStore.getState().isOpen).toBe(false);
+    expect(langy.getState().isOpen).toBe(false);
 
     await userEvent.click(screen.getByRole("button", { name: "Open Langy" }));
 
-    expect(useLangyStore.getState().isOpen).toBe(true);
+    expect(langy.getState().isOpen).toBe(true);
   });
 });
 

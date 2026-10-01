@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { useState } from "react";
@@ -30,10 +30,6 @@ const LOCALE: DeclaredParameter = {
   defaultValue: "en",
   source: "scenario",
 };
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 /** The field with its own state, the way a dialog holds it. */
 function Field({
@@ -68,7 +64,7 @@ describe("<ParameterLineField/>", () => {
     /** @scenario "Key mode lists every declared parameter with its description, default and source" */
     it("lists every declared parameter with its description, default and source", async () => {
       const user = userEvent.setup();
-      render(<Field />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Field />);
 
       await user.click(screen.getByTestId("line"));
 
@@ -84,7 +80,7 @@ describe("<ParameterLineField/>", () => {
 
     /** @scenario "The placeholder reads the first declared parameter" */
     it("reads the first declared parameter as its placeholder", () => {
-      render(<Field definitions={[MODEL, LOCALE]} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Field definitions={[MODEL, LOCALE]} />);
 
       expect(screen.getByTestId("line")).toHaveAttribute("placeholder", "model=gpt-5-mini");
     });
@@ -94,7 +90,7 @@ describe("<ParameterLineField/>", () => {
     /** @scenario "Value mode lists the options of a closed list" */
     it("lists the options, and a click writes the pair on the line", async () => {
       const user = userEvent.setup();
-      render(<Field />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Field />);
 
       await user.type(screen.getByTestId("line"), "model=");
 
@@ -118,7 +114,7 @@ describe("<ParameterLineField/>", () => {
 
     beforeEach(() => {
       user = userEvent.setup();
-      render(<Field />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Field />);
       line = screen.getByTestId("line");
     });
 
@@ -168,7 +164,7 @@ describe("<ParameterLineField/>", () => {
     it("keeps the text and shows no list", async () => {
       const user = userEvent.setup();
       const onCommit = vi.fn();
-      render(<Field onCommit={onCommit} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Field onCommit={onCommit} />);
 
       const line = screen.getByTestId("line");
       await user.type(line, "model=claude");
@@ -183,7 +179,7 @@ describe("<ParameterLineField/>", () => {
   describe("when a second pair is started after a comma", () => {
     it("offers the keys again for the new token", async () => {
       const user = userEvent.setup();
-      render(<Field initial="model=gpt-5" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Field initial="model=gpt-5" />);
 
       const line = screen.getByTestId("line");
       await user.click(line);
@@ -203,7 +199,7 @@ describe("<ParameterLineField/>", () => {
   describe("when the list is open", () => {
     it("points the input at the list of options and at the highlighted one", async () => {
       const user = userEvent.setup();
-      render(<Field />, { wrapper: Wrapper });
+      renderWithDesignSystem(<Field />);
 
       const line = screen.getByTestId("line");
       await user.click(line);
@@ -222,7 +218,7 @@ describe("<ParameterLineField/>", () => {
 
   describe("when the server refused a value", () => {
     it("reads the refusal under the line", () => {
-      render(
+      renderWithDesignSystem(
         <ParameterLineField
           ariaLabel="Parameters"
           testId="line"
@@ -231,7 +227,6 @@ describe("<ParameterLineField/>", () => {
           definitions={[MODEL]}
           error="Choose one of gpt-5-mini, gpt-5."
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("line")).toHaveAttribute("aria-invalid", "true");

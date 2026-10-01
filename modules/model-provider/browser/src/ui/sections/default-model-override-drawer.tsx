@@ -4,21 +4,22 @@
  * keeps the outgoing model stale until remounted.
  */
 import type { WireOf } from "@langwatch/api/web";
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   INHERIT_SENTINEL,
-  modelSelectorOptions,
   ProviderModelSelector,
-} from "@langwatch/model-provider-browser-kit";
+} from "@langwatch/design-system/provider-model-selector";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { modelSelectorOptions } from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
   LATEST_ALIAS_PROVIDERS,
+  modelDisplayLabel,
+  modelPickerOption,
   type ModelDefaultInheritedValues,
   type ModelDefaultSnapshot,
 } from "@langwatch/model-provider-contract";
@@ -27,6 +28,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import { ScopeChipPicker, type ScopeTriadEntry } from "./authz/scope-picker/scope-chip-picker.tsx";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;
@@ -605,11 +607,16 @@ function RoleRow({
         <Box width="240px" flexShrink={0}>
           <ProviderModelSelector
             model={current}
-            options={roleSelectModelOptions({ options: modelOptions, role })}
+            query={{
+              data: roleSelectModelOptions({ options: modelOptions, role }).map((modelValue) =>
+                modelPickerOption({ displayNames, modelValue }),
+              ),
+              isLoading: false,
+            }}
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={inheritOption}
             disabled={unsupportedAtScope}
-            displayNames={displayNames}
+            labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
           />
         </Box>
         {canExpand ? (
@@ -717,13 +724,16 @@ function FeatureRow({
       <Box width="240px" flexShrink={0}>
         <ProviderModelSelector
           model={override}
-          options={featureRowModelOptions({
-            options: modelOptions,
-            featureKey: feature.key,
-          })}
+          query={{
+            data: featureRowModelOptions({
+              options: modelOptions,
+              featureKey: feature.key,
+            }).map((modelValue) => modelPickerOption({ displayNames, modelValue })),
+            isLoading: false,
+          }}
           onChange={(m) => onSetOverride(feature.key, m)}
           inheritOption={inheritOption ?? undefined}
-          displayNames={displayNames}
+          labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
         />
       </Box>
       <Box width="24px" flexShrink={0} />

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -38,7 +38,7 @@ function withProviders(ui: React.ReactNode) {
   });
   return (
     <QueryClientProvider client={queryClient}>
-      <ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>
+      <DesignSystemProvider forcedTheme="light">{ui}</DesignSystemProvider>
     </QueryClientProvider>
   );
 }

@@ -2,9 +2,8 @@ import { Skeleton } from "@langwatch/design-system/primitives";
 import groupBy from "lodash-es/groupBy";
 import { useMemo } from "react";
 
-import { promptApi } from "../../../../behavior/prompt-api.ts";
 import { useAllPromptsForProject } from "../../../../behavior/use-all-prompts-for-project.ts";
-import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
+import { usePromptDefaultModel } from "../../../../behavior/use-prompt-default-model.ts";
 import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";
 import { modelProviderIcons } from "../model-selection/model-provider-icons.tsx";
@@ -18,13 +17,8 @@ export function PublishedPromptsList() {
   // fresh reference on every read, which `useSyncExternalStore` reads as a
   // change and the studio re-renders until React gives up.
   const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
-  const { project } = usePromptProject();
-
   // Cascade-resolved model for new-tab prompt defaults.
-  const resolvedDefault = promptApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
+  const resolvedDefault = usePromptDefaultModel();
 
   /**
    * Group the prompts by folder, derived from the handle prefix.

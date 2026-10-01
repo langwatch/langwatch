@@ -5,11 +5,9 @@
  */
 
 import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
-import { TRACE_QUERY_CONFIG } from "@langwatch/trace-browser-kit";
 import { LuListTree } from "react-icons/lu";
 
-import { promptApi } from "../../../../behavior/prompt-api.ts";
-import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
+import { usePlaygroundTrace } from "../../../../behavior/use-playground-trace.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 
 function SeparatorLine() {
@@ -76,23 +74,9 @@ export function PlaygroundTurnSeparator({
    */
   live?: boolean;
 }) {
-  const { project } = usePromptProject();
   const host = usePromptHost();
 
-  // Traces land a beat after the message snapshot, so retry quietly and only
-  // advertise the affordance once the trace actually exists.
-  const traceQuery = promptApi.traces.getById.useQuery(
-    { projectId: project?.id ?? "", traceId: traceId ?? "" },
-    {
-      enabled: !!project && !!traceId,
-      ...TRACE_QUERY_CONFIG,
-      // Each separator opens its own query, so a transcript of N turns holds N
-      // of them. Waiting out ten minute-spaced retries per turn is only worth
-      // it while the trace might still land; on a replay it is a retry tail for
-      // a trace that already does not exist.
-      retry: live ? TRACE_QUERY_CONFIG.retry : 0,
-    },
-  );
+  const traceQuery = usePlaygroundTrace({ traceId, live });
   // One value carries both facts the render needs: that a trace exists, and
   // which one - so the click handler cannot be built without an id to open.
   const linkedTraceId = traceQuery.data && traceId ? traceId : undefined;

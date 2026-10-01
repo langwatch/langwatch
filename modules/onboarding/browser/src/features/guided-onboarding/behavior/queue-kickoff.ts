@@ -1,6 +1,5 @@
-import { type GuidedKickoff, planGuidedKickoffSend } from "@langwatch/onboarding-browser-kit";
-
 import type { OnboardingHostApi } from "../../../model/onboarding-host.ts";
+import { type GuidedKickoff, planGuidedKickoffSend } from "../model/kickoff.ts";
 
 /**
  * Queues the kickoff once Langy announces it is scoped to `organizationId`: the parts the

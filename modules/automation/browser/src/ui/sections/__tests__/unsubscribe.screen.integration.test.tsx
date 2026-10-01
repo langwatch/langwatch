@@ -5,8 +5,8 @@
  * Spec: specs/automations/unsubscribe-landing.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, screen, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -48,11 +48,7 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
 }));
 
 function renderScreen(token: string) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <UnsubscribeScreen token={token} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<UnsubscribeScreen token={token} />);
 }
 
 beforeEach(() => {

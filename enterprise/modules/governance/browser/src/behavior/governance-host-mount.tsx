@@ -123,7 +123,7 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
   const { organizationId, projectId } = useUiScope().activeScope();
   const uiDeployment = useUiDeployment();
 
-  const organizations = governanceApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = governanceApi.organization.getScopeGraph.useQuery({});
   const orgs = organizations.data ?? NO_ORGANIZATIONS;
 
   const org = useMemo(

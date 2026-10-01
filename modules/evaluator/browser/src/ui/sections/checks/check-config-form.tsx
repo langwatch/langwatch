@@ -32,7 +32,6 @@ import {
   findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser-kit";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import {
   type ComponentProps,
@@ -56,10 +55,12 @@ import { z } from "zod";
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { EvaluatorTracesMapping } from "../../../behavior/lent-peers.tsx";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
+import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import {
   type CheckPreconditions,
   checkPreconditionsSchema,
 } from "../../../model/evaluations/types.ts";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
 import { PreconditionsField } from "../../elements/checks/preconditions-field.tsx";
 import DynamicZodForm from "./dynamic-zod-form.tsx";
 import { EvaluationManualIntegration } from "./evaluation-manual-integration.tsx";
@@ -96,17 +97,9 @@ export default function CheckConfigForm({
   // Cascade-resolved defaults so the form's initial model /
   // embeddings_model values reflect the project's configured
   // providers instead of the generic DEFAULT_MODEL fallback.
-  const resolvedDefaultModel = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
-  const resolvedDefaultEmbeddings = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id },
-  );
+  const { resolvedDefaultModel, resolvedDefaultEmbeddings } = useEvaluatorDefaultModels({
+    projectId: project?.id,
+  });
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({

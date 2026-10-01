@@ -4,7 +4,7 @@
  * ticks to its frame, and shows its code's own errors on the card.
  * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,7 +14,7 @@ const { periodMock, executorMock, frameProps } = vi.hoisted(() => ({
   frameProps: vi.fn<(props: SandboxedChartFrameProps) => void>(),
 }));
 
-vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => ({
+vi.mock("../../elements/period-selector.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   usePeriodSelector: () => periodMock(),
 }));
@@ -58,7 +58,7 @@ const period = ({ startMs, endMs }: { startMs: number; endMs: number }) => ({
 });
 
 const widget = (refreshedAt?: number) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <DashboardRefreshedAtContext.Provider value={refreshedAt}>
       <DashboardWidgetFrame
         id="graph_1"
@@ -68,7 +68,7 @@ const widget = (refreshedAt?: number) => (
         maxHeight={300}
       />
     </DashboardRefreshedAtContext.Provider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 beforeEach(() => {

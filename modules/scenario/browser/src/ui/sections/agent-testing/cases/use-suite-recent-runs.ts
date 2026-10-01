@@ -4,12 +4,16 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit";
-import { computeBatchRunSummary, groupRunsByBatchId } from "@langwatch/suite-browser-kit";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useMemo } from "react";
 
-import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useSuiteRunData } from "../../../../behavior/suites/use-suite-run-data.ts";
+import { useSuites } from "../../../../behavior/suites/use-suites.ts";
+import {
+  computeBatchRunSummary,
+  groupRunsByBatchId,
+} from "../../../../model/suite/run-history-transforms.ts";
+import type { Period } from "../../../elements/analytics/period-selector.tsx";
 import { type PlanIdentity, planOfSet } from "./plan-of-set.ts";
 
 /** How many runs the list holds. It is a way into a run, not a run history. */
@@ -57,17 +61,18 @@ export function useSuiteRecentRuns({
   const endDate = period.endDate.epochMilliseconds;
   const isEnabled = enabled && !!project && scenarioIds.length > 0;
 
-  const { data, isLoading } = api.scenarios.getSuiteRunData.useQuery(
-    { projectId, limit: RECENT_RUNS_READ, startDate, endDate },
-    { enabled: isEnabled, trpc: { context: { skipBatch: true } } },
-  );
+  const { data, isLoading } = useSuiteRunData({
+    input: { projectId, limit: RECENT_RUNS_READ, startDate, endDate },
+    enabled: isEnabled,
+  });
 
   // The plans the runs belong to, for the name a row reads and the address it
   // opens. Read beside the runs, and just as lazily.
-  const { data: suites } = api.suites.getAll.useQuery(
-    { projectId, kinds: ["run_plan", "test_suite"] },
-    { enabled: isEnabled },
-  );
+  const { data: suites } = useSuites({
+    projectId,
+    kinds: ["run_plan", "test_suite"],
+    enabled: isEnabled,
+  });
 
   const runs = useMemo<RecentRun[]>(() => {
     // The read answers "nothing moved" with no runs at all when it is asked

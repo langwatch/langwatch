@@ -4,7 +4,6 @@
  * Spec: specs/automations/slack-connections.feature.
  */
 
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { describeError } from "@langwatch/browser-host/errors";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -20,17 +19,18 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import {
-  maskedSecret,
-  type SlackConnection,
-  slackConnectionKindLabel,
-  slackConnectionScopeLabel,
-  usedByLabel,
-} from "@langwatch/slack-browser-kit";
 import { FaSlack } from "react-icons/fa";
 import { LuChevronRight, LuPlus } from "react-icons/lu";
 
 import { slackApi } from "../../behavior/slack-api.ts";
+import {
+  maskedSecret,
+  slackConnectionKindLabel,
+  slackConnectionScopeLabel,
+  usedByLabel,
+} from "../../model/slack/slack-connection-copy.ts";
+import { type SlackConnection } from "../../model/slack/slack-connection-types.ts";
+import { ProviderScopeChips } from "./authz/scope-picker/provider-scope-chips.tsx";
 
 export function SlackCard() {
   const { project } = useOrganizationTeamProject();

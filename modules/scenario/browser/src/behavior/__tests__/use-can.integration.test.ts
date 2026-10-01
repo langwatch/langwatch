@@ -18,7 +18,7 @@ vi.mock("../scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("../use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
     organization: { id: "org-1" },

@@ -24,7 +24,7 @@ const usageOptions = vi.fn();
 const organizations = vi.fn((): { data?: unknown[] } => ({}));
 vi.mock("../authz-api.ts", () => ({
   authzApi: {
-    organization: { getAll: { useQuery: () => organizations() } },
+    organization: { getScopeGraph: { useQuery: () => organizations() } },
     plan: {
       getActivePlan: {
         useQuery: (input: unknown, options: unknown) => {

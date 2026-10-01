@@ -35,7 +35,6 @@ export function useBlobListing(): BlobListing {
   const [sort, setSort] = useState<OpsBlobSort>("largest");
 
   const queues = api.ops.listBlobQueues.useQuery(undefined, {
-    refetchInterval: 60_000,
   });
   const selectedQueue = queueName ?? queues.data?.[0] ?? null;
 
@@ -43,7 +42,6 @@ export function useBlobListing(): BlobListing {
     { queueName: selectedQueue ?? "", sort, limit: PAGE_SIZE },
     {
       enabled: !!selectedQueue,
-      refetchInterval: 30_000,
       placeholderData: keepPreviousData,
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     },

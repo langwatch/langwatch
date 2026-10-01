@@ -8,7 +8,7 @@ import {
   highlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
-} from "@langwatch/trace-browser-kit";
+} from "@langwatch/trace-contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";

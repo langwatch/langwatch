@@ -5,21 +5,19 @@
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useMemo } from "react";
 
+import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import {
   type DeclaredParameter,
   unionParameterDefinitions,
 } from "../../../../behavior/suites/use-run-suite.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 export function useAgentDeclaredParameters(): DeclaredParameter[] {
   const { project } = useOrganizationTeamProject();
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
+  const { data: agents } = useAgents({ projectId: project?.id });
   return useMemo(
     () =>
       unionParameterDefinitions({

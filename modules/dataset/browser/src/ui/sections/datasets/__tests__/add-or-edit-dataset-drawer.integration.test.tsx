@@ -4,8 +4,8 @@
  * (dev/docs/best_practices/drawers.md), not throw.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -30,7 +30,7 @@ vi.mock("@langwatch/browser-host/errors", () => ({
   showErrorToast: () => void 0,
 }));
 
-vi.mock("@langwatch/workflow-browser-kit", () => ({
+vi.mock("../../../../model/workflow/studio-dataset.utils.ts", () => ({
   tryToMapPreviousColumnsToNewColumns: (records: unknown) => records,
 }));
 
@@ -41,6 +41,12 @@ vi.mock("@langwatch/workflow-browser-kit", () => ({
  */
 vi.mock("../../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
+    useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
     dataset: {
       upsert: {
         useMutation: () => ({
@@ -61,14 +67,12 @@ vi.mock("../../../../behavior/dataset-api.ts", () => ({
       getById: { useQuery: () => ({ data: void 0 }) },
       validateDatasetName: { useQuery: () => ({ refetch: () => Promise.resolve({}) }) },
     },
-    useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
   },
 }));
 
 import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
 
-const mount = (element: ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
+const mount = (element: ReactElement) => renderWithDesignSystem(element);
 
 describe("given the dataset editor opened from a bare drawer address", () => {
   describe("when the reader names a dataset and creates it", () => {

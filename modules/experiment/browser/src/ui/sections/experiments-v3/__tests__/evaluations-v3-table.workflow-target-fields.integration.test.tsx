@@ -3,9 +3,9 @@
  * the workbench reconciles them from the API on load.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { AvailableSource } from "@langwatch/prompt-browser-kit";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { AvailableSource } from "@langwatch/workflow-contract";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -77,19 +77,48 @@ vi.mock("../../../../behavior/experiment-api.ts", () => ({
       prompts: { getByIdOrHandle: { fetch: vi.fn().mockResolvedValue(null) } },
       evaluators: { getById: { fetch: vi.fn().mockResolvedValue(null) } },
     }),
-    datasetRecord: {
-      getAll: { useQuery: () => ({ data: null, isLoading: false }) },
-      update: { useMutation: () => ({ mutate: vi.fn() }) },
-      deleteMany: { useMutation: () => ({ mutate: vi.fn() }) },
-    },
     agents: {
       getAll: {
         useQuery: () => ({ data: agentsOnServer.data, isLoading: false }),
       },
     },
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({
+      agents: { getById: { fetch: vi.fn() } },
+      prompts: { getByIdOrHandle: { fetch: vi.fn().mockResolvedValue(null) } },
+      evaluators: { getById: { fetch: vi.fn().mockResolvedValue(null) } },
+    }),
+    datasetRecord: {
+      getAll: { useQuery: () => ({ data: null, isLoading: false }) },
+      update: { useMutation: () => ({ mutate: vi.fn() }) },
+      deleteMany: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      agents: { getById: { fetch: vi.fn() } },
+      prompts: { getByIdOrHandle: { fetch: vi.fn().mockResolvedValue(null) } },
+      evaluators: { getById: { fetch: vi.fn().mockResolvedValue(null) } },
+    }),
     evaluators: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      agents: { getById: { fetch: vi.fn() } },
+      prompts: { getByIdOrHandle: { fetch: vi.fn().mockResolvedValue(null) } },
+      evaluators: { getById: { fetch: vi.fn().mockResolvedValue(null) } },
+    }),
     prompts: {
       getAllPromptsForProject: {
         useQuery: () => ({ data: [], isLoading: false }),
@@ -102,10 +131,6 @@ vi.mock("../../../../behavior/experiments-v3/lent-dataset-capabilities.tsx", () 
   AddOrEditDatasetDrawer: () => null,
   DatasetRecordSync: () => null,
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const workflowTarget = (overrides?: Partial<TargetConfig>): TargetConfig => ({
   id: "target-1",
@@ -191,9 +216,7 @@ describe("Workflow agent target fields", () => {
       /** @scenario "A target added before the fields were derived recovers on load" */
       it("records every result the workflow declares", async () => {
         seed(workflowTarget());
-        render(<EvaluationsV3Table disableVirtualization />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<EvaluationsV3Table disableVirtualization />);
 
         await waitFor(() => {
           expect(targetInStore()?.outputs).toEqual([
@@ -205,9 +228,7 @@ describe("Workflow agent target fields", () => {
 
       it("records the workflow's own inputs rather than a synthetic one", async () => {
         seed(workflowTarget());
-        render(<EvaluationsV3Table disableVirtualization />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<EvaluationsV3Table disableVirtualization />);
 
         await waitFor(() => {
           expect(targetInStore()?.inputs).toEqual([{ identifier: "question", type: "str" }]);
@@ -218,9 +239,7 @@ describe("Workflow agent target fields", () => {
         seed(workflowTarget());
         useEvaluationsV3Store.temporal.getState().clear();
 
-        render(<EvaluationsV3Table disableVirtualization />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<EvaluationsV3Table disableVirtualization />);
 
         await waitFor(() => {
           expect(targetInStore()?.outputs).toHaveLength(2);
@@ -234,9 +253,7 @@ describe("Workflow agent target fields", () => {
       it("offers every result as a mapping source, with its own type", async () => {
         const user = userEvent.setup();
         seed(workflowTarget());
-        render(<EvaluationsV3Table disableVirtualization />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<EvaluationsV3Table disableVirtualization />);
 
         await waitFor(() => {
           expect(targetInStore()?.outputs).toHaveLength(2);
@@ -286,9 +303,7 @@ describe("Workflow agent target fields", () => {
           }),
         );
 
-        render(<EvaluationsV3Table disableVirtualization />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<EvaluationsV3Table disableVirtualization />);
 
         await waitFor(() => {
           expect(screen.getAllByText("wf agent").length).toBeGreaterThan(0);
@@ -325,9 +340,7 @@ describe("Workflow agent target fields", () => {
           }),
         );
 
-        render(<EvaluationsV3Table disableVirtualization />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<EvaluationsV3Table disableVirtualization />);
 
         await waitFor(() => {
           expect(targetInStore()?.outputs).toEqual([]);
@@ -350,9 +363,7 @@ describe("Workflow agent target fields", () => {
         ];
         seed(workflowTarget({ outputs: [{ identifier: "output", type: "str" }] }));
 
-        render(<EvaluationsV3Table disableVirtualization />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<EvaluationsV3Table disableVirtualization />);
 
         await waitFor(() => {
           expect(targetInStore()?.outputs).toEqual([]);

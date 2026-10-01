@@ -20,7 +20,7 @@ const { state } = vi.hoisted(() => ({
     breakGlassInvalidated: 0,
     grants: [] as unknown[],
     candidates: [] as unknown[],
-    polls: [] as ({ enabled?: boolean; refetchInterval?: number | false } | undefined)[],
+    polls: [] as ({ enabled?: boolean } | undefined)[],
   },
 }));
 
@@ -56,7 +56,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
         getSetup: {
           useQuery: (
             _input: unknown,
-            options?: { enabled?: boolean; refetchInterval?: number | false },
+            options?: { enabled?: boolean },
           ) => {
             state.polls.push(options);
             return {
@@ -412,7 +412,7 @@ describe("the single sign-on setup page", () => {
 
       expect(screen.getByRole("status").textContent).toContain("Activation accepted");
       expect(screen.getByTestId("connection-go-live-activate")).toHaveProperty("disabled", true);
-      expect(state.polls.at(-1)).toEqual({ enabled: true, refetchInterval: 1_000 });
+      expect(state.polls.at(-1)).toEqual({ enabled: true });
 
       state.view = setupView({
         connection: connectionView({ state: "ACTIVE" }),
@@ -420,7 +420,7 @@ describe("the single sign-on setup page", () => {
       });
       rerenderWithSsoHost(<SsoSetupScreen />);
 
-      expect(state.polls.at(-1)).toEqual({ enabled: false, refetchInterval: false });
+      expect(state.polls.at(-1)).toEqual({ enabled: false });
       expect(screen.queryByText(/Activation accepted/)).toBeNull();
     });
 

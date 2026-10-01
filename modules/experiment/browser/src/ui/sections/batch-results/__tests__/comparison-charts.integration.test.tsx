@@ -3,21 +3,20 @@ import "@testing-library/jest-dom/vitest";
 /**
  * Tests for ComparisonCharts component
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { BatchEvaluationData, ComparisonRunData } from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
+import type {
+  BatchEvaluationData,
+  ComparisonRunData,
+} from "../../batch-evaluation-results.types.ts";
 import {
   ComparisonCharts,
   computeRunMetrics,
   computeTargetMetrics,
 } from "../comparison-charts.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 // Mock data for testing
 type MockRunOptions = {
@@ -124,9 +123,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       expect(screen.queryByTestId("charts-container")).toBeInTheDocument();
     });
@@ -134,9 +131,7 @@ describe("ComparisonCharts", () => {
     it("renders charts for single run with multiple targets", () => {
       const comparisonData = [createMockRunData("run-1", Date.now(), { targetCount: 2 })];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       expect(screen.queryByTestId("charts-container")).toBeInTheDocument();
     });
@@ -168,9 +163,8 @@ describe("ComparisonCharts", () => {
         },
       };
 
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <ComparisonCharts comparisonData={[singleTargetRun]} isVisible={true} />,
-        { wrapper: Wrapper },
       );
 
       expect(container.firstChild).toBeNull();
@@ -184,9 +178,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now(), { hasScores: true }),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Should have a chart for "Accuracy" evaluator score
       expect(screen.getByTestId("chart-score-accuracy")).toBeInTheDocument();
@@ -199,9 +191,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now(), { hasPassRates: true }),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Should have a chart for "Exact Match" evaluator pass rate
       expect(screen.getByTestId("chart-pass-exact_match")).toBeInTheDocument();
@@ -214,9 +204,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Verify the Legend component was removed
       const _charts = screen.queryAllByRole("img");
@@ -231,9 +219,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       expect(screen.getByTestId("metrics-selector-button")).toBeInTheDocument();
     });
@@ -245,9 +231,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       await user.click(screen.getByTestId("metrics-selector-button"));
 
@@ -261,9 +245,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       await user.click(screen.getByTestId("metrics-selector-button"));
 
@@ -283,9 +265,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Cost chart should be visible initially
       expect(screen.getByTestId("chart-cost")).toBeInTheDocument();
@@ -307,9 +287,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       expect(screen.getByTestId("xaxis-selector")).toBeInTheDocument();
       expect(screen.getByTestId("group-by-button")).toBeInTheDocument();
@@ -322,9 +300,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now(), { targetCount: 2 }),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -339,9 +315,7 @@ describe("ComparisonCharts", () => {
         createMockRunData("run-2", Date.now()),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -367,9 +341,7 @@ describe("ComparisonCharts", () => {
       const user = userEvent.setup();
       const comparisonData = [createMockRunData("run-1", Date.now(), { targetCount: 3 })];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Should default to "Target" for single run with multiple targets
       expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Target");
@@ -416,9 +388,9 @@ describe("ComparisonCharts", () => {
             },
           };
 
-          render(<ComparisonCharts comparisonData={[evaluatorOnlyRun]} isVisible={true} />, {
-            wrapper: Wrapper,
-          });
+          renderWithDesignSystem(
+            <ComparisonCharts comparisonData={[evaluatorOnlyRun]} isVisible={true} />,
+          );
 
           expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Runs");
         });
@@ -458,9 +430,9 @@ describe("ComparisonCharts", () => {
             },
           };
 
-          render(<ComparisonCharts comparisonData={[virtualEvalRun]} isVisible={true} />, {
-            wrapper: Wrapper,
-          });
+          renderWithDesignSystem(
+            <ComparisonCharts comparisonData={[virtualEvalRun]} isVisible={true} />,
+          );
 
           expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Runs");
         });
@@ -478,9 +450,7 @@ describe("ComparisonCharts", () => {
         }),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -500,9 +470,7 @@ describe("ComparisonCharts", () => {
         }),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -524,9 +492,7 @@ describe("ComparisonCharts", () => {
         }),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Open dropdown
       await user.click(screen.getByTestId("group-by-button"));
@@ -547,9 +513,7 @@ describe("ComparisonCharts", () => {
         }),
       ];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // Open dropdown and select Model
       await user.click(screen.getByTestId("group-by-button"));
@@ -575,9 +539,7 @@ describe("ComparisonCharts", () => {
       // Pass in reverse order (newer first)
       const comparisonData = [newerRun, olderRun];
 
-      render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />);
 
       // The component should internally sort by createdAt
       // Charts should render successfully
@@ -1000,9 +962,9 @@ describe("ComparisonCharts", () => {
       it("renders score chart when grouped by target", () => {
         const comparisonData = [createMultiTargetRunWithDifferentScores()];
 
-        render(<ComparisonCharts comparisonData={comparisonData} isVisible={true} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <ComparisonCharts comparisonData={comparisonData} isVisible={true} />,
+        );
 
         // For single run with multiple targets, defaults to "Target" grouping
         expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Target");

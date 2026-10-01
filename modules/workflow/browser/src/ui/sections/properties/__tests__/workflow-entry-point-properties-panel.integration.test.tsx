@@ -1,13 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { VariablesSection } from "@langwatch/prompt-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Entry } from "@langwatch/workflow-contract";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { VariablesSection } from "../../prompt/variables/variables-section.tsx";
 
 const mockSetNode = vi.fn();
 const mockSetSelectedNode = vi.fn();
@@ -47,17 +48,15 @@ const createEntryNode = (overrides: Partial<Entry> = {}): Node<Entry> => ({
 });
 
 const renderPanel = (node: Node<Entry> = createEntryNode(), datasetTotal?: number) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <EntryPointPropertiesPanel
-        node={node}
-        renderBase={({ children }) => <div data-testid="base-properties-panel">{children}</div>}
-        renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
-        renderDatasetModal={({ open }) => (open ? <div data-testid="dataset-modal" /> : null)}
-        datasetTotal={datasetTotal}
-        renderPropertySectionTitle={({ children }) => <span>{children}</span>}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <EntryPointPropertiesPanel
+      node={node}
+      renderBase={({ children }) => <div data-testid="base-properties-panel">{children}</div>}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderDatasetModal={({ open }) => (open ? <div data-testid="dataset-modal" /> : null)}
+      datasetTotal={datasetTotal}
+      renderPropertySectionTitle={({ children }) => <span>{children}</span>}
+    />,
   );
 
 describe("EntryPointPropertiesPanel", () => {

@@ -1,4 +1,3 @@
-import { RadioGroup } from "@chakra-ui/react";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Who this connection admits (ADR-117 §3). The question nobody was asked:
@@ -8,6 +7,7 @@ import { RadioGroup } from "@chakra-ui/react";
  * something, and going live waits for it.
  */
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import type { SsoArrivalPolicy, SsoConnectionLifecycleState } from "@langwatch/identity-contract";
 import { useState } from "react";
 

@@ -11,10 +11,9 @@
  * endpoint's actual contract: strictly-older-than-cursor, newest first,
  * sliced to limit, no total.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useSourceEventsPager } from "../behavior/use-source-events-pager.ts";
@@ -86,11 +85,7 @@ function Harness({
 }
 
 const renderTable = (props: Parameters<typeof Harness>[0]) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <Harness {...props} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<Harness {...props} />);
 
 describe("given a source with ingested events", () => {
   /** @scenario "Events render as a table, newest first" */
@@ -275,11 +270,7 @@ describe("given the page stays mounted while the source it addresses changes", (
     const view = renderTable({ fetchPage: sourceA, pageSize: 10 });
     await screen.findByText("actor-source-a@acme.test");
 
-    view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <Harness fetchPage={sourceB} pageSize={10} />
-      </ChakraProvider>,
-    );
+    view.rerender(<Harness fetchPage={sourceB} pageSize={10} />);
     await screen.findByText("actor-source-b@acme.test");
     expect(screen.queryByText("actor-source-a@acme.test")).toBeNull();
   });
@@ -290,13 +281,9 @@ describe("given React mounts the table twice, as StrictMode does in development"
     const server = fakeServer([
       makeEvent({ id: "only", ts: BASE_TS, actor: "actor-once@acme.test" }),
     ]);
-    render(
-      <StrictMode>
-        <ChakraProvider value={defaultSystem}>
-          <Harness fetchPage={server} pageSize={10} />
-        </ChakraProvider>
-      </StrictMode>,
-    );
+    renderWithDesignSystem(<Harness fetchPage={server} pageSize={10} />, {
+      reactStrictMode: true,
+    });
     await screen.findByText("actor-once@acme.test");
     // A second landing of the same walk must be dropped, not appended
     // as a phantom second page.
@@ -319,13 +306,9 @@ describe("given React mounts the table twice, as StrictMode does in development"
       }
       return realServer(req);
     });
-    render(
-      <StrictMode>
-        <ChakraProvider value={defaultSystem}>
-          <Harness fetchPage={flakyServer} pageSize={10} />
-        </ChakraProvider>
-      </StrictMode>,
-    );
+    renderWithDesignSystem(<Harness fetchPage={flakyServer} pageSize={10} />, {
+      reactStrictMode: true,
+    });
 
     await screen.findByText("actor-second@acme.test");
     expect(screen.queryByText("Couldn't load this source's events")).toBeNull();

@@ -1,4 +1,3 @@
-import { ProviderScopeChips, type ProviderScopeType } from "@langwatch/authz-browser-kit";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
@@ -33,6 +32,10 @@ import { readableDate } from "../../../model/readable-date.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+import {
+  ProviderScopeChips,
+  type ProviderScopeType,
+} from "../authz/scope-picker/provider-scope-chips.tsx";
 
 type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];
 

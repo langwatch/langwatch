@@ -7,6 +7,7 @@
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Grid, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { CheckSquare, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 
@@ -27,12 +28,13 @@ export default function EvaluatorsScreen() {
   const host = useEvaluatorHost();
   const { projectId } = host.scope();
   const utils = evaluatorApi.useUtils();
+  const evaluatorUtils = evaluatorClient.useUtils();
 
   const [evaluatorToDelete, setEvaluatorToDelete] = useState<EvaluatorRef | null>(null);
   const [evaluatorForCopy, setEvaluatorForCopy] = useState<EvaluatorRef | null>(null);
   const [evaluatorForPush, setEvaluatorForPush] = useState<EvaluatorRef | null>(null);
 
-  const evaluatorsQuery = evaluatorApi.evaluators.getAll.useQuery(
+  const evaluatorsQuery = evaluatorClient.evaluators.getAll.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId },
   );
@@ -40,9 +42,9 @@ export default function EvaluatorsScreen() {
   const historyId = host.route().query[HISTORY_PARAM];
   const historyEvaluator = evaluatorsQuery.data?.find((evaluator) => evaluator.id === historyId);
 
-  const syncFromSource = evaluatorApi.evaluators.syncFromSource.useMutation({
+  const syncFromSource = evaluatorClient.evaluators.syncFromSource.useMutation({
     onSuccess: (_result, variables) => {
-      void utils.evaluators.getAll.invalidate({ projectId: variables.projectId });
+      void evaluatorUtils.evaluators.getAll.invalidate({ projectId: variables.projectId });
       host.succeeded({
         title: "Evaluator updated",
         description: "Evaluator has been updated from source.",
@@ -62,22 +64,22 @@ export default function EvaluatorsScreen() {
 
   // Asked only while the confirmation is open: the answer is what the dialog's
   // warning is built from, and asking it per card would fan out with the grid.
-  const relatedEntitiesQuery = evaluatorApi.evaluators.getRelatedEntities.useQuery(
+  const relatedEntitiesQuery = evaluatorClient.evaluators.getRelatedEntities.useQuery(
     { id: evaluatorToDelete?.id ?? "", projectId: projectId ?? "" },
     { enabled: !!evaluatorToDelete && !!projectId },
   );
 
-  const deleteMutation = evaluatorApi.evaluators.delete.useMutation({
+  const deleteMutation = evaluatorClient.evaluators.delete.useMutation({
     onSuccess: () => {
-      void utils.evaluators.getAll.invalidate({ projectId: projectId ?? "" });
+      void evaluatorUtils.evaluators.getAll.invalidate({ projectId: projectId ?? "" });
       void utils.licenseEnforcement.checkLimit.invalidate();
     },
   });
 
-  const cascadeArchiveMutation = evaluatorApi.evaluators.cascadeArchive.useMutation({
+  const cascadeArchiveMutation = evaluatorClient.evaluators.cascadeArchive.useMutation({
     onSuccess: (result) => {
       setEvaluatorToDelete(null);
-      void utils.evaluators.getAll.invalidate({ projectId: projectId ?? "" });
+      void evaluatorUtils.evaluators.getAll.invalidate({ projectId: projectId ?? "" });
       void utils.licenseEnforcement.checkLimit.invalidate();
 
       const parts: string[] = [];
@@ -218,7 +220,9 @@ export default function EvaluatorsScreen() {
       <EvaluatorReplicateDialog
         open={!!evaluatorForCopy}
         onClose={() => setEvaluatorForCopy(null)}
-        onSuccess={() => void utils.evaluators.getAll.invalidate({ projectId: projectId ?? "" })}
+        onSuccess={() =>
+          void evaluatorUtils.evaluators.getAll.invalidate({ projectId: projectId ?? "" })
+        }
         evaluatorId={evaluatorForCopy?.id ?? ""}
         evaluatorName={evaluatorForCopy?.name ?? ""}
       />

@@ -14,12 +14,6 @@ export type PromptHostScope = {
   teamId: string | undefined;
   projectId: string | undefined;
   projectSlug: string | undefined;
-  /**
-   * Sent, not displayed, by two surfaces: the playground chat authenticates
-   * its run with it, and the deploy dialog seeds the code snippets it
-   * prints. The application already puts it in the browser for both.
-   */
-  projectApiKey: string | undefined;
 };
 
 /** The path parameters and query string the screen was opened with. */

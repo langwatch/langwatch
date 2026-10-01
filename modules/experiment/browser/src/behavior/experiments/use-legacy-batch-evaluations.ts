@@ -1,8 +1,8 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
+import { datasetClient } from "@langwatch/dataset-client";
 
 import type { ExperimentRow } from "../../model/experiment-api-map.ts";
 import type { BatchEvaluation } from "../../model/prisma-types.ts";
-import { experimentApi } from "../experiment-api.ts";
 
 /**
  * The legacy (pre-V2) batch evaluation rows for an experiment.
@@ -17,7 +17,7 @@ export const useLegacyBatchEvaluations = ({
   experiment: ExperimentRow | undefined;
   enabled: boolean;
 }) => {
-  const evaluationsQuery = experimentApi.batchRecord.getAllByexperimentSlug.useQuery(
+  const evaluationsQuery = datasetClient.batchRecord.getAllByexperimentSlug.useQuery(
     {
       projectId: project?.id ?? "",
       experimentSlug: experiment?.slug ?? "",

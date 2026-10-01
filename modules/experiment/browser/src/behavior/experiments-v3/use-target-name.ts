@@ -1,5 +1,7 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { type NamedEntity, pickTargetName } from "@langwatch/experiment-contract";
+import { promptClient } from "@langwatch/prompt-client";
 import { useMemo } from "react";
 
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";
@@ -24,7 +26,7 @@ export const useTargetName = (target: TargetConfig): string => {
   const { project } = useOrganizationTeamProject();
 
   // Fetch prompt name for prompt targets
-  const { data: prompt, isLoading: promptLoading } = experimentApi.prompts.getByIdOrHandle.useQuery(
+  const { data: prompt, isLoading: promptLoading } = promptClient.prompts.getByIdOrHandle.useQuery(
     {
       idOrHandle: target.promptId ?? "",
       projectId: project?.id ?? "",
@@ -47,7 +49,7 @@ export const useTargetName = (target: TargetConfig): string => {
 
   // Fetch evaluator name for evaluator targets
   const { data: evaluator, isLoading: evaluatorLoading } =
-    experimentApi.evaluators.getById.useQuery(
+    evaluatorClient.evaluators.getById.useQuery(
       {
         id: target.targetEvaluatorId ?? "",
         projectId: project?.id ?? "",

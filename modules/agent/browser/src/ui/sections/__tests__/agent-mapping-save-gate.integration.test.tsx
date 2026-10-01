@@ -1,11 +1,11 @@
+import type { AgentInputBinding } from "@langwatch/agent-contract";
+import { buildCodeConfig } from "@langwatch/agent-contract/code-config";
 /**
  * @vitest-environment jsdom
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { AgentInputBinding } from "@langwatch/agent-contract";
-import { buildCodeConfig } from "@langwatch/agent-contract/code-config";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AgentBrowser } from "../../../model/agent-client.ts";
@@ -49,11 +49,7 @@ function workflowEditor(overrides: Partial<AgentWorkflowEditorDrawerProps>) {
     onClose: vi.fn(),
     ...overrides,
   };
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentWorkflowEditorDrawer {...props} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<AgentWorkflowEditorDrawer {...props} />);
   return { clearOutput: () => act(() => clearOutput(undefined)) };
 }
 
@@ -102,11 +98,7 @@ function codeEditor(agent: AgentBrowser) {
     },
     renderTestPanel: () => null,
   };
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentCodeEditorDrawer {...props} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<AgentCodeEditorDrawer {...props} />);
   return { clearOutput: () => act(() => clearOutput(undefined)) };
 }
 

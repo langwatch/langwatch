@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/{all-runs-panel,all-runs-group-by,suite-bugfixes-1956}.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,13 +12,17 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof traceBrowserKitModule>(
-    "@langwatch/trace-browser-kit",
-  );
+vi.mock("@langwatch/browser-host/page-visibility", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule0>();
   return {
     ...actual,
     usePageVisibility: () => true,
+  };
+});
+vi.mock("@langwatch/browser-host/sse-subscription", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule1>();
+  return {
+    ...actual,
     useSSESubscription: vi.fn(() => ({
       connectionState: "disconnected",
       isConnected: false,
@@ -40,10 +44,28 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 }));
 
 const mockRunDataQuery = vi.hoisted(() => vi.fn());
+
+/** A single-page result in the infinite-query shape; one per source, so identity holds. */
+const toInfinite = vi.hoisted(() => {
+  const cache = new WeakMap<object, unknown>();
+  return (result: { data: unknown }) => {
+    if (typeof result !== "object" || !result || "fetchNextPage" in result) return result;
+    if (!cache.has(result)) {
+      cache.set(result, {
+        ...result,
+        data: { pages: [result.data] },
+        hasNextPage: false,
+        fetchNextPage: vi.fn(),
+        isFetchingNextPage: false,
+      });
+    }
+    return cache.get(result);
+  };
+});
 const mockScenariosQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     hasAnyPermission: () => true,
@@ -61,6 +83,20 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
+    useUtils: () => ({}),
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
     useUtils: () => ({
       scenarios: {
         getSuiteRunData: { invalidate: vi.fn() },
@@ -69,26 +105,22 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
       },
     }),
     scenarios: {
-      getSuiteRunData: { useQuery: mockRunDataQuery },
+      getSuiteRunData: {
+        useInfiniteQuery: (input: unknown) => toInfinite(mockRunDataQuery(input)),
+      },
       getSuiteRunFreshness: { useQuery: vi.fn(() => ({ data: undefined })) },
       getAll: { useQuery: mockScenariosQuery },
       cancelJob: { useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })) },
       cancelBatchRun: { useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })) },
       onSimulationUpdate: {},
     },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
-    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
-    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
   },
 }));
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+import type * as actualModule0 from "@langwatch/browser-host/page-visibility";
+import type * as actualModule1 from "@langwatch/browser-host/sse-subscription";
 
 import { RunHistoryPanel } from "../run-history-panel.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const defaultPeriod = {
   startDate: Temporal.Instant.from("2024-01-01T00:00:00Z"),
@@ -142,9 +174,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
-      return render(<RunHistoryPanel period={defaultPeriod} />, {
-        wrapper: Wrapper,
-      });
+      return renderWithDesignSystem(<RunHistoryPanel period={defaultPeriod} />);
     }
 
     describe("when the panel renders every run type together", () => {
@@ -220,7 +250,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       /** @scenario "None grouping on All Runs preserves batch run layout" */
       it("renders the group-by selector with None selected by default", () => {
         setupWithRuns();
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<RunHistoryPanel period={defaultPeriod} />);
 
         const groupBySelect = screen.getByLabelText("Group by");
         expect(groupBySelect).toBeInTheDocument();
@@ -284,7 +314,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
           data: [{ id: "scen_shared", name: "Shared Scenario" }],
         });
 
-        render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+        renderWithDesignSystem(<RunHistoryPanel period={defaultPeriod} />);
 
         await userEvent.selectOptions(screen.getByLabelText("Group by"), "scenario");
 

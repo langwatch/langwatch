@@ -18,10 +18,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { getRunDisplayName } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import React from "react";
@@ -34,11 +32,13 @@ import {
 import { useBatchEvaluationState } from "../../../behavior/experiments/use-batch-evaluation-runs.ts";
 import { VersionBox } from "../../../behavior/lent-workflow.tsx";
 import { useDejaViewLink } from "../../../behavior/use-deja-view-link.ts";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import type {
   ExperimentApiOutputs,
   ExperimentApiRouter,
   ExperimentRow,
 } from "../../../model/experiment-api-map.ts";
+import { FormatMoney } from "../workflow/format-money.tsx";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,
@@ -72,14 +72,12 @@ export function BatchEvaluationV2({
     project,
     experiment,
     runId: selectedRunId,
-    isFinished,
   });
 
   const evaluationResults = useBatchEvaluationResults({
     project,
     experiment,
     runId: selectedRun?.runId,
-    isFinished,
   });
 
   const dejaView = useDejaViewLink({

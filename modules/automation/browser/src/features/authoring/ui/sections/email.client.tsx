@@ -20,7 +20,7 @@ import {
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { api } from "../../../../behavior/automation-api.ts";
+import { useTeamWithMembers } from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import type {
   ConfigFormProps,
@@ -108,10 +108,10 @@ function templatesFromSlice(slice: EmailSlice) {
  */
 function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, EmailPreview>) {
   const cannotSendEmail = !useAutomationHost().hasEmailProvider();
-  const teamWithMembers = api.team.getTeamWithMembers.useQuery(
-    { slug: ctx.teamSlug ?? "", organizationId: ctx.organizationId ?? "" },
-    { enabled: !!ctx.teamSlug && !!ctx.organizationId },
-  );
+  const teamWithMembers = useTeamWithMembers({
+    slug: ctx.teamSlug,
+    organizationId: ctx.organizationId,
+  });
   const memberEmails = useMemo(
     () =>
       (teamWithMembers.data?.members ?? [])

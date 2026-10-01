@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
 import { Temporal } from "@langwatch/time";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -42,21 +42,19 @@ const scenarios: ScenarioListItem[] = [
 ];
 
 function renderTable(onRowSelectionChange = vi.fn()) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ScenarioTable
-        scenarios={scenarios}
-        columnFilters={[]}
-        onColumnFiltersChange={vi.fn()}
-        onRowClick={vi.fn()}
-        rowSelection={{}}
-        onRowSelectionChange={onRowSelectionChange}
-        onArchive={vi.fn()}
-        formatUpdatedAt={(updatedAt) => updatedAt.toString()}
-        renderLabels={(labels) => labels.join(", ")}
-        renderRow={(_scenario, row) => row}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ScenarioTable
+      scenarios={scenarios}
+      columnFilters={[]}
+      onColumnFiltersChange={vi.fn()}
+      onRowClick={vi.fn()}
+      rowSelection={{}}
+      onRowSelectionChange={onRowSelectionChange}
+      onArchive={vi.fn()}
+      formatUpdatedAt={(updatedAt) => updatedAt.toString()}
+      renderLabels={(labels) => labels.join(", ")}
+      renderRow={(_scenario, row) => row}
+    />,
   );
 }
 
@@ -86,21 +84,19 @@ describe("ScenarioTable", () => {
     const onRowClick = vi.fn();
     const renderRow = vi.fn((_scenario: ScenarioListItem, row: ReactElement) => row);
     const user = userEvent.setup();
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <ScenarioTable
-          scenarios={scenarios}
-          columnFilters={[]}
-          onColumnFiltersChange={vi.fn()}
-          onRowClick={onRowClick}
-          rowSelection={{}}
-          onRowSelectionChange={vi.fn()}
-          onArchive={onArchive}
-          formatUpdatedAt={(updatedAt) => `formatted:${updatedAt.toString()}`}
-          renderLabels={(labels) => labels.join("|")}
-          renderRow={renderRow}
-        />
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <ScenarioTable
+        scenarios={scenarios}
+        columnFilters={[]}
+        onColumnFiltersChange={vi.fn()}
+        onRowClick={onRowClick}
+        rowSelection={{}}
+        onRowSelectionChange={vi.fn()}
+        onArchive={onArchive}
+        formatUpdatedAt={(updatedAt) => `formatted:${updatedAt.toString()}`}
+        renderLabels={(labels) => labels.join("|")}
+        renderRow={renderRow}
+      />,
     );
 
     expect(screen.getByText("formatted:2026-08-25T12:00:00Z")).toBeInTheDocument();

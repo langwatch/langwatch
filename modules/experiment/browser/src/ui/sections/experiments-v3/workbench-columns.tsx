@@ -1,4 +1,3 @@
-import type { DatasetTableColumnType as ColumnType } from "@langwatch/dataset-browser-kit";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 /**
  * The workbench table's column definitions: stable structure only. Headers and
@@ -21,6 +20,7 @@ import {
   DATASET_COL_DEFAULT_PCT,
   TARGET_COL_DEFAULT_PCT,
 } from "../../../model/experiments-v3/workbench-column-widths.ts";
+import type { DatasetTableColumnType as ColumnType } from "../../elements/dataset/table-cell.tsx";
 import { ComparisonCell } from "./comparison-cell.tsx";
 import { ComparisonColumnHeader } from "./comparison-column-header.tsx";
 import {

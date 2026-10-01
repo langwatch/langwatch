@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -34,11 +34,7 @@ function editor(overrides: Partial<AgentWorkflowEditorDrawerProps> = {}) {
     onClose: vi.fn(),
     ...overrides,
   };
-  const view = render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentWorkflowEditorDrawer {...props} />
-    </ChakraProvider>,
-  );
+  const view = renderWithDesignSystem(<AgentWorkflowEditorDrawer {...props} />);
   return { ...view, props };
 }
 
@@ -108,16 +104,14 @@ describe("workflow agent editor", () => {
 describe("workflow target editor", () => {
   it("hides mappings after a lookup failure and leaves the drawer closable", () => {
     const onClose = vi.fn();
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <AgentWorkflowTargetEditorDrawer
-          open={true}
-          isLoading={false}
-          hasLookupFailed={true}
-          mappings={<div>Unsafe mappings</div>}
-          onClose={onClose}
-        />
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <AgentWorkflowTargetEditorDrawer
+        open={true}
+        isLoading={false}
+        hasLookupFailed={true}
+        mappings={<div>Unsafe mappings</div>}
+        onClose={onClose}
+      />,
     );
 
     expect(screen.getByTestId("workflow-lookup-error")).toBeVisible();

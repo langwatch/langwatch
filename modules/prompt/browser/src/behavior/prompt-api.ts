@@ -189,8 +189,7 @@ export type PromptApiMap = {
 
   organization: {
     /**
-     * The organization graph, narrowed to this family's reads. `apiKey` arrives
-     * blank when the reader may not see it (server-decided). Membership is per
+     * The organization graph, narrowed to this family's reads. Membership is per
      * team, since the replication picker only offers creatable projects.
      */
     getAll: {
@@ -207,7 +206,7 @@ export type PromptApiMap = {
               role: string;
               assignedRole?: { permissions?: unknown } | null;
             }[];
-            projects: { id: string; name: string; slug: string; apiKey?: string }[];
+            projects: { id: string; name: string; slug: string }[];
           }[];
         }[];
       };

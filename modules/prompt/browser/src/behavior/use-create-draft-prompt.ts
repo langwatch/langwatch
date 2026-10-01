@@ -1,9 +1,10 @@
-import { getMaxTokenLimit } from "@langwatch/prompt-browser-kit";
 import { useCallback } from "react";
 
+import { getMaxTokenLimit } from "../model/max-token-limit.ts";
 import { buildDefaultFormValues } from "../model/prompt-form/index.ts";
 import { promptApi } from "./prompt-api.ts";
 import { useModelProvidersSettings } from "./use-model-providers-settings.ts";
+import { usePromptDefaultModel } from "./use-prompt-default-model.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
@@ -34,10 +35,7 @@ export function useCreateDraftPrompt() {
 
   // Cascade-resolved model for "new prompt" surfaces. Returns null when
   // nothing is configured at any scope; the form then starts with no model.
-  const resolvedDefault = promptApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
+  const resolvedDefault = usePromptDefaultModel();
   const projectId = project?.id;
 
   // A click can land before the query above answers, so a missing answer is

@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { agentApi } from "../../behavior/agent-api.ts";
+import { useAgents } from "../../behavior/use-agents.ts";
 import { connectedAgentsOf } from "../../behavior/use-connected-agent-detail.ts";
 import { VOICE_AGENTS_FLAG_KEY } from "../../features/voice-editor/model/voice-talk.ts";
 import {
@@ -152,7 +153,7 @@ export function AgentManagementScreen() {
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't start the test run" }),
   });
 
-  const agentsQuery = agentApi.agents.getAll.useQuery({ projectId }, { enabled: Boolean(project) });
+  const agentsQuery = useAgents({ projectId: project?.id });
 
   const items = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
   // The connected agents draw their own card (ADR-128); `items` keeps every

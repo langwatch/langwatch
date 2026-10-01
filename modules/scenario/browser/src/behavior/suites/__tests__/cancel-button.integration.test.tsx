@@ -3,22 +3,19 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { RunRow, ScenarioTargetRow } from "@langwatch/suite-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ScenarioTargetRow } from "../../../ui/elements/suite/runs/scenario-target-row.tsx";
+import { RunRow } from "../../../ui/sections/suite/run-row.tsx";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("<ScenarioTargetRow/> cancel button", () => {
   afterEach(() => {
@@ -29,7 +26,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
   describe("given a pending scenario run with onCancel", () => {
     /** @scenario "User cancels a single running job from the run card" */
     it("displays the cancel button", () => {
-      render(
+      renderWithDesignSystem(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.PENDING,
@@ -39,7 +36,6 @@ describe("<ScenarioTargetRow/> cancel button", () => {
           onClick={vi.fn()}
           onCancel={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("cancel-run-button")).toBeInTheDocument();
@@ -48,7 +44,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
 
   describe("given an in-progress scenario run with onCancel", () => {
     it("displays the cancel button", () => {
-      render(
+      renderWithDesignSystem(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.IN_PROGRESS,
@@ -58,7 +54,6 @@ describe("<ScenarioTargetRow/> cancel button", () => {
           onClick={vi.fn()}
           onCancel={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("cancel-run-button")).toBeInTheDocument();
@@ -70,7 +65,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
       // STALLED is not in CANCELLABLE_STATUSES — the enum explicitly lists it as
       // a terminal status alongside SUCCESS, FAILED, ERROR, and CANCELLED.
       // Only QUEUED, PENDING, and IN_PROGRESS are cancellable.
-      render(
+      renderWithDesignSystem(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.STALLED,
@@ -80,7 +75,6 @@ describe("<ScenarioTargetRow/> cancel button", () => {
           onClick={vi.fn()}
           onCancel={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
@@ -90,7 +84,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
   describe("given a completed scenario run with onCancel", () => {
     /** @scenario "Cancel button is hidden for jobs that already completed" */
     it("does not display the cancel button", () => {
-      render(
+      renderWithDesignSystem(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.SUCCESS,
@@ -99,7 +93,6 @@ describe("<ScenarioTargetRow/> cancel button", () => {
           onClick={vi.fn()}
           onCancel={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
@@ -108,7 +101,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
 
   describe("given a failed scenario run with onCancel", () => {
     it("does not display the cancel button", () => {
-      render(
+      renderWithDesignSystem(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.FAILED,
@@ -117,7 +110,6 @@ describe("<ScenarioTargetRow/> cancel button", () => {
           onClick={vi.fn()}
           onCancel={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
@@ -126,7 +118,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
 
   describe("given a cancelled scenario run with onCancel", () => {
     it("does not display the cancel button", () => {
-      render(
+      renderWithDesignSystem(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.CANCELLED,
@@ -136,7 +128,6 @@ describe("<ScenarioTargetRow/> cancel button", () => {
           onClick={vi.fn()}
           onCancel={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
@@ -145,7 +136,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
 
   describe("given a cancellable run without onCancel prop", () => {
     it("does not display the cancel button", () => {
-      render(
+      renderWithDesignSystem(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.PENDING,
@@ -154,7 +145,6 @@ describe("<ScenarioTargetRow/> cancel button", () => {
           targetName="Agent"
           onClick={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
@@ -169,7 +159,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
       const onCancel = vi.fn();
       const onClick = vi.fn();
 
-      render(
+      renderWithDesignSystem(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.PENDING,
@@ -179,7 +169,6 @@ describe("<ScenarioTargetRow/> cancel button", () => {
           onClick={onClick}
           onCancel={onCancel}
         />,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("cancel-run-button"));
@@ -211,7 +200,7 @@ describe("<RunRow/> cancel all button", () => {
         ],
       });
 
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={batchRun}
           summary={makeSummary({
@@ -225,7 +214,6 @@ describe("<RunRow/> cancel all button", () => {
           onScenarioRunClick={vi.fn()}
           onCancelAll={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByTestId("cancel-all-button")).toBeInTheDocument();
@@ -247,7 +235,7 @@ describe("<RunRow/> cancel all button", () => {
         ],
       });
 
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={batchRun}
           summary={makeSummary({
@@ -261,7 +249,6 @@ describe("<RunRow/> cancel all button", () => {
           onScenarioRunClick={vi.fn()}
           onCancelAll={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("cancel-all-button")).not.toBeInTheDocument();
@@ -285,7 +272,7 @@ describe("<RunRow/> cancel all button", () => {
         ],
       });
 
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={batchRun}
           summary={makeSummary({
@@ -300,7 +287,6 @@ describe("<RunRow/> cancel all button", () => {
           onScenarioRunClick={vi.fn()}
           onCancelAll={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("cancel-all-button")).not.toBeInTheDocument();
@@ -319,7 +305,7 @@ describe("<RunRow/> cancel all button", () => {
         ],
       });
 
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={batchRun}
           summary={makeSummary({
@@ -333,7 +319,6 @@ describe("<RunRow/> cancel all button", () => {
           resolveTargetName={() => "Agent"}
           onScenarioRunClick={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("cancel-all-button")).not.toBeInTheDocument();
@@ -359,7 +344,7 @@ describe("<RunRow/> cancel all button", () => {
         ],
       });
 
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={batchRun}
           summary={makeSummary({
@@ -374,7 +359,6 @@ describe("<RunRow/> cancel all button", () => {
           onScenarioRunClick={vi.fn()}
           onCancelAll={onCancelAll}
         />,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("cancel-all-button"));

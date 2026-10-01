@@ -1,10 +1,11 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-browser-kit";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-table";
 
+import { scenarioContextChip } from "../../../behavior/langy/langy-context-chips.ts";
 import type { Scenario } from "../../../behavior/scenario-api.ts";
 import { type ScenarioListItem } from "../../../model/scenario-list.types.ts";
+import { LangyContextTarget } from "../../sections/langy/langy-context-target.tsx";
 import { ScenarioTable as ScenarioTableView } from "../scenario-table.tsx";
 import { TagList } from "../tag-list.tsx";
 

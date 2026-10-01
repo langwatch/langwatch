@@ -36,7 +36,6 @@ export function SubscribersCard() {
     staleTime: 10 * 60 * 1000,
   });
   const dashboard = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    refetchInterval: 15_000,
   });
   const actions = usePauseActions();
 

@@ -32,6 +32,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/client/tsconfig.build.json"
+    },
+    {
       "path": "../../auth/contract/tsconfig.build.json"
     },
     {
@@ -39,9 +42,6 @@
     },
     {
       "path": "../../../packages/browser-host/tsconfig.build.json"
-    },
-    {
-      "path": "../../coding-agent/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../coding-agent/contract/tsconfig.build.json"
@@ -71,9 +71,6 @@
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
-      "path": "../../model-provider/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
@@ -81,9 +78,6 @@
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../browser-kit/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

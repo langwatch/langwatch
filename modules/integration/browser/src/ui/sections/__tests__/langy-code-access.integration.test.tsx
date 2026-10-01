@@ -5,8 +5,8 @@
  * a settings page offering to change a choice nobody made is noise.
  * @see specs/langy/langy-code-access.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const preference = vi.hoisted(() => ({ current: null as "github" | null }));
@@ -37,12 +37,7 @@ import { LangyCodeAccess } from "../langy-code-access.tsx";
 afterEach(cleanup);
 beforeEach(() => clearPreference.mockClear());
 
-const renderSection = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <LangyCodeAccess />
-    </ChakraProvider>,
-  );
+const renderSection = () => renderWithDesignSystem(<LangyCodeAccess />);
 
 describe("given GitHub was remembered for code changes", () => {
   beforeEach(() => {

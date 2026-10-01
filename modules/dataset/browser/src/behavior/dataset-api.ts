@@ -5,7 +5,6 @@
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
-import type { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
 import type { storedObjectTrpc } from "@langwatch/stored-object-contract";
 
 /**
@@ -66,11 +65,7 @@ type BorrowedProcedures = {
 };
 
 /** Everything this family calls: the declared namespaces plus the borrowed three. */
-export type DatasetApiMap = ContractApiMap<typeof datasetTrpc> &
-  ContractApiMap<typeof datasetRecordTrpc> &
-  ContractApiMap<typeof batchRecordTrpc> &
-  ContractApiMap<typeof storedObjectTrpc> &
-  BorrowedProcedures;
+export type DatasetApiMap = ContractApiMap<typeof storedObjectTrpc> & BorrowedProcedures;
 
 /**
  * The Datasets family's typed tRPC hooks, on the application's transport and

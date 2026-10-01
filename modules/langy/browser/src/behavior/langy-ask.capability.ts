@@ -1,4 +1,4 @@
-import { useLangyStore, type LangyAttachedContextType } from "@langwatch/langy-browser-kit";
+import { useLangyStore, type LangyAttachedContextType } from "./langy.store.ts";
 
 /** One reference the asking module hands over with its question. */
 export interface LangyAskContext {

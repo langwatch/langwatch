@@ -1,5 +1,6 @@
 // Appends CSV/JSON/JSONL rows; requires all dataset columns mapped or unmapped columns get blanks.
 
+import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetColumns,
   type DatasetRecordEntry,
@@ -18,7 +19,6 @@ import { generate } from "@langwatch/ksuid";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { datasetApi } from "../../behavior/dataset-api.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../model/convert-record-values.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { TabularFileDropzone } from "./tabular-file-dropzone.tsx";
@@ -46,7 +46,7 @@ export function AddRowsFromCSVModal({
 }) {
   const host = useDatasetHost();
   const project = host.project();
-  const uploadRecords = datasetApi.datasetRecord.create.useMutation();
+  const uploadRecords = datasetClient.datasetRecord.create.useMutation();
 
   const [fileHeaders, setFileHeaders] = useState<string[]>([]);
   const [fileRows, setFileRows] = useState<string[][]>([]);

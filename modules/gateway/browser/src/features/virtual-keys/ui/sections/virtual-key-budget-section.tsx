@@ -1,4 +1,3 @@
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
   Badge,
@@ -14,6 +13,7 @@ import { SmallLabel } from "@langwatch/design-system/small-label";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 
 import { api } from "../../../../behavior/gateway-api.ts";
+import type { ScopeTriadEntry } from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 
 export type VirtualKeyBudgetWindow = "DAY" | "WEEK" | "MONTH";
 

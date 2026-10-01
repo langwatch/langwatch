@@ -1,9 +1,9 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { LangyCard } from "@langwatch/langy-browser-kit";
 import { AlertCircle, ChevronRight, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
+import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import type {
   LangyErrorPresentation,
   LangySerializedReason,

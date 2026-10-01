@@ -15,7 +15,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ProviderIcon } from "@langwatch/model-provider-browser-kit";
+import { ProviderIcon } from "@langwatch/design-system/provider-icons";
 import type {
   CostRuleMatchingSpansPreview,
   CostRulePreviewSampleSpan,
@@ -302,7 +302,6 @@ export function LLMModelCostMatchingSpans({
     {
       enabled: !!projectId && regexValid,
       placeholderData: keepPreviousData,
-      staleTime: 30_000,
     },
   );
 

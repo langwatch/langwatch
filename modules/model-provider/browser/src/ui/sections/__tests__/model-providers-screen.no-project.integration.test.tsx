@@ -5,12 +5,13 @@
  * Spec: specs/model-providers/providers-without-a-project.feature
  */
 
-import type * as authzBrowserKitModule from "@langwatch/authz-browser-kit";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
+import type * as providerScopeChipsModule from "../authz/scope-picker/provider-scope-chips.tsx";
+import type * as scopeFilterModule from "../authz/scope-picker/scope-filter.tsx";
 
 const { mockState, mockDeleteProvider, mockTestConnection } = vi.hoisted(() => ({
   mockState: {
@@ -65,13 +66,22 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
   },
 }));
 
-vi.mock("@langwatch/authz-browser-kit", async () => {
-  const actual = await vi.importActual<typeof authzBrowserKitModule>(
-    "@langwatch/authz-browser-kit",
+vi.mock("../authz/scope-picker/scope-filter.tsx", async () => {
+  const actual = await vi.importActual<typeof scopeFilterModule>(
+    "../authz/scope-picker/scope-filter.tsx",
   );
   return {
     ...actual,
     ScopeFilter: () => <div data-testid="scope-filter" />,
+  };
+});
+
+vi.mock("../authz/scope-picker/provider-scope-chips.tsx", async () => {
+  const actual = await vi.importActual<typeof providerScopeChipsModule>(
+    "../authz/scope-picker/provider-scope-chips.tsx",
+  );
+  return {
+    ...actual,
     ProviderScopeChips: ({ scopes }: { scopes?: { scopeType: string; name?: string }[] }) => (
       <div
         data-testid="provider-scope-chips"

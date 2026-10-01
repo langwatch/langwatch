@@ -16,6 +16,7 @@ import {
   useCodexCodingDefaultsAskStore,
 } from "../../behavior/codex-coding-defaults-ask.store.ts";
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useResolvedDefaultModel } from "../../behavior/use-resolved-default-model.ts";
 import {
   useModelProviderHost,
   type ModelProviderHostApi,
@@ -33,13 +34,11 @@ export function CodexCodingDefaultsAskHost() {
   );
   const clear = useCodexCodingDefaultsAskStore((state: CodexCodingDefaultsAskState) => state.clear);
 
-  const resolvedDefault = modelProviderApi.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: pending?.projectId ?? "",
-      featureKey: LANGY_CHAT_FEATURE_KEY,
-    },
-    { enabled: !!pending },
-  );
+  const resolvedDefault = useResolvedDefaultModel({
+    projectId: pending?.projectId,
+    featureKey: LANGY_CHAT_FEATURE_KEY,
+    enabled: !!pending,
+  });
 
   // "Definitely codex already" is the only reason to skip; while the resolver
   // is still loading nothing renders, and a resolver error falls through to

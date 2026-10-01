@@ -6,8 +6,8 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -45,30 +45,12 @@ const emptyQuery = vi.hoisted(() => () => ({
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    // The run dialog reads the saved evaluators for the ones a run carries.
-    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
     useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
-      },
       suites: {
         testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
-    scenarios: {
-      getAll: { useQuery: mockScenariosGetAll },
-      getExternalSetSummaries: { useQuery: emptyQuery },
-      getLastResultSummaries: { useQuery: emptyQuery },
-      getScenarioSetRunData: { useQuery: emptyQuery },
-      getRunConfigurations: { useQuery: mockRunConfigurations },
-      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      moveToTestSuite: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-      },
-    },
     suites: {
       testSuites: {
         getAll: { useQuery: mockTestSuitesGetAll },
@@ -102,10 +84,55 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
       getOrganizationWithMembersAndTheirTeams: { useQuery: emptyQuery },
     },
     agents: { getAll: { useQuery: mockAgentsGetAll } },
-    prompts: { getAllPromptsForProject: { useQuery: mockPromptsGetAll } },
     modelProvider: {
       listAllForProjectForFrontend: { useQuery: emptyQuery },
       getResolvedDefault: { useQuery: emptyQuery },
+    },
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    prompts: { getAllPromptsForProject: { useQuery: mockPromptsGetAll } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
+      },
+    }),
+    scenarios: {
+      getAll: { useQuery: mockScenariosGetAll },
+      getExternalSetSummaries: { useQuery: emptyQuery },
+      getLastResultSummaries: { useQuery: emptyQuery },
+      getScenarioSetRunData: { useQuery: emptyQuery },
+      getRunConfigurations: { useQuery: mockRunConfigurations },
+      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      moveToTestSuite: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
   },
 }));
@@ -139,7 +166,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getComplexProps: () => null,
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -161,10 +188,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
     isReady: true,
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const ONLINE_AGENT = {
   id: "agent_1",
@@ -224,9 +247,9 @@ const caseSubject = (): RunDialogSubject => ({
 function renderDialog(subject: RunDialogSubject) {
   const onClose = vi.fn();
   const onRunStarted = vi.fn();
-  render(<RunDialog subject={subject} onClose={onClose} onRunStarted={onRunStarted} />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(
+    <RunDialog subject={subject} onClose={onClose} onRunStarted={onRunStarted} />,
+  );
   return { onClose, onRunStarted };
 }
 
@@ -1232,7 +1255,7 @@ describe("<RunDialog/>", () => {
       const order: string[] = [];
       const onClose = vi.fn(() => order.push("close"));
       const onRunStarted = vi.fn(() => order.push("started"));
-      render(
+      renderWithDesignSystem(
         <RunDialog
           subject={suiteSubject({
             initialTarget: { type: "http", id: "agent_1" },
@@ -1240,7 +1263,6 @@ describe("<RunDialog/>", () => {
           onClose={onClose}
           onRunStarted={onRunStarted}
         />,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("run-dialog-run"));
@@ -1417,7 +1439,7 @@ describe("run entries on the Scenarios tab", () => {
       data: [configurationEntry({ scope: { mode: "all" } })],
       isLoading: false,
     });
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await user.click(screen.getByRole("button", { name: "Actions for Refunds" }));
     await user.click(await screen.findByRole("menuitem", { name: "Run suite" }));
@@ -1434,7 +1456,7 @@ describe("run entries on the Scenarios tab", () => {
   /** @scenario "Clicking the Run button does not open the row" */
   it("opens the run dialog from the row Run button, not the run drawer", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await user.click(screen.getByRole("button", { name: "Run Double charge" }));
 
@@ -1446,7 +1468,7 @@ describe("run entries on the Scenarios tab", () => {
   /** @scenario "A run started from the rail opens on the run it started" */
   it("starts a suite run from the rail, opens its results and holds a place for it", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await user.click(screen.getByRole("button", { name: "Actions for Refunds" }));
     await user.click(await screen.findByRole("menuitem", { name: "Run suite" }));

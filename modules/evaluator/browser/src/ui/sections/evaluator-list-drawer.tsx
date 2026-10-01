@@ -9,6 +9,7 @@ import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import {
   COMPARISON_EVALUATOR_TYPE,
@@ -18,7 +19,6 @@ import { formatDistanceToNow } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 import { EvaluatorApiUsageDialog } from "../blocks/evaluator-api-usage-dialog.tsx";
 import { EvaluatorListItem } from "../blocks/evaluator-list-item.tsx";
@@ -38,7 +38,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const projectId = host.scope().projectId;
   const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = evaluatorApi.useUtils();
+  const utils = evaluatorClient.useUtils();
   const flowCallbacks = getFlowCallbacks("evaluatorList");
 
   const onClose = props.onClose ?? closeDrawer;
@@ -57,7 +57,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const createLabel = props.createLabel ?? "New Evaluator";
   const itemLabel = props.itemLabel ?? "evaluator";
 
-  const evaluatorsQuery = evaluatorApi.evaluators.getAll.useQuery(
+  const evaluatorsQuery = evaluatorClient.evaluators.getAll.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId && isOpen },
   );
@@ -82,7 +82,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         );
       });
 
-  const deleteMutation = evaluatorApi.evaluators.delete.useMutation({
+  const deleteMutation = evaluatorClient.evaluators.delete.useMutation({
     onSuccess: () => {
       void utils.evaluators.getAll.invalidate({ projectId: projectId ?? "" });
     },

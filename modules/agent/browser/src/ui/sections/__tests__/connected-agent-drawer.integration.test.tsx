@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
@@ -90,15 +90,13 @@ function connectedAgent(overrides: Partial<ConnectedAgentBrowser> = {}): Connect
 }
 
 function renderDrawer(agent: ConnectedAgentBrowser) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ConnectedAgentDrawer
-        agent={agent}
-        isLoading={false}
-        projectId="project_1"
-        onClose={vi.fn()}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ConnectedAgentDrawer
+      agent={agent}
+      isLoading={false}
+      projectId="project_1"
+      onClose={vi.fn()}
+    />,
   );
 }
 

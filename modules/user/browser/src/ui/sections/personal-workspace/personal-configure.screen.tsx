@@ -94,13 +94,14 @@ export function PersonalConfigureScreen() {
             </SectionCard>
           ) : null}
 
-          {personalContextQuery.data?.workspace.project.apiKey ? (
+          {personalProjectId && ctx.organizationId ? (
             <SectionCard
               title="Personal OTLP Endpoint"
               description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
             >
               <PersonalOtlpEndpointPanel
-                apiKey={personalContextQuery.data.workspace.project.apiKey}
+                organizationId={ctx.organizationId}
+                projectId={personalProjectId}
               />
             </SectionCard>
           ) : null}

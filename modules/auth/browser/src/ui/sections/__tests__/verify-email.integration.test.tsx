@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * Verify-email landing; never auto-completes, never exposes proof in DOM.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { searchParamsRef } = vi.hoisted(() => ({
@@ -21,12 +21,7 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 
 import VerifyEmail from "../verify-email-screen.tsx";
 
-const renderPage = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <VerifyEmail />
-    </ChakraProvider>,
-  );
+const renderPage = () => renderWithDesignSystem(<VerifyEmail />);
 
 describe("the /auth/verify-email landing page", () => {
   const fetchSpy = vi.fn();

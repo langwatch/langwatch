@@ -5,11 +5,14 @@
  */
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
-import { type BatchRun, computeBatchRunSummary } from "@langwatch/suite-browser-kit";
 
 import { batchNote } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { runTitle } from "../../../../behavior/agent-testing/results/run-titles.ts";
 import { useNow } from "../../../../behavior/use-now.ts";
+import {
+  type BatchRun,
+  computeBatchRunSummary,
+} from "../../../../model/suite/run-history-transforms.ts";
 import {
   RunsSidebarEntry,
   type SidebarTargetRate,

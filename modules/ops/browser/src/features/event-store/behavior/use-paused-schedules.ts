@@ -17,7 +17,7 @@ export interface PausedSchedulesResult {
 export function usePausedSchedules(): PausedSchedulesResult {
   const query = api.ops.listPausedSchedules.useQuery(
     { limit: PAGE_SIZE },
-    { refetchInterval: 30_000 },
+    {},
   );
 
   const rows = query.data?.schedules;

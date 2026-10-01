@@ -16,6 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { datasetClient } from "@langwatch/dataset-client";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -45,7 +46,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { datasetApi } from "../../behavior/dataset-api.ts";
 import {
   type BulkFile,
   type BulkUploadTransport,
@@ -526,16 +526,12 @@ function BulkFileRow({
   // Poll the dataset status inline once finalized (no nested container). The
   // server normalizes off-thread; the row reports ready/failed in place.
   const isPolling = file.status === "processing" && !!file.datasetId;
-  const statusQuery = datasetApi.dataset.getById.useQuery(
+  const statusQuery = datasetClient.dataset.getById.useQuery(
     { projectId, datasetId: file.datasetId ?? "" },
     {
       enabled: isPolling,
       refetchOnWindowFocus: false,
-      refetchInterval: (query) => {
-        const isProcessing = query.state.data?.status === "processing";
-
-        return isProcessing ? 3000 : false;
-      },
+      // needs a read hint: dataset normalisation finished (ready or failed)
     },
   );
   const polledStatus = statusQuery.data?.status;
@@ -638,7 +634,7 @@ export function BulkUploadDrawer({
 }) {
   const projectId = useDatasetHost().project()?.id;
   const importTransport = useDatasetImportTransport();
-  const retryNormalize = datasetApi.dataset.retryNormalize.useMutation();
+  const retryNormalize = datasetClient.dataset.retryNormalize.useMutation();
   const bulkTransport: BulkUploadTransport = useMemo(
     () => ({ ...importTransport, retryDatasetNormalize: retryNormalize.mutateAsync }),
     [importTransport, retryNormalize.mutateAsync],

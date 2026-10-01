@@ -73,13 +73,13 @@ describe("ProviderScreen", () => {
     expect(emitMock).toHaveBeenCalledWith("viewed", "provider");
   }, 10000);
 
-  it("offers the marks as one radio group with the first provider checked", async () => {
+  it("offers the marks as one group with the first provider pressed", async () => {
     renderScreen();
     // The marks stay aria-hidden until the line has finished typing, as on main.
-    const group = await screen.findByRole("radiogroup", { name: "AI provider" }, { timeout: 8000 });
-    const marks = within(group).getAllByRole("radio");
-    expect(marks[0]).toHaveAttribute("aria-checked", "true");
-    expect(marks[1]).toHaveAttribute("aria-checked", "false");
+    const group = await screen.findByRole("group", { name: "AI provider" }, { timeout: 8000 });
+    const marks = within(group).getAllByRole("button");
+    expect(marks[0]).toHaveAttribute("aria-pressed", "true");
+    expect(marks[1]).toHaveAttribute("aria-pressed", "false");
   }, 10000);
 
   it("reports a failed save as a failed provider event", async () => {

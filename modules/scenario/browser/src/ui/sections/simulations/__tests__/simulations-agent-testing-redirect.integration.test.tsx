@@ -18,7 +18,7 @@ const state = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-feature-flag.ts", () => ({
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: (flag: string) => ({
     enabled: flag === "release_ui_agent_testing_v2_enabled" ? state.flagEnabled : false,
     isLoading: state.flagLoading,

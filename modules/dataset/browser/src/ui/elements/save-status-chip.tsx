@@ -1,0 +1,41 @@
+/**
+ * Compact autosave indicator: nothing while idle, a spinner while saving,
+ * a check on success, a loud error with the message on failure. A blocked
+ * save must never look successful, so error is its own state, not a silent idle.
+ */
+
+import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Check, X } from "lucide-react";
+
+import type { AutosaveState } from "../../model/dataset-table-context.tsx";
+
+export function SaveStatusChip({ state, error }: { state: AutosaveState; error?: string }) {
+  if (state === "saving") {
+    return (
+      <HStack gap={1} color="fg.muted" data-testid="save-status-saving">
+        <Spinner size="xs" />
+        <Text fontSize="12px">Saving…</Text>
+      </HStack>
+    );
+  }
+  if (state === "saved") {
+    return (
+      <HStack gap={1} color="green.fg" data-testid="save-status-saved">
+        <Check size={13} />
+        <Text fontSize="12px">Saved</Text>
+      </HStack>
+    );
+  }
+  if (state === "error") {
+    return (
+      <Tooltip content={error ?? "Unknown error"}>
+        <HStack gap={1} color="red.fg" data-testid="save-status-error">
+          <X size={13} />
+          <Text fontSize="12px">Failed to save</Text>
+        </HStack>
+      </Tooltip>
+    );
+  }
+  return null;
+}

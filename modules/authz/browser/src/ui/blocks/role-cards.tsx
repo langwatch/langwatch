@@ -1,7 +1,6 @@
 // The role cards (main's RoleCards): a predefined tier names what it adds to the one
 // below; a custom role shows what it grants, where it is in force and who holds it.
 
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import {
   Badge,
   Box,
@@ -22,6 +21,7 @@ import type { GrantScope, Holder } from "../../model/role-holders.ts";
 import { permissionsNeedingOrganizationScope } from "../../model/role-permissions.ts";
 import { PermissionTokenList } from "../elements/permission-token.tsx";
 import { PrincipalAvatar } from "../elements/principal-avatar.tsx";
+import { ProviderScopeChips } from "../sections/scope-picker/provider-scope-chips.tsx";
 
 const TIER_COLOUR = { ADMIN: "red", MEMBER: "blue", VIEWER: "gray" } as const;
 

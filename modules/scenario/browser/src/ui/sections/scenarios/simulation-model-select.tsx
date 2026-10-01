@@ -1,17 +1,22 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import {
   INHERIT_SENTINEL,
-  modelSelectorOptions,
   ProviderModelSelector,
-} from "@langwatch/model-provider-browser-kit";
+} from "@langwatch/design-system/provider-model-selector";
+import { modelSelectorOptions } from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
   LATEST_ALIAS_PROVIDERS,
+  modelDisplayLabel,
+  modelPickerOption,
 } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
-import { api } from "../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import {
+  useProjectModelProviders,
+  useResolvedDefaultModel,
+} from "../../../behavior/scenarios/use-scenario-models.ts";
 
 /**
  * Model picker for the scenario user-simulator and judge roles.
@@ -33,15 +38,9 @@ export function SimulationModelSelect({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const projectProviders = api.modelProvider.listAllForProjectForFrontend.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnMount: false },
-  );
+  const projectProviders = useProjectModelProviders({ projectId });
 
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId, featureKey },
-    { enabled: !!projectId },
-  );
+  const resolvedDefault = useResolvedDefaultModel({ projectId, featureKey });
 
   // Chat models the project can actually use: aliases + registry + custom
   // entries from enabled providers. Same source the default-models drawer
@@ -77,6 +76,14 @@ export function SimulationModelSelect({
     [projectProviders.data],
   );
 
+  const query = useMemo(
+    () => ({
+      data: options.map((modelValue) => modelPickerOption({ displayNames, modelValue })),
+      isLoading: projectProviders.isLoading,
+    }),
+    [options, displayNames, projectProviders.isLoading],
+  );
+
   const inheritModel = resolvedDefault.data?.model ?? "";
 
   return (
@@ -88,11 +95,11 @@ export function SimulationModelSelect({
       )}
       <ProviderModelSelector
         model={value ?? ""}
-        options={options}
+        query={query}
+        labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
         size={size}
         onChange={(model) => onChange(model === INHERIT_SENTINEL ? null : model)}
         inheritOption={inheritModel ? { model: inheritModel, label: "Default model" } : undefined}
-        displayNames={displayNames}
       />
     </VStack>
   );

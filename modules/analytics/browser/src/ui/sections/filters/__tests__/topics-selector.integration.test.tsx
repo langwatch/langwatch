@@ -3,8 +3,8 @@
  * The published filter sidebar's topics filter: ticks write to the router query.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,7 +23,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   }),
 }));
 
-vi.mock("@langwatch/analytics-browser-kit", () => ({
+vi.mock("../../../../behavior/use-filter-params.ts", () => ({
   useFilterParams: () => ({ filterParams: { filters: {} }, queryOpts: {} }),
 }));
 
@@ -54,11 +54,7 @@ import { TopicsSelector } from "../topics-selector.tsx";
 function mount(query: Record<string, string | string[]>) {
   router.query = query;
   router.pushed = [];
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <TopicsSelector />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<TopicsSelector />);
   return userEvent.setup();
 }
 

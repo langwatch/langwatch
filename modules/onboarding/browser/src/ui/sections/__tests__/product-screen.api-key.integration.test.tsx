@@ -1,12 +1,12 @@
 /**
  * @vitest-environment jsdom
- * The manual setup card prints the key of the project resolved from `projectSlug`,
- * asked of the host because the scope graph carries no credentials.
+ * The manual setup card mints a personal access token on the project resolved from
+ * `projectSlug` only when the reader asks: no key is on the page before.
  * Spec: specs/features/onboarding/manual-setup-api-key.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { type ReactNode, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -32,6 +32,33 @@ vi.mock("../../../behavior/use-product-flow.ts", () => ({
     handleSelectProduct: vi.fn(),
   }),
 }));
+
+// The hook's own suite covers scoping; this double records the project and holds the token.
+const minted = vi.hoisted(() => ({
+  projects: [] as (string | undefined)[],
+  tokens: {} as Record<string, string>,
+}));
+vi.mock("@langwatch/api-key-client", () => ({
+  SETUP_AGENT_PERMISSIONS: [],
+  useMintPersonalToken: ({ projectId }: { projectId: string | undefined }) =>
+    useMintDouble(projectId),
+}));
+
+function useMintDouble(projectId: string | undefined) {
+  const [token, setToken] = useState<string>();
+  return {
+    token,
+    isMinting: false,
+    scopeNote: "",
+    mint: async () => {
+      minted.projects.push(projectId);
+      const answer = projectId ? minted.tokens[projectId] : undefined;
+      if (!answer) throw new Error("refused");
+      setToken(answer);
+      return answer;
+    },
+  };
+}
 
 // Read at render time, after the top-level import below has bound it.
 vi.mock("../create-product-screens.tsx", () => ({
@@ -66,7 +93,7 @@ const SAAS_DEPLOYMENT: UiDeployment = {
   hasEmailProvider: true,
 };
 
-const TEST_KEY = "sk-lw-test-fixture-not-a-real-key-000000000000";
+const TEST_TOKEN = "lw-pat-test-fixture-not-a-real-token-0000";
 
 const organization: OnboardingOrganization = {
   id: "org_1",
@@ -86,9 +113,9 @@ const organization: OnboardingOrganization = {
 };
 
 class ProductTestHost extends OnboardingHostApi {
-  constructor(private readonly keys: Readonly<Record<string, string>>) {
-    super();
-  }
+  readonly copies: string[] = [];
+  userId = "user_1";
+
   scope(): OnboardingScope {
     return {
       organization,
@@ -98,7 +125,7 @@ class ProductTestHost extends OnboardingHostApi {
     };
   }
   currentUser() {
-    return { id: "user_1", email: "r@acme.dev", name: "Test User" };
+    return { id: this.userId, email: "r@acme.dev", name: "Test User" };
   }
   sessionStatus() {
     return "authenticated" as const;
@@ -121,11 +148,9 @@ class ProductTestHost extends OnboardingHostApi {
   signOut() {}
   succeeded() {}
   failed() {}
-  async copyToClipboard() {
+  async copyToClipboard(input: { text: string }) {
+    this.copies.push(input.text);
     return true;
-  }
-  revealProjectApiKey(projectId?: string) {
-    return projectId ? this.keys[projectId] : undefined;
   }
   prefersReducedMotion() {
     return true;
@@ -144,11 +169,15 @@ class ProductTestHost extends OnboardingHostApi {
   }
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  minted.projects = [];
+  minted.tokens = {};
+});
 
-function renderManualSetup(keys: Readonly<Record<string, string>>) {
+function renderManualSetup(host: ProductTestHost) {
   const query = { projectSlug: "acme-agent", step: "manually" };
-  return render(
+  const tree = () => (
     <ChakraProvider value={defaultSystem}>
       <UiCapabilityContextProvider
         value={{
@@ -159,36 +188,57 @@ function renderManualSetup(keys: Readonly<Record<string, string>>) {
           deployment: SAAS_DEPLOYMENT,
         }}
       >
-        <OnboardingHostProvider value={new ProductTestHost(keys)}>
+        <OnboardingHostProvider value={host}>
           <ProductScreen />
         </OnboardingHostProvider>
       </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    </ChakraProvider>
   );
+  const utils = render(tree());
+  return { ...utils, rerenderManualSetup: () => utils.rerender(tree()) };
 }
 
 describe("ProductScreen manual setup", () => {
-  describe("when the reader may manage the project named by projectSlug", () => {
-    /** @scenario "Manual setup shows the key of the project named in the address" */
-    it("prints that project's key once the reader shows it", async () => {
-      renderManualSetup({ proj_agent: TEST_KEY, proj_other: "sk-lw-other-project-key-0000000000" });
+  describe("when the reader may mint a key on the project named by projectSlug", () => {
+    /** @scenario Manual setup offers a personal access token for the project named in the address, shown once */
+    it("mints on that project on the click and never before", async () => {
+      const host = new ProductTestHost();
+      minted.tokens = { proj_agent: TEST_TOKEN };
+      renderManualSetup(host);
 
-      fireEvent.click(await screen.findByRole("button", { name: "Show key" }));
-
-      expect(screen.getByLabelText("Your API key")).toHaveTextContent(
-        `LANGWATCH_API_KEY=${TEST_KEY}`,
+      const create = await screen.findByRole("button", { name: "Create a personal access token" });
+      expect(minted.projects).toEqual([]);
+      expect(screen.getByLabelText("Your API key").textContent).toContain(
+        "<YOUR_LANGWATCH_API_KEY>",
       );
+
+      fireEvent.click(create);
+
+      await waitFor(() =>
+        expect(screen.getByLabelText("Your API key").textContent).toContain(TEST_TOKEN),
+      );
+      expect(minted.projects).toEqual(["proj_agent"]);
+
+      fireEvent.click(screen.getByRole("button", { name: "Copy your api key" }));
+      await waitFor(() => expect(host.copies).toEqual([TEST_TOKEN]));
     });
   });
 
-  describe("when the server withholds the key from the reader", () => {
-    /** @scenario "Manual setup shows no key to a reader the server withholds it from" */
-    it("prints an empty key", async () => {
-      renderManualSetup({});
+  describe("when the mint is refused", () => {
+    /** @scenario Manual setup fills in no token when the mint is refused */
+    it("keeps the placeholder and copies nothing", async () => {
+      const host = new ProductTestHost();
+      renderManualSetup(host);
 
-      fireEvent.click(await screen.findByRole("button", { name: "Show key" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Create a personal access token" }),
+      );
 
-      expect(screen.getByLabelText("Your API key").textContent).toBe("LANGWATCH_API_KEY=");
+      await waitFor(() => expect(minted.projects).toEqual(["proj_agent"]));
+      expect(screen.getByLabelText("Your API key").textContent).toContain(
+        "<YOUR_LANGWATCH_API_KEY>",
+      );
+      expect(host.copies).toEqual([]);
     });
   });
 });

@@ -5,18 +5,18 @@
  */
 
 import { useDrawerParams } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { buildDisplayTitle } from "@langwatch/suite-browser-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api } from "../../../../behavior/scenario-api.ts";
 import {
   isCancellableStatus,
   useCancelScenarioRun,
 } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useTargetNameMap } from "../../../../behavior/use-target-name-map.ts";
+import { buildDisplayTitle } from "../../../../model/suite/run-history-transforms.ts";
 import { useScenarioRunDetail } from "../../simulations/use-scenario-run-detail.ts";
 
 /** Everything one open drawer knows about the run it is showing. */
@@ -103,7 +103,7 @@ function useRereadOnSettled({
   scenarioState: { status: ScenarioRunStatus; results?: unknown } | undefined;
   open: boolean;
 }): void {
-  const utils = api.useUtils();
+  const utils = scenarioClient.useUtils();
   const utilsRef = useRef(utils);
   utilsRef.current = utils;
 
@@ -142,7 +142,7 @@ function useResolvedScenarioRunId({ open }: { open: boolean }): {
   const { project } = useOrganizationTeamProject();
   const needsResolution = !params.scenarioRunId && !!params.batchRunId && !!params.scenarioSetId;
 
-  const { data } = api.scenarios.getBatchRunData.useQuery(
+  const { data } = scenarioClient.scenarios.getBatchRunData.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId: params.scenarioSetId ?? "",
@@ -150,11 +150,7 @@ function useResolvedScenarioRunId({ open }: { open: boolean }): {
     },
     {
       enabled: open && needsResolution && !!project?.id,
-      refetchInterval: (query) => {
-        const result = query.state.data;
-        const runs = result && "runs" in result ? result.runs : [];
-        return runs.length > 0 ? false : 1000;
-      },
+      // needs a read hint: scenario run started in the batch
     },
   );
 
@@ -210,7 +206,7 @@ function useDrawerDetail({
   // the stand-in.
   const isQueued = open && !detail.scenarioState && !isHardReadError(detail.runStateError);
 
-  const { data: queuedScenario } = api.scenarios.getByIdIncludingArchived.useQuery(
+  const { data: queuedScenario } = scenarioClient.scenarios.getByIdIncludingArchived.useQuery(
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
     { enabled: isQueued && !!project?.id && !!scenarioId },
   );
@@ -286,7 +282,7 @@ export function useRunDrawerStop({
   const { project } = useOrganizationTeamProject();
   const params = useDrawerParams();
   const { can } = useCan();
-  const utils = api.useUtils();
+  const utils = scenarioClient.useUtils();
 
   const { cancelJob } = useCancelScenarioRun({
     onCancelJobSuccess: () => void utils.scenarios.getRunState.invalidate(),

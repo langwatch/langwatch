@@ -25,7 +25,7 @@ import { FaSlack } from "react-icons/fa";
 
 import { api } from "../../../../behavior/automation-api.ts";
 import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
-import { slackApi } from "../../../../behavior/slack-api.ts";
+import { useSlackConnections } from "../../../../behavior/use-automation-reads.ts";
 import type {
   ConfigFormProps,
   NotifyClientDef,
@@ -581,10 +581,7 @@ function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice, S
   // over the framework default.
   const templateValue = slice.template.value || templateDefault;
   const slackPreview = ctx.preview;
-  const connections = slackApi.slackIntegration.list.useQuery(
-    { projectId: ctx.projectId },
-    { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
-  );
+  const connections = useSlackConnections({ projectId: ctx.projectId });
   const variables = useMemo(
     () => filterVariablesForCadence(ctx.variables, ctx.cadenceMode),
     [ctx.variables, ctx.cadenceMode],

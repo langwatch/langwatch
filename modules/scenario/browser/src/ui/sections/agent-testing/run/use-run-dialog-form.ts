@@ -6,18 +6,21 @@
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { declaredDefaults } from "@langwatch/suite-contract";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
+import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { useSession } from "../../../../behavior/auth-session.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useFilteredAgents } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
+import { useScenarios } from "../../../../behavior/scenarios/use-scenarios.ts";
 import {
   unionParameterDefinitions,
   type DeclaredParameter,
 } from "../../../../behavior/suites/use-run-suite.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useTestSuites } from "../../../../behavior/suites/use-test-suites.ts";
 import {
   formatParameterLine,
   formatStoredParameterLine,
@@ -57,7 +60,7 @@ import { buildTargetLabels, scopeLabelOf, useRunName } from "./use-run-name.ts";
 import { type RunPlanFields, useRunPlanFields } from "./use-run-plan-fields.ts";
 
 /** One key per subject the dialog can be open on, "closed" when it is not. */
-function subjectKeyOf(subject: RunDialogSubject | null): string {
+export function subjectKeyOf(subject: RunDialogSubject | null): string {
   if (!subject) return "closed";
   if (subject.kind === "plan") return "plan";
   if (subject.kind === "all") return "all";
@@ -128,16 +131,16 @@ function rememberedParameters(subject: RunDialogSubject | null) {
 }
 
 /** The state of the parameter block: its line, its rows and its secrets. */
-function useParameterFieldsState() {
-  const [parameterLine, setParameterLine] = useState("");
+function useParameterFieldsState(remembered: ReturnType<typeof rememberedParameters>) {
+  const [parameterLine, setParameterLine] = useState(remembered.line);
   // False while the line is the one the dialog wrote itself, from what the
   // subject remembers or from a stored configuration. Only a line the dialog
   // wrote may be shortened when the agent cannot read what is on it.
   const [parameterLineTyped, setParameterLineTyped] = useState(false);
   // Null while the line is what the block holds: the rows are read off the
   // line until something is typed into one of them.
-  const [parameterRows, setParameterRows] = useState<ParameterRow[] | null>(null);
-  const [rowsRequested, setRowsRequested] = useState(false);
+  const [parameterRows, setParameterRows] = useState<ParameterRow[] | null>(remembered.rows);
+  const [rowsRequested, setRowsRequested] = useState(remembered.rowsRequested);
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
 
   return {
@@ -154,48 +157,25 @@ function useParameterFieldsState() {
   };
 }
 
-/** The fields of the dialog, reset whenever it opens on a new subject. */
+/** The fields of the dialog, opened on the values of the subject it is mounted for. */
 function useRunDialogFields(subject: RunDialogSubject | null) {
-  const [target, setTarget] = useState<TargetValue>(null);
-  const [mode, setMode] = useState<RunDialogMode>("agents");
+  const initialTarget = subject?.initialTarget ?? null;
+  const remembered = rememberedParameters(subject);
+  const [target, setTarget] = useState<TargetValue>(initialTarget);
+  const [mode, setMode] = useState<RunDialogMode>(
+    initialTarget?.type === "prompt" ? "prompts" : "agents",
+  );
+  // The note is the one field a run never remembers: it says what this run
+  // is for, so it starts empty every time.
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState("");
-  const [showParams, setShowParams] = useState(false);
-  const parameterFields = useParameterFieldsState();
+  const [showParams, setShowParams] = useState(remembered.show);
+  const parameterFields = useParameterFieldsState(remembered);
   const [inlineError, setInlineError] = useState<unknown>(null);
   // A refusal that names one parameter reads under the field that holds it.
   const [parameterError, setParameterError] = useState<ParameterFieldError | null>(null);
   const [missingProvider, setMissingProvider] = useState(false);
-  // The subject the fields below already hold the opening values of. Anything
-  // that reads the fields waits for this, because the reset runs in an effect
-  // and the render that opens the dialog is one render ahead of it.
-  const [resetFor, setResetFor] = useState("closed");
   const agentTargetBeforePrompt = useRef<TargetValue>(null);
-
-  const subjectKey = subjectKeyOf(subject);
-  const initialTarget = subject?.initialTarget ?? null;
-  const remembered = rememberedParameters(subject);
-  useEffect(() => {
-    setTarget(initialTarget);
-    setMode(initialTarget?.type === "prompt" ? "prompts" : "agents");
-    // The note is the one field a run never remembers: it says what this run
-    // is for, so it starts empty every time.
-    setShowNote(false);
-    setNote("");
-    setShowParams(remembered.show);
-    parameterFields.setParameterLine(remembered.line);
-    parameterFields.setParameterLineTyped(false);
-    parameterFields.setRowsRequested(remembered.rowsRequested);
-    parameterFields.setParameterRows(remembered.rows);
-    parameterFields.setSecretValues({});
-    setInlineError(null);
-    setParameterError(null);
-    setMissingProvider(false);
-    setResetFor(subjectKey);
-    agentTargetBeforePrompt.current = null;
-    // Reset exactly once per subject; the target of a subject does not move
-    // under an open dialog.
-  }, [subjectKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     target,
@@ -215,7 +195,6 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setParameterError,
     missingProvider,
     setMissingProvider,
-    resetFor,
     agentTargetBeforePrompt,
   };
 }
@@ -231,23 +210,23 @@ function useRunDialogChoices(subject: RunDialogSubject | null) {
   const projectId = project?.id ?? "";
   const isDialogOpen = !!project && !!subject;
 
-  const { data: agents } = api.agents.getAll.useQuery({ projectId }, { enabled: isDialogOpen });
+  const { data: agents } = useAgents({ projectId, enabled: isDialogOpen });
   const scenarioAgents = useFilteredAgents({
     agents,
     searchValue: "",
     viewerUserId,
   });
   const { data: prompts } = useAllPromptsForProject();
-  const { data: allScenarios } = api.scenarios.getAll.useQuery(
-    { projectId },
-    { enabled: isDialogOpen },
-  );
+  const { data: allScenarios } = useScenarios({
+    projectId,
+    enabled: isDialogOpen,
+  });
   // Only the New run plan entry point names test suites, but the run name of
   // every entry point can read one, so the list is read whenever it is open.
-  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
-    { projectId },
-    { enabled: isDialogOpen },
-  );
+  const { data: testSuites } = useTestSuites({
+    projectId,
+    enabled: isDialogOpen,
+  });
 
   const publishedPrompts: PromptEntry[] = useMemo(
     () =>
@@ -370,6 +349,35 @@ function targetLabelOf({
 }
 
 /**
+ * The block as the dialog shows it: a line the dialog wrote itself loses the
+ * plain overrides nothing in the run declares, and a block that held remembered
+ * values alone has nothing left to say, so it folds away and the chip offers it
+ * again. Only a line the dialog wrote may be shortened, never one that was typed.
+ */
+function shownParameterBlock({
+  fields,
+  definitions,
+  hasDeclaredSecrets,
+  isLoaded,
+  isCompare,
+}: {
+  fields: RunDialogFields;
+  definitions: readonly DeclaredParameter[];
+  hasDeclaredSecrets: boolean;
+  isLoaded: boolean;
+  isCompare: boolean;
+}): { parameterLine: string; showParams: boolean } {
+  const { parameterLine, parameterLineTyped, showParams, rowsRequested } = fields;
+  if (!isLoaded || !showParams || isCompare || parameterLineTyped) {
+    return { parameterLine, showParams };
+  }
+  const shortened = lineWithoutUndeclared({ line: parameterLine, definitions });
+  const foldsAway =
+    shortened === "" && parameterLine !== "" && !rowsRequested && !hasDeclaredSecrets;
+  return { parameterLine: shortened, showParams: !foldsAway };
+}
+
+/**
  * The plain overrides the block holds that nothing in the run declares.
  */
 function useUndeclaredParameters({
@@ -377,51 +385,24 @@ function useUndeclaredParameters({
   definitions,
   rows,
   showParameterRows,
-  hasDeclaredSecrets,
   agents,
   isLoaded,
   isCompare,
 }: {
+  /** The fields with the block as shown, see `shownParameterBlock`. */
   fields: RunDialogFields;
   definitions: readonly DeclaredParameter[];
   rows: readonly ParameterRow[];
   showParameterRows: boolean;
-  /** Whether a declared secret holds the block open on its own. */
-  hasDeclaredSecrets: boolean;
   agents: readonly RunDialogAgent[];
   /** Whether the reads that hold the declarations have answered. */
   isLoaded: boolean;
   isCompare: boolean;
 }): ParameterFieldError | null {
-  const { parameterLine, parameterLineTyped, setParameterLine } = fields;
-  const { showParams, setShowParams, rowsRequested, target } = fields;
+  const { parameterLine, showParams, target } = fields;
   // A comparison keeps its plain values on the rows of its targets, each one
   // read against its own agent, so this block holds the secrets alone.
   const isActive = isLoaded && showParams && !isCompare;
-
-  useEffect(() => {
-    if (!isActive || parameterLineTyped) return;
-    const shortened = lineWithoutUndeclared({
-      line: parameterLine,
-      definitions,
-    });
-    if (shortened === parameterLine) return;
-    setParameterLine(shortened);
-    // A block that held remembered values alone has nothing left to say, so
-    // it folds away and the chip offers it again.
-    if (shortened === "" && !rowsRequested && !hasDeclaredSecrets) {
-      setShowParams(false);
-    }
-  }, [
-    isActive,
-    parameterLineTyped,
-    parameterLine,
-    definitions,
-    rowsRequested,
-    hasDeclaredSecrets,
-    setParameterLine,
-    setShowParams,
-  ]);
 
   const names = useMemo(() => {
     if (!isActive) return [];
@@ -506,7 +487,7 @@ function useRunDialogParameters({
   /** Whether the reads that hold the declarations have answered. */
   areChoicesLoaded: boolean;
 }) {
-  const { showParams, parameterLine, secretValues } = fields;
+  const { secretValues } = fields;
 
   const scenarioIds = useMemo(
     () => scenarioIdsOfSubject(subject, allScenarios ?? []),
@@ -525,6 +506,15 @@ function useRunDialogParameters({
   const hasDeclaredSecrets = secretDefinitions.length > 0;
   const showParameterRows = fields.rowsRequested || hasDeclaredSecrets;
 
+  const { parameterLine, showParams } = shownParameterBlock({
+    fields,
+    definitions: parameterDefinitions,
+    hasDeclaredSecrets,
+    isLoaded: areChoicesLoaded,
+    isCompare,
+  });
+  const shownFields = { ...fields, parameterLine, showParams };
+
   // The line is what the block holds until a row is touched; after that the
   // rows are, and the line is written back from them.
   const parameterRows = useMemo(
@@ -540,7 +530,7 @@ function useRunDialogParameters({
   const rowActions = useParameterRowActions({ fields, rows: parameterRows });
 
   const secrets = useSecretParameterFields({
-    fields,
+    fields: shownFields,
     secretDefinitions,
     rows: parameterRows,
     showParameterRows,
@@ -560,11 +550,10 @@ function useRunDialogParameters({
   const parameterDefaults = useParameterDefaults(parameterDefinitions);
 
   const undeclaredError = useUndeclaredParameters({
-    fields,
+    fields: shownFields,
     definitions: parameterDefinitions,
     rows: parameterRows,
     showParameterRows,
-    hasDeclaredSecrets,
     agents,
     isLoaded: areChoicesLoaded,
     isCompare,
@@ -575,6 +564,8 @@ function useRunDialogParameters({
     declaredParametersOf,
     parameterDefaults,
     secretDefinitions,
+    parameterLine,
+    showParams,
     parameterRows,
     showParameterRows,
     ...rowActions,
@@ -1077,10 +1068,10 @@ function useDerivedRunDialogState({
 export function useRunDialogForm(subject: RunDialogSubject | null) {
   const subjectKey = subjectKeyOf(subject);
   const choices = useRunDialogChoices(subject);
-  const fields = useRunDialogFields(subject);
+  const heldFields = useRunDialogFields(subject);
   const planFields = useRunPlanFields({ subject, subjectKey });
   const targetAgentIds = targetAgentIdsOf({
-    target: fields.target,
+    target: heldFields.target,
     compareRows: planFields.compareRows,
   });
   const parameters = useRunDialogParameters({
@@ -1088,10 +1079,16 @@ export function useRunDialogForm(subject: RunDialogSubject | null) {
     allScenarios: choices.allScenarios,
     agents: choices.scenarioAgents,
     targetAgentIds,
-    fields,
+    fields: heldFields,
     isCompare: planFields.showCompare,
     areChoicesLoaded: choices.areChoicesLoaded,
   });
+  // Everything below reads the block as shown, not as held.
+  const fields = {
+    ...heldFields,
+    parameterLine: parameters.parameterLine,
+    showParams: parameters.showParams,
+  };
   const targeting = useRunDialogTargeting({
     fields,
     publishedPrompts: choices.publishedPrompts,

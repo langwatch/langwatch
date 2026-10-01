@@ -1,10 +1,10 @@
-import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
 /**
  * Everything the Scenarios tab reads and writes, in one model.
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/features/agent-testing/cases-table.feature
  */
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { Instant } from "@langwatch/time";
 import { useCallback } from "react";
 
@@ -23,7 +23,11 @@ import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-a
 import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { useScenarioPeriod } from "../../../../behavior/agent-testing/use-scenario-period.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type {
+  Period,
+  PeriodMode,
+  RelativePresetKey,
+} from "../../../elements/analytics/period-selector.tsx";
 import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer.tsx";
 import { AGENT_TYPE_SELECTOR_DRAWER } from "./drawer-keys.ts";
 import { type CaseOpenActions, useCaseOpenActions } from "./use-case-open-actions.ts";

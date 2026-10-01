@@ -5,9 +5,9 @@
  * @see specs/lwql/saved-charts.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,8 +78,7 @@ function answer({
   };
 }
 
-const mount = (element: ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
+const mount = (element: ReactElement) => renderWithDesignSystem(element);
 
 function mountWidget(props: { granularitySeconds?: LangWatchQLGranularityStep } = {}) {
   return mount(
@@ -165,14 +164,12 @@ describe("the LangWatchQL dashboard widget", () => {
       // A second request, as a period drag would issue: same chart, different
       // step, so the widget's request key changes and a new run fires.
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <LangWatchQLDashboardWidget
-            chartId="chart_1"
-            projectId="project_1"
-            name="p95 latency"
-            granularitySeconds={3600}
-          />
-        </ChakraProvider>,
+        <LangWatchQLDashboardWidget
+          chartId="chart_1"
+          projectId="project_1"
+          name="p95 latency"
+          granularitySeconds={3600}
+        />,
       );
 
       await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(2));
@@ -253,14 +250,12 @@ describe("the LangWatchQL dashboard widget", () => {
       await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(1));
 
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <LangWatchQLDashboardWidget
-            chartId="chart_1"
-            projectId="project_1"
-            name="p95 latency"
-            granularitySeconds={3600}
-          />
-        </ChakraProvider>,
+        <LangWatchQLDashboardWidget
+          chartId="chart_1"
+          projectId="project_1"
+          name="p95 latency"
+          granularitySeconds={3600}
+        />,
       );
 
       await waitFor(() => expect(mutateMock).toHaveBeenCalledTimes(2));

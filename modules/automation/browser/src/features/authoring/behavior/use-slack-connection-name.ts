@@ -1,8 +1,8 @@
 import { TriggerAction } from "@langwatch/automation-contract";
-import { type NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import { useEffect } from "react";
 
-import { slackApi } from "../../../behavior/slack-api.ts";
+import { useSlackConnections } from "../../../behavior/use-automation-reads.ts";
+import { type NamedSlackConnection } from "../../../model/slack/slack-connection-name.ts";
 import { type SlackNamedDraft, withSlackConnectionName } from "../model/slack-connection-name.ts";
 import type { SlackSlice } from "../model/slack-slice.ts";
 
@@ -26,10 +26,7 @@ export function useSlackConnectionName({
 }): readonly NamedSlackConnection[] | undefined {
   const slice = draft.slices[TriggerAction.SEND_SLACK_MESSAGE];
   const isSlack = draft.action === TriggerAction.SEND_SLACK_MESSAGE && !!slice.slackIntegrationId;
-  const list = slackApi.slackIntegration.list.useQuery(
-    { projectId },
-    { enabled: !!projectId && isSlack, refetchOnWindowFocus: false },
-  );
+  const list = useSlackConnections({ projectId, enabled: isSlack });
   const connections = list.data?.connections;
   useEffect(() => {
     const named = withSlackConnectionName({ draft, connections });

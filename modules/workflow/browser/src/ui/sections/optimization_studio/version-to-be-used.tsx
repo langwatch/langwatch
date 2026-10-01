@@ -1,3 +1,4 @@
+import { AISparklesLoader } from "@langwatch/design-system/ai-sparkles-loader";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import {
   Field,
@@ -8,7 +9,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { AISparklesLoader, allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";

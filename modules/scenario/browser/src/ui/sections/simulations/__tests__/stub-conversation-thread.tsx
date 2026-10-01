@@ -4,7 +4,7 @@
  * handed in. How trace draws each part is covered by trace's own suite.
  */
 import type { UiConversationThreadProps } from "@langwatch/browser-host/declarations";
-import { type DisplayPart, groupIntoTurns } from "@langwatch/trace-browser-kit";
+import { type DisplayPart, groupIntoTurns } from "@langwatch/trace-contract/conversation";
 
 export function StubConversationThread({
   parts,

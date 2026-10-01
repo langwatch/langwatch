@@ -102,7 +102,7 @@ export default function AuditLogScreen() {
   const isEnterprise = plan.data?.type === "ENTERPRISE";
 
   const members = organizationApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId },
+    { organizationId, includeDeactivated: false },
     { enabled: !!organizationId },
   );
   const searchUserId = matchMemberId(members.data?.members ?? [], userSearch);

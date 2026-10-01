@@ -1,8 +1,8 @@
-import { useFilterToggle } from "@langwatch/analytics-browser-kit";
 import { VStack } from "@langwatch/design-system/primitives";
 import React from "react";
 
 import { QueryStringFieldsFilters } from "./fields-filters.tsx";
+import { useFilterToggle } from "./filter-toggle.tsx";
 import { TopicsSelector } from "./topics-selector.tsx";
 
 export const FilterSidebar = React.memo(function FilterSidebar({

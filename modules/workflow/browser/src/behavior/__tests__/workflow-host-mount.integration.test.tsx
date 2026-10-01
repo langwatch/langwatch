@@ -1,9 +1,3 @@
-// @vitest-environment jsdom
-/**
- * Workflow's declared mount: the list threw, and Replicate listed nothing, without it.
- * Spec: specs/ui/module-host-mounting.feature
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   UiCapabilityContextProvider,
   UiCopyTargets,
@@ -17,12 +11,19 @@ import {
   createUiScopeHost,
   type UiScopeHost,
 } from "@langwatch/browser-host/use-organization-team-project";
+// @vitest-environment jsdom
+/**
+ * Workflow's declared mount: the list threw, and Replicate listed nothing, without it.
+ * Spec: specs/ui/module-host-mounting.feature
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { installedModuleHostMounts } from "@langwatch/ui-kernel/module-hosts";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentType, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 const listed = vi.fn((_input: { projectId: string }) => ({ data: [], isLoading: false }));
 vi.mock("../workflow-api.ts", () => ({
@@ -118,12 +119,10 @@ async function renderUnderMount(
     copyTargets,
   };
 
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <UiCapabilityContextProvider value={capabilities}>
-        <Mount>{children}</Mount>
-      </UiCapabilityContextProvider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <UiCapabilityContextProvider value={capabilities}>
+      <Mount>{children}</Mount>
+    </UiCapabilityContextProvider>,
   );
 }
 

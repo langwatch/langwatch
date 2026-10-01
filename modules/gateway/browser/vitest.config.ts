@@ -12,9 +12,6 @@ export default defineConfig({
       "@langwatch/gateway-contract": fileURLToPath(
         new URL("../contract/src/index.ts", import.meta.url),
       ),
-      "@langwatch/authz-browser-kit": fileURLToPath(
-        new URL("../../authz/browser-kit/src/index.ts", import.meta.url),
-      ),
       "@langwatch/model-provider-contract": fileURLToPath(
         new URL("../../model-provider/contract/src/index.ts", import.meta.url),
       ),

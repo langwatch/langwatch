@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { modelSelectionFrom } from "@langwatch/model-provider-browser-kit";
+import { modelSelectionFrom } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
 import { evaluatorApi } from "./evaluator-api.ts";

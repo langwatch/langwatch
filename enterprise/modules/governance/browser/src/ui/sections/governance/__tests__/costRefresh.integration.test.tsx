@@ -1,12 +1,12 @@
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 /**
  * @vitest-environment jsdom
  *
  * Tests cost screen refresh and collection state updates.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { builtinRolePermissions } from "@langwatch/authz-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GovernanceHostProvider } from "../../../../model/governance-host.ts";
@@ -153,12 +153,10 @@ const costsHost = () =>
   });
 
 const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <GovernanceHostProvider value={costsHost()}>
-        <CostsPage />
-      </GovernanceHostProvider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <GovernanceHostProvider value={costsHost()}>
+      <CostsPage />
+    </GovernanceHostProvider>,
   );
 
 /** Named list of all screen reads; named not counted. */

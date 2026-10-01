@@ -48,7 +48,7 @@
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
-      "path": "../../workflow/browser-kit/tsconfig.build.json"
+      "path": "../../workflow/contract/tsconfig.build.json"
     }
   ]
 }

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type {
   GovernanceCostDayRecords,
   GovernanceCostProviderDayRow,
 } from "@langwatch/enterprise-governance-contract";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,10 +77,8 @@ const ROWS: GovernanceCostProviderDayRow[] = [
 ];
 
 const renderPanel = (rows: readonly GovernanceCostProviderDayRow[] = ROWS) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <CostProviderDayPanel organizationId="org-1" rows={rows} interval="month" />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <CostProviderDayPanel organizationId="org-1" rows={rows} interval="month" />,
   );
 
 /**

@@ -1,6 +1,7 @@
 import { HStack } from "@langwatch/design-system/primitives";
-import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit";
 import type { ReactNode } from "react";
+
+import { ColorfulBlockIcon } from "../workflow/workflow-icons.tsx";
 
 type SuperHeaderProps = {
   colSpan: number;

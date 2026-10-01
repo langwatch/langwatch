@@ -58,7 +58,4 @@ export * from "./behavior/use-lingering-dodge.ts";
 export * from "./behavior/use-scrolled-from-top.ts";
 export * from "./model/values/langy-shimmer.ts";
 export * from "./model/values/langy-thinking-verbs.ts";
-// The panel's store, its page-context registry and the empty-state suggestion
-// list moved to `@langwatch/langy-browser-kit` — trace/browser is a consumer,
-// so this module is closed against reaching back into its own browser package.
 export { LangyClient, type LangyTransport } from "./model/langy-client.ts";

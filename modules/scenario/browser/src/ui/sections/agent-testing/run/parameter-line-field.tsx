@@ -4,7 +4,7 @@
  */
 
 import { Badge, Box, chakra, HStack, Input, Text } from "@langwatch/design-system/primitives";
-import { SuggestionPanel } from "@langwatch/trace-browser-kit";
+import { SuggestionPanel } from "@langwatch/design-system/suggestion-panel";
 import { useId, useRef } from "react";
 
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";

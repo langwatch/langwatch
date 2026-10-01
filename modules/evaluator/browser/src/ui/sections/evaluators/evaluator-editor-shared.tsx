@@ -23,6 +23,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
+import { evaluatorClient } from "@langwatch/evaluator-client";
+import { type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -36,28 +38,25 @@ import type {
 } from "@langwatch/experiment-contract";
 import { isComparisonEvaluatorType } from "@langwatch/experiment-contract";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import { toEpochMs } from "@langwatch/time";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  WorkflowCardDisplay,
-  WorkflowCardLink,
-  FormServerError,
-} from "@langwatch/workflow-browser-kit";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { evaluatorApi, type RouterOutputs } from "../../../behavior/evaluator-api.ts";
 import { ComparisonConfigForm } from "../../../behavior/lent-peers.tsx";
+import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
 import {
   EvaluatorEditorActions,
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
 } from "../../elements/evaluator-editor-chrome.tsx";
 import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section.tsx";
+import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
+import { WorkflowCardDisplay, WorkflowCardLink } from "../../elements/workflow/workflow-card.tsx";
 import DynamicZodForm from "../checks/dynamic-zod-form.tsx";
 
 // Stable module-level reference (not an inline JSX literal): ComparisonConfigForm
@@ -198,7 +197,7 @@ export function useEvaluatorEditorController(
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const utils = evaluatorApi.useUtils();
+  const utils = evaluatorClient.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("evaluatorEditor");
@@ -239,7 +238,7 @@ export function useEvaluatorEditorController(
 
   const { isOpen } = props;
 
-  const evaluatorQuery = evaluatorApi.evaluators.getById.useQuery(
+  const evaluatorQuery = evaluatorClient.evaluators.getById.useQuery(
     { id: evaluatorId ?? "", projectId: project?.id ?? "" },
     { enabled: !!evaluatorId && !!project?.id && isOpen },
   );
@@ -345,7 +344,7 @@ export function useEvaluatorEditorController(
     };
   }, [form, debouncedUpdateLocalConfig]);
 
-  const createMutation = evaluatorApi.evaluators.create.useMutation({
+  const createMutation = evaluatorClient.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       onLocalConfigChangeRef.current?.(undefined);
@@ -361,7 +360,7 @@ export function useEvaluatorEditorController(
     },
   });
 
-  const updateMutation = evaluatorApi.evaluators.update.useMutation({
+  const updateMutation = evaluatorClient.evaluators.update.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       void utils.evaluators.getById.invalidate({
@@ -871,17 +870,10 @@ function useResolvedDefaultSettings({
   // embeddings_model values reflect what this project actually has
   // configured (claude-opus, gemini-pro, etc.) instead of the generic
   // DEFAULT_MODEL constant baked into the evaluator zod schemas.
-  const resolvedDefaultModel = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id && isOpen },
-  );
-  const resolvedDefaultEmbeddings = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id && isOpen },
-  );
+  const { resolvedDefaultModel, resolvedDefaultEmbeddings } = useEvaluatorDefaultModels({
+    projectId: project?.id,
+    enabled: isOpen,
+  });
 
   const defaultSettings = useMemo(() => {
     if (!evaluatorDef || !project) return {};
@@ -947,7 +939,7 @@ function isEditorValid({
 }
 
 function workflowCardOf(
-  evaluator: RouterOutputs["evaluators"]["getById"] | undefined,
+  evaluator: EvaluatorOutputs["evaluators"]["getById"] | undefined,
 ): EvaluatorEditorController["workflowCard"] {
   if (!evaluator?.workflowId) return undefined;
   return {

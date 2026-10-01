@@ -16,6 +16,8 @@ vi.mock("react-contextual-analytics", () => ({
   useAnalytics: () => ({ emit: emitMock }),
 }));
 
+vi.mock("../observability/project-token-banner.tsx", () => ({ ProjectTokenBanner: () => null }));
+
 const API_KEY = "sk-lw-test-SUPERSECRET-000";
 
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
@@ -27,7 +29,8 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { ActiveProjectProvider, ViaClaudeCodeScreen } from "@langwatch/onboarding-browser-kit";
+import { ActiveProjectProvider } from "../active-project-context.tsx";
+import { ViaClaudeCodeScreen } from "../via-claude-code-screen.tsx";
 
 type EmitCall = [string, string, Record<string, unknown> | undefined];
 
@@ -48,7 +51,8 @@ function renderScreen() {
     <ChakraProvider value={defaultSystem}>
       <ActiveProjectProvider
         value={{
-          project: { id: "project-1", slug: "project-1", name: "Project", apiKey: API_KEY },
+          project: { id: "project-1", slug: "project-1", name: "Project" },
+          freshToken: API_KEY,
         }}
       >
         <ViaClaudeCodeScreen />
@@ -264,7 +268,7 @@ describe("when the clipboard write fails", () => {
   });
 });
 
-describe("given the screen renders commands that embed the project API key", () => {
+describe("given the screen renders commands that embed the minted token", () => {
   /** @scenario No onboarding analytics payload carries the project API key */
   it("never puts the API key or the copied text in an analytics payload", async () => {
     renderScreen();

@@ -16,15 +16,14 @@ export type WorkflowScreenName = keyof typeof workflowScreens;
 
 export { workflowApi, type WorkflowApiMap } from "./behavior/workflow-api.ts";
 export {
-  WorkflowHostApi,
-  WorkflowHostProvider,
   WORKFLOWS_PAGE_PERMISSION,
   type WorkflowCopyTarget,
   type WorkflowFailureNotice,
+  type WorkflowHostSlice,
   type WorkflowRouteReading,
   type WorkflowScope,
   type WorkflowSuccessNotice,
-} from "@langwatch/workflow-browser-kit";
+} from "./model/workflow-host.ts";
 
 /**
  * The Optimization Studio, `/:project/studio/:workflow` - the third

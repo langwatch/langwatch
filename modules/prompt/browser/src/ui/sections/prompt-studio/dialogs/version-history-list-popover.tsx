@@ -1,5 +1,5 @@
-import { Avatar } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Avatar } from "@langwatch/design-system/avatar";
 import { Menu } from "@langwatch/design-system/menu";
 import { Popover } from "@langwatch/design-system/popover";
 import {
@@ -20,7 +20,7 @@ import { MoreVertical } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuChevronDown, LuChevronUp } from "react-icons/lu";
 
-import { promptApi } from "../../../../behavior/prompt-api.ts";
+import { usePromptVersionHistory } from "../../../../behavior/prompts/use-prompt-version-history.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 import {
@@ -549,15 +549,11 @@ export function VersionHistoryListPopover({
   }, []);
   const { project } = usePromptProject();
   const host = usePromptHost();
-  const { data: prompts = [], isLoading } = promptApi.prompts.getAllVersionsForPrompt.useQuery(
-    {
-      idOrHandle: configId,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: open && !!project?.id && !!configId,
-    },
-  );
+  const { versions: prompts, isLoading } = usePromptVersionHistory({
+    configId,
+    projectId: project?.id,
+    isOpen: open,
+  });
 
   /**
    * Load version data into the form without creating a new version.

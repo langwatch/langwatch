@@ -3,13 +3,14 @@
  */
 
 import { Temporal } from "@langwatch/time";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import type { Project } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
+import { useWorkflowHost } from "../../model/workflow-host.ts";
+
 /**
  * The project row, as the studio's closure reads it. The API key is not part of it:
- * only the publish screen's API modal fetches it.
+ * the publish screen's API modal mints a personal access token instead.
  */
 export type StudioProject = Omit<Project, "apiKey">;
 

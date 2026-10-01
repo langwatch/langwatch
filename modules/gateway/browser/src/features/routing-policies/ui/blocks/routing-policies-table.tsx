@@ -1,5 +1,3 @@
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import {
   Badge,
   Box,
@@ -11,6 +9,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 
+import { ProviderScopeChips } from "../../../../ui/sections/authz/scope-picker/provider-scope-chips.tsx";
+import type { ScopeTriadEntry } from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 import { isModelTier } from "../../model/model-tier-presets.ts";
 import { RoutingPolicyRowActions } from "../elements/routing-policy-row-actions.tsx";
 

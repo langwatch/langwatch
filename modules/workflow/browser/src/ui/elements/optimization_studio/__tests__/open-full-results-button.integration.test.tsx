@@ -3,17 +3,13 @@
  *
  * The run summary footer links to full experiment results.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type BatchRunSummary, BatchSummaryFooter } from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { type BatchRunSummary } from "../../../sections/experiment/batch-results/batch-runs-sidebar.tsx";
+import { BatchSummaryFooter } from "../../../sections/experiment/batch-results/batch-summary-footer.tsx";
 import { OpenFullResultsButton } from "../open-full-results-button.tsx";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const runSummary: BatchRunSummary = {
   runId: "run_123",
@@ -33,7 +29,7 @@ describe("OpenFullResultsButton", () => {
   describe("when rendered in the run summary footer", () => {
     /** @scenario Opening the full results page for the selected run */
     it("links to the experiment results page for the run in a new tab", () => {
-      render(
+      renderWithDesignSystem(
         <BatchSummaryFooter
           run={runSummary}
           actions={
@@ -44,7 +40,6 @@ describe("OpenFullResultsButton", () => {
             />
           }
         />,
-        { wrapper: Wrapper },
       );
 
       const link = screen.getByTestId("open-full-results");

@@ -32,10 +32,9 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
   };
 });
 
-vi.mock("@langwatch/langy-browser-kit", () => ({
-  isLangyDemoProject: () => false,
-  useReducedMotion: () => false,
-}));
+vi.mock("../../model/langy/langy-demo-project.ts", () => ({ isLangyDemoProject: () => false }));
+
+vi.mock("@langwatch/design-system/use-reduced-motion", () => ({ useReducedMotion: () => false }));
 
 import { useProjectHomeHost } from "../../model/project-home-host.ts";
 import ProjectHomeHostMount from "../project-home-host-mount.tsx";

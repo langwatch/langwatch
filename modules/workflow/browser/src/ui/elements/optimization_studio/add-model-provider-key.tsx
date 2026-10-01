@@ -8,8 +8,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 
 export const AddModelProviderKey = ({
   runWhat,

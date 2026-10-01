@@ -21,6 +21,7 @@ import { annotationApi } from "../../behavior/annotation-api.ts";
 import { useAnnotationColumnChoices } from "../../behavior/use-annotation-column-choices.ts";
 import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
 import { useAnnotationQueues } from "../../behavior/use-annotation-queues.ts";
+import { useScoreTypes } from "../../behavior/use-annotation-reads.ts";
 import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
 import { usePersonalDatasetGate } from "../../behavior/use-personal-feature-gate.ts";
 import {
@@ -258,10 +259,7 @@ export function AnnotationList({
     enabled: !isPageProvidedRows,
   });
 
-  const scoreTypes = annotationApi.annotationScore.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const scoreTypes = useScoreTypes({ projectId: project?.id });
 
   const activeScoreTypes: ActiveScoreType[] = useMemo(
     () =>

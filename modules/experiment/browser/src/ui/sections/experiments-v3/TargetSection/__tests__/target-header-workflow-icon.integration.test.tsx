@@ -4,8 +4,8 @@
  * @see specs/agents/workflow-agent-as-target.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts", () => ({
@@ -50,12 +50,8 @@ import {
 } from "../../../../../model/experiments-v3/types.ts";
 import { TargetHeader } from "../target-header.tsx";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 function renderHeader(target: TargetConfig) {
-  return render(<TargetHeader target={target} />, { wrapper: Wrapper });
+  return renderWithDesignSystem(<TargetHeader target={target} />);
 }
 
 const WORKFLOW_AGENT: TargetConfig = {

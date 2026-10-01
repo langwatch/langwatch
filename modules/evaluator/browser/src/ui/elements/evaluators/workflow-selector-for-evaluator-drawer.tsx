@@ -15,18 +15,17 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import {
-  getRandomWorkflowIcon,
-  customEvaluatorTemplate,
-  EmojiPickerModal,
-  FormServerError,
-} from "@langwatch/workflow-browser-kit";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
+import { getRandomWorkflowIcon } from "../../../model/workflow/random-workflow-icon.ts";
+import { customEvaluatorTemplate } from "../../../model/workflow/templates/custom-evaluator.template.ts";
+import { EmojiPickerModal } from "../../sections/workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
+import { FormServerError } from "../workflow/studio-host/errors.tsx";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = UiWorkflowSelectorForEvaluatorDrawerProps;
 
@@ -45,7 +44,7 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = evaluatorApi.useUtils();
+  const utils = evaluatorClient.useUtils();
   const router = useRouter();
   const emojiPicker = useDisclosure();
 
@@ -78,7 +77,7 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
   const name = watch("name");
 
   const createWorkflowMutation = evaluatorApi.workflow.create.useMutation();
-  const createEvaluatorMutation = evaluatorApi.evaluators.create.useMutation({
+  const createEvaluatorMutation = evaluatorClient.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       onSave?.({

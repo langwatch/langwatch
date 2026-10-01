@@ -4,8 +4,7 @@
  * package only.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ReactElement, ReactNode } from "react";
 
 import {
@@ -58,10 +57,6 @@ export function renderWithSecretHost(
 ) {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <SecretHostProvider value={host}>{element}</SecretHostProvider>
-      </ChakraProvider>,
-    ),
+    ...renderWithDesignSystem(<SecretHostProvider value={host}>{element}</SecretHostProvider>),
   };
 }

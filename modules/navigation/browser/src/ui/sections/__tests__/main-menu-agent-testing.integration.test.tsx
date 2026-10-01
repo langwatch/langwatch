@@ -3,8 +3,8 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NavigationProject } from "../../../model/navigation-host.ts";
@@ -26,24 +26,22 @@ function renderMenu({
   agentTestingEnabled: boolean;
   isLoading?: boolean;
 }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          project: PROJECT,
-          pathname: "/[project]",
-          permissions: ["scenarios:view"],
-          flags: {
-            release_ui_agent_testing_v2_enabled: {
-              enabled: agentTestingEnabled,
-              isLoading,
-            },
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        project: PROJECT,
+        pathname: "/[project]",
+        permissions: ["scenarios:view"],
+        flags: {
+          release_ui_agent_testing_v2_enabled: {
+            enabled: agentTestingEnabled,
+            isLoading,
           },
-        }}
-      >
-        <MainMenuSections showExpanded />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+        },
+      }}
+    >
+      <MainMenuSections showExpanded />
+    </WithStubNavigationHost>,
   );
 }
 

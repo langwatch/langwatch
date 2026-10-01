@@ -3,10 +3,10 @@
  * @vitest-environment jsdom
  * @see specs/langy/langy-ui-actions.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { LangyUiActionHandlers } from "@langwatch/langy-browser-kit";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { LangyUiActionHandlers } from "../../../../model/langy/ui-actions/langy-ui-action-types.ts";
 
 /** What the page hands to `useRegisterLangyActions`, captured on render. */
 const captured = vi.hoisted(() => ({
@@ -123,7 +123,7 @@ vi.mock("../../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => 
   useOptimizeWithLangy: () => undefined,
 }));
 
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
+vi.mock("../../langy/langy-page-context.tsx", async (importOriginal) => {
   const actual = await importOriginal<typeof langyPageRegistrationModule>();
   return {
     ...actual,
@@ -168,22 +168,38 @@ vi.mock("../../../../behavior/experiment-api.ts", () => ({
   experimentApi: {
     useUtils: () => ({}),
     useQueries: () => [],
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({}),
     evaluators: {
       create: { useMutation: () => ({ mutate: vi.fn() }) },
       update: { useMutation: () => ({ mutate: vi.fn() }) },
       delete: { useMutation: () => ({ mutate: vi.fn() }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
     prompts: {
       create: { useMutation: () => ({ mutate: vi.fn() }) },
       update: { useMutation: () => ({ mutate: vi.fn() }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({}),
     dataset: { upsert: { useMutation: () => ({ mutate: vi.fn() }) } },
     datasetRecord: { create: { useMutation: () => ({ mutate: vi.fn() }) } },
   },
 }));
 
-import type * as langyPageRegistrationModule from "@langwatch/langy-browser-kit";
-
+import type * as langyPageRegistrationModule from "../../langy/langy-page-context.tsx";
 import ExperimentsWorkbenchPage from "../workbench.screen.tsx";
 
 describe("given the page holds an edit the agent has just made", () => {
@@ -196,11 +212,7 @@ describe("given the page holds an edit the agent has just made", () => {
   describe("when the agent dispatches workbench.run", () => {
     /** @scenario A run waits for the page's own edits to be saved first */
     it("saves before the run starts", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ExperimentsWorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ExperimentsWorkbenchPage />);
 
       const runAction = captured.handlers?.["workbench.run"];
       expect(runAction).toBeTruthy();
@@ -214,11 +226,7 @@ describe("given the page holds an edit the agent has just made", () => {
 
     /** @scenario A run answers with the id of the run it started */
     it("answers with the run id, without waiting for the run", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ExperimentsWorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ExperimentsWorkbenchPage />);
 
       const answer = await captured.handlers?.["workbench.run"]?.run({} as never);
 

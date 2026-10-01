@@ -3,6 +3,7 @@ import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { datasetClient } from "@langwatch/dataset-client";
 import type {
   DatasetColumns,
   DatasetConfirmColumns,
@@ -35,7 +36,6 @@ import {
   usePapaParse,
 } from "react-papaparse";
 
-import { datasetApi } from "../../../behavior/dataset-api.ts";
 import { PresignedUploadFailedError } from "../../../behavior/stored-object-upload.ts";
 import { useDatasetImportTransport } from "../../../behavior/use-stored-object-upload.ts";
 import { parseHeaderColumns } from "../../../model/parse-header-columns.ts";
@@ -267,29 +267,18 @@ export function DatasetUploadProcessing({
   onViewDataset: () => void;
 }) {
   const [isRetrying, setIsRetrying] = useState(false);
-  const retryNormalize = datasetApi.dataset.retryNormalize.useMutation();
-  const datasetQuery = datasetApi.dataset.getById.useQuery(
+  const retryNormalize = datasetClient.dataset.retryNormalize.useMutation();
+  const datasetQuery = datasetClient.dataset.getById.useQuery(
     { projectId, datasetId },
     {
       enabled: !!projectId && !!datasetId,
-      // Poll only while preparing, then stop — same contract as the dataset
-      // page. `finalizeUpload` always flips the row to "processing" before
-      // normalize runs, so "ready" is only ever reached once normalize has
-      // finished; we don't second-guess it (a degenerate columnless dataset is
-      // still terminally ready, not an endless spinner).
-      refetchInterval: (query) => {
-        const status = query.state.data?.status;
-        const isPreparing = status === "processing" || status === "uploading";
-
-        return isPreparing ? 3000 : false;
-      },
+      // needs a read hint: dataset normalisation finished (ready or failed)
     },
   );
 
   const data = datasetQuery.data;
   // `getById` (findFirst, archivedAt: null) returns null for a missing/archived
-  // dataset — a terminal state, NOT "still preparing" (else the spinner hangs
-  // forever, since refetchInterval also stops on null).
+  // dataset — a terminal state, NOT "still preparing" (else the spinner hangs).
   const datasetGone = datasetQuery.isFetched && data == null;
   const isFailed = data?.status === "failed";
   const isReady = data?.status === "ready";
@@ -593,7 +582,7 @@ export function UploadCSVForm({
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const trpcUtils = datasetApi.useUtils();
+  const trpcUtils = datasetClient.useUtils();
   const router = useRouter();
   const importTransport = useDatasetImportTransport();
 

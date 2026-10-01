@@ -39,10 +39,10 @@ const answer = vi.fn(() => ({ data: [ORGANIZATION_GRAPH] }));
 const usage = vi.fn((): UsageAnswer => ({ isLoading: false }));
 vi.mock("../gateway-api.ts", () => ({
   gatewayApi: {
-    organization: { getAll: { useQuery: () => answer() } },
+    organization: { getScopeGraph: { useQuery: () => answer() } },
     plan: { getActivePlan: { useQuery: () => usage() } },
   },
-  api: { organization: { getAll: { useQuery: () => answer() } } },
+  api: { organization: { getScopeGraph: { useQuery: () => answer() } } },
 }));
 
 import { useGatewayHost } from "../../model/gateway-host.ts";

@@ -6,7 +6,18 @@
  * @see modules/annotation/specs/annotation-queue-workflow.feature
  */
 
-import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
+import { defineSlice } from "@langwatch/browser-host/global-store";
+import {
+  type AnnotationQueueSessionState,
+  createAnnotationQueueSession,
+  TRACE_ANNOTATION_QUEUE_SESSION_SLICE,
+} from "@langwatch/trace-contract";
+
+// Stands in for trace, the owner of the slice, which this package only reads.
+const useAnnotationQueueSessionStore = defineSlice<AnnotationQueueSessionState>({
+  name: TRACE_ANNOTATION_QUEUE_SESSION_SLICE,
+  create: createAnnotationQueueSession,
+});
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";

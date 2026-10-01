@@ -6,6 +6,7 @@
 
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { scenarioClient } from "@langwatch/scenario-client";
 import {
   DEFAULT_CALLER_VOICE,
   type CallerVoiceConfig,
@@ -20,6 +21,7 @@ import {
 import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type Scenario } from "../../../../behavior/scenario-api.ts";
+import { useScenario } from "../../../../behavior/scenarios/use-scenario.ts";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import {
   formatParameterLine,
@@ -237,6 +239,7 @@ function useCaseWrites({
   runAfterSave: MutableRefObject<boolean>;
 }) {
   const utils = api.useUtils();
+  const scenarioUtils = scenarioClient.useUtils();
   const [staleVersion, setStaleVersion] = useState<number | null>(null);
   const [fieldsError, setFieldsError] = useState<string | null>(null);
 
@@ -254,11 +257,11 @@ function useCaseWrites({
   }, []);
 
   const invalidate = useCallback(() => {
-    void utils.scenarios.getAll.invalidate({ projectId });
+    void scenarioUtils.scenarios.getAll.invalidate({ projectId });
     void utils.suites.testSuites.getAll.invalidate({ projectId });
   }, [utils, projectId]);
 
-  const createMutation = api.scenarios.create.useMutation({
+  const createMutation = scenarioClient.scenarios.create.useMutation({
     onSuccess: (saved) => {
       invalidate();
       onSaved(saved, { shouldRunAfterSave: runAfterSave.current });
@@ -266,11 +269,11 @@ function useCaseWrites({
     onError: (error) => surfaceError(error, "Couldn't create the scenario"),
   });
 
-  const updateMutation = api.scenarios.update.useMutation({
+  const updateMutation = scenarioClient.scenarios.update.useMutation({
     onSuccess: (saved) => {
       invalidate();
-      utils.scenarios.getById.setData({ projectId, id: saved.id }, saved);
-      void utils.scenarios.getById.invalidate({ projectId, id: saved.id });
+      scenarioUtils.scenarios.getById.setData({ projectId, id: saved.id }, saved);
+      void scenarioUtils.scenarios.getById.invalidate({ projectId, id: saved.id });
       onSaved(saved, { shouldRunAfterSave: runAfterSave.current });
     },
     onError: (error) => {
@@ -419,10 +422,11 @@ function useCaseScenarioQuery({
     data: scenario,
     isLoading: isScenarioLoading,
     refetch,
-  } = api.scenarios.getById.useQuery(
-    { projectId, id: scenarioId ?? "" },
-    { enabled: open && !!projectId && !!scenarioId },
-  );
+  } = useScenario({
+    projectId,
+    id: scenarioId ?? undefined,
+    enabled: open,
+  });
   return { scenario, isScenarioLoading, refetchScenario: refetch };
 }
 

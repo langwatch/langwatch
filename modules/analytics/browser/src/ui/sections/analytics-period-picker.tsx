@@ -4,8 +4,7 @@
  * `model/analytics-period.ts` and bound in `behavior/use-analytics-period.ts`.
  */
 
-import type { PopoverRootProps } from "@chakra-ui/react";
-import { Popover } from "@langwatch/design-system/popover";
+import { Popover, type PopoverRootProps } from "@langwatch/design-system/popover";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
 import {
   Box,

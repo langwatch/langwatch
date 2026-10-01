@@ -256,7 +256,7 @@ function useDeliveriesDrawerData(organizationId: string, endpoint: EndpointView 
       organizationId,
       endpointId: endpoint?.id ?? "",
     },
-    { enabled: endpoint !== null, refetchInterval: 15_000 },
+    { enabled: endpoint !== null },
   );
 
   return {

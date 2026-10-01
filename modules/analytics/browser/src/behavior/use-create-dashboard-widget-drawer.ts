@@ -1,8 +1,8 @@
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useEffect, useMemo, useState } from "react";
 
 import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "../model/dashboard-widget/presets.ts";
+import { usePeriodSelector } from "../ui/elements/period-selector.tsx";
 import { analyticsApi as api } from "./analytics-api.ts";
 import { useShowErrorToast } from "./analytics-feedback.ts";
 import { useWidgetPreview } from "./use-widget-preview.ts";

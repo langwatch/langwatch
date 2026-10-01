@@ -9,13 +9,6 @@ import type {
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { Button, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import {
-  EmojiPickerModal,
-  getRandomWorkflowIcon,
-  RenderCode,
-  WorkflowCodeEditorModal,
-  type WorkflowCodeEditorModalHost,
-} from "@langwatch/workflow-browser-kit";
 import { useState } from "react";
 
 import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
@@ -24,12 +17,19 @@ import { useCreateWorkflowAgent } from "../../behavior/use-create-workflow-agent
 import { useRoutedCodeAgent } from "../../behavior/use-routed-code-agent.ts";
 import { useRoutedDrawer } from "../../behavior/use-routed-drawer.ts";
 import { useRoutedHttpAgent } from "../../behavior/use-routed-http-agent.ts";
+import { getRandomWorkflowIcon } from "../../model/workflow/random-workflow-icon.ts";
+import {
+  WorkflowCodeEditorModal,
+  type WorkflowCodeEditorModalHost,
+} from "../elements/workflow/code/workflow-code-editor.tsx";
 import { AgentCodeEditorDrawer } from "./agent-code-editor-drawer.tsx";
 import { AgentHttpEditorDrawer } from "./agent-http-editor-drawer.tsx";
 import { AgentTestPanel } from "./agent-test-panel.tsx";
 import { ConnectFromCodeDrawer } from "./connect-from-code-drawer.tsx";
 import { ConnectedAgentDrawer } from "./connected-agent-drawer.tsx";
 import { WorkflowSelectorDrawer } from "./workflow-selector-drawer.tsx";
+import { RenderCode } from "./workflow/code/render-code.tsx";
+import { EmojiPickerModal } from "./workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
 
 export function RoutedConnectedAgentDrawer({ agentId }: { agentId?: string }) {
   const { close } = useRoutedDrawer();

@@ -1,4 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { promptClient } from "@langwatch/prompt-client";
 import { useMemo } from "react";
 
 import { experimentApi } from "./experiment-api.ts";
@@ -15,7 +16,7 @@ export function useTargetNameMap(): Map<string, string> {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
-  const { data: prompts } = experimentApi.prompts.getAllPromptsForProject.useQuery(
+  const { data: prompts } = promptClient.prompts.getAllPromptsForProject.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );

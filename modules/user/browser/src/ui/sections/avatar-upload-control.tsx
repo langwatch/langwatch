@@ -1,7 +1,7 @@
+import { UserAvatar } from "@langwatch/design-system/avatar";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { chakra, Box, Button, Center, HStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { UserAvatar } from "@langwatch/user-browser-kit";
 import { Info, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -11,6 +11,7 @@ import {
   useShowErrorToast,
 } from "../../behavior/personal-workspace-feedback.ts";
 import { useCurrentUser } from "../../behavior/personal-workspace-session.ts";
+import { useUserAvatarUrl } from "../../behavior/use-user-avatar-url.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { processAvatarImage } from "../../model/process-avatar-image.ts";
 
@@ -30,6 +31,7 @@ function AvatarEditButton({
   isDisabled: boolean;
   onOpen: () => void;
 }) {
+  const src = useUserAvatarUrl(image);
   return (
     <chakra.button
       position="relative"
@@ -42,13 +44,7 @@ function AvatarEditButton({
       _hover={isDisabled ? undefined : { opacity: 0.85 }}
       onClick={isDisabled ? undefined : onOpen}
     >
-      <UserAvatar
-        name={name}
-        image={image}
-        size="xl"
-        borderWidth="1px"
-        borderColor="border.muted"
-      />
+      <UserAvatar name={name} src={src} size="xl" borderWidth="1px" borderColor="border.muted" />
       <Box
         position="absolute"
         bottom="0"
@@ -100,6 +96,7 @@ function AvatarPhotoDialog({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const src = useUserAvatarUrl(image);
   return (
     <Dialog.Root open={isOpen} onOpenChange={(e) => onOpenChange(e.open)} size="sm">
       <Dialog.Content bg="bg">
@@ -111,7 +108,7 @@ function AvatarPhotoDialog({
           <Center py={2}>
             <UserAvatar
               name={name}
-              image={image}
+              src={src}
               width="180px"
               height="180px"
               borderWidth="1px"

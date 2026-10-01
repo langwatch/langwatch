@@ -16,13 +16,6 @@ export const UI_ORGANIZATIONS_PROCEDURE = "organization.getScopeGraph";
 export const UI_DEMO_ORGANIZATIONS_PROCEDURE = "organization.getAll";
 export const UI_SHARED_TRACE_PROCEDURE = "sharedTrace.get";
 
-/**
- * Off the HTTP batch: left in it, these shell-mounted queries wait behind
- * a page's slowest read (seconds, on a drawer-open burst) — the shell is
- * what the page needs FIRST, so it runs on its own connection instead.
- */
-const OFF_BATCH = { context: { skipBatch: true } } as const;
-
 export type UiSharedProject = {
   readonly id: string;
   readonly name: string;
@@ -48,8 +41,7 @@ export function useUiOrganizations({
   const input = isDemo ? { isDemo } : {};
   return useQuery({
     queryKey: trpcQueryKey(procedure, { input, type: "query" }),
-    queryFn: () =>
-      transport.query(procedure, input, OFF_BATCH) as Promise<readonly UiScopeOrganization[]>,
+    queryFn: () => transport.query(procedure, input) as Promise<readonly UiScopeOrganization[]>,
     enabled,
   });
 }

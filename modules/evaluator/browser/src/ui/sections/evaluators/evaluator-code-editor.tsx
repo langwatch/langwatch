@@ -1,10 +1,10 @@
 /** Workflow's code editor from its kit, wired with this project's secret names. */
 
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { WorkflowCodeEditor } from "@langwatch/workflow-browser-kit";
 import { type ComponentProps, useMemo } from "react";
 
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
+import { WorkflowCodeEditor } from "../../elements/workflow/code/workflow-code-editor.tsx";
 
 type EvaluatorCodeEditorProps = Omit<
   ComponentProps<typeof WorkflowCodeEditor>,

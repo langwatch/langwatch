@@ -1,10 +1,10 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { CustomEvaluator } from "@langwatch/evaluation-contract";
-import { evaluatorCatalogueWith } from "@langwatch/evaluator-browser-kit";
 import type { EvaluatorDefinition } from "@langwatch/evaluator-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
+import { evaluatorCatalogueWith } from "../model/custom-evaluator-catalogue.ts";
 import { evaluatorApi } from "./evaluator-api.ts";
 
 export const useAvailableEvaluators = ():

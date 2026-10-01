@@ -2,7 +2,6 @@
  * Suite detail panel showing header, stats bar, and run results.
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import {
   Box,
@@ -33,6 +32,7 @@ import { useState } from "react";
 import { SetupWithAgentButton } from "../../../behavior/lent-trace.tsx";
 import type { SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { useNow } from "../../../behavior/use-now.ts";
+import type { Period } from "../../elements/analytics/period-selector.tsx";
 import { RunHistoryPanel, type RunHistoryStats } from "./run-history-panel.tsx";
 
 type SuiteDetailPanelProps = {

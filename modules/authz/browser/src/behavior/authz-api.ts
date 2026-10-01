@@ -100,9 +100,9 @@ export type AuthzApiMap = {
       };
     };
 
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: {
           id: string;
           name: string;

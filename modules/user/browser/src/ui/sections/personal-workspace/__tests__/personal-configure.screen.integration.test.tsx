@@ -35,7 +35,7 @@ const { state, calls } = vi.hoisted(() => {
   const state: ScreenState = {
     ctx: undefined,
     projectId: "proj_me",
-    projectApiKey: "sk-personal",
+    projectApiKey: "",
     features: { evaluations: true, datasets: true, annotations: true, automations: true },
     failWith: undefined,
   };
@@ -58,8 +58,8 @@ vi.mock("../../home-page-picker.tsx", () => ({
   HomePagePicker: () => <div data-testid="home-page-picker" />,
 }));
 vi.mock("../../personal-otlp-endpoint-panel.tsx", () => ({
-  PersonalOtlpEndpointPanel: ({ apiKey }: { apiKey: string }) => (
-    <div data-testid="otlp-panel" data-api-key={apiKey} />
+  PersonalOtlpEndpointPanel: ({ projectId }: { projectId: string }) => (
+    <div data-testid="otlp-panel" data-project-id={projectId} />
   ),
 }));
 vi.mock("../../budget-overview/index.ts", () => ({
@@ -151,7 +151,7 @@ const KEY: PersonalContext["apiKeys"][number] = {
 beforeEach(() => {
   state.ctx = personalContext();
   state.projectId = "proj_me";
-  state.projectApiKey = "sk-personal";
+  state.projectApiKey = "";
   state.features = { evaluations: true, datasets: true, annotations: true, automations: true };
   state.failWith = undefined;
   calls.mutations.length = 0;
@@ -296,11 +296,12 @@ describe("PersonalConfigureScreen", () => {
     });
   });
 
-  describe("when the personal project has an API key", () => {
-    it("shows the OTLP endpoint with that key and the landing page picker", () => {
+  describe("when the personal context carries no API key", () => {
+    /** @scenario "The personal context never carries the personal project's API key" */
+    it("shows the OTLP endpoint for the project, which mints a token itself, and the picker", () => {
       renderScreen();
 
-      expect(screen.getByTestId("otlp-panel")).toHaveAttribute("data-api-key", "sk-personal");
+      expect(screen.getByTestId("otlp-panel")).toHaveAttribute("data-project-id", "proj_me");
       expect(screen.getByTestId("home-page-picker")).toBeInTheDocument();
     });
   });

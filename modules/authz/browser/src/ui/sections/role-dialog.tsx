@@ -2,7 +2,6 @@
 // that adds up to on the right. Creating and editing are one screen (main's RoleDialog).
 
 import { type AuthzPermission, isRegistryPermission } from "@langwatch/authorization";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Box,
@@ -21,6 +20,7 @@ import { authzApi } from "../../behavior/authz-api.ts";
 import { useAuthzHost } from "../../model/authz-host.ts";
 import { RoleEffectPreview } from "../blocks/role-effect-preview.tsx";
 import { RolePermissionComposer } from "../blocks/role-permission-composer.tsx";
+import type { ScopeTriadEntry } from "./scope-picker/scope-chip-picker.tsx";
 
 type RoleFormValues = {
   name: string;

@@ -30,7 +30,7 @@ const calls = vi.hoisted(() => ({
   invalidateLimit: vi.fn(),
 }));
 
-vi.mock("../../../behavior/evaluator-api.ts", () => {
+const { mutation } = vi.hoisted(() => {
   const mutation = (spy: (input: unknown) => unknown) => ({
     useMutation: (options?: {
       onSuccess?: (result: unknown, variables: unknown) => void;
@@ -48,31 +48,42 @@ vi.mock("../../../behavior/evaluator-api.ts", () => {
       mutateAsync: async (input: unknown) => spy(input),
     }),
   });
+  return { mutation };
+});
 
+vi.mock("../../../behavior/evaluator-api.ts", () => {
   return {
     evaluatorApi: {
       useUtils: () => ({
         evaluators: { getAll: { invalidate: calls.invalidateAll } },
         licenseEnforcement: { checkLimit: { invalidate: calls.invalidateLimit } },
       }),
-      evaluators: {
-        getAll: {
-          useQuery: () => ({ data: state.evaluators, isLoading: state.isLoading }),
-        },
-        getRelatedEntities: {
-          useQuery: () => ({ data: state.related, isLoading: state.relatedLoading }),
-        },
-        getCopies: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
-        getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
-        delete: mutation(calls.deleteEvaluator),
-        cascadeArchive: mutation(calls.cascadeArchive),
-        syncFromSource: mutation(calls.syncFromSource),
-        copy: mutation(vi.fn()),
-        pushToCopies: mutation(vi.fn()),
-      },
     },
   };
 });
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      evaluators: { getAll: { invalidate: calls.invalidateAll } },
+      licenseEnforcement: { checkLimit: { invalidate: calls.invalidateLimit } },
+    }),
+    evaluators: {
+      getAll: {
+        useQuery: () => ({ data: state.evaluators, isLoading: state.isLoading }),
+      },
+      getRelatedEntities: {
+        useQuery: () => ({ data: state.related, isLoading: state.relatedLoading }),
+      },
+      getCopies: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+      getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+      delete: mutation(calls.deleteEvaluator),
+      cascadeArchive: mutation(calls.cascadeArchive),
+      syncFromSource: mutation(calls.syncFromSource),
+      copy: mutation(vi.fn()),
+      pushToCopies: mutation(vi.fn()),
+    },
+  },
+}));
 
 const evaluator = (overrides: Record<string, unknown> = {}) => ({
   id: "eval_1",

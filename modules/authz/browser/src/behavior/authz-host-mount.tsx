@@ -95,7 +95,7 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
     [planType, activePlan.isLoading],
   );
   // The shell's own workspace read, under the same cache key: no second request.
-  const organizations = authzApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = authzApi.organization.getScopeGraph.useQuery({});
   const structure = useMemo(() => {
     const organization = organizations.data?.find((candidate) => candidate.id === organizationId);
     const teams = organization?.teams ?? [];

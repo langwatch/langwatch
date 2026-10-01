@@ -3,11 +3,11 @@ import "@testing-library/jest-dom/vitest";
 /**
  * Tests for WinRateChart.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { BatchComparisonColumn } from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { BatchComparisonColumn } from "../../batch-evaluation-results.types.ts";
 import { WinRateChart } from "../win-rate-chart.tsx";
 
 vi.mock("recharts", () => {
@@ -30,10 +30,6 @@ vi.mock("recharts", () => {
   };
 });
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 afterEach(() => {
   cleanup();
 });
@@ -55,9 +51,7 @@ const createColumn = (overrides: Partial<BatchComparisonColumn> = {}): BatchComp
 describe("WinRateChart", () => {
   describe("given variants with distinct names", () => {
     it("labels each bar with its own name", () => {
-      render(<WinRateChart column={createColumn()} chartHeight={160} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<WinRateChart column={createColumn()} chartHeight={160} />);
 
       expect(screen.getByTestId("bar-chart-data").textContent).toBe(
         "gpt-5-mini, claude-haiku-4-5, Tie",
@@ -77,9 +71,7 @@ describe("WinRateChart", () => {
         ],
       });
 
-      render(<WinRateChart column={column} chartHeight={160} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<WinRateChart column={column} chartHeight={160} />);
 
       expect(screen.getByTestId("bar-chart-data").textContent).toBe(
         "gpt-5-mini (1), gpt-5-mini (2), Tie",

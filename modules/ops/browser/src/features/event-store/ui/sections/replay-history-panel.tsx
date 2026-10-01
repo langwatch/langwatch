@@ -7,7 +7,6 @@ import { ReplayHistorySection as ReplayHistorySectionView } from "../blocks/repl
 export function ReplayHistorySection() {
   const replay = useOpsOverlay("replay");
   const historyQuery = api.ops.getReplayHistory.useQuery(undefined, {
-    refetchInterval: 10000,
   });
 
   return (

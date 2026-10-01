@@ -1,16 +1,12 @@
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
 import { EvaluatorCategoryPicker } from "../evaluator-category-picker.tsx";
 import { EvaluatorTypePicker } from "../evaluator-type-picker.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("Evaluator web primitives", () => {
   it("explains all missing code evaluator requirements", () => {
@@ -37,13 +33,12 @@ describe("Evaluator web primitives", () => {
     const user = userEvent.setup();
     const onSelectCategory = vi.fn();
     const onSelectCode = vi.fn();
-    render(
+    renderWithDesignSystem(
       <EvaluatorCategoryPicker
         onSelectCategory={onSelectCategory}
         onSelectCode={onSelectCode}
         onSelectWorkflow={vi.fn()}
       />,
-      { wrapper: Wrapper },
     );
 
     await user.click(screen.getByTestId("evaluator-category-llm_judge"));
@@ -56,7 +51,7 @@ describe("Evaluator web primitives", () => {
   it("groups contract definitions and exposes unavailable evaluator state", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    render(
+    renderWithDesignSystem(
       <EvaluatorTypePicker
         category="expected_answer"
         evaluators={{
@@ -74,7 +69,6 @@ describe("Evaluator web primitives", () => {
         }}
         onSelect={onSelect}
       />,
-      { wrapper: Wrapper },
     );
 
     await user.click(screen.getByTestId("evaluator-type-langevals-exact_match"));

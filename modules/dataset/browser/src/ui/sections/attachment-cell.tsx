@@ -1,5 +1,4 @@
 import { describeError } from "@langwatch/browser-host/errors";
-import type { DatasetAttachmentSlot } from "@langwatch/dataset-browser-kit";
 import { attachmentDisplayName, isDatasetAttachmentRef } from "@langwatch/dataset-contract";
 import { getImageUrl } from "@langwatch/design-system/external-image";
 /**
@@ -15,10 +14,11 @@ import {
   Spinner,
   Text,
 } from "@langwatch/design-system/primitives";
-import { StoredObjectImage } from "@langwatch/stored-object-browser-kit";
 import { ImageIcon, Paperclip, Trash2, Upload } from "lucide-react";
 
 import { useAttachmentUpload } from "../../behavior/use-attachment-upload.ts";
+import type { DatasetAttachmentSlot } from "../../model/dataset-table-context.tsx";
+import { StoredObjectImage } from "./stored-object/stored-object-image.tsx";
 
 /** The column types this cell renders. */
 export type AttachmentColumnType = "image" | "file";

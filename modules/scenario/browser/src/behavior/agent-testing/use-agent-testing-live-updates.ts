@@ -4,6 +4,7 @@
  */
 
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { scenarioClient } from "@langwatch/scenario-client";
 import type { ScenarioTabNavigatePayload } from "@langwatch/scenario-contract";
 import { useCallback, useRef } from "react";
 
@@ -41,6 +42,7 @@ export function useAgentTestingLiveUpdates(projectId: string): {
   isSseConnected: boolean;
 } {
   const utils = api.useUtils();
+  const scenarioUtils = scenarioClient.useUtils();
   const scenarioTab = useScenarioTabFollow();
   const followRun = useFollowRunInThisTab();
 
@@ -48,16 +50,16 @@ export function useAgentTestingLiveUpdates(projectId: string): {
     projectId,
     refetch: () => {
       void utils.suites.getSummaries.invalidate();
-      void utils.scenarios.getExternalSetSummaries.invalidate();
+      void scenarioUtils.scenarios.getExternalSetSummaries.invalidate();
       // The run number of a plan counts the runs of the window. A run that
       // just finished makes that count one higher, and a stale count names
       // the new run after the one before it.
-      void utils.scenarios.getScenarioSetBatchRunCount.invalidate();
+      void scenarioUtils.scenarios.getScenarioSetBatchRunCount.invalidate();
       // The results page polls only while the stream is down, so the rows
       // and the header pills read again on every update here. The last
       // update of a run is the one its evaluators send after it finished.
-      void utils.scenarios.getResultsOverview.invalidate();
-      void utils.scenarios.getResultAtoms.invalidate();
+      void scenarioUtils.scenarios.getResultsOverview.invalidate();
+      void scenarioUtils.scenarios.getResultAtoms.invalidate();
     },
     enabled: !!projectId,
     debounceMs: 500,

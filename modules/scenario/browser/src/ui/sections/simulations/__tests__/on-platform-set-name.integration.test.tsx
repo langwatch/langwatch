@@ -3,16 +3,12 @@
  * @vitest-environment jsdom
  * @see specs/suites/internal-run-set-surface.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SetCard } from "../../../elements/set-card.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("the on-platform run set name", () => {
   afterEach(() => {
@@ -29,7 +25,7 @@ describe("the on-platform run set name", () => {
 
   /** @scenario "The internal run set reads with a friendly name, never its raw address" */
   it("shows a readable name and never the raw address", () => {
-    render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<SetCard {...defaultProps} />);
 
     expect(screen.getByText(ON_PLATFORM_DISPLAY_NAME)).toBeInTheDocument();
     expect(screen.queryByText(internalSetId)).not.toBeInTheDocument();
@@ -37,7 +33,7 @@ describe("the on-platform run set name", () => {
 
   /** @scenario "The v1 pages keep the name they show today" */
   it('keeps the v1 name "Manual Run" on the v1 card', () => {
-    render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<SetCard {...defaultProps} />);
 
     expect(screen.getByText("Manual Run")).toBeInTheDocument();
     expect(screen.queryByText("One-off runs")).not.toBeInTheDocument();

@@ -8,12 +8,6 @@ import {
   versionMetadataToNodeFormat,
 } from "@langwatch/prompt-contract";
 import {
-  type LlmConfigInputType,
-  LlmConfigInputTypes,
-  type LlmConfigOutputType,
-  LlmConfigOutputTypes,
-} from "@langwatch/workflow-browser-kit";
-import {
   type Component,
   type LLMConfig,
   type LlmConfigParameter,
@@ -27,6 +21,12 @@ import type { DeepPartial } from "react-hook-form";
 
 import type { SaveVersionParams } from "../../model/prompts/providers/types.ts";
 import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt.ts";
+import {
+  type LlmConfigInputType,
+  LlmConfigInputTypes,
+  type LlmConfigOutputType,
+  LlmConfigOutputTypes,
+} from "../../model/workflow/types.ts";
 import { inputsAndOutputsToDemostrationColumns } from "../../prompt-form.ts";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(

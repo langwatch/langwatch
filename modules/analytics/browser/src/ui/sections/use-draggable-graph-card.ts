@@ -1,4 +1,3 @@
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useMemo, useState } from "react";
 
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
@@ -8,6 +7,7 @@ import {
   dashboardWidgetDefinitionSchema,
   type DashboardWidgetDraft,
 } from "../../model/dashboard-widget-definition.ts";
+import { usePeriodSelector } from "../elements/period-selector.tsx";
 import type { GraphData } from "./draggable-graph-card.tsx";
 
 /**

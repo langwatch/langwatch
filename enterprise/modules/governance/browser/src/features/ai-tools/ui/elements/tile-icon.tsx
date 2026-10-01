@@ -1,10 +1,13 @@
-import { ASSISTANT_PRESETS, type AssistantKind } from "@langwatch/coding-agent-browser-kit";
 import { Box, Image } from "@langwatch/design-system/primitives";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import type { AiToolType } from "@langwatch/enterprise-governance-contract";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import { Bot, Boxes, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
+import {
+  ASSISTANT_PRESETS,
+  type AssistantKind,
+} from "../../../../model/coding-agent/assistant-presets.ts";
 import { resolveToolPreset, TOOL_PRESETS } from "./tool-icons.tsx";
 
 const FALLBACK_ICONS: Record<AiToolType, ReactNode> = {

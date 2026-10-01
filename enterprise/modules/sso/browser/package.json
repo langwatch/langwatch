@@ -27,7 +27,6 @@
     "@langwatch/error-views": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "react-icons": "catalog:"

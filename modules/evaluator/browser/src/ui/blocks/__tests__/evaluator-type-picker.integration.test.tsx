@@ -1,16 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EvaluatorTypePicker } from "../evaluator-type-picker.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 afterEach(() => {
   cleanup();
@@ -21,9 +17,7 @@ describe("EvaluatorTypePicker", () => {
     /** @scenario Each category contains specific evaluators */
     /** @scenario EvaluatorTypeSelectorDrawer shows evaluators in category */
     it("shows evaluators for the selected category", async () => {
-      render(<EvaluatorTypePicker category="expected_answer" onSelect={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<EvaluatorTypePicker category="expected_answer" onSelect={vi.fn()} />);
 
       await waitFor(() => {
         expect(screen.getByText(/Exact Match/)).toBeInTheDocument();
@@ -39,9 +33,9 @@ describe("EvaluatorTypePicker", () => {
     it("calls onSelect with the chosen evaluator type", async () => {
       const user = userEvent.setup();
       const onSelect = vi.fn();
-      render(<EvaluatorTypePicker category="expected_answer" onSelect={onSelect} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <EvaluatorTypePicker category="expected_answer" onSelect={onSelect} />,
+      );
 
       await waitFor(() => {
         expect(screen.getByText(/Exact Match/)).toBeInTheDocument();
@@ -64,9 +58,8 @@ describe("EvaluatorTypePicker", () => {
 
     /** @scenario Azure evaluators are disabled when no Azure Safety provider is configured */
     it("disables all three Azure evaluator cards", async () => {
-      render(
+      renderWithDesignSystem(
         <EvaluatorTypePicker category="safety" availability={availability} onSelect={vi.fn()} />,
-        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -89,9 +82,8 @@ describe("EvaluatorTypePicker", () => {
     it("leaves non-Azure safety evaluators enabled and selectable", async () => {
       const onSelect = vi.fn();
       const user = userEvent.setup();
-      render(
+      renderWithDesignSystem(
         <EvaluatorTypePicker category="safety" availability={availability} onSelect={onSelect} />,
-        { wrapper: Wrapper },
       );
 
       const piiCard = await screen.findByTestId("evaluator-type-presidio-pii_detection");
@@ -107,14 +99,13 @@ describe("EvaluatorTypePicker", () => {
         const onConfigureAzureSafety = vi.fn();
         const onSelect = vi.fn();
         const user = userEvent.setup();
-        render(
+        renderWithDesignSystem(
           <EvaluatorTypePicker
             category="safety"
             availability={availability}
             onSelect={onSelect}
             onConfigureAzureSafety={onConfigureAzureSafety}
           />,
-          { wrapper: Wrapper },
         );
 
         const cta = await screen.findByTestId("evaluator-type-azure-content_safety-cta");
@@ -129,7 +120,7 @@ describe("EvaluatorTypePicker", () => {
   describe("given the project has azure_safety configured with valid keys", () => {
     /** @scenario Configuring Azure Safety enables all three Azure evaluators */
     it("leaves all three Azure evaluator cards enabled", async () => {
-      render(
+      renderWithDesignSystem(
         <EvaluatorTypePicker
           category="safety"
           availability={{
@@ -139,7 +130,6 @@ describe("EvaluatorTypePicker", () => {
           }}
           onSelect={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       await waitFor(() => {

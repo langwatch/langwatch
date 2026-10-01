@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -21,7 +21,7 @@ function GovernancePage({ name }: { name: string }) {
 }
 
 function renderWithChakra(node: React.ReactNode) {
-  return render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
+  return renderWithDesignSystem(node);
 }
 
 function toggleIn(name: string) {

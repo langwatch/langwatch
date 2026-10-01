@@ -30,8 +30,15 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => ({
       setAvatar: { useMutation: () => ({ mutate: () => {}, isPending: false }) },
       removeAvatar: { useMutation: () => ({ mutate: () => {}, isPending: false }) },
     },
-    apiKey: { list: { useQuery: () => ({ data: [] }) } },
   },
+}));
+
+vi.mock("@langwatch/api-key-client", () => ({
+  apiKeyClient: { apiKey: { list: { useQuery: () => ({ data: [] }) } } },
+}));
+
+vi.mock("../../../../behavior/user-api.ts", () => ({
+  userApi: { user: { getAvatarUrl: { useQuery: () => ({ data: undefined }) } } },
 }));
 
 afterEach(() => cleanup());

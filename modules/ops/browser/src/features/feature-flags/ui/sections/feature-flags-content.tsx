@@ -12,7 +12,6 @@ export function FeatureFlagsContent() {
   const host = useOpsHost();
   const canManage = scope?.kind === "platform";
   const query = api.ops.listFeatureFlags.useQuery(undefined, {
-    refetchInterval: 30_000,
   });
   const utils = api.useUtils();
   const setFlag = api.ops.setFeatureFlag.useMutation({

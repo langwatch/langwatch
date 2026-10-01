@@ -1,3 +1,4 @@
+import { promptClient } from "@langwatch/prompt-client";
 import { useCallback, useMemo, type ReactNode } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -13,21 +14,21 @@ import {
  * FoundryProject list. */
 function flattenFoundryProjects(organizations: OpsOrganizationGraph[]): FoundryProject[] {
   return organizations.flatMap((organization) =>
-    organization.teams.flatMap((team) => mapTeamProjects(organization.name, team)),
+    organization.teams.flatMap((team) => mapTeamProjects(organization, team)),
   );
 }
 
-/** Maps one team's projects to FoundryProject rows, carrying the org name through. */
+/** Maps one team's projects to FoundryProject rows, carrying the organization through. */
 function mapTeamProjects(
-  orgName: string,
+  organization: OpsOrganizationGraph,
   team: OpsOrganizationGraph["teams"][number],
 ): FoundryProject[] {
   return team.projects.map((candidate) => ({
     id: candidate.id,
     name: candidate.name,
     slug: candidate.slug,
-    apiKey: candidate.apiKey,
-    orgName,
+    organizationId: organization.id,
+    orgName: organization.name,
     teamName: team.name,
   }));
 }
@@ -39,14 +40,14 @@ export function FoundryTransport({
   children: ReactNode;
   includeProjects?: boolean;
 }) {
-  // The project the operator is standing in, and its key: a generated trace
-  // is sent with the project's own API key, so the host answers both.
+  // The project the operator is standing in; a generated trace is sent with a
+  // personal access token minted for it at the first send.
   const project = useOpsHost().project();
   const organizations = api.organization.getAll.useQuery(
     { isDemo: false },
     { enabled: includeProjects, staleTime: 60_000 },
   );
-  const apiUtils = api.useUtils();
+  const apiUtils = promptClient.useUtils();
 
   const projects = useMemo<FoundryProject[]>(() => {
     if (!organizations.data) {
@@ -74,7 +75,7 @@ export function FoundryTransport({
 
   const transport = useMemo<FoundryTransport>(
     () => ({
-      currentProject: project ? { id: project.id, apiKey: project.apiKey } : void 0,
+      currentProject: project ? { id: project.id } : void 0,
       projects,
       loadPrompts,
     }),

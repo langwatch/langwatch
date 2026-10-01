@@ -1,18 +1,21 @@
+import { SETUP_AGENT_PERMISSIONS, useMintPersonalToken } from "@langwatch/api-key-client";
 import { Box } from "@langwatch/design-system/primitives";
-import { useProjectBySlugOrLatest, ActiveProjectProvider } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useProductFlow } from "../../behavior/use-product-flow.ts";
+import { useProjectBySlugOrLatest } from "../../behavior/use-project-by-slug-or-latest.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { LoadingScreen } from "../blocks/loading-screen.tsx";
 import { OnboardingContainer } from "../blocks/onboarding-container.tsx";
 import { ScreenLifecycle } from "../elements/screen-lifecycle.tsx";
+import { ActiveProjectProvider } from "./active-project-context.tsx";
 import { useCreateProductScreens } from "./create-product-screens.tsx";
 
 const PRODUCT_BOUNDARY = "onboarding_product";
+const AGENT_SCREENS = new Set(["via-claude-code", "via-claude-desktop"]);
 
 export const ProductScreen: React.FC = () => {
   const { currentScreenIndex, flow, navigation, canGoBack, handleSelectProduct } = useProductFlow();
@@ -20,14 +23,7 @@ export const ProductScreen: React.FC = () => {
     redirectToOnboarding: true,
   });
   const { project: resolvedProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
-  // The scope graph carries no credentials, so the key the setup screens print
-  // is asked of the host for the project this screen resolved.
   const host = useOnboardingHost();
-  const apiKey = resolvedProject ? host.revealProjectApiKey(resolvedProject.id) : void 0;
-  const activeProject = useMemo(
-    () => (resolvedProject && apiKey ? { ...resolvedProject, apiKey } : resolvedProject),
-    [resolvedProject, apiKey],
-  );
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
@@ -54,6 +50,14 @@ export const ProductScreen: React.FC = () => {
     [flow.visibleScreens, currentScreenIndex],
   );
   const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
+  const minting = useMintPersonalToken({
+    organizationId: organization?.id,
+    projectId: resolvedProject?.id,
+    userId: host.currentUser()?.id,
+    name: "Personal access token",
+    // Ingestion by default; a screen handing the token to a coding agent or MCP may read too.
+    permissions: AGENT_SCREENS.has(currentScreen?.id ?? "") ? SETUP_AGENT_PERMISSIONS : undefined,
+  });
   if (!currentScreen) {
     return null;
   }
@@ -76,7 +80,14 @@ export const ProductScreen: React.FC = () => {
         skipHref={skipSlug ? `/${skipSlug}` : undefined}
       >
         <Box w="full">
-          <ActiveProjectProvider value={{ project: activeProject, organization }}>
+          <ActiveProjectProvider
+            value={{
+              project: resolvedProject,
+              organization,
+              freshToken: minting.token,
+              minting,
+            }}
+          >
             {!isLoading && currentScreen.component ? (
               <>
                 <ScreenLifecycle key={currentScreen.id} boundary={currentScreen.id} />

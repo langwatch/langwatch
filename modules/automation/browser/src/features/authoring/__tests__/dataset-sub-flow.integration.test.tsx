@@ -19,7 +19,10 @@ const { refetchMock, datasets } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../behavior/automation-api.ts", () => ({
-  api: {
+  api: {},
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
     dataset: {
       getAll: {
         useQuery: () => ({

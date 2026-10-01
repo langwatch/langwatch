@@ -96,7 +96,7 @@ export function usePersonalDatasetGate({
 }): PersonalFeatureGate {
   const features = annotationApi.personalWorkspaceFeatures.get.useQuery(
     { projectId: projectId ?? "" },
-    { enabled: isOwnPersonalWorkspace && !!projectId, refetchOnWindowFocus: false },
+    { enabled: isOwnPersonalWorkspace && !!projectId },
   );
 
   const utils = annotationApi.useUtils();

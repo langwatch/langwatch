@@ -1,3 +1,4 @@
+import { datasetClient } from "@langwatch/dataset-client";
 import type {
   CreateDatasetFromStoredObjectInput,
   DatasetImportStarted,
@@ -36,7 +37,7 @@ export type DatasetImportTransport = {
 
 export function useDatasetImportTransport(): DatasetImportTransport {
   const transport = useStoredObjectUploadTransport();
-  const createFromStoredObject = datasetApi.dataset.createFromStoredObject.useMutation();
+  const createFromStoredObject = datasetClient.dataset.createFromStoredObject.useMutation();
   return useMemo(
     () => ({
       uploadStoredObject: (params) => uploadStoredObject({ ...params, transport }),

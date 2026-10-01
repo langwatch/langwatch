@@ -4,9 +4,10 @@
  * query writes are RECORDED, not performed, so tests assert what the screen SAID.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderResult } from "@testing-library/react";
-import type { ReactElement, ReactNode } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 
 import {
   AnalyticsHostApi,
@@ -96,10 +97,13 @@ export function AnalyticsTestHarness({
   host: AnalyticsHostApi;
   children: ReactNode;
 }) {
+  const [queryClient] = useState(() => new QueryClient());
   return (
-    <ChakraProvider value={defaultSystem}>
-      <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>
-    </ChakraProvider>
+    <DesignSystemProvider forcedTheme="light">
+      <QueryClientProvider client={queryClient}>
+        <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>
+      </QueryClientProvider>
+    </DesignSystemProvider>
   );
 }
 

@@ -1,9 +1,3 @@
-// @vitest-environment jsdom
-/**
- * Dataset's Replicate dialog offers only projects the reader may create datasets in.
- * Spec: specs/datasets/datasets-list-page.feature
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   UiCapabilityContextProvider,
   UiCopyTargets,
@@ -17,14 +11,25 @@ import {
   createUiScopeHost,
   type UiScopeHost,
 } from "@langwatch/browser-host/use-organization-team-project";
+// @vitest-environment jsdom
+/**
+ * Dataset's Replicate dialog offers only projects the reader may create datasets in.
+ * Spec: specs/datasets/datasets-list-page.feature
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { installedModuleHostMounts } from "@langwatch/ui-kernel/module-hosts";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentType, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../dataset-api.ts", () => ({
   datasetApi: {
+    useUtils: () => ({ dataset: { getAll: { invalidate: () => Promise.resolve() } } }),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
     useUtils: () => ({ dataset: { getAll: { invalidate: () => Promise.resolve() } } }),
     dataset: {
       copy: { useMutation: () => ({ mutateAsync: () => Promise.resolve(), isPending: false }) },
@@ -115,14 +120,12 @@ describe("given a reader who may create datasets in one of their projects and no
       };
       const user = userEvent.setup({ pointerEventsCheck: 0 });
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <UiCapabilityContextProvider value={capabilities}>
-            <Mount>
-              <CopyDatasetDialog open onClose={vi.fn()} datasetId="ds-1" datasetName="Golden" />
-            </Mount>
-          </UiCapabilityContextProvider>
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <UiCapabilityContextProvider value={capabilities}>
+          <Mount>
+            <CopyDatasetDialog open onClose={vi.fn()} datasetId="ds-1" datasetName="Golden" />
+          </Mount>
+        </UiCapabilityContextProvider>,
       );
 
       await user.click(await screen.findByRole("combobox"));

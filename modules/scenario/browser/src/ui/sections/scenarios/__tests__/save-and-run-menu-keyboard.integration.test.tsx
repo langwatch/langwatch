@@ -3,12 +3,12 @@
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
@@ -55,16 +55,14 @@ describe("<SaveAndRunMenu/>", () => {
     it("gives the agent row the focus and runs it when activated", async () => {
       const user = userEvent.setup();
       const onSaveAndRun = vi.fn();
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <SaveAndRunMenu
-            selectedTarget={{ type: "prompt", id: "p1" } as never}
-            onTargetChange={vi.fn()}
-            onSaveAndRun={onSaveAndRun}
-            onSaveWithoutRunning={vi.fn()}
-            onCreateAgent={vi.fn()}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <SaveAndRunMenu
+          selectedTarget={{ type: "prompt", id: "p1" } as never}
+          onTargetChange={vi.fn()}
+          onSaveAndRun={onSaveAndRun}
+          onSaveWithoutRunning={vi.fn()}
+          onCreateAgent={vi.fn()}
+        />,
       );
 
       await user.click(screen.getByRole("button", { name: /save and run/i }));

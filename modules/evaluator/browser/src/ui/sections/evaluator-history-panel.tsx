@@ -5,6 +5,7 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { toEpochMs } from "@langwatch/time";
 import {
   ArrowUp,
@@ -17,7 +18,6 @@ import {
   X,
 } from "lucide-react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 
 const ACTION_META = {
@@ -56,7 +56,7 @@ export function EvaluatorHistoryPanel({
   const host = useEvaluatorHost();
   const { projectId } = host.scope();
 
-  const { data, isLoading, isError } = evaluatorApi.evaluators.getHistory.useQuery(
+  const { data, isLoading, isError } = evaluatorClient.evaluators.getHistory.useQuery(
     { evaluatorId, projectId: projectId ?? "" },
     { enabled: !!projectId && !!evaluatorId },
   );

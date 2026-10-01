@@ -6,13 +6,12 @@
 import {
   isScopeInFilter,
   resolveScopeFilter,
-  ScopeChipPicker,
-  ScopeFilter,
   scopeFilterAddressWrite,
   scopeFilterFromAddress,
   scopeHierarchyOf,
-  type ScopeFilterValue,
-} from "@langwatch/authz-browser-kit";
+} from "../../model/authz/scope-picker/scope-filter-address.ts";
+import { ScopeChipPicker } from "./authz/scope-picker/scope-chip-picker.tsx";
+import { ScopeFilter, type ScopeFilterValue } from "./authz/scope-picker/scope-filter.tsx";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   type ScopeAssignment,
@@ -201,14 +200,13 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     onConfirm: () => void | Promise<void>;
   } | null>(null);
 
-  // Poll system.mutations while a retroactive apply is in flight, then idle.
   const projectIsWritable =
     rulesQuery.data?.available.projects.some((project) => project.id === projectId) ?? false;
   const progressQuery = dataRetentionApi.dataRetention.getMutationProgress.useQuery(
     { projectId },
     {
       enabled: projectIsWritable,
-      refetchInterval: (query) => ((query.state.data?.length ?? 0) > 0 ? 3000 : false),
+      // needs a read hint: retroactive retention mutation finished (system.mutations)
     },
   );
   const activeMutations = progressQuery.data ?? [];

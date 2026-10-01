@@ -17,7 +17,6 @@ import { api } from "../../../../behavior/ops-api.ts";
  * loop). Post-incident: surface tenant volume anomalies early. */
 export function AnomaliesCard() {
   const query = api.ops.listAnomalies.useQuery(undefined, {
-    refetchInterval: 30_000,
   });
   const dismiss = api.ops.dismissAnomaly.useMutation({
     onSuccess: () => query.refetch(),
