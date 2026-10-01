@@ -1,12 +1,18 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
 /**
  * @vitest-environment jsdom
  * @see specs/features/suites/{all-runs-panel,all-runs-group-by,suite-bugfixes-1956}.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import {
+  RUN_HISTORY_ABSENT,
+  RUN_HISTORY_SLICE,
+  type RunHistoryState,
+} from "@langwatch/suite-contract";
 import { Temporal } from "@langwatch/time";
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
@@ -64,6 +70,19 @@ const toInfinite = vi.hoisted(() => {
 });
 const mockScenariosQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
+
+function installRunHistoryStore() {
+  defineSlice<RunHistoryState>({
+    name: RUN_HISTORY_SLICE,
+    create: (set) => ({
+      ...RUN_HISTORY_ABSENT,
+      setGroupBy: (groupBy) => set({ groupBy }),
+      setViewMode: (viewMode) => set({ viewMode }),
+      setFilter: (key, value) => set((state) => ({ filters: { ...state.filters, [key]: value } })),
+      setFilters: (filters) => set({ filters }),
+    }),
+  });
+}
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
@@ -128,6 +147,10 @@ const defaultPeriod = {
 };
 
 describe("<RunHistoryPanel/> (all-runs view)", () => {
+  beforeEach(() => {
+    installRunHistoryStore();
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
