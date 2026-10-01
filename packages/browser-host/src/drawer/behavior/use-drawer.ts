@@ -176,32 +176,6 @@ export const getDrawerStack = (): DrawerStackEntry[] => readDrawerStack(readDraw
 /** The open drawer, or `undefined`; read from the address, so never stale. */
 export const getTopDrawer = (): DrawerType | undefined => readDrawerLocation().query["drawer.open"];
 
-// ============================================================================
-// The open rewrite the host installs
-// ============================================================================
-
-/**
- * A rule that redirects one drawer-open request to another — e.g. rewriting a
- * `traceDetails` open to `traceV2Details`. This is a feature's rule, not the
- * framework's, so the application installs it rather than hard-coding it.
- */
-export type DrawerOpenRewrite = (
-  drawer: DrawerType,
-  props: Record<string, unknown> | undefined,
-) => { drawer: DrawerType; props: Record<string, unknown> | undefined };
-
-const passThroughRewrite: DrawerOpenRewrite = (drawer, props) => ({ drawer, props });
-
-let openRewrite: DrawerOpenRewrite = passThroughRewrite;
-
-export const installDrawerOpenRewrite = (rewrite: DrawerOpenRewrite): void => {
-  openRewrite = rewrite;
-};
-
-export const clearDrawerOpenRewrite = (): void => {
-  openRewrite = passThroughRewrite;
-};
-
 /** The drawers beneath `next` once it opens over the address `query`/`state` describe. */
 function ancestorsForOpen({
   query,
@@ -489,12 +463,8 @@ function openOn({
   options?: OpenOptions;
 }): void {
   const { replace, resetStack, replaceCurrentInStack } = options;
-  // The host's own rewrite: every trace open lands on the Trace Explorer
-  // drawer, from every entry point, rather than each call site choosing.
-  const { drawer: effectiveDrawer, props: effectiveProps } = openRewrite(
-    drawerKey(drawer),
-    props === undefined ? undefined : toRecord(props),
-  );
+  const effectiveDrawer = drawerKey(drawer);
+  const effectiveProps = props === undefined ? undefined : toRecord(props);
 
   // Extract urlParams and merge with props
   const { urlParams, ...drawerProps } = effectiveProps ?? {};

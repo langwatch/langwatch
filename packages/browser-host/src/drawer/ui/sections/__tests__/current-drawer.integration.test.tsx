@@ -10,12 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { type Location, MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  clearDrawerOpenRewrite,
-  clearFlowCallbacks,
-  installDrawerOpenRewrite,
-  useDrawer,
-} from "../../../behavior/use-drawer.ts";
+import { clearFlowCallbacks, useDrawer } from "../../../behavior/use-drawer.ts";
 import type { DrawerPropsMapOf } from "../../../model/drawer-map.ts";
 import { CurrentDrawer } from "../current-drawer.tsx";
 
@@ -122,7 +117,6 @@ const address = () => screen.getByTestId("address").textContent;
 beforeEach(() => {
   lastLocation = undefined;
   clearFlowCallbacks();
-  clearDrawerOpenRewrite();
 });
 
 describe("the drawer host", () => {
@@ -293,22 +287,6 @@ describe("the drawer host", () => {
         await screen.findByText("reading a trace");
 
         expect(screen.queryByRole("button", { name: "back" })).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("given a host that installed an open rewrite", () => {
-    describe("when a screen opens the drawer the rule redirects", () => {
-      it("opens the drawer the rule names instead", async () => {
-        installDrawerOpenRewrite((drawer, props) =>
-          drawer === "readable" ? { drawer: "other", props } : { drawer, props },
-        );
-        mount("/acme/traces");
-        const user = userEvent.setup();
-
-        await user.click(screen.getByRole("button", { name: "open readable" }));
-
-        expect(await screen.findByText("the other drawer")).toBeInTheDocument();
       });
     });
   });

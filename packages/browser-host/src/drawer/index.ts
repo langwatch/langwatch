@@ -18,7 +18,6 @@ export {
   type DrawerPreloader,
 } from "./behavior/drawer-preloader.ts";
 export {
-  clearDrawerOpenRewrite,
   clearFlowCallbacks,
   getAllFlowCallbacks,
   getComplexProps,
@@ -26,7 +25,6 @@ export {
   getDrawerStack,
   getFlowCallbacks,
   getTopDrawer,
-  installDrawerOpenRewrite,
   navigateToDrawer,
   setComplexProps,
   setFlowCallbacks,
@@ -34,7 +32,6 @@ export {
   useDrawer,
   useDrawerParams,
   useUpdateDrawerParams,
-  type DrawerOpenRewrite,
   type DrawerType,
   updateDrawerParams,
 } from "./behavior/use-drawer.ts";
