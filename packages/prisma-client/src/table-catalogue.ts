@@ -2022,6 +2022,7 @@ export const prismaModelFieldCatalogue = {
     "adminUserId",
     "seeded",
     "evaluationCount",
+    "simulationRunCount",
     "updatedAt"
   ],
   "BillingMeterCheckpoint": [
