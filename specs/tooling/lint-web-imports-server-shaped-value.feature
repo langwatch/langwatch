@@ -22,8 +22,8 @@ Feature: The web-imports-server-shaped-value lint rule
     Then it reports serverShaped
 
   @unit
-  Scenario: The rule covers browser kits and the design system
-    Given a browser kit module or a design-system module that value-imports a database client
+  Scenario: The rule covers browser packages and the design system
+    Given a browser module or a design-system module that value-imports a database client
     When the web-imports-server-shaped-value rule runs over it
     Then it reports serverShaped
 

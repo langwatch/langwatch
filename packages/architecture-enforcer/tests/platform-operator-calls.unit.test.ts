@@ -57,7 +57,17 @@ describe("platform-operator-calls", () => {
   it("allows ops", () => {
     write(
       "modules/ops/process/src/x.ts",
-      `${IMPORT}export const x = (api: AuthzApi) => api.listPlatformOperators({});\n`,
+      `${IMPORT}export const x = (api: AuthzApi) => api.grantPlatformOperator({});\n`,
+    );
+
+    expect(run()).toEqual([]);
+  });
+
+  /** @scenario "Another module lists the platform operators" */
+  it("allows any module to list", () => {
+    write(
+      "modules/billing/process/src/services/z.ts",
+      `${IMPORT}export const z = (api: AuthzApi) => api.listPlatformOperators();\n`,
     );
 
     expect(run()).toEqual([]);

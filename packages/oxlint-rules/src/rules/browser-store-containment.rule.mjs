@@ -1,8 +1,7 @@
 import { defineRule } from "../define-rule.mjs";
 
 // One zustand store per feature, under `behavior/`, private to the module
-// (ARCHITECTURE.md, browser state tiers). A kit owning its concept's store is
-// a different seam and is not governed here.
+// (ARCHITECTURE.md, browser state tiers).
 
 const ZUSTAND = /^zustand(?:\/vanilla)?$/;
 const CREATORS = new Set(["create", "createStore"]);

@@ -7,17 +7,14 @@ import { sourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /**
- * Only ops and identity grant, revoke or list platform operators: those operations
- * take a `system` caller that skips the ceiling and self-grant checks (ARCHITECTURE.md §7).
+ * Only ops and identity grant or revoke platform operators: those operations take a
+ * `system` caller that skips the ceiling and self-grant checks (ARCHITECTURE.md §7).
+ * Listing takes no caller, so any peer may read it.
  */
 
 const POLICY = "platform-operator-calls";
 const AUTHZ_CONTRACT = "@langwatch/authz-contract";
-const OPERATIONS = new Set([
-  "grantPlatformOperator",
-  "revokePlatformOperator",
-  "listPlatformOperators",
-]);
+const OPERATIONS = new Set(["grantPlatformOperator", "revokePlatformOperator"]);
 const ALLOWED_OWNERS = new Set(["authz", "ops", "identity"]);
 const SCANNED = ["modules", "enterprise/modules", "apps", "packages"];
 const SOURCE_FILE = /\.[cm]?tsx?$/;
@@ -47,7 +44,7 @@ function calledOperations(file: string): { name: string; line: number }[] {
   return found;
 }
 
-/** Refuses a call to the platform-operator operations from any owner but authz, ops, identity. */
+/** Refuses a grant or revoke call from any owner but authz, ops and identity. */
 export function lintPlatformOperatorCalls(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const files = SCANNED.flatMap((directory) =>
     snapshot.files({
@@ -66,7 +63,7 @@ export function lintPlatformOperatorCalls(snapshot: WorkspaceSnapshot): Architec
       line,
       message: `\`${name}\` is called from ${owner}; a platform-operator grant skips the ceiling and self-grant checks for a \`system\` caller.`,
       allowed:
-        "Only the ops and identity modules call AuthzApi.grantPlatformOperator, revokePlatformOperator and listPlatformOperators. See dev/docs/ARCHITECTURE.md §7.",
+        "Only the ops and identity modules call AuthzApi.grantPlatformOperator and revokePlatformOperator. See dev/docs/ARCHITECTURE.md §7.",
     }));
   });
 }

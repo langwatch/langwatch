@@ -88,7 +88,6 @@ void describe("shouldIgnoreWatchPath", () => {
   void it("ignores a module's browser half, which the backend cannot import", () => {
     assert.equal(shouldIgnoreWatchPath("../../modules/trace/browser/src/ui/a.tsx"), true);
     assert.equal(shouldIgnoreWatchPath("../../modules/trace/browser/package.json"), true);
-    assert.equal(shouldIgnoreWatchPath("../../modules/trace/browser-kit/src/a.ts"), true);
     assert.equal(
       shouldIgnoreWatchPath("../../enterprise/modules/governance/browser/src/a.tsx"),
       true,

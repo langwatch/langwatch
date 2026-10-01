@@ -666,7 +666,7 @@ finding and each flow judged `works`, at the candidate commit; a section that
 fails again is forgotten. A later run skips a recorded section while
 `git diff --name-only <commit> <candidate> --` is empty over what it touches:
 the module whose `defineWebModule` screens declare its path (its `browser`,
-`browser-kit`, `process` and `contract`), `packages/browser-host`,
+`process` and `contract`), `packages/browser-host`,
 `packages/design-system`, `apps/ui` and the runner's source. A flow touches the
 modules of its `go` steps' paths, and its steps and expects must hash as
 recorded. The map is read from the candidate's screen declarations at run

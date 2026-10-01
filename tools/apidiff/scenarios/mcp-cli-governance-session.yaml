@@ -7,42 +7,13 @@
 # routes have no client-side delete (a personal key is replaced by the next mint; the device
 # label names the rest), so those scenarios leave keys behind. Written unrun.
 
-# ── session: personal project and project key ────────────────────────────────
+# ── session: personal project ────────────────────────────────
 
 - id: "cli-session-personal-project-carries-the-project-and-its-key"
   endpoint: "GET /api/auth/cli/personal-project"
   auth: "cli"
   request: {"path": "/api/auth/cli/personal-project"}
   expect: {"status": 200, "body": {"project": {"id": "<any>", "slug": "<any>", "name": "<any>", "api_key": "<any>"}}}
-
-- id: "cli-session-project-key-by-slug-carries-the-key-and-project"
-  endpoint: "POST /api/auth/cli/project-key"
-  auth: "cli"
-  setup:
-    - request: "POST /api/projects"
-      auth: "org"
-      body: {"name": "vd-{uid}", "language": "python", "framework": "openai", "newTeamName": "vd-team-{uid}"}
-      capture: {"newProjectId": "id", "newSlug": "slug"}
-      expect: {"status": 201}
-  request:
-    path: "/api/auth/cli/project-key"
-    body: {"slug": "{newSlug}"}
-  expect: {"status": 200, "body": {"api_key": "<any>", "project": {"id": "{newProjectId}", "slug": "{newSlug}", "name": "vd-{uid}"}}}
-  teardown:
-    - request: "DELETE /api/projects/{newProjectId}"
-      auth: "org"
-
-- id: "cli-session-project-key-unknown-slug-names-not-found"
-  endpoint: "POST /api/auth/cli/project-key"
-  auth: "cli"
-  request: {"path": "/api/auth/cli/project-key", "body": {"slug": "nope-{uid}"}}
-  expect: {"status": 404, "body": {"error": "not_found", "error_description": "<any>"}}
-
-- id: "cli-session-project-key-without-a-slug-is-refused"
-  endpoint: "POST /api/auth/cli/project-key"
-  auth: "cli"
-  request: {"path": "/api/auth/cli/project-key", "body": {}}
-  expect: {"status": 400, "body": {"error": "invalid_request"}}
 
 # ── governance: status, sources, keys ────────────────────────────────────────
 

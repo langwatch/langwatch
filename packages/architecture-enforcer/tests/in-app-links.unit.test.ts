@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { sourceFile } from "../src/workspace/module-graph.ts";
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
-const BROWSER_HALVES = ["browser/src", "browser-kit/src"];
+const BROWSER_HALVES = ["browser/src"];
 
 function sourcesUnder(dir: string): string[] {
   if (!existsSync(dir)) return [];

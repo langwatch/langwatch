@@ -1079,7 +1079,7 @@ jobs:
         run: >-
           pnpm --filter @langwatch/architecture-enforcer lint --
           --no-declarations
-          --policies application-boundaries,browser-kit-exports,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams
+          --policies application-boundaries,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams
 
       # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
       # fails the job. A config error and a lint violation both surface here.

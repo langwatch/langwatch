@@ -12,8 +12,6 @@ import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
 import { lintBrowserNodeLeaks } from "./frontend/browser-node-leak.ts";
 import {
-  lintBrowserKitDependencies,
-  lintBrowserKitExports,
   lintBrowserPackageClosure,
   lintBrowserPackageExports,
   lintBrowserPackageManifestClosure,
@@ -65,7 +63,7 @@ function lintPrismaMigrationAccessPolicy(snapshot: WorkspaceSnapshot): Architect
   return lintPrismaMigrationAccess(root, catalogue, new Set(models.keys()));
 }
 
-/** Kit law 1 at both levels: each import once, each manifest edge once. */
+/** The closed browser package at both levels: each import once, each manifest edge once. */
 function lintBrowserPackageClosurePolicy(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   return [...lintBrowserPackageClosure(snapshot), ...lintBrowserPackageManifestClosure(snapshot)];
 }
@@ -130,16 +128,6 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "browser-package-exports",
     spec: "specs/frontend-feature-boundaries.feature",
     run: lintBrowserPackageExports,
-  }),
-  definePolicy({
-    id: "browser-kit-exports",
-    spec: "specs/frontend-feature-boundaries.feature",
-    run: lintBrowserKitExports,
-  }),
-  definePolicy({
-    id: "browser-kit-dependencies",
-    spec: "specs/frontend-feature-boundaries.feature",
-    run: lintBrowserKitDependencies,
   }),
   definePolicy({
     id: "architecture-records",

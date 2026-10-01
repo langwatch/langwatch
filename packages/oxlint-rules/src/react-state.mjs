@@ -7,10 +7,10 @@ export function isFunction(node) {
   return Boolean(node) && FUNCTION_TYPES.has(node.type);
 }
 
-/** Browser packages, kits and the UI app; tests are never governed. */
+/** Browser packages and the UI app; tests are never governed. */
 export function isBrowserCode(file) {
   if (file.isTest) return false;
-  if (file.role === "browser" || file.role === "browser-kit") return true;
+  if (file.role === "browser") return true;
 
   return file.kind === "application" && file.workspacePath.startsWith("apps/ui/");
 }

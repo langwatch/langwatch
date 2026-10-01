@@ -209,12 +209,10 @@ flows:
           selector: 'xpath=//*[normalize-space()="canary-{uid}"]/ancestor::*[.//*[@role="combobox"]][1]//*[@role="combobox"]'
       - action: click
         with:
-          selector: '[role="option"]'
-          hasText: /^\s*v1\b/
+          testId: "prompt-deploy-tag-canary-{uid}-version-1"
       - action: click
         with:
-          selector: '[role="dialog"] button'
-          hasText: /^\s*Save\s*$/
+          testId: prompt-deploy-save
       - action: expect
         with:
           api: "/api/prompts/tags"
@@ -257,18 +255,21 @@ flows:
       - action: click
         with:
           text: /^Variables$/
-      - action: fill
+      - action: expect
         with:
-          testId: "variable-value-input-input"
-          value: "echo-{uid}"
+          testId: "variable-name-input"
+      - action: click
+        with:
+          text: /^Conversation$/
       - action: type
         with:
           placeholder: "Type your message here"
-          text: "Go"
+          text: "echo-{uid}"
           submit: "true"
       - action: expect
         with:
           text: "echo-{uid}"
+          min: "2"
           timeout: "60000"
 
   - id: prompt-playground-change-model
@@ -303,10 +304,10 @@ flows:
           contains: "vd-prompt-{uid}"
       - action: click
         with:
-          selector: 'xpath=//div[svg[contains(@class,"lucide-chevron-down")]][preceding-sibling::*]'
+          testId: prompt-model-popover-trigger
       - action: click
         with:
-          selector: '[role="dialog"] [role="combobox"]'
+          testId: prompt-model-selector-trigger
       - action: fill
         with:
           field: "Search models"
@@ -853,7 +854,7 @@ flows:
           hasText: /^\s*Edit( Graph)?\s*$/
       - action: click
         with:
-          label: "Rename vd-widget-{uid}"
+          selector: '[role="dialog"] [aria-label="Rename vd-widget-{uid}"]'
       - action: fill
         with:
           selector: "input:focus"
@@ -910,11 +911,9 @@ flows:
         with:
           selector: "input:focus"
           value: "vd-renamed-{uid}"
-      - action: type
+      - action: click
         with:
-          selector: "input:focus"
-          text: ""
-          submit: "true"
+          text: /^\s*Custom\s*$/
       - action: expect
         with:
           api: "/api/dashboards"

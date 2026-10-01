@@ -1,4 +1,4 @@
-export type FeaturePackageRole = "contract" | "process" | "browser" | "browser-kit";
+export type FeaturePackageRole = "contract" | "process" | "browser";
 
 export type ApplicationPackageRole = "ui" | "api" | "worker" | "server" | "tasks";
 

@@ -102,10 +102,8 @@ const browserModuleRoots = (): string[] => {
   const roots = [join(REPO_ROOT, "apps", "ui")];
   for (const tree of MODULE_TREES) {
     for (const feature of subdirectories(tree)) {
-      for (const half of ["browser", "browser-kit"]) {
-        const browser = join(tree, feature, half);
-        if (existsSync(browser)) roots.push(browser);
-      }
+      const browser = join(tree, feature, "browser");
+      if (existsSync(browser)) roots.push(browser);
     }
   }
   return roots.map((root) => root + sep);
@@ -202,9 +200,6 @@ describe("browser-only UI never reaches backend code", () => {
         join(REPO_ROOT, "enterprise", "modules", "billing", "process", "src"),
       );
       expect(BROWSER_MODULE_ROOTS).toContain(join(REPO_ROOT, "modules", "trace", "browser") + sep);
-      expect(BROWSER_MODULE_ROOTS).toContain(
-        join(REPO_ROOT, "modules", "trace", "browser-kit") + sep,
-      );
       expect(BROWSER_MODULE_ROOTS).toContain(
         join(REPO_ROOT, "enterprise", "modules", "sso", "browser") + sep,
       );

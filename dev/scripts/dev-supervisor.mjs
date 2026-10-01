@@ -72,7 +72,7 @@ const WATCH_IGNORE_PATTERNS = [
   // enforcer's frontend/server separation). Reloading for it is pure churn,
   // and on a shared checkout it lets one session's screen work bounce
   // another's backend. specs/setup/dev-process-topology.feature.
-  /(^|\/)modules\/[^/]+\/browser(-kit)?(\/|$)/,
+  /(^|\/)modules\/[^/]+\/browser(\/|$)/,
   // Prose and specs: no backend process ever loads them.
   /\.(md|mdx|feature)$/,
   /(^|\/)tsconfig[^/]*\.json$/,

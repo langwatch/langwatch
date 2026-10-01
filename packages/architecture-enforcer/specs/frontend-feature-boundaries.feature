@@ -1,9 +1,9 @@
-# The kit law, dev/docs/ARCHITECTURE.md §3.4.
+# A browser package is closed, dev/docs/ARCHITECTURE.md §3.4.
 
 Feature: A module's browser package is closed
   As a maintainer
   I want every edge onto a module's browser package refused, at import and at manifest level
-  So that sharing happens through a browser-kit and never through a side door
+  So that sharing happens through the design system, a contract or a client and never through a side door
 
   @unit @architecture
   Scenario: A cross-module import of a browser package is reported
@@ -36,6 +36,12 @@ Feature: A module's browser package is closed
     Then nothing is reported, because apps/ui installs browser halves
 
   @unit @architecture
+  Scenario: The installed web modules package may import a browser package
+    Given the installed-web-modules package imports a module's browser declaration
+    When the browser package closure is checked
+    Then nothing is reported, because that package is the generated installer list
+
+  @unit @architecture
   Scenario: A browser package's own files may import themselves
     Given a browser package imports one of its own subpaths
     When the browser package closure is checked
@@ -48,32 +54,21 @@ Feature: A module's browser package is closed
     Then the manifest edge is reported whether or not any source file uses it
 
   @unit @architecture
+  Scenario: A type-only devDependency onto a browser package passes
+    Given a module package declares another module's browser package under devDependencies
+    And every import of it is an import type
+    When the browser package closure is checked
+    Then nothing is reported, because types are erased (Q5, Alex 2026-10-01)
+
+  @unit @architecture
   Scenario: One manifest edge onto a browser package is reported once
-    Given a browser package and a kit each declare another module's browser package
-    When the manifest, kit and closure policies all run
+    Given two browser packages each declare another module's browser package
+    When the manifest and closure policies all run
     Then each edge is reported once, by the manifest closure
-    And neither the cross-feature manifest check nor the kit dependency check repeats it
+    And the cross-feature manifest check does not repeat it
 
   @unit @architecture
   Scenario: A browser package with a surfaces/* export entry is reported
     Given a browser package's exports map declares an entry other than ./declaration
     When its exports are checked
     Then every such entry is reported as a side door
-
-  @unit @architecture
-  Scenario: A kit with a named subpath export entry is reported
-    Given a kit's exports map declares an entry other than "."
-    When its exports are checked
-    Then every such entry is reported
-
-  @unit @architecture
-  Scenario: A kit depending on a browser or a sibling kit is reported
-    Given a kit declares a dependency on another kit or on a package that is not in the fixture's browser set
-    When its dependencies are checked
-    Then each dependency outside contracts, the Design System and browser-host is reported
-
-  @unit @architecture
-  Scenario: A kit's contract, Design System and browser-host dependencies pass
-    Given a kit depends only on contracts, the Design System and browser-host
-    When its dependencies are checked
-    Then nothing is reported
