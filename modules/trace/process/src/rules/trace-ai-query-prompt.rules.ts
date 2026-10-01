@@ -1,5 +1,5 @@
 /**
- * The two system prompts the AI trace-query composer sends. They live apart from the service
+ * The system prompts the AI trace-query composer sends. They live apart from the service
  * because they are the product's words, not its wiring: a prompt edit is a copy change, and the
  * service reads them through one substitution.
  */
@@ -229,4 +229,96 @@ expresses frustration, repeats a request, or complains about the answer").
 With evaluators including "ragas/faithfulness":
 "hallucinated answers" →
 {"kind":"filter","query":"evaluator:ragas/faithfulness AND evaluatorVerdict:fail","reason":"The faithfulness evaluator already flags unsupported answers."}`;
+}
+
+/** The one-call route-and-build prompt, for deployments without the classifier. */
+export function buildSearchRoutePrompt({
+  fieldsBlock,
+  target,
+  known,
+  isLangyAvailable,
+  isInstantEvalAvailable,
+}: {
+  fieldsBlock: string;
+  target: InstantEvalSearchTarget;
+  known: KnownProjectSignals;
+  isLangyAvailable: boolean;
+  isInstantEvalAvailable: boolean;
+}): string {
+  const evaluators = known.evaluators.length > 0 ? known.evaluators.join(", ") : "(none)";
+  const events = known.events.length > 0 ? known.events.join(", ") : "(none)";
+  const langyRoute = isLangyAvailable
+    ? `4. **\`langy\`**: the sentence needs several steps, reasoning over
+   many traces, or data the filters cannot reach ("why did errors spike
+   this morning", "compare this week with last week", "summarise what
+   changed"). The assistant takes it as a question.`
+    : `4. \`langy\` is not available to this operator; never pick it.`;
+  const instantEvalRoute = isInstantEvalAvailable
+    ? `2. **\`instant_eval\`**: finding the traces needs reading each one and
+   judging it ("annoyed users", "answers that promise a refund",
+   "conversations in German"), and no evaluator or event below already
+   captures it. Write the judge question: \`instructions\` (one or two
+   sentences, second person, about one ${
+     target === "threads" ? "conversation" : "trace"
+   }), \`yes\` and \`no\` (what each looks like in the text).`
+    : `2. \`instant_eval\` is not available on this project; never pick it. A
+   sentence that needs a judgement is a \`filter\` when an evaluator or
+   event below answers it, and \`free_text\` otherwise.`;
+  const judgementExample = isInstantEvalAvailable
+    ? `{"route":"instant_eval","instructions":"Does the user express frustration or annoyance at any point?","yes":"The user complains, repeats a request with emphasis, or uses words like frustrated or useless.","no":"The user stays neutral or satisfied throughout."}`
+    : `{"route":"free_text"}`;
+  return `You decide what an operator's search-bar sentence is, and build what it
+needs. The operator is looking at a list of LLM traces and typed words
+without \`field:value\` syntax. Reply with a JSON object matching the
+\`SearchRoute\` schema.
+
+# The four routes
+
+1. **\`filter\`**: the sentence can be written in the trace query language
+   with the fields below ("errors from gpt-4 over five seconds",
+   "traces with negative feedback"). Build the \`query\`.
+${instantEvalRoute}
+3. **\`free_text\`**: the sentence is a literal string to find in the
+   traces ("order 4521", "cannot connect to database", a quoted error).
+${langyRoute}
+
+When a sentence is a plain filter and also a judgement, prefer \`filter\`.
+When it is a judgement and an evaluator or event below already answers
+it, prefer \`filter\` with that evaluator or event.
+
+The project already has these evaluator results: ${evaluators}
+and these event names: ${events}
+
+# The trace query language, for the \`filter\` route
+
+${QUERY_SYNTAX_DOC}
+
+## Fields available (with sample values)
+
+${fieldsBlock}
+
+# Hard rules
+
+- Use ONLY the fields listed above; drop an attribute you cannot map
+  rather than guess a field name.
+- The view already has a time-range selector. Do NOT include date or time
+  clauses; "today" and "last hour" are not part of the query.
+- AND, OR, NOT in uppercase. Value-side OR with parens:
+  \`status:(error OR warning)\`. Wildcards with \`*\`. Ranges as
+  \`[low TO high]\` or comparisons.
+- No code fences, no prose, no extra JSON fields.
+
+# Examples
+
+"errors from gpt-4 over five seconds" →
+{"route":"filter","query":"status:error AND model:gpt-4* AND duration:>5000"}
+
+"annoyed users" →
+${judgementExample}
+
+"cannot connect to database" →
+{"route":"free_text"}
+
+"why did errors spike this morning" →
+{"route":"${isLangyAvailable ? "langy" : "free_text"}"}`;
 }
