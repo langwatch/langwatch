@@ -55,6 +55,7 @@ import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
 import { TraceEdgeMediaPayloadService } from "../services/trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../services/trace-edge-media-telemetry.service.ts";
+import { TraceEdgeSpoolService } from "../services/trace-edge-spool.service.ts";
 import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
 import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
@@ -288,7 +289,12 @@ export function composeTraceAppDependencies(
   const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
   const spanStorageRepository = options.repositories.spanStorage;
   const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
-  const edgeMedia = options.featureFlags
+  // ADR-022: media extraction first, then the whole-payload spool over 256 KB, as main ordered.
+  const edgeSpool = TraceEdgeSpoolService.create({
+    spool: options.blobStore,
+    logger: createLogger("langwatch:traces:edge-spool"),
+  });
+  const payloads = options.featureFlags
     ? TraceEdgeMediaPayloadService.create({
         deps: {
           featureFlags: options.featureFlags,
@@ -298,8 +304,9 @@ export function composeTraceAppDependencies(
           service: TraceStoredMediaStoreService.create(options.storedObjects),
         },
         logger: createLogger("langwatch:traces:edge-media-extraction"),
+        next: edgeSpool,
       })
-    : undefined;
+    : edgeSpool;
   const logRecords = LogRecordStorageService.create({
     repository: options.repositories.logRecords,
     canonical: options.logs,
@@ -397,7 +404,7 @@ export function composeTraceAppDependencies(
       codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
       dedup: options.dedup,
       commands: TraceComposedIngressCommand.create(options.commands),
-      ...(edgeMedia ? { payloads: edgeMedia } : {}),
+      payloads,
     }),
     viewer: TraceViewerReadService.create({
       read,

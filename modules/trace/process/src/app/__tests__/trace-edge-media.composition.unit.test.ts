@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
+ * Spec: modules/trace/specs/large-trace-blob-offload.feature
  */
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -44,14 +45,15 @@ function compose({
     isDuplicate: false,
   }));
   const plans = createApiFixture<EntitlementApi>();
+  const blobStore = TraceBlobStoreService.create({
+    legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
+    resolveClickHouseClient: refuse,
+  });
   const deps = composeTraceAppDependencies({
     repositories: MemoryTraceRepositories.create(),
     storedObjects: createApiFixture<StoredObjectApi>({ storeFromBytes } as never),
     canonicalisation: TraceCanonicalisationService.create(),
-    blobStore: TraceBlobStoreService.create({
-      legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
-      resolveClickHouseClient: refuse,
-    }),
+    blobStore,
     dedup: MemoryTraceSpanDedupRepository.create(),
     commands: {
       recordSpan: async (data) => void recorded.push(data),
@@ -91,14 +93,25 @@ function compose({
     ...(featureFlags ? { featureFlags } : {}),
   });
 
-  return { ingestion: deps.ingestion, recorded, storeFromBytes };
+  return { ingestion: deps.ingestion, recorded, storeFromBytes, blobStore };
 }
 
 async function ingestInlineImage(composed: ReturnType<typeof compose>): Promise<string> {
-  const now = String(Date.now() * 1_000_000);
   const original = JSON.stringify([
     { role: "user", content: [{ type: "image_url", image_url: { url: PNG_DATA_URI } }] },
   ]);
+
+  return ingestInput({ composed, original });
+}
+
+async function ingestInput({
+  composed,
+  original,
+}: {
+  composed: ReturnType<typeof compose>;
+  original: string;
+}): Promise<string> {
+  const now = String(Date.now() * 1_000_000);
   await composed.ingestion?.ingestNormalizedSpan({
     tenantId: "project-1",
     span: {
@@ -169,6 +182,34 @@ describe("composeTraceAppDependencies edge media hook", () => {
 
       expect(composed.storeFromBytes).not.toHaveBeenCalled();
       expect(storedInput(composed)).toBe(original);
+    });
+  });
+});
+
+describe("composeTraceAppDependencies edge spool", () => {
+  const oversized = "x".repeat(300 * 1024);
+
+  describe("given a span whose command payload exceeds 256 KB", () => {
+    /** @scenario "An over-threshold command is spooled to S3 transiently and reconstituted" */
+    it("spools the command and queues only the spool reference", async () => {
+      const composed = compose({ featureFlags: flags(true) });
+      const putSpool = vi.spyOn(composed.blobStore, "putSpool").mockResolvedValue("v2");
+
+      await ingestInput({ composed, original: oversized });
+
+      expect(putSpool).toHaveBeenCalledOnce();
+      expect(composed.recorded[0]?.spoolRef).toBe("v2");
+      expect(composed.recorded[0]?.span.attributes).toEqual([]);
+    });
+
+    /** @scenario "When edge S3 spool PUT fails, ingestion falls back to inline (fail-open)" */
+    it("queues the full inline payload when the spool write fails", async () => {
+      const composed = compose({ featureFlags: flags(true) });
+
+      await ingestInput({ composed, original: oversized });
+
+      expect(composed.recorded[0]?.spoolRef).toBeUndefined();
+      expect(storedInput(composed)).toBe(oversized);
     });
   });
 });
