@@ -90,7 +90,7 @@ export function OrganizationUserRoleField({
   // A full-width trigger gets a menu the same width, so it never runs past
   // the edge of whatever holds the field; a narrow trigger gets a menu wide
   // enough for the descriptions to read in one or two lines.
-  const fillsTrigger = width === "full";
+  const isFullWidth = width === "full";
 
   return (
     <VStack align="start" width="full">
@@ -104,13 +104,13 @@ export function OrganizationUserRoleField({
               onChange(selectedValue as OrganizationUserRole);
             }
           }}
-          positioning={{ sameWidth: fillsTrigger }}
+          positioning={{ sameWidth: isFullWidth }}
         >
           <Select.Trigger width={width} aria-label={ariaLabel} background="bg">
             <Select.ValueText placeholder="Select role" />
           </Select.Trigger>
           <Select.Content
-            width={fillsTrigger ? undefined : "320px"}
+            width={isFullWidth ? undefined : "320px"}
             paddingY={2}
           >
             {options.map((option) => (
