@@ -44,7 +44,7 @@ change.
 ## Checklist
 
 - Tokens, never literals: `fg.muted`, `border.emphasized`, `red.solid` — no hex.
-- No `@chakra-ui/react` import outside this package.
+- No `@chakra-ui/*` or `@emotion/*` import outside this package, tests included: take layout primitives from `./primitives`, wrapped parts from their own subpath, and mount tests with `renderWithDesignSystem` from `./testing`.
 - Sizes and variants are props, not copies of the component.
 - Accessible name on every control; decorative icons carry `aria-hidden`.
 - Copy follows `dev/docs/best_practices/copywriting.md`: no abbreviations, no

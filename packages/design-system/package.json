@@ -30,6 +30,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./primitives": {
+      "types": "./dist/primitives.d.ts",
+      "default": "./src/primitives.ts"
+    },
     "./system": {
       "types": "./dist/system/index.d.ts",
       "default": "./src/system/index.ts"
