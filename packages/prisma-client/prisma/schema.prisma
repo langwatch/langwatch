@@ -4083,6 +4083,14 @@ model GroupMembership {
   @@index([groupId])
 }
 
+/// Who authz treats as gone, from user's and identity's facts; authz never reads User (ARCHITECTURE.md, "Platform operators are a grant").
+model AuthzUserStanding {
+  userId            String    @id
+  deactivatedAt     DateTime?
+  erasedAt          DateTime?
+  standingChangedAt DateTime
+}
+
 model RoleBinding {
   id             String       @id @default(nanoid())
   organizationId String
