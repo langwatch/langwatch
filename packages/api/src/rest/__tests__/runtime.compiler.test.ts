@@ -107,6 +107,7 @@ it("infers trailing middleware arguments and rejects wrong facts and responses",
   writeFileSync(
     fixture,
     `import { z } from "zod";
+import { moduleApi } from "@langwatch/module";
 import { defineRestRouter } from "../src/rest/declaration.ts";
 import { defineRestMiddleware } from "../src/rest/request.ts";
 const api = moduleApi<object>()("annotation");
@@ -166,6 +167,7 @@ it("types the handler's scope from the declared credential, and refuses a door w
   writeFileSync(
     fixture,
     `import { z } from "zod";
+import { moduleApi } from "@langwatch/module";
 import { defineRestRouter } from "../src/rest/declaration.ts";
 const api = moduleApi<object>()("role");
 const tier = z.object({ tier: z.literal("organization") });
@@ -216,6 +218,7 @@ it("types the handler's answer from the statuses the declaration named", () => {
   writeFileSync(
     fixture,
     `import { z } from "zod";
+import { moduleApi } from "@langwatch/module";
 import { defineRestRouter } from "../src/rest/declaration.ts";
 const api = moduleApi<object>()("platform-health");
 const report = z.object({ status: z.string() });
