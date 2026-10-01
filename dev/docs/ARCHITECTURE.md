@@ -2338,8 +2338,8 @@ person with no organization back to their own account; the browser-host scope ho
 
 Throw `HandledError` only when the cause is known **and** the caller can act;
 declare the `code` on the subclass in the module's contract and register it in
-`packages/error-presentation/src/app-codes.ts` (`APP_ERROR_CODES`, sorted). Its customer copy goes in the
-presentation registry (`packages/error-presentation/src/presentation.ts`), and its tips and docs link in the
+`packages/handled-error/src/app-codes.ts` (`APP_ERROR_CODES`, sorted). Its customer copy goes in the
+presentation registry (`packages/handled-error/src/presentation.ts`), and its tips and docs link in the
 remediation registry (`packages/handled-error/src/remediation.ts`, spread in as `remediation(code)`). Everything else stays a plain
 `Error` and degrades to "unknown" + trace id at the boundary — deliberately.
 `message` is customer-safe, never internals; the tRPC wire message is the
