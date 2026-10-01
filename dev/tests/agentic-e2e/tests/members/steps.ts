@@ -19,7 +19,7 @@ export async function givenIAmOnTheMembersPage(page: Page) {
   // Org-scoped at /settings/members, kept rather than `/settings/directory` on purpose:
   // `members.tsx` now redirects, so arriving by the old address covers the redirect too.
   await page.goto(`/settings/members`);
-  await expect(page.getByRole("heading", { name: "Organization Members" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "Directory", level: 1 })).toBeVisible({
     timeout: 15000,
   });
 }

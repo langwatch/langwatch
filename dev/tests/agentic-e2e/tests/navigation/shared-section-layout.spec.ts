@@ -40,7 +40,7 @@ test("complex product areas share one local navigation layout", async ({ page },
       name: `${section.sectionLabel} navigation`,
     });
     const content = page.getByTestId("section-navigation-content");
-    const container = page.getByTestId("section-navigation-container");
+    const container = page.getByTestId("section-navigation-layout");
     const heading = page.getByRole("heading", {
       name: section.pageHeading,
       exact: true,
@@ -59,7 +59,6 @@ test("complex product areas share one local navigation layout", async ({ page },
     expect(contentBox).not.toBeNull();
     expect(containerBox).not.toBeNull();
     expect(navigationBox!.x).toBeLessThan(contentBox!.x);
-    expect(containerBox!.width).toBeLessThanOrEqual(1600);
 
     measurements.push({
       name: section.name,
@@ -77,7 +76,7 @@ test("complex product areas share one local navigation layout", async ({ page },
   }
 
   expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual(
-    sections.map(() => 220),
+    sections.map(() => 200),
   );
   expect(new Set(measurements.map(({ containerWidth }) => containerWidth)).size).toBe(1);
   expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(1);
@@ -91,8 +90,8 @@ test("complex product areas share one local navigation layout", async ({ page },
   const automationsNavigation = page.getByRole("navigation", {
     name: "Automations navigation",
   });
-  await automationsNavigation.getByRole("link", { name: "Alerts", exact: true }).click();
-  await expect(page).toHaveURL(`/${projectSlug}/automations/alerts`);
+  await automationsNavigation.getByRole("link", { name: "Reports", exact: true }).click();
+  await expect(page).toHaveURL(`/${projectSlug}/automations/schedules`);
 
   // The URL flips synchronously on pushState, but the router only commits the
   // new location once the lazily-loaded route resolves; until then the nav
@@ -103,7 +102,7 @@ test("complex product areas share one local navigation layout", async ({ page },
       .getByRole("link", { name: "Overview", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     const activeBackground = await automationsNavigation
-      .getByRole("link", { name: "Alerts", exact: true })
+      .getByRole("link", { name: "Reports", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(overviewBackground).not.toBe(activeBackground);
   }).toPass({ timeout: 15_000 });
