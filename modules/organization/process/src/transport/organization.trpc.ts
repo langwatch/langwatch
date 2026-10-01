@@ -1,12 +1,12 @@
 /** Server-side organization procedures: permissions and handlers forward to application. */
 
+import type { AuthzDeclaration } from "@langwatch/api/access";
 import {
   defineTrpcFact,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
-import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
   OrganizationApi,
   organizationTrpc,

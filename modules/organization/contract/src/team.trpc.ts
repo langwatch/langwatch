@@ -4,7 +4,7 @@
  * `team:manage` administers, `organization:manage` creates.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 import { organizationApiScopeSchema } from "./organization.trpc-schemas.ts";
 import {
