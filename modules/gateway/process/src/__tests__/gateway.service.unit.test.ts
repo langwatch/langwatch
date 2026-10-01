@@ -2,6 +2,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayAudit } from "../app/gateway.members.ts";
@@ -162,6 +163,7 @@ function serviceFor(result: GatewayBudgetCheckResult): {
     service: GatewayService.create({
       repository,
       projects,
+      organizations: createApiFixture<OrganizationApi>(),
       cacheRules: GatewayCacheRuleService.create(new EmptyCacheRuleRepository()),
       guardrails: GatewayGuardrailService.create({
         repository: new EmptyGuardrailRepository(),
@@ -198,6 +200,7 @@ function serviceOverCatalogues({
       scopes: [],
     }),
     projects,
+    organizations: createApiFixture<OrganizationApi>(),
     cacheRules: GatewayCacheRuleService.create(cacheRuleRepository),
     guardrails: GatewayGuardrailService.create({
       repository: guardrailRepository,

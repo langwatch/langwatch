@@ -4,7 +4,11 @@
  * organizations.
  * @see specs/ai-gateway/governance/vk-scope-rbac.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzPermission } from "@langwatch/authorization";
+import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayPermissionScope, GatewayScopePermissions } from "../../app/gateway.members.ts";
@@ -64,15 +68,45 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
     super();
     this.membership = membership;
   }
-  async findProjectTeam({ projectId }: { projectId: string }) {
-    const teamId = TEAM_OF_PROJECT[projectId];
-    return teamId ? { id: projectId, teamId } : null;
+  /** The organization feature's answers for this fake directory's one member. */
+  organizations(): Pick<OrganizationApi, "getMember" | "findMemberTeamIds"> {
+    return createApiFixture<OrganizationApi>({
+      getMember: async ({ organizationId, userId }) => {
+        if (!this.membership.role) throw new MemberNotFoundError(userId);
+        return {
+          userId,
+          organizationId,
+          role: this.membership.role,
+          disabledAt: null,
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: userId, name: null, email: null },
+          teams: [],
+        };
+      },
+      findMemberTeamIds: async () => this.membership.teamIds,
+    });
   }
-  async findOrganizationRole() {
-    return this.membership.role ? { role: this.membership.role } : null;
-  }
-  async findMemberTeamIds() {
-    return this.membership.teamIds;
+  /** The project feature's answers for the projects "acme" owns. */
+  projects(): Pick<ProjectApi, "findIdentity" | "listIdsByOrganization"> {
+    return createApiFixture<ProjectApi>({
+      findIdentity: async (id) => {
+        const teamId = TEAM_OF_PROJECT[id];
+        return teamId
+          ? {
+              id,
+              name: id,
+              slug: id,
+              teamId,
+              organizationId: "acme",
+              isPersonal: false,
+              ownerUserId: null,
+            }
+          : null;
+      },
+      listIdsByOrganization: async ({ organizationId }) =>
+        organizationId === "acme" ? Object.keys(TEAM_OF_PROJECT) : [],
+    });
   }
   async findProjectIdsForTeams({ teamIds }: { teamIds: string[] }) {
     return Object.entries(TEAM_OF_PROJECT)
@@ -88,15 +122,6 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
   }) {
     return organizationId === "acme" ? teamIds.filter((id) => id in ALL_TEAMS) : [];
   }
-  async findProjectIdsInOrganization({
-    organizationId,
-    projectIds,
-  }: {
-    organizationId: string;
-    projectIds: string[];
-  }) {
-    return organizationId === "acme" ? projectIds.filter((id) => id in TEAM_OF_PROJECT) : [];
-  }
   async findVirtualKeyScopes() {
     return null;
   }
@@ -106,7 +131,11 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
 }
 
 const service = (directory = new AcmeDirectory()) =>
-  VirtualKeyAuthorizationService.create({ directory });
+  VirtualKeyAuthorizationService.create({
+    directory,
+    organizations: directory.organizations(),
+    projects: directory.projects(),
+  });
 
 const manage = (at: Grant["at"], id: string): Grant => ({
   permission: "virtualKeys:manage",

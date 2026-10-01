@@ -36,7 +36,7 @@ const TEAM_ID = "team_1";
 
 const hasApiKeyPermission = vi.fn<AuthzApi["hasApiKeyPermission"]>();
 const findOrganizationId = vi.fn<ProjectApi["findOrganizationId"]>();
-const findProject = vi.fn();
+const findProject = vi.fn<ProjectApi["findIdentity"]>();
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
@@ -46,7 +46,7 @@ async function gatewayApp(): Promise<GatewayApp> {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
       authz: createApiFixture<AuthzApi>({ hasApiKeyPermission }),
-      projects: createApiFixture<ProjectApi>({ findOrganizationId }),
+      projects: createApiFixture<ProjectApi>({ findOrganizationId, findIdentity: findProject }),
       evaluators: peer("evaluators"),
       evaluations: peer("evaluations"),
       monitors: peer("monitors"),
@@ -57,7 +57,7 @@ async function gatewayApp(): Promise<GatewayApp> {
       oneTimeReveals: peer("oneTimeReveals"),
     },
     members: {
-      prisma: prismaDouble({ project: { findUnique: findProject } }) as PrismaClient,
+      prisma: prismaDouble({}) as PrismaClient,
       clickhouse: clickHouseQueryClientDouble({
         query: async () => ({ rows: [] }),
         insert: async () => {},
@@ -97,7 +97,15 @@ describe("GatewayApp.authorizeKeyCaller", () => {
     vi.clearAllMocks();
     hasApiKeyPermission.mockResolvedValue(true);
     findOrganizationId.mockResolvedValue(ORGANIZATION_ID);
-    findProject.mockResolvedValue({ id: PROJECT_ID, teamId: TEAM_ID });
+    findProject.mockResolvedValue({
+      id: PROJECT_ID,
+      name: "Project",
+      slug: "project",
+      teamId: TEAM_ID,
+      organizationId: ORGANIZATION_ID,
+      isPersonal: false,
+      ownerUserId: null,
+    });
   });
 
   describe("given an organization key that names no project", () => {

@@ -224,6 +224,7 @@ import {
   type GatewaySpendScope,
   type GatewaySpendScopeQuery,
 } from "../services/gateway-spend-reconciliation.service.ts";
+import { GatewaySpendScopeService } from "../services/gateway-spend-scope.service.ts";
 import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
 import type {
   VirtualKeyCamelDto,
@@ -811,6 +812,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       peers: {
         authz: setup.dependencies.authz,
         projects: setup.dependencies.projects,
+        organizations: setup.dependencies.organizations,
         evaluators: setup.dependencies.evaluators,
         monitors: setup.dependencies.monitors,
         platformProviders: setup.dependencies.modelProviders,
@@ -855,6 +857,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
           database: setup.members.prisma,
         }),
         platformProviders: setup.dependencies.modelProviders,
+        projects: setup.dependencies.projects,
       }),
       connectUpstream,
     });
@@ -959,7 +962,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
   #spend: GatewaySpendCollaborators | undefined;
   #spendPipeline: GatewaySpendPipelineParts | undefined;
   #spendProcessing: EventingGatewaySpendAdapter | undefined;
-  #spendScope: PrismaGatewaySpendScopeRepository | undefined;
+  #spendScope: GatewaySpendScopeService | undefined;
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
   #budgetOverview: BudgetOverviewService | undefined;
@@ -1376,8 +1379,11 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
   resolveSpendScope(input: GatewaySpendScopeQuery): Promise<GatewaySpendScope> {
     // Held rather than rebuilt per call: the adapter keeps a project cache, and
     // a fresh one per request would resolve every filter from cold.
-    this.#spendScope ??= PrismaGatewaySpendScopeRepository.create({
-      database: this.#spendCollaborators.prisma,
+    this.#spendScope ??= GatewaySpendScopeService.create({
+      projects: this.#dependencies.projects,
+      virtualKeys: PrismaGatewaySpendScopeRepository.create({
+        database: this.#spendCollaborators.prisma,
+      }),
     });
 
     return this.#spendScope.resolveSpendScope(input);

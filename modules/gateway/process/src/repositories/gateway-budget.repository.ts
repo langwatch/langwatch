@@ -46,6 +46,9 @@ export type GatewayKeyReachCandidate = {
   groupIds: string[];
 };
 
+/** A key's reach facts before the organization feature has named its principal's groups. */
+export type GatewayKeyReachRow = Omit<GatewayKeyReachCandidate, "groupIds">;
+
 export type ScopeReach = {
   reachable: boolean;
   reachableProjectIds: string[];
@@ -90,6 +93,13 @@ export type GatewayBudgetReadInput = GatewayOrganizationBudgetReadInput & {
 
 export type GatewayBudgetCheckReadInput = BudgetCheckInput & {
   tenantIds: string[];
+  /** The groups the organization feature says the principal belongs to; empty without one. */
+  memberGroupIds: string[];
+};
+
+/** A resolution target plus the principal's group ids, which the organization feature owns. */
+export type GatewayBudgetResolutionRead = GatewayBudgetResolutionTarget & {
+  memberGroupIds: string[];
 };
 
 export type GatewayVirtualKeyProjectScope = {
@@ -138,7 +148,7 @@ export abstract class GatewayBudgetRepository {
   abstract findById(input: GatewayBudgetReadInput): Promise<GatewayBudgetWithSeats | null>;
   abstract findHealthById(input: GatewayBudgetReadInput): Promise<BudgetHealth | null>;
   abstract findDetailById(input: GatewayBudgetReadInput): Promise<BudgetDetail | null>;
-  abstract findScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachCandidate[]>;
+  abstract findScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachRow[]>;
   /** Refuses a request-supplied scope id naming anything outside the budget's organization. */
   abstract assertScopeWithinOrganization(input: CreateBudgetInput): Promise<void>;
   abstract create(input: CreateBudgetInput): Promise<GatewayBudgetResource>;
@@ -146,7 +156,7 @@ export abstract class GatewayBudgetRepository {
   abstract archive(input: ArchiveBudgetInput): Promise<GatewayBudgetResource>;
   abstract reset(input: ResetGatewayBudgetInput): Promise<GatewayBudgetResource>;
   abstract resolveApplicableBudgets(
-    input: GatewayBudgetResolutionTarget,
+    input: GatewayBudgetResolutionRead,
   ): Promise<GatewayResolvedBudget[]>;
   abstract resolveScopeTargets(input: {
     budgets: { scopeType: string; scopeId: string }[];

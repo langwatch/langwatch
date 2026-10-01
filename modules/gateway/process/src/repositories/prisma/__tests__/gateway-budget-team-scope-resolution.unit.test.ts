@@ -55,6 +55,7 @@ describe("team-scope budget resolution", () => {
       await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: client,
         target: {
+          memberGroupIds: [],
           organizationId: "org_1",
           virtualKeyId: "vk_1",
           teamId: "team_governance",
@@ -74,6 +75,7 @@ describe("team-scope budget resolution", () => {
       await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: client,
         target: {
+          memberGroupIds: [],
           organizationId: "org_1",
           virtualKeyId: "vk_1",
           teamId: "team_platform",
@@ -94,6 +96,7 @@ describe("team-scope budget resolution", () => {
       await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: client,
         target: {
+          memberGroupIds: [],
           organizationId: "org_1",
           virtualKeyId: null,
           teamId: null,
@@ -113,6 +116,7 @@ describe("team-scope budget resolution", () => {
       await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: client,
         target: {
+          memberGroupIds: [],
           organizationId: "org_1",
           virtualKeyId: null,
           teamId: null,

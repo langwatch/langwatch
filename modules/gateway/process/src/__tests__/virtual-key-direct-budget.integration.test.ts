@@ -15,6 +15,7 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts";
 import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import {
   ALL_KEY_IDS,
   BUDGET_BOTH_MANAGED_ID,
@@ -42,9 +43,17 @@ const prisma = connection?.client as PrismaClient;
 
 let chRepo: GatewayBudgetClickHouseRepository;
 
+const projects = new TestProjectApi({
+  listIdsByOrganization: async ({ organizationId }) =>
+    (
+      await prisma.project.findMany({ where: { team: { organizationId } }, select: { id: true } })
+    ).map((project) => project.id),
+});
+
 const load = () =>
   VirtualKeyDirectBudgetService.create({
     repository: PrismaVirtualKeyDirectBudgetRepository.create({ database: prisma }),
+    projects,
   }).loadDirectBudgetsForKeys({
     organizationId: ORG_ID,
     virtualKeyIds: ALL_KEY_IDS,
@@ -183,6 +192,7 @@ describe.skipIf(!databaseUrl || !chUrl)("direct budget per virtual key (real PG 
     it("reports an unknown spend rather than zero", async () => {
       const budgets = await VirtualKeyDirectBudgetService.create({
         repository: PrismaVirtualKeyDirectBudgetRepository.create({ database: prisma }),
+        projects,
       }).loadDirectBudgetsForKeys({
         organizationId: ORG_ID,
         virtualKeyIds: ALL_KEY_IDS,

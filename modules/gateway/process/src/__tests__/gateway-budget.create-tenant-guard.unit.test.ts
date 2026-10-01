@@ -5,6 +5,8 @@
  * could otherwise target another tenant's team or project.
  */
 
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
@@ -40,6 +42,7 @@ function mockPrisma(overrides: { team?: unknown; project?: unknown }): PrismaCli
 function serviceOver(prisma: PrismaClient, project: unknown) {
   return PrismaGatewayAdapter.create({
     database: prisma,
+    organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
     projects: {
       findWithTeam: vi
         .fn()

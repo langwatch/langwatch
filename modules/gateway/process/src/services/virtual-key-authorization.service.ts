@@ -6,9 +6,12 @@ import {
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { GatewayScopePermissions } from "../app/gateway.members.ts";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
+import { isMemberNotFound } from "../rules/gateway-organization-peer.rules.ts";
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 /**
@@ -122,11 +125,45 @@ export type VirtualKeyReader = Pick<VirtualKeyService, "findById">;
 export class VirtualKeyAuthorizationService {
   static create(input: {
     directory: VirtualKeyAuthorizationRepository;
+    organizations: Pick<OrganizationApi, "getMember" | "findMemberTeamIds">;
+    projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">;
   }): VirtualKeyAuthorizationService {
-    return new VirtualKeyAuthorizationService(input.directory);
+    return new VirtualKeyAuthorizationService(input.directory, input.organizations, input.projects);
   }
 
-  private constructor(private readonly directory: VirtualKeyAuthorizationRepository) {}
+  private constructor(
+    private readonly directory: VirtualKeyAuthorizationRepository,
+    private readonly organizations: Pick<OrganizationApi, "getMember" | "findMemberTeamIds">,
+    private readonly projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">,
+  ) {}
+
+  /** The role an enabled member holds here; none for a stranger or a disabled seat. */
+  private async enabledRole(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<{ role: string } | null> {
+    try {
+      const member = await this.organizations.getMember(input);
+
+      return member.disabledAt === null ? { role: member.role } : null;
+    } catch (error) {
+      if (isMemberNotFound(error)) return null;
+
+      throw error;
+    }
+  }
+
+  /** Of the named projects, those inside this organization. */
+  private async projectIdsInOrganization(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<string[]> {
+    const inOrganization = new Set(
+      await this.projects.listIdsByOrganization({ organizationId: input.organizationId }),
+    );
+
+    return input.projectIds.filter((id) => inOrganization.has(id));
+  }
 
   private async actorHasPermissionAtScope(
     ctx: ActorContext,
@@ -190,7 +227,7 @@ export class VirtualKeyAuthorizationService {
       return { type: "team", id: scope.scopeId };
     }
 
-    const project = await this.directory.findProjectTeam({ projectId: scope.scopeId });
+    const project = await this.projects.findIdentity(scope.scopeId);
     // Fail closed on a dangling project reference.
     if (!project) {
       return null;
@@ -313,8 +350,8 @@ export class VirtualKeyAuthorizationService {
     userId: string;
   }): Promise<MembershipSet> {
     const [organizationRole, memberTeamIds] = await Promise.all([
-      this.directory.findOrganizationRole(input),
-      this.directory.findMemberTeamIds(input),
+      this.enabledRole(input),
+      this.organizations.findMemberTeamIds(input),
     ]);
     const teamIds = new Set(memberTeamIds);
     const projectIds =
@@ -354,7 +391,7 @@ export class VirtualKeyAuthorizationService {
     );
 
     await assertAllResolve("project", idsOfType("PROJECT"), (projectIds) =>
-      this.directory.findProjectIdsInOrganization({ organizationId, projectIds }),
+      this.projectIdsInOrganization({ organizationId, projectIds }),
     );
   }
 
@@ -412,7 +449,7 @@ export class VirtualKeyAuthorizationService {
       return;
     }
 
-    const found = await this.directory.findProjectIdsInOrganization({
+    const found = await this.projectIdsInOrganization({
       organizationId,
       projectIds: [traceProjectId],
     });

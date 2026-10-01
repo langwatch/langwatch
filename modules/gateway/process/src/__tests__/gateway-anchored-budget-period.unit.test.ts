@@ -4,7 +4,9 @@
  * for it must honor (cycle arithmetic itself: anchoredBudgetCycles.unit.test.ts).
  */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { computeBudgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
@@ -210,6 +212,7 @@ describe("GatewayService.create with a cycle anchor", () => {
   function serviceOver(prisma: PrismaClient) {
     return PrismaGatewayAdapter.create({
       database: prisma,
+      organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
       projects: {
         findWithTeam: vi.fn().mockResolvedValue({
           id: "project_1",

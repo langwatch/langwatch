@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
@@ -32,6 +34,7 @@ function serviceWith(vkFound: boolean, projectFound: boolean) {
   } as never;
   return PrismaGatewayAdapter.create({
     database: prisma,
+    organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
     projects,
     evaluators: {} as never,
     monitors: {} as never,

@@ -106,11 +106,6 @@ export {
 } from "./repositories/clickhouse/clickhouse.gateway-open-admissions-sweep.repository.ts";
 export type { OpenAdmission } from "./repositories/gateway-open-admissions.repository.ts";
 export * from "./eventing/gateway-spend.pipeline.ts";
-export {
-  PrismaGatewayBudgetResolutionReadRepository,
-  type GatewayBudgetResolutionApi,
-  type GatewayBudgetResolutionDatabase,
-} from "./repositories/prisma/prisma.gateway-budget-resolution-read.repository.ts";
 export type { GatewaySpendState } from "./eventing/gateway-spend.projection.ts";
 export * from "./rules/gateway-wire-pagination.rules.ts";
 export * from "./services/virtual-key-crypto.service.ts";
@@ -165,6 +160,7 @@ export {
 } from "./services/gateway-realtime-session.service.ts";
 export type { ReserveResult } from "./repositories/gateway-realtime-session.repository.ts";
 export { PrismaGatewaySpendScopeRepository } from "./repositories/prisma/prisma.gateway-spend-scope.repository.ts";
+export { GatewaySpendScopeService } from "./services/gateway-spend-scope.service.ts";
 export {
   GatewayJwtService,
   type GatewayJwtClaims,

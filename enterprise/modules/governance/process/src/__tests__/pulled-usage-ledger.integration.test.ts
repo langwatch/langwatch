@@ -280,6 +280,7 @@ describe.skipIf(!databaseUrl)(
       gateway = PrismaGatewayAdapter.create({
         database: prisma,
         projects: new SuiteProjectService(),
+        organizations: {} as never,
         evaluators: {} as never,
         monitors: {} as never,
         changes: {} as never,

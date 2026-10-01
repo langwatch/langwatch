@@ -41,7 +41,7 @@ const isMember = vi.fn();
 const getPersonalWorkspace = vi.fn();
 const isEnabled = vi.fn();
 const virtualKeyFindMany = vi.fn();
-const groupMembershipFindMany = vi.fn();
+const listGroupsForMember = vi.fn();
 const gatewayBudgetFindMany = vi.fn();
 
 function organizationsStub(overrides: Partial<OrganizationApi>): OrganizationApi {
@@ -64,7 +64,6 @@ function fakeClickHouse(overrides: Partial<ClickHouseQueryClient>): ClickHouseQu
 /** Answers the reads the budget-resolution repository makes, one delegate at a time. */
 function fakePrisma(overrides: {
   virtualKey?: Partial<PrismaClient["virtualKey"]>;
-  groupMembership?: Partial<PrismaClient["groupMembership"]>;
   gatewayBudget?: Partial<PrismaClient["gatewayBudget"]>;
 }): PrismaClient {
   return overrides as PrismaClient;
@@ -81,7 +80,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       evaluators: peer("evaluators"),
       evaluations: peer("evaluations"),
       monitors: peer("monitors"),
-      organizations: organizationsStub({ isMember, getPersonalWorkspace }),
+      organizations: organizationsStub({ isMember, getPersonalWorkspace, listGroupsForMember }),
       featureFlags: featureFlagsStub({ isEnabled }),
       modelProviders: peer("modelProviders"),
       traces: peer("traces"),
@@ -90,7 +89,6 @@ async function gatewayAppStub(): Promise<GatewayApp> {
     members: {
       prisma: fakePrisma({
         virtualKey: { findMany: virtualKeyFindMany },
-        groupMembership: { findMany: groupMembershipFindMany },
         gatewayBudget: { findMany: gatewayBudgetFindMany },
       }),
       clickhouse: fakeClickHouse({ query: vi.fn(), insert: vi.fn() }),
@@ -117,7 +115,7 @@ describe("GatewayApp.budgetOverviewForUser", () => {
     getPersonalWorkspace.mockRejectedValue(new TeamNotFoundError());
     isEnabled.mockResolvedValue(true);
     virtualKeyFindMany.mockResolvedValue([]);
-    groupMembershipFindMany.mockResolvedValue([]);
+    listGroupsForMember.mockResolvedValue([]);
     gatewayBudgetFindMany.mockResolvedValue([]);
   });
 

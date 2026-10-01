@@ -30,6 +30,7 @@ import {
   type UpdateGatewayCacheRuleInput,
   type UpdateGatewayGuardrailInput,
 } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -42,14 +43,22 @@ import {
   type BudgetListWithHealth,
   type BudgetPageWithHealth,
   type CreateBudgetInput,
+  type GatewayKeyReachCandidate,
   type UpdateBudgetInput,
   type GatewayBudgetScope,
 } from "../repositories/gateway-budget.repository.ts";
+import { isGroupNotFound, isMemberNotFound } from "../rules/gateway-organization-peer.rules.ts";
 import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service.ts";
 import type { GatewayCacheRuleService } from "./gateway-cache-rule.service.ts";
 import type { GatewayGuardrailService } from "./gateway-guardrail.service.ts";
 
 export type { GatewayBudgetScopeReachInput } from "@langwatch/gateway-contract";
+
+/** The organization facts the budget lifecycle reads: groups, and who holds a membership. */
+export type GatewayBudgetOrganizations = Pick<
+  OrganizationApi,
+  "getGroup" | "getMember" | "listGroupsForMember"
+>;
 
 /** The singular process-owned Gateway service for the full budget lifecycle. */
 export class GatewayService {
@@ -57,22 +66,26 @@ export class GatewayService {
 
   private readonly repository: GatewayBudgetRepository;
   private readonly projects: ProjectApi;
+  private readonly organizations: GatewayBudgetOrganizations;
   private readonly cacheRules: GatewayCacheRuleService;
   private readonly guardrails: GatewayGuardrailService;
 
   private constructor({
     repository,
     projects,
+    organizations,
     cacheRules,
     guardrails,
   }: {
     repository: GatewayBudgetRepository;
     projects: ProjectApi;
+    organizations: GatewayBudgetOrganizations;
     cacheRules: GatewayCacheRuleService;
     guardrails: GatewayGuardrailService;
   }) {
     this.repository = repository;
     this.projects = projects;
+    this.organizations = organizations;
     this.cacheRules = cacheRules;
     this.guardrails = guardrails;
   }
@@ -80,12 +93,14 @@ export class GatewayService {
   static create(input: {
     repository: GatewayBudgetRepository;
     projects: ProjectApi;
+    organizations: GatewayBudgetOrganizations;
     cacheRules: GatewayCacheRuleService;
     guardrails: GatewayGuardrailService;
   }): GatewayService {
     return new GatewayService({
       repository: input.repository,
       projects: input.projects,
+      organizations: input.organizations,
       cacheRules: input.cacheRules,
       guardrails: input.guardrails,
     });
@@ -94,15 +109,17 @@ export class GatewayService {
   async checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> {
     const parsed = gatewayBudgetCheckInputSchema.parse(input);
     const tenantIds = await this.listSpendTenantIds(parsed.organizationId);
+    const memberGroupIds = await this.memberGroupIds(parsed);
 
-    return this.repository.check({ ...parsed, tenantIds });
+    return this.repository.check({ ...parsed, tenantIds, memberGroupIds });
   }
 
   /** Compatibility name retained while callers migrate to checkBudget. */
   async check(input: BudgetCheckInput): Promise<BudgetCheckResult> {
     const tenantIds = await this.listSpendTenantIds(input.organizationId);
+    const memberGroupIds = await this.memberGroupIds(input);
 
-    return this.repository.check({ ...input, tenantIds });
+    return this.repository.check({ ...input, tenantIds, memberGroupIds });
   }
 
   async list(organizationId: string): Promise<GatewayBudgetWithSeats[]> {
@@ -220,7 +237,10 @@ export class GatewayService {
   }
 
   async scopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult> {
-    const candidates = await this.repository.findScopeReachCandidates(input.organizationId);
+    const candidates = await this.reachCandidates({
+      organizationId: input.organizationId,
+      withGroups: input.scope.scopeType === "GROUP",
+    });
     const projectIds = candidates.flatMap((candidate) =>
       candidate.traceProjectId ? [candidate.traceProjectId] : [],
     );
@@ -239,6 +259,7 @@ export class GatewayService {
     await this.assertProjectScopesBelongToOrganization(parsed);
     // Ownership before reach: a scope from another tenant is refused as that, never as unreachable.
     await this.repository.assertScopeWithinOrganization(parsed);
+    await this.assertOrganizationScopesBelongToOrganization(parsed);
     await this.assertScopeIsReachable(parsed);
 
     return this.repository.create(parsed);
@@ -256,8 +277,12 @@ export class GatewayService {
     return this.repository.reset(resetGatewayBudgetInputSchema.parse(input));
   }
 
-  resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]> {
-    return this.repository.resolveApplicableBudgets(input);
+  async resolveApplicableBudgets(
+    input: GatewayBudgetResolutionTarget,
+  ): Promise<GatewayResolvedBudget[]> {
+    const memberGroupIds = await this.memberGroupIds(input);
+
+    return this.repository.resolveApplicableBudgets({ ...input, memberGroupIds });
   }
 
   /** When each of these budgets' buckets last rolled over, for a boundary-aware spend read. */
@@ -380,7 +405,10 @@ export class GatewayService {
     result: Result,
     organizationId: string,
   ): Promise<Result> {
-    const candidates = await this.repository.findScopeReachCandidates(organizationId);
+    const candidates = await this.reachCandidates({
+      organizationId,
+      withGroups: result.budgets.some((budget) => budget.scopeType === "GROUP"),
+    });
     const projectIds = candidates.flatMap((candidate) =>
       candidate.traceProjectId ? [candidate.traceProjectId] : [],
     );
@@ -392,6 +420,97 @@ export class GatewayService {
     });
 
     return { ...result, scopeReach };
+  }
+
+  /**
+   * The active keys' reach facts. A key's groups are the organization feature's to
+   * name, and only a GROUP budget's reach reads them, so they are asked for then.
+   */
+  private async reachCandidates({
+    organizationId,
+    withGroups,
+  }: {
+    organizationId: string;
+    withGroups: boolean;
+  }): Promise<GatewayKeyReachCandidate[]> {
+    const rows = await this.repository.findScopeReachCandidates(organizationId);
+    if (!withGroups) {
+      return rows.map((row) => ({ ...row, groupIds: [] }));
+    }
+
+    const principalUserIds = [
+      ...new Set(rows.flatMap((row) => (row.principalUserId ? [row.principalUserId] : []))),
+    ];
+    const groupIdsByPrincipal = new Map(
+      await Promise.all(
+        principalUserIds.map(
+          async (userId) =>
+            [
+              userId,
+              await this.memberGroupIds({ organizationId, principalUserId: userId }),
+            ] as const,
+        ),
+      ),
+    );
+
+    return rows.map((row) => ({
+      ...row,
+      groupIds: row.principalUserId ? (groupIdsByPrincipal.get(row.principalUserId) ?? []) : [],
+    }));
+  }
+
+  /** The groups the principal belongs to in this organization; none for a key with no principal. */
+  private async memberGroupIds({
+    organizationId,
+    principalUserId,
+  }: {
+    organizationId: string;
+    principalUserId?: string | null | undefined;
+  }): Promise<string[]> {
+    if (!principalUserId) {
+      return [];
+    }
+    const groups = await this.organizations.listGroupsForMember({
+      organizationId,
+      userId: principalUserId,
+    });
+
+    return groups.map((group) => group.id);
+  }
+
+  /** A PRINCIPAL or GROUP scope must name a person or group of the budget's own organization. */
+  private async assertOrganizationScopesBelongToOrganization(
+    input: CreateBudgetInput,
+  ): Promise<void> {
+    if (input.scope.kind === "PRINCIPAL") {
+      // The named user must belong to the organization, or the budget would never
+      // match their traffic (PRINCIPAL spans only their organization's keys).
+      const isMember = await this.organizations
+        .getMember({ organizationId: input.organizationId, userId: input.scope.principalUserId })
+        .then(
+          () => true,
+          (error: unknown) => {
+            if (isMemberNotFound(error)) return false;
+
+            throw error;
+          },
+        );
+      if (!isMember) {
+        throw new GatewayScopeOrgMismatchError("user");
+      }
+    }
+
+    if (input.scope.kind === "GROUP") {
+      // The scope id is request-supplied: without this a caller could put a
+      // per-member budget on another tenant's group.
+      await this.organizations
+        .getGroup({ organizationId: input.organizationId, groupId: input.scope.groupId })
+        .catch((error: unknown) => {
+          if (isGroupNotFound(error)) throw new GatewayScopeOrgMismatchError("group");
+
+          throw error;
+        });
+    }
   }
 
   private async assertScopeIsReachable(input: CreateBudgetInput): Promise<void> {

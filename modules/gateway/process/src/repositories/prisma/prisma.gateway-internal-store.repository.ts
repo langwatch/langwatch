@@ -81,14 +81,6 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStoreRe
     return row ? { periodStartedAt: fromDate(row.periodStartedAt) } : null;
   }
 
-  async findProjectIdsForOrganization(organizationId: string): Promise<string[]> {
-    const projects = await this.database.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true },
-    });
-    return projects.map((project) => project.id);
-  }
-
   async findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
     {
       id: string;
@@ -111,13 +103,6 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStoreRe
       ...row,
       lastUsedAt: row.lastUsedAt ? fromDate(row.lastUsedAt) : null,
     }));
-  }
-
-  findProjectTeams(projectIds: readonly string[]): Promise<{ id: string; teamId: string }[]> {
-    return this.database.project.findMany({
-      where: { id: { in: [...projectIds] } },
-      select: { id: true, teamId: true },
-    });
   }
 
   /**
