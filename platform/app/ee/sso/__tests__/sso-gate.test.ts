@@ -47,6 +47,7 @@ vi.mock("../../licensing/validation", () => ({
 }));
 
 import { env } from "~/env.mjs";
+import { mintActivationCode } from "../../licensing/activation/activationCode";
 import {
   isExpired,
   parseLicenseKey,
@@ -245,15 +246,14 @@ describe("platformSSOAllowed", () => {
   describe("given an activation code set as the instance license key", () => {
     /** @scenario "an activation code in the license variable is not read as a license" */
     it("does not parse the code as a license and lets the organization scan decide", async () => {
-      envMock.LANGWATCH_LICENSE_KEY = "LW-A1B2-C3D4-E5F6-G7H8";
+      const code = mintActivationCode();
+      envMock.LANGWATCH_LICENSE_KEY = code;
       __setSsoLicenseRepositoryForTests(repoWithOrgs([]));
 
       const allowed = await platformSSOAllowed();
 
       expect(allowed).toBe(false);
-      expect(parseLicenseKey).not.toHaveBeenCalledWith(
-        "LW-A1B2-C3D4-E5F6-G7H8",
-      );
+      expect(parseLicenseKey).not.toHaveBeenCalledWith(code);
     });
   });
 
