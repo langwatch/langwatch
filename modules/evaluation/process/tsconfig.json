@@ -99,6 +99,9 @@
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]

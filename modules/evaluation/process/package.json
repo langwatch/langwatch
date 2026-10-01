@@ -68,6 +68,7 @@
     "zod-validation-error": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
