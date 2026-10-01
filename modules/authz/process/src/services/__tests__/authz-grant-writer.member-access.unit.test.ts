@@ -137,6 +137,8 @@ class MemberAccessStore {
       findGroupMembers: async () => [],
       findOrganizationUserIds: async () => [],
       findGrantPrincipals: async () => [],
+      findTeamMembers: async () => [],
+      findRoleHolderPrincipals: async () => [],
       findUserGroups: async () => [],
       isGroupInOrganization: async () => true,
       isApiKeyInOrganization: async () => true,

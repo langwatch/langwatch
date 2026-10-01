@@ -5,6 +5,7 @@ import type { Instant } from "@langwatch/time";
 import type {
   AuthzAssignableRoleRow,
   AuthzBindingScopeRow,
+  AuthzGrantPrincipalRow,
   AuthzManagedBindingRow,
   AuthzUserGroupRow,
 } from "../authz-managed-grant.repository.ts";
@@ -24,6 +25,13 @@ export type AuthzMemoryAdmissionGrantRow = {
   organizationId: string;
   userId: string;
   grantId: string;
+  revoked: boolean;
+};
+
+export type AuthzMemoryGrantRow = {
+  organizationId: string;
+  principal: AuthzGrantPrincipalRow["principal"];
+  roleKey: string | null;
   revoked: boolean;
 };
 
@@ -50,6 +58,9 @@ export class AuthzMemoryStore {
     [];
   readonly organizationRoles = new Map<string, OrganizationRole>();
   readonly legacySharedTeamMemberships: { organizationId: string; userId: string }[] = [];
+  readonly teamMemberships: { organizationId: string; teamId: string; userId: string }[] = [];
+  /** The grant ledger head's rows, as far as a role's holders need them. */
+  readonly grants: AuthzMemoryGrantRow[] = [];
   readonly roles: (AuthzAssignableRoleRow & { organizationId: string })[] = [];
   readonly apiKeys: { organizationId: string; apiKeyId: string }[] = [];
 
@@ -71,6 +82,8 @@ export class AuthzMemoryStore {
       this.scopes,
       this.groupMemberships,
       this.legacySharedTeamMemberships,
+      this.teamMemberships,
+      this.grants,
       this.roles,
       this.apiKeys,
     ]) {

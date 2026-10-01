@@ -61,6 +61,38 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
       .map((row) => ({ groupId: row.groupId, userId: row.userId }));
   }
 
+  async findTeamMembers(input: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<{ teamId: string; userId: string }[]> {
+    return this.memory.teamMemberships
+      .filter(
+        (row) =>
+          row.organizationId === input.organizationId &&
+          input.teamIds.includes(row.teamId) &&
+          this.memory.organizationRoles.has(`${input.organizationId}:${row.userId}`),
+      )
+      .map((row) => ({ teamId: row.teamId, userId: row.userId }));
+  }
+
+  async findRoleHolderPrincipals(input: {
+    organizationId: string;
+    roleId: string;
+    limit: number;
+  }): Promise<AuthzGrantPrincipalRow["principal"][]> {
+    const distinct = new Map(
+      this.memory.grants
+        .filter(
+          (row) =>
+            row.organizationId === input.organizationId &&
+            row.roleKey === `custom:${input.roleId}` &&
+            !row.revoked,
+        )
+        .map(({ principal }) => [`${principal.type}:${principal.id}`, principal]),
+    );
+    return [...distinct.values()].slice(0, input.limit);
+  }
+
   async findOrganizationUserIds(input: { organizationId: string }): Promise<string[]> {
     const prefix = `${input.organizationId}:`;
     return [...this.memory.organizationRoles.keys()]

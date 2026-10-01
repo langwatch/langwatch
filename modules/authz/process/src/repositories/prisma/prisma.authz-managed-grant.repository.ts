@@ -30,6 +30,12 @@ const scopeProjectRowSchema = scopeTeamRowSchema
   .safeExtend({ team: z.object({ isPersonal: z.boolean(), name: z.string() }).strict() })
   .strict();
 const groupMemberRowSchema = z.object({ groupId: z.string(), userId: z.string() }).strict();
+const teamMemberRowsSchema = z.array(z.object({ teamId: z.string(), userId: z.string() }).strict());
+const rolePrincipalRowsSchema = z.array(
+  z
+    .object({ principalType: storedPrincipalKindSchema, principalId: z.string().nullable() })
+    .strict(),
+);
 const userGroupRowSchema = z
   .object({
     groupId: z.string(),
@@ -89,7 +95,17 @@ export type AuthzManagedGrantDatabase = {
   project: Delegate;
   roleBinding: Delegate;
   team: Delegate;
-  teamUser: Delegate;
+  teamUser: Pick<Delegate, "count"> & {
+    findMany(args: {
+      where: {
+        teamId: { in: string[] };
+        team: { organizationId: string };
+        user: { orgMemberships: { some: { organizationId: string } } };
+      };
+      select: { teamId: true; userId: true };
+    }): Promise<unknown[]>;
+  };
+  $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
 };
 
 export class PrismaAuthzManagedGrantRepository extends AuthzManagedGrantRepository {
@@ -241,6 +257,49 @@ export class PrismaAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     });
 
     return userGroupRowsSchema.parse(rows);
+  }
+
+  async findTeamMembers({
+    organizationId,
+    teamIds,
+  }: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<{ teamId: string; userId: string }[]> {
+    if (teamIds.length === 0) return [];
+    const rows = await this.database.teamUser.findMany({
+      where: {
+        teamId: { in: [...teamIds] },
+        team: { organizationId },
+        user: { orgMemberships: { some: { organizationId } } },
+      },
+      select: { teamId: true, userId: true },
+    });
+    return teamMemberRowsSchema.parse(rows);
+  }
+
+  async findRoleHolderPrincipals({
+    organizationId,
+    roleId,
+    limit,
+  }: {
+    organizationId: string;
+    roleId: string;
+    limit: number;
+  }): Promise<AuthzGrantPrincipalRow["principal"][]> {
+    // DISTINCT and LIMIT in SQL: Prisma's `distinct` dedupes in memory after reading every row.
+    const rows = await this.database.$queryRaw`
+      SELECT DISTINCT "principalType"::text AS "principalType", "principalId"
+      FROM "Grant"
+      WHERE "organizationId" = ${organizationId}
+        AND "roleKey" = ${`custom:${roleId}`}
+        AND "revokedAt" IS NULL
+      LIMIT ${limit}
+    `;
+    return rolePrincipalRowsSchema.parse(rows).map((row) => ({
+      type: PRINCIPAL_KIND_FROM_STORED[row.principalType],
+      id: row.principalId,
+    }));
   }
 
   async findOrganizationUserIds({ organizationId }: { organizationId: string }): Promise<string[]> {

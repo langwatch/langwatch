@@ -23,6 +23,7 @@ function setup() {
     roleBinding: delegate(),
     team: delegate(),
     teamUser: delegate(),
+    $queryRaw: vi.fn().mockResolvedValue([]),
   } satisfies AuthzManagedGrantDatabase;
   return {
     database,
@@ -191,5 +192,17 @@ describe("PrismaAuthzManagedGrantRepository", () => {
       },
       select: { id: true, permissions: true },
     });
+  });
+
+  it("caps a role's holders with DISTINCT and LIMIT in the SQL, not after reading every row", async () => {
+    const { database, repository } = setup();
+    database.$queryRaw.mockResolvedValue([{ principalType: "GROUP", principalId: "group-1" }]);
+
+    await expect(
+      repository.findRoleHolderPrincipals({ organizationId: "org-1", roleId: "role-1", limit: 501 }),
+    ).resolves.toEqual([{ type: "group", id: "group-1" }]);
+    const [strings, ...values] = database.$queryRaw.mock.calls[0] ?? [];
+    expect(String(strings)).toMatch(/SELECT DISTINCT[\s\S]*"revokedAt" IS NULL[\s\S]*LIMIT/);
+    expect(values).toEqual(["org-1", "custom:role-1", 501]);
   });
 });
