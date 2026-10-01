@@ -12,6 +12,7 @@ import {
   type SaveExperimentInput,
 } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
   WorkflowNotFoundError,
   type StudioWorkflow,
@@ -19,10 +20,7 @@ import {
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 
-import type {
-  ExperimentMonitorCascade,
-  ExperimentWorkflowAuthoring,
-} from "../app/experiment.app.ts";
+import type { ExperimentWorkflowAuthoringService } from "./experiment-workflow-authoring.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 /** The workbench state the legacy wizard stored, as this service reads it. */
@@ -35,9 +33,9 @@ type LegacyWorkbenchState = Readonly<{
 export type ExperimentWorkflowLinkServiceOptions = {
   experiments: Pick<ExperimentService, "getById" | "findNextDraftName" | "save">;
   workflows: Pick<WorkflowApi, "getById">;
-  workflowAuthoring: Pick<ExperimentWorkflowAuthoring, "create" | "saveVersion">;
+  workflowAuthoring: Pick<ExperimentWorkflowAuthoringService, "create" | "saveVersion">;
   dataset: Pick<DatasetApi, "getByIds" | "renameDataset">;
-  monitors: Pick<ExperimentMonitorCascade, "upsertForExperiment">;
+  monitors: Pick<MonitorApi, "upsertForExperiment">;
   slugify(value: string): string;
 };
 
@@ -151,19 +149,17 @@ export class ExperimentWorkflowLinkService {
     return this.options.monitors.upsertForExperiment({
       projectId: input.projectId,
       experimentId: input.experimentId,
-      monitor: {
-        name: experiment.name ?? "Unknown",
-        checkType: evaluatorData.evaluator,
-        slug: experiment.slug,
-        preconditions: workbenchState.realTimeExecution?.preconditions ?? [],
-        parameters: Object.fromEntries(
-          (evaluatorData.parameters ?? []).map((param) => [param.identifier, param.value]),
-        ),
-        mappings: workbenchState.realTimeTraceMappings,
-        sample: workbenchState.realTimeExecution?.sample ?? 1,
-        enabled: true,
-        executionMode: "ON_MESSAGE",
-      },
+      name: experiment.name ?? "Unknown",
+      checkType: evaluatorData.evaluator,
+      slug: experiment.slug,
+      preconditions: workbenchState.realTimeExecution?.preconditions ?? [],
+      parameters: Object.fromEntries(
+        (evaluatorData.parameters ?? []).map((param) => [param.identifier, param.value]),
+      ),
+      mappings: workbenchState.realTimeTraceMappings,
+      sample: workbenchState.realTimeExecution?.sample ?? 1,
+      enabled: true,
+      executionMode: "ON_MESSAGE",
     });
   }
 

@@ -2,22 +2,19 @@ import { isAzureEvaluatorType } from "@langwatch/evaluation-contract";
 import type { AVAILABLE_EVALUATORS, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import type {
-  EvaluationAzureSafetyCredentials,
-  EvaluationInstallEnvironment,
-  EvaluationModelEnv,
-} from "../app/evaluation.members.ts";
+import type { AzureSafetyCredentialsService } from "./azure-safety-credentials.service.ts";
+import type { EvaluatorEnvironmentService } from "./evaluator-environment.service.ts";
 
 /** The environment one evaluator runs with: its own variables, then its model's and embeddings'. */
-export class EvaluatorModelEnvService implements EvaluationModelEnv {
+export class EvaluatorModelEnvService {
   readonly #modelProviders: Pick<ModelProviderApi, "prepareEvaluatorModelEnv">;
-  readonly #azureSafety: EvaluationAzureSafetyCredentials;
-  readonly #environment: EvaluationInstallEnvironment;
+  readonly #azureSafety: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
+  readonly #environment: Pick<EvaluatorEnvironmentService, "read">;
 
   private constructor(options: {
     modelProviders: Pick<ModelProviderApi, "prepareEvaluatorModelEnv">;
-    azureSafety: EvaluationAzureSafetyCredentials;
-    environment: EvaluationInstallEnvironment;
+    azureSafety: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
+    environment: Pick<EvaluatorEnvironmentService, "read">;
   }) {
     this.#modelProviders = options.modelProviders;
     this.#azureSafety = options.azureSafety;
@@ -26,8 +23,8 @@ export class EvaluatorModelEnvService implements EvaluationModelEnv {
 
   static create(options: {
     modelProviders: Pick<ModelProviderApi, "prepareEvaluatorModelEnv">;
-    azureSafety: EvaluationAzureSafetyCredentials;
-    environment: EvaluationInstallEnvironment;
+    azureSafety: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
+    environment: Pick<EvaluatorEnvironmentService, "read">;
   }): EvaluatorModelEnvService {
     return new EvaluatorModelEnvService(options);
   }

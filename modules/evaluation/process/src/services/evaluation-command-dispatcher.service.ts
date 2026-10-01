@@ -4,7 +4,6 @@ import type {
 } from "@langwatch/evaluation-contract";
 import type { EventingCommands, QueueSendOptions } from "@langwatch/eventing";
 
-import type { EvaluationReport } from "../app/evaluation.members.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import type { EvaluationProcessingPipeline } from "../eventing/evaluation-processing-definition.pipeline.ts";
 
@@ -16,7 +15,7 @@ const TRACE_EVALUATION_DEDUP_TTL_MS = 6 * 60 * 1000;
  * pipeline is registered. A process that hosts none refuses by name rather
  * than failing on an undefined sender.
  */
-export class EvaluationCommandDispatcherService implements EvaluationReport {
+export class EvaluationCommandDispatcherService {
   #commands: EventingCommands<EvaluationProcessingPipeline> | undefined;
 
   private constructor() {}

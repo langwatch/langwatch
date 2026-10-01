@@ -22,20 +22,20 @@ import {
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type {
-  EvaluationExecution,
-  EvaluationInputsResolution,
+  EvaluationRunRepository,
   EvaluationRetentionLookup,
-} from "../app/evaluation.members.ts";
-import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
+} from "../repositories/evaluation.repository.ts";
 import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository.ts";
+import type { EvaluationExecutionService } from "./evaluation-execution.service.ts";
+import type { EvaluationInputsOffloadService } from "./evaluation-inputs-offload.service.ts";
 import { MonitorPerformanceService } from "./monitor-performance.service.ts";
 
 export type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;
   monitorPerformance: MonitorPerformanceRepository;
   retention: EvaluationRetentionLookup;
-  execution: EvaluationExecution;
-  inputResolution: EvaluationInputsResolution;
+  execution: Pick<EvaluationExecutionService, "execute">;
+  inputResolution: Pick<EvaluationInputsOffloadService, "resolveInputs">;
   workflows: WorkflowApi;
 };
 

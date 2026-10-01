@@ -4,11 +4,8 @@ import type {
 } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  type EvaluationCostRecorder,
-  type EvaluationExecution,
-  type EvaluationExecutionReceipt,
-} from "../app/evaluation.members.ts";
+import type { EvaluationCostService } from "./evaluation-cost.service.ts";
+import type { EvaluationExecutionService } from "./evaluation-execution.service.ts";
 
 const logger = createLogger("langwatch:evaluation:execution-receipt");
 
@@ -16,17 +13,17 @@ const logger = createLogger("langwatch:evaluation:execution-receipt");
  * Runs the evaluator and writes its cost row, with the cost — and only the cost — protected
  * against a redelivery.
  */
-export class EvaluationExecutionReceiptService implements EvaluationExecutionReceipt {
+export class EvaluationExecutionReceiptService {
   static create(input: {
-    execution: EvaluationExecution;
-    costs: EvaluationCostRecorder;
+    execution: Pick<EvaluationExecutionService, "execute">;
+    costs: Pick<EvaluationCostService, "recordCost">;
   }): EvaluationExecutionReceiptService {
     return new EvaluationExecutionReceiptService(input.execution, input.costs);
   }
 
   private constructor(
-    private readonly execution: EvaluationExecution,
-    private readonly costs: EvaluationCostRecorder,
+    private readonly execution: Pick<EvaluationExecutionService, "execute">,
+    private readonly costs: Pick<EvaluationCostService, "recordCost">,
   ) {}
 
   async execute(input: {

@@ -10,13 +10,9 @@ import {
 } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  type EvaluationLangevals,
-  type EvaluationExecutionTelemetry,
-  type LangevalsEvaluateParams,
-} from "../app/evaluation.members.ts";
 import { type LangevalsChannel, PayloadTooLargeError } from "../channels/langevals.channel.ts";
 import { toLangevalsContexts } from "../rules/langevals-contexts.rules.ts";
+import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 
@@ -69,11 +65,11 @@ export type LangevalsRuntimeConfig = Readonly<{
 }>;
 
 /** Runs one installed evaluator over the langevals channel: retry, timeout and result mapping. */
-export class LangevalsEvaluatorService implements EvaluationLangevals {
+export class LangevalsEvaluatorService {
   static create(input: {
     config: LangevalsRuntimeConfig;
     langevals: LangevalsChannel;
-    telemetry?: EvaluationExecutionTelemetry;
+    telemetry?: Pick<EvaluationExecutionMetricsService, "record">;
   }): LangevalsEvaluatorService {
     return new LangevalsEvaluatorService(input.config, input.langevals, input.telemetry);
   }
@@ -81,7 +77,7 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
   private constructor(
     private readonly config: LangevalsRuntimeConfig,
     private readonly langevals: LangevalsChannel,
-    private readonly telemetry: EvaluationExecutionTelemetry | undefined,
+    private readonly telemetry: Pick<EvaluationExecutionMetricsService, "record"> | undefined,
   ) {}
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
@@ -188,3 +184,11 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
     return result;
   }
 }
+
+export type LangevalsEvaluateParams = Readonly<{
+  evaluatorType: string;
+  data: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  env: Record<string, string>;
+  idempotencyKey?: string;
+}>;

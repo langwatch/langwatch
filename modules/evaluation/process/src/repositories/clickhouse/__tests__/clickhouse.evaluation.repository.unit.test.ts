@@ -2,7 +2,7 @@ import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { SecurityError } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluationRetentionLookup } from "../../../app/evaluation.members.ts";
+import type { EvaluationRetentionLookup } from "../../evaluation.repository.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,

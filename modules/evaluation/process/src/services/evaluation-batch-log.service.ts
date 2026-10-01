@@ -18,8 +18,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { EvaluationReport } from "../app/evaluation.members.ts";
 import { gatedVerdictFields, normalizeTargets } from "../rules/evaluation-dispatch.rules.ts";
+import type { EvaluationCommandDispatcherService } from "./evaluation-command-dispatcher.service.ts";
 
 const logger = createLogger("langwatch:evaluation:batch-log");
 
@@ -93,7 +93,7 @@ export interface EvaluationExperimentRunWriter {
 export type EvaluationBatchLogDeps = Readonly<{
   experiments: EvaluationExperimentDirectory;
   runs: EvaluationExperimentRunWriter;
-  report: EvaluationReport;
+  report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
 }>;
 
 export class EvaluationBatchLogService {

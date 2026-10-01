@@ -47,18 +47,6 @@ import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type {
-  EvaluationCustomEvaluators,
-  EvaluationExecution,
-  EvaluationExecutionIntent,
-  EvaluationInputsResolution,
-  EvaluationInstallEnvironment,
-  EvaluationRetentionLookup,
-  EvaluationReport,
-  EvaluationRescore,
-  EvaluationRunAnalytics,
-  EvaluationWarmupProbe,
-} from "../app/evaluation.members.ts";
 import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
 import { NullLangevalsChannel } from "../channels/null.langevals.channel.ts";
 import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
@@ -70,6 +58,7 @@ import {
 } from "../eventing/evaluation-processing-definition.pipeline.ts";
 import { EvaluationProcessingStoresAdapter } from "../eventing/evaluation-processing-stores.pipeline.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
+import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
 import {
@@ -112,14 +101,14 @@ import { WorkflowEvaluationService } from "../services/workflow-evaluation.servi
 
 export type EvaluationInfrastructure = Readonly<{
   retention: EvaluationRetentionLookup;
-  execution: EvaluationExecution;
-  inputResolution: EvaluationInputsResolution;
-  environment: EvaluationInstallEnvironment;
+  execution: Pick<EvaluationExecutionService, "execute">;
+  inputResolution: Pick<EvaluationInputsOffloadService, "resolveInputs">;
+  environment: Pick<EvaluatorEnvironmentService, "read">;
   customEvaluators: EvaluationCustomEvaluators;
   rescore: EvaluationRescore;
   warmup: EvaluationWarmupProbe;
   analytics: EvaluationRunAnalytics;
-  report: EvaluationReport;
+  report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
   // What the public evaluation doors reach beyond the module: the experiment
   // an SDK batch is written into, the rows a slug names, the saved-evaluator
   // directory, the model cascade, the cost ledger and the evaluator runtime.
@@ -175,6 +164,32 @@ function createUnavailableEvaluationInfrastructure(processName: string): Evaluat
     },
     runner: { runEvaluation: async () => unavailable("evaluator runtime") },
   };
+}
+
+/** The project's own workflow-backed evaluators, each with its published version. */
+export interface EvaluationCustomEvaluators {
+  findAll(input: Readonly<{ projectId: string }>): Promise<CustomEvaluator[]>;
+}
+
+/** Scores one stored trace with one evaluator, read through the caller's protections. */
+export interface EvaluationRescore {
+  runForTrace(
+    input: RunTraceEvaluationInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<EvaluationRunOutcome>;
+}
+
+/**
+ * One liveness probe at the evaluator backend. A failed probe is not an error,
+ * only a probe that did not warm anything.
+ */
+export interface EvaluationWarmupProbe {
+  probe(input: Readonly<{ projectId: string }>): Promise<void>;
+}
+
+/** Product analytics for a completed run. */
+export interface EvaluationRunAnalytics {
+  evaluationRan(input: Readonly<{ userId: string; projectId: string }>): void;
 }
 
 /** The monitors and datasets an evaluate call addresses by slug. */
@@ -276,12 +291,12 @@ export class EvaluationApp implements EvaluationApiContract {
 
   readonly #service: EvaluationService;
   readonly #azureSafety: AzureSafetyCredentialsService;
-  readonly #environment: EvaluationInstallEnvironment;
+  readonly #environment: Pick<EvaluatorEnvironmentService, "read">;
   readonly #customEvaluators: EvaluationCustomEvaluators;
   readonly #rescore: EvaluationRescore;
   readonly #warmup: EvaluationWarmupProbe;
   readonly #analytics: EvaluationRunAnalytics;
-  readonly #report: EvaluationReport;
+  readonly #report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
   readonly #batchLog: EvaluationBatchLogService;
   readonly #autoslug: EvaluationNameAutoslugService;
   readonly #filterMatching: EvaluationFilterMatchingService;
@@ -294,7 +309,7 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #commands: EvaluationCommandDispatcherService | undefined;
   readonly #clustering: LangevalsClusteringService;
   readonly #piiDetection: LangevalsPiiDetectionService;
-  readonly #executionIntent: EvaluationExecutionIntent;
+  readonly #executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
   readonly #eventing: EvaluationProcessingStoresAdapter;
   readonly #lifecycle: EvaluationLifecycleService | undefined;
 
@@ -315,7 +330,7 @@ export class EvaluationApp implements EvaluationApiContract {
     commands: EvaluationCommandDispatcherService | undefined;
     clustering: LangevalsClusteringService;
     piiDetection: LangevalsPiiDetectionService;
-    executionIntent: EvaluationExecutionIntent;
+    executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
     eventing: EvaluationProcessingStoresAdapter;
     lifecycle: EvaluationLifecycleService | undefined;
   }) {
@@ -512,7 +527,7 @@ export class EvaluationApp implements EvaluationApiContract {
     lifecycle?: EvaluationLifecycleService;
     clustering: LangevalsClusteringService;
     piiDetection: LangevalsPiiDetectionService;
-    executionIntent: EvaluationExecutionIntent;
+    executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
     eventing: EvaluationProcessingStoresAdapter;
   }): EvaluationApp {
     const {

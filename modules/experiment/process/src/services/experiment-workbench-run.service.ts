@@ -31,7 +31,6 @@ import { deriveRunActor } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
-import type { ExperimentWorkbenchObserver } from "../app/experiment-workbench.members.ts";
 import type {
   ExperimentRunProgressState,
   ExperimentRunStartRecord,
@@ -45,6 +44,7 @@ import {
 } from "./experiment-execution-data.service.ts";
 import { ExperimentRunPlanService } from "./experiment-run-plan.service.ts";
 import { ExperimentSavedStateExecutionService } from "./experiment-saved-state-execution.service.ts";
+import type { ExperimentWorkbenchObserver } from "./experiment-workbench-observer.service.ts";
 import {
   ExperimentWorkbenchPipelineRunService,
   type PipelineRunStart,

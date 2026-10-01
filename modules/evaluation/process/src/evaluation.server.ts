@@ -1,26 +1,19 @@
 import { defineServerModule } from "@langwatch/kernel";
 
 import { EvaluationApp } from "./app/evaluation.app.ts";
-import type {
-  EvaluationAzureSafetyCredentials,
-  EvaluationCostRecorder,
-  EvaluationExecution,
-  EvaluationExecutionIntent,
-  EvaluationInputStorage,
-  EvaluationInputsOffload,
-  EvaluationRetentionLookup,
-  EvaluationSettingsRecovery,
-  ExecuteEvaluationCommandDeps,
-} from "./app/evaluation.members.ts";
 import { evaluationLifecycleEventing } from "./eventing/evaluation-lifecycle.pipeline.ts";
 import { evaluationProcessingEventing } from "./eventing/evaluation-processing.pipeline.ts";
 import type { EvaluationClickHouseResolver } from "./repositories/clickhouse/clickhouse.evaluation-session.store.ts";
 import { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "./repositories/clickhouse/monitor-performance.repository.ts";
+import type { EvaluationInputRepository } from "./repositories/evaluation-input.repository.ts";
 import { evaluationRepositories } from "./repositories/evaluation-repositories.registry.ts";
+import type { EvaluationRetentionLookup } from "./repositories/evaluation.repository.ts";
 import { PrismaEvaluationCostRepository } from "./repositories/prisma/prisma.evaluation-cost.repository.ts";
+import type { AzureSafetyCredentialsService } from "./services/azure-safety-credentials.service.ts";
 import { EvaluationCostService } from "./services/evaluation-cost.service.ts";
 import { EvaluationExecutionIntentService } from "./services/evaluation-execution-intent.service.ts";
+import type { ExecuteEvaluationCommandDeps } from "./services/evaluation-execution-intent.service.ts";
 import { EvaluationExecutionReceiptService } from "./services/evaluation-execution-receipt.service.ts";
 import {
   EvaluationExecutionService,
@@ -32,8 +25,10 @@ import {
   EVAL_INPUTS_PREVIEW_BYTES,
   EvaluationInputsOffloadService,
   type EvaluationInputOffloadConfig,
+  type EvaluationInputsOffload,
 } from "./services/evaluation-inputs-offload.service.ts";
 import { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
+import type { EvaluationSettingsRecoverySwitchService } from "./services/evaluation-settings-recovery-switch.service.ts";
 import { MonitorPerformanceService } from "./services/monitor-performance.service.ts";
 import { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 import { evaluationsLegacyRest } from "./transport/evaluations-legacy.rest.ts";
@@ -103,14 +98,14 @@ export function createEvaluationEngine(deps: EvaluationExecutionDeps): Evaluatio
 export function createEvaluationExecutionIntent(input: {
   monitors: ExecuteEvaluationCommandDeps["monitors"];
   traces: ExecuteEvaluationCommandDeps["traces"];
-  azureSafetyCredentials: EvaluationAzureSafetyCredentials;
-  settingsRecovery: EvaluationSettingsRecovery;
+  azureSafetyCredentials: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
+  settingsRecovery: Pick<EvaluationSettingsRecoverySwitchService, "isDisabled">;
   inputsOffload: EvaluationInputsOffload;
   /** The engine the receipt drives, adapted by the process to the command shape. */
-  execution: EvaluationExecution;
+  execution: Pick<EvaluationExecutionService, "execute">;
   /** Where the run is billed. */
-  costs: EvaluationCostRecorder;
-}): EvaluationExecutionIntent {
+  costs: Pick<EvaluationCostService, "recordCost">;
+}): Pick<EvaluationExecutionIntentService, "execute"> {
   return EvaluationExecutionIntentService.create({
     monitors: input.monitors,
     traces: input.traces,
@@ -129,7 +124,7 @@ export function createEvaluationExecutionIntent(input: {
  * two processes disagreeing on the ceiling would write markers the reader cannot resolve.
  */
 export function createEvaluationInputsOffload(input: {
-  storage: EvaluationInputStorage;
+  storage: EvaluationInputRepository;
   config?: EvaluationInputOffloadConfig;
 }): EvaluationInputsOffloadStore {
   return EvaluationInputsOffloadService.create({

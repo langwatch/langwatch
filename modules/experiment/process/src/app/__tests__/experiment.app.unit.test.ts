@@ -8,7 +8,8 @@ import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
  */
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experiment-contract";
+import type { Experiment } from "@langwatch/experiment-contract";
+import type { Monitor } from "@langwatch/monitor-contract";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -34,7 +35,7 @@ const experiment: Experiment = {
   workbenchVersion: 0,
 };
 
-const monitor: ExperimentPublishedMonitor = {
+const monitor: Monitor = {
   id: "monitor-1",
   projectId: "project-1",
   experimentId: "experiment-1",
@@ -162,7 +163,7 @@ function harness({
     })),
   };
   const runLookup = ExperimentFindOrCreateService.create(experimentService);
-  const permissions = { mayManageEvaluations: vi.fn(async () => true) };
+  const permissions = { hasPermission: vi.fn(async () => true) };
   const people = { namesOf: vi.fn(async () => []) };
   const modelCosts = { listFor: vi.fn(async () => []) };
   const broadcast = {

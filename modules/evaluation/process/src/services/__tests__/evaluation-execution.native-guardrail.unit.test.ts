@@ -9,11 +9,11 @@ import {
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
-import type { EvaluationLangevals } from "../../app/evaluation.members.ts";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "../evaluation-execution.service.ts";
+import type { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
 
 /**
  * Only executeNative and augmentResult are exercised by this dispatch path;
@@ -42,7 +42,7 @@ function unused(member: string) {
   };
 }
 
-function buildService(langevalsEvaluate: Mock<EvaluationLangevals["evaluate"]>) {
+function buildService(langevalsEvaluate: Mock<LangevalsEvaluatorService["evaluate"]>) {
   const { api: evaluators, executeNative } = createFakeEvaluatorApi();
   const deps: EvaluationExecutionDeps = {
     traces: {
@@ -69,7 +69,7 @@ describe("EvaluationExecutionService guardrail dispatch", () => {
   describe("given a guardrail call to a native evaluator with a leaked key", () => {
     /** @scenario The secrets evaluator runs in-process as a guardrail */
     it("responds with a failed evaluation without calling the analysis service", async () => {
-      const langevalsEvaluate = vi.fn<EvaluationLangevals["evaluate"]>();
+      const langevalsEvaluate = vi.fn<LangevalsEvaluatorService["evaluate"]>();
       const { service, executeNative } = buildService(langevalsEvaluate);
 
       const result = await service.executeForData({

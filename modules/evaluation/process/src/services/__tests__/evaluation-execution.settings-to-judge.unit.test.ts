@@ -4,11 +4,12 @@ import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
-import type { EvaluationLangevals, EvaluationModelEnv } from "../../app/evaluation.members.ts";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "../evaluation-execution.service.ts";
+import type { EvaluatorModelEnvService } from "../evaluator-model-env.service.ts";
+import type { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
 
 // A real, non-native builtin evaluator with no required fields, so the fixed
 // trace's default input/output pass straight through.
@@ -28,17 +29,17 @@ function buildTrace(overrides: Partial<Trace> = {}): Trace {
 
 function buildService(
   overrides: {
-    resolveForEvaluator?: Mock<EvaluationModelEnv["resolveForEvaluator"]>;
-    evaluate?: Mock<EvaluationLangevals["evaluate"]>;
+    resolveForEvaluator?: Mock<EvaluatorModelEnvService["resolveForEvaluator"]>;
+    evaluate?: Mock<LangevalsEvaluatorService["evaluate"]>;
   } = {},
 ) {
   const resolveForEvaluator =
     overrides.resolveForEvaluator ??
-    vi.fn<EvaluationModelEnv["resolveForEvaluator"]>().mockResolvedValue({});
+    vi.fn<EvaluatorModelEnvService["resolveForEvaluator"]>().mockResolvedValue({});
   const evaluate =
     overrides.evaluate ??
     vi
-      .fn<EvaluationLangevals["evaluate"]>()
+      .fn<LangevalsEvaluatorService["evaluate"]>()
       .mockResolvedValue({ status: "processed", score: 0.95, passed: true });
 
   const traces = {

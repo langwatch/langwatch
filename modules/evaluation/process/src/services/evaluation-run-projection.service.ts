@@ -8,9 +8,11 @@ import {
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
 
-import type { EvaluationRetentionLookup } from "../app/evaluation.members.ts";
 import { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
-import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
+import type {
+  EvaluationRunRepository,
+  EvaluationRetentionLookup,
+} from "../repositories/evaluation.repository.ts";
 
 /**
  * Run store without execution capability; mirrors {@link EvaluationService}

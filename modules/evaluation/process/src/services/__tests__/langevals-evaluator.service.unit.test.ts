@@ -5,11 +5,11 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { EvaluatorExecutionError } from "@langwatch/evaluation-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { LangevalsEvaluateParams } from "../../app/evaluation.members.ts";
 import { HttpLangevalsChannel } from "../../channels/http/http.langevals.channel.ts";
 import type { LangevalsPayloadStaging } from "../../channels/langevals.channel.ts";
 import { NullLangevalsChannel } from "../../channels/null.langevals.channel.ts";
 import { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
+import type { LangevalsEvaluateParams } from "../langevals-evaluator.service.ts";
 
 const ENDPOINT = "http://langevals.internal.langwatch.svc.cluster.local:5562";
 

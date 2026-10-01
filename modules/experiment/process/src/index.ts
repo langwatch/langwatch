@@ -22,15 +22,8 @@ export type {
   ClickhouseExperimentRunProcessingRepository,
   ExperimentRunProcessingPipeline,
 } from "./eventing/experiment-run-processing.pipeline.ts";
-export type {
-  ExperimentAppDependencies,
-  ExperimentModelCosts,
-  ExperimentBroadcast,
-  ExperimentMonitorCascade,
-  ExperimentPeople,
-  ExperimentPermissions,
-  ExperimentWorkflowAuthoring,
-} from "./app/experiment.app.ts";
+export type { ExperimentAppDependencies, ExperimentPeople } from "./app/experiment.app.ts";
+export type { ExperimentBroadcast } from "./channels/experiment-broadcast.channel.ts";
 export { experimentServer } from "./experiment.server.ts";
 export { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
@@ -75,7 +68,7 @@ export {
   type ExperimentV3RestApi,
   experimentWorkbenchCredential,
 } from "./transport/experiment-v3.rest.ts";
-export type { ExperimentWorkbenchObserver } from "./app/experiment-workbench.members.ts";
+export type { ExperimentWorkbenchObserver } from "./services/experiment-workbench-observer.service.ts";
 export { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 export type { ExperimentFindOrCreateInput } from "./services/experiment-find-or-create.service.ts";
 export { experimentInitRest, experimentInitCaller } from "./transport/experiment-init.rest.ts";

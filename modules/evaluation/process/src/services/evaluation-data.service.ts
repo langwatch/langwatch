@@ -22,9 +22,8 @@ import {
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
-import { type Trace } from "@langwatch/trace-contract";
+import type { Protections, Trace } from "@langwatch/trace-contract";
 
-import type { EvaluationTraceProtections } from "../app/evaluation.members.ts";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
@@ -36,7 +35,13 @@ import {
 import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
-const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
+/** The three redactions a trace read honours. */
+type ReadProtections = Pick<
+  Protections,
+  "canSeeCosts" | "canSeeCapturedInput" | "canSeeCapturedOutput"
+>;
+
+const INTERNAL_PROTECTIONS: ReadProtections = {
   canSeeCosts: true,
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
@@ -81,7 +86,7 @@ export class EvaluationDataService {
     isThreadLevel: boolean;
     projectId: string;
     /** The reader's redactions over the thread's other traces; full access when none is named. */
-    protections?: EvaluationTraceProtections;
+    protections?: ReadProtections;
     /** Tokens the AI-readable trace and thread sources are rendered under. */
     renderBudgetTokens: number;
   }): Promise<DataForEvaluation> {
@@ -185,7 +190,7 @@ export class EvaluationDataService {
     projectId: string;
     trace: Trace;
     mappings: MappingState;
-    protections: EvaluationTraceProtections;
+    protections: ReadProtections;
     maxTokens: number;
   }): Promise<Record<string, unknown>> {
     const threadId = trace.metadata?.thread_id;

@@ -1,3 +1,4 @@
+import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
   EvaluationInputsQuery,
   EvaluationRunData,
@@ -8,8 +9,6 @@ import type {
   TraceEvaluationData,
   TraceEvaluationsQuery,
 } from "@langwatch/evaluation-contract";
-
-import type { EvaluationRetentionLookup } from "../app/evaluation.members.ts";
 
 /** A run lookup with the tenant retention its unbounded fallback is floored at. */
 export type EvaluationRunFloorLookup = EvaluationRunLookup &
@@ -35,4 +34,10 @@ export abstract class EvaluationRunRepository {
     input: TraceEvaluationsQuery,
   ): Promise<Record<string, TraceEvaluationData[]>>;
   abstract findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
+}
+
+/** Each tenant's retention, which the ClickHouse run read floors its partition scan at. */
+export interface EvaluationRetentionLookup extends RetentionDaysProvider {
+  /** What the floor falls back to when the tenant's retention cannot be read. */
+  getPlatformDefaultRetentionDays(): number;
 }

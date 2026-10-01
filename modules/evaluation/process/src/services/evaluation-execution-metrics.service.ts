@@ -5,8 +5,6 @@ import {
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
 
-import type { EvaluationExecutionTelemetry } from "../app/evaluation.members.ts";
-
 /**
  * Two metric series pinned as literals (read by dashboards) with
  * evaluator_type label.
@@ -15,7 +13,7 @@ export const EVALUATION_DURATION_METRIC_NAME = "evaluation_duration_milliseconds
 export const EVALUATION_STATUS_METRIC_NAME = "evaluation_status_counter";
 
 /** Evaluation run duration and outcome over OTLP; meter resolved at declaration. */
-export class EvaluationExecutionMetricsService implements EvaluationExecutionTelemetry {
+export class EvaluationExecutionMetricsService {
   static create(): EvaluationExecutionMetricsService {
     return new EvaluationExecutionMetricsService(
       histogram({

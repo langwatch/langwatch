@@ -7,23 +7,6 @@ export { EvaluationNameAutoslugService } from "./services/evaluation-name-autosl
 export { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository.ts";
 export { EvaluationRunProjectionService } from "./services/evaluation-run-projection.service.ts";
 export type {
-  EvaluationExecution,
-  EvaluationExecutionIntent,
-  EvaluationCostRecorder,
-  EvaluationInputStorage,
-  EvaluationAzureSafetyCredentials,
-  EvaluationSettingsRecovery,
-  EvaluationInputsOffload,
-  EvaluationInputsResolution,
-  EvaluationRetentionLookup,
-  EvaluationLangevals,
-  EvaluationModelEnv,
-  EvaluationSpanDigest,
-  EvaluationWorkflowExecutor,
-  EvaluationTraceProtections,
-  LangevalsEvaluateParams,
-} from "./app/evaluation.members.ts";
-export type {
   EvaluationClickHouseResolver,
   EvaluationClickHouseClient,
 } from "./repositories/clickhouse/clickhouse.evaluation-session.store.ts";

@@ -14,7 +14,6 @@ import type { RunActor } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { ExperimentWorkbenchObserver } from "../app/experiment-workbench.members.ts";
 import type {
   ExperimentRunEventStream,
   ExperimentRunStreamMessage,
@@ -31,6 +30,7 @@ import type {
 } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "./experiment-run-command-dispatcher.service.ts";
+import type { ExperimentWorkbenchObserver } from "./experiment-workbench-observer.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
