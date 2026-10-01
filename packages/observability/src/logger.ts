@@ -56,24 +56,40 @@ const superjsonErrorSerializer = (error: unknown) => {
 const CREDENTIAL_COMMANDS = new Set(["auth", "hello"]);
 
 /**
- * The credential values among a command's arguments: every string argument of
- * AUTH (user and password), and those after the AUTH token of HELLO.
+ * The password among a command's arguments: the last argument of
+ * `AUTH [username] password`, and the one after the username in
+ * `HELLO protover AUTH username password`. A username is not a secret, and
+ * masking a common one such as `default` would blank unrelated text.
  */
 function credentialValues(name: string, args: unknown): string[] {
   if (!Array.isArray(args)) return [];
-  const strings = (list: unknown[]) =>
-    list.filter((a): a is string => typeof a === "string" && a.length > 0);
-  if (name === "auth") return strings(args);
-  const at = args.findIndex(
-    (a) => typeof a === "string" && a.toLowerCase() === "auth",
-  );
-  return at < 0 ? [] : strings(args.slice(at + 1));
+  let password: unknown;
+  if (name === "auth") {
+    password = args[args.length - 1];
+  } else {
+    const at = args.findIndex(
+      (a) => typeof a === "string" && a.toLowerCase() === "auth",
+    );
+    password = at < 0 ? undefined : args[at + 2];
+  }
+  return typeof password === "string" && password.length > 0 ? [password] : [];
 }
 
-/** Replaces every credential value in a text, such as an error message. */
+/**
+ * A server that does not know the command echoes its first arguments, cut at
+ * about 128 bytes and with CR/LF replaced, so an exact match on the password
+ * can miss a truncated or rewritten copy. The whole echoed list goes.
+ */
+const ECHOED_ARGUMENTS = /(with args beginning with:)[^\n]*/g;
+
+/** Replaces the password, and any echoed argument list, in a text. */
 function maskValues(text: unknown, values: string[]): unknown {
   if (typeof text !== "string") return text;
-  return values.reduce((out, value) => out.split(value).join("[redacted]"), text);
+  const masked = values.reduce(
+    (out, value) => out.split(value).join("[redacted]"),
+    text,
+  );
+  return masked.replace(ECHOED_ARGUMENTS, "$1 [redacted]");
 }
 
 /**

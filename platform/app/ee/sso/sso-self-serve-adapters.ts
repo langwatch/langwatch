@@ -56,7 +56,7 @@ const logger = createLogger("langwatch:identity:sso-self-serve");
 /**
  * What the installation's licence may authorize (D05 tier 2).
  *
- * The answer is ADR-027's gate, unchanged and for the same reason: it is
+ * The answer is ADR-027's gate (as amended in v9), for the same reason: it is
  * memoized per process, and a licence activated while the installation is
  * running reaches it within the gate's deny TTL.
  * Reusing the gate rather than reading a licence here is deliberate — two

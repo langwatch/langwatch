@@ -61546,7 +61546,7 @@ Connect talks to two hosts, split by what the data is, so a network rule can all
 
 | Host | What travels | Who sends it |
 |---|---|---|
-| `connect.langwatch.ai` | Metadata only: the signed license key, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
+| `connect.langwatch.ai` | Metadata only: a license token derived from the signed license key, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
 | `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
 
 The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
@@ -61559,7 +61559,7 @@ Each service states what it sends before you switch it on. Your traces, datasets
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
 | Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
-| License sync, on a license naming a hosted service | The signed license key, the instance id, the app version, and two counts: members and lite members. No organization name. |
+| License sync, on a license naming a hosted service | A license token derived from the signed license key (a hash, not the key), the instance id, the app version, and two counts: members and lite members. No organization name. |
 
 ## Activate with a code
 
@@ -61646,7 +61646,7 @@ Switching a service on or off takes effect within a minute, with no restart.
 
 ## What does the license sync send
 
-Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its signed license key, its instance id, the app version it runs, and two seat counts, members and lite members.
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: a license token derived from its signed license key (a hash, not the key itself), its instance id, the app version it runs, and two seat counts, members and lite members.
 
 LangWatch answers with the current license for this install, signed by the same key pair that signed the one you activated. A renewed or changed license reaches the install this way, and the install applies it through the same validation a pasted key gets.
 
@@ -61746,7 +61746,7 @@ You can read the exact report your install sends on **Settings, Checkup**, copy 
 | Channel | Who sends it | Where it goes | What it carries | How to stop it |
 |---|---|---|---|---|
 | Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
-| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | The signed license key, the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
+| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | A license token derived from the signed license key (a hash, not the key), the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
 
 The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that. Keeping them apart is what lets both sentences stay true.
 
@@ -63068,7 +63068,7 @@ Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metr
 | Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
 | WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
 
-Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. The chart sets both buffering annotations to off so a controller-wide setting cannot change them. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
+Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. On the gateway Ingress the chart sets both buffering annotations to off so a controller-wide setting cannot change them. The app Ingress keeps the controller defaults. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
 
 ## Chart Ingress
 
@@ -64519,7 +64519,7 @@ Plan entitlements apply immediately. SSO turns on at once on the server that sto
 
 ## An activation code in the variable
 
-When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
+When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code and an organization exists, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
 
 - If an organization already holds a license, the code is not redeemed again, so a restart is a no-op. To change the license later, use **Settings → License** or put the signed license key in the variable.
 - On a fresh install with no organization yet, the code is redeemed when the first organization is created, and SSO turns on without a restart.

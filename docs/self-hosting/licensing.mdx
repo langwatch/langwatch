@@ -127,7 +127,7 @@ Plan entitlements apply immediately. SSO turns on at once on the server that sto
 
 ## An activation code in the variable
 
-When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
+When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code and an organization exists, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
 
 - If an organization already holds a license, the code is not redeemed again, so a restart is a no-op. To change the license later, use **Settings → License** or put the signed license key in the variable.
 - On a fresh install with no organization yet, the code is redeemed when the first organization is created, and SSO turns on without a restart.

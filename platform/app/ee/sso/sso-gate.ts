@@ -73,21 +73,30 @@ export const DENIED_GATE_TTL_MS = 60_000;
 let memoizedGate: Promise<boolean> | null = null;
 /** When the memo resolved to a deny; null while pending or once allowed. */
 let deniedAt: number | null = null;
+/** Set once the memo resolved to an allow, which is kept for the process. */
+let allowedForProcess = false;
 /** The email-mode warning is logged once per process, not once per re-read. */
 let warnedEmailMode = false;
 
 /**
- * Forgets the gate's answer, so the next request decides again. Called by the
- * process that just stored a license, which then sees SSO on at once instead
- * of after {@link DENIED_GATE_TTL_MS}.
+ * Forgets a deny or a pending read, so the next request decides again. Called
+ * by the process that just stored a license, which then sees SSO on at once
+ * instead of after {@link DENIED_GATE_TTL_MS}. An allow is kept: re-reading it
+ * could only turn into a deny during a licensing-store outage.
  */
 export function invalidateSsoGate(): void {
+  if (allowedForProcess) return;
+  forgetGate();
+}
+
+function forgetGate(): void {
   memoizedGate = null;
   deniedAt = null;
 }
 
 export function __resetSsoGateForTests(): void {
-  invalidateSsoGate();
+  forgetGate();
+  allowedForProcess = false;
   warnedEmailMode = false;
   repositoryOverride = null;
 }
@@ -242,7 +251,10 @@ function startGateComputation(): Promise<boolean> {
     .then((allowed) => {
       // Only this computation may stamp the deny: an invalidation that
       // landed while it was in flight has already replaced the memo.
-      if (memoizedGate === pending) deniedAt = allowed ? null : Date.now();
+      if (memoizedGate === pending) {
+        deniedAt = allowed ? null : Date.now();
+        allowedForProcess = allowed;
+      }
       if (!allowed) warnEmailModeOnce();
       return allowed;
     })

@@ -17,7 +17,8 @@ import {
  * `NEXTAUTH_PROVIDER` the provider set was fixed at boot and the `before` hook
  * was the only point that saw the legacy `/callback/auth0|okta` rewrite. Under
  * the router, *which methods exist at all* is policy, and this is where it
- * lives. Every semantic ADR-027 decided carries over unchanged:
+ * lives. Every ADR-027 semantic carries over, with the gate memo as amended
+ * in ADR-027 v9:
  *
  *   - the gate is still `platformSSOAllowed()`, still THE one gate module,
  *     still memoized per process. Policy is evaluated per request over the

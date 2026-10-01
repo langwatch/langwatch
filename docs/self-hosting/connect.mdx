@@ -21,7 +21,7 @@ Connect talks to two hosts, split by what the data is, so a network rule can all
 
 | Host | What travels | Who sends it |
 |---|---|---|
-| `connect.langwatch.ai` | Metadata only: the signed license key, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
+| `connect.langwatch.ai` | Metadata only: a license token derived from the signed license key, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
 | `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
 
 The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
@@ -34,7 +34,7 @@ Each service states what it sends before you switch it on. Your traces, datasets
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
 | Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
-| License sync, on a license naming a hosted service | The signed license key, the instance id, the app version, and two counts: members and lite members. No organization name. |
+| License sync, on a license naming a hosted service | A license token derived from the signed license key (a hash, not the key), the instance id, the app version, and two counts: members and lite members. No organization name. |
 
 ## Activate with a code
 
@@ -121,7 +121,7 @@ Switching a service on or off takes effect within a minute, with no restart.
 
 ## What does the license sync send
 
-Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its signed license key, its instance id, the app version it runs, and two seat counts, members and lite members.
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: a license token derived from its signed license key (a hash, not the key itself), its instance id, the app version it runs, and two seat counts, members and lite members.
 
 LangWatch answers with the current license for this install, signed by the same key pair that signed the one you activated. A renewed or changed license reaches the install this way, and the install applies it through the same validation a pasted key gets.
 

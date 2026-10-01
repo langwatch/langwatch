@@ -252,6 +252,41 @@ describe("RedisConnectionService", () => {
       expect(error.stack).not.toContain("s3cret-redis-password");
     });
 
+
+    it("removes a truncated echo of a long password", () => {
+      const connection = new RedisConnectionService().connect({
+        url: "redis://localhost:6379",
+      }) as unknown as FakeConnection;
+      const password = `p${"x".repeat(200)}`;
+      const error = Object.assign(
+        new Error(
+          `ERR unknown command 'AUTH', with args beginning with: 'default' '${password.slice(0, 110)}' `,
+        ),
+        { command: { name: "auth", args: ["default", password] } },
+      );
+      connection.on("error", () => {});
+
+      connection.emit("error", error);
+
+      expect(error.message).toBe(
+        "ERR unknown command 'AUTH', with args beginning with: [redacted]",
+      );
+      expect(error.stack).not.toContain("x".repeat(20));
+    });
+
+    it("keeps the username elsewhere in the message", () => {
+      const connection = new RedisConnectionService().connect({
+        url: "redis://localhost:6379",
+      }) as unknown as FakeConnection;
+      const error = Object.assign(new Error("WRONGPASS for the default user"), {
+        command: { name: "auth", args: ["default", "s3cret-redis-password"] },
+      });
+      connection.on("error", () => {});
+
+      connection.emit("error", error);
+
+      expect(error.message).toBe("WRONGPASS for the default user");
+    });
     it("redacts node errors on a cluster", () => {
       const connection = new RedisConnectionService().connect({
         clusterEndpoints: "one:6379",

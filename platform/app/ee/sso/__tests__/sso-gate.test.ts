@@ -366,6 +366,22 @@ describe("platformSSOAllowed", () => {
       expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(2);
     });
 
+    /** @scenario An allow is kept and a deny is not re-read on every request */
+    it("keeps an allow through an invalidation, so a store outage cannot turn it off", async () => {
+      licenseVerifies();
+      const findOrganizationsWithLicense = vi
+        .fn()
+        .mockResolvedValueOnce([{ id: "org_1", license: "encoded" }])
+        .mockRejectedValue(new Error("store down"));
+      __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
+
+      expect(await platformSSOAllowed()).toBe(true);
+      invalidateSsoGate();
+
+      expect(await platformSSOAllowed()).toBe(true);
+      expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(1);
+    });
+
     /** @scenario Another replica picks up an activation within a minute */
     it("re-reads the store once the deny is older than its TTL, with no restart", async () => {
       vi.useFakeTimers({ toFake: ["Date"] });

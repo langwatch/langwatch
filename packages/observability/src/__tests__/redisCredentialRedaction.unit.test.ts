@@ -89,6 +89,42 @@ describe("Redis credentials in logged errors", () => {
     });
   });
 
+  describe("when the echoed arguments are cut short or rewritten", () => {
+    it("removes the whole echoed list, so a partial password does not survive", () => {
+      const password = `p${"x".repeat(200)}\r\nend`;
+      const error = Object.assign(
+        new Error(
+          `ERR unknown command 'AUTH', with args beginning with: 'default' '${"p".concat("x".repeat(110))}' `,
+        ),
+        { command: { name: "auth", args: ["default", password] } },
+      );
+      const [line] = captureLines((logger) =>
+        logger.error({ error }, "redis error"),
+      );
+
+      expect(line).not.toContain("x".repeat(20));
+      expect(JSON.parse(line ?? "{}").error.message).toBe(
+        "ERR unknown command 'AUTH', with args beginning with: [redacted]",
+      );
+    });
+  });
+
+  describe("when the AUTH username is a common word", () => {
+    it("masks only the password, not the username elsewhere in the text", () => {
+      const error = Object.assign(
+        new Error("WRONGPASS for the default user"),
+        { command: { name: "auth", args: ["default", "s3cret-redis-password"] } },
+      );
+      const [line] = captureLines((logger) =>
+        logger.error({ error }, "redis error"),
+      );
+
+      expect(JSON.parse(line ?? "{}").error.message).toBe(
+        "WRONGPASS for the default user",
+      );
+    });
+  });
+
   describe("when HELLO carries AUTH", () => {
     it("redacts every argument", () => {
       const error = Object.assign(new Error("WRONGPASS"), {

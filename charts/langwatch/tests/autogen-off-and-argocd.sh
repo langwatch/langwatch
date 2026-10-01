@@ -11,7 +11,8 @@
 #   - remapped key names reach every consumer of the app Secret;
 #   - the LangWatchQL render Job is named by its spec, not by the revision;
 #   - missing LangWatchQL passwords never leave ClickHouse waiting;
-#   - every StatefulSet claim template names its apiVersion and kind.
+#   - every StatefulSet claim template names its apiVersion and kind;
+#   - the chart Secrets the render Job reads sync before it.
 #
 # Each test that binds to a feature scenario carries a "# @scenario \"...\"" line.
 #
@@ -331,12 +332,41 @@ test_claim_templates_name_api_version_and_kind() {
   fi
 }
 
+# @scenario "the Secrets the render Job reads sync before it under Argo CD"
+test_job_inputs_sync_before_the_job() {
+  # The chart Secrets only render with autogen on.
+  if ! render waves --set autogen.enabled=true; then
+    fail "secret waves" "the default render failed: $(cat "$tmp/waves.err")"
+    return
+  fi
+  local source doc
+  for source in \
+    langwatch/templates/app/secrets.yaml \
+    langwatch/templates/clickhouse/url-secret.yaml \
+    langwatch/templates/postgresql/secret.yaml \
+    langwatch/templates/redis/secret.yaml; do
+    doc=$(awk -v src="# Source: $source" '
+      /^---/ { insrc = 0; next }
+      $0 == src { insrc = 1 }
+      insrc { print }
+    ' "$tmp/waves.yaml")
+    if [[ -z "$doc" ]]; then
+      fail "secret waves" "$source rendered nothing with autogen on"
+    elif grep -q 'argocd.argoproj.io/sync-wave: "-2"' <<<"$doc"; then
+      ok "secret waves" "$source syncs in Argo CD wave -2, before the render Job"
+    else
+      fail "secret waves" "$source has no Argo CD wave -2, so the render Job (wave -1) can run before the Secret it reads"
+    fi
+  done
+}
+
 test_autogen_off_render_is_stable
 test_db_passwords_need_a_secret
 test_key_names_are_remappable
 test_render_job_is_named_by_spec
 test_missing_lwql_passwords_do_not_block_clickhouse
 test_claim_templates_name_api_version_and_kind
+test_job_inputs_sync_before_the_job
 
 if [[ "$failures" -gt 0 ]]; then
   echo "$failures failure(s)"
