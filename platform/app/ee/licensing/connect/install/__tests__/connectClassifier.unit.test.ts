@@ -55,7 +55,7 @@ const ANSWER = {
 };
 
 interface Row {
-  connectServicesEnabled: string[];
+  connectServicesDisabled: string[];
   license: string | null;
 }
 
@@ -70,7 +70,7 @@ function prismaWith(row: Row) {
       },
       organization: {
         findUnique: vi.fn(async () => ({
-          connectServicesEnabled: row.connectServicesEnabled,
+          connectServicesDisabled: row.connectServicesDisabled,
           license: row.license,
         })),
       },
@@ -124,7 +124,7 @@ describe("given an organization whose license names no hosted judging", () => {
     /** @scenario "An install with the service off publishes eval functions as unavailable" */
     it("skips the judgement and sends nothing", async () => {
       const { classifier, call } = classifierOver({
-        row: { connectServicesEnabled: [], license: OFFLINE_LICENSE_KEY },
+        row: { connectServicesDisabled: [], license: OFFLINE_LICENSE_KEY },
         clock: { now: 0 },
       });
 
@@ -139,7 +139,7 @@ describe("given an organization whose license names no hosted judging", () => {
 
     it("publishes the eval functions as unavailable for that organization", async () => {
       const { classifier } = classifierOver({
-        row: { connectServicesEnabled: [], license: OFFLINE_LICENSE_KEY },
+        row: { connectServicesDisabled: [], license: OFFLINE_LICENSE_KEY },
         clock: { now: 0 },
       });
 
@@ -155,7 +155,7 @@ describe("given an organization with no license at all", () => {
     /** @scenario "An install without a license cannot use Connect" */
     it("skips the judgement and sends nothing", async () => {
       const { classifier, call } = classifierOver({
-        row: { connectServicesEnabled: [], license: null },
+        row: { connectServicesDisabled: [], license: null },
         clock: { now: 0 },
       });
 
@@ -163,26 +163,6 @@ describe("given an organization with no license at all", () => {
         skippedReason: "classifier_not_configured",
       });
       expect(call).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe("given an organization whose license names hosted judging that nobody switched on", () => {
-  describe("when an eval function runs", () => {
-    /** @scenario "An entitled service is off until an admin switches it on" */
-    it("skips the judgement and sends nothing", async () => {
-      const { classifier, call } = classifierOver({
-        row: { connectServicesEnabled: [], license: LICENSE_KEY },
-        clock: { now: 0 },
-      });
-
-      await expect(judge(classifier)).resolves.toMatchObject({
-        skippedReason: "classifier_not_configured",
-      });
-      expect(call).not.toHaveBeenCalled();
-      await expect(
-        classifier.isAvailableForOrganization(ORGANIZATION),
-      ).resolves.toBe(false);
     });
   });
 });
@@ -192,10 +172,7 @@ describe("given an organization whose license names hosted judging", () => {
     /** @scenario "An install with the service on judges through the hosted service" */
     it("judges through the hosted service and returns the usual shape", async () => {
       const { classifier, call } = classifierOver({
-        row: {
-          connectServicesEnabled: ["instant_evals"],
-          license: LICENSE_KEY,
-        },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
         clock: { now: 0 },
       });
 
@@ -217,10 +194,7 @@ describe("given an organization whose license names hosted judging", () => {
 
     it("carries a skip the host reported back as this side's own reason", async () => {
       const { classifier } = classifierOver({
-        row: {
-          connectServicesEnabled: ["instant_evals"],
-          license: LICENSE_KEY,
-        },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
         clock: { now: 0 },
         classify: vi.fn(async () => ({
           verdicts: [],
@@ -240,10 +214,7 @@ describe("given an organization whose license names hosted judging", () => {
     it("reads the organization once for a run of many judgements", async () => {
       const clock = { now: 0 };
       const { classifier, store } = classifierOver({
-        row: {
-          connectServicesEnabled: ["instant_evals"],
-          license: LICENSE_KEY,
-        },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
         clock,
       });
 
@@ -259,13 +230,13 @@ describe("given an organization whose license names hosted judging", () => {
   });
 });
 
-describe("given an administrator who switches the service on while the process runs", () => {
+describe("given an administrator who switches the service back on while the process runs", () => {
   describe("when the next eval function runs", () => {
     /** @scenario "Switching the service on takes effect without a restart" */
     it("judges through the hosted service without a restart", async () => {
       const clock = { now: 0 };
       const row: Row = {
-        connectServicesEnabled: [],
+        connectServicesDisabled: ["instant_evals"],
         license: LICENSE_KEY,
       };
       const { classifier, call } = classifierOver({ row, clock });
@@ -274,7 +245,7 @@ describe("given an administrator who switches the service on while the process r
         skippedReason: "classifier_not_configured",
       });
 
-      row.connectServicesEnabled = ["instant_evals"];
+      row.connectServicesDisabled = [];
       clock.now += STATE_TTL_MS;
 
       await expect(judge(classifier)).resolves.toMatchObject({

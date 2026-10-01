@@ -76,7 +76,7 @@ const USAGE: ConnectUsage = {
 };
 
 interface Row {
-  connectServicesEnabled: string[];
+  connectServicesDisabled: string[];
   license: string | null;
   connectLastSyncAt?: Date | null;
   connectLastSyncError?: string | null;
@@ -89,7 +89,7 @@ function storeWith(row: Row) {
     client: {
       organization: {
         findUnique: vi.fn(async () => ({
-          connectServicesEnabled: row.connectServicesEnabled,
+          connectServicesDisabled: row.connectServicesDisabled,
           license: row.license,
           connectLastSyncAt: row.connectLastSyncAt ?? null,
           connectLastSyncError: row.connectLastSyncError ?? null,
@@ -153,7 +153,7 @@ describe("given a deployment with Connect switched off", () => {
     it("says Connect is off for this deployment, and calls nothing", async () => {
       const client = fakeClient();
       const { service } = serviceOver({
-        row: { connectServicesEnabled: [], license: LICENSE_KEY },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
         client,
         config: CONFIG_OFF,
       });
@@ -166,7 +166,7 @@ describe("given a deployment with Connect switched off", () => {
 
     it("refuses a change that could not take effect", async () => {
       const { service, store } = serviceOver({
-        row: { connectServicesEnabled: [], license: LICENSE_KEY },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
         config: CONFIG_OFF,
       });
 
@@ -188,7 +188,7 @@ describe("given an organization with no license", () => {
     it("reports the deployment as on and the organization as unlicensed", async () => {
       const client = fakeClient();
       const { service } = serviceOver({
-        row: { connectServicesEnabled: [], license: null },
+        row: { connectServicesDisabled: [], license: null },
         client,
       });
 
@@ -204,38 +204,12 @@ describe("given an organization with no license", () => {
   });
 });
 
-describe("given a licensed organization that has switched nothing on", () => {
-  describe("when an admin reads the Connect settings", () => {
-    /** @scenario "Settings, Connect for an organization with nothing switched on calls nothing" */
-    it("lists what the license names as switchable, and sends nothing to the gateway", async () => {
-      const client = fakeClient();
-      const { service } = serviceOver({
-        row: { connectServicesEnabled: [], license: LICENSE_KEY },
-        client,
-      });
-
-      await expect(service.status(ORGANIZATION)).resolves.toMatchObject({
-        deployment: "on",
-        licensed: true,
-        enabledServices: [],
-        entitledServices: ["instant_evals", "managed_models"],
-        usage: null,
-        refusal: null,
-      });
-      expect(client.usage).not.toHaveBeenCalled();
-    });
-  });
-});
-
 describe("given a licensed organization the host answers for", () => {
   describe("when an admin reads the Connect settings", () => {
     /** @scenario "Spend the hosted usage route reports is read into the settings" */
     it("reports the spend, the cap, the remaining credit and what the license includes", async () => {
       const { service } = serviceOver({
-        row: {
-          connectServicesEnabled: ["instant_evals", "managed_models"],
-          license: LICENSE_KEY,
-        },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
       });
 
       const status = await service.status(ORGANIZATION);
@@ -254,12 +228,12 @@ describe("given a licensed organization the host answers for", () => {
     });
   });
 
-  describe("when an admin switches a service on", () => {
+  describe("when an admin switches a service back on", () => {
     /** @scenario "Switching a service on leaves an audit record" */
-    it("records the opt-in, and the mutation is one the audit trail records", async () => {
+    it("clears the refusal, and the mutation is one the audit trail records", async () => {
       const { service, store } = serviceOver({
         row: {
-          connectServicesEnabled: ["managed_models"],
+          connectServicesDisabled: ["instant_evals"],
           license: LICENSE_KEY,
         },
       });
@@ -275,21 +249,19 @@ describe("given a licensed organization the host answers for", () => {
       });
       expect(store.update).toHaveBeenCalledWith({
         where: { id: ORGANIZATION },
-        data: { connectServicesEnabled: ["managed_models", "instant_evals"] },
+        data: { connectServicesDisabled: [] },
       });
       expect(isAuditLogExempt("connect.setService")).toBe(false);
     });
   });
 
   describe("when an admin switches a service off", () => {
-    it("leaves every other service switched on, and asks the gateway nothing", async () => {
-      const client = fakeClient();
+    it("leaves every other service the license names", async () => {
       const { service, store } = serviceOver({
         row: {
-          connectServicesEnabled: ["instant_evals", "managed_models"],
+          connectServicesDisabled: [],
           license: LICENSE_KEY,
         },
-        client,
       });
 
       await expect(
@@ -301,9 +273,8 @@ describe("given a licensed organization the host answers for", () => {
       ).resolves.toEqual({ enabledServices: ["managed_models"] });
       expect(store.update).toHaveBeenCalledWith({
         where: { id: ORGANIZATION },
-        data: { connectServicesEnabled: ["managed_models"] },
+        data: { connectServicesDisabled: ["instant_evals"] },
       });
-      expect(client.usage).not.toHaveBeenCalled();
     });
   });
 
@@ -315,7 +286,7 @@ describe("given a licensed organization the host answers for", () => {
         maximumCapUsd: 1500,
       }));
       const { service } = serviceOver({
-        row: { connectServicesEnabled: [], license: LICENSE_KEY },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
         client: fakeClient({ setBudget }),
       });
 
@@ -334,7 +305,7 @@ describe("given a license that does not include the service", () => {
     /** @scenario "A service the license is not entitled to cannot be switched on" */
     it("is refused, and the service stays switched off", async () => {
       const { service, store } = serviceOver({
-        row: { connectServicesEnabled: [], license: LICENSE_KEY },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
         client: fakeClient({
           usage: vi.fn(async () => ({ ...USAGE, services: [] })),
         }),
@@ -360,7 +331,7 @@ describe("given an install whose license syncs", () => {
     it("reports when it succeeded and no failure", async () => {
       const { service } = serviceOver({
         row: {
-          connectServicesEnabled: [],
+          connectServicesDisabled: [],
           license: LICENSE_KEY,
           connectLastSyncAt: SYNCED_AT,
         },
@@ -378,7 +349,7 @@ describe("given an install whose license syncs", () => {
     it("reports the failure beside the last success from the first failure", async () => {
       const { service } = serviceOver({
         row: {
-          connectServicesEnabled: [],
+          connectServicesDisabled: [],
           license: LICENSE_KEY,
           connectLastSyncAt: SYNCED_AT,
           connectLastSyncError: "connect_unreachable",
@@ -398,10 +369,7 @@ describe("given a host that refuses the read", () => {
     /** @scenario "An unregistered license surfaces as a named error" */
     it("carries the refusal back as data rather than failing the read", async () => {
       const { service } = serviceOver({
-        row: {
-          connectServicesEnabled: ["instant_evals"],
-          license: LICENSE_KEY,
-        },
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
         client: fakeClient({
           usage: vi.fn(async () => {
             throw new ConnectUnreachableError({

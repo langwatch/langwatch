@@ -1,7 +1,7 @@
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
-import { appOfflineEnv } from "./offline-defaults.ts";
+import { appOfflineEnv, FORCED_ENV } from "./offline-defaults.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
@@ -42,6 +42,7 @@ export async function startLangwatchWorkers(
         ...appOfflineEnv(ctx.paths),
         ...process.env,
         ...envFromFile,
+        ...FORCED_ENV,
         // ctx.paths.bin first so the bundled pnpm is reachable to nested
         // invocations; matches startLangwatch.
         PATH: `${ctx.paths.bin}:${process.env.PATH ?? ""}`,

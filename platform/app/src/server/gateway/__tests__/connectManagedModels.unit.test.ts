@@ -2,7 +2,7 @@
  * Managed models on the install's side and on LangWatch Cloud's.
  *
  * The install: the LangWatch provider slot is added only where the license
- * names managed models and an administrator switched it on, and the license
+ * names managed models and no administrator switched it off, and the license
  * token reaches it without ever being written to a provider row.
  *
  * LangWatch Cloud: the chain a license's managed key dispatches to is the
@@ -23,7 +23,8 @@ const credential = vi.hoisted(() => ({
   current: null as ConnectCredential | null,
 }));
 /**
- * What the organization's license names that an administrator switched on. Stood in for here: how that answer is reached has its own suite, and
+ * What the organization's license names, less what an administrator switched
+ * off. Stood in for here: how that answer is reached has its own suite, and
  * what this one pins is which answer builds a provider slot.
  */
 const enabledServices = vi.hoisted(() => ({ current: [] as string[] }));
@@ -66,7 +67,7 @@ describe("the LangWatch provider slot an install adds", () => {
     };
   });
 
-  describe("given a license naming managed models that an administrator switched on", () => {
+  describe("given a license naming managed models that nobody switched off", () => {
     /** @scenario The install adds the LangWatch provider only when Connect and the service are on */
     it("carries the license token, the instance id and the gateway endpoint", async () => {
       const slot = await connectLangWatchProviderSlot({

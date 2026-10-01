@@ -161,7 +161,6 @@ describe("outbound defaults in the service env", () => {
 		/** @scenario A value in the user's .env overrides a default */
 		it("passes the user's value through", async () => {
 			const userEnv = {
-				CHECKPOINT_DISABLE: "0",
 				TIKTOKENS_PATH: "/srv/tiktoken",
 				RAGAS_DO_NOT_TRACK: "false",
 			};
@@ -170,11 +169,23 @@ describe("outbound defaults in the service env", () => {
 			await startLangevals(ctx(), bus, userEnv);
 			await runMigrations(ctx(), bus, userEnv);
 
-			expect(spawnedEnvs.langwatch?.CHECKPOINT_DISABLE).toBe("0");
 			expect(spawnedEnvs.langwatch?.TIKTOKENS_PATH).toBe("/srv/tiktoken");
 			expect(spawnedEnvs.workers?.TIKTOKENS_PATH).toBe("/srv/tiktoken");
 			expect(spawnedEnvs.langevals?.RAGAS_DO_NOT_TRACK).toBe("false");
-			expect(execCalls[0]?.env?.CHECKPOINT_DISABLE).toBe("0");
+		});
+
+		/** @scenario Prisma's version check stays off whatever the user's .env says */
+		it("keeps Prisma's version check off", async () => {
+			const userEnv = { CHECKPOINT_DISABLE: "0" };
+			await startLangwatch(ctx(), bus, userEnv);
+			await startLangwatchWorkers(ctx(), bus, userEnv);
+			await runMigrations(ctx(), bus, userEnv);
+
+			expect(spawnedEnvs.langwatch?.CHECKPOINT_DISABLE).toBe("1");
+			expect(spawnedEnvs.workers?.CHECKPOINT_DISABLE).toBe("1");
+			for (const call of execCalls) {
+				expect(call.env?.CHECKPOINT_DISABLE).toBe("1");
+			}
 		});
 	});
 });

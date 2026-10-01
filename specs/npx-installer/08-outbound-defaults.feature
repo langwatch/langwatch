@@ -9,6 +9,12 @@ Feature: An npx install makes no outbound calls beyond license sync and usage re
     Then the process env carries "CHECKPOINT_DISABLE=1"
 
   @unit
+  Scenario: Prisma's version check stays off whatever the user's .env says
+    Given the user's .env sets CHECKPOINT_DISABLE to "0"
+    When the launcher starts the app, the workers or the migrations
+    Then the process env carries "CHECKPOINT_DISABLE=1"
+
+  @unit
   Scenario: The app and the workers read tokenizer files from disk
     When the launcher starts the app or the workers
     Then the process env points TIKTOKENS_PATH at the launcher's tokenizer cache
@@ -22,7 +28,7 @@ Feature: An npx install makes no outbound calls beyond license sync and usage re
 
   @unit
   Scenario: A value in the user's .env overrides a default
-    Given the user's .env sets CHECKPOINT_DISABLE, TIKTOKENS_PATH or RAGAS_DO_NOT_TRACK
+    Given the user's .env sets TIKTOKENS_PATH or RAGAS_DO_NOT_TRACK
     When the launcher starts the service
     Then the process env carries the user's value
 

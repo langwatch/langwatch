@@ -1,6 +1,6 @@
-Feature: A self-hosted install makes no outbound call it was not asked to make
+Feature: A self-hosted install makes no third-party call it was not asked to make
   As the operator of a self-hosted install under a security review
-  I want every call to a third party or to LangWatch beyond the license sync and the usage report to be off by default
+  I want the third-party calls libraries inside the images would make to be off by default
   So that the egress list a reviewer reads is the egress the install makes
 
   @unit
@@ -23,3 +23,9 @@ Feature: A self-hosted install makes no outbound call it was not asked to make
     Given TIKTOKENS_PATH points at a directory holding the encoding file
     When a span's tokens are counted
     Then the file is read from that directory and no network request is made
+
+  @unit
+  Scenario: Prisma's version check is off in every environment
+    Given CHECKPOINT_DISABLE is empty, which would leave the check on
+    When any prisma command loads the app's Prisma config
+    Then CHECKPOINT_DISABLE is "1" and the check is skipped

@@ -591,25 +591,3 @@ side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
   version. It goes away when the SDK is bumped for the whole billing module.
 - DNS and ingress for the two hosts live in the infrastructure repository and
   are listed in the pull request.
-
-## Amendment (2026-10-01): hosted services are opt-in
-
-On a self-hosted install, every hosted service is off until an administrator
-of the organization switches it on. A license that names a service makes it
-available, not active. This replaces the opt-out in section 9.
-
-`Organization.connectServicesEnabled` records the services an administrator
-switched on. A service is called only when the license names it and it is
-listed there. `Organization.connectServicesDisabled` is no longer read. It
-stays in the schema so a rolling deploy does not break the previous release,
-and a later migration drops it. Existing organizations are not backfilled, so
-every one starts with nothing enabled.
-
-Settings, Connect makes no call to the gateway until a service is enabled.
-Until then the page reads the services from the license the install already
-holds and shows no spend. Switching a service on asks the gateway for the
-entitlement once, as part of that admin action. Switching it off makes no
-call.
-
-The license sync and the usage report are unchanged. They are the only calls
-to LangWatch a self-hosted install makes without an opt-in.

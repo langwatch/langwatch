@@ -4061,16 +4061,7 @@
 					"kind": "scalar",
 					"isList": true,
 					"isOptional": false,
-					"documentation": "No longer read. Kept only so a rolling deploy does not break the previous\nrelease, to be dropped in a later migration. Superseded by\nconnectServicesEnabled (ADR-141, amendment 2026-10-01)."
-				},
-				{
-					"name": "connectServicesEnabled",
-					"columnName": "connectServicesEnabled",
-					"type": "String",
-					"kind": "scalar",
-					"isList": true,
-					"isOptional": false,
-					"documentation": "LangWatch-hosted services an administrator of this organization switched\nON, named the way the license names them (\"instant_evals\"). An entitled\nservice is off until it is listed here, and a service listed here is\nreached only while the license still names it (ADR-141, amendment\n2026-10-01)."
+					"documentation": "LangWatch-hosted services this organization has switched OFF, named the\nway its license names them (\"instant_evals\"). A service the license is\nentitled to is on unless it is listed here, so a customer who bought\nhosted judging gets it without finding a settings page first, and an\nadministrator who switched one off keeps it off across license changes\n(ADR-139, section 2). A license that names no service reaches nothing,\nwhatever this column holds."
 				},
 				{
 					"name": "connectLastSyncAt",

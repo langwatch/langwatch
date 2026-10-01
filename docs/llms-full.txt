@@ -61538,7 +61538,7 @@ Your license decides what this install may call. A license that names a hosted s
 
 An install on an offline license still sends the daily usage report unless you switch it off, see [Data and telemetry](/self-hosting/data-and-telemetry#without-a-hosted-service-license).
 
-A service your license names stays off until an organization admin switches it on in **Settings, Connect**. Until then the install calls no hosted service, and the page makes no call to LangWatch. Once a service is on, the same page shows what has been spent, the cap the install stops at, and the credit that is left.
+A service your license names is on. An organization admin switches off the ones they do not want in **Settings, Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
 
 <Info>
 **Also check:** [Editions and licensing](/self-hosting/licensing), [Data and telemetry](/self-hosting/data-and-telemetry), [Instant Evals](/features/instant-evals/overview), [Environment variables](/self-hosting/configuration/environment-variables).
@@ -61551,7 +61551,7 @@ Connect talks to two hosts, split by what the data is, so a network rule can all
 | Host | What travels | Who sends it |
 |---|---|---|
 | `connect.langwatch.ai` | Metadata only: the license token, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
-| `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names and an admin switched on |
+| `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
 
 The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
 
@@ -61571,7 +61571,7 @@ A fresh install starts on the open source baseline with no account and no licens
 
 1. Open **Settings, License**.
 2. Choose **Enter activation code**, paste the code, and confirm.
-3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names can then be switched on in **Settings, Connect**.
+3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names are on at once.
 
 The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
 
@@ -61634,8 +61634,8 @@ A second install running a copy of the database presents another id and is refus
 
 | Section | What it shows |
 |---|---|
-| Hosted services | One row per service your license names, off until an admin switches it on, with the sentences naming what leaves the install. A service your license does not include cannot be switched on. |
-| Spend | Spent, cap and remaining, and the day the current period started, once a service is on. A figure reads "Not available" while the spend ledger cannot be read. |
+| Hosted services | One row per service your license names, switched on, with the sentences naming what leaves the install. A service your license does not include cannot be switched on. |
+| Spend | Spent, cap and remaining, and the day the current period started. A figure reads "Not available" while the spend ledger cannot be read. |
 | Spending cap in USD | The cap you set yourself, between zero and the maximum your contract allows. A higher number is refused and the message names the maximum. |
 | License sync | The last successful sync and any sync failure, from the first one. |
 
@@ -61663,13 +61663,13 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
 
-Without a judge key, an install whose license names **Instant Evals** judges through LangWatch once an admin switches it on. Until then the organization publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
 ## Managed models
 
-With **Managed models** switched on, the LangWatch AI Gateway in your install can call a model LangWatch runs by spelling the model with a `langwatch/` prefix:
+With **Managed models** on, the LangWatch AI Gateway in your install can call a model LangWatch runs by spelling the model with a `langwatch/` prefix:
 
 ```bash
 curl https://<your-gateway>/v1/chat/completions \
@@ -61736,7 +61736,7 @@ keywords: telemetry, usage report, usage statistics, self-hosted, privacy, opt o
 
 A self-hosted install sends LangWatch one usage report a day, and a licensed install with hosted services also syncs its license once a day. Both carry counts and metadata. Neither carries a trace, a prompt, a dataset row, an evaluation input or output, a project name, a user name, an email address, an IP address or a key.
 
-Two hosted services do carry content: Instant Evals and managed models. They run only when the license names them and an administrator switched them on. Both are off by default.
+Two hosted services do carry content: Instant Evals and managed models. They run only when the license names them, and an administrator can switch either off.
 
 Calls to third parties that libraries inside the images would make on their own (a Cloudflare tunnel, Prisma's version check, RAGAS analytics, price list and tokenizer downloads) are off by default. See [Third-party calls that are off by default](#third-party-calls-that-are-off-by-default).
 
@@ -61760,9 +61760,9 @@ The chart ships a NetworkPolicy for the Langy agent only, and the AI Gateway's N
 | `connect.langwatch.ai/v1/stats` | Workers | The same report, sent here instead once a license names a hosted service | The same report | `DISABLE_USAGE_STATS=true` |
 | `connect.langwatch.ai/v1/license/sync` | Workers daily; App on demand from the License page | For organizations whose license names a hosted service | The license token, the instance id, the release, and the member and lite member counts | `LANGWATCH_CONNECT_DISABLED=true` |
 | `connect.langwatch.ai/v1/license/activate` | App | An admin redeems an activation code on the License page | The activation code and the instance id | Paste a license instead, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1/instant-evals/classify` | App, Workers | An admin switched [Instant Evals](#instant-evals) on, and Instant Evals run or a sentence typed in trace search is routed | Content: the text being judged and the questions | Off by default. Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1` | AI Gateway | An admin switched [managed models](#managed-models) on, and a virtual-key request names a `langwatch/` model | Content: the full model request and response | Off by default. Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
-| `gateway.langwatch.ai/v1/usage`, `/v1/budget` | App | Someone opens **Settings, Connect** or **Settings, Checkup** in an organization with a hosted service switched on, an admin switches a service on, or an admin sets a spending cap | The license token and the instance id; the cap | `LANGWATCH_CONNECT_DISABLED=true` |
+| `gateway.langwatch.ai/v1/instant-evals/classify` | App, Workers | The license names [Instant Evals](#instant-evals), no admin switched it off, and Instant Evals run or a sentence typed in trace search is routed | Content: the text being judged and the questions | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
+| `gateway.langwatch.ai/v1` | AI Gateway | The license names [managed models](#managed-models), no admin switched it off, and a virtual-key request names a `langwatch/` model | Content: the full model request and response | Switch it off on **Settings, Connect**, or `LANGWATCH_CONNECT_DISABLED=true` |
+| `gateway.langwatch.ai/v1/usage`, `/v1/budget` | App | Someone opens **Settings, Connect** or **Settings, Checkup** in an organization whose license names a hosted service, an admin switches a service on or off, or an admin sets a spending cap | The license token and the instance id; the cap | `LANGWATCH_CONNECT_DISABLED=true` |
 | `connect.langwatch.ai`, `gateway.langwatch.ai` | App | Someone runs the reach checks on **Settings, Checkup** | A `HEAD` request with no body, to test the firewall | `LANGWATCH_CONNECT_DISABLED=true`, or do not run them |
 
 The license token is a hash of the license key, not the key itself. The instance id is minted once into the install's own database.
@@ -61777,7 +61777,7 @@ An install with no license, or with a pasted offline license that names no hoste
 
 Two calls can still happen on an explicit user action. Running the reach checks on **Settings, Checkup** sends a `HEAD` to both LangWatch hosts. Redeeming an activation code calls `/v1/license/activate`. `LANGWATCH_CONNECT_DISABLED=true` stops both.
 
-With a license that names hosted services, the install also runs the daily license sync. Until an admin switches a service on, it calls no hosted service, and **Settings, Connect** makes no call to LangWatch.
+With a license that names hosted services, the install also runs the daily license sync, and each service the license names is on until an admin switches it off on **Settings, Connect**.
 
 ### To services you configure
 
@@ -61800,7 +61800,7 @@ Libraries inside the images can call third parties on their own. A self-hosted i
 | Host | Component | What it would do | Default | How to turn it on |
 |---|---|---|---|---|
 | `api.trycloudflare.com` and the Cloudflare tunnel edge; `cloudflare-dns.com`, `dns.google` | Workers | Open a public `*.trycloudflare.com` hostname to the worker's voice media listener, so phone calls can reach it | Off: the app leaves the tunnel off on a self-hosted production install, and the chart sets `VOICE_TUNNEL=false` | `VOICE_TUNNEL=true` on the Workers. Or set `VOICE_PUBLIC_BASE_URL` to your own hostname, which needs no tunnel |
-| `checkpoint.prisma.io` | App, Workers | Prisma's version check during the migration at each start: CLI version, hashed project path, database type, command name | Off: the app image and the chart set `CHECKPOINT_DISABLE=1` | Set `CHECKPOINT_DISABLE` to an empty value |
+| `checkpoint.prisma.io` | App, Workers | Prisma's version check during the migration at each start: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
 | `openaipublic.blob.core.windows.net` | App, Workers, LangEvals | Download a tokenizer file for token counting | Never: the app image ships every file and sets `TIKTOKENS_PATH`, and the LangEvals image ships them in its tiktoken cache | No switch |
 | `raw.githubusercontent.com` | LangEvals | Download the LiteLLM model price list at startup | Never: LangEvals prices model calls from LangWatch's own model catalog, shipped in the image, on top of the list bundled with the pinned LiteLLM | No switch |
 | `t.explodinggradients.com` | LangEvals | RAGAS usage analytics: a random id, the RAGAS version, provider and model names, request counts | Off: LangEvals, its image and the chart set `RAGAS_DO_NOT_TRACK=true` | `RAGAS_DO_NOT_TRACK=false` |
@@ -61823,7 +61823,7 @@ workers:
 
 ## Hosted services that carry content
 
-Both services run only when three things hold: the license names the service, an administrator switched it on for the organization on **Settings, Connect**, and `LANGWATCH_CONNECT_DISABLED` is not set. A service the license names stays off until an administrator switches it on.
+Both services run only when three things hold: the license names the service, no administrator switched it off for the organization on **Settings, Connect**, and `LANGWATCH_CONNECT_DISABLED` is not set.
 
 ### Instant Evals
 
@@ -61833,7 +61833,7 @@ With `JEV_API_KEY` set, the same calls go to `api.typesafe.ai` with your own key
 
 ### Managed models
 
-When the license names `managed_models` and an administrator switched it on, the App adds one extra provider slot to every virtual key of the organization in the in-cluster AI Gateway. The slot points at `https://gateway.langwatch.ai/v1` and authenticates with the license token and the instance id. It comes after the organization's own providers.
+When the license names `managed_models` and no administrator switched it off, the App adds one extra provider slot to every virtual key of the organization in the in-cluster AI Gateway. The slot points at `https://gateway.langwatch.ai/v1` and authenticates with the license token and the instance id. It comes after the organization's own providers.
 
 The gateway sends the whole request (messages, tools, attachments) to that slot, and the response comes back through it. LangWatch serves it with model providers it holds keys for and meters it against the organization's budget.
 
@@ -61899,7 +61899,7 @@ The report lands in a database at LangWatch, one row per install and one per rep
 
 An install on an offline license, upgraded to a release with this page, behaves as before: the same seat cap, the same screens, the same license check with no network on the path, and the usage report going where it always went. The report gains fields with the release, and the switches above are how to trim it.
 
-An upgraded install also takes the off-by-default settings on this page. A hosted service the license names stays off until an administrator switches it on in **Settings, Connect**, including on an install where it ran before the upgrade. A worker that ran voice phone calls through the Cloudflare quick tunnel now needs `VOICE_TUNNEL=true`, or `VOICE_PUBLIC_BASE_URL` set to your own hostname.
+An upgraded install also takes the off-by-default settings on this page. A worker that ran voice phone calls through the Cloudflare quick tunnel now needs `VOICE_TUNNEL=true`, or `VOICE_PUBLIC_BASE_URL` set to your own hostname.
 
 ---
 
@@ -64397,7 +64397,7 @@ Volume is bounded by your own hardware, not by us. A self-hosted deployment is n
 | **Extended retention** | Multi-class retention policies configured per category. |
 | **Support and SLA** | Named contact, response targets, upgrade guidance. |
 
-A licensed install can also call LangWatch-hosted services, the Instant Evals judge and managed models, over one outbound connection. The license decides which of them this install may call, each stays off until an organization admin switches it on, and what you spend is metered and capped on the LangWatch side against your contract. See [Connect](/self-hosting/connect).
+A licensed install can also call LangWatch-hosted services, the Instant Evals judge and managed models, over one outbound connection. The license decides which of them this install may call, an organization admin can switch off the ones they do not want, and what you spend is metered and capped on the LangWatch side against your contract. See [Connect](/self-hosting/connect).
 
 The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 

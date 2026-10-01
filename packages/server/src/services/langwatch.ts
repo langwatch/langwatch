@@ -5,7 +5,7 @@ import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
-import { appOfflineEnv } from "./offline-defaults.ts";
+import { appOfflineEnv, FORCED_ENV } from "./offline-defaults.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
@@ -40,6 +40,7 @@ export async function startLangwatch(
         ...appOfflineEnv(ctx.paths),
         ...process.env,
         ...envFromFile,
+        ...FORCED_ENV,
         // Prepend ctx.paths.bin so the bundled pnpm is reachable to any
         // nested pnpm calls inside langwatch's own scripts. Without this,
         // `sh -c '... pnpm ...'` subshells can't find pnpm on bare-Linux

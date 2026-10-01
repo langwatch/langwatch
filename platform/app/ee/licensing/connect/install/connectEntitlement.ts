@@ -87,13 +87,13 @@ export async function organizationConnectServices({
 }
 
 /**
- * The services one organization actually calls: the ones its license names
- * that an administrator switched on.
+ * The services one organization actually calls: the ones its license names,
+ * less the ones an administrator switched off.
  *
- * Off is the default for an entitled service. A self-hosted install sends
- * nothing to a hosted service until an administrator of the organization opts
- * in on Settings, Connect, and a service switched on stops being reached as
- * soon as the license no longer names it.
+ * Switched on is the default for an entitled service. The column records
+ * refusals rather than approvals, so a customer who bought hosted judging has
+ * it working before anyone opens Settings, and a service switched off stays
+ * off when the license is reissued.
  */
 export async function organizationEnabledConnectServices({
   prisma,
@@ -110,18 +110,18 @@ export async function organizationEnabledConnectServices({
   // text, so a second query here is a second query per judged row.
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { license: true, connectServicesEnabled: true },
+    select: { license: true, connectServicesDisabled: true },
   });
   const entitled = licenseConnectServices({
     licenseKey: organization?.license ?? env.LANGWATCH_LICENSE_KEY ?? null,
     ...(publicKey ? { publicKey } : {}),
     ...(now ? { now } : {}),
   });
-  const optedIn = new Set(organization?.connectServicesEnabled ?? []);
-  return entitled.filter((service) => optedIn.has(service));
+  const disabled = new Set(organization?.connectServicesDisabled ?? []);
+  return entitled.filter((service) => !disabled.has(service));
 }
 
-/** Whether one hosted service is both entitled and switched on by an admin. */
+/** Whether one hosted service is both entitled and switched on. */
 export async function connectServiceEnabled({
   prisma,
   organizationId,

@@ -177,9 +177,9 @@ COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
 
-# Prisma's version check to checkpoint.prisma.io runs during the
-# `prisma migrate deploy` every start does. Set CHECKPOINT_DISABLE to an empty
-# value to turn it back on.
+# Prisma's version check to checkpoint.prisma.io would run during the
+# `prisma migrate deploy` every start does. LangWatch never uses it;
+# prisma.config.ts also forces it off.
 ENV CHECKPOINT_DISABLE=1
 
 # Every tiktoken encoding file, so token counting reads it from disk instead of

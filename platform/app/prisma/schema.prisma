@@ -1219,16 +1219,14 @@ model Organization {
   /// A customer that runs LangWatch self-hosted. The hosted usage, budgets and
   /// invoices of its connected installs attach to this organization (ADR-139).
   selfHostedCustomer     Boolean                        @default(false)
-  /// No longer read. Kept only so a rolling deploy does not break the previous
-  /// release, to be dropped in a later migration. Superseded by
-  /// connectServicesEnabled (ADR-141, amendment 2026-10-01).
+  /// LangWatch-hosted services this organization has switched OFF, named the
+  /// way its license names them ("instant_evals"). A service the license is
+  /// entitled to is on unless it is listed here, so a customer who bought
+  /// hosted judging gets it without finding a settings page first, and an
+  /// administrator who switched one off keeps it off across license changes
+  /// (ADR-139, section 2). A license that names no service reaches nothing,
+  /// whatever this column holds.
   connectServicesDisabled String[]                      @default([])
-  /// LangWatch-hosted services an administrator of this organization switched
-  /// ON, named the way the license names them ("instant_evals"). An entitled
-  /// service is off until it is listed here, and a service listed here is
-  /// reached only while the license still names it (ADR-141, amendment
-  /// 2026-10-01).
-  connectServicesEnabled  String[]                      @default([])
   /// When the last license sync succeeded.
   connectLastSyncAt      DateTime?
   /// The code of the failure the last sync ended on, cleared on the next

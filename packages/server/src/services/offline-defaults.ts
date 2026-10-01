@@ -9,9 +9,16 @@ import type { EventBus } from "./event-bus.ts";
 /**
  * Defaults that keep an install from making outbound calls beyond the license
  * sync and the usage report, matching the Docker images and the Helm chart.
- * Every value here is a default: the services spread it first, so the user's
- * shell and their LANGWATCH_HOME/.env override any of them.
+ * The services spread these defaults first, so the user's shell and their
+ * LANGWATCH_HOME/.env override any of them. FORCED_ENV is spread last and has
+ * no override.
  */
+
+/**
+ * Prisma's version check to checkpoint.prisma.io, made by every prisma
+ * command. LangWatch never uses it, so it is off in every environment.
+ */
+export const FORCED_ENV = { CHECKPOINT_DISABLE: "1" } as const;
 
 export type OfflineCachePaths = {
 	/** Every tiktoken encoding file, read by the app through TIKTOKENS_PATH. */
@@ -34,9 +41,6 @@ export function appOfflineEnv(
 	paths: Pick<LangwatchPaths, "root">,
 ): Record<string, string> {
 	return {
-		// Prisma's version check to checkpoint.prisma.io, made by every
-		// `prisma migrate deploy`.
-		CHECKPOINT_DISABLE: "1",
 		TIKTOKENS_PATH: offlineCachePaths(paths).tiktokenEncodings,
 	};
 }
