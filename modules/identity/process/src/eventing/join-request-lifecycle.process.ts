@@ -1,7 +1,7 @@
 import type { EventHandler, IntentContext, IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
-export const JOIN_REQUEST_LIFECYCLE_PROCESS_NAME = "joinRequestLifecycle" as const;
+export { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "../rules/join-request-id.rules.ts";
 
 /**
  * How long a request waits for an answer: fourteen days, matching an

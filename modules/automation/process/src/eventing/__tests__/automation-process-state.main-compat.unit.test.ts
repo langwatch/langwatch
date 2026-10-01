@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { triggerSettlementStateSchema } from "../../rules/trigger-settlement-state.rules.ts";
 import { graphAlertSweepStateSchema } from "../graph-alert-sweep.process.ts";
-import { triggerSettlementStateSchema } from "../trigger-settlement.process.ts";
 
 describe("process state stored by the main release", () => {
   it("parses a graph alert sweep state as main stored it", () => {

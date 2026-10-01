@@ -12,7 +12,7 @@ import {
   type OverflowFlush,
   type PersistPage,
   type SettlementState,
-} from "../eventing/trigger-settlement.process.ts";
+} from "./trigger-settlement-state.rules.ts";
 
 function pendingDueTimes(state: SettlementState): number[] {
   return Object.values(state.pendingMatches).map((match) => match.dispatchDueAt);

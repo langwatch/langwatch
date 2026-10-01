@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 
-import { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "../eventing/join-request-lifecycle.process.ts";
+export const JOIN_REQUEST_LIFECYCLE_PROCESS_NAME = "joinRequestLifecycle" as const;
 
 /**
  * Join-request identity (D12): every id/command-id form lives here, never

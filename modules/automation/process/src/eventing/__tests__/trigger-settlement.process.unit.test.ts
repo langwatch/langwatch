@@ -5,16 +5,16 @@ import { describe, expect, it } from "vitest";
 
 import { automationProcessDefinition } from "../../__tests__/fixtures/pipeline-test-harness.ts";
 import {
+  MAX_PENDING_MATCHES,
+  PERSIST_PAGE_MAX,
+  type SettlementState,
+} from "../../rules/trigger-settlement-state.rules.ts";
+import {
   addPending,
   digestBatchKey,
   drainDue,
   pagePersistMatches,
 } from "../../rules/trigger-settlement.rules.ts";
-import {
-  MAX_PENDING_MATCHES,
-  PERSIST_PAGE_MAX,
-  type SettlementState,
-} from "../trigger-settlement.process.ts";
 
 const initialState = (): SettlementState => ({
   pendingMatches: {},

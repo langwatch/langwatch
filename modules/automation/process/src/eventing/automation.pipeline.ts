@@ -33,6 +33,10 @@ import type {
 } from "../app/automation.members.ts";
 import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
 import {
+  INITIAL_SETTLEMENT_STATE,
+  triggerSettlementStateSchema,
+} from "../rules/trigger-settlement-state.rules.ts";
+import {
   addPending,
   digestBatchKey,
   drainDue,
@@ -88,10 +92,6 @@ import {
   persistMatchIntentSchema,
   TRIGGER_SETTLEMENT_INTENT_TYPES,
 } from "./trigger-settlement.intent.ts";
-import {
-  INITIAL_SETTLEMENT_STATE,
-  triggerSettlementStateSchema,
-} from "./trigger-settlement.process.ts";
 
 export const RecordTriggerMatchCommand = defineCommand({
   commandType: RECORD_TRIGGER_MATCH_COMMAND_TYPE,

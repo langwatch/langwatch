@@ -20,12 +20,10 @@ import type {
   AutomationEvaluationTraceSummary,
   AutomationGraphActivity,
 } from "../../app/automation.members.ts";
-import {
-  AutomationEvaluationSubscriberService,
-  AutomationEvaluationTriggerFilterService,
-  type AutomationTriggerMatchRecorder,
-} from "../../index.ts";
+import { type AutomationTriggerMatchRecorder } from "../../index.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
+import { AutomationEvaluationSubscriberService } from "../../services/automation-evaluation-subscriber.service.ts";
+import { AutomationEvaluationTriggerFilterService } from "../../services/automation-evaluation-trigger-filter.service.ts";
 
 function trigger(): TriggerSummary {
   return {
