@@ -6,6 +6,7 @@ import {
   SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
   type SsoDomainProofNotificationPort,
 } from "@ee/event-sourcing/pipelines/sso-connections/process-manager/sso-domain-proof-notification.process";
+import { configuredSignedLicenseKey } from "@ee/licensing/configuredLicenseKey";
 import { parseLicenseKey, verifySignature } from "@ee/licensing/validation";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import type { ISsoLicenseRepository } from "@ee/sso/sso-license.repository";
@@ -120,7 +121,7 @@ export class InstanceLicenseProof implements SsoLicenseProofPort {
   constructor(private readonly licenses: ISsoLicenseRepository) {}
 
   async currentLicenseKey(): Promise<string | null> {
-    const instance = env.LANGWATCH_LICENSE_KEY;
+    const instance = configuredSignedLicenseKey();
     if (instance && isGenuine(instance)) return instance;
     // The same candidate scan the sign-in gate runs, through the same
     // repository — one query shape, so "which licences count" cannot drift

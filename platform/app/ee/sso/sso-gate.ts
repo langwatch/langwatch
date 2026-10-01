@@ -2,6 +2,7 @@
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
+import { configuredSignedLicenseKey } from "../licensing/configuredLicenseKey";
 import {
   isExpired,
   parseLicenseKey,
@@ -127,9 +128,11 @@ function warnIfExpired(
 
 /**
  * Checks the `LANGWATCH_LICENSE_KEY` env var (instance-level entitlement,
- * Decision 5) — no DB required.
+ * Decision 5) — no DB required. Only its signed license key form counts: an
+ * activation code there is redeemed before the server listens and lands on an
+ * organization, where the scan below finds it.
  */
-function hasSignedInstanceLicense(licenseKey: string | undefined): boolean {
+function hasSignedInstanceLicense(licenseKey: string | null): boolean {
   if (!licenseKey) return false;
   const license = inspectCandidateLicense(licenseKey, { source: "instance" });
   if (!license) return false;
@@ -185,7 +188,7 @@ class SsoGateTimeoutError extends Error {
  * MINOR-4 / the "IS_SAAS never touches DB" invariant).
  */
 async function computeGate(): Promise<boolean> {
-  if (hasSignedInstanceLicense(env.LANGWATCH_LICENSE_KEY)) return true;
+  if (hasSignedInstanceLicense(configuredSignedLicenseKey())) return true;
 
   let timer: NodeJS.Timeout | undefined;
   try {

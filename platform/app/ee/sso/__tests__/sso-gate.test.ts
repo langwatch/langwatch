@@ -242,6 +242,21 @@ describe("platformSSOAllowed", () => {
     });
   });
 
+  describe("given an activation code set as the instance license key", () => {
+    /** @scenario "an activation code in the license variable is not read as a license" */
+    it("does not parse the code as a license and lets the organization scan decide", async () => {
+      envMock.LANGWATCH_LICENSE_KEY = "LW-A1B2-C3D4-E5F6-G7H8";
+      __setSsoLicenseRepositoryForTests(repoWithOrgs([]));
+
+      const allowed = await platformSSOAllowed();
+
+      expect(allowed).toBe(false);
+      expect(parseLicenseKey).not.toHaveBeenCalledWith(
+        "LW-A1B2-C3D4-E5F6-G7H8",
+      );
+    });
+  });
+
   describe("given the licensing store cannot be reached on the first sign-in attempt", () => {
     /** @scenario A licensing-store outage refuses SSO and heals itself */
     it("denies the first attempt without memoizing, then allows once the store answers", async () => {
