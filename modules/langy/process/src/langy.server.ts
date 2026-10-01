@@ -1,5 +1,5 @@
 import { bindRestCredential } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { LangyApp } from "./app/langy.app.ts";
 import type { LangyTitleGenerator, LangySessionKeyMetrics } from "./app/langy.members.ts";

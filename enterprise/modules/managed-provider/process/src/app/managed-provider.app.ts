@@ -4,7 +4,7 @@ import {
   managedProviderSecrets,
   parseManagedBedrockDirectory,
 } from "@langwatch/enterprise-managed-provider-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 
 import { HttpManagedProviderCredentialsChannel } from "../channels/http/http.managed-provider-credentials.channel.ts";
 import { ManagedProviderConfigurationService } from "../services/managed-provider-configuration.service.ts";

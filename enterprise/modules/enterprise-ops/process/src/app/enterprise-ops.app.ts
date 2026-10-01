@@ -5,8 +5,8 @@ import {
   EnterpriseOpsApi,
   type EnterpriseOpsApi as EnterpriseOpsApiContract,
 } from "@langwatch/enterprise-ops-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import type { FeatureSetup } from "@langwatch/process";
 
 import { LicenseRegistryAuditService } from "../services/license-registry-audit.service.ts";
 import { SelfHostedInstanceAuditService } from "../services/self-hosted-instance-audit.service.ts";

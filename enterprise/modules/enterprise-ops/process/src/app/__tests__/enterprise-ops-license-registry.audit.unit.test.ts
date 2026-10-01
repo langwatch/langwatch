@@ -14,8 +14,8 @@ import {
   listActivationCodesInputSchema,
 } from "@langwatch/enterprise-licensing-contract";
 import { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
-import { createApp } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, type OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 

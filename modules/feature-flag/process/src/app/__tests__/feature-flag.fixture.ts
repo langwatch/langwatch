@@ -8,8 +8,8 @@ import {
   type FeatureFlagRegistry,
   type FeatureFlagServerConfig,
 } from "@langwatch/feature-flag-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";

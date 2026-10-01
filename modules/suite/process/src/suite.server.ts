@@ -3,16 +3,12 @@ import {
   bindRestMiddleware,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { SuiteApp } from "#app/suite.app";
 import { suiteRunProcessingEventing } from "#eventing/suite-run-processing.pipeline";
 import { suiteRepositories } from "#repositories/suite-repositories.registry";
-import {
-  suiteCallerKeyFact,
-  suiteCallerKeyOf,
-  suiteSurfaceFact,
-} from "#rules/suite-wire-v1.rules";
+import { suiteCallerKeyFact, suiteCallerKeyOf, suiteSurfaceFact } from "#rules/suite-wire-v1.rules";
 import { createRunPlansRest } from "#transport/run-plans.rest";
 import { suiteTrpcTransport } from "#transport/suite.trpc";
 import { createSuitesAliasRest } from "#transport/suites-alias.rest";

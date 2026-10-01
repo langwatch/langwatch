@@ -1,13 +1,13 @@
 import { EventEmitter } from "node:events";
 
 import { createApiFixture } from "@langwatch/api-fixture";
-import { ResourceScope } from "@langwatch/kernel";
 /**
  * The presence graph as its tests need it: memory sessions, a fan-out that
  * records rather than publishes, and peers that answer only what a test asked
  * for.
  */
 import type { PresenceUser } from "@langwatch/presence-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";

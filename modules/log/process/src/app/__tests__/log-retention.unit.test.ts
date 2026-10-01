@@ -8,8 +8,8 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { createApp } from "@langwatch/kernel";
 import { LOG_PROCESSING_PIPELINE_NAME } from "@langwatch/log-contract";
+import { createApp } from "@langwatch/process";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

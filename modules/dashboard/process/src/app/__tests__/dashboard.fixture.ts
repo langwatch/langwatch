@@ -8,7 +8,7 @@ import type {
 import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { vi } from "vitest";
 

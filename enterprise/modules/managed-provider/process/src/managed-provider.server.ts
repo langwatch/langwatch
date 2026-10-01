@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { ManagedProviderApp } from "./app/managed-provider.app.ts";
 import type { ManagedProviderCredentialVendor } from "./channels/managed-provider-credentials.channel.ts";

@@ -21,8 +21,8 @@
   },
   "dependencies": {
     "@langwatch/audit-log-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
-    "@langwatch/module": "workspace:*"
+    "@langwatch/module": "workspace:*",
+    "@langwatch/process": "workspace:*"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",

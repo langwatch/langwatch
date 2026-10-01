@@ -1,5 +1,5 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { AuthzApp } from "./app/authz.app.ts";
 import { authzEventing } from "./eventing/authz-grant.pipeline.ts";

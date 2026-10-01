@@ -1,6 +1,5 @@
 import type { EventEmitter } from "node:events";
 
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   type PresenceBroadcastFabric,
   PresenceApi,
@@ -19,6 +18,7 @@ import {
   type ReadHint,
   type ReadHintsWatchInput,
 } from "@langwatch/presence-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { Cluster, Redis } from "ioredis";

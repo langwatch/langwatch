@@ -1,5 +1,5 @@
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 /** The secret feature application shared by all transports. */
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";

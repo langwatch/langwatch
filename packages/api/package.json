@@ -68,7 +68,6 @@
     "@langwatch/actor": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",

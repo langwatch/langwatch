@@ -35,14 +35,18 @@ import {
   type UsageWarningDecision,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import type { EventingCommands, EventingCommandSender } from "@langwatch/eventing";
+import type {
+  EventingCommands,
+  EventingCommandSender,
+  EventingParticipation,
+} from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { NotFoundError } from "@langwatch/handled-error";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { AdminSurfaceHiddenError, type OpsOperatorPermission } from "@langwatch/ops-contract";
 import { OrganizationApi, type OrganizationCaller } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
 import Stripe from "stripe";

@@ -6,8 +6,8 @@ import {
   DataPrivacyApi,
   type DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,

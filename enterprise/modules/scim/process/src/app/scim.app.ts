@@ -68,11 +68,15 @@ import {
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, EventSourcing } from "@langwatch/eventing";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  EventSourcing,
+} from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";

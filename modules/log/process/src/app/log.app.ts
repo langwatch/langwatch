@@ -2,7 +2,6 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   LogApi,
   LOG_DEFAULT_READ_LIMIT,
@@ -19,6 +18,7 @@ import {
   type LogServerConfig,
 } from "@langwatch/log-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
+import type { FeatureSetup } from "@langwatch/process";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";

@@ -1,5 +1,5 @@
 import { bindRestHeader } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { ScenarioApp } from "./app/scenario.app.ts";
 import { scenarioLifecycleEventing } from "./eventing/scenario-lifecycle.pipeline.ts";

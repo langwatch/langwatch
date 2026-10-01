@@ -5,8 +5,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * crashed on undefined errors (defaultFeatures, systemProviders, exists).
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";

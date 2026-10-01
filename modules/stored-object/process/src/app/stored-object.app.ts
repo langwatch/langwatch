@@ -4,7 +4,7 @@
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import type { ProcessMembers, RateLimiter } from "@langwatch/process-stores/members";
 import {
   StoredObjectApi,

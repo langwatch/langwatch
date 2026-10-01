@@ -15,7 +15,7 @@ import {
   type SsoSetupApi,
   type SsoSetupCommandsApi,
 } from "@langwatch/identity-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets, signInProviderSecrets, type SecretHandle } from "@langwatch/secrets";
 import { vi } from "vitest";
 

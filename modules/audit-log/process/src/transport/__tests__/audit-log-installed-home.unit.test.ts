@@ -9,8 +9,8 @@ import { SessionReader } from "@langwatch/api/rest";
 import { TrpcHost } from "@langwatch/api/trpc";
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { Dataset, DatasetApi } from "@langwatch/dataset-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { Monitor, MonitorApi } from "@langwatch/monitor-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {

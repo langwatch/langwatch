@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { AuditLogApp } from "./app/audit-log.app.ts";
 import { auditLogRepositories } from "./repositories/audit-log-repositories.registry.ts";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { EnterpriseGatewayApp } from "./app/enterprise-gateway.app.ts";
 import { enterpriseGatewayRepositories } from "./repositories/enterprise-gateway-repositories.registry.ts";

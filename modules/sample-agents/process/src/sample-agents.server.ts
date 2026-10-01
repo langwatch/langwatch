@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { SampleAgentsApp } from "./app/sample-agents.app.ts";
 import { hotelBotRest } from "./transport/hotel-bot.rest.ts";

@@ -12,8 +12,8 @@ import type {
   DataPrivacyApi,
   DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
-import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
+import { LocalFeatureApis, ResourceScope } from "@langwatch/process";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";

@@ -15,7 +15,6 @@ import {
   describePasswordProblem,
   routesToOrganizationConnection,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -25,6 +24,7 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";

@@ -5,8 +5,8 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { IncomingUsageReport, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SaasApi } from "@langwatch/enterprise-saas-contract";
-import { createApp } from "@langwatch/kernel";
 import type { OpsApi } from "@langwatch/ops-contract";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { createTestLogger, frozenAt, memoryRateLimiter } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";

@@ -1,14 +1,14 @@
-/**
- * The one framework subscriber turning committed events into read hints (record §10, "Server
- * events say when a read is stale"): `{ path }` on the framework's read-hint channel, under the
- * event's tenant or the field its read named. Spec: packages/api/specs/read-hints.feature.
- */
-import type { ReadHintMap, ReadHintTarget } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import { defineAggregate } from "../domain/definitions.ts";
 import type { Event } from "../domain/types.ts";
+/**
+ * The one framework subscriber turning committed events into read hints (record §10, "Server
+ * events say when a read is stale"): `{ path }` on the framework's read-hint channel, under the
+ * event's tenant or the field its read named. Spec: packages/api/specs/read-hints.feature.
+ */
+import type { ReadHintMap, ReadHintTarget } from "../pipeline/feature-eventing.ts";
 import { definePipeline } from "../pipeline/staticBuilder.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
 

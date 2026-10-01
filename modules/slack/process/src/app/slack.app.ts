@@ -1,6 +1,6 @@
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { credentialsSecret, sessionSecret } from "@langwatch/secrets";

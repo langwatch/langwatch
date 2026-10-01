@@ -657,7 +657,7 @@ Messages:
 
 - `bootHookOutsideGuard`
   - what: `process.{{method}}("{{event}}", ...)` is registered outside the boot guard.
-  - fix: Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process-server`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`.
+  - fix: Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`.
 
 ## `langwatch/no-form-watch-in-child`
 

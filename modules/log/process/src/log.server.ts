@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { LogApp } from "./app/log.app.ts";
 import { logEventing } from "./eventing/log.pipeline.ts";

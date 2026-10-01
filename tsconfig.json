@@ -418,12 +418,6 @@
       "path": "packages/internal-slack/tsconfig.json"
     },
     {
-      "path": "packages/kernel/tsconfig.test.json"
-    },
-    {
-      "path": "packages/kernel/tsconfig.type-tests.json"
-    },
-    {
       "path": "packages/ksuid/tsconfig.json"
     },
     {
@@ -553,7 +547,10 @@
       "path": "packages/prisma-client/tsconfig.json"
     },
     {
-      "path": "packages/process-server/tsconfig.test.json"
+      "path": "packages/process/tsconfig.test.json"
+    },
+    {
+      "path": "packages/process/tsconfig.type-tests.json"
     },
     {
       "path": "packages/process-stores/tsconfig.test.json"

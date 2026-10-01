@@ -11,7 +11,6 @@ import type { EventingCommandSender } from "@langwatch/eventing";
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
@@ -21,6 +20,7 @@ import {
 } from "@langwatch/onboarding-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";

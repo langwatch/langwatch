@@ -7,7 +7,7 @@ import {
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayApp } from "./app/gateway.app.ts";

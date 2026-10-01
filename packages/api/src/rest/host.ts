@@ -1,3 +1,7 @@
+import { createLogger } from "@langwatch/observability";
+import { Hono } from "hono";
+
+import type { Entitlements } from "../access/access.ts";
 /**
  * Where every declared REST family mounts. Thin on purpose: it states which
  * credential answers which family and hands one application to the hosting.
@@ -7,11 +11,7 @@ import type {
   FeatureRestHost,
   FeatureRestMountOptions,
   MountableTransport,
-} from "@langwatch/kernel";
-import { createLogger } from "@langwatch/observability";
-import { Hono } from "hono";
-
-import type { Entitlements } from "../access/access.ts";
+} from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
 import type { MountableRestApp } from "./addressing.ts";
 import { CliTokenIdentity } from "./cli-token-identity.ts";

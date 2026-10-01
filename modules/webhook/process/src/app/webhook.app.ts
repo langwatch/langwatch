@@ -1,8 +1,11 @@
 import { AwsClientConfiguration } from "@langwatch/aws-client";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  ProcessStore,
+} from "@langwatch/eventing";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
@@ -10,6 +13,7 @@ import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
  */
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {

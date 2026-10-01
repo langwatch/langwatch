@@ -12,7 +12,7 @@ const NODE_RUNTIME = /^node:/;
 const BROWSER_RUNTIME =
   /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|design-system|ui-kernel)(?:\/|$))/;
 const SERVER_RUNTIME =
-  /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process-server|process-stores)(?:\/|$))/;
+  /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process|process-stores)(?:\/|$))/;
 /** apps/tasks' pre-serve migration steps: its `*migrat*` files and the two LangWatchQL steps. */
 const MIGRATION_RUNNER =
   /^apps\/tasks\/src\/(?:[^/]*migrat[^/]*|lwql-provision|lwql-render-access-config)\.[cm]?tsx?$/;

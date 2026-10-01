@@ -1,6 +1,5 @@
 import { AwsClientConfiguration } from "@langwatch/aws-client";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   NotificationService as NotificationApi,
   notificationBrowserConfig,
@@ -14,6 +13,7 @@ import {
   type SendEmailCommand,
   sendEmailCommandSchema,
 } from "@langwatch/notification-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { Secret } from "@langwatch/secrets";
 
 import {

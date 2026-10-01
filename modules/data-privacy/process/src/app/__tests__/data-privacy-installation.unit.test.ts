@@ -3,8 +3,8 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { dataPrivacyServer } from "../../data-privacy.server.ts";

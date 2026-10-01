@@ -15,11 +15,11 @@ import {
 import { serverModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
+  type InstallableServerFeature,
+  processConfig,
   storesBackedMembers,
   withMemoryRepositories,
-  type InstallableServerFeature,
-} from "@langwatch/kernel";
-import { processConfig } from "@langwatch/process-server";
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,

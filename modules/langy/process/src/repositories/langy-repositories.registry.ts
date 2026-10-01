@@ -1,10 +1,10 @@
 import type { AppendStore, StateProjectionStore } from "@langwatch/eventing";
-import { defineRepositories } from "@langwatch/kernel";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
 } from "@langwatch/langy-contract";
+import { defineRepositories } from "@langwatch/process";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
 import type { LangyAnalyticsEventRepository } from "./langy-analytics-event.repository.ts";

@@ -1,5 +1,5 @@
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 

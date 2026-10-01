@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { EvaluatorApp } from "./app/evaluator.app.ts";
 import { evaluatorRepositories } from "./repositories/evaluator-repositories.registry.ts";

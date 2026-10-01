@@ -1,5 +1,5 @@
 import type { DatasetNormalizationWorker } from "@langwatch/dataset-contract";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { DatasetApp } from "#app/dataset.app";
 import type { DatasetNormalize, DatasetNormalizeQueue } from "#app/dataset.app";

@@ -1,5 +1,5 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { PromptApp } from "./app/prompt.app.ts";
 import { promptLifecycleEventing } from "./eventing/prompt-lifecycle.pipeline.ts";

@@ -2,7 +2,7 @@ Feature: The no-boot-hook-outside-guard lint rule
   Process-level failure handling is one seam, not one per package: a second
   `uncaughtException` or `unhandledRejection` listener races the boot guard
   and can swallow the exit it relies on. There are two guards: every `Server`
-  installs `installFatalHandlers` (`packages/process-server/src/server.ts`), and
+  installs `installFatalHandlers` (`packages/process/src/server.ts`), and
   a one-shot executable boots through `bootNodeExecutable`
   (`packages/observability/src/boot-guard.ts`).
 
@@ -36,7 +36,7 @@ Feature: The no-boot-hook-outside-guard lint rule
 
   @unit
   Scenario: The boot guards own process-level failure handling
-    Given packages/process-server/src/server.ts and packages/observability/src/boot-guard.ts each registering an uncaughtException handler
+    Given packages/process/src/server.ts and packages/observability/src/boot-guard.ts each registering an uncaughtException handler
     When the no-boot-hook-outside-guard rule runs over it
     Then it reports nothing
 

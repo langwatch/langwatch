@@ -8,7 +8,6 @@ import { AUTHZ_ENGINE_MIGRATION_NAME, AuthzApi } from "@langwatch/authz-contract
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
 import { serverModules } from "@langwatch/installed-server-modules";
-import { bootInstalledProcess, storesBackedMembers } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -28,7 +27,7 @@ import {
   ShareVisibility,
   type Team,
 } from "@langwatch/prisma-client/generated";
-import { processConfig } from "@langwatch/process-server";
+import { bootInstalledProcess, processConfig, storesBackedMembers } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { createTestLogger } from "@langwatch/test-harness";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";

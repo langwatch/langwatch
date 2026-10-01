@@ -11,6 +11,7 @@ import {
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import type { ResourceOwnership } from "@langwatch/process";
 import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
 import {
   SimulationRunQueuedEventSchema,
@@ -178,7 +179,12 @@ export class SimulationProcessingPipelineAdapter {
 /** simulation_processing, built by the app in both roles; its senders carry every run write. */
 export const simulationProcessingEventing = defineEventingModule({
   pipeline: "simulation_processing",
-  build: ({ app, participation, priorEvents, resources }: EventingSetup<never, ScenarioApp>) =>
+  build: ({
+    app,
+    participation,
+    priorEvents,
+    resources,
+  }: EventingSetup<never, ScenarioApp, Pick<ResourceOwnership, "own">>) =>
     app.simulationPipeline({
       participation,
       ...(priorEvents ? { priorEvents } : {}),

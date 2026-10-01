@@ -21,9 +21,9 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/sample-agents-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",

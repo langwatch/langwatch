@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { StoredObjectApp } from "#app/stored-object.app";
 import type { PayloadStagingRepository } from "#repositories/payload-staging.repository";

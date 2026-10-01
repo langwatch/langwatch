@@ -4,7 +4,7 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { createApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";

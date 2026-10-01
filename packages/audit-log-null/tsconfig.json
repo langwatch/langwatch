@@ -18,10 +18,10 @@
       "path": "../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
-      "path": "../kernel/tsconfig.build.json"
+      "path": "../module/tsconfig.build.json"
     },
     {
-      "path": "../module/tsconfig.build.json"
+      "path": "../process/tsconfig.build.json"
     },
     {
       "path": "../vitest-config/tsconfig.build.json"

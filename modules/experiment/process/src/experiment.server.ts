@@ -4,7 +4,7 @@ import {
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { WorkbenchCredential } from "@langwatch/experiment-contract";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.app";
 

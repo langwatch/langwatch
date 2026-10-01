@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { HostedMcpApp } from "./app/hosted-mcp.app.ts";
 import { mcpAuthorizeRest } from "./transport/mcp-authorize.rest.ts";

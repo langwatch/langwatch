@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemoryNurturingRepositories } from "./memory/memory.nurturing.repositories.ts";
 import { PostgresNurturingRepositories } from "./prisma/prisma.nurturing.repositories.ts";

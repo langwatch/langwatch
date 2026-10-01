@@ -6,8 +6,8 @@
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 

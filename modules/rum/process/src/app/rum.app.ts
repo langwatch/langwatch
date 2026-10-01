@@ -1,5 +1,5 @@
-import type { FeatureSetup } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
+import type { FeatureSetup } from "@langwatch/process";
 import {
   type BrowserTraceReport,
   RumApi,

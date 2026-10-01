@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { SaasApp } from "./app/saas.app.ts";
 import { usageReportRest } from "./transport/usage-report.rest.ts";

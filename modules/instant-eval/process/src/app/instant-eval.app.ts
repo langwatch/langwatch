@@ -22,7 +22,7 @@ import {
   type InstantEvalServerConfig,
   instantEvalConfig,
 } from "@langwatch/instant-eval-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";

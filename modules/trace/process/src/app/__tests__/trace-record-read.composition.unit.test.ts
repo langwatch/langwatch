@@ -15,10 +15,10 @@ import {
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { LocalFeatureApis } from "@langwatch/kernel";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { CLOUD_FREE_LICENSING_PLAN } from "@langwatch/plans";
+import { LocalFeatureApis } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";

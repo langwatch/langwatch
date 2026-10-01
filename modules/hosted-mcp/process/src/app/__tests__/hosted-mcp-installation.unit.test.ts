@@ -11,7 +11,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
-import { createApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

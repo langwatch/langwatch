@@ -16,7 +16,7 @@ import {
   type Evaluator,
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";

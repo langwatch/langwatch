@@ -1,5 +1,5 @@
 import { bindRestMiddleware } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { OpsApp } from "#app/ops.app";
 import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeline";

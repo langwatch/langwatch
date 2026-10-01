@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { AnnotationApp } from "#app/annotation.app";
 import { annotationRepositories } from "#repositories/annotation-repositories.registry";

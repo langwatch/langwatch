@@ -365,7 +365,7 @@ func GenerateModules(root string) ([]Output, error) {
 	if err != nil {
 		return nil, err
 	}
-	serverPackages := []string{"@langwatch/kernel"}
+	serverPackages := []string{"@langwatch/process"}
 	serverNames := []string{}
 	for _, d := range servers {
 		serverPackages = append(serverPackages, d.pkg)

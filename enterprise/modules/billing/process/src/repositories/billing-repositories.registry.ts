@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { ClickHouseBillingRepositories } from "./clickhouse/clickhouse.billing-clickhouse.repositories.ts";
 import { LiveBillingRepositories } from "./live/live.billing.repositories.ts";

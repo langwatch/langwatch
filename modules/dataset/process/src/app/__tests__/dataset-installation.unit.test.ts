@@ -6,7 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * repositories, with the two peers it declares, in every role it serves.
  */
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";

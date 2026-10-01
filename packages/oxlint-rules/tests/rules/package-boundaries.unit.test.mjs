@@ -175,7 +175,7 @@ describe("given package-boundaries", () => {
       for (const specifier of [
         "node:fs",
         "react",
-        "@langwatch/process-server",
+        "@langwatch/process",
         "@langwatch/agent-process",
         "@langwatch/agent-browser/declaration",
         "@langwatch/project-contract",

@@ -1,6 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import { withMemoryRepositories } from "@langwatch/kernel";
+import { withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 

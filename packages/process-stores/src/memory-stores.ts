@@ -1,5 +1,4 @@
-import type { StoresMemberSource } from "@langwatch/kernel";
-
+import type { StoresMemberSource } from "./members.ts";
 import { memoryObjectStorage } from "./object-storage-memory.ts";
 
 /**

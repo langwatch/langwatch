@@ -1,5 +1,5 @@
 import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { dashboardServer } from "../../dashboard.server.ts";

@@ -1,3 +1,4 @@
+import { type FeatureTrpcHost } from "@langwatch/api";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -7,10 +8,10 @@ import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing } from "@langwatch/eventing";
 import type { IdentityLookupApi } from "@langwatch/identity-contract";
-import { createApp, type FeatureTrpcHost, withMemoryRepositories } from "@langwatch/kernel";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";

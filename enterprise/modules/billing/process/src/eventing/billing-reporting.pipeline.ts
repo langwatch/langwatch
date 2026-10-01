@@ -6,11 +6,11 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
+  type EventingParticipation,
   type EventingSetup,
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { EventingParticipation } from "@langwatch/kernel";
 
 import type { BillingApp } from "../app/billing.app.ts";
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";

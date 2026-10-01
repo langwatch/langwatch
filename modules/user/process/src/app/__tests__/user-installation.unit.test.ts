@@ -7,7 +7,6 @@ import type {
 } from "@langwatch/enterprise-gateway-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type {
   OrganizationApi,
@@ -15,6 +14,7 @@ import type {
   PersonalWorkspace,
 } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";

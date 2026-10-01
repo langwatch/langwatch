@@ -6,8 +6,8 @@ import {
   type SaasApi as SaasApiContract,
   type UsageReportReceipt,
 } from "@langwatch/enterprise-saas-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OpsApi } from "@langwatch/ops-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 
 import { productAnalyticsChannels } from "../channels/product-analytics-channels.registry.ts";

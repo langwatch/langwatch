@@ -2,11 +2,11 @@ import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authoriz
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 /**
  * The prompt library's application: what its doors call.
  */
-import type { FeatureSetup } from "@langwatch/kernel";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {

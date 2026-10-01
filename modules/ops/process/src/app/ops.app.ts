@@ -42,7 +42,6 @@ import { GithubApi } from "@langwatch/github-contract";
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch/identity-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { LangyApi } from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
@@ -230,6 +229,7 @@ import {
   submitBugReportSchema,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { storesOwner } from "@langwatch/process-stores/config";
 import {
   ProjectApi,

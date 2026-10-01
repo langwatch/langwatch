@@ -2,7 +2,7 @@ import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { HostedMcpApi, type HostedMcpApiContract } from "@langwatch/hosted-mcp-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Cluster, Redis } from "ioredis";
 

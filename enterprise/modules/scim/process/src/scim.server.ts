@@ -10,7 +10,7 @@ import {
   organizationCredentialOfRequest,
   scimCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { ScimApp } from "./app/scim.app.ts";
 import { scimDirectoryEventing } from "./eventing/scim-directory.pipeline.ts";

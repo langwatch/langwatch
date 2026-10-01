@@ -4,7 +4,7 @@ import {
   browserCallerOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { WorkflowApp } from "#app/workflow.app";
 import { workflowLifecycleEventing } from "#eventing/workflow-lifecycle.pipeline";

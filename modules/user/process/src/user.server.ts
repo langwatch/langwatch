@@ -1,6 +1,6 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
 import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 import type { MePersonalCredential } from "@langwatch/user-contract";
 
 import { UserApp } from "./app/user.app.ts";

@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 import type { Cluster, Redis } from "ioredis";
 
 import { PresenceApp, type PresenceBroadcast, type PresenceEmitter } from "./app/presence.app.ts";

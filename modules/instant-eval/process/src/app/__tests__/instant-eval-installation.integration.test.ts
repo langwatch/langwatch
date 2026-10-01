@@ -23,7 +23,7 @@ import {
   InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
-import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import {
   type ProjectApi,

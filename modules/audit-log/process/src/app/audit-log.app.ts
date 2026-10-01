@@ -10,8 +10,8 @@ import {
   type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { MonitorApi } from "@langwatch/monitor-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";

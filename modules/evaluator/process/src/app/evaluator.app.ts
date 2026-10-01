@@ -35,10 +35,10 @@ import {
 } from "@langwatch/evaluator-contract";
 import { preconditionMatchInputSchema } from "@langwatch/evaluator-contract/evaluation-types";
 import { ValidationError } from "@langwatch/handled-error";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import type { Trace } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";

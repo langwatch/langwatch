@@ -26,8 +26,8 @@ import {
   type PublicAnonymousFlagMap,
   type UserExperimentEnrolmentInput,
 } from "@langwatch/feature-flag-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";

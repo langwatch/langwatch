@@ -7,7 +7,6 @@ import { createHmac } from "crypto";
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
-import { createApp } from "@langwatch/kernel";
 import {
   ModelProviderNotFoundError,
   type ModelProviderApi,
@@ -21,6 +20,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp } from "@langwatch/process";
 import { resolvedSecrets } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";

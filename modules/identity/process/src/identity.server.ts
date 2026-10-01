@@ -1,5 +1,5 @@
 import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { IdentityApp } from "./app/identity.app.ts";
 import { identityEventing } from "./eventing/identity.pipeline.ts";

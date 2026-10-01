@@ -57,13 +57,14 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
-import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
+import type { ResolvedTokens } from "@langwatch/module";
 import {
   MonitorApi,
   type Monitor,
   type MonitorApi as MonitorApiContract,
 } from "@langwatch/monitor-contract";
 import { NotificationService } from "@langwatch/notification-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
 import { SlackApi } from "@langwatch/slack-contract";

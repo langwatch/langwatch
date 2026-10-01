@@ -20,16 +20,16 @@ import {
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { serverModules } from "@langwatch/installed-server-modules";
-import {
-  bootInstalledProcess,
-  storesBackedMembers,
-  withMemoryRepositories,
-  type InstallableServerFeature,
-} from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { processConfig } from "@langwatch/process-server";
+import {
+  bootInstalledProcess,
+  type InstallableServerFeature,
+  processConfig,
+  storesBackedMembers,
+  withMemoryRepositories,
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,

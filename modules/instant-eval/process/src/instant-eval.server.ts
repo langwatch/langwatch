@@ -4,7 +4,7 @@ import {
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { instantEvalRestCredential } from "@langwatch/instant-eval-contract";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { InstantEvalApp } from "./app/instant-eval.app.ts";
 import { instantEvalEventing } from "./eventing/instant-eval-processing.pipeline.ts";

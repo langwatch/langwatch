@@ -23,11 +23,11 @@ import {
   type GithubUsageCount,
   type GithubWebhookEnvelope,
 } from "@langwatch/github-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   OrganizationApi,
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 

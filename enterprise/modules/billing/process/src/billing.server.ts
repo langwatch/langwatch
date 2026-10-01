@@ -1,5 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
+import { defineServerModule, instantiateRepositories } from "@langwatch/process";
 
 /**
  * What a process composes billing's process-side work from: the

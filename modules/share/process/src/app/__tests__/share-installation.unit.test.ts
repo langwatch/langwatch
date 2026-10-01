@@ -1,4 +1,4 @@
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
 import type Redis from "ioredis";
 import { describe, expect, it } from "vitest";

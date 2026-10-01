@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { MetricApp } from "./app/metric.app.ts";
 import { metricEventing } from "./eventing/metric.pipeline.ts";

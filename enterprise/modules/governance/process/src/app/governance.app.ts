@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { AgentApi } from "@langwatch/agent-contract";
-import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { CliTokenIdentity } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
@@ -150,11 +150,10 @@ import {
   EntitlementApi,
   type EntitlementOperator,
 } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { LogApi } from "@langwatch/log-contract";
 import { MetricApi } from "@langwatch/metric-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -164,6 +163,7 @@ import {
   type OrganizationService,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";

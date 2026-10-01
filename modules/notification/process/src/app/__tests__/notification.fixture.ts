@@ -1,4 +1,4 @@
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
 import { MemoryNotificationRepositories } from "../../repositories/memory/memory.notification.repositories.ts";

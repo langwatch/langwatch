@@ -1,6 +1,5 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { LangyApi, type LangyKeyCaller } from "@langwatch/langy-contract";
 import {
   PlatformHealthApi,
@@ -11,6 +10,7 @@ import {
   PLATFORM_HEALTH_CHECK_NAMES,
   type ProjectKeyedProbeRequest,
 } from "@langwatch/platform-health-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { Secret } from "@langwatch/secrets";

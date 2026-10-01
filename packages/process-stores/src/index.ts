@@ -19,6 +19,7 @@ export {
   type RateLimitDecision,
   type RateLimiter,
   type SecretResolver,
+  type StoresMemberSource,
   type SignedObjectUpload,
   type StoredObjectAddress,
   type Telemetry,

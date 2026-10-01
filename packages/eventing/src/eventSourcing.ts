@@ -1,4 +1,3 @@
-import type { EventingParticipation, ReadHintMap } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
@@ -8,6 +7,7 @@ import { DisabledPipeline } from "./disabledPipeline.ts";
 import { createEventCatalogue } from "./domain/definitions.ts";
 import type { Event, Projection } from "./domain/types.ts";
 import type { KillSwitch } from "./kill-switch/index.ts";
+import type { EventingParticipation, ReadHintMap } from "./pipeline/feature-eventing.ts";
 import {
   type SealedPipelineDefinition,
   sealPipelineDefinition,

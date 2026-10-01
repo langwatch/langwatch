@@ -5,8 +5,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * repositories, with no repository class or tier named here.
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";

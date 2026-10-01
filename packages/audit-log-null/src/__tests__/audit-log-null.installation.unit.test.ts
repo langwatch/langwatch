@@ -1,5 +1,5 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { createApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { auditLogNullServer } from "../audit-log-null.server.ts";

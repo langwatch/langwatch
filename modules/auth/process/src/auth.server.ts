@@ -1,6 +1,6 @@
 import { bindApiDoor } from "@langwatch/api/hosting";
 import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { AuthApp } from "./app/auth.app.ts";
 import { authLifecycleEventing } from "./eventing/auth-lifecycle.pipeline.ts";

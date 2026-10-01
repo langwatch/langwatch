@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { DemoDataApp } from "./app/demo-data.app.ts";
 import { demoDataEventing } from "./eventing/demo-data.pipeline.ts";

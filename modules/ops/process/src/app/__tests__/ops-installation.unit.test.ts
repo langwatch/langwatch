@@ -26,7 +26,6 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { LangyApi } from "@langwatch/langy-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -34,6 +33,7 @@ import type { NotificationService as NotificationApi } from "@langwatch/notifica
 import { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";

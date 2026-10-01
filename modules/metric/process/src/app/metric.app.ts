@@ -2,7 +2,6 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   MetricApi,
   METRIC_DEFAULT_RETENTION_DAYS,
@@ -17,6 +16,7 @@ import {
   type MetricServerConfig,
 } from "@langwatch/metric-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
+import type { FeatureSetup } from "@langwatch/process";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import { ClickHouseMetricDataPointAppendRepository } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";

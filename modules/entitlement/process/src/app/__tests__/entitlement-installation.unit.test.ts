@@ -8,8 +8,8 @@ import {
   type Plan,
   type ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";

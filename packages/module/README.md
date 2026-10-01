@@ -5,4 +5,4 @@ The light core every module contract imports: the `moduleApi` and supply tokens,
 the tRPC contract builder, UI tokens and release flags. It has no server, no
 tRPC runtime and no Node API in its value-import graph, so a browser can import
 it. Heavy composition (`createApp`, the installer, eventing) stays in
-`@langwatch/kernel`, which does not re-export anything from here.
+`@langwatch/process`, which does not re-export anything from here.

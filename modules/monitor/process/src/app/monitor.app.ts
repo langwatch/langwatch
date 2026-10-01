@@ -12,7 +12,6 @@ import {
   findEvaluatorDefinitions,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import {
   MonitorApi,
@@ -38,6 +37,7 @@ import {
   type EnabledGuardrailMonitor,
   type MonitorSummary,
 } from "@langwatch/monitor-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 

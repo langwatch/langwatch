@@ -1,6 +1,6 @@
 import type { Projection, StaticPipelineDefinition } from "@langwatch/eventing";
 import type { GithubApi } from "@langwatch/github-contract";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import {

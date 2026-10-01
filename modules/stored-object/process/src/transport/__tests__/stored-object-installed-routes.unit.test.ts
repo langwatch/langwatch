@@ -7,8 +7,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { createApp } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 

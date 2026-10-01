@@ -3,7 +3,7 @@ import {
   AnnotationNotFoundError,
   AnnotationQueueItemNotFoundError,
 } from "@langwatch/annotation-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { annotationServer } from "../../annotation.server.ts";

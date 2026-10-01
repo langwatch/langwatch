@@ -7,7 +7,7 @@ import {
   type NurturingSignal,
 } from "@langwatch/enterprise-nurturing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import { UserApi } from "@langwatch/user-contract";
 
 import { postHogChannels } from "../channels/posthog-channels.registry.ts";

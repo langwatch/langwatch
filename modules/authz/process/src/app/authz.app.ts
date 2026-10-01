@@ -24,7 +24,7 @@ import {
   type AuthzScopeRef,
   PLATFORM_OPERATOR_PERMISSIONS,
 } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import type { SystemMigration } from "@langwatch/system-migrations";
 

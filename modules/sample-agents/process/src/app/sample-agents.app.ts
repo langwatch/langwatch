@@ -1,4 +1,4 @@
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import type { MembersRead } from "@langwatch/process-stores/members";
 import {
   SampleAgentsApi,

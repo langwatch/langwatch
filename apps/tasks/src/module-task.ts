@@ -1,6 +1,6 @@
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { createLogger } from "@langwatch/observability";
-import { processConfig, Server } from "@langwatch/process-server";
+import { processConfig, Server } from "@langwatch/process";
 import { Task, TaskCatalogue } from "@langwatch/task";
 
 import { processEnvironment } from "./config.ts";

@@ -11,7 +11,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { LocalFeatureApis } from "@langwatch/kernel";
+import { LocalFeatureApis } from "@langwatch/process";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { organizationKeyFacts } from "../organization-management.rest.ts";

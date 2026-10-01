@@ -7,8 +7,8 @@ import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc"
  */
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";

@@ -9,12 +9,6 @@ import {
   replayProjectionsOf,
 } from "@langwatch/eventing";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
-/**
- * Builds the {@link OpsAppInfrastructure} `apps/api/src/features/ops/ops.composition.ts`
- * (deleted by b383462d96) used to hand-compose. Answers each api-unavailable
- * capability with its named refusal, exactly as that composition did.
- */
-import type { ResourceOwnership } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
 import {
   type OpsServerConfig,
@@ -23,6 +17,12 @@ import {
   type OpsQueueReconcileOutcome,
   type QueueInfo,
 } from "@langwatch/ops-contract";
+/**
+ * Builds the {@link OpsAppInfrastructure} `apps/api/src/features/ops/ops.composition.ts`
+ * (deleted by b383462d96) used to hand-compose. Answers each api-unavailable
+ * capability with its named refusal, exactly as that composition did.
+ */
+import type { ResourceOwnership } from "@langwatch/process";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";

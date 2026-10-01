@@ -56,10 +56,10 @@ import {
   type SignedInWith,
   SignInMethodPolicyService,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   internalSlackSignupsWebhook,
@@ -83,7 +83,6 @@ import {
 } from "../eventing/auth-lifecycle.pipeline.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
-import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
@@ -91,6 +90,7 @@ import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
+import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
 import { AuthDoorService } from "../services/auth-door.service.ts";
 import {
   AuthLifecycleNoticeService,
@@ -178,7 +178,7 @@ const AUTH_CLOSED_READS = [
 export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
   Readonly<{
     /** The public base URL this process was deployed under, or absent where
-     * it named none — the process's own fact (`packages/process-server`),
+     * it named none — the process's own fact (`packages/process`),
      * never a module-declared env spelling. */
     publicBaseUrl: string | undefined;
     /** The address the identifier ledger holds for a person, where it holds

@@ -65,6 +65,7 @@ describe("defineTrpcContract", () => {
 
       expect(valueImports(sourceOf("../index.ts"))).toEqual([
         "./module-api-token.ts",
+        "./dependency-token.ts",
         "./supply-token.ts",
         "./module-namespace.ts",
         "./contract/trpc-contract.ts",

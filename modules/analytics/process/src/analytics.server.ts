@@ -1,6 +1,6 @@
 import { langWatchQLKeyReach } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, keyCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { AnalyticsApp } from "./app/analytics.app.ts";
 import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";

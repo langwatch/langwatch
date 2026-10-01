@@ -1,4 +1,4 @@
-import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 

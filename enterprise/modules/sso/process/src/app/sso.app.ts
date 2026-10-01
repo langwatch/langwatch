@@ -68,8 +68,8 @@ import {
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { IdentityApi, SsoConnectionNotFoundError } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { signInProviderSecrets } from "@langwatch/secrets";
 
 import {

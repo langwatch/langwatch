@@ -4,7 +4,7 @@ import {
   bindRestMiddleware,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What a process composes this feature's process-side work from: the ingestion

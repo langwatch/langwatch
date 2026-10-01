@@ -1,3 +1,4 @@
+import { type TransportPeers } from "@langwatch/api";
 /** The api installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13). */
 import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
@@ -5,13 +6,12 @@ import { EventSourcing } from "@langwatch/eventing";
 import { serverModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
-  storesBackedMembers,
-  withMemoryRepositories,
   type ExposedSurface,
   type InstallableServerFeature,
-  type TransportPeers,
-} from "@langwatch/kernel";
-import { processConfig } from "@langwatch/process-server";
+  processConfig,
+  storesBackedMembers,
+  withMemoryRepositories,
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,

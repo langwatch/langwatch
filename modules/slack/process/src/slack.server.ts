@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { SlackApp } from "./app/slack.app.ts";
 import { slackRepositories } from "./repositories/slack-repositories.registry.ts";

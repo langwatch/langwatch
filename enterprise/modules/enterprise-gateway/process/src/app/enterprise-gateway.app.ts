@@ -28,7 +28,6 @@ import {
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-gateway-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   ModelProviderApi,
   suggestTierTargets,
@@ -36,6 +35,7 @@ import {
   type TierTargetSuggestion,
 } from "@langwatch/model-provider-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 
 import type { EnterpriseGatewayRepositories } from "../repositories/routing-policy.repository.ts";

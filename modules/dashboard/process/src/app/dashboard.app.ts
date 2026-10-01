@@ -33,7 +33,7 @@ import {
   type SavedWorkbenchChartDefinitionUpdate,
   type DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";

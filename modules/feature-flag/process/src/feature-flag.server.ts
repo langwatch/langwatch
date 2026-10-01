@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { FeatureFlagApp } from "./app/feature-flag.app.ts";
 import { featureFlagRepositories } from "./repositories/feature-flag-repositories.registry.ts";

@@ -14,14 +14,14 @@ import {
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { serverModules } from "@langwatch/installed-server-modules";
+import { ModuleApiToken } from "@langwatch/module";
 import {
   bootInstalledProcess,
+  type InstallableServerFeature,
+  processConfig,
   storesBackedMembers,
   withMemoryRepositories,
-  type InstallableServerFeature,
-} from "@langwatch/kernel";
-import { ModuleApiToken } from "@langwatch/module";
-import { processConfig } from "@langwatch/process-server";
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,

@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 import type { WebhookEnvelope, WebhookSpendEventRow } from "@langwatch/webhook-contract";
 
 import { WebhookApp } from "./app/webhook.app.ts";

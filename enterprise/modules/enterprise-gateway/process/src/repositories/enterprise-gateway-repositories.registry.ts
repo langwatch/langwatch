@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemoryEnterpriseGatewayRepositories } from "./memory/memory.enterprise-gateway.repositories.ts";
 import { PrismaEnterpriseGatewayRepositories } from "./prisma/prisma.enterprise-gateway.repositories.ts";

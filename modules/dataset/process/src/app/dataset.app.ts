@@ -45,8 +45,8 @@ import {
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
+import type { FeatureSetup } from "@langwatch/process";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";

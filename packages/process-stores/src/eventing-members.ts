@@ -6,10 +6,11 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   createEventingGroupQueueFactory,
+  type EventingParticipation,
   EventSourcing,
-  EventStoreProducerOnly,
-  type EventStore,
   type EventSourcingOptions,
+  type EventStore,
+  EventStoreProducerOnly,
   type ProcessStore,
 } from "@langwatch/eventing";
 import {
@@ -29,7 +30,6 @@ import {
   type GroupQueueContextMetadata,
 } from "@langwatch/group-queue";
 import { BlobSweeper } from "@langwatch/group-queue/operational";
-import type { EventingParticipation } from "@langwatch/kernel";
 import {
   createContextFromJobData,
   getJobContextMetadata,

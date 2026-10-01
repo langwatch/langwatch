@@ -8,7 +8,6 @@ import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type {
   MailDeliveryView,
   NotificationService,
@@ -16,6 +15,7 @@ import type {
 } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { resolvedSecrets } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";

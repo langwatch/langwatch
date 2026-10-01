@@ -16,13 +16,13 @@ import {
   type GrantScopeTier,
 } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationApi,
   PersonalWorkspaceNotManagedHereError,
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   OrgExclusivePermissionScopeError,

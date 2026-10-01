@@ -8,11 +8,6 @@ import {
   type AuthzScopeLineageResult,
   type PermissionDecision,
 } from "@langwatch/authorization";
-import type {
-  FeatureTrpcHost,
-  FeatureTrpcMountOptions,
-  MountableTransport,
-} from "@langwatch/kernel";
 import {
   SCHEMA_HASH_HEADER,
   schemaHashOf,
@@ -25,6 +20,11 @@ import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
 import type { Authorize, Entitlements } from "../access/access.ts";
+import type {
+  FeatureTrpcHost,
+  FeatureTrpcMountOptions,
+  MountableTransport,
+} from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
 import type { SessionCaller, SessionReader } from "../rest/credential.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";

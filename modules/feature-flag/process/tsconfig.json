@@ -35,9 +35,6 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/module/tsconfig.build.json"
     },
     {
@@ -48,6 +45,9 @@
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/process-stores/tsconfig.build.json"

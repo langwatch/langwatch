@@ -36,7 +36,6 @@ import {
   type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 /**
@@ -46,6 +45,7 @@ import { NotificationService } from "@langwatch/notification-contract";
  */
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";

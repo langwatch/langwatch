@@ -6,8 +6,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { evaluatorSchema, type EvaluatorApi } from "@langwatch/evaluator-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { DataRetentionApp } from "./app/data-retention.app.ts";
 import { dataRetentionRepositories } from "./repositories/data-retention-repositories.registry.ts";

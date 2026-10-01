@@ -3,8 +3,8 @@ import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contrac
 import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";

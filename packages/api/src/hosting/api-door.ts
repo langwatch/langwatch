@@ -1,14 +1,13 @@
-/**
- * The one door every API request passes: who is calling, and what they may do. auth binds it
- * from the peers it already holds; the process opens it before its hosts (record §4, §8).
- */
-import type { TransportFactBinding, TransportPeers } from "@langwatch/kernel";
-
 import type { Authorize, Entitlements } from "../access/access.ts";
 import type { SessionVerification } from "../rest/credential.ts";
 import type { RestAuditSink, RestIdentity } from "../rest/runtime.ts";
 import type { TrpcAuditSink } from "../trpc/host.ts";
 import type { TrpcSessionVersions } from "../trpc/session-version.ts";
+/**
+ * The one door every API request passes: who is calling, and what they may do. auth binds it
+ * from the peers it already holds; the process opens it before its hosts (record §4, §8).
+ */
+import type { TransportFactBinding, TransportPeers } from "./transport-hosts.ts";
 
 export type ApiDoor = Readonly<{
   /** Who a browser request is; the process's session reader asks it once per request. */

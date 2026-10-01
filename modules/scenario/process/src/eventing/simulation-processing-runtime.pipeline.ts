@@ -1,7 +1,11 @@
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { createTenantId } from "@langwatch/eventing";
-import type { EventingParticipation, PriorEventsRead, ResourceOwnership } from "@langwatch/kernel";
+import {
+  createTenantId,
+  type EventingParticipation,
+  type PriorEventsRead,
+} from "@langwatch/eventing";
+import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   loadRunAttachments,

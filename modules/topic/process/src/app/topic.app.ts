@@ -1,7 +1,7 @@
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import type { Instant } from "@langwatch/time";
 import type {
   Topic,

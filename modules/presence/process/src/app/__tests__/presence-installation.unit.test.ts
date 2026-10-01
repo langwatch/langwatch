@@ -1,10 +1,10 @@
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 /**
  * The installer, booted the way a process boots it: memory sessions, the peers
  * it names in `static dependencies`, and the one namespace it contributes.
  * @see modules/presence/specs/presence.feature
  */
 import { PresenceApi } from "@langwatch/presence-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { presenceServer } from "../../presence.server.ts";

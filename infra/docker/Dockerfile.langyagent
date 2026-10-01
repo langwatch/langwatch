@@ -138,7 +138,7 @@ COPY packages/api ./packages/api
 COPY packages/api-fixture ./packages/api-fixture
 COPY packages/config ./packages/config
 COPY packages/handled-error ./packages/handled-error
-COPY packages/kernel ./packages/kernel
+COPY packages/module ./packages/module
 COPY packages/ksuid ./packages/ksuid
 COPY packages/observability ./packages/observability
 COPY packages/secrets ./packages/secrets

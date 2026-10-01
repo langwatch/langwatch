@@ -1,5 +1,5 @@
 import { bindRestCredential } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { LicensingApp } from "./app/licensing.app.ts";
 import { licenseSyncEventing } from "./eventing/license-sync.pipeline.ts";

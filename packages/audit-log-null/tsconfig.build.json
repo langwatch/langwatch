@@ -15,10 +15,10 @@
       "path": "../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
-      "path": "../kernel/tsconfig.build.json"
+      "path": "../module/tsconfig.build.json"
     },
     {
-      "path": "../module/tsconfig.build.json"
+      "path": "../process/tsconfig.build.json"
     }
   ]
 }

@@ -8,8 +8,8 @@ import {
   type SeedRunReport,
 } from "@langwatch/enterprise-demo-data-contract";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant } from "@langwatch/time";
 

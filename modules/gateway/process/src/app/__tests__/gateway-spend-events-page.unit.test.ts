@@ -5,8 +5,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * virtual-key display-name resolution — moved here so REST and tRPC agree.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";

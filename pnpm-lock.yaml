@@ -988,9 +988,6 @@ importers:
       '@langwatch/installed-server-modules':
         specifier: workspace:*
         version: link:../../packages/installed-server-modules
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../packages/ksuid
@@ -1060,9 +1057,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../packages/prisma-client
-      '@langwatch/process-server':
+      '@langwatch/process':
         specifier: workspace:*
-        version: link:../../packages/process-server
+        version: link:../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../packages/process-stores
@@ -1719,9 +1716,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../packages/prisma-client
-      '@langwatch/process-server':
+      '@langwatch/process':
         specifier: workspace:*
-        version: link:../../packages/process-server
+        version: link:../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../packages/process-stores
@@ -1756,9 +1753,6 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../packages/api-fixture
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../packages/kernel
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../modules/prompt/contract
@@ -2337,9 +2331,6 @@ importers:
       '@langwatch/installed-server-modules':
         specifier: workspace:*
         version: link:../../packages/installed-server-modules
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../packages/ksuid
@@ -2409,9 +2400,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../packages/prisma-client
-      '@langwatch/process-server':
+      '@langwatch/process':
         specifier: workspace:*
-        version: link:../../packages/process-server
+        version: link:../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../packages/process-stores
@@ -2806,9 +2797,6 @@ importers:
       '@langwatch/internal-slack':
         specifier: workspace:*
         version: link:../../../../packages/internal-slack
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
@@ -2839,6 +2827,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../modules/project/contract
@@ -2922,15 +2913,15 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../packages/eventing
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -3005,9 +2996,6 @@ importers:
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
@@ -3023,6 +3011,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -3100,15 +3091,15 @@ importers:
       '@langwatch/enterprise-ops-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -3373,9 +3364,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
@@ -3403,6 +3391,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -3607,9 +3598,6 @@ importers:
       '@langwatch/internal-slack':
         specifier: workspace:*
         version: link:../../../../packages/internal-slack
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
@@ -3628,6 +3616,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -3733,15 +3724,15 @@ importers:
       '@langwatch/enterprise-managed-provider-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
     devDependencies:
       '@langwatch/secrets':
         specifier: workspace:*
@@ -3807,9 +3798,6 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../../../modules/experiment/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
@@ -3825,6 +3813,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../modules/project/contract
@@ -3951,9 +3942,6 @@ importers:
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
@@ -3963,6 +3951,9 @@ importers:
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -4134,9 +4125,6 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
@@ -4155,6 +4143,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -4323,15 +4314,15 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../../packages/process
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
@@ -4634,9 +4625,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -4649,6 +4637,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -5004,9 +4995,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -5019,6 +5007,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -5229,9 +5220,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -5250,6 +5238,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -5473,9 +5464,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -5491,6 +5479,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -5571,9 +5562,6 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -5589,6 +5577,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -5829,9 +5820,6 @@ importers:
       '@langwatch/internal-slack':
         specifier: workspace:*
         version: link:../../../packages/internal-slack
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -5859,6 +5847,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -6057,9 +6048,6 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -6075,6 +6063,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -6327,9 +6318,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -6354,6 +6342,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -6558,9 +6549,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/log-contract':
         specifier: workspace:*
         version: link:../../log/contract
@@ -6579,6 +6567,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -6683,9 +6674,6 @@ importers:
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -6698,6 +6686,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -6848,9 +6839,6 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -6866,6 +6854,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -7007,9 +6998,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -7025,6 +7013,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -7290,9 +7281,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -7308,6 +7296,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -7418,9 +7409,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -7436,6 +7424,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -7552,9 +7543,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -7573,6 +7561,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -7880,9 +7871,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -7901,6 +7889,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -8261,9 +8252,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -8288,6 +8276,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -8471,9 +8462,6 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -8486,6 +8474,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -8705,9 +8696,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -8735,6 +8723,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -8912,9 +8903,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -8933,6 +8921,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -9019,9 +9010,6 @@ importers:
       '@langwatch/hosted-mcp-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -9037,6 +9025,9 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -9150,9 +9141,6 @@ importers:
       '@langwatch/internal-slack':
         specifier: workspace:*
         version: link:../../../packages/internal-slack
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -9177,6 +9165,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -9305,9 +9296,6 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -9323,6 +9311,9 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -9696,9 +9687,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -9729,6 +9717,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -9869,9 +9860,6 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/log-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9887,6 +9875,9 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9961,9 +9952,6 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -9982,6 +9970,9 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -10198,9 +10189,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -10219,6 +10207,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -10399,9 +10390,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -10417,6 +10405,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -10661,9 +10652,6 @@ importers:
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -10679,6 +10667,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -10877,9 +10868,6 @@ importers:
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
@@ -10904,6 +10892,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -11183,9 +11174,6 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../instant-eval/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -11222,6 +11210,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -11495,9 +11486,6 @@ importers:
       '@langwatch/internal-slack':
         specifier: workspace:*
         version: link:../../../packages/internal-slack
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -11522,6 +11510,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -11629,9 +11620,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -11647,6 +11635,9 @@ importers:
       '@langwatch/platform-health-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -11770,9 +11761,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -11782,6 +11770,9 @@ importers:
       '@langwatch/presence-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -12028,9 +12019,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -12046,6 +12034,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../contract
@@ -12332,9 +12323,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -12353,6 +12341,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -12448,9 +12439,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -12463,6 +12451,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -12540,15 +12531,15 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../../../packages/react-rum
@@ -12614,15 +12605,15 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -12984,9 +12975,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -13008,6 +12996,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -13218,9 +13209,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -13233,6 +13221,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -13368,9 +13359,6 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -13383,6 +13371,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -13530,9 +13521,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -13548,6 +13536,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -13649,9 +13640,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -13664,6 +13652,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -13838,9 +13829,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -13856,6 +13844,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -13997,9 +13988,6 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14015,6 +14003,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -14468,9 +14459,6 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../instant-eval/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14501,6 +14489,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -14792,9 +14783,6 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14816,6 +14804,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -14935,9 +14926,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14950,6 +14938,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -15307,9 +15298,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -15334,6 +15322,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -15429,9 +15420,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../module
@@ -15554,12 +15542,12 @@ importers:
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../modules/audit-log/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../module
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../process
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -16109,9 +16097,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../ksuid
@@ -16337,9 +16322,6 @@ importers:
       '@langwatch/instant-eval-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval/process
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../kernel
       '@langwatch/langy-process':
         specifier: workspace:*
         version: link:../../modules/langy/process
@@ -16373,6 +16355,9 @@ importers:
       '@langwatch/presence-process':
         specifier: workspace:*
         version: link:../../modules/presence/process
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../process
       '@langwatch/project-process':
         specifier: workspace:*
         version: link:../../modules/project/process
@@ -16567,34 +16552,6 @@ importers:
       '@slack/types':
         specifier: ^2.21.1
         version: 2.21.1
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/kernel:
-    dependencies:
-      '@langwatch/config':
-        specifier: workspace:*
-        version: link:../config
-      '@langwatch/module':
-        specifier: workspace:*
-        version: link:../module
-      '@langwatch/secrets':
-        specifier: workspace:*
-        version: link:../secrets
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -16886,7 +16843,7 @@ importers:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  packages/process-server:
+  packages/process:
     dependencies:
       '@langwatch/actor':
         specifier: workspace:*
@@ -16897,12 +16854,12 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../eventing
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../module
@@ -16928,6 +16885,12 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -16964,9 +16927,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../kernel
       '@langwatch/module':
         specifier: workspace:*
         version: link:../module

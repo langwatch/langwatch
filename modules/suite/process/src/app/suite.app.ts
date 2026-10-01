@@ -20,8 +20,8 @@ import {
   type FeatureFlagApi as FeatureFlagApiType,
 } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
 import {

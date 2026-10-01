@@ -6,7 +6,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
 import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 

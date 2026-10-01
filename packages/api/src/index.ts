@@ -44,6 +44,17 @@ export {
   type RawHttpListener,
 } from "./raw-http.ts";
 
+export type {
+  BoundTransportFacts,
+  FeatureRestHost,
+  FeatureRestMountOptions,
+  FeatureTrpcHost,
+  FeatureTrpcMountOptions,
+  MountableTransport,
+  TransportFactBinding,
+  TransportPeers,
+} from "./hosting/transport-hosts.ts";
+
 export type { ApiSchema, ApiSchemaOutput } from "./schema.ts";
 
 // The access-policy vocabulary: what credential an operation accepts, and what

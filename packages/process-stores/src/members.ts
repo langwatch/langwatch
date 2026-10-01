@@ -224,3 +224,11 @@ export const MEMBER_NAMES = [
 export type MembersRead<Names extends readonly MemberName[]> = {
   readonly [Name in Names[number]]: ProcessMembers[Name];
 };
+
+/** What a process's opened stores hand boot: names in build order, values on demand. */
+export interface StoresMemberSource {
+  /** Repository selection belongs to the whole supplied store tier. */
+  readonly tier?: "live" | "memory";
+  readonly order: readonly string[];
+  read(name: string): unknown;
+}

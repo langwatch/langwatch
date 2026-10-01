@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { DataPrivacyApp } from "./app/data-privacy.app.ts";
 import { dataPrivacyRepositories } from "./repositories/data-privacy-repositories.registry.ts";

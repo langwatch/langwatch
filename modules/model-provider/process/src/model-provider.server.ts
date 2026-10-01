@@ -1,7 +1,7 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { defineServerModule } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { defineServerModule } from "@langwatch/process";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 

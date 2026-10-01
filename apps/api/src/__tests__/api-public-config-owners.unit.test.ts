@@ -1,5 +1,5 @@
 import { serverModules } from "@langwatch/installed-server-modules";
-import { isProcessModule, processConfig } from "@langwatch/process-server";
+import { isProcessModule, processConfig } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 describe("the modules a container takes from the server's config", () => {

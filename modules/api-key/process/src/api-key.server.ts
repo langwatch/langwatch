@@ -4,7 +4,7 @@ import {
   organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 import type { Instant } from "@langwatch/time";
 
 import { ApiKeyApp } from "./app/api-key.app.ts";

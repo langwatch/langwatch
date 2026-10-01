@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { TopicApp } from "./app/topic.app.ts";
 import { topicClusteringEventing } from "./eventing/topic-clustering-processing.pipeline.ts";

@@ -1,5 +1,5 @@
 import { FeatureFlagApi, UnknownFeatureFlagError } from "@langwatch/feature-flag-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { featureFlagServer } from "../../feature-flag.server.ts";

@@ -1,5 +1,5 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import {
   composeTraceLegacyRead,

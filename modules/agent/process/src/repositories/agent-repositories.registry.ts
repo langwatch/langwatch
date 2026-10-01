@@ -1,6 +1,6 @@
-import { defineRepositories } from "@langwatch/kernel";
 import { prismaRepositories } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { defineRepositories } from "@langwatch/process";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { AgentRepositories } from "./agent.repositories.ts";

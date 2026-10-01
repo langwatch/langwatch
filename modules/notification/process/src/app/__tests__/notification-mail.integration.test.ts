@@ -1,8 +1,8 @@
 import { once } from "node:events";
 import { createServer, type Server, type Socket } from "node:net";
 
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { afterEach, describe, expect, it } from "vitest";
 

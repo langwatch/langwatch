@@ -1,5 +1,5 @@
 import { managedProviderSecrets } from "@langwatch/enterprise-managed-provider-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import { SecretsChain, SecretsResolver, type ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 

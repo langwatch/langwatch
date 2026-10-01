@@ -11,7 +11,7 @@ import {
   type EvaluationRunData,
   type EvaluationRunsByTraceQuery,
 } from "@langwatch/evaluation-contract";
-import type { EventingCommands } from "@langwatch/eventing";
+import type { EventingCommands, EventingParticipation } from "@langwatch/eventing";
 import { ValidationError } from "@langwatch/handled-error";
 import type {
   InstantEvalApi,
@@ -19,10 +19,10 @@ import type {
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";

@@ -75,6 +75,6 @@ export function lintBrowserNodeLeaks(snapshot: WorkspaceSnapshot): ArchitectureV
     specifier: finding.specifier,
     message: `\`${finding.specifier}\` is a Node.js builtin, imported here in a file a browser-reachable package (a *-contract or *-browser package, or the Design System) can reach.`,
     allowed:
-      "Move the Node-only code behind a leaf subpath export the browser never resolves — the pattern @langwatch/secrets and @langwatch/kernel use (ADR-132) — so the package's default entry stays portable.",
+      "Move the Node-only code behind a leaf subpath export the browser never resolves — the pattern @langwatch/secrets and @langwatch/eventing use (ADR-132) — so the package's default entry stays portable.",
   }));
 }

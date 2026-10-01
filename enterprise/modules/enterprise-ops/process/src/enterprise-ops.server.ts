@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { EnterpriseOpsApp } from "./app/enterprise-ops.app.ts";
 import { licenseRegistryTrpcTransport } from "./transport/license-registry.trpc.ts";

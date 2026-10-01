@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { ShareApp } from "./app/share.app.ts";
 import { shareRepositories } from "./repositories/share-repositories.registry.ts";

@@ -41,7 +41,7 @@
     "@langwatch/ops-process": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
-    "@langwatch/process-server": "workspace:*",
+    "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
@@ -55,7 +55,6 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",

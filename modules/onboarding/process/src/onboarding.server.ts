@@ -1,5 +1,5 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { OnboardingApp } from "./app/onboarding.app.ts";
 import { guidedOnboardingLifecycleEventing } from "./eventing/guided-onboarding-lifecycle.pipeline.ts";

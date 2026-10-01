@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { RumApp } from "./app/rum.app.ts";
 import { rumRepositories } from "./repositories/rum-repositories.registry.ts";

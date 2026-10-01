@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { SecretApp } from "./app/secret.app.ts";
 import { secretRepositories } from "./repositories/secret-repositories.registry.ts";

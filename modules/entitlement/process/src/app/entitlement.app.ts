@@ -24,7 +24,6 @@ import {
   PlanLimitExceededError,
 } from "@langwatch/entitlement-contract";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
@@ -32,6 +31,7 @@ import {
   type RequestBoundKey,
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";

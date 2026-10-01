@@ -1,5 +1,5 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import { RoleApp } from "./app/role.app.ts";
 import { roleRepositories } from "./repositories/role-repositories.registry.ts";

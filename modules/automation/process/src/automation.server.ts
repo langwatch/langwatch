@@ -1,6 +1,6 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { defineServerModule } from "@langwatch/kernel";
+import { defineServerModule } from "@langwatch/process";
 
 import {
   composeAutomationGraphActivity,
