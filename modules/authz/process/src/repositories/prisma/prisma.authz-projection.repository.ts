@@ -139,11 +139,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
       case "role.delete":
         // A compat binding still naming the role would be nulled by the
         // foreign key and fail the custom-role check, so it goes first.
-        await this.prisma.$transaction([
-          this.prisma.roleBinding.deleteMany({ where: { customRoleId: write.roleId } }),
-          this.prisma.customRole.deleteMany({ where: { id: write.roleId } }),
-        ]);
-        return;
+        return this.compatForRoleDelete(write.roleId);
     }
   }
 
@@ -274,6 +270,23 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
         where: { projectId: row.projectId, id: grantId },
       });
     }
+  }
+
+  /** The tenant guard refuses a binding delete naming no organization: read the role's own. */
+  private async compatForRoleDelete(roleId: string): Promise<void> {
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+      select: { organizationId: true },
+    });
+    if (!role) return;
+    await this.prisma.$transaction([
+      this.prisma.roleBinding.deleteMany({
+        where: { organizationId: role.organizationId, customRoleId: roleId },
+      }),
+      this.prisma.customRole.deleteMany({
+        where: { organizationId: role.organizationId, id: roleId },
+      }),
+    ]);
   }
 
   /** A write the guard skipped mirrors only a redelivery of the live head;

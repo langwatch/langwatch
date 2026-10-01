@@ -34,7 +34,7 @@ flows:
           selector: .react-flow__node[data-id="entry"]
       - action: click
         with:
-          testId: attach-dataset-button
+          text: /^\s*Replace\s*$/
       - action: click
         with:
           testId: dataset-card-Visual Diff QA
@@ -53,7 +53,7 @@ flows:
           path: /{slug}/workflows
       - action: click
         with:
-          text: vd-wfds-{uid}
+          selector: 'a:has-text("vd-wfds-{uid}"), button[aria-label="vd-wfds-{uid}"]'
       - action: click
         with:
           selector: .react-flow__node[data-id="entry"]
@@ -98,7 +98,7 @@ flows:
           text: vd-wfdel-{uid}
       - action: click
         with:
-          selector: a:has-text("vd-wfdel-{uid}") button.js-inner-menu
+          selector: 'a:has-text("vd-wfdel-{uid}") button.js-inner-menu, [data-testid="workflow-card-vd-wfdel-{uid}"] button.js-inner-menu'
       - action: click
         with:
           text: /^\s*Delete\s*$/
@@ -262,7 +262,7 @@ flows:
           path: "/{slug}/workflows"
       - action: click
         with:
-          text: "vd-wfnode-{uid}"
+          selector: 'a:has-text("vd-wfnode-{uid}"), button[aria-label="vd-wfnode-{uid}"]'
       - action: expect
         with:
           count: '.react-flow__node[data-id="code"]'
@@ -298,7 +298,7 @@ flows:
           timeout: "30000"
       - action: click
         with:
-          selector: .react-flow__node[data-id="llm_call"] button:has(svg.feather-play)
+          selector: .react-flow__node[data-id="llm_call"] button:has(svg:has(polygon[points="5 3 19 12 5 21 5 3"]))
       - action: click
         with:
           text: Run workflow until here
@@ -310,7 +310,7 @@ flows:
           testId: run-until-here-run
       - action: expect
         with:
-          count: .react-flow__node[data-id="llm_call"] svg.feather-check
+          count: .react-flow__node[data-id="llm_call"] svg:has(polyline[points="20 6 9 17 4 12"])
           timeout: "90000"
 
   - id: workflow-add-evaluator-node-connect-save
@@ -386,7 +386,7 @@ flows:
           path: "/{slug}/workflows"
       - action: click
         with:
-          text: "vd-wfev-{uid}"
+          selector: 'a:has-text("vd-wfev-{uid}"), button[aria-label="vd-wfev-{uid}"]'
       - action: expect
         with:
           count: '.react-flow__node[data-id="evaluator"]'
@@ -422,7 +422,7 @@ flows:
           timeout: "30000"
       - action: click
         with:
-          selector: .react-flow__node[data-id="end"] button:has(svg.feather-play)
+          selector: .react-flow__node[data-id="end"] button:has(svg:has(polygon[points="5 3 19 12 5 21 5 3"]))
       - action: click
         with:
           text: Run workflow until here
@@ -438,15 +438,15 @@ flows:
           testId: run-until-here-run
       - action: expect
         with:
-          count: .react-flow__node[data-id="llm_call"] svg.feather-check
+          count: .react-flow__node[data-id="llm_call"] svg:has(polyline[points="20 6 9 17 4 12"])
           timeout: "90000"
       - action: expect
         with:
-          count: .react-flow__node[data-id="end"] svg.feather-check
+          count: .react-flow__node[data-id="end"] svg:has(polyline[points="20 6 9 17 4 12"])
           timeout: "30000"
       - action: click
         with:
-          selector: '.react-flow__node[data-id="llm_call"] div[role="button"]:has(svg.feather-check)'
+          selector: '.react-flow__node[data-id="llm_call"] div[role="button"]:has(svg:has(polyline[points="20 6 9 17 4 12"]))'
       - action: expect
         with:
           text: Outputs
@@ -483,7 +483,7 @@ flows:
           selector: '.react-flow__node[data-id="entry"]'
       - action: click
         with:
-          testId: attach-dataset-button
+          text: /^\s*Replace\s*$/
       - action: click
         with:
           testId: dataset-card-Visual Diff QA
@@ -574,7 +574,7 @@ flows:
           path: "/{slug}/workflows"
       - action: click
         with:
-          text: "vd-wfrst-{uid}"
+          selector: 'a:has-text("vd-wfrst-{uid}"), button[aria-label="vd-wfrst-{uid}"]'
       - action: expect
         with:
           count: '.react-flow__node[data-id="entry"]'
@@ -624,7 +624,7 @@ flows:
           path: "/{slug}/workflows"
       - action: click
         with:
-          text: "vd-wfpub-{uid}"
+          selector: 'a:has-text("vd-wfpub-{uid}"), button[aria-label="vd-wfpub-{uid}"]'
       - action: expect
         with:
           count: '.react-flow__node[data-id="entry"]'
@@ -790,7 +790,8 @@ flows:
           text: Go to end node
       - action: expect
         with:
-          testId: attach-dataset-button
+          testId: entry-dataset-card
+          hasText: Draft Dataset
 
   - id: workflow-studio-http-node-panel
     title: Drop an HTTP Call node, open its properties and read the Body, Auth, Headers and Test tabs
