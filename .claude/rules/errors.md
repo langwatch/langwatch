@@ -2,7 +2,7 @@
 paths:
   - "**/*.errors.ts"
   - "packages/handled-error/**"
-  - "packages/error-presentation/**"
+  - "packages/handled-error/**"
   - "modules/*/process/src/services/**"
   - "modules/*/process/src/transport/**"
   - "enterprise/modules/*/process/src/services/**"
@@ -16,8 +16,8 @@ Read `dev/docs/best_practices/error-handling.md` and ADR-045. Throw a
 Everything else stays a plain `Error` and degrades to a generic "unknown" plus a
 trace id; never dress an infrastructure failure up as handled.
 
-- A new code goes in `packages/error-presentation/src/app-codes.ts` (sorted)
-  with a customer-safe entry in `packages/error-presentation/src/presentation.ts`
+- A new code goes in `packages/handled-error/src/app-codes.ts` (sorted)
+  with a customer-safe entry in `packages/handled-error/src/presentation.ts`
   in the same change. That registry is the words a customer reads.
 - `message` is customer-safe: no env vars, hostnames or internal service names.
 - A 5xx subclass sets `fault` (`platform` or `provider`) explicitly. The default,

@@ -21,8 +21,8 @@ repositories, channels and the module class stay thin.
 ```
 process/src/
 ├── index.ts                    installer + transport declarations, nothing else
-├── monitor.server.ts           the installer (§16: target stem is .module.ts)
-├── app/monitor.app.ts          the module class (§16: target name is *Module)
+├── monitor.module.ts           the installer
+├── app/monitor.app.ts          the module class (`MonitorModule`)
 ├── services/*.service.ts       behaviour, one class per entity
 ├── repositories/
 │   ├── monitor.repository.ts           interface
@@ -73,7 +73,7 @@ accepts it; no module has moved yet.
    the pure functions over them live here, not as `*Service` classes
    (`rules/monitor-platform-url.rules.ts`). Only a real named decision earns
    a rule; assembly stays in the service.
-7. **The module class is thin forwarding.** `MonitorApp` builds services in its
+7. **The module class is thin forwarding.** `MonitorModule` builds services in its
    constructor from the repositories and forwards each `MonitorApi` operation
    (`app/monitor.app.ts`). Services and peers are `#private`; the public
    surface is exactly the API's operations. Logic in the class is a defect.
@@ -122,9 +122,9 @@ function with its own unit test.
   Propose, do not write.
 - **A catch-all `utils.ts` or a `Date.now()` in a rule.** Both are refused:
   the first by the grammar, the second by the rules purity check.
-- **Today versus target names.** Today: `defineServerModule`, `*App`,
-  `.withApp`, `<f>.server.ts`. §16 lists the target (`defineProcessModule`,
-  `*Module`, `.withApi`, `<f>.module.ts`). Write today's; the §15 spellings
+- **Deleted names.** `defineServerModule`, `*App` classes, `.withApp` and
+  `<f>.server.ts` are gone (§15); write `defineProcessModule`, `*Module`,
+  `.withApi` and `<f>.module.ts`. The other §15 spellings
   (`createProcess`, `withMemoryRepositories` in new code, `members:` options)
   are deleted. Existing tests under `app/__tests__/` still use some; copy the
   shape from §13, not those lines.

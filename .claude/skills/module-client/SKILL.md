@@ -1,6 +1,6 @@
 ---
 name: module-client
-description: "Create or use a <name>-client package (modules/<name>/client): the typed tRPC hooks another module's browser reads. Use when someone says 'read another module's data in the browser', 'prompt-client', 'dataset-client', 'a client package', 'createModuleApi', 'ContractApiMap', 'derived tRPC client', 'ui-kernel wire', 'httpLink', 'request batching', 'the tRPC client in the browser', 'AppRouter in the UI', or 'can my screen call another module's procedure'. Teaches the record (ARCHITECTURE.md section 2 wire row, 3.4, 10)."
+description: "Create or use a <name>-client package (modules/<name>/client): the typed tRPC hooks another module's browser reads. Use when someone says 'read another module's data in the browser', 'prompt-client', 'dataset-client', 'a client package', 'createModuleApi', 'ContractApiMap', 'derived tRPC client', 'browser wire', 'httpLink', 'request batching', 'the tRPC client in the browser', 'AppRouter in the UI', or 'can my screen call another module's procedure'. Teaches the record (ARCHITECTURE.md section 2 wire row, 3.4, 10)."
 user-invocable: true
 argument-hint: "<module name or data question>"
 ---
@@ -19,12 +19,12 @@ each). A module with tRPC procedures gets `modules/<name>/client`, package
 ```
 contract (<name>Trpc)  --ContractApiMap-->  createModuleApi()  -->  hooks (useQuery, useMutation, useUtils)
                                                        |
-                  @langwatch/ui-kernel owns the one browser client: httpLink + SSE link + query client
+                  @langwatch/browser owns the one browser client: httpLink + SSE link + query client
 ```
 
 - `@langwatch/api/web` derives the typed client from the contract's declarations.
-- `@langwatch/ui-kernel` owns the transport (one client per application,
-  `packages/ui-kernel/src/transport.ts`), the SSE subscription link and the
+- `@langwatch/browser` owns the transport (one client per application,
+  `packages/browser/src/transport.ts`), the SSE subscription link and the
   query client. Only a client package and a screen's `behavior/` import it.
   A design-system component fetches nothing.
 - The browser calls no REST.
@@ -36,7 +36,7 @@ contract (<name>Trpc)  --ContractApiMap-->  createModuleApi()  -->  hooks (useQu
 2. **A client holds only the hooks `createModuleApi` derives, plus at most a
    few thin convenience hooks.** Never a component.
 3. **It imports its own contract and `@langwatch/api/web`, nothing else**: no
-   other client, no browser package, no ui-kernel, no `browser-host`. A hook that
+   other client, no browser package, no `@langwatch/browser`, no `browser-host`. A hook that
    combines two modules lives in the screen that needs it.
 4. **One call per request over `httpLink`.** Each answer carries its own
    status, session version and schema hash. The record rules batching out
@@ -89,7 +89,7 @@ evaluator, prompt and scenario have one.
 - **Calling a procedure by path from a typed hook's key.** A surface too wide
   for a typed hook uses the shell's `UiRpc`; never re-enter the cache under the
   key being resolved (§10).
-- **`ui-kernel` still says "batching" in §2.** The record contradicts itself
+- **`@langwatch/browser` still says "batching" in §2.** The record contradicts itself
   there; the `No request batching` ruling (§10) is the newer one.
 - Host-service wiring, lending and entitlement are not here: the future
   `module-dependencies` skill. Where the hook is used: `browser-module`.

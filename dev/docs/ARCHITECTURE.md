@@ -27,6 +27,13 @@ transport hosting, static serving, error formatting, lifecycle, signals,
 listeners, per-domain compositions, features trees — belongs to the framework
 packages below.
 
+**One exception to "no product code" in shape, not in kind (R4, Alex, 2026-10-01).** An app may also
+hold a generated module list: the process apps (`api`, `worker`, `tasks`) each carry the list of
+installed process halves, and `apps/ui` the list of installed browser halves, written by
+`pnpm generate:modules` from `modules/catalogue.json` and never edited by hand. Each app depends only
+on the half it runs, so no declared edge reaches a browser package from a process app. The
+`installed-*` packages are deleted.
+
 `apps/scenario-child` is the one exception: a standalone program the scenario
 module spawns per run, which owns its own logic (adapters, turn execution) and
 reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
@@ -52,7 +59,7 @@ Named by one rule: **where the code runs, or what it declares.**
 |          | core                | runs + declares      | reads                       | wire                   | shares          |
 | -------- | ------------------- | -------------------- | --------------------------- | ---------------------- | --------------- |
 | **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api`       | contracts       |
-| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/ui-kernel` | `<name>-client` |
+| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/browser`   | `<name>-client` |
 
 The core is a contract's only framework import and is incredibly light;
 each runtime owns the declaration vocabulary for its own half, so weight is
@@ -60,7 +67,7 @@ imported the rest of the way down, never from the top.
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
   the `moduleApi` token factory, module ids, UI tokens and
-  release-flag tokens (§10.1; Alex, 2026-10-01). Zod-only,
+  release-flag tokens (§10.1; Alex, 2026-10-01), and the contract declarations (`defineTrpcContract`, `defineRestMiddleware`). Zod-only,
   framework-free, browser-safe, near-zero weight. Every contract depends on
   it; it depends on nothing but zod. The heavy declaration vocabulary is NOT
   here — it lives in the runtime that consumes it, so nothing backend-shaped
@@ -85,7 +92,7 @@ imported the rest of the way down, never from the top.
   navigation, storage, toasts, **drawers**. The browser analogue of the
   closed members. Host services only — components live in the design system;
   release flags come from feature-flag (§10.1).
-- **`@langwatch/ui-kernel`** owns the browser's wire: the transport (the SSE
+- **The browser's wire** lives in `@langwatch/browser`: the transport (the SSE
   subscription link), the browser RPC and the query
   client. Only a `<name>-client` package and a screen's behaviour import it; design-system components
   fetch nothing. The client types are
@@ -100,10 +107,11 @@ imported the rest of the way down, never from the top.
   `bg.scrim`), never a scale step, hex, `rgb()` or bare white/black. A library that needs a string
   takes Chakra's `useToken` / `system.token.var` (a variable that follows the mode) or
   `getRawColorValue` / `useColorRawValue` (a literal for the current mode). Enforced by `no-raw-color`.
-- Support packages: `handled-error` (the error contract), `secrets`
+- Support packages: `handled-error` (the error contract and its presentation: `/presentation`,
+  `/app-codes`, `/docs-url`, `/read-handled-error`; `error-views` stays its own package because it
+  depends on the design system), `authorization` (principals, grants and the one `ledgerActorSchema`), `secrets`
   (ADR-132), `config` (generic config machinery), `observability` (logger +
-  OTel), `test-harness` (fixtures and doubles), `installed-server-modules` and `installed-web-modules`
-  (generated lists — never edited by hand), and the raw clients
+  OTel), `test-harness` (fixtures and doubles, including `./api-fixture`), and the raw clients
   (`prisma-client`, `clickhouse-client`, `redis-client`, `eventing`).
 
 A package earns existence by being framework, not feature. Feature code in
@@ -203,7 +211,7 @@ export const TraceApi = moduleApi<TraceApi>()("trace");
 // modules/trace/process/src/trace.module.ts — the installer
 export const traceProcessModule = defineProcessModule("trace")
   .withRepositories(traceRepositories) // registry: { live, memory }
-  .withChannels(traceChannels) // registry: { live, memory }; the kernel builds both (§5)
+  .withChannels(traceChannels) // registry: { live, memory }; the container builds both (§5)
   .withApi(TraceModule) // the one class implementing TraceApi
   .withTransports(traceRest, traceTrpc) // inert declarations
   .withEventing(tracePipeline); // §9
@@ -255,7 +263,7 @@ fold's stored payload) and travels as its `z.infer` type after that: a service d
 its transport or a peer's typed call handed it, and a Prisma repository does not parse columns Prisma
 already types (Alex, 2026-09-28).
 
-**A public signature takes one options object** (`max-params`), kernel constructors and the Trace,
+**A public signature takes one options object** (`max-params`), framework constructors and the Trace,
 EventStore and log-record repositories included. The one exception is `ksuid`, whose signature is a
 cross-language wire and is documented as such (Alex, 2026-09-29).
 In module code a scope travels as a named parameter, never through `AsyncLocalStorage` (framework
@@ -267,7 +275,7 @@ repository, never ambient (Alex, 2026-09-30; [ADR-166](adr/166-grant-scoped-data
 **An implementation never sees a raw client** (Alex, 2026-10-01). No prisma, clickhouse, redis,
 objectStorage or rateLimiter in any `*Module` class or service. A store client crosses into a module
 in exactly one place: the `create(stores)` of one of its repository or channel registries, which the
-kernel calls. The module class receives built repositories and channels.
+container calls. The module class receives built repositories and channels.
 
 ### 3.3 What a module may demand — the four-way rule
 
@@ -278,7 +286,7 @@ of:
 
 1. **Derivable from the opened stores with no extra info** (a tenant resolver
    over ClickHouse, an actor lookup over Prisma) → a repository or channel
-   **inside the module**, built by the kernel from the module's registry (§5). No demand exists.
+   **inside the module**, built by the container from the module's registry (§5). No demand exists.
 2. **Another module's capability** → a peer: the `*Api` token in
    `static dependencies`. The container resolves tokens; modules receive each
    other's implementations.
@@ -503,7 +511,7 @@ apps/api/src/main.ts                 # process declaration, at most 50 lines
 apps/worker/src/main.ts              # same graph, consuming pipelines
 packages/api/src/hosting/            # HTTP mux, API hosts and browser bundle
 packages/api/src/policy/             # headers, CSP and client address
-packages/process-server/src/         # boot, lifecycle and peer composition
+packages/process/src/                # boot, lifecycle and peer composition
 ```
 
 The application declares what it serves through `exposeTransports`.
@@ -513,7 +521,7 @@ no supply and takes no `.provide` or `withMember`. Authentication policy stays i
 binds the one API door (sessions, key credentials, plan gate, audit sinks) from
 the peers it already holds, in its own transport facts; the process opens it
 before its hosts and builds both over it. A process with no door, or two,
-refuses boot by name, and process-server names no module contract but ops (its
+refuses boot by name, and `@langwatch/process` names no module contract but ops (its
 admin edge). This keeps transport machinery out of `main.ts` without making
 the API framework import the feature implementations which depend on it.
 
@@ -527,9 +535,9 @@ A hand-maintained per-app config of what modules own is a defect.
 ```ts
 // apps/api/src/main.ts
 import "@langwatch/time/polyfill";
-import { serverModules as processModules } from "@langwatch/installed-server-modules";
+import { processModules } from "./process-modules.generated";
 import { processTelemetry } from "@langwatch/observability/node";
-import { processConfig, Server } from "@langwatch/process-server";
+import { processConfig, Server } from "@langwatch/process";
 
 const server = await Server.create("langwatch-api")
   .withConfig(processConfig(processModules))
@@ -566,7 +574,7 @@ module declarations: an omitted declared transport refuses boot by name.
 The bundle is explicit, including an explicit opt-out for deployments
 without one. There is no `withModules` and no `withPipelines` in an app: a container takes its
 modules from the owners the app already handed to `withConfig(processConfig(processModules))`,
-so `packages/process-server` never imports the installed list, and the role decides
+so `packages/process` never imports the installed list, and the role decides
 pipeline participation (api produces, worker consumes, tasks produces) (Alex,
 2026-09-29). Pipelines are never exposed as HTTP surfaces. Consumption includes command production for follow-up work.
 The API also registers every pipeline's consume-side definitions descriptively, so ops
@@ -574,6 +582,13 @@ introspection lists projections, subscribers and process managers: described, ne
 a module's `build` must describe itself without the worker's dependencies (Alex, 2026-09-29).
 Each process entry point and its surface declaration stay within 50 lines;
 framework implementations retain the code needed to preserve behaviour.
+
+**A process mounts only the surfaces it selects and skips the rest (D3, Alex, 2026-10-01).** The
+API package is split into core, `api-rest` and `api-trpc`;
+a process that does not select `.rest()`, `.trpc()` or `.browserBundle()` neither imports nor mounts
+that surface, and a module's declaration for it is skipped without refusal. Deployment is unchanged
+for now: locally one server runs rest, trpc, ui and the worker; in production one pod runs api, trpc
+and ui, and another the worker.
 
 **The HTTP boundary is API versus browser bundle.** The host knows two
 paths, `/api` and `/`. The API package owns the fixed tRPC prefix
@@ -789,7 +804,7 @@ dependencies", `registerProcessDependencies` and `createProcessApp`). **Stores**
 go only to a module's repository and channel registries. **Peers** (`*Api` tokens) go only to the
 module class. Config and secrets are declarations (§6), not dependencies. Delivery is
 **registry-based**: a module declares `{ live, memory }` registries for its repositories and its
-channels, the installer names both (`.withRepositories(...)`, `.withChannels(...)`), and the kernel
+channels, the installer names both (`.withRepositories(...)`, `.withChannels(...)`), and the container
 picks the tier and calls `create`. Every `create()` **arrives with its things already resolved**.
 Passing a hand-assembled composition object into anything is banned as a shape: nothing receives a
 bag it has to pick apart.
@@ -802,14 +817,14 @@ boot by name, and an instance bound at create may not be invoked until
 after boot.
 
 **Peer cycles shrink to zero, then refuse** (Alex, 2026-09-29). Refusal stays the rule, but today
-nothing reaches it: the kernel hands every `*Api` token a proxy before any module installs and
+nothing reaches it: the container hands every `*Api` token a proxy before any module installs and
 orders modules without them, so two modules naming each other's `*Api` in `static dependencies` boot.
 The transition is a shrink-only list. The `peer-cycles` policy reports every declared peer edge whose
 peer reaches back, and `packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` refuses an
 edge missing from `tests/baselines/peer-cycle-edges.json` and a listed edge that no longer exists, so
 the list only shrinks and a change that cuts an edge removes it. A cycle is cut in §9's shape (a
 command on the other module's pipeline, or a pull by a scheduled process manager where that would
-itself be a cycle). When the list is empty the kernel refuses a peer cycle at boot by name, and the
+itself be a cycle). When the list is empty the container refuses a peer cycle at boot by name, and the
 list is deleted.
 
 `gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) are listed
@@ -833,7 +848,7 @@ So are `*-composition.build.ts` and `*.members.ts` beside the module class: stor
 the registries, the rest into `create()` (Alex, 2026-10-01).
 
 The `processModules` list is generated from `modules/catalogue.json`
-(`pnpm generate:modules` → `@langwatch/installed-server-modules` and `@langwatch/installed-web-modules`). **Installing a
+(`pnpm generate:modules` writes one list into each app: process halves into `api`, `worker` and `tasks`, browser halves into `ui`). **Installing a
 module edits the catalogue, never a root.** A process composes the whole
 list by asking for its container — `server.container(role)` takes the modules
 `withConfig(processConfig(processModules))` named (Alex, 2026-09-29) — and that is also the cheap shape: one call over all 49 modules costs ~88k type
@@ -891,7 +906,7 @@ declaration rather than each writing their own:
   slice before first render; the browser never sees a handle or a leaf.
 
 A module with no deployment facts declares neither and contributes no root
-key. Framework owners (process-server, stores, observability) declare the
+key. Framework owners (process, stores, observability) declare the
 same way at their own package, which is why they are not module-shaped.
 
 **You write the schema yourself and attach it where you define the module**
@@ -937,7 +952,7 @@ export const billingConfig = Config.define((c) => ({
 - `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` and their lower-case spellings → `outboundProxy`, raw by env
   name; notification and webhook parse it.
 
-Framework owners (process-server, observability) pick from the same object.
+Framework owners (process, observability) pick from the same object.
 
 When the single owner is a **module** rather than the process, it passes the
 value down as a capability on its own `*Api`, never as a shared variable and
@@ -979,12 +994,12 @@ only the first is config: a module deployment fact (→ the contract slice), a
 process fact (→ a leaf the slice picks from `processFacts`), an availability
 decision (→ the module's own answer from its config and secrets), and a
 role decision (→ `setup.role`). Sorting those four is the port; the
-static, its `*AppConfigSchema` const, its inferred type and the kernel's
+static, its `*AppConfigSchema` const, its inferred type and the container's
 `withConfig(app.configSchema)` parse branch all go. A module with no
 deployment facts of its own declares no `config` static at all and its
 `FeatureSetup` config parameter is `undefined`.
 
-The kernel keeps only a type-only `withConfigType<Config>()` where the schema
+The container keeps only a type-only `withConfigType<Config>()` where the schema
 used to be: the process parse has already produced the slice, so the
 declaration states its type and nothing re-validates. Two phantom anchors make
 that safe and must not be "tidied away" — `InstallableServerFeature.configType`
@@ -1007,7 +1022,7 @@ declared anywhere in the module array is checked answerable — env set, or
 key present in the vault — and a miss fails the boot immediately, naming
 every missing key at once, values never held. **Global concerns declare the
 same way at their framework owner** — logging and telemetry are
-everyone-sends-to-one-place concerns, so the process-server and
+everyone-sends-to-one-place concerns, so `@langwatch/process` and
 observability packages declare their config slices and secret handles
 exactly as a module does, and the preamble order (config → secrets →
 telemetry) is what makes a logging credential resolvable the moment
@@ -1499,7 +1514,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
 close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
-- The API door is bound once, by auth, with `bindApiDoor` in its `withTransportFacts`; the kernel
+- The API door is bound once, by auth, with `bindApiDoor` in its `withTransportFacts`; the container
   hands installed facts to the surface factory, which opens it ahead of REST and tRPC. None or two
   binders refuse boot by name (`MissingApiDoorError`, `DuplicateApiDoorError`) (Alex, 2026-10-01).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
@@ -1784,7 +1799,7 @@ feature is still a defect. A screen takes the design system's shared piece over 
 (§3.4 — every sibling entry is a side door, and 23 packages grew one),
 and the declaration file (`<name>.web.ts`, colocated test beside it)
 declares screens, drawers and api bindings with the same loader shape —
-`{ load }` — for each. The kernel (`@langwatch/ui-kernel`) stays React-free
+`{ load }` — for each. The browser runtime (`@langwatch/browser`) stays React-free
 and merges what modules declared: `installedModuleScreens` and
 `installedDrawerLoaders` each fold the installed array into one registry
 and **refuse a name two modules claim, naming both owners**. The shell
@@ -1904,7 +1919,7 @@ invented:
 - **A declaration slot nothing consumes is deleted, not kept** (ruled
   2026-09-18). The declaration is a contract, and a slot with no consumer is
   not one — it is an invitation to declare something that will never be read.
-  Counted across `defineWebModule`'s ten module-facing slots:
+  Counted across `defineBrowserModule`'s ten module-facing slots:
 
   | slot                         | declarers | consumer                             |
   | ---------------------------- | --------- | ------------------------------------ |
@@ -1949,7 +1964,7 @@ invented:
 
 - **An unmounted host is refused at install, not thrown at render** (ruled
   2026-09-18). A screen declares a `*HostApi`; if nothing mounts it, `createUi`
-  refuses by name — the same way the kernel already refuses a screen name two
+  refuses by name — the same way the browser runtime already refuses a screen name two
   modules claim, and in the same pass, **before a component renders** (§10).
 
   The measurement that forced it: **35 of 39 `*HostProvider`s had no production
@@ -1969,7 +1984,7 @@ invented:
   slot below is the mechanism rather than a second idea:
 
   ```tsx
-  // packages/ui-kernel/src/ui-feature-shell.tsx — the only mount pattern
+  // packages/browser/src/ui-feature-shell.tsx — the only mount pattern
   <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
   ```
 
@@ -1987,7 +2002,7 @@ invented:
     `withDrawers` carry a loader; `mounts` carries a bare string:
 
     ```ts
-    // packages/ui-kernel/src/web-module.ts — names only, nothing to render
+    // packages/browser/src/web-module.ts — names only, nothing to render
     type WebHostDeclaration = {
       readonly requires: readonly string[];
       readonly mounts: readonly string[];
@@ -1996,7 +2011,7 @@ invented:
 
     `hosts.mounts` is read in exactly one place, `ui-host-mounts.ts`, to decide
     whether a `requires` is satisfied. No code path renders a mount, so
-    `mounts` today is a promise about the world, not a thing the kernel does.
+    `mounts` today is a promise about the world, not a thing the browser runtime does.
 
   Restoring the deleted `apps/ui/src/features/*/ui/sections/*-host.tsx` files
   is **not** the fix and is refused (ruled 2026-09-18): those reached into
@@ -2059,13 +2074,13 @@ invented:
   about. Reading the seam from the mount side names the typo, and it is why a
   module declares both halves in one change rather than mounting first.
 
-- **A capability travels by declaration** (ruled 2026-09-18). `defineWebModule`
+- **A capability travels by declaration** (ruled 2026-09-18). `defineBrowserModule`
   carries a capability slot, and the composition root reaches a module's
   capability implementation through `./declaration` like everything else:
 
   ```ts
   // modules/organization/browser/src/organization.web.ts
-  export const organizationWeb = defineWebModule("organization")
+  export const organizationWeb = defineBrowserModule("organization")
     .withScreens({/* … */})
     // "Where they are standing" is organization's to answer, and its one
     // consumer is the composition root, so it is declared, not shared.
@@ -2139,12 +2154,12 @@ invented:
   (organization). Flags are `ReleaseFlagToken`s from `FrontendFlags` in feature-flag's contract,
   screens' `flags:` included. The session answers no flag.
 
-  **A host service is provided by its owner and resolved by the kernel.** browser-host declares
+  **A host service is provided by its owner and resolved by the browser runtime.** browser-host declares
   `hostService<Source>(name)`; the owner declares `.provides(Service, { load })`; `createUi` resolves
-  each to its one installed provider, refuses none or two, and runs the sources in the kernel's
+  each to its one installed provider, refuses none or two, and runs the sources in the runtime's
   order. apps/ui names no provider.
 
-  **browser-host and ui-kernel depend on no module contract.** A feature type in a framework package
+  **browser-host and browser depend on no module contract.** A feature type in a framework package
   is a central map every browser program compiles: before tokens, 39 packages compiled 14 contracts
   through `declarations.ts`. An enforcer policy holds this, with a shrink-only baseline (§17).
 
@@ -2193,13 +2208,13 @@ invented:
   So: the former `behavior/` layer dissolves — shared machinery becomes
   capability classes in `@langwatch/browser-host`, module-specific parts move
   into their owning module's browser half — and `shell/` follows it out, into
-  `@langwatch/ui-kernel`, which is the browser twin of the process kernel and
+  `@langwatch/browser`, which is the browser twin of `@langwatch/process` and
   already owns `createUi`. Providers, the router construction, route
   materialisation, page fallbacks, the drawer mount and the error boundary are
   all machinery: none of them is specific to this deployment of the product.
 
   The measurement that forced the amendment: apps/ui held 75 files across
-  `behavior/`, `shell/`, `ui/` and `model/`, while `ui-kernel` held 6.
+  `behavior/`, `shell/`, `ui/` and `model/`, while the browser runtime held 6.
 
   The route table is the interesting residue. It is data about which address a
   module serves, and every module that declares its own screens shrinks it —
@@ -2213,7 +2228,7 @@ invented:
   of nothing else. Everything a second browser application would also need is
   machinery and leaves. The test is not "is it small" or "is it composition-
   adjacent"; it is **would a second browser application want this file** — if
-  yes it belongs in `@langwatch/browser-host` or `@langwatch/ui-kernel`, and if
+  yes it belongs in `@langwatch/browser-host` or `@langwatch/browser`, and if
   no it is composition and may stay until it dissolves.
 
 ### 10.2 Browser state (ruled 2026-10-01)
@@ -2392,9 +2407,9 @@ The installation test boots the installed list over memory members, with no serv
 
 ```ts
 const runtime = await bootInstalledProcess({
-  role: "api", // from @langwatch/kernel; no server: nothing to tear down
-  modules: serverModules.map(overMemory), // memory twins for every repository registry
-  config: parseProcessConfig({ owners: processConfig(serverModules, "api"), environment }),
+  role: "api", // from @langwatch/process; no server: nothing to tear down
+  modules: processModules.map(overMemory), // memory twins for every repository registry
+  config: parseProcessConfig({ owners: processConfig(processModules, "api"), environment }),
   secrets: (owner, declared) => resolver.scopeTo(owner, declared),
   members: { ...storesBackedMembers(memoryStores(), stores), close: async () => void 0 },
 });
@@ -2485,6 +2500,12 @@ in `packages/config` or `packages/secrets` (§6) · the dev UI's copy of public-
 (`public-app-config.projection.ts`, §6) · `ProcessModuleApp`, `registerProcessDependencies`,
 `addProcessDependencies`, `withProcessDependencies`/`withModuleDependencies` and `createProcessApp`,
 targets that never landed and are superseded by the container (§5).
+· The rename window (Alex, 2026-10-01): `@langwatch/kernel` (its light half is `@langwatch/module`,
+the rest `@langwatch/process`), `@langwatch/process-server`, `@langwatch/ui-kernel`,
+`@langwatch/api-fixture`, `@langwatch/error-presentation`, `@langwatch/actor`,
+`@langwatch/installed-server-modules` and `@langwatch/installed-web-modules`, `packages/audit-log-null`,
+`defineServerModule` / `defineWebModule`, `serverModules` / `webModules`, `<id>Server`,
+`openProcessStores`, `<f>.server.ts` stems, `<X>App` module classes and `.withApp(...)`.
 
 ---
 
@@ -2495,23 +2516,19 @@ This document names the target. **Landed 2026-09-18:** the tree rename
 `*-process`/`*-browser`; `*/browser-kit` was later removed, see §3.4), `@langwatch/process-stores`,
 `@langwatch/browser-host` (+drawer), plan-gate
 dissolved into `entitlement-contract`, and `.withStores(stores)` on the
-chain. The rows below have not landed: the tree still uses the right column (`defineServerModule`,
-`serverModules`, `.withApp`), so code spells the right column until its row lands, and this
-record's prose names the left, the target.
+chain. **Landed 2026-10-01 (the rename window):** `@langwatch/module`, `@langwatch/process`,
+`@langwatch/browser`, `openStores`, `defineProcessModule` / `defineBrowserModule`, `processModules`,
+`<id>ProcessModule`, `XModule` + `.withApi(...)`, `<f>.module.ts` stems, `test-harness/api-fixture`,
+`handled-error` presentation subpaths, the ledger actor in `@langwatch/authorization`, the generated
+per-app module lists, and `audit-log-null` deleted (their old spellings are in §15). The rows below
+have not landed: code spells the right column until its row lands, and this record's prose names
+the left, the target.
 
 | Target                                                                                   | Today                                                              |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `@langwatch/module` (light core)                                                         | `@langwatch/kernel`'s token half                                   |
-| `@langwatch/process`                                                                     | `@langwatch/process-server` + kernel's boot AND declaration halves |
-| `@langwatch/browser`                                                                     | `@langwatch/ui-kernel` (boot half)                                 |
-| `openStores(config)`                                                                     | `openProcessStores({ config })`                                    |
-| `defineProcessModule` / `defineBrowserModule`                                            | `defineServerModule` / `defineWebModule`                           |
-| `traceProcessModule` / `processModules`                                                  | `traceServer` / `serverModules`                                    |
-| `TraceModule` + `.withApi(...)`                                                          | `TraceApp` + `.withApp(...)`                                       |
-| `<f>.module.ts` / `<f>.web.ts` file stems                                                | `<f>.server.ts` / `<f>.web.ts`                                     |
 | host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers)        |
 | `enterprise/modules/audit-log` (§4)                                                      | `modules/audit-log`                                                |
-| `processFacts` in `@langwatch/config`, picked by each slice (§6)                         | `deployment-facts.ts`, process-server `owner.ts` (`baseHost`, `nodeEnvironment`, `outboundProxy`), observability's `serviceVersion`, `rawSocketPort`; handed out as members |
+| `processFacts` in `@langwatch/config`, picked by each slice (§6)                         | `deployment-facts.ts`, `@langwatch/process`'s `owner.ts` (`baseHost`, `nodeEnvironment`, `outboundProxy`), observability's `serviceVersion`, `rawSocketPort`; handed out as members |
 | store clients reach registries only; `.withChannels(registry)` on the installer (§5)     | `static reads` + `setup.members`; channel registries built by hand in `create()` |
 | `secrets.into({ … }, build)` (§6)                                                        | nested `secrets.into(handle, …)`                                   |
 | `hostedStores(stores)` (§4)                                                              | `hostedMembers(stores)`                                            |
@@ -2528,12 +2545,12 @@ instantiations (107.2s of checking) to 13.9M (2.3s). Build it again once
 `modules/` can emit a `.d.ts`; today it cannot
 (`TS7056` — the composed type exceeds what the compiler will serialize, and
 ~50 `TS2883`s name module repositories the composed type should not expose).
-A process composes `serverModules` through its container.
+A process composes `processModules` through its container.
 
 Homes for the no-members migration (coordinator, 2026-10-01): the logger is `createLogger("<module>")` inside the module; the clock is `@langwatch/time`, and memory twins take one in their registry; `processName` is deleted, and refusals name the module and role; `operatorReads` goes to registries like any store client; tests call `XModule.create(setup)` with `createApiFixture` peers and memory registries, and installation tests boot the installed list over memory; a reader takes the owner contract's exported leaf, which supersedes the 2026-09-18 ask-the-owner's-Api rule; `CREDENTIALS_SECRET` and `NEXTAUTH_SECRET` stay shared as `processSecrets` beside `processFacts`; the egress fence and the OTEL endpoint are process facts, and voice loopback is scenario's; the dev UI lifts the config meta tag from the api's own rendered shell; the names `processFacts`, `defineChannels`, `.withChannels` and `hostedStores` stand.
 
 Also open, each a worklist: the no-members migration (process facts, store clients into
-registries, kernel-installed channels, record `into`, owner-held handles, the dev UI projection);
+registries, container-installed channels, record `into`, owner-held handles, the dev UI projection);
 eventing's client for both roles; `browserModules` is
 empty (no module exports `./declaration` yet — the browser serves chrome
 only); the ClickHouse resolver ruling (§7); background loops main runs that this

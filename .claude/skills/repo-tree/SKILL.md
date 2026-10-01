@@ -1,6 +1,6 @@
 ---
 name: repo-tree
-description: "Where a thing lives in the LangWatch tree and what each top-level folder is for. Use when someone says 'where does this go', 'which package', 'new package', 'is this a module or a package', 'apps vs modules vs packages vs services vs tools', 'what is installed-server-modules', 'catalogue.json', 'generate:modules', 'which app runs this', or opens a folder and cannot tell what it owns. Teaches the map and the placement test; the record is dev/docs/ARCHITECTURE.md sections 1 to 3."
+description: "Where a thing lives in the LangWatch tree and what each top-level folder is for. Use when someone says 'where does this go', 'which package', 'new package', 'is this a module or a package', 'apps vs modules vs packages vs services vs tools', 'what is a generated module list', 'catalogue.json', 'generate:modules', 'which app runs this', or opens a folder and cannot tell what it owns. Teaches the map and the placement test; the record is dev/docs/ARCHITECTURE.md sections 1 to 3."
 user-invocable: true
 ---
 
@@ -38,8 +38,8 @@ disagree, the linter wins (§17).
 4. **The prefix tells you the graph.** Nothing `browser-*` in a server graph;
    no `process*` package in a web graph (§2). A contract imports no framework
    beyond `@langwatch/module`.
-5. **Generated lists are never edited.** `packages/installed-server-modules`
-   and `packages/installed-web-modules` are written by
+5. **Generated lists are never edited.** The module list each app carries
+   (process halves in `api`, `worker`, `tasks`; browser halves in `ui`) is written by
    `pnpm generate:modules` from the catalogue. Add a module by editing
    `modules/catalogue.json`, then run the generator.
 6. **Shared browser code has three homes, no kits.** Component: the design
@@ -64,7 +64,7 @@ Ask in order. Stop at the first yes.
 | Is it a component several modules share? | `packages/design-system` (§2). |
 | Is it data several browsers read? | The owner's `modules/<f>/client/`. |
 | Is it a schema, error or `*Api` another module calls? | The owner's `contract/`. |
-| Does it start a process, parse config or open stores? | A framework package (`process-server`, `process-stores`, `config`). |
+| Does it start a process, parse config or open stores? | A framework package (`process`, `process-stores`, `config`). |
 | Is it a one-shot migration or backfill? | The module's `process/src/migrations/` or `tasks/`, run by `apps/tasks`. |
 | Is it Go or Python? | `services/<name>`. |
 | Is it dev-only tooling? | `tools/<name>`. |
@@ -79,7 +79,7 @@ The smallest full module. Read it before inventing a layout.
 modules/monitor/
 ├── adrs/  specs/
 ├── contract/src/    monitor.api.ts  monitor.errors.ts  monitor.trpc.ts  index.ts
-├── process/src/     monitor.server.ts  index.ts  app/  services/  repositories/
+├── process/src/     monitor.module.ts  index.ts  app/  services/  repositories/
 │                    rules/  transport/
 └── browser/src/     monitor.web.ts  model/  behavior/  ui/{elements,blocks,sections}
 ```

@@ -91,8 +91,8 @@ Throw `HandledError` only when the cause is known and the caller can act on it. 
 the module's contract (`modules/automation/contract/src/automation.errors.ts`: `TriggerNotFoundError`
 carries `code: "trigger_not_found"` and `httpStatus: 404`). The service throws it; the transport lets it
 escape. The REST runtime renders `type`, `code`, `message` at the root of the body, and tRPC sends the
-code slug. Register the code in `packages/error-presentation/src/app-codes.ts` and its customer copy in
-`packages/error-presentation/src/presentation.ts`. Never a `TRPCError`. Never set `Retry-After` yourself:
+code slug. Register the code in `packages/handled-error/src/app-codes.ts` and its customer copy in
+`packages/handled-error/src/presentation.ts`. Never a `TRPCError`. Never set `Retry-After` yourself:
 `meta.retryAfterMs` renders it. Everything unknown stays a plain `Error`; the boundary degrades it to
 "unknown" plus a trace id. Detail: `dev/docs/best_practices/error-handling.md`.
 

@@ -26,7 +26,7 @@ Not here: how the module is wired into a process for the installation test (the 
    reaches a datastore. `*.integration.test.tsx`: renders a component (jsdom). A test that renders is an
    integration test, however small.
 5. **Doubles throw by name.** `createApiFixture<XApi>({ ...only what this test calls })`
-   (`@langwatch/api-fixture`) for a peer or app. An unconfigured method throws, so a test cannot pass on a
+   (`@langwatch/test-harness/api-fixture`) for a peer or app. An unconfigured method throws, so a test cannot pass on a
    silent no-op. Raw clients (Prisma, ClickHouse, ioredis, Stripe) have one typed double each in
    `@langwatch/test-harness` (`client-doubles/`). A `{ fn: vi.fn() }` literal or a class stub is a defect.
 6. **No casts, no spies on real services.** A class with private members is built for real over its memory

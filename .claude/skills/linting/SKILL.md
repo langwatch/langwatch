@@ -87,8 +87,7 @@ A file-name finding is the same loop: `triggerRepo.ts` fails
 `trigger.repository.ts` passes. The artifact suffix table
 (`api`, `channel`, `repository`, `rules`, `service`, `subscriber`, ...) is
 `ARTIFACT_TABLE` in the grammar file. Read that table; do not guess a suffix.
-Today's installer stem is `<f>.server.ts` (`modules/monitor/process/src/monitor.server.ts`);
-the target `<f>.module.ts` is listed in §16 as in flight.
+The installer stem is `<f>.module.ts` (`modules/monitor/process/src/monitor.module.ts`).
 
 ## Which finding comes from where
 

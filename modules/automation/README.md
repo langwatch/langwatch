@@ -17,14 +17,14 @@ It is one module of three packages, laid out as ARCHITECTURE.md §3 describes
   containment policy and the retry-idempotent hourly/daily email caps.
   Trigger, CustomGraph and TriggerSent persistence is private to the module.
 - `browser/` owns the module's screens, drawers and publications, declared with
-  `defineWebModule` at `./declaration` (`model/` → `behavior/` → `ui/`): the
+  `defineBrowserModule` at `./declaration` (`model/` → `behavior/` → `ui/`): the
   authoring drawer and provider forms, graph-series presentation and display
   action parameters, template variable catalogues, Liquid JSON substitution,
   cadence UI, and overview presentation. `apps/ui` installs the generated
   list; it hosts none of this itself.
 
 No app holds an automation composition file. `apps/api` and `apps/worker`
-install the module's process half through the generated `serverModules` list,
+install the module's process half through the generated process-module list,
 and the role decides what runs: the api serves the routes, the worker consumes
 the pipeline (graph, settlement and settlement reads). Eventing calls the
 module's own services; delivery, Redis claims, ClickHouse counting, recipient

@@ -1,6 +1,6 @@
 ---
 name: browser-module
-description: "Write or change a module's browser half (modules/<name>/browser): a screen, a drawer, a section, a hook, a slice of browser state, a cached read, or a data fetch in the UI. Use when someone says 'add a screen', 'add a drawer', 'where does this component go', 'browser state', 'global UI store', 'defineBrowserModule', 'defineWebModule', 'stale read', 'cache this query', 'polling', 'auto-refresh', 'IndexedDB mirror', 'useUiDeployment', 'can I import another module's component', or 'ui/elements vs blocks vs sections'. Teaches the record (ARCHITECTURE.md section 3.4, 10, 10.2, ADR-169); for the typed data client see module-client, for components and tokens see design-system."
+description: "Write or change a module's browser half (modules/<name>/browser): a screen, a drawer, a section, a hook, a slice of browser state, a cached read, or a data fetch in the UI. Use when someone says 'add a screen', 'add a drawer', 'where does this component go', 'browser state', 'global UI store', 'defineBrowserModule', 'stale read', 'cache this query', 'polling', 'auto-refresh', 'IndexedDB mirror', 'useUiDeployment', 'can I import another module's component', or 'ui/elements vs blocks vs sections'. Teaches the record (ARCHITECTURE.md section 3.4, 10, 10.2, ADR-169); for the typed data client see module-client, for components and tokens see design-system."
 user-invocable: true
 argument-hint: "<screen, drawer, hook or state question>"
 ---
@@ -10,8 +10,7 @@ argument-hint: "<screen, drawer, hook or state question>"
 Read `dev/docs/ARCHITECTURE.md` §3.4, §10 and §10.2. This skill is the short
 version. Exemplar: `modules/organization/browser` (screens, drawers, hooks,
 features/ nesting, a colocated test). New code uses the left column of §16;
-today's tree still spells `defineWebModule` (ui-kernel) for the target
-`defineBrowserModule`. The declaration stem stays `<name>.web.ts`.
+the declaration is `defineBrowserModule` from `@langwatch/browser`. The declaration stem stays `<name>.web.ts`.
 
 ## The shape
 

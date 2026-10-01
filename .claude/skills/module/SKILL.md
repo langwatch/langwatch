@@ -38,8 +38,8 @@ Enterprise modules mirror this exactly under `enterprise/modules/` (§3, §11).
    collection. A tRPC namespace belongs to one module (§3).
 4. **A module is installed by editing the catalogue, never a root.** Add an
    entry, run `pnpm generate:modules`. It rewrites
-   `packages/installed-server-modules/src/server-modules.generated.ts` (and
-   the web twin). Never hand-edit a generated file. Uninstalling a module
+   the generated module list inside each app (process halves into `api`,
+   `worker` and `tasks`, browser halves into `ui`). Never hand-edit a generated file. Uninstalling a module
    another one depends on fails to compile, naming the dependent (§5).
 5. **Specs first.** `specs/*.feature` is the requirement. No scenario for your
    change: write one first, error paths included (CLAUDE.md, §13).
@@ -69,7 +69,7 @@ Enterprise modules mirror this exactly under `enterprise/modules/` (§3, §11).
 | 2 | `contract/src/monitor.api.ts` | the `MonitorApi` interface and token |
 | 3 | `contract/src/monitor.errors.ts` | `HandledError` subclasses |
 | 4 | `contract/src/monitor.trpc.ts` | every procedure declared once |
-| 5 | `process/src/monitor.server.ts` | the installer: repositories, app, transports |
+| 5 | `process/src/monitor.module.ts` | the installer: repositories, module class, transports |
 | 6 | `process/src/transport/monitor.{rest,trpc}.ts` | permission and handler per route |
 | 7 | `process/src/repositories/` | interface, `prisma/`, `memory/`, registry |
 | 8 | `process/src/services/monitor.service.ts` | behaviour over the repository |
@@ -104,9 +104,8 @@ For a module with a `client/` package read `modules/dataset/client`.
   The `manifests` policy refuses it (§3).
 - **A second `feature.json` or a hand-edited generated list.** The catalogue
   is the one map.
-- **Today's names differ from the target names** (`defineServerModule`,
-  `*App`, `<f>.server.ts`). Write today's, and see §16 for the rename table.
-  The §15 deleted spellings are never new code.
+- **Old spellings are deleted** (`defineServerModule`, `*App` classes,
+  `<f>.server.ts`; §15). Write `defineProcessModule`, `*Module` and `<f>.module.ts`.
 - **Peer cycles.** A module may not depend back on its dependent. Use events
   and a pending answer (§3, §17; `pnpm lint:architecture --list-policies`).
 

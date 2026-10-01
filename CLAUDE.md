@@ -46,7 +46,7 @@ specs/  tools/ (thuishaven = haven)  mcp/typescript/  docs/ (public docs site)
 ui, api and worker always run together: a stack missing the worker serves pages
 and silently processes no jobs.
 
-Inside a module: `process/src/` holds `<name>.server.ts`, `app/`, `services/`,
+Inside a module: `process/src/` holds `<name>.module.ts`, `app/`, `services/`,
 `repositories/`, `channels/`, `eventing/`, `transport/`, `rules/`, `tasks/`,
 `migrations/`; `browser/src/` holds `model/` → `behavior/` → `ui/elements|blocks|sections`.
 The filename grammar is `packages/oxlint-rules/grammar/feature-layout-policy.mjs`.

@@ -61,8 +61,9 @@ Read §3.3 and ADR-147/148 directly and ask before inventing a shape.
    one in old code is conversion debt. Do not copy a spelling you find in the
    tree without checking §15 first.
 3. **§16 maps target names to today's names.** The tree still carries the right
-   column for several (`defineServerModule`, `<f>.server.ts`, `*App` classes,
-   `@langwatch/kernel`). Skills teach what is in the tree and link §16 for the
+   column for the rows still open. The rename window (2026-10-01) landed the
+   package, `define*Module`, `.module.ts` and `*Module` rows; their old
+   spellings are in §15. Skills teach what is in the tree and link §16 for the
    target. Do not rename on your own.
 4. **A rule without an owner is not a ruling.** A "ruling" cites the record or
    Alex's words with a date. If a manifest or a skill says "must" and cites
@@ -107,11 +108,10 @@ Read §3.3 and ADR-147/148 directly and ask before inventing a shape.
 Prefer the tree for names and the linter for rules; report, do not fix a record
 you do not own. Current list:
 
-- §2/§4 name `@langwatch/installed-modules`; the tree has
-  `installed-server-modules` and `installed-web-modules`.
+- §1 (R4) has each app carry its own generated module list; W5 is landing it, so
+  a tree still holding `installed-*` packages is conversion debt.
 - §4 says an app has no config file; `apps/{api,worker,tasks}/src/config.ts` exist.
 - §3 says each module has a root `feature.json`; none does.
-- §12 cites `packages/handled-error/src/app-codes.ts`, which is gone.
 
 ## Links
 
