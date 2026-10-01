@@ -4141,6 +4141,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/auth/contract
       '@langwatch/browser':
         specifier: workspace:*
         version: link:../../../../packages/browser

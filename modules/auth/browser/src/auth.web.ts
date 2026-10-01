@@ -3,6 +3,7 @@
  * front-door screens, every one under the auth layout that mounts AuthHostApi.
  */
 
+import { SsoTestSignInToken } from "@langwatch/auth-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 
 export const authWeb = defineBrowserModule("auth")
@@ -61,4 +62,6 @@ export const authWeb = defineBrowserModule("auth")
     signInMethodLinking: {
       load: () => import("./behavior/sign-in-method-linking-capability.ts"),
     },
-  });
+  })
+  /** SSO's "Test sign-in": a sign-in that names a connection. */
+  .lends(SsoTestSignInToken, { load: () => import("./behavior/sign-in-capability.ts") });

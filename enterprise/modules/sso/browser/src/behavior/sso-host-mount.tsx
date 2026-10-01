@@ -4,6 +4,11 @@
  * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
  */
 import {
+  normalizeSignInErrorCode,
+  SsoTestSignInToken,
+  type SsoTestSignInOperations,
+} from "@langwatch/auth-contract";
+import {
   UiCapabilityUnavailableError,
   useUiCapabilities,
   useUiScope,
@@ -11,6 +16,7 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import { useLentOperations } from "@langwatch/browser-host/lent";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -22,27 +28,11 @@ import {
   type SsoTestSignInResult,
 } from "../model/sso-host.ts";
 
-/**
- * Auth's half of the host: starting a sign-in that names a connection, and
- * spelling a sign-in code the one way. Inert until the shell wires it from
- * `modules/auth/browser`'s published capability (handoff §10) — the sign-in
- * refuses loudly rather than reporting a test nobody ran as a success.
- */
-export type SsoAuthCapability = {
-  testSignIn(options: {
-    connectionId: string;
-    callbackQuery: Readonly<Record<string, string | undefined>>;
-  }): Promise<SsoTestSignInResult>;
-  normalizeSignInErrorCode(code: string): string;
-};
+/** Auth lends the sign-in that names a connection; unlent, it refuses rather than fake a pass. */
+type SsoTestSignIn = SsoTestSignInOperations["testSignIn"];
 
-const INERT_AUTH: SsoAuthCapability = {
-  testSignIn() {
-    throw new UiCapabilityUnavailableError("sso test sign-in");
-  },
-  normalizeSignInErrorCode(code) {
-    return code;
-  },
+const INERT_TEST_SIGN_IN: SsoTestSignIn = () => {
+  throw new UiCapabilityUnavailableError("sso test sign-in");
 };
 
 /** Every control on the page, as ADR-122 gates them. */
@@ -55,7 +45,7 @@ class CapabilitySsoHost extends SsoHostApi {
       feedback: UiFeedback;
       route: UiRoute;
       session: UiSession;
-      auth: SsoAuthCapability;
+      testSignIn: SsoTestSignIn;
     },
   ) {
     super();
@@ -89,11 +79,11 @@ class CapabilitySsoHost extends SsoHostApi {
     connectionId: string;
     callbackQuery: Readonly<Record<string, string | undefined>>;
   }): Promise<SsoTestSignInResult> {
-    return this.deps.auth.testSignIn(options);
+    return this.deps.testSignIn(options);
   }
 
   normalizeSignInErrorCode(code: string): string {
-    return this.deps.auth.normalizeSignInErrorCode(code);
+    return normalizeSignInErrorCode(code) ?? code;
   }
 }
 
@@ -104,6 +94,7 @@ class CapabilitySsoHost extends SsoHostApi {
 export default function SsoHostMount({ children }: { children?: ReactNode }) {
   const { feedback, route, session } = useUiCapabilities();
   const { organizationId } = useUiScope().activeScope();
+  const loadSignIn = useLentOperations(SsoTestSignInToken);
 
   const host = useMemo(
     () =>
@@ -112,9 +103,12 @@ export default function SsoHostMount({ children }: { children?: ReactNode }) {
         feedback,
         route,
         session,
-        auth: INERT_AUTH,
+        testSignIn:
+          loadSignIn === undefined
+            ? INERT_TEST_SIGN_IN
+            : async (options) => (await loadSignIn()).testSignIn(options),
       }),
-    [organizationId, feedback, route, session],
+    [organizationId, feedback, route, session, loadSignIn],
   );
 
   return <SsoHostProvider value={host}>{children}</SsoHostProvider>;
