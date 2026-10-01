@@ -12,7 +12,6 @@ flows:
           name: vd-expwb-{uid}
         as:
           expSlug: slug
-          expName: name
     steps:
       - action: go
         with:
@@ -23,19 +22,19 @@ flows:
           min: "1"
       - action: expect
         with:
-          text: "{expName}"
+          text: "vd-expwb-{uid}"
       - action: go
         with:
           path: /{slug}/experiments
       - action: expect
         with:
-          text: "{expName}"
+          text: "vd-expwb-{uid}"
           role: row
-          name: "{expName}"
+          name: "vd-expwb-{uid}"
       - action: expect
         with:
           api: /api/experiments/{expSlug}
-          contains: "{expName}"
+          contains: "vd-expwb-{uid}"
 
   - id: experiment-results-open
     title: Open a batch run's results from the experiment list and read its rows
@@ -50,7 +49,7 @@ flows:
       - post: /api/evaluations/batch/log_results
         body:
           experiment_slug: "{expSlug}"
-          run_id: vd-run-a
+          run_id: vd-run-a-{uid}
           progress: 2
           total: 2
           dataset:
@@ -101,7 +100,7 @@ flows:
           url: /experiments/{expSlug}
       - action: expect
         with:
-          testId: run-item-vd-run-a
+          testId: run-item-vd-run-a-{uid}
           timeout: "30000"
       - action: expect
         with:
@@ -131,7 +130,7 @@ flows:
       - post: /api/evaluations/batch/log_results
         body:
           experiment_slug: "{expSlug}"
-          run_id: vd-run-a
+          run_id: vd-run-a-{uid}
           progress: 2
           total: 2
           dataset:
@@ -168,7 +167,7 @@ flows:
       - post: /api/evaluations/batch/log_results
         body:
           experiment_slug: "{expSlug}"
-          run_id: vd-run-b
+          run_id: vd-run-b-{uid}
           progress: 2
           total: 2
           dataset:
@@ -208,11 +207,11 @@ flows:
           path: /{slug}/experiments/{expSlug}
       - action: expect
         with:
-          testId: run-item-vd-run-a
+          testId: run-item-vd-run-a-{uid}
           timeout: "30000"
       - action: expect
         with:
-          testId: run-item-vd-run-b
+          testId: run-item-vd-run-b-{uid}
           timeout: "30000"
       - action: click
         with:
@@ -222,7 +221,7 @@ flows:
           testId: exit-compare-button
       - action: click
         with:
-          testId: run-checkbox-vd-run-a
+          testId: run-checkbox-vd-run-a-{uid}
       - action: expect
         with:
           testIdPrefix: run-checkbox-
