@@ -1,12 +1,12 @@
 import { z } from "zod";
 
+import { promptingTechniqueSchema } from "./prompt.field-schemas.ts";
 import {
   promptHandleSchema,
   promptScopeSchema,
   promptMessageSchema,
   promptInputSchema,
   promptOutputSchema,
-  promptingTechniqueSchema,
   type PromptConfigData,
 } from "./prompt.ts";
 

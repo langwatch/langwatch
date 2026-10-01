@@ -16,6 +16,7 @@ export {
   messageSchema,
   inputsSchema,
   outputsSchema,
+  promptingTechniqueSchema,
   nameSchema,
   scopeSchema,
   commitMessageSchema,

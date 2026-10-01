@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { datasetColumnTypeSchema } from "./prompt.enums.ts";
+import { promptingTechniqueSchema } from "./prompt.field-schemas.ts";
 
 export const PROMPT_FEATURE_ID = "prompt" as const;
 export const promptScopeSchema = z.enum(["PROJECT", "ORGANIZATION"]);
@@ -83,13 +84,6 @@ export const promptResponseFormatSchema = z.object({
     })
     .nullable(),
 });
-
-export const promptingTechniqueSchema = z
-  .object({
-    type: z.enum(["few_shot", "in_context", "chain_of_thought"]),
-    demonstrations: promptDemonstrationsSchema.optional(),
-  })
-  .strict();
 
 export const promptConfigDataSchema = z
   .object({
