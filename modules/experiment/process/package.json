@@ -70,6 +70,7 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/prompt-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

@@ -1,10 +1,11 @@
-import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 /**
  * The pinned experiment wire: twenty tRPC procedures and sixteen REST routes
  * with their origin/main names, kinds and permissions.
  * Spec: modules/experiment/specs/experiment-service.feature.
  */
-import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzDeclaration } from "@langwatch/api/access";
+import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { experimentsTrpc } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
