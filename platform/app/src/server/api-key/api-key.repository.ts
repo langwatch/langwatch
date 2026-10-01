@@ -19,6 +19,7 @@ import {
   liveRoles,
 } from "~/server/app-layer/authz/repositories/live-rows";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { holdsOrganizationBinding } from "~/utils/memberRoleConstraints";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 import type { ApiKeyRevocationCause } from "./revocation-cause";
 
@@ -580,7 +581,7 @@ export class ApiKeyRepository {
     });
     // Neither a Lite Member nor a Developer (ADR-143) ever holds an
     // organization-scoped binding, admin least of all.
-    if (!member || member.role === "EXTERNAL" || member.role === "DEVELOPER") {
+    if (!member || !holdsOrganizationBinding(member.role)) {
       return null;
     }
     const binding = await liveGrants(this.prisma).findFirst({

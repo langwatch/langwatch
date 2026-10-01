@@ -81,6 +81,7 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { holdsSharedAccess } from "~/utils/memberRoleConstraints";
 import {
   publishDeviceCodeSettled,
   waitForDeviceCodeSettled,
@@ -425,7 +426,7 @@ async function isDeveloperSeat({
     },
     select: { role: true },
   });
-  return membership?.role === "DEVELOPER";
+  return membership != null && !holdsSharedAccess(membership.role);
 }
 
 /**

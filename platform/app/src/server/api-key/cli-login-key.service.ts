@@ -7,6 +7,7 @@ import {
   batchTeamsPermissions,
   type Permission,
 } from "~/server/app-layer/authz/permission-adapters";
+import { holdsSharedAccess } from "~/utils/memberRoleConstraints";
 import { ApiKeyService, type CustomRoleBindingInput } from "./api-key.service";
 import { defaultCliKeyPermissions } from "./cli-key-defaults";
 import { ApiKeyAlreadyRevokedError, ApiKeyNotFoundError } from "./errors";
@@ -301,7 +302,8 @@ export class CliLoginKeyService {
       where: { userId, organizationId, disabledAt: null },
       select: { role: true },
     });
-    const personalOnly = membership?.role === "DEVELOPER";
+    const personalOnly =
+      membership != null && !holdsSharedAccess(membership.role);
     const teams = await this.prisma.team.findMany({
       where: {
         organizationId,
