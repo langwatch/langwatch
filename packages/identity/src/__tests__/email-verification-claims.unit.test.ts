@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { assertedEmailVerification } from "../email-verification-claims";
-import { entraEndpointOrigins, isEntraIssuer } from "../entra-issuer";
+import {
+  canonicalEntraIssuer,
+  entraEndpointOrigins,
+  entraMultiTenantSegment,
+  isEntraIssuer,
+} from "../entra-issuer";
 
 const ENTRA =
   "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0";
@@ -110,5 +115,31 @@ describe("entraEndpointOrigins", () => {
     ["http://login.microsoftonline.com/tenant/v2.0", []],
   ] as const)("names Graph for %s", (issuer, expected) => {
     expect(entraEndpointOrigins(issuer)).toEqual(expected);
+  });
+});
+
+describe("canonicalEntraIssuer", () => {
+  it.each([
+    [`${ENTRA}/`, ENTRA],
+    [`${ENTRA}//`, ENTRA],
+    [ENTRA, ENTRA],
+    ["https://sts.windows.net/tenant", "https://sts.windows.net/tenant/"],
+    ["https://sts.windows.net/tenant/", "https://sts.windows.net/tenant/"],
+    ["https://acme.eu.auth0.com/", "https://acme.eu.auth0.com/"],
+    [KEYCLOAK, KEYCLOAK],
+  ])("reads %s as %s", (issuer, expected) => {
+    expect(canonicalEntraIssuer(issuer)).toBe(expected);
+  });
+});
+
+describe("entraMultiTenantSegment", () => {
+  it.each([
+    ["https://login.microsoftonline.com/common/v2.0", "common"],
+    ["https://login.microsoftonline.com/organizations/v2.0", "organizations"],
+    ["https://login.microsoftonline.com/Consumers/v2.0/", "consumers"],
+    [ENTRA, null],
+    ["https://acme.okta.com/common", null],
+  ])("reads %s as %s", (issuer, expected) => {
+    expect(entraMultiTenantSegment(issuer)).toBe(expected);
   });
 });

@@ -31,7 +31,12 @@ export {
   type AssertedEmailVerification,
   assertedEmailVerification,
 } from "./email-verification-claims";
-export { entraEndpointOrigins, isEntraIssuer } from "./entra-issuer";
+export {
+  canonicalEntraIssuer,
+  entraEndpointOrigins,
+  entraMultiTenantSegment,
+  isEntraIssuer,
+} from "./entra-issuer";
 export {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
@@ -333,6 +338,8 @@ export {
   SsoDomainProofLapsedError,
   SsoDomainProofNotFoundError,
   SsoExistingAccountUnconfirmedError,
+  SsoIssuerMismatchError,
+  SsoIssuerMultiTenantError,
   SsoIssuerUnreachableError,
   SsoLicenseRequiredError,
   SsoSamlMetadataInvalidError,

@@ -13,6 +13,7 @@
  * for OIDC, and a samlify identity provider signing the SAML response.
  */
 
+import { readFileSync } from "node:fs";
 import { inflateRawSync } from "node:zlib";
 
 import { PrismaScimSsoUsers } from "@ee/scim/scim-sso-user.prisma.repository";
@@ -39,6 +40,11 @@ import {
 import { databaseHooks } from "~/server/better-auth/config/database-hooks";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
+import {
+  nameIssuerMismatch,
+  noteIdTokenIssuerRefusal,
+  runWithIdTokenIssuerScope,
+} from "~/server/better-auth/id-token-issuer-mismatch";
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
 import { resolveTrustedOrigins } from "~/server/better-auth/trustedOrigins";
 import { prisma } from "~/server/db";
@@ -158,6 +164,13 @@ const auth = ({ cloud = false }: { cloud?: boolean } = {}) =>
     baseURL: BASE_URL,
     secret: "test-secret-test-secret-test-secret",
     database: identityStorageAdapter(),
+    // The production logger hook: an ID token refused for its issuer is
+    // noted here, so the callback can name the mismatch.
+    logger: {
+      disabled: false,
+      log: (_level, message, ...args) =>
+        noteIdTokenIssuerRefusal([message, ...args]),
+    },
     // The production resolution: the origins of the issuer the request names,
     // and for Entra ID the Microsoft Graph origin its userinfo endpoint is on.
     trustedOrigins: async (request) =>
@@ -323,8 +336,8 @@ async function connection({
       oidcConfig: JSON.stringify({
         clientId: CLIENT_ID,
         clientSecret: "langwatch-test-secret",
-        discoveryEndpoint: `${issuer}/.well-known/openid-configuration`,
-        ...(issuer.startsWith(ENTRA_HOST)
+        discoveryEndpoint: `${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`,
+        ...(issuer.startsWith(`${ENTRA_HOST}/`)
           ? {}
           : {
               authorizationEndpoint: `${issuer}/authorize`,
@@ -486,15 +499,22 @@ async function signInThrough(
     z.object({ url: z.string() }).parse(await started.json()).url,
   );
   const state = authorize.searchParams.get("state");
-  const callback = await betterAuthInstance.handler(
-    new Request(
-      `${BASE_URL}/api/auth/sso/callback/${providerId}?code=test-code&state=${state}`,
-      {
-        method: "GET",
-        redirect: "manual",
-        headers: { cookie: started.headers.get("set-cookie") ?? "" },
-      },
-    ),
+  const callbackRequest = new Request(
+    `${BASE_URL}/api/auth/sso/callback/${providerId}?code=test-code&state=${state}`,
+    {
+      method: "GET",
+      redirect: "manual",
+      headers: { cookie: started.headers.get("set-cookie") ?? "" },
+    },
+  );
+  // Wrapped the way `server/routes/auth.ts` wraps every auth request.
+  const callback = await runWithIdTokenIssuerScope(async () =>
+    nameIssuerMismatch({
+      response: await betterAuthInstance.handler(callbackRequest),
+      expectedIssuer: async () =>
+        (await ssoRegisteredIssuers().issuersForRequest(callbackRequest))[0] ??
+        null,
+    }),
   );
   const location = callback.headers.get("location") ?? "";
   const cookie = callback.headers
@@ -578,9 +598,13 @@ beforeAll(async () => {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
     if (url.startsWith(GRAPH_USERINFO)) return respond(graphUserInfo);
-    if (url.startsWith(ENTRA_HOST)) {
+    if (url.startsWith(`${ENTRA_HOST}/`)) {
       if (url.includes("/.well-known/openid-configuration")) {
-        return respond(entraDiscovery(url.split("/.well-known/")[0] ?? ""));
+        return respond(
+          entraDiscovery(
+            (url.split("/.well-known/")[0] ?? "").replace(/\/+$/, ""),
+          ),
+        );
       }
       if (url.includes("/oauth2/v2.0/token")) return respond(tokenResponse());
       if (url.includes("/discovery/v2.0/keys")) return respond(jwks);
@@ -1040,6 +1064,91 @@ describe("given a password account whose address was never confirmed, on LangWat
       expect(result.session).toBeNull();
       expect(await linkedAccounts(user.id, providerId)).toEqual([]);
       expect(await addressConfirmed(user.id)).toBe(false);
+    });
+  });
+});
+
+/** The upgrade's data migration, applied the way `prisma migrate deploy`
+ *  applies it. */
+const TRAILING_SLASH_MIGRATION = readFileSync(
+  new URL(
+    "../../../prisma/migrations/20261001120000_sso_provider_entra_issuer_trailing_slash/migration.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
+
+describe("given a Microsoft Entra ID connection whose issuer was stored with a trailing slash", () => {
+  describe("when a guest signs in before and after the upgrade migration", () => {
+    /** @scenario "A Microsoft Entra ID connection stored with a trailing slash signs in after the upgrade" */
+    it("names the mismatch before, and signs in after without re-registering", async () => {
+      const issuer = entra("slash");
+      const { user, providerId } = await setUp({
+        label: "entra-slash",
+        state: "ACTIVE",
+        domainVerified: true,
+        issuer: `${issuer}/`,
+      });
+      const subject = `entra-slash-${SUITE}`;
+      await identityProviderAsserts({
+        email: user.email,
+        subject,
+        issuer,
+        claims: {
+          tid: `${SUITE}-slash`,
+          oid: subject,
+          idp: `https://sts.windows.net/${SUITE}-home-tenant/`,
+        },
+      });
+
+      const before = await signInThrough(providerId);
+
+      expect(before.error).toBe("sso_issuer_mismatch");
+      expect(before.session).toBeNull();
+
+      await prisma.$executeRawUnsafe(TRAILING_SLASH_MIGRATION);
+      const after = await signInThrough(providerId);
+
+      expect(after.error).toBeNull();
+      expect(after.session?.user.id).toBe(user.id);
+      expect(
+        await prisma.ssoProvider.findFirstOrThrow({
+          where: { providerId },
+          select: { issuer: true },
+        }),
+      ).toEqual({ issuer });
+    });
+  });
+});
+
+describe("given a Microsoft Entra ID connection registered for one tenant", () => {
+  describe("when a guest signs in with a token from another tenant", () => {
+    /** @scenario "An ID token from another issuer is refused with both issuers named" */
+    it("refuses with sso_issuer_mismatch and names the expected and received issuers", async () => {
+      const expected = entra("app-tenant");
+      const received = entra("home-tenant");
+      const { user, providerId } = await setUp({
+        label: "entra-other-tenant",
+        state: "DRAFT",
+        domainVerified: true,
+        issuer: expected,
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `entra-other-tenant-${SUITE}`,
+        issuer: received,
+        claims: { idp: `https://sts.windows.net/${SUITE}-home-tenant/` },
+      });
+
+      const result = await signInThrough(providerId);
+
+      expect(result.error).toBe("sso_issuer_mismatch");
+      const params = new URL(result.location, BASE_URL).searchParams;
+      expect(params.get("expected_issuer")).toBe(expected);
+      expect(params.get("received_issuer")).toBe(received);
+      expect(params.get("error_description")).toBeNull();
+      expect(result.session).toBeNull();
+      expect(await linkedAccounts(user.id, providerId)).toEqual([]);
     });
   });
 });

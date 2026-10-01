@@ -87,6 +87,22 @@ export class PrismaScimSsoUsers {
     return new PrismaScimSsoUsers(transactions, isHosted);
   }
 
+  /**
+   * Whether an OIDC sign-in carries no word from the provider that the
+   * address is real. SAML supplies a signed email attribute and no
+   * verification flag, and the caller has already admitted it through the
+   * domain gate, so it is never unvouched here. LangWatch Cloud takes only an
+   * explicit `email_verified: true` as the provider's word; a self-hosted
+   * installation refuses only a provider that says the address is NOT
+   * verified (see `#resolveUnconfirmedUser`).
+   */
+  #isUnvouched(input: SSOUserResolutionInput): boolean {
+    if (input.protocol !== "oidc") return false;
+    return this.#isHosted()
+      ? !input.providerUser.emailVerified
+      : emailVerificationOf(input) === "unverified";
+  }
+
   async resolve(input: SSOUserResolutionInput): Promise<SSOUserResolution> {
     const database = this.#transactions.getStore();
     if (!database) {
@@ -111,16 +127,7 @@ export class PrismaScimSsoUsers {
     const user = candidates[0];
     if (!user) return CONTINUE;
 
-    // SAML supplies a signed email attribute and no verification flag, so it
-    // is always `unasserted`. The caller has already admitted the assertion
-    // through the domain gate.
-    // LangWatch Cloud takes only an explicit `email_verified: true` as the
-    // provider's word. A self-hosted installation refuses only a provider
-    // that says the address is NOT verified (see `#resolveUnconfirmedUser`).
-    const unvouched = this.#isHosted()
-      ? !input.providerUser.emailVerified
-      : emailVerificationOf(input) === "unverified";
-    if (input.protocol === "oidc" && unvouched) {
+    if (this.#isUnvouched(input)) {
       return this.#resolveUnvouchedAddress(database, input, user);
     }
 
@@ -130,6 +137,16 @@ export class PrismaScimSsoUsers {
         : this.#resolveConfirmedOidcUser(database, input, user);
     }
 
+    return this.#resolveUnconfirmedAccount(database, input, user);
+  }
+
+  /** An account whose address was never confirmed: the directory's own
+   *  member, or an account this sign-in may link. */
+  async #resolveUnconfirmedAccount(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+    user: { id: string; emailVerified: boolean; deactivatedAt: Date | null },
+  ): Promise<SSOUserResolution> {
     if (!(await this.#directoryOwns(database, input.providerId, user.id))) {
       return this.#resolveUnconfirmedUser(database, input, user);
     }

@@ -132,6 +132,7 @@ function failureFor({
   code: string;
   yourAddress: string | null | undefined;
 }): TestSignInFailure {
+  if (code === "sso_issuer_mismatch") return issuerMismatchFailure();
   const ours = OUR_REFUSALS[normalizeErrorCode(code) ?? code];
   if (ours) {
     return {
@@ -150,6 +151,41 @@ function failureFor({
     detail: description ? `${code}: ${description}` : code,
     advice:
       "These are the provider's own words. Check them against the application you created there — the redirect address and the client values are the usual suspects.",
+  };
+}
+
+/** An issuer as the callback reported it, or null for anything that is not
+ *  a plain https address. The query string is caller-controlled, so only an
+ *  address is quoted back. */
+function issuerParam(name: string): string | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get(name);
+  if (!value || value.length > 2048) return null;
+  try {
+    return new URL(value).protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The ID token named a different issuer from the connection's. Both are
+ * quoted, since the fix is to make them equal.
+ */
+export function issuerMismatchFailure(): TestSignInFailure {
+  const expected = issuerParam("expected_issuer");
+  const received = issuerParam("received_issuer");
+  const detail = [
+    expected ? `This connection expects: ${expected}` : null,
+    received ? `Your identity provider sent: ${received}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    title: "Your identity provider names a different issuer",
+    detail: detail === "" ? null : detail,
+    advice:
+      "The issuer on this connection has to be exactly the one in the provider's sign-in tokens. Change it on this connection to the one your provider sent. For Microsoft Entra ID it is https://login.microsoftonline.com/<tenant id>/v2.0 with the tenant id of the app registration, not a user's home tenant and not common or organizations.",
   };
 }
 

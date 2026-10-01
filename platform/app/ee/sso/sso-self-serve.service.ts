@@ -934,7 +934,7 @@ export class SsoSelfServeService {
     const credentials = this.deps.credentials;
 
     if (idp.protocol === "oidc") {
-      await validateOidcRegistration({
+      const { issuer } = await validateOidcRegistration({
         registration: idp,
         discovery: this.deps.discovery,
       });
@@ -955,7 +955,7 @@ export class SsoSelfServeService {
       return {
         type: "oidc",
         idp: {
-          issuer: idp.issuer,
+          issuer,
           providerId,
           clientIdRef,
           secretRef,
