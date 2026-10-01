@@ -184,18 +184,8 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
     });
   });
 
-  describe("when the browser already holds the current version", () => {
-    /** @scenario "A browser holding the current version is answered unchanged" */
-    it("answers the same graph twice, so the host's hash of it is the held version", async () => {
-      const first = await service.getScopeGraph({ id: ids.caller });
-      const again = await service.getScopeGraph({ id: ids.caller });
-
-      expect(JSON.stringify(again)).toBe(JSON.stringify(first));
-    });
-  });
-
   describe("when a project the caller can see is renamed", () => {
-    /** @scenario "A rename answers a new version" */
+    /** @scenario "A rename answers the new name" */
     it("answers a different graph carrying the new name", async () => {
       const before = await service.getScopeGraph({ id: ids.caller });
 

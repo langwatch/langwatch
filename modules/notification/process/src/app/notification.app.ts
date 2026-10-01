@@ -13,7 +13,10 @@ import {
   type NotificationServerConfig,
   type SendEmailCommand,
   sendEmailCommandSchema,
+  type ReadHint,
+  type ReadHintsWatchInput,
 } from "@langwatch/notification-contract";
+import { PresenceApi } from "@langwatch/presence-contract";
 import { Secret } from "@langwatch/secrets";
 
 import {
@@ -26,6 +29,7 @@ import type { NotificationRepositories } from "../repositories/notification.repo
 import { EmailDeliveryService } from "../services/email-delivery.service.ts";
 import { MailDeliveryService } from "../services/mail-delivery.service.ts";
 import { NotificationService } from "../services/notification.service.ts";
+import { ReadHintStreamService } from "../services/read-hint-stream.service.ts";
 
 /**
  * Process facts: the sender address derives from the public base URL when unnamed,
@@ -45,7 +49,7 @@ type NotificationSetup = FeatureSetup<
 
 export class NotificationApp implements NotificationApiContract {
   static readonly contract = NotificationApi;
-  static readonly dependencies = {};
+  static readonly dependencies = { presence: PresenceApi };
   static readonly reads = ["publicBaseUrl", "outboundProxy"] as const;
   static readonly config = notificationConfig;
   static readonly publicConfig = notificationBrowserConfig.project;
@@ -59,10 +63,16 @@ export class NotificationApp implements NotificationApiContract {
 
   #notifications: NotificationService;
   #mailDelivery: MailDeliveryService;
+  #readHints: ReadHintStreamService;
 
-  private constructor(repositories: NotificationRepositories, mailDelivery: MailDeliveryService) {
+  private constructor(
+    repositories: NotificationRepositories,
+    mailDelivery: MailDeliveryService,
+    readHints: ReadHintStreamService,
+  ) {
     this.#notifications = NotificationService.create({ repository: repositories.notifications });
     this.#mailDelivery = mailDelivery;
+    this.#readHints = readHints;
   }
 
   static async create({
@@ -71,6 +81,7 @@ export class NotificationApp implements NotificationApiContract {
     secrets,
     members,
     resources,
+    dependencies,
   }: NotificationSetup): Promise<NotificationApp> {
     const settings = await mailGatewaySettings({ config, secrets });
     const configuration = {
@@ -93,7 +104,8 @@ export class NotificationApp implements NotificationApiContract {
     });
     resources.own("Notification mail gateway", () => delivery.close());
     const mailDelivery = MailDeliveryService.create({ settings: async () => settings, delivery });
-    return new NotificationApp(repositories, mailDelivery);
+    const readHints = ReadHintStreamService.create({ emitters: dependencies.presence });
+    return new NotificationApp(repositories, mailDelivery, readHints);
   }
 
   listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
@@ -114,6 +126,16 @@ export class NotificationApp implements NotificationApiContract {
 
   sendEmail(input: SendEmailCommand): Promise<void> {
     return this.#mailDelivery.sendEmail(sendEmailCommandSchema.parse(input));
+  }
+
+  readHints({
+    userId,
+    organizationId,
+    projectId,
+    signal,
+  }: ReadHintsWatchInput): AsyncIterable<ReadHint> {
+    const tenantIds = [userId, organizationId, ...(projectId === undefined ? [] : [projectId])];
+    return this.#readHints.watch({ tenantIds, ...(signal === undefined ? {} : { signal }) });
   }
 }
 

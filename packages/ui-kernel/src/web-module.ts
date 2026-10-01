@@ -122,7 +122,7 @@ export type WebModuleInstallation = Readonly<{
   /** What this module lends or registers by token, in declaration order. */
   lends: readonly UiLend[];
   api?: unknown;
-  /** The contracts whose cache tiers the api's reads follow (ADR-164). */
+  /** The contracts whose cache policies the api's reads follow. */
   apiContracts?: readonly CacheDeclaringContract[];
   failureInterceptors: readonly unknown[];
 }>;

@@ -57,8 +57,7 @@ describe("defineTrpcContract", () => {
       // is imported by every browser that installs it, so one server import
       // here is `node:async_hooks` in the browser bundle — which is what
       // `defineRestMiddleware` living in rest/request.ts actually did.
-      expect(valueImports(sourceOf("trpc-contract.ts"))).toEqual(["./versioned-answer.ts"]);
-      expect(valueImports(sourceOf("versioned-answer.ts"))).toEqual(["zod"]);
+      expect(valueImports(sourceOf("trpc-contract.ts"))).toEqual([]);
       expect(valueImports(sourceOf("rest-middleware.ts"))).toEqual([]);
       expect(valueImports(sourceOf("ui-tokens.ts"))).toEqual([]);
       expect(valueImports(sourceOf("release-flags.ts"))).toEqual([]);
@@ -88,9 +87,9 @@ describe("defineTrpcContract", () => {
 });
 
 describe("defineTrpcContract cache policy", () => {
-  describe("given a read declared with a cache tier and one declared without", () => {
+  describe("given a read declared with a cache policy and one declared without", () => {
     const contract = defineTrpcContract("organization")
-      .query("getAll", { cache: { tier: "session", persist: true } })
+      .query("getAll", { cache: { persist: true } })
       .withInput(z.object({}))
       .withOutput(z.array(z.string()))
 
@@ -99,7 +98,7 @@ describe("defineTrpcContract cache policy", () => {
       .build();
 
     it("carries the declared policy on the member", () => {
-      expect(contract.members.getAll.cache).toEqual({ tier: "session", persist: true });
+      expect(contract.members.getAll.cache).toEqual({ persist: true });
     });
 
     it("leaves an undeclared read without one", () => {
@@ -108,40 +107,39 @@ describe("defineTrpcContract cache policy", () => {
   });
 });
 
-describe("defineTrpcContract versioned read", () => {
+describe("a read naming the events that make it stale", () => {
   const contract = defineTrpcContract("organization")
-    .query("getScopeGraph", { cache: { tier: "session", persist: true, versioned: true } })
+    .query("getScopeGraph", { invalidatedBy: ["lw.project.created"] })
     .withInput(z.object({}))
     .withOutput(z.array(z.string()))
+    .query("getAll", {
+      invalidatedBy: [
+        { event: "lw.project.created", scope: "organizationId" },
+        "lw.authz.grant.revoked",
+      ],
+    })
+    .withInput(z.object({}))
+    .withOutput(z.unknown())
+    .query("getOrganizationWithMembers")
+    .withInput(z.object({}))
+    .withOutput(z.unknown())
     .build();
 
-  const member = contract.members.getScopeGraph;
-
-  /** @scenario "A contract declares a versioned read once, with its envelope" */
-  it("adds an optional since to the input and wraps the answer in the envelope", () => {
-    expect(member.input.validate({})).toBe(true);
-    expect(member.input.validate({ since: "v1" })).toBe(true);
-    expect(member.input.validate({ since: 7 })).toBe(false);
-
-    expect(member.output.validate({ unchanged: true })).toBe(true);
-    expect(member.output.validate({ version: "v1", data: ["a"] })).toBe(true);
-    expect(member.output.validate({ version: "v1", data: [1] })).toBe(false);
-    expect(member.output.validate(["a"])).toBe(false);
+  /** @scenario "A read names the committed events that make it stale" */
+  it("carries the events it named", () => {
+    expect(contract.members.getScopeGraph.invalidatedBy).toEqual(["lw.project.created"]);
   });
 
-  /** @scenario "A contract declares a versioned read once, with its envelope" */
-  it("carries the versioned cache policy and the answer it wraps", () => {
-    expect(member.cache).toEqual({ tier: "session", persist: true, versioned: true });
-    expect(member.answer.validate(["a"])).toBe(true);
+  /** @scenario "A read names the event field its hint is scoped by" */
+  it("carries a scoped event with the field its hint is read from", () => {
+    expect(contract.members.getAll.invalidatedBy).toEqual([
+      { event: "lw.project.created", scope: "organizationId" },
+      "lw.authz.grant.revoked",
+    ]);
   });
 
-  /** @scenario "A contract declares a versioned read once, with its envelope" */
-  it("refuses a versioned read that already declares since", () => {
-    const declared = () =>
-      defineTrpcContract("organization")
-        .query("getScopeGraph", { cache: { tier: "session", versioned: true } })
-        .withInput(z.object({ since: z.string() }));
-
-    expect(declared).toThrow(/adds "since" to its input/);
+  /** @scenario "A read names the committed events that make it stale" */
+  it("carries none on a read that names none", () => {
+    expect("invalidatedBy" in contract.members.getOrganizationWithMembers).toBe(false);
   });
 });

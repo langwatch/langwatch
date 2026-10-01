@@ -18,7 +18,7 @@ const plan = cachePlanFor({
   contracts: [
     {
       namespace: "organization",
-      members: { getAll: { cache: { tier: "session", persist: true } } },
+      members: { getAll: { cache: { persist: true } } },
     },
   ],
 });

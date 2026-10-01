@@ -1,14 +1,11 @@
 /**
- * Tier resolution and the session-version stamp. ADR-164;
+ * The cache plan, the persisted gcTime and the session-version stamp. ADR-164;
  * specs/ui/browser-query-caching.feature.
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
 import {
-  applyCacheTiers,
-  CACHE_TIER_STALE_TIME,
   cachePlanFor,
-  invalidateSessionTier,
   PERSISTED_QUERY_MAX_AGE,
   procedurePathOf,
 } from "@langwatch/browser-host/cache-tiers";
@@ -18,7 +15,6 @@ import {
   SessionVersionWatch,
   sessionVersionFetch,
 } from "@langwatch/browser-host/session-version";
-import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
 import { createUiQueryClient } from "../query-client.ts";
@@ -26,42 +22,14 @@ import { createUiQueryClient } from "../query-client.ts";
 // The shape `defineTrpcContract(...).build()` produces, minus the schemas the plan never reads.
 const organizationTrpc = {
   namespace: "organization",
-  members: { getAll: { cache: { tier: "session", persist: true } }, getMemberById: {} },
+  members: { getAll: { cache: { persist: true } }, getMemberById: {} },
 } as const;
 
-const modelProviderTrpc = {
-  namespace: "modelProvider",
-  members: { getAllForProject: { cache: { tier: "reference" } } },
-} as const;
-
-const plan = cachePlanFor({ contracts: [organizationTrpc, modelProviderTrpc] });
+const plan = cachePlanFor({ contracts: [organizationTrpc] });
 
 describe("cachePlanFor", () => {
-  it("keys each declared read by its dotted procedure path", () => {
-    expect([...plan.tiers]).toEqual([
-      ["organization.getAll", "session"],
-      ["modelProvider.getAllForProject", "reference"],
-    ]);
-  });
-
-  it("marks only the reads declared persist", () => {
+  it("marks only the reads declared persist, by their dotted procedure path", () => {
     expect([...plan.persisted]).toEqual(["organization.getAll"]);
-  });
-
-  it("marks only the reads declared versioned", () => {
-    const versioned = cachePlanFor({
-      contracts: [
-        {
-          namespace: "organization",
-          members: {
-            getScopeGraph: { cache: { tier: "session", persist: true, versioned: true } },
-            getAll: { cache: { tier: "session" } },
-          },
-        },
-      ],
-    });
-
-    expect([...versioned.versioned]).toEqual(["organization.getScopeGraph"]);
   });
 });
 
@@ -77,48 +45,18 @@ describe("procedurePathOf", () => {
   });
 });
 
-describe("applyCacheTiers", () => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
-  applyCacheTiers({ queryClient, plan });
-  const staleTimeOf = (path: string, input: unknown) =>
-    queryClient.defaultQueryOptions({ queryKey: trpcQueryKey(path, { input, type: "query" }) })
-      .staleTime;
+describe("createUiQueryClient with a cache plan", () => {
+  const queryClient = createUiQueryClient({ cachePlan: plan });
+  const gcTimeOf = (path: string) =>
+    queryClient.defaultQueryOptions({ queryKey: trpcQueryKey(path, { input: {}, type: "query" }) })
+      .gcTime;
 
-  it("gives a session read no expiry", () => {
-    expect(staleTimeOf("organization.getAll", {})).toBe(CACHE_TIER_STALE_TIME.session);
-  });
-
-  it("gives a reference read an hour", () => {
-    expect(staleTimeOf("modelProvider.getAllForProject", { projectId: "p" })).toBe(3_600_000);
+  it("keeps a persisted read in memory as long as it may be restored", () => {
+    expect(gcTimeOf("organization.getAll")).toBe(PERSISTED_QUERY_MAX_AGE);
   });
 
   it("leaves an undeclared read on the default", () => {
-    expect(staleTimeOf("organization.getMemberById", { id: "u" })).toBe(30_000);
-  });
-
-  it("keeps a persisted read in memory as long as it may be restored", () => {
-    const options = queryClient.defaultQueryOptions({
-      queryKey: trpcQueryKey("organization.getAll", { input: {}, type: "query" }),
-    });
-    expect(options.gcTime).toBe(PERSISTED_QUERY_MAX_AGE);
-  });
-});
-
-describe("invalidateSessionTier", () => {
-  it("marks session reads stale and leaves the rest", async () => {
-    const queryClient = new QueryClient();
-    const session = trpcQueryKey("organization.getAll", { input: {}, type: "query" });
-    const reference = trpcQueryKey("modelProvider.getAllForProject", {
-      input: { projectId: "p" },
-      type: "query",
-    });
-    queryClient.setQueryData(session, ["org"]);
-    queryClient.setQueryData(reference, ["provider"]);
-
-    await invalidateSessionTier({ queryClient, plan });
-
-    expect(queryClient.getQueryState(session)?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryState(reference)?.isInvalidated).toBe(false);
+    expect(gcTimeOf("organization.getMemberById")).not.toBe(PERSISTED_QUERY_MAX_AGE);
   });
 });
 
@@ -146,6 +84,7 @@ describe("SessionVersionWatch", () => {
   });
 
   describe("given an equal, older or unreadable stamp", () => {
+    /** @scenario "An equal, older or unreadable session version changes nothing" */
     it("does nothing", () => {
       const onNewer = vi.fn();
       const watch = SessionVersionWatch.create();
@@ -175,44 +114,9 @@ describe("SessionVersionWatch", () => {
 });
 
 describe("a 403 answer", () => {
-  const forbidden = { data: { httpStatus: 403 } };
-
   it("is recognised by status alone", () => {
-    expect(isForbiddenAnswer(forbidden)).toBe(true);
+    expect(isForbiddenAnswer({ data: { httpStatus: 403 } })).toBe(true);
     expect(isForbiddenAnswer({ data: { httpStatus: 404 } })).toBe(false);
     expect(isForbiddenAnswer(new Error("x"))).toBe(false);
-  });
-
-  describe("when a mutation is refused", () => {
-    it("invalidates the session tier", async () => {
-      const queryClient = createUiQueryClient({ cachePlan: plan, onMutationError: () => {} });
-      const session = trpcQueryKey("organization.getAll", { input: {}, type: "query" });
-      queryClient.setQueryData(session, ["org"]);
-
-      await queryClient
-        .getMutationCache()
-        .build(queryClient, { mutationFn: () => Promise.reject(forbidden), retry: false })
-        .execute(undefined)
-        .catch(() => {});
-      await vi.waitFor(() => expect(queryClient.getQueryState(session)?.isInvalidated).toBe(true));
-    });
-  });
-
-  describe("when a session read refuses itself", () => {
-    it("does not invalidate the session tier again", async () => {
-      const queryClient = createUiQueryClient({ cachePlan: plan });
-      const other = trpcQueryKey("organization.getAll", { input: { other: true }, type: "query" });
-      queryClient.setQueryData(other, ["org"]);
-
-      await queryClient
-        .fetchQuery({
-          queryKey: trpcQueryKey("organization.getAll", { input: {}, type: "query" }),
-          queryFn: () => Promise.reject(forbidden),
-          retry: false,
-        })
-        .catch(() => {});
-
-      expect(queryClient.getQueryState(other)?.isInvalidated).toBe(false);
-    });
   });
 });

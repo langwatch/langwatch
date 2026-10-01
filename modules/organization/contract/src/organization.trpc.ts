@@ -1,9 +1,19 @@
 /** Organization and membership procedures; `invite.*` is its own namespace (`invite.trpc.ts`). */
 
+import {
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_REVOKED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+} from "@langwatch/authz-contract";
 import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { signUpDataSchema } from "@langwatch/onboarding-contract";
+import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { z } from "zod";
 
+import {
+  INVITE_ACCEPTED_EVENT_TYPE,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+} from "./organization-lifecycle.events.ts";
 import {
   organizationAuditLogPageSchema,
   organizationCreatedSchema,
@@ -66,12 +76,23 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withOutput(organizationWriteAckSchema)
 
   /** Every organization the caller can reach, fully loaded and redacted. */
-  .query("getAll", { cache: { tier: "session", persist: true } })
+  .query("getAll", { cache: { persist: true } })
   .withInput(organizationApiGetAllInputSchema)
   .withOutput(organizationFullyLoadedListSchema)
 
-  /** The shell's scope skeleton, narrowed to the caller; `since` may be answered `unchanged`. */
-  .query("getScopeGraph", { cache: { tier: "session", persist: true, versioned: true } })
+  /** The shell's scope skeleton, narrowed to the caller. */
+  .query("getScopeGraph", {
+    cache: { persist: true },
+    // Grants are appended under their organization, so they hint under their own tenant.
+    invalidatedBy: [
+      { event: PROJECT_CREATED_EVENT_TYPE, scope: "organizationId" },
+      ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+      { event: INVITE_ACCEPTED_EVENT_TYPE, scope: "organizationId" },
+      GRANT_ATTACHED_EVENT_TYPE,
+      GRANT_ROLE_CHANGED_EVENT_TYPE,
+      GRANT_REVOKED_EVENT_TYPE,
+    ],
+  })
   .withInput(organizationApiScopeGraphInputSchema)
   .withOutput(scopeGraphSchema)
 

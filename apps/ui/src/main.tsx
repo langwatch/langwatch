@@ -2,10 +2,8 @@
 import "@langwatch/time/polyfill";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
 import {
-  cachePlanFor,
   createUiVersionedReads,
   type UiBindableVersionedReads,
-  unbatchedCachePaths,
 } from "@langwatch/browser-host/cache-tiers";
 import type {
   UiDeployment,
@@ -244,19 +242,14 @@ class BrowserUiShell extends UiShell {
 export async function startUi(): Promise<void> {
   const served = readPublicAppConfig(document);
   const config = parseUiFeatureConfig(served);
-  // Session and reference reads travel unbatched, and every answer's session version
-  // reaches the watch the shell invalidates the session tier from (ADR-164).
-  const cachePlan = cachePlanFor({
-    contracts: webModules.flatMap((module) => module.installation.apiContracts ?? []),
-  });
+  // Every answer's session version reaches the watch the shell invalidates reads from.
   const sessionVersions = SessionVersionWatch.create();
-  // The shell owns the QueryClient and binds it to these when it renders (ADR-164).
-  const versionedReads = createUiVersionedReads({ plan: cachePlan });
+  // The shell owns the QueryClient and binds it to these when it renders.
+  const versionedReads = createUiVersionedReads();
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
   const transport = createUiFeatureApiClient({
     fetch: sessionVersionFetch({ watch: sessionVersions }),
-    unbatchedPaths: unbatchedCachePaths({ plan: cachePlan }),
     versionedReads,
     isDevelopment: config.process.mode === "development",
   });

@@ -3,9 +3,11 @@
  * Composition names no pipeline, projection or subscriber, keeping
  * `@langwatch/eventing` and the Prisma/ioredis/ClickHouse graph off this package.
  */
+import type { TrpcContract } from "./contract/trpc-contract.ts";
 import type { ServerRole } from "./feature-installer.ts";
 import type { ResourceOwnership } from "./resource-scope.ts";
 import type { RuntimeService } from "./runtime-lifecycle.ts";
+import type { DeclaredTransports } from "./transport-mounting.ts";
 
 /**
  * Whether this process only sends on a pipeline, or also drains it: the api produces, the
@@ -207,6 +209,8 @@ export interface EventingHost {
   describe?(definition: unknown): void;
   /** The runtime's own maintenance pipelines (blob, process-manager retention). */
   maintenancePipelines?(): readonly unknown[];
+  /** The one subscriber turning committed events into read hints; absent where none can publish. */
+  readHintPipeline?(hinted: ReadHintMap): unknown;
   /** Keeps what registration would start idle until `startConsumers`. */
   holdConsumers?(): void;
   /** Starts consuming; the kernel calls it when the booted runtime starts. */
@@ -225,6 +229,70 @@ export function installEventingMaintenance(eventing: EventingHost | undefined): 
     return;
   }
   for (const definition of definitions) eventing.describe?.(definition);
+}
+
+/** A read an event makes stale, and the event data field naming the hint's tenant. */
+export type ReadHintTarget = Readonly<{ path: string; scope?: string }>;
+
+/** Committed event type to the reads it makes stale (record §10, read-hints.feature). */
+export type ReadHintMap = ReadonlyMap<string, readonly ReadHintTarget[]>;
+
+/** Every installed read naming an event, keyed by that event. */
+export function readHintsOf({ contracts }: { contracts: readonly TrpcContract[] }): ReadHintMap {
+  const hinted = new Map<string, ReadHintTarget[]>();
+  for (const { namespace, members } of contracts) {
+    for (const [name, member] of Object.entries(members)) {
+      for (const invalidation of member.invalidatedBy ?? []) {
+        const path = `${namespace}.${name}`;
+        const event = typeof invalidation === "string" ? invalidation : invalidation.event;
+        const target: ReadHintTarget =
+          typeof invalidation === "string" ? { path } : { path, scope: invalidation.scope };
+        hinted.set(event, [...(hinted.get(event) ?? []), target]);
+      }
+    }
+  }
+  return hinted;
+}
+
+function isTrpcContract(value: unknown): value is TrpcContract {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "namespace" in value &&
+    typeof value.namespace === "string" &&
+    "members" in value &&
+    typeof value.members === "object" &&
+    value.members !== null
+  );
+}
+
+/** The tRPC contracts the installed modules declared, read off their transports. */
+function trpcContractsOf(declared: readonly DeclaredTransports[]): TrpcContract[] {
+  return declared.flatMap(({ transports }) =>
+    transports.flatMap((transport) =>
+      transport.protocol === "trpc" && "contract" in transport && isTrpcContract(transport.contract)
+        ? [transport.contract]
+        : [],
+    ),
+  );
+}
+
+/**
+ * Registers the read-hint subscriber once, after every module installed, in every role: a
+ * global subscriber is staged where an event is appended, the api included.
+ */
+export function installReadHints({
+  eventing,
+  declared,
+}: {
+  eventing: EventingHost | undefined;
+  declared: readonly DeclaredTransports[];
+}): void {
+  if (eventing?.readHintPipeline === void 0) return;
+  const hinted = readHintsOf({ contracts: trpcContractsOf(declared) });
+  if (hinted.size === 0) return;
+  const definition = eventing.readHintPipeline(hinted);
+  if (definition !== void 0) eventing.register(definition);
 }
 
 /**
@@ -252,6 +320,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
       : {}),
     ...(typeof host.maintenancePipelines === "function"
       ? { maintenancePipelines: host.maintenancePipelines.bind(candidate) }
+      : {}),
+    ...(typeof host.readHintPipeline === "function"
+      ? { readHintPipeline: host.readHintPipeline.bind(candidate) }
       : {}),
     ...(typeof host.holdConsumers === "function" && typeof host.startConsumers === "function"
       ? {

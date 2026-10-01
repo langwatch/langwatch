@@ -18,6 +18,7 @@ export const TENANT_BROADCAST_EVENT_TYPES = [
   "discover_updated",
   "langy_conversation_updated",
   "experiment_updated",
+  "read_invalidated",
 ] as const;
 
 export type TenantBroadcastEventType = (typeof TENANT_BROADCAST_EVENT_TYPES)[number];

@@ -22,10 +22,10 @@ const plan = cachePlanFor({
   contracts: [
     {
       namespace: "organization",
-      members: { getAll: { cache: { tier: "session", persist: true } }, getMemberById: {} },
+      members: { getAll: { cache: { persist: true } }, getMemberById: {} },
     },
     // Marked persist on purpose: the session read is excluded by key, whatever the plan says.
-    { namespace: "auth", members: { session: { cache: { tier: "session", persist: true } } } },
+    { namespace: "auth", members: { session: { cache: { persist: true } } } },
   ],
 });
 
@@ -86,6 +86,7 @@ async function session({
 
 describe("persistUiQueries", () => {
   describe("given a marked read cached before a reload", () => {
+    /** @scenario "A reload paints a persisted read from disk, then revalidates it" */
     it("paints it from disk and marks it for revalidation", async () => {
       const store = memoryStore();
       await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
@@ -98,6 +99,7 @@ describe("persistUiQueries", () => {
   });
 
   describe("given an unmarked read", () => {
+    /** @scenario "A read not marked persist never reaches the disk" */
     it("never reaches the store", async () => {
       const store = memoryStore();
       await session({
@@ -128,6 +130,7 @@ describe("persistUiQueries", () => {
   });
 
   describe("given the build changed since the cache was written", () => {
+    /** @scenario "A build change discards the store" */
     it("discards the store", async () => {
       const store = memoryStore();
       await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
@@ -196,9 +199,9 @@ describe("persistUiQueries sealing", () => {
   };
   const orgRow = storedQueryKey({ userId: "alice", queryHash: hashKey(orgGraph) });
 
-  describe("given a row sealed under the user's key", () => {
-    /** @scenario "A sealed row restores for the same user in a new session" */
-    it("restores it in a new session for the same user, and never holds the data in clear", async () => {
+  describe("given a row sealed under this session's key", () => {
+    /** @scenario "A sealed row restores on a refresh in the same session" */
+    it("restores it on a refresh in the same session, and never holds the data in clear", async () => {
       const { store, write } = written();
       await session({ store, userId: "alice", cacheKey: KEY_1, write });
 
@@ -209,8 +212,8 @@ describe("persistUiQueries sealing", () => {
     });
   });
 
-  describe("given a row sealed under another user's or a rotated key", () => {
-    /** @scenario "A row sealed under another key is a miss and is refetched" */
+  describe("given a row sealed by an earlier session, after a re-login", () => {
+    /** @scenario "A row from another session is a miss and is refetched" */
     it("restores nothing and removes the row", async () => {
       const { store, write } = written();
       await session({ store, userId: "alice", cacheKey: KEY_1, write });

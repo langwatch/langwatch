@@ -33,7 +33,9 @@ export type BroadcastEventType =
   // seam, whoever wrote it: a person, the agent, or an API caller. The payload
   // carries the experiment id, slug and new version only — clients refetch, so
   // no workbench state rides the tenant-wide channel.
-  | "experiment_updated";
+  | "experiment_updated"
+  // A read's contract named a committed event; the payload is `{ path }` only (read-hints.feature).
+  | "read_invalidated";
 
 const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "trace_updated",
@@ -44,6 +46,7 @@ const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "discover_updated",
   "langy_conversation_updated",
   "experiment_updated",
+  "read_invalidated",
 ];
 
 function redisChannel(eventType: BroadcastEventType): string {

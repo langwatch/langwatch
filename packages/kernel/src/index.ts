@@ -58,6 +58,9 @@ export {
   type FeatureEventingSetup,
   type PriorEventsQuery,
   type PriorEventsRead,
+  readHintsOf,
+  type ReadHintMap,
+  type ReadHintTarget,
 } from "./module-eventing.ts";
 export { moduleApi, ModuleApiToken, type OperationsOnly } from "./module-api-token.ts";
 export { supplyToken, SupplyToken } from "./supply-token.ts";

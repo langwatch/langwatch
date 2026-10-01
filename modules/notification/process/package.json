@@ -21,12 +21,14 @@
   },
   "dependencies": {
     "@aws-sdk/client-ses": "catalog:",
+    "@langwatch/api": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/presence-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
@@ -35,6 +37,7 @@
     "undici": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/nodemailer": "catalog:",

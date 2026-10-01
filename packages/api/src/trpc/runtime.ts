@@ -74,7 +74,6 @@ import {
   type TrpcFailureTraceIds,
 } from "./audit.ts";
 import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
-import { answerVersioned, splitSince } from "./versioned-read.ts";
 
 const logger = createLogger("langwatch:trpc");
 const outputLogger = createLogger("langwatch:api:output-validation");
@@ -303,20 +302,6 @@ type DeclaredResult<Member extends TrpcContractMember> =
       : void | Promise<void>
     : never;
 
-/** A versioned read answers its own data; the host wraps it in the envelope. */
-type MemberResult<Member extends TrpcContractMember> = Member extends {
-  readonly answer: infer Answer extends z.ZodType;
-}
-  ? ValueResult<Answer>
-  : DeclaredResult<Member>;
-
-/** What a handler is handed as input: the parsed one, without the `since` a host strips. */
-type MemberHandlerInput<Member extends TrpcContractMember> = Member extends {
-  readonly answer: z.ZodType;
-}
-  ? Omit<z.output<Member["input"]>, "since">
-  : z.output<Member["input"]>;
-
 /** Names the procedures `build()` is still waiting for. */
 export type TrpcProceduresNotImplemented<Names extends string> = Readonly<{
   readonly procedureNotImplemented: Names;
@@ -495,9 +480,9 @@ export interface TrpcRouterImplementation<
 > {
   handle(
     handler: (
-      args: HandlerArgumentsFor<Caller, MemberHandlerInput<Contract["members"][Name]>, Api>,
+      args: HandlerArgumentsFor<Caller, z.output<Contract["members"][Name]["input"]>, Api>,
       ...facts: TrpcFactValues<Facts>
-    ) => MemberResult<Contract["members"][Name]>,
+    ) => DeclaredResult<Contract["members"][Name]>,
   ): TrpcRouterBuilder<Api, Contract, Implemented | Name>;
 }
 
@@ -973,7 +958,6 @@ export function createTrpcRuntime<
       procedure: request.procedure,
       kind: request.member.kind,
       output: request.member.output,
-      answer: request.member.answer,
       handler: request.handle,
     });
 
@@ -1304,20 +1288,17 @@ function validateDeclaredOutput({
 
 /**
  * The handler, with its answer checked against the declaration. A stream is checked one value at
- * a time, because a single wrong yield is what a client crashes on. A versioned read's handler is
- * never handed `since`; its data is hashed into the envelope.
+ * a time, because a single wrong yield is what a client crashes on.
  */
 function guardOutput({
   procedure,
   kind,
   output,
-  answer,
   handler,
 }: {
   procedure: string;
   kind: TrpcContractMember["kind"];
   output: z.ZodType | undefined;
-  answer: z.ZodType | undefined;
   handler: (args: never, ...facts: never[]) => unknown;
 }): (opts: ResolverOptions) => unknown {
   const invoke = (opts: ResolverOptions, input: unknown = opts.input): unknown => {
@@ -1328,19 +1309,6 @@ function guardOutput({
 
   if (!output) {
     return async (opts: ResolverOptions) => voidOutput({ procedure, value: await invoke(opts) });
-  }
-
-  if (answer && kind === "query") {
-    return async (opts: ResolverOptions) => {
-      const { since, input } = splitSince(opts.input);
-      const data = validateDeclaredOutput({
-        procedure,
-        schema: answer,
-        value: await invoke(opts, input),
-      });
-
-      return answerVersioned({ userId: resolvedAccessOf(opts.ctx)?.actor?.id ?? "", since, data });
-    };
   }
 
   if (kind === "subscription") {

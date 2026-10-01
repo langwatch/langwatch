@@ -1,7 +1,7 @@
 /**
  * The session-version stamp: every tRPC answer names the version of the
- * caller's session-tier state, and a newer one than the session tier was
- * fetched under marks that tier stale. A 403 does the same. ADR-164.
+ * caller's session state, and a newer one than was seen marks every read
+ * stale. ADR-164.
  */
 
 /** The response header the API stamps on every tRPC answer. */

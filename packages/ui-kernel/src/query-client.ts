@@ -4,19 +4,15 @@
  * inline, and auto-reporting a background refetch would double it.
  */
 
-import {
-  applyCacheTiers,
-  invalidateSessionTier,
-  procedurePathOf,
-  type UiCachePlan,
-} from "@langwatch/browser-host/cache-tiers";
+import { trpcQueryKey } from "@langwatch/api/web";
+import { PERSISTED_QUERY_MAX_AGE, type UiCachePlan } from "@langwatch/browser-host/cache-tiers";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
 import { isForbiddenAnswer } from "@langwatch/browser-host/session-version";
 import {
   focusManager,
+  hashKey,
   MutationCache,
-  type Query,
   QueryCache,
   QueryClient,
 } from "@tanstack/react-query";
@@ -50,8 +46,14 @@ export type UiQueryClientOptions = {
    * carry no equivalent hook — deliberate, see the file docblock.
    */
   onMutationError?: (error: unknown) => void;
-  /** The declared cache tiers (ADR-164); without one every read keeps the 30s default. */
+  /** The declared cache policies; a persisted read is kept in memory as long as its mirror. */
   cachePlan?: UiCachePlan;
+  /**
+   * The session read's key. When set, any other read failing 403 refetches the
+   * session once (never more while it is already fetching); nothing else is
+   * invalidated. browser-query-caching.feature.
+   */
+  sessionQueryKey?: readonly unknown[];
 };
 
 /**
@@ -62,41 +64,34 @@ export type UiQueryClientOptions = {
 export function createUiQueryClient({
   onMutationError = defaultMutationErrorReporter,
   cachePlan,
+  sessionQueryKey,
 }: UiQueryClientOptions = {}): QueryClient {
-  // A 403 means the session tier described a standing the server no longer grants. A
-  // session read refused itself is not refetched again, or the refusal would loop.
-  const onForbidden = ({
-    error,
-    query,
-  }: {
-    error: unknown;
-    query?: Query<unknown, unknown, unknown>;
-  }) => {
-    if (!cachePlan || !isForbiddenAnswer(error)) return;
-    if (query && cachePlan.tiers.get(procedurePathOf(query.queryKey) ?? "") === "session") return;
-    void invalidateSessionTier({ queryClient, plan: cachePlan });
-  };
   installFocusGate();
-  const queryClient = new QueryClient({
+  const queryClient: QueryClient = new QueryClient({
     defaultOptions: {
-      // Navigation and focus do not replay every mounted query; a screen
-      // showing live state opts into focus refresh itself.
+      // A read is trusted for 5 minutes, then refetched on focus (the focused tab only) or
+      // reconnect; a read hint refetches it sooner. Nothing polls. read-hints.feature.
       queries: {
         retry: shouldRetryQuery,
-        staleTime: 30_000,
-        refetchOnWindowFocus: false,
+        staleTime: 5 * 60_000,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
         refetchIntervalInBackground: false,
       },
     },
-    queryCache: new QueryCache({ onError: (error, query) => onForbidden({ error, query }) }),
-    mutationCache: new MutationCache({
-      onError: (error) => {
-        onForbidden({ error });
-        onMutationError(error);
+    mutationCache: new MutationCache({ onError: onMutationError }),
+    queryCache: new QueryCache({
+      onError: (error, query) => {
+        if (!sessionQueryKey || !isForbiddenAnswer(error)) return;
+        if (query.queryHash === hashKey(sessionQueryKey)) return;
+        if (queryClient.isFetching({ queryKey: sessionQueryKey, exact: true }) > 0) return;
+        void queryClient.refetchQueries({ queryKey: sessionQueryKey, exact: true });
       },
     }),
   });
-  if (cachePlan) applyCacheTiers({ queryClient, plan: cachePlan });
+  for (const path of cachePlan?.persisted ?? []) {
+    queryClient.setQueryDefaults(trpcQueryKey(path), { gcTime: PERSISTED_QUERY_MAX_AGE });
+  }
 
   return queryClient;
 }

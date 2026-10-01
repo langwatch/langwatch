@@ -282,7 +282,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       };
 
       /**
-       * The scope skeleton the shell resolves against: a versioned, session-tier
+       * The scope skeleton the shell resolves against: a persisted
        * read, so it shares the shell's one cache entry (and its invalidation).
        */
       getScopeGraph: {

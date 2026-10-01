@@ -68,9 +68,7 @@ export type UiFeatureApiClientOptions = {
   subscriptionUrl?: string;
   /** The EventSource to open live channels with. Defaults to the browser's. */
   eventSource?: SseEventSourceConstructor;
-  /** Reads sent alone, so one URL is one read and its ETag means one thing (ADR-164). */
-  unbatchedPaths?: ReadonlySet<string>;
-  /** Reads declared `versioned`: sent with `since`, answered `unchanged` or with a new version. */
+  /** Reads that send `since`; none today, event-sourced reads will answer by projection cursor. */
   versionedReads?: UiVersionedReads;
   /** The deployment's `isDevelopment`: logs operation and timing, never what a request carried. */
   isDevelopment?: boolean;
@@ -84,13 +82,11 @@ function uiFeatureApiLinks({
   fetch,
   subscriptionUrl = subscriptionOrigin(),
   eventSource,
-  unbatchedPaths,
   versionedReads,
   isDevelopment = false,
 }: UiFeatureApiClientOptions) {
   const batchRouting = splitLink({
-    condition: (operation) =>
-      operation.context.skipBatch === true || unbatchedPaths?.has(operation.path) === true,
+    condition: (operation) => operation.context.skipBatch === true,
     true: httpLink({ url, ...(fetch ? { fetch } : {}) }),
     false: httpBatchStreamLink({
       url,
@@ -167,9 +163,8 @@ function dataOfVersionedAnswer({
 }
 
 /**
- * A versioned read is sent with the version its cached data holds and, answered
- * `unchanged`, resolves to that cached data. A new version is remembered, and the
- * caller sees the bare data either way. specs/ui/browser-query-caching.feature.
+ * A versioned read is sent with the version its cached data holds and, answered `unchanged`,
+ * resolves to that cached data. Kept for cursor-backed reads; none opts in yet (ARCHITECTURE.md).
  */
 function versionedReadLink<TRouter extends AnyRouter>({
   paths,
@@ -235,6 +230,6 @@ export type UiFeatureApiBinding = {
   /** The package this transport serves, named for composition diagnostics. */
   readonly name: string;
   readonly Provider: UiFeatureApiProvider;
-  /** The contracts whose declared cache tiers this package's reads follow (ADR-164). */
+  /** The contracts whose declared cache policies this package's reads follow. */
   readonly contracts?: readonly CacheDeclaringContract[];
 };

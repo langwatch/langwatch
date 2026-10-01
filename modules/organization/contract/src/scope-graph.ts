@@ -1,6 +1,6 @@
 /**
  * The organization, team and project skeleton the browser resolves a scope against,
- * narrowed to the caller: `organization.getScopeGraph`, a versioned read. Credentials and
+ * narrowed to the caller: `organization.getScopeGraph`. Credentials and
  * settings-only fields stay out; the shapes match `ui-scope.ts`, plus the chrome's scalars.
  */
 import { z } from "zod";
@@ -46,8 +46,8 @@ export const scopeGraphOrganizationSchema = z.object({
 });
 export type ScopeGraphOrganization = z.infer<typeof scopeGraphOrganizationSchema>;
 
-/** The read takes no arguments of its own; the host adds `since` (a versioned read). */
+/** The read takes no arguments. */
 export const organizationApiScopeGraphInputSchema = z.object({});
 
-/** What the handler returns; the wire carries it inside the versioned envelope. */
+/** What the handler returns. */
 export const scopeGraphSchema = z.array(scopeGraphOrganizationSchema);

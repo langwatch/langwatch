@@ -28,7 +28,7 @@ import { defineTrpcContract } from "@langwatch/kernel/contract";
 const IMPLIED_BY_SESSION = { caller: true, actor: true } as const;
 
 export const authzTrpc = defineTrpcContract("authz")
-  .query("effectivePermissions", { cache: { tier: "session" } })
+  .query("effectivePermissions")
   .withInput(authzOwnStandingInputSchema)
   .withOutput(authzOwnStandingSchema)
 

@@ -5,7 +5,6 @@
 export {
   defineTrpcContract,
   type TrpcCachePolicy,
-  type TrpcCacheTier,
   type TrpcContract,
   type TrpcContractBuilder,
   type TrpcContractInputBuilder,
@@ -13,13 +12,9 @@ export {
   type TrpcContractMember,
   type TrpcContractMembers,
   type TrpcContractOutputBuilder,
-  type TrpcVersionedCachePolicy,
-  type TrpcVersionedInputBuilder,
-  type TrpcVersionedMember,
-  type TrpcVersionedOutputBuilder,
+  type TrpcReadInvalidation,
+  type TrpcReadOptions,
 } from "./trpc-contract.ts";
-
-export type { VersionedAnswerSchema, VersionedInput } from "./versioned-answer.ts";
 
 export { defineRestMiddleware, type RestTransportMiddleware } from "./rest-middleware.ts";
 

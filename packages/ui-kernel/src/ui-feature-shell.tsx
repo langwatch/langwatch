@@ -5,8 +5,6 @@
 import {
   cachePlanFor,
   createUiVersionedReads,
-  invalidateSessionTier,
-  unbatchedCachePaths,
   type UiBindableVersionedReads,
 } from "@langwatch/browser-host/cache-tiers";
 import {
@@ -47,6 +45,7 @@ import {
 
 import { BrowserUiRpc } from "./browser-rpc.ts";
 import { createUiQueryClient } from "./query-client.ts";
+import { readHintStreamOver, startUiQueryHints } from "./query-hints.ts";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
@@ -148,10 +147,10 @@ export function createUiFeatureShell({
   // Chosen once per shell, never per render, so the hook it calls is the same
   // hook on every pass.
   const useSessionCapability = session ?? useUnavailableUiSession;
-  // Every installed module's declared cache tiers, as one plan (ADR-164).
+  // Every installed module's declared cache policies, as one plan.
   const cachePlan = cachePlanFor({ contracts: apis.flatMap((api) => api.contracts ?? []) });
   // The transport is built before the client the shell owns, so the cache is bound at render.
-  const reads = versionedReads ?? createUiVersionedReads({ plan: cachePlan });
+  const reads = versionedReads ?? createUiVersionedReads();
 
   function UiCapabilities({
     transport: sessionTransport,
@@ -179,7 +178,7 @@ export function createUiFeatureShell({
     // The marked reads are mirrored per user, sealed under the session read's keys, and every
     // tab syncs their versions. No key, no mirror.
     useEffect(() => {
-      if (!userId || !cacheKey || cachePlan.tiers.size === 0) return;
+      if (!userId || !cacheKey || cachePlan.persisted.size === 0) return;
       const store = sealedUiQueryStore({
         store: queryStore ?? indexedDbQueryStore,
         cacheKey,
@@ -222,6 +221,16 @@ export function createUiFeatureShell({
         }),
       [documentTitle, navigation, route, rpc, live],
     );
+    // The focused tab's one read-hint stream, for where it stands (read-hints.feature).
+    const { organizationId, projectId } =
+      !resolved.scope || resolved.scope === UNAVAILABLE_UI_SCOPE
+        ? { organizationId: null, projectId: null }
+        : resolved.scope.activeScope();
+    useEffect(() => {
+      if (!userId || !organizationId) return;
+      const stream = readHintStreamOver({ rpc, organizationId, projectId });
+      return startUiQueryHints({ queryClient, stream });
+    }, [queryClient, rpc, userId, organizationId, projectId]);
 
     // The toast and error singletons are called from mutation callbacks and
     // store actions, where no hook can run, so the resolved feedback port is
@@ -263,6 +272,7 @@ export function createUiFeatureShell({
       createUiQueryClient({
         onMutationError: (error) => reportFailure({ error, failures, host: failureHost.current }),
         cachePlan,
+        sessionQueryKey,
       }),
     );
     const queryClient = hostQueryClient ?? ownQueryClient;
@@ -272,14 +282,13 @@ export function createUiFeatureShell({
         transport ??
         createUiFeatureApiClient({
           fetch: sessionVersionFetch({ watch }),
-          unbatchedPaths: unbatchedCachePaths({ plan: cachePlan }),
           versionedReads: reads,
         }),
     );
     reads.bind(queryClient);
-    // A newer session version marks the session tier stale in whichever cache is serving.
+    // A newer session version marks every read stale in whichever cache is serving.
     useEffect(
-      () => watch.onNewer(() => void invalidateSessionTier({ queryClient, plan: cachePlan })),
+      () => watch.onNewer(() => void queryClient.invalidateQueries()),
       [watch, queryClient],
     );
 

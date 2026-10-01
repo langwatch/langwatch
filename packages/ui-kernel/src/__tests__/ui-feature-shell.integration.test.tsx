@@ -310,10 +310,9 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     });
   });
 
-  describe("when installed reads declare a cache tier (ADR-164)", () => {
+  describe("when an installed read declares persist", () => {
     const orgGraph = [["organization", "getAll"], { input: {}, type: "query" }];
     const member = [["organization", "getMemberById"], { input: { id: "u" }, type: "query" }];
-    const providers = [["modelProvider", "getAllForProject"], { input: {}, type: "query" }];
 
     function tieredBinding(): UiFeatureApiBinding {
       return {
@@ -322,11 +321,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         contracts: [
           {
             namespace: "organization",
-            members: { getAll: { cache: { tier: "session", persist: true } }, getMemberById: {} },
-          },
-          {
-            namespace: "modelProvider",
-            members: { getAllForProject: { cache: { tier: "reference" } } },
+            members: { getAll: { cache: { persist: true } }, getMemberById: {} },
           },
         ],
       };
@@ -344,11 +339,11 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     }
 
     describe("given a newer session version reaches the watch", () => {
-      /** @scenario "A newer session version invalidates the session tier" */
-      it("marks the session tier stale in the serving cache and leaves the rest", async () => {
+      /** @scenario "A newer session version invalidates every read" */
+      it("marks every read stale in the serving cache", async () => {
         const host = new QueryClient();
         host.setQueryData(orgGraph, ["org"]);
-        host.setQueryData(providers, ["provider"]);
+        host.setQueryData(member, { id: "u" });
         const sessionVersions = SessionVersionWatch.create();
         const shell = createUiFeatureShell({
           sessionQueryKey: TEST_SESSION_QUERY_KEY,
@@ -363,7 +358,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         sessionVersions.observe("8");
 
         await waitFor(() => expect(host.getQueryState(orgGraph)?.isInvalidated).toBe(true));
-        expect(host.getQueryState(providers)?.isInvalidated).toBe(false);
+        await waitFor(() => expect(host.getQueryState(member)?.isInvalidated).toBe(true));
       });
     });
 

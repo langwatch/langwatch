@@ -90,6 +90,7 @@ describe("RedisTenantBroadcastChannel", () => {
         "broadcast:discover_updated",
         "broadcast:langy_conversation_updated",
         "broadcast:experiment_updated",
+        "broadcast:read_invalidated",
       ]);
     });
 

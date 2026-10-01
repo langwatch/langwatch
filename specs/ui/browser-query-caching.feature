@@ -1,45 +1,24 @@
-Feature: The browser trusts a read for as long as its tier says, and no longer
-  A read's contract declares its cache tier: `live` is always refetched,
-  `session` (organization graph, permissions, flags, plan, admin) is trusted
-  until the server says the session changed, and `reference` (model provider
-  lists, catalogues) for an hour. An undeclared read keeps the 30 second
-  default. A few large reads are also kept on disk so a reload paints at once.
+Feature: The browser caches a read in memory, and on disk only when its contract says so
+  The server never answers `unchanged`: it always sends the full answer. A read is trusted for
+  five minutes, refetched sooner by a read hint (packages/api/specs/read-hints.feature). A read
+  whose contract declares `persist` is also mirrored to a sealed IndexedDB store so a reload
+  paints at once. Event-sourced reads will later answer by projection cursor (not built yet).
   ADR: dev/docs/adr/164-browser-query-cache-tiers.md
 
   Background:
-    Given a browser application whose query client applies the declared tiers
+    Given a browser application whose query client applies the declared cache policies
 
   @unit
-  Scenario: A declared tier sets how long a read stays fresh
-    Given "organization.getAll" is declared session and "modelProvider.getAllForProject" reference
-    When either is read
-    Then the session read never goes stale on its own
-    And the reference read stays fresh for an hour
-    And an undeclared read of the same namespace keeps the 30 second default
-
-  @unit
-  Scenario: A newer session version invalidates the session tier
-    Given the session tier was fetched under session version 7
+  Scenario: A newer session version invalidates every read
+    Given reads were fetched under session version 7
     When any answer carries session version 8
-    Then every session-tier read is marked stale and the mounted ones refetch
-    And reads of other tiers are left alone
+    Then every read is marked stale and the mounted ones refetch
 
   @unit
   Scenario: An equal, older or unreadable session version changes nothing
-    Given the session tier was fetched under session version 7
+    Given reads were fetched under session version 7
     When an answer carries version 7, 6, no version, or a value that is not a number
     Then nothing is invalidated
-
-  @unit
-  Scenario: A refused call invalidates the session tier
-    Given a session-tier read is cached
-    When a mutation or a read of another tier is answered 403
-    Then every session-tier read is marked stale
-
-  @unit
-  Scenario: A session read that is itself refused does not loop
-    Given a session-tier read is answered 403
-    Then the session tier is not invalidated again because of it
 
   @integration
   Scenario: A reload paints a persisted read from disk, then revalidates it
@@ -90,7 +69,7 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
 
   @integration
   Scenario: A restored version is sent as since
-    Given a versioned read was persisted with version "v1"
+    Given a read sent with a held version was persisted with version "v1"
     When the document reloads and the read is revalidated
     Then the request carries since "v1"
 
@@ -100,15 +79,29 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
     When the user signs out
     Then every persisted query cache is removed and unrelated entries are kept
 
-  # The mirror is sealed per user and the seal expires: every row on disk is AES-GCM under the
-  # user's key for a seven-day epoch, which the session read hands over with last epoch's key.
+  # The mirror is sealed per session and the seal expires: every row on disk is AES-GCM under
+  # the session's key for a seven-day epoch, which the session read hands over with last
+  # epoch's key. A new session after expiry gets a new key, so its old mirror is refetched.
 
   @integration
-  Scenario: A sealed row restores for the same user in a new session
-    Given a persisted read was sealed under the user's key for this epoch
-    When the document reloads in a new session for the same user
+  Scenario: A sealed row restores on a refresh in the same session
+    Given a persisted read was sealed under this session's key for this epoch
+    When the document refreshes, or a new tab opens, in the same session
     Then the read is drawn from disk
     And the store never holds its data in clear
+
+  @integration
+  Scenario: A row from another session is a miss and is refetched
+    Given a persisted read was sealed by an earlier session of the same user
+    When the user signs in again and the document restores it, or a tab adopts it on focus
+    Then nothing is drawn from disk
+    And the row is removed so the read is fetched again and overwritten
+
+  @unit
+  Scenario: A revoked session's key is gone
+    Given a browser session whose row was revoked
+    When the browser polls its session
+    Then the answer carries no document and no key
 
   @integration
   Scenario: A row sealed last epoch restores and is re-sealed with this epoch's key
@@ -119,16 +112,9 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
 
   @integration
   Scenario: A row sealed two epochs ago is a miss
-    Given a persisted read was sealed two epochs ago
+    Given a persisted read was sealed two epochs ago in a long sliding session
     When the document restores it with this epoch's key and last epoch's
     Then nothing is drawn from disk and the row is removed
-
-  @integration
-  Scenario: A row sealed under another key is a miss and is refetched
-    Given a persisted read was sealed under another user's key or a rotated one
-    When the document restores it, or a tab adopts it on focus
-    Then nothing is drawn from disk
-    And the row is removed so the read is fetched again
 
   @integration
   Scenario: A tampered row is a miss
@@ -188,33 +174,27 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
     Then its freshness stays unconfirmed, as of the original fetch
 
   @unit
-  Scenario: The same user always gets the same cache key
+  Scenario: The same session and epoch always get the same cache key
     Given the deployment's session secret
-    When the cache key is derived twice for one user, generation and epoch
+    When the cache key is derived twice for one server-resolved session and epoch
     Then both keys are the same 256-bit key
 
   @unit
-  Scenario: Two users get different cache keys
+  Scenario: Two sessions get different cache keys
     Given the deployment's session secret
-    When the cache key is derived for two users, or for one user and someone browsing as them
+    When the cache key is derived for two sessions, or for a session and someone browsing as its user
     Then the keys differ
 
   @unit
   Scenario: A key expires with its epoch
     Given the deployment's session secret and a seven-day epoch on the server's clock
-    When the cache key is derived for one user in this epoch and the last
-    Then the keys differ
-
-  @unimplemented
-  Scenario: A changed key generation gives a different key
-    Given a user whose key generation moves when their sessions are revoked everywhere
-    When the cache key is derived before and after
+    When the cache key is derived for one session in this epoch and the last
     Then the keys differ
 
   @unit
   Scenario: The session read carries this epoch's key and the last
     Given a signed-in browser polls its session
-    Then the document carries its user's key for the server's epoch and for the one before
+    Then the document carries its session's key for the server's epoch and for the one before
 
   @unit
   Scenario: Every tRPC answer carries the session version
@@ -236,52 +216,28 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
     Then the caller's next answer carries a newer session version
 
   @unit
-  Scenario: A session read answers 304 when its body is unchanged
-    Given a session or reference read answered as an unbatched GET with an ETag hashing its body for the caller
-    When the browser asks again with that ETag in If-None-Match and the body is unchanged
-    Then the server answers 304 with no body
-
-  @unit
-  Scenario: A changed body gets a new ETag
-    Given a session read answered with an ETag hashing its body for the caller
-    When the browser asks again with that ETag and the body has changed
-    Then the server answers 200 with the new body and a new ETag
-
-  @unit
-  Scenario: One user's ETag never revalidates another user's read
-    Given a read answered with an ETag for one user
-    When a different user asks with that ETag for a byte-identical body
-    Then the server answers 200 with that user's body
-
-  @unit
-  Scenario: A live read or a batch never carries an ETag
-    Given a read declared live, or several reads batched into one request
-    When it answers
-    Then the answer carries no ETag and is never answered 304
-
-  @unit
   Scenario: A versioned read sends the version it holds
-    Given a read declared versioned is cached under version "v1"
+    Given a read sent with a held version is cached under version "v1"
     When the read is asked again
     Then the request carries since "v1"
     And no since is sent when nothing is cached
 
   @unit
   Scenario: An unchanged answer keeps the cached data
-    Given a versioned read is cached under version "v1"
+    Given a read sent with a held version is cached under version "v1"
     When the server answers unchanged
     Then the caller receives the cached data
 
   @unit
   Scenario: A new version replaces the data
-    Given a versioned read is cached under version "v1"
+    Given a read sent with a held version is cached under version "v1"
     When the server answers version "v2" with new data
     Then the caller receives the new data
     And version "v2" is remembered for the next request
 
   @unit
   Scenario: A fetch in the focused tab announces its version, never its data
-    Given this tab is focused and holds a read that stays fresh beyond a refetch
+    Given this tab is focused and holds a persisted read
     When a fetch for that read lands
     Then the tab broadcasts the read's key and version only
 
@@ -322,13 +278,13 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
     Then the read is fetched once, with its version as since
 
   @unimplemented
-  Scenario: A versioned read is asked again on focus only after the cooldown
-    Given a versioned read was fetched less than 60 seconds ago
-    When the tab gains focus
-    Then it is not fetched
-    And a read fetched more than 60 seconds ago is revalidated
-
-  @unimplemented
   Scenario: A hidden or unfocused tab makes no calls
     Given a tab that is hidden or whose window is blurred
     Then it is not focused for polling or revalidation
+
+  @unit
+  Scenario: A forbidden read refetches the session once
+    Given any read other than the session read fails with HTTP 403
+    When many reads fail with 403 at once
+    Then the session read is refetched once and nothing else is invalidated
+    But a 403 on the session read itself, or any other failure status, refetches nothing

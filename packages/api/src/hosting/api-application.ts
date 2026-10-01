@@ -87,8 +87,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
       return resolved;
     };
 
-    // The session version rides every answer; session and reference reads revalidate
-    // by content (ADR-164).
+    // The session version rides every answer.
     const versionHeaders = await trpc.sessionVersionHeaders({ context: createContext });
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
@@ -98,7 +97,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
 
-    return trpc.revalidate({ request, response, context: createContext });
+    return response;
   });
 
   const sse = SseLane.create({

@@ -4,7 +4,6 @@
  * IndexedDB first. specs/ui/browser-query-caching.feature.
  */
 
-import { nowInstant } from "@langwatch/time";
 import {
   focusManager,
   hashKey,
@@ -17,9 +16,6 @@ import { procedurePathOf, type UiCachePlan, type UiQueryVersions } from "./cache
 import { readStoredQuery, storedQueryKey, type UiQueryStore } from "./query-persistence.ts";
 
 export const UI_QUERY_SYNC_CHANNEL = "langwatch:query-versions";
-
-/** How long a focused tab trusts a versioned read before asking the server again. */
-export const UI_REVALIDATE_COOLDOWN_MS = 60_000;
 
 type UiQuerySyncMessage = { key: string; version: string };
 
@@ -59,12 +55,9 @@ type SyncContext = {
 
 const pathOf = (query: Query) => procedurePathOf(query.queryKey) ?? "";
 
-/** Tier session or reference, persisted or versioned: the reads that outlive a refetch. */
+/** The persisted reads: the ones another tab's copy or the disk can stand in for. */
 function isTracked({ plan, query }: { plan: UiCachePlan; query: Query }): boolean {
-  const path = pathOf(query);
-  const tier = plan.tiers.get(path);
-  const outlivesRefetch = tier !== undefined && tier !== "live";
-  return outlivesRefetch || plan.versioned.has(path) || plan.persisted.has(path);
+  return plan.persisted.has(pathOf(query));
 }
 
 function versionOf({ versions, query }: { versions: UiQueryVersions; query: Query }): string {
@@ -125,19 +118,13 @@ async function adoptFromDisk({ context, query }: { context: SyncContext; query: 
   await markStale({ queryClient, query });
 }
 
-/** Disk first, then the cooldown, then the network for what is still behind. */
+/** Disk first, then the network for what is still behind. */
 async function refreshOnFocus(context: SyncContext): Promise<void> {
   const { queryClient, plan } = context;
   const isBehind = (query: Query) => isTracked({ plan, query }) && query.state.isInvalidated;
   const behind = queryClient.getQueryCache().findAll({ predicate: isBehind });
   await Promise.all(behind.map((query) => adoptFromDisk({ context, query })));
   context.announced.clear();
-  const cooledDown = nowInstant().epochMilliseconds - UI_REVALIDATE_COOLDOWN_MS;
-  await queryClient.invalidateQueries({
-    predicate: (query) =>
-      plan.versioned.has(pathOf(query)) && query.state.dataUpdatedAt < cooledDown,
-    refetchType: "none",
-  });
   await queryClient.refetchQueries({ type: "active", predicate: isBehind });
 }
 

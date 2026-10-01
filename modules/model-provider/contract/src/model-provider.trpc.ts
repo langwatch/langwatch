@@ -43,16 +43,16 @@ import {
 export const modelProviderTrpc = defineTrpcContract("modelProvider")
   // Every read here answers the MASKED projection: a decrypted credential is
   // only ever handed to a server-internal caller of `getExecutionProviders`.
-  .query("getAllForProject", { cache: { tier: "reference" } })
+  .query("getAllForProject")
   .withInput(modelProviderProjectTrpcInputSchema)
   .withOutput(modelProviderListEntryMapTrpcSchema)
 
-  .query("getAllForProjectForFrontend", { cache: { tier: "reference", persist: true } })
+  .query("getAllForProjectForFrontend", { cache: { persist: true } })
   .withInput(modelProviderProjectTrpcInputSchema)
   .withOutput(modelProviderListEntryMapTrpcSchema)
 
   /** One entry per stored row, uncollapsed — for surfaces that render every row. */
-  .query("listAllForProjectForFrontend", { cache: { tier: "reference" } })
+  .query("listAllForProjectForFrontend")
   .withInput(modelProviderProjectTrpcInputSchema)
   .withOutput(z.array(modelProviderListEntrySchema))
 

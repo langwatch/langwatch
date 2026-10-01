@@ -14,7 +14,7 @@ const plan = cachePlanFor({
   contracts: [
     {
       namespace: "organization",
-      members: { getScopeGraph: { cache: { tier: "session", persist: true, versioned: true } } },
+      members: { getScopeGraph: { cache: { persist: true } } },
     },
   ],
 });
@@ -155,7 +155,7 @@ describe("startUiQuerySync", () => {
   });
 
   describe("given the stored copy was sealed under a key this tab does not hold", () => {
-    /** @scenario "A row sealed under another key is a miss and is refetched" */
+    /** @scenario "A row from another session is a miss and is refetched" */
     it("does not adopt it on focus, and removes it", async () => {
       const disk = memoryStore();
       const rowKey = storedQueryKey({ userId: "alice", queryHash: graphHash });

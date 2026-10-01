@@ -43,13 +43,17 @@ describe("createUiQueryClient", () => {
     });
 
     /** @scenario "Moving between pages does not ask for the offer again" */
-    it("keeps an answer fresh for thirty seconds and does not refetch on focus", () => {
+    /** @scenario "A read is trusted for five minutes and refetched on focus only when stale" */
+    it("keeps an answer fresh for five minutes and refetches on focus only once stale", () => {
       const client = createUiQueryClient();
+      const queries = client.getDefaultOptions().queries;
 
-      expect(client.getDefaultOptions().queries).toMatchObject({
-        staleTime: 30_000,
-        refetchOnWindowFocus: false,
+      expect(queries).toMatchObject({
+        staleTime: 5 * 60_000,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
       });
+      expect(queries?.refetchInterval).toBeUndefined();
     });
 
     it("never auto-reports a query failure", async () => {
@@ -122,6 +126,87 @@ describe("createUiQueryClient", () => {
       // only the first is this seam's contract.
       expect(onMutationError.mock.calls[0]?.[0]).toBe(error);
       expect(failed).toHaveLength(0);
+    });
+  });
+
+  describe("given a session query key", () => {
+    const sessionKey = ["session"];
+
+    async function failRead({
+      client,
+      key,
+      error,
+    }: {
+      client: ReturnType<typeof createUiQueryClient>;
+      key: readonly unknown[];
+      error: unknown;
+    }) {
+      await client
+        .fetchQuery({ queryKey: key, queryFn: () => Promise.reject(error), retry: false })
+        .catch(() => {});
+    }
+
+    function clientWithSession() {
+      const client = createUiQueryClient({ sessionQueryKey: sessionKey });
+      // Slow enough that a second failure lands while the refetch is still in flight.
+      const sessionRead = vi.fn(
+        () => new Promise((resolve) => setTimeout(resolve, 20, { user: "u" })),
+      );
+      client.setQueryDefaults(sessionKey, { queryFn: sessionRead });
+      client.setQueryData(sessionKey, { user: "u" });
+      return { client, sessionRead };
+    }
+
+    /** @scenario "A forbidden read refetches the session once" */
+    it("refetches the session once when another read fails 403", async () => {
+      const { client, sessionRead } = clientWithSession();
+
+      await failRead({
+        client,
+        key: ["other"],
+        error: handled({ code: "forbidden", httpStatus: 403 }),
+      });
+
+      expect(sessionRead).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A forbidden read refetches the session once" */
+    it("refetches the session once when two reads fail 403 together", async () => {
+      const { client, sessionRead } = clientWithSession();
+      const error = handled({ code: "forbidden", httpStatus: 403 });
+
+      await Promise.all([
+        failRead({ client, key: ["a"], error }),
+        failRead({ client, key: ["b"], error }),
+      ]);
+
+      expect(sessionRead).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A forbidden read refetches the session once" */
+    it("does nothing when the session read itself fails 403", async () => {
+      const { client, sessionRead } = clientWithSession();
+
+      await failRead({
+        client,
+        key: sessionKey,
+        error: handled({ code: "forbidden", httpStatus: 403 }),
+      });
+
+      expect(sessionRead).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A forbidden read refetches the session once" */
+    it("does nothing when a read fails 500", async () => {
+      const { client, sessionRead } = clientWithSession();
+
+      await failRead({
+        client,
+        key: ["other"],
+        error: handled({ code: "internal", httpStatus: 500 }),
+      });
+
+      expect(sessionRead).not.toHaveBeenCalled();
     });
   });
 });

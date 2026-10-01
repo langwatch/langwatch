@@ -14,11 +14,12 @@ import type { TenantBroadcast } from "./channels/tenant-broadcast.channel.ts";
 import { TenantBroadcastPublisher } from "./channels/tenant-broadcast.channel.ts";
 import { notificationRepositories } from "./repositories/notification-repositories.registry.ts";
 import { EmailDeliveryService } from "./services/email-delivery.service.ts";
+import { notificationTrpcTransport } from "./transport/notification.trpc.ts";
 
 export const notificationServer = defineServerModule("notification")
   .withRepositories(notificationRepositories)
   .withApp(NotificationApp)
-  .build();
+  .withTransports(notificationTrpcTransport);
 
 /**
  * What this feature contributes to a process that sends mail or tells a

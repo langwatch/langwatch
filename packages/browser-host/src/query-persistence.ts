@@ -1,6 +1,6 @@
 /**
  * Mirrors `persist: true` reads to IndexedDB, one AES-GCM sealed object per query under the
- * user's key, keyed by user and query hash, discarded by build. ADR-164;
+ * session's key, keyed by user and query hash, discarded by build. ADR-164;
  * specs/ui/browser-query-caching.feature.
  */
 
@@ -124,7 +124,7 @@ const SEAL_IV_BYTES = 12;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-/** One epoch's key for this user, imported non-extractable and held in memory only. */
+/** One epoch's key for this session, imported non-extractable and held in memory only. */
 type UiQueryCipher = Readonly<{ subtle: SubtleCrypto; key: CryptoKey }>;
 
 /** A mirrored read on disk: the whole row sealed, its size and when it was last read. */
