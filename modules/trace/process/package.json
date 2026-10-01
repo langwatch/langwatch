@@ -111,6 +111,7 @@
   "devDependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/papaparse": "catalog:",

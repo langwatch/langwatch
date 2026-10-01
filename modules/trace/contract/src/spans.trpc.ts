@@ -3,7 +3,7 @@
  * is trace content, and nothing here is readable to a caller who may not read
  * the trace it belongs to.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { promptStudioSpanSchema, spansForTraceSchema } from "./trace.responses.ts";
