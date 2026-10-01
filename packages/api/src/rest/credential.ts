@@ -168,6 +168,11 @@ export function credentialPrincipalOfToken(
   };
 }
 
+/** The key row a credential names: none for a legacy project key or a person's access token. */
+export function apiKeyIdOfCredential(credential: RestResolvedProjectCredential): string | null {
+  return credential.type === "apiKey" && !credential.isPersonSession ? credential.apiKeyId : null;
+}
+
 /** The principal a resolved organization token stands for. */
 export function organizationCredentialPrincipalOfToken(
   resolved: RestResolvedOrganizationCredential,

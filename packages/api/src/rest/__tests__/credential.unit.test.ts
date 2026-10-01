@@ -5,11 +5,13 @@
  */
 
 import {
+  apiKeyIdOfCredential,
   credentialPrincipalOf,
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,
   resolvePersonalCaller,
   type RestCredentialPrincipal,
+  type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
 import { Context } from "hono";
 import { describe, expect, it } from "vitest";
@@ -227,5 +229,39 @@ describe("resolving who a personal-workspace read answers for", () => {
         ).toBe("personal_usage_service_key_unsupported");
       });
     });
+  });
+});
+
+describe("the key row a project credential names", () => {
+  const project = {
+    id: "project-1",
+    name: "P",
+    slug: "p",
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+  };
+  const key = {
+    type: "apiKey",
+    apiKeyId: "key_1",
+    userId: "user_1",
+    organizationId: "organization-1",
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+    project,
+  } satisfies RestResolvedProjectCredential;
+
+  it.each<[string, RestResolvedProjectCredential, string | null]>([
+    ["a scoped API key", key, "key_1"],
+    ["a scoped API key marked not a session", { ...key, isPersonSession: false }, "key_1"],
+    [
+      "a person's access token",
+      { ...key, apiKeyId: "cli-access-abc", isPersonSession: true },
+      null,
+    ],
+    ["a legacy project key", { type: "legacyProjectKey", project }, null],
+  ])("given %s", (_label, credential, expected) => {
+    expect(apiKeyIdOfCredential(credential)).toBe(expected);
   });
 });
