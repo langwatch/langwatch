@@ -15,7 +15,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
-import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
+import {
+  GatewayGuardrailEvaluationService,
+  type GuardrailCheckAnswer,
+  type GuardrailCheckVerdict,
+} from "../services/gateway-guardrail-evaluation.service.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
@@ -85,13 +89,18 @@ const skipped: SingleEvaluationResult = {
 
 const monitors = monitorRowsFromDatabase();
 
+function evaluated(answer: GuardrailCheckAnswer): GuardrailCheckVerdict {
+  if (answer.status !== "evaluated") throw new Error(`expected a verdict, got ${answer.status}`);
+  return answer.verdict;
+}
+
 const guardrails = PrismaGatewayGuardrailRepository.create(prisma);
 
 const guardrailWire = GatewayGuardrailEvaluationService.create({
   repository: guardrails,
   monitors,
   evaluations: {
-    runEvaluator: async () => {
+    checkGuardrail: async () => {
       throw new Error("the wire mapping tests never run an evaluator");
     },
   },
@@ -101,7 +110,9 @@ const serviceReturning = (result: SingleEvaluationResult) =>
   GatewayGuardrailEvaluationService.create({
     repository: guardrails,
     monitors,
-    evaluations: { runEvaluator: async () => result },
+    evaluations: {
+      checkGuardrail: async () => ({ status: "evaluated", result }),
+    },
   });
 
 async function createGuardrail({
@@ -229,12 +240,14 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_CLOSED",
       });
 
-      const verdict = await serviceReturning(failing).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-        content: { messages: [{ role: "user", content: "my email is a@b.c" }] },
-      });
+      const verdict = evaluated(
+        await serviceReturning(failing).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+          content: { messages: [{ role: "user", content: "my email is a@b.c" }] },
+        }),
+      );
 
       expect(verdict.decision).toBe("block");
       expect(verdict.reason).toBe("PII detected: email");
@@ -254,12 +267,14 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_CLOSED",
       });
 
-      const verdict = await serviceReturning(passing).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-        content: { messages: [] },
-      });
+      const verdict = evaluated(
+        await serviceReturning(passing).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+          content: { messages: [] },
+        }),
+      );
 
       expect(verdict.decision).toBe("allow");
       expect(verdict.policies_triggered).toEqual([]);
@@ -281,12 +296,14 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_CLOSED",
       });
 
-      const verdict = await serviceReturning(skipped).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-        content: { messages: [{ role: "user", content: "hi" }] },
-      });
+      const verdict = evaluated(
+        await serviceReturning(skipped).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+          content: { messages: [{ role: "user", content: "hi" }] },
+        }),
+      );
 
       expect(verdict.decision).toBe("allow");
       expect(verdict.policies_triggered).toEqual([]);
@@ -305,11 +322,13 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_CLOSED",
       });
 
-      const verdict = await serviceReturning(erroring).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-      });
+      const verdict = evaluated(
+        await serviceReturning(erroring).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+        }),
+      );
 
       expect(verdict.decision).toBe("block");
       expect(verdict.reason).toContain("evaluator exploded");
@@ -326,11 +345,13 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_OPEN",
       });
 
-      const verdict = await serviceReturning(erroring).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-      });
+      const verdict = evaluated(
+        await serviceReturning(erroring).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+        }),
+      );
 
       expect(verdict.decision).toBe("allow");
     });
@@ -356,11 +377,13 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_CLOSED",
       });
 
-      const allAllowed = await serviceReturning(passing).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [passId, failId],
-        direction: "request",
-      });
+      const allAllowed = evaluated(
+        await serviceReturning(passing).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [passId, failId],
+          direction: "request",
+        }),
+      );
       expect(allAllowed.decision).toBe("allow");
 
       // Both guardrails are in the request and only one fails. The runner
@@ -370,14 +393,19 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         repository: guardrails,
         monitors,
         evaluations: {
-          runEvaluator: async ({ settings }) => (settings.verdict === "fail" ? failing : passing),
+          checkGuardrail: async ({ settings }) => ({
+            status: "evaluated",
+            result: settings.verdict === "fail" ? failing : passing,
+          }),
         },
       });
-      const blocked = await routed.check({
-        projectId: PROJECT_ID,
-        guardrailIds: [passId, failId],
-        direction: "request",
-      });
+      const blocked = evaluated(
+        await routed.check({
+          projectId: PROJECT_ID,
+          guardrailIds: [passId, failId],
+          direction: "request",
+        }),
+      );
 
       expect(blocked.decision).toBe("block");
       // The id, not the display name, and only the guardrail that failed.
@@ -406,11 +434,13 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_CLOSED",
       });
 
-      const verdict = await serviceReturning(failing).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-      });
+      const verdict = evaluated(
+        await serviceReturning(failing).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+        }),
+      );
 
       expect(verdict.decision).toBe("allow");
     });
@@ -427,11 +457,13 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         archived: true,
       });
 
-      const verdict = await serviceReturning(failing).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-      });
+      const verdict = evaluated(
+        await serviceReturning(failing).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+        }),
+      );
 
       expect(verdict.decision).toBe("allow");
     });
@@ -446,11 +478,13 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_CLOSED",
       });
 
-      const verdict = await serviceReturning(failing).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-      });
+      const verdict = evaluated(
+        await serviceReturning(failing).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+        }),
+      );
 
       expect(verdict.decision).toBe("allow");
     });
@@ -477,11 +511,13 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
         failureMode: "FAIL_CLOSED",
       });
 
-      const verdict = await serviceReturning(passing).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [id],
-        direction: "request",
-      });
+      const verdict = evaluated(
+        await serviceReturning(passing).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [id],
+          direction: "request",
+        }),
+      );
 
       expect(verdict.decision).toBe("block");
     });
@@ -489,11 +525,13 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
 
   describe("when no guardrails are attached", () => {
     it("allows without touching the database", async () => {
-      const verdict = await serviceReturning(failing).check({
-        projectId: PROJECT_ID,
-        guardrailIds: [],
-        direction: "request",
-      });
+      const verdict = evaluated(
+        await serviceReturning(failing).check({
+          projectId: PROJECT_ID,
+          guardrailIds: [],
+          direction: "request",
+        }),
+      );
       expect(verdict.decision).toBe("allow");
     });
   });

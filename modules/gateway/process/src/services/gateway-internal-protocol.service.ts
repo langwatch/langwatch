@@ -215,7 +215,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   }
 
   async checkGuardrails(input: GatewayGuardrailCheckInput): Promise<GatewayGuardrailCheckResult> {
-    return { status: "evaluated", verdict: await this.#members.guardrails.check(input) } as const;
+    return this.#members.guardrails.check(input);
   }
 
   async budgetBucketSpend(input: { budgetId: string; endUserId: string }): Promise<

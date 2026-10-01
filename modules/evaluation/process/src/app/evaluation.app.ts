@@ -75,6 +75,7 @@ import { EvaluationExecutionReceiptService } from "../services/evaluation-execut
 import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
 import { EvaluationExperimentRunService } from "../services/evaluation-experiment-run.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
+import { EvaluationGuardrailCheckService } from "../services/evaluation-guardrail-check.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
@@ -274,7 +275,7 @@ export class EvaluationModule implements EvaluationApiContract {
     retention: DataRetentionApi,
     featureFlags: FeatureFlagApi,
     evaluators: EvaluatorApi,
-    /** Read per request (queued runs, slug lookups), never in construction: MonitorModule needs us. */
+    /** Read per request (queued runs, slug lookups), not in construction: monitor needs us. */
     monitors: MonitorApi,
     /** Where the analytics folds and rollup are written. */
     analytics: AnalyticsApi,
@@ -306,6 +307,7 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #models: EvaluationModelCascade;
   readonly #ledger: EvaluationLedger;
   readonly #runner: EvaluationRunner;
+  readonly #guardrails: EvaluationGuardrailCheckService;
   readonly #commands: EvaluationCommandDispatcherService | undefined;
   readonly #clustering: LangevalsClusteringService;
   readonly #piiDetection: LangevalsPiiDetectionService;
@@ -353,6 +355,10 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#models = members.models;
     this.#ledger = members.ledger;
     this.#runner = members.runner;
+    this.#guardrails = EvaluationGuardrailCheckService.create({
+      runner: members.runner,
+      ledger: members.ledger,
+    });
     this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
     this.#filterMatching = EvaluationFilterMatchingService.create();
@@ -616,6 +622,8 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#batchLog.log(input);
   runEvaluator: EvaluationApiContract["runEvaluator"] = (input) =>
     this.#runner.runEvaluation(input);
+  checkGuardrail: EvaluationApiContract["checkGuardrail"] = (input) =>
+    this.#guardrails.check(input);
   resolveSavedEvaluator: EvaluationApiContract["resolveSavedEvaluator"] = (input) =>
     this.#savedEvaluators.resolveForExecution(input);
   findMonitorBySlug: EvaluationApiContract["findMonitorBySlug"] = (input) =>

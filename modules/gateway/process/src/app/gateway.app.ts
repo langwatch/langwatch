@@ -242,6 +242,7 @@ import type {
   GatewayInternalChangesRequest,
   GatewayInternalConfigRequest,
   GatewayInternalDoorApi,
+  GatewayInternalGuardrailRequest,
   GatewayInternalRawRequest,
   GatewayInternalResolveKeyRequest,
   GatewayInternalSessionRequest,
@@ -1253,7 +1254,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }
 
   answerInternalGuardrailCheck(
-    input: GatewayInternalRawRequest,
+    input: GatewayInternalGuardrailRequest,
   ): Promise<RestDeclaredResult<typeof gatewayInternalGuardrailAnswers>> {
     return this.#internalAnswers.answerGuardrailCheck(input);
   }

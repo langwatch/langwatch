@@ -339,10 +339,14 @@ export type GatewayGuardrailCheckInput = {
     tools?: unknown;
     mcps?: unknown;
   };
+  /** The caller abandoning the check aborts the evaluators still running. */
+  signal?: AbortSignal | undefined;
 };
 
 export type GatewayGuardrailCheckResult =
   | { status: "unavailable" }
+  /** A fail-closed guardrail had no verdict by the deadline: retryable, never an allow. */
+  | { status: "deadline_exceeded" }
   | {
       status: "evaluated";
       verdict: {

@@ -116,9 +116,12 @@ function testGuardrails(options?: {
       listEnabledGuardrailMonitors: vi.fn(async () => options?.monitors ?? []),
     }),
     evaluations: {
-      runEvaluator:
-        options?.runEvaluator ??
-        vi.fn(async (): Promise<SingleEvaluationResult> => ({ status: "processed", passed: true })),
+      checkGuardrail: async () => ({
+        status: "evaluated",
+        result: options?.runEvaluator
+          ? await options.runEvaluator()
+          : { status: "processed", passed: true },
+      }),
     },
   });
 }

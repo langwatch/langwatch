@@ -88,7 +88,7 @@ export class LangevalsEvaluatorService {
     params: LangevalsEvaluateParams,
     retriesLeft: number,
   ): Promise<SingleEvaluationResult> {
-    const { evaluatorType, data, settings, env, idempotencyKey } = params;
+    const { evaluatorType, data, settings, env, idempotencyKey, signal } = params;
     const url = `${this.config.endpoint}/${evaluatorType}/evaluate`;
     const startTime = performance.now();
     const controller = new AbortController();
@@ -100,7 +100,7 @@ export class LangevalsEvaluatorService {
         url,
         kind: "evaluation",
         headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
-        signal: controller.signal,
+        signal: withCallerSignal({ own: controller.signal, caller: signal }),
         body: {
           data: [
             {
@@ -134,7 +134,7 @@ export class LangevalsEvaluatorService {
     }
 
     if (!response.ok) {
-      if (response.status >= 500 && retriesLeft > 0) {
+      if (response.status >= 500 && retriesLeft > 0 && !signal?.aborted) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         return this.evaluateWithRetry(params, retriesLeft - 1);
       }
@@ -185,10 +185,22 @@ export class LangevalsEvaluatorService {
   }
 }
 
+function withCallerSignal({
+  own,
+  caller,
+}: {
+  own: AbortSignal;
+  caller: AbortSignal | undefined;
+}): AbortSignal {
+  return caller ? AbortSignal.any([own, caller]) : own;
+}
+
 export type LangevalsEvaluateParams = Readonly<{
   evaluatorType: string;
   data: Record<string, unknown>;
   settings: Record<string, unknown>;
   env: Record<string, string>;
   idempotencyKey?: string;
+  /** The caller's cancellation, combined with this client's own timeout. */
+  signal?: AbortSignal | undefined;
 }>;

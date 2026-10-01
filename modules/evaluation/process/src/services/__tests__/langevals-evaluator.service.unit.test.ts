@@ -148,6 +148,43 @@ describe("LangevalsEvaluatorService", () => {
     });
   });
 
+  describe("given the caller aborts while langevals is still judging", () => {
+    /** @scenario "a cancelled guardrail check aborts the evaluator's call to the analysis service" */
+    it("aborts the request and does not retry", async () => {
+      const fetchMock = vi.fn(
+        (_url: unknown, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
+              once: true,
+            });
+          }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const service = LangevalsEvaluatorService.create({
+        config: { endpoint: ENDPOINT, maxRetries: 2, timeoutMs: 60_000 },
+        langevals: HttpLangevalsChannel.create({
+          config: {
+            stagingThresholdBytes: undefined,
+            stagingTtlSeconds: 60,
+            evaluationMaxPayloadBytes: 1_000_000,
+            topicClusteringMaxPayloadBytes: 1_000_000,
+          },
+          staging: createApiFixture<LangevalsPayloadStaging>(),
+        }),
+      });
+      const caller = new AbortController();
+
+      const run = service
+        .evaluate({ ...params, signal: caller.signal })
+        .catch((error: unknown) => error);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      caller.abort();
+
+      await expect(run).resolves.toBeInstanceOf(Error);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given a deployment without a langevals endpoint", () => {
     it("answers every evaluation as skipped", async () => {
       const service = LangevalsEvaluatorService.create({

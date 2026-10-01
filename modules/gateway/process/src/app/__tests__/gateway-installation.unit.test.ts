@@ -1,7 +1,6 @@
 import { BearerIdentity, RestHost, type RestCredentialBinding } from "@langwatch/api/rest";
 import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import { EvaluationApi, type GuardrailCheckOutcome } from "@langwatch/evaluation-contract";
 import { createTenantId, type EventingCommandSender, type ProcessStore } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -474,7 +473,9 @@ describe("gateway app installation", () => {
           participation: "consume",
         });
 
-        expect(gatewayProcessModule.eventing?.pipeline).toContain("gateway_realtime_session_maintenance");
+        expect(gatewayProcessModule.eventing?.pipeline).toContain(
+          "gateway_realtime_session_maintenance",
+        );
         expect(
           maintenance.processManagers.get("gatewayRealtimeSessionReconcile")?.config.schedule,
         ).toEqual({ everyMs: 60_000 });
@@ -518,17 +519,20 @@ describe("gateway app installation", () => {
 
     /** @scenario "The installed gateway runs a guardrail's evaluator through the evaluation module" */
     it("runs a guardrail's evaluator through the evaluation module", async () => {
-      const runEvaluator = vi.fn(async (): Promise<SingleEvaluationResult> => ({
-        status: "processed",
-        passed: false,
-        details: "PII detected",
+      const checkGuardrail = vi.fn(async (): Promise<GuardrailCheckOutcome> => ({
+        status: "evaluated",
+        result: {
+          status: "processed",
+          passed: false,
+          details: "PII detected",
+        },
       }));
       const { state, resources } = await installGateway({
         prisma: relationalWithGuardrails([
           { id: "gr_1", name: "PII", evaluatorId: "eval_1", failureMode: "FAIL_CLOSED" },
         ]),
         peers: new Map<TokenIdentity, unknown>([
-          [EvaluationApi, createApiFixture<EvaluationApi>({ runEvaluator })],
+          [EvaluationApi, createApiFixture<EvaluationApi>({ checkGuardrail })],
           [
             MonitorApi,
             createApiFixture<MonitorApi>({
@@ -567,7 +571,7 @@ describe("gateway app installation", () => {
           reason: "PII detected",
           policies_triggered: ["gr_1"],
         });
-        expect(runEvaluator).toHaveBeenCalledWith(
+        expect(checkGuardrail).toHaveBeenCalledWith(
           expect.objectContaining({ projectId: "project-1", evaluatorType: "langevals/basic" }),
         );
       } finally {

@@ -16,7 +16,7 @@ Feature: The installed gateway answers the data plane's callbacks through the co
     Given the gateway module installed with its members and peers
     And a fail-closed request guardrail whose evaluator has an enabled guardrail monitor
     When the data plane posts a guardrail check naming that guardrail
-    Then the evaluation module's runEvaluator runs the monitor's check
+    Then the evaluation module's checkGuardrail runs the monitor's check
     And the evaluator's failing verdict blocks the request
 
   @unit

@@ -372,7 +372,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/vk-config-bundle.feature",
   "specs/ai-gateway/governance/vk-personal-scope.feature",
   "specs/ai-gateway/governance/vk-scope-inheritance.feature",
-  "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
   "specs/ai-gateway/prometheus-metrics.feature",

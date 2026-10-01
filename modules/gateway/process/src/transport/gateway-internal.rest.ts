@@ -44,6 +44,11 @@ const GATEWAY_INTERNAL_GATE =
   "the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs";
 
 export type GatewayInternalRawRequest = Readonly<{ raw: string }>;
+/** The data plane abandoning its call aborts the check (specs/ai-gateway/guardrails.feature). */
+export type GatewayInternalGuardrailRequest = Readonly<{
+  raw: string;
+  signal: AbortSignal | undefined;
+}>;
 export type GatewayInternalSessionRequest = Readonly<{ sessionId: string; raw: string }>;
 export type GatewayInternalResolveKeyRequest = Readonly<{ raw: string; node: string | undefined }>;
 export type GatewayInternalConfigRequest = Readonly<{
@@ -72,7 +77,7 @@ export interface GatewayInternalDoorApi {
     input: GatewayInternalChangesRequest,
   ): Promise<RestDeclaredResult<typeof gatewayInternalChangesAnswers>>;
   answerInternalGuardrailCheck(
-    input: GatewayInternalRawRequest,
+    input: GatewayInternalGuardrailRequest,
   ): Promise<RestDeclaredResult<typeof gatewayInternalGuardrailAnswers>>;
   answerInternalBudgetBucketSpend(
     input: GatewayInternalBucketRequest,
@@ -163,7 +168,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
   .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))
   .responds(gatewayInternalGuardrailAnswers)
   .withDocs({ hide: true })
-  .handle(({ app, raw }) => app.answerInternalGuardrailCheck({ raw }))
+  .handle(({ app, raw, signal }) => app.answerInternalGuardrailCheck({ raw, signal }))
 
   .get("/api/internal/gateway/budget-bucket-spend", "gatewayInternalBudgetBucketSpend")
   .withAccess(anyAuthenticated({ reason: GATEWAY_INTERNAL_GATE }))

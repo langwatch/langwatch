@@ -272,6 +272,7 @@ export class EvaluationExecutionService {
     settings?: Record<string, unknown>;
     workflowId?: string | null;
     idempotencyKey?: string;
+    signal?: AbortSignal | undefined;
   }): Promise<SingleEvaluationResult> {
     return this.runEvaluation(params);
   }
@@ -289,6 +290,7 @@ export class EvaluationExecutionService {
     workflowId?: string | null;
     parentCausalityDepth?: number;
     idempotencyKey?: string;
+    signal?: AbortSignal | undefined;
   }): Promise<SingleEvaluationResult> {
     const {
       projectId,
@@ -299,6 +301,7 @@ export class EvaluationExecutionService {
       workflowId,
       parentCausalityDepth,
       idempotencyKey,
+      signal,
     } = params;
 
     if (data.type === "custom") {
@@ -345,6 +348,7 @@ export class EvaluationExecutionService {
       settings: settings ?? {},
       env: evaluatorEnv,
       idempotencyKey,
+      signal,
     });
 
     return this.deps.evaluators.augmentResult({

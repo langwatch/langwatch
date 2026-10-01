@@ -12,6 +12,8 @@ import type {
   EvaluationMonitorSummary,
   EvaluationSlugLookup,
   EvaluationSlugMatch,
+  GuardrailCheckInput,
+  GuardrailCheckOutcome,
   LogBatchEvaluationInput,
   RunEvaluatorInput,
   SavedEvaluatorLookup,
@@ -87,6 +89,8 @@ export interface EvaluationApi {
   logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
   /** Runs one evaluator over one input, and never rejects for a domain reason. */
   runEvaluator(input: RunEvaluatorInput): Promise<SingleEvaluationResult>;
+  /** Runs one guardrail's evaluator until its deadline or the caller's abort; records its cost. */
+  checkGuardrail(input: GuardrailCheckInput): Promise<GuardrailCheckOutcome>;
   /** One saved evaluator, ready to run; throws when no evaluator answers to it. */
   resolveSavedEvaluator(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
   /** One monitor by slug, or null. */
