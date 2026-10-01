@@ -76,7 +76,10 @@ import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "../rules/sign-in-providers.rules.ts";
-import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
+import {
+  findDeploymentSignIns,
+  ssoServiceProviderAddresses,
+} from "../rules/sso-service-provider.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
 import {
@@ -340,10 +343,17 @@ export class SsoApp implements SsoApiContract {
     return {
       ...journey,
       availability: await this.#selfServeContext.availability({ ...input, actorId: by.id }),
-      serviceProvider: ssoServiceProviderAddresses({
-        baseUrl: this.#baseUrl,
-        connectionId: journey.connection?.connectionId ?? null,
-      }),
+      serviceProvider: {
+        ...ssoServiceProviderAddresses({
+          baseUrl: this.#baseUrl,
+          connectionId: journey.connection?.connectionId ?? null,
+        }),
+        deploymentSignIn:
+          findDeploymentSignIns({
+            provider: await this.resolveProvider(),
+            baseUrl: this.#baseUrl,
+          })[0] ?? null,
+      },
     };
   }
 
@@ -396,7 +406,7 @@ export class SsoApp implements SsoApiContract {
   }): Promise<SignInProviderMounts> {
     return Promise.resolve({
       socialProviders: buildSocialProviders(
-        this.#configuration,
+        { ...this.#configuration, baseUrl: input.baseUrl },
         input.onMicrosoftProfile ? { onMicrosoftProfile: input.onMicrosoftProfile } : {},
       ),
       genericOAuthConfigs:

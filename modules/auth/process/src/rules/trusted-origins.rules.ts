@@ -1,3 +1,5 @@
+import { entraEndpointOrigins } from "@langwatch/identity-contract";
+
 /**
  * Which origins this installation trusts beyond its own address. No list
  * shipped with a deploy holds the next customer's provider: an administrator
@@ -57,7 +59,11 @@ export function resolveTrustedOrigins({
   const origins = [
     baseUrl,
     ...(publicBaseUrl && publicBaseUrl !== baseUrl ? [publicBaseUrl] : []),
-    ...registeredIssuers.flatMap(findOrigins),
+    // Entra ID names its userinfo endpoint on Microsoft Graph, another origin.
+    ...registeredIssuers.flatMap((issuer) => {
+      const origins = findOrigins(issuer);
+      return origins.length === 0 ? [] : [...origins, ...entraEndpointOrigins(issuer)];
+    }),
     ...originsIn(trustedIdpOrigins),
     ...(isProduction ? [] : originsIn(idpSimulatorUrl)),
   ];

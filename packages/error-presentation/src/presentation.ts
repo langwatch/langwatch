@@ -2968,6 +2968,17 @@ const presentations = {
     describe: () =>
       "Add the client ID and secret for OpenID Connect, or the signing certificate for SAML, before this connection can be registered.",
   },
+  sso_issuer_mismatch: {
+    // Names both addresses: they are public, and the fix is to make them equal.
+    title: "The identity provider names a different issuer",
+    describe: (error) =>
+      `This connection expects ${str(error, "expected", "its issuer")}, and the identity provider sent ${str(error, "received", "a different one")}. Use the issuer the identity provider names. For Microsoft Entra ID that is https://login.microsoftonline.com/<tenant id>/v2.0 with the tenant id of the app registration, not a user's home tenant and not common or organizations.`,
+  },
+  sso_issuer_multi_tenant: {
+    title: "Use your tenant's own issuer",
+    describe: (error) =>
+      `${str(error, "issuer", "That address")} is a Microsoft Entra ID multi-tenant endpoint, and no sign-in token carries it as the issuer. Use https://login.microsoftonline.com/<tenant id>/v2.0 with the tenant id of the app registration.`,
+  },
   sso_issuer_unreachable: {
     title: "The identity provider could not be reached",
     describe: () =>
@@ -3101,7 +3112,7 @@ const presentations = {
   sso_existing_account_unconfirmed: {
     title: "An account with this address already exists",
     describe: () =>
-      "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain and your identity provider marks the address as verified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
+      "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain, and not while your identity provider reports the address as unverified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
   },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",

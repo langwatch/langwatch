@@ -124,7 +124,36 @@ describe("given identity decides whether an assertion may become a session", () 
       accountKey: { issuer: "https://idp.acme.test", accountId: "subject-1" },
       email: "person@acme.test",
       emailVerified: true,
+      emailVerification: "unasserted",
     });
+  });
+
+  /** @scenario "Microsoft Entra ID's xms_edov true links an unconfirmed password account" */
+  it.each([
+    [{ xms_edov: true }, "verified"],
+    [{ xms_edov: false }, "unverified"],
+    [{}, "unasserted"],
+  ] as const)("reads Entra ID's %o as %s", async (claims, emailVerification) => {
+    const resolveUser = vi.fn(async () => ({ action: "continue" }) as const);
+    const entraIssuer = "https://login.microsoftonline.com/tenant-1/v2.0";
+
+    await resolveSsoUser({
+      assertions: createApiFixture<SsoAssertionApi>({
+        decide: async () => ({ action: "continue" }),
+        resolveUser,
+      }),
+      input: {
+        ...assertionOf("person@acme.test"),
+        accountKey: { issuer: entraIssuer, accountId: "subject-1" },
+        providerUser: { email: "person@acme.test", emailVerified: false, name: "A Person" },
+        verifiedIdTokenClaims: { iss: entraIssuer, ...claims },
+      } as Parameters<typeof resolveSsoUser>[0]["input"],
+      context: transaction().context,
+    });
+
+    expect(resolveUser).toHaveBeenCalledWith(
+      expect.objectContaining({ emailVerified: false, emailVerification }),
+    );
   });
 
   it("returns a refusal as the plugin's own rejection, never throwing it", async () => {

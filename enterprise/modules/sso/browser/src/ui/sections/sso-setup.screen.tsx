@@ -487,6 +487,7 @@ function SetupJourneySteps({
             protocol={connection.type}
             addresses={view.serviceProvider}
             connected
+            deploymentSignIn={view.serviceProvider.deploymentSignIn}
           />
         </VStack>
       </SetupStep>

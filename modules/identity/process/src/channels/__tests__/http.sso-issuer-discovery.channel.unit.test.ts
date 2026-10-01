@@ -69,7 +69,10 @@ describe("given an issuer an administrator typed", () => {
   it("reads the well-known document under the issuer, trailing slash and all", async () => {
     const { channel, asked } = channelAnswering(async () => respond(200, DISCOVERY_DOCUMENT));
 
-    await expect(channel.discover({ issuer: ISSUER })).resolves.toEqual({ reachable: true });
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toEqual({
+      reachable: true,
+      issuer: "https://login.acme.okta.com",
+    });
     expect(asked).toEqual([ENDPOINT]);
   });
 
@@ -196,6 +199,7 @@ describe("given an issuer origin an operator vouched for", () => {
 
     await expect(channel.discover({ issuer: `${VOUCHED}/realms/acme` })).resolves.toEqual({
       reachable: true,
+      issuer: "https://login.acme.okta.com",
     });
     expect(asked).toEqual([`${VOUCHED}/realms/acme/.well-known/openid-configuration`]);
   });

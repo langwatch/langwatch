@@ -8,6 +8,7 @@ import {
   fetchValidatedDestination,
 } from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 
 import {
   discoveryEndpointFor,
@@ -20,6 +21,9 @@ import type {
 import type { SsoDomainProofEgressPolicy } from "./http.sso-domain-proof-file.channel.ts";
 
 const logger = createLogger("langwatch:identity:sso-issuer-discovery");
+
+/** The issuer a discovery document names for itself, which its tokens carry. */
+const discoveryIssuerSchema = z.object({ issuer: z.string().min(1) });
 
 /** A discovery journey may canonicalise, but not wander, and not for long. */
 const DISCOVERY_TIMEOUT_MS = 5_000;
@@ -143,9 +147,12 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
       );
       if (!response.ok) return { reachable: false, reason: `answered ${response.status}` };
 
-      return looksLikeDiscoveryDocument(await response.json())
-        ? { reachable: true }
-        : { reachable: false, reason: "answered something else" };
+      const document: unknown = await response.json();
+      if (!looksLikeDiscoveryDocument(document)) {
+        return { reachable: false, reason: "answered something else" };
+      }
+      const named = discoveryIssuerSchema.safeParse(document);
+      return named.success ? { reachable: true, issuer: named.data.issuer } : { reachable: true };
     } catch (error) {
       const reason = reasonFor({ error, aborted: controller.signal.aborted });
       logger.warn({ issuer, endpoint, reason, error }, "an sso issuer could not be reached");

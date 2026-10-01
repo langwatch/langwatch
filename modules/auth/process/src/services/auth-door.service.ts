@@ -11,12 +11,15 @@ import { z } from "zod";
 
 import { isAllowedAuthOrigin, parseOrigin } from "../rules/auth-origin.rules.ts";
 import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
+import { issuerMismatchRedirectOf } from "../rules/id-token-issuer-mismatch.rules.ts";
+import { microsoftCallbackRouteOf } from "../rules/legacy-microsoft-callback.rules.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
 import {
   isSignInCallbackPath,
   signInErrorRedirectOf,
   signInFailureLocation,
 } from "../rules/sign-in-callback-failure.rules.ts";
+import { findConnectionIdsInPath } from "../rules/sso-request-target.rules.ts";
 
 const logger = createLogger("langwatch:auth");
 
@@ -32,6 +35,15 @@ export interface AuthDoorDeps {
     verified: VerifiedBrowserSession;
   }): Promise<BrowserSessionResolution>;
   revokeBrowserSession(input: { sessionId: string }): Promise<void>;
+  /** What the Better Auth logger saw of an ID token refused for its issuer, per request. */
+  idTokenIssuerRefusals: Readonly<{
+    runWithScope<T>(run: () => Promise<T>): Promise<T>;
+    findRefusedIssuers(): string[];
+  }>;
+  /** The issuer the connection a callback names holds, for the mismatch redirect. */
+  connectionIssuers: Readonly<{
+    findIssuersForConnection(args: { connectionId: string }): Promise<string[]>;
+  }>;
 }
 
 /** The `/api/auth` door: Better Auth's handshake, the browser's session poll and its sign-out. */
@@ -90,6 +102,32 @@ export class AuthDoorService {
     throw new InvalidAuthOriginError();
   }
 
+  /** The engine's generic refusal of an ID token for its `iss`, answered as
+   *  `sso_issuer_mismatch` with both issuers (specs/identity/sso-issuer-mismatch.feature). */
+  private async nameIssuerMismatch({
+    request,
+    response,
+  }: {
+    request: Request;
+    response: Response;
+  }): Promise<Response> {
+    const [received] = this.deps.idTokenIssuerRefusals.findRefusedIssuers();
+    if (received === undefined) return response;
+    const [connectionId] = findConnectionIdsInPath(request.url);
+    const [expected] = connectionId
+      ? await this.deps.connectionIssuers.findIssuersForConnection({ connectionId })
+      : [];
+    const redirect = issuerMismatchRedirectOf({
+      location: response.headers.get("location"),
+      received,
+      expected,
+    });
+    if (redirect.kind === "pass") return response;
+    const headers = new Headers(response.headers);
+    headers.set("location", redirect.location);
+    return new Response(response.body, { status: response.status, headers });
+  }
+
   /** Better Auth's own fetch handler, behind the origin gate and the born-finalized entrance. */
   async betterAuthHandshake(request: Request): Promise<Response> {
     const origin = request.headers.get("origin");
@@ -125,11 +163,19 @@ export class AuthDoorService {
     const bornFinalized = await this.deps.isBornFinalizedSignUp(request);
     const betterAuth = await this.deps.betterAuth();
     // Better Auth counts the caller the platform resolved, never one a header claims.
-    const stated = requestStatingCaller({ request, caller: ClientAddress.resolvedFor(request) });
+    const stated = requestStatingCaller({
+      request: withMicrosoftCallbackPath(request),
+      caller: ClientAddress.resolvedFor(request),
+    });
 
-    const answered = await (bornFinalized
-      ? this.deps.runWithIdentityBirth(() => betterAuth.handler(stated))
-      : betterAuth.handler(stated));
+    const answered = await this.deps.idTokenIssuerRefusals.runWithScope(async () =>
+      this.nameIssuerMismatch({
+        request,
+        response: await (bornFinalized
+          ? this.deps.runWithIdentityBirth(() => betterAuth.handler(stated))
+          : betterAuth.handler(stated)),
+      }),
+    );
     // Each acts on a different status (a 3xx to the error page, a 5xx on a callback).
     const errorPageUrl = `${baseUrl}/auth/error`;
     const traceId = getActiveTraceId();
@@ -140,6 +186,20 @@ export class AuthDoorService {
       traceId,
     });
   }
+}
+
+/** The request Better Auth answers: the Microsoft callback at its legacy path is handed on. */
+function withMicrosoftCallbackPath(request: Request): Request {
+  const route = microsoftCallbackRouteOf({ url: request.url });
+  if (route.kind === "pass") return request;
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  const init: RequestInit & { duplex?: "half" } = {
+    method: request.method,
+    headers: request.headers,
+    redirect: request.redirect,
+    ...(hasBody ? { body: request.body, duplex: "half" } : {}),
+  };
+  return new Request(route.url, init);
 }
 
 /**

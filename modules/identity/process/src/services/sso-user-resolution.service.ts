@@ -59,12 +59,12 @@ export class SsoUserResolutionService {
     const user = candidates[0];
     if (!user) return CONTINUE;
 
-    // SAML supplies a signed email attribute, without an OIDC verification flag.
-    // The caller has already admitted that assertion through the domain gate.
-    if (input.protocol === "oidc" && !input.emailVerified) {
-      return this.resolveUnvouchedAddress({ connection, input, user });
+    if (this.isUnvouched(input)) return this.resolveUnvouchedAddress({ connection, input, user });
+    if (user.emailVerified) {
+      return input.protocol === "saml"
+        ? this.resolveVerifiedSamlUser({ input, user, email })
+        : this.resolveConfirmedOidcUser({ connection, input, user, email });
     }
-    if (user.emailVerified) return this.resolveVerifiedSamlUser({ input, user, email });
     if (!(await this.directoryOwns({ connection, input, userId: user.id }))) {
       return this.resolveUnconfirmedUser({ connection, input, user, email });
     }
@@ -72,6 +72,16 @@ export class SsoUserResolutionService {
       return REFUSE;
     }
     return this.resolveOwnedUser({ input, userId: user.id, email });
+  }
+
+  /**
+   * An OIDC sign-in with no word from the provider that the address is real.
+   * SAML carries no flag and was admitted by the domain gate. Cloud takes only
+   * `email_verified: true`; self-hosted refuses only an explicit "unverified".
+   */
+  private isUnvouched(input: SsoUserResolutionInput): boolean {
+    if (input.protocol !== "oidc") return false;
+    return this.deps.isHosted ? !input.emailVerified : input.emailVerification === "unverified";
   }
 
   /** An existing subject binding still names an inactive member after the
@@ -121,9 +131,39 @@ export class SsoUserResolutionService {
     return { action: "link", userId: user.id, profile: "preserve" };
   }
 
-  /** An OIDC provider that does not say the address is verified: the library
-   *  refuses the link either way, and an unconfirmed account this connection's
-   *  directory does not own gets the named refusal instead. */
+  /**
+   * A confirmed account, signed in on self-hosted by an OIDC provider that did
+   * not send `email_verified: true` (Entra ID never does). The library would
+   * refuse, so the connection's domain proof links it, as for an unconfirmed one.
+   */
+  private async resolveConfirmedOidcUser({
+    connection,
+    input,
+    user,
+    email,
+  }: {
+    connection: SsoConnectionState;
+    input: SsoUserResolutionInput;
+    user: SsoResolutionCandidate;
+    email: string;
+  }): Promise<SsoUserResolution> {
+    if (this.deps.isHosted || input.emailVerified) return CONTINUE;
+    if (user.deactivated) return REFUSE;
+    if (await this.holdsThisBinding({ input, userId: user.id })) return CONTINUE;
+    if (!connectionProvesDomainOf({ connection, email: input.email })) return CONTINUE;
+    const contested = await this.deps.people.isAddressOrSubjectHeldByAnother({
+      userId: user.id,
+      email,
+      accountKey: input.accountKey,
+    });
+    if (contested) return REFUSE;
+    return { action: "link", userId: user.id, profile: "preserve" };
+  }
+
+  /** An OIDC provider that does not vouch for the address (said "unverified",
+   *  or said nothing on Cloud): the library refuses the link either way, and an
+   *  unconfirmed account this connection's directory does not own gets the
+   *  named refusal instead. */
   private async resolveUnvouchedAddress({
     connection,
     input,
@@ -140,14 +180,14 @@ export class SsoUserResolutionService {
     return refuseUnconfirmed({
       providerId: input.providerId,
       detail:
-        "the provider did not assert the address is verified and the account's address is unconfirmed",
+        "the provider asserted the address is not verified and the account's address is unconfirmed",
     });
   }
 
   /**
-   * An unconfirmed account, asserted by an OIDC provider that says the address
-   * is verified, on a self-hosted installation: the connection's qualified
-   * domain proof may vouch for it (sso-link-unconfirmed-local-account.feature).
+   * An unconfirmed account on a self-hosted installation, asserted by SAML or
+   * by an OIDC provider that did not say "unverified": the connection's
+   * qualified domain proof may vouch for it (sso-link-unconfirmed-local-account.feature).
    */
   private async resolveUnconfirmedUser({
     connection,
@@ -160,7 +200,7 @@ export class SsoUserResolutionService {
     user: SsoResolutionCandidate;
     email: string;
   }): Promise<SsoUserResolution> {
-    if (this.deps.isHosted || input.protocol !== "oidc") return CONTINUE;
+    if (this.deps.isHosted) return CONTINUE;
     if (user.deactivated) return REFUSE;
     if (await this.holdsThisBinding({ input, userId: user.id })) return CONTINUE;
     if (!connectionProvesDomainOf({ connection, email: input.email })) {

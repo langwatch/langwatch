@@ -51,6 +51,26 @@ describe("given a customer registered an issuer", () => {
   });
 });
 
+describe("given the registered issuer is Microsoft Entra ID", () => {
+  const entra = "https://login.microsoftonline.com/tenant-id/v2.0";
+
+  it("trusts Microsoft Graph too, where Entra ID serves userinfo", () => {
+    expect(resolveTrustedOrigins({ ...deployment, registeredIssuers: [entra] })).toEqual([
+      "https://app.langwatch.test",
+      "https://login.microsoftonline.com",
+      "https://graph.microsoft.com",
+    ]);
+  });
+
+  describe("when the issuer is any other provider", () => {
+    it("does not trust Microsoft Graph", () => {
+      expect(
+        resolveTrustedOrigins({ ...deployment, registeredIssuers: ["https://acme.okta.com"] }),
+      ).not.toContain("https://graph.microsoft.com");
+    });
+  });
+});
+
 describe("given an operator's own allowlist", () => {
   it("reads it however they wrote it, in production too", () => {
     expect(

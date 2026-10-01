@@ -43,3 +43,42 @@ export function ssoServiceProviderAddresses({
     metadataUrl: `${auth}/sso/saml2/sp/metadata?providerId=${provider}`,
   };
 }
+
+/** The provider ids a deployment names for its own sign-in, in a reader's words. */
+const DEPLOYMENT_PROVIDER_NAMES: Readonly<Record<string, string>> = {
+  "azure-ad": "Microsoft",
+  auth0: "Auth0",
+  cognito: "AWS Cognito",
+  github: "GitHub",
+  gitlab: "GitLab",
+  google: "Google",
+  okta: "Okta",
+  onelogin: "OneLogin",
+  oidc: "OpenID Connect",
+};
+
+export interface DeploymentSignIn {
+  name: string;
+  redirectUrl: string;
+}
+
+/**
+ * The sign-in the deployment configures for itself, beside the connection set
+ * up here: a separate door returning to `/api/auth/callback/<provider>`. Empty
+ * when the deployment signs in with email only (also what a denied licence reads as).
+ */
+export function findDeploymentSignIns({
+  provider,
+  baseUrl,
+}: {
+  provider: string;
+  baseUrl: string;
+}): DeploymentSignIn[] {
+  if (provider === "" || provider === "email") return [];
+  return [
+    {
+      name: DEPLOYMENT_PROVIDER_NAMES[provider] ?? provider,
+      redirectUrl: `${withoutTrailingSlashes(baseUrl)}/api/auth/callback/${provider}`,
+    },
+  ];
+}

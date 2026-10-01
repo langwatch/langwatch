@@ -1,6 +1,10 @@
 import {
+  canonicalEntraIssuer,
+  entraTenancyOf,
   SsoCertificateInvalidError,
   SsoCredentialsRequiredError,
+  SsoIssuerMismatchError,
+  SsoIssuerMultiTenantError,
   SsoIssuerUnreachableError,
   type SsoOidcRegistration,
   type SsoSamlIdpConfig,
@@ -15,6 +19,7 @@ import {
   looksLikeCertificate,
   looksLikeSamlDescriptor,
   trimmedText,
+  withoutTrailingSlashes,
 } from "../rules/sso-idp-registration.rules.ts";
 
 export interface SsoIdpRegistrationServiceDeps {
@@ -33,10 +38,19 @@ export class SsoIdpRegistrationService {
 
   private constructor(private readonly deps: SsoIdpRegistrationServiceDeps) {}
 
-  /** Checks an OpenID Connect registration by asking the issuer whether it is
-   *  one. The credentials are checked for presence only: whether they are the
-   *  RIGHT ones is a question only a sign-in can answer. */
-  async validateOidcRegistration(registration: SsoOidcRegistration): Promise<void> {
+  /**
+   * Checks an OpenID Connect registration by asking the issuer whether it is
+   * one, and answers the issuer to store: the one the discovery document names,
+   * since tokens are compared to it exactly. Credentials are checked for presence only.
+   */
+  async validateOidcRegistration(registration: SsoOidcRegistration): Promise<{ issuer: string }> {
+    const tenancy = entraTenancyOf(registration.issuer);
+    if (tenancy.multiTenant) {
+      throw new SsoIssuerMultiTenantError({
+        issuer: registration.issuer,
+        segment: tenancy.segment,
+      });
+    }
     if (
       trimmedText(registration.clientId) === "" ||
       trimmedText(registration.clientSecret) === ""
@@ -52,6 +66,19 @@ export class SsoIdpRegistrationService {
         `discovery at ${registration.issuer} did not answer: ${answer.reason}`,
       );
     }
+    const named = answer.issuer;
+    if (named === undefined) return { issuer: canonicalEntraIssuer(registration.issuer) };
+    if (named.includes("{tenantid}")) {
+      throw new SsoIssuerMultiTenantError({ issuer: registration.issuer, segment: null });
+    }
+    if (withoutTrailingSlashes(named) !== withoutTrailingSlashes(registration.issuer)) {
+      throw new SsoIssuerMismatchError({
+        expected: registration.issuer,
+        received: named,
+        at: "registration",
+      });
+    }
+    return { issuer: named };
   }
 
   /** Checks a SAML registration and answers the document to keep. What is

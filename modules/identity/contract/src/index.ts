@@ -130,6 +130,17 @@ export {
   type SsoTestArrivalStanding,
   ssoTestArrivalStandingSchema,
 } from "./sso-admission.ts";
+export {
+  type AssertedEmailVerification,
+  assertedEmailVerification,
+} from "./sso-email-verification.ts";
+export {
+  canonicalEntraIssuer,
+  entraEndpointOrigins,
+  type EntraTenancy,
+  entraTenancyOf,
+  isEntraIssuer,
+} from "./sso-entra-issuer.ts";
 export { SSO_CREDENTIAL_KINDS, type SsoCredentialKind } from "./sso-credential.ts";
 export {
   parseSamlIdpConfig,
@@ -340,6 +351,8 @@ export {
   SsoDomainProofLapsedError,
   SsoDomainProofNotFoundError,
   SsoExistingAccountUnconfirmedError,
+  SsoIssuerMismatchError,
+  SsoIssuerMultiTenantError,
   SsoIssuerUnreachableError,
   SsoSamlMetadataInvalidError,
   SsoSamlNotSelfServeError,

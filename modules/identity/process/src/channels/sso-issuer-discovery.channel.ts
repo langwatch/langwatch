@@ -3,7 +3,9 @@
  * "unreachable" and "not a provider" both stop the registration, and the
  * reason is what says which.
  */
-export type SsoIssuerDiscovery = { reachable: true } | { reachable: false; reason: string };
+export type SsoIssuerDiscovery =
+  /** `issuer` is the one the discovery document names, when it names one. */
+  { reachable: true; issuer?: string } | { reachable: false; reason: string };
 
 /**
  * Asking an issuer whether it is one. Runs once, at registration, to turn

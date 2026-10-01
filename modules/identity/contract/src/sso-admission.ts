@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { SsoAssertionRefusedError } from "./identity.errors.ts";
+import type { AssertedEmailVerification } from "./sso-email-verification.ts";
 
 /** The person arriving, as every step of an admission names them. */
 export interface SsoArrivingUser {
@@ -40,8 +41,10 @@ export interface SsoUserResolutionInput {
   providerId: string;
   accountKey: Readonly<{ issuer: string; accountId: string }>;
   email: string;
-  /** The OIDC provider's word that it verified the address; SAML carries none. */
+  /** The sign-in library's own reading: the OIDC provider sent `email_verified: true`. */
   emailVerified: boolean;
+  /** Every verification claim the provider sent (`xms_edov` included); SAML says nothing. */
+  emailVerification: AssertedEmailVerification;
 }
 
 /**

@@ -17,9 +17,12 @@ export class MemorySsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChanne
     return new MemorySsoIssuerDiscoveryChannel();
   }
 
-  /** States that one issuer answers as a provider. */
-  seedReachable({ issuer }: { issuer: string }): void {
-    this.answers.set(issuer, { reachable: true });
+  /** States that one issuer answers as a provider, naming `named` as its issuer. */
+  seedReachable({ issuer, named }: { issuer: string; named?: string }): void {
+    this.answers.set(
+      issuer,
+      named === undefined ? { reachable: true } : { reachable: true, issuer: named },
+    );
   }
 
   /** States why one issuer does not. */

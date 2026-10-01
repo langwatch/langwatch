@@ -19,12 +19,24 @@ const ADDRESSES: ServiceProviderAddresses = {
   metadataUrl: "https://app.langwatch.ai/api/auth/sso/saml2/sp/metadata/{connection}",
 };
 
-const renderSection = (overrides: { protocol?: "oidc" | "saml"; connected?: boolean } = {}) =>
+const DEPLOYMENT_SIGN_IN = {
+  name: "Microsoft",
+  redirectUrl: "https://app.langwatch.ai/api/auth/callback/azure-ad",
+};
+
+const renderSection = (
+  overrides: {
+    protocol?: "oidc" | "saml";
+    connected?: boolean;
+    deploymentSignIn?: typeof DEPLOYMENT_SIGN_IN | null;
+  } = {},
+) =>
   renderWithSsoHost(
     <ServiceProviderSection
       protocol={overrides.protocol ?? "oidc"}
       addresses={ADDRESSES}
       connected={overrides.connected ?? false}
+      deploymentSignIn={overrides.deploymentSignIn ?? null}
     />,
   );
 
@@ -80,5 +92,24 @@ describe("given an organization with no connection registered yet", () => {
     const { container } = renderSection({ connected: true });
 
     expect(container.textContent).not.toContain("come back for the finished");
+  });
+});
+
+describe("given a deployment that also configures its own sign-in", () => {
+  describe("when the connection is OpenID Connect", () => {
+    it("names the deployment sign-in's redirect address as a second one to register", () => {
+      const { container } = renderSection({ deploymentSignIn: DEPLOYMENT_SIGN_IN });
+
+      expect(container.textContent).toContain("Microsoft sign-in set up by its deployment");
+      expect(screen.getByText(DEPLOYMENT_SIGN_IN.redirectUrl)).toBeTruthy();
+    });
+  });
+
+  describe("when the connection is SAML", () => {
+    it("leaves the deployment sign-in out", () => {
+      renderSection({ protocol: "saml", deploymentSignIn: DEPLOYMENT_SIGN_IN });
+
+      expect(screen.queryByText(DEPLOYMENT_SIGN_IN.redirectUrl)).toBeNull();
+    });
   });
 });

@@ -6,7 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ssoServiceProviderAddresses } from "../sso-service-provider.rules.ts";
+import {
+  findDeploymentSignIns,
+  ssoServiceProviderAddresses,
+} from "../sso-service-provider.rules.ts";
 
 describe("the addresses this deployment answers on", () => {
   it("keys every per-provider path on the connection", () => {
@@ -48,5 +51,35 @@ describe("the addresses this deployment answers on", () => {
     });
 
     expect(addresses.redirectUrl).toBe("https://app.acme.test/api/auth/sso/callback/connection-1");
+  });
+});
+
+describe("given the sign-in a deployment configures for itself", () => {
+  const BASE_URL = "https://langwatch.acme.com/";
+
+  describe("when the deployment signs in with email only", () => {
+    it.each(["", "email"])("names no other sign-in for %j", (provider) => {
+      expect(findDeploymentSignIns({ provider, baseUrl: BASE_URL })).toEqual([]);
+    });
+  });
+
+  describe("when the deployment configures Microsoft", () => {
+    it("names the azure-ad callback the Microsoft sign-in sends", () => {
+      expect(findDeploymentSignIns({ provider: "azure-ad", baseUrl: BASE_URL })).toEqual([
+        { name: "Microsoft", redirectUrl: "https://langwatch.acme.com/api/auth/callback/azure-ad" },
+      ]);
+    });
+  });
+
+  describe("when the deployment configures another provider", () => {
+    it.each([
+      ["okta", "Okta"],
+      ["google", "Google"],
+      ["oidc", "OpenID Connect"],
+    ])("names /api/auth/callback/%s", (provider, name) => {
+      expect(findDeploymentSignIns({ provider, baseUrl: BASE_URL })).toEqual([
+        { name, redirectUrl: `https://langwatch.acme.com/api/auth/callback/${provider}` },
+      ]);
+    });
   });
 });

@@ -324,10 +324,10 @@ export class SsoSetupCommandsService {
       ({ organizationId, connectionId, kind }) as const;
 
     if (registration.protocol === "oidc") {
-      await this.deps.registrations.validateOidcRegistration(registration);
+      const { issuer } = await this.deps.registrations.validateOidcRegistration(registration);
 
       return {
-        issuer: registration.issuer,
+        issuer,
         clientIdRef: await this.deps.credentials.put({
           ...vault("oidc-client-id"),
           value: registration.clientId,

@@ -45,6 +45,7 @@ import {
   type SignInAttemptCounter,
 } from "../channels/http/http.better-auth.channel.ts";
 import { CredentialSessionGuard } from "../channels/http/http.credential-session-guard.channel.ts";
+import type { IdTokenIssuerRefusalChannel } from "../channels/http/http.id-token-issuer-refusal.channel.ts";
 import type { SignUpVerification } from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
 import type { SignUpAddressConfirmation } from "../channels/http/http.sign-up-confirmation.channel.ts";
@@ -326,6 +327,8 @@ export class IdentitySsoArrivals implements SsoArrivalApi {
 export type BuildBetterAuthOptions = Readonly<{
   /** The deployment's browser-session identity; without it, no instance. */
   identity: BetterAuthDeploymentIdentity;
+  /** Shared with the sign-in door, which names an ID token refused for its issuer. */
+  idTokenIssuerRefusals?: IdTokenIssuerRefusalChannel;
   /** Main's sign-up announcement, for a user who joins through their domain. */
   signupAnnouncements: SignupAnnouncementService;
   /** Where a session and a domain auto-join are recorded for nurturing. */
@@ -424,6 +427,7 @@ export async function buildBetterAuth(
 
   return createBetterAuthTransport({
     auth: options.auth,
+    idTokenIssuerRefusals: options.idTokenIssuerRefusals,
     users: options.users,
     database: PrismaBetterAuthHooksRepository.create(options.prisma),
     secondaryStorage,

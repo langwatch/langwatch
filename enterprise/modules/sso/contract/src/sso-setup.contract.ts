@@ -220,6 +220,13 @@ export const ssoSetupPageViewSchema = z
         singleLogoutUrl: z.string(),
         entityId: z.string(),
         metadataUrl: z.string(),
+        /** The sign-in the deployment configures for itself (`AUTH_PROVIDER`) and the
+         *  address it returns to, which is not the connection's. Null for email only. */
+        deploymentSignIn: z
+          .object({ name: z.string(), redirectUrl: z.string() })
+          .strict()
+          .nullable()
+          .optional(),
       })
       .strict(),
   })
