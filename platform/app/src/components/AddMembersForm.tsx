@@ -23,7 +23,11 @@ import {
 } from "react-hook-form";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
-import { getDefaultTeamRoleForOrganizationRole } from "~/utils/memberRoleConstraints";
+import {
+  getAutoCorrectedTeamRoleForOrganizationRole,
+  getDefaultTeamRoleForOrganizationRole,
+  type TeamRoleValue,
+} from "~/utils/memberRoleConstraints";
 import { OrganizationUserRoleField } from "./settings/OrganizationUserRoleField";
 import { LITE_MEMBER_NEEDS_TEAM_WARNING } from "./settings/seatTypeCopy";
 import {
@@ -48,7 +52,7 @@ const INVITE_SEATS: readonly OrganizationUserRole[] = [
 
 type TeamAssignment = {
   teamId: string;
-  role: TeamUserRole | string;
+  role: TeamRoleValue;
   customRoleId?: string;
 };
 
@@ -161,15 +165,15 @@ export function AddMembersForm({
         selectedTeams.forEach(
           (team: TeamAssignment | undefined, teamIndex: number) => {
             if (!team) return;
+            const correctedRole = getAutoCorrectedTeamRoleForOrganizationRole({
+              organizationRole: orgRole,
+              currentTeamRole: team.role,
+            });
+            if (correctedRole === team.role) return;
+            setValue(`teams.${teamIndex}.role`, correctedRole);
+            // A Lite Member seat holds Viewer only, never a custom role.
             if (orgRole === OrganizationUserRole.EXTERNAL) {
-              if (team.role !== TeamUserRole.VIEWER) {
-                setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
-                setValue(`teams.${teamIndex}.customRoleId`, undefined);
-              }
-            } else if (orgRole === OrganizationUserRole.MEMBER) {
-              if (team.role === TeamUserRole.VIEWER) {
-                setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
-              }
+              setValue(`teams.${teamIndex}.customRoleId`, undefined);
             }
           },
         );
