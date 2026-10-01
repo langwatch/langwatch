@@ -1910,6 +1910,16 @@ const presentations = {
     title: "That team isn't in this organization",
     describe: () => "Pick a team that belongs to this organization.",
   },
+  user_email_ambiguous: {
+    title: "More than one account uses this address",
+    describe: () =>
+      "Two or more accounts hold this email address in different letter case. Change one of their addresses, then try again.",
+  },
+  user_last_platform_operator: {
+    title: "This is the last platform operator",
+    describe: () =>
+      "Make someone else a platform operator first, then deactivate this account. An installation always keeps at least one.",
+  },
   user_not_in_organization: {
     title: "They're not in this organization",
     describe: () =>
@@ -3346,6 +3356,25 @@ const presentations = {
     title: "The platform is not healthy",
     describe: () =>
       "At least one subsystem did not answer. The report lists every subsystem and what each one said.",
+  },
+  platform_operator_last_holder: {
+    title: "This is the last platform operator",
+    describe: () =>
+      "Make someone else a platform operator first, then remove this one. An installation always keeps at least one.",
+  },
+  platform_operator_self_grant: {
+    title: "You cannot make yourself a platform operator",
+    describe: () => "Ask an existing platform operator to grant you the role.",
+  },
+  platform_operator_user_not_found: {
+    title: "No active user has that address",
+    describe: () =>
+      "Only an existing, active account can be made a platform operator. Ask them to sign up first.",
+  },
+  platform_permission_not_assignable: {
+    title: "Operations permissions cannot be added to a role",
+    describe: () =>
+      "Operations access belongs to platform operators only. Remove those permissions from the role and save again.",
   },
   user_token_required: {
     title: "Sign in to do this",
