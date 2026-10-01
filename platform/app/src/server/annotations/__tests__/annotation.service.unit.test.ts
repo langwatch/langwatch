@@ -141,6 +141,31 @@ describe("AnnotationService", () => {
         annotationId: "ann-1",
       });
     });
+
+    describe("when no annotation has that id in the project", () => {
+      function serviceWithNothingToDelete() {
+        const repository = createMockRepository();
+        vi.mocked(repository.delete).mockResolvedValue(null);
+        return new AnnotationService(repository);
+      }
+
+      it("refuses with annotation_not_found as a 404", async () => {
+        await expect(
+          serviceWithNothingToDelete().delete(defaultDeleteInput),
+        ).rejects.toMatchObject({
+          code: "annotation_not_found",
+          httpStatus: 404,
+        });
+      });
+
+      it("leaves the trace alone", async () => {
+        await serviceWithNothingToDelete()
+          .delete(defaultDeleteInput)
+          .catch(() => undefined);
+
+        expect(mockSyncAnnotationToTrace).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("static create() factory", () => {

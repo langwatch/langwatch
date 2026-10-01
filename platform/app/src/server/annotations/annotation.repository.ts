@@ -1,5 +1,6 @@
 import type { JsonValue } from "@prisma/client/runtime/client";
 import type { Annotation, PrismaClient } from "~/generated/prisma/client";
+import { isRecordNotFoundError } from "~/server/utils/prismaErrors";
 import {
   type AnnotationAnchorKind,
   type AnnotationAnchorScope,
@@ -152,15 +153,21 @@ export class AnnotationRepository {
   }
 
   /**
-   * Deletes an annotation by id within a project.
+   * Deletes an annotation by id within a project. Null when no annotation
+   * with that id exists in the project.
    */
-  async delete(input: DeleteAnnotationInput): Promise<Annotation> {
-    return await this.prisma.annotation.delete({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-      },
-    });
+  async delete(input: DeleteAnnotationInput): Promise<Annotation | null> {
+    try {
+      return await this.prisma.annotation.delete({
+        where: {
+          id: input.id,
+          projectId: input.projectId,
+        },
+      });
+    } catch (error) {
+      if (isRecordNotFoundError(error)) return null;
+      throw error;
+    }
   }
 
   /**

@@ -56,6 +56,7 @@ export const APP_ERROR_CODES = [
   "ai_query_provider_error",
   "already_organization_member",
   "analytics_series_percentage_unsupported",
+  "annotation_not_found",
   "anomaly_rule_not_found",
   "api_key_already_revoked",
   "api_key_not_found",
