@@ -98,7 +98,7 @@ it("keeps the contract modules browser-safe: no server framework in their value 
     for (const specifier of valueImports(relative)) {
       expect([specifier, relative]).toEqual([
         expect.stringMatching(
-          /^(?:zod|@langwatch\/api\/contract|@langwatch\/kernel\/contract$|\.\/)/,
+          /^(?:zod|@langwatch\/api\/contract|@langwatch\/module$|\.\/)/,
         ),
         relative,
       ]);
