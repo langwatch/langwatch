@@ -7,7 +7,7 @@
 import { schemaHashOf, type TrpcContract, type TrpcContractMember } from "@langwatch/module";
 import type { QueryKey } from "@tanstack/react-query";
 
-/** The query client's gcTime default: how long any read's cache entry lives once nothing observes it. */
+/** The query client's gcTime default: how long a read's cache entry lives once unobserved. */
 export const PERSISTED_QUERY_MAX_AGE = 24 * 60 * 60 * 1000;
 
 /**
