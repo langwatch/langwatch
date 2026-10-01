@@ -58,22 +58,43 @@ const SEAT_EXPLANATIONS: Partial<
 /**
  * OrganizationUserRoleField
  * Single Responsibility: Render a dropdown to choose a user's organization role
+ *
+ * The same picker serves the members drawer and the invite form, so both
+ * surfaces explain the seats in the same words. `roles` narrows the list where
+ * a surface offers fewer seats: the invite form hands out no Admin seat.
  */
 export function OrganizationUserRoleField({
   value,
   onChange,
+  roles,
+  width = "200px",
+  ariaLabel = "Organization role",
 }: {
   value: OrganizationUserRole;
   onChange: (role: OrganizationUserRole) => void;
+  roles?: readonly OrganizationUserRole[];
+  width?: string;
+  ariaLabel?: string;
 }) {
-  const roleCollection = useMemo(
-    () => createListCollection({ items: orgRoleOptions }),
-    [],
+  const options = useMemo(
+    () =>
+      roles
+        ? orgRoleOptions.filter((option) => roles.includes(option.value))
+        : orgRoleOptions,
+    [roles],
   );
+  const roleCollection = useMemo(
+    () => createListCollection({ items: options }),
+    [options],
+  );
+  // A full-width trigger gets a menu the same width, so it never runs past
+  // the edge of whatever holds the field; a narrow trigger gets a menu wide
+  // enough for the descriptions to read in one or two lines.
+  const fillsTrigger = width === "full";
 
   return (
-    <VStack align="start">
-      <HStack gap={6}>
+    <VStack align="start" width="full">
+      <HStack gap={6} width="full">
         <Select.Root
           collection={roleCollection}
           value={[value]}
@@ -83,12 +104,16 @@ export function OrganizationUserRoleField({
               onChange(selectedValue as OrganizationUserRole);
             }
           }}
+          positioning={{ sameWidth: fillsTrigger }}
         >
-          <Select.Trigger width="200px">
+          <Select.Trigger width={width} aria-label={ariaLabel} background="bg">
             <Select.ValueText placeholder="Select role" />
           </Select.Trigger>
-          <Select.Content width="320px" paddingY={2}>
-            {orgRoleOptions.map((option) => (
+          <Select.Content
+            width={fillsTrigger ? undefined : "320px"}
+            paddingY={2}
+          >
+            {options.map((option) => (
               <Select.Item key={option.value} item={option}>
                 <VStack align="start" gap={0} flex={1}>
                   <HStack gap={0}>

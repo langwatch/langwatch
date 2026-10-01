@@ -21,28 +21,30 @@ import {
   useForm,
   useWatch,
 } from "react-hook-form";
-import { Checkbox } from "~/components/ui/checkbox";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { getDefaultTeamRoleForOrganizationRole } from "~/utils/memberRoleConstraints";
-import { InfoWithoutSelecting } from "./settings/InfoWithoutSelecting";
-import {
-  DEVELOPER_EXPLANATION,
-  DEVELOPER_SHORT_DESCRIPTION,
-  LITE_MEMBER_EXPLANATION,
-  LITE_MEMBER_NEEDS_TEAM_WARNING,
-  LITE_MEMBER_SHORT_DESCRIPTION,
-  SEAT_TYPES_DOC_PATH,
-} from "./settings/seatTypeCopy";
+import { OrganizationUserRoleField } from "./settings/OrganizationUserRoleField";
+import { LITE_MEMBER_NEEDS_TEAM_WARNING } from "./settings/seatTypeCopy";
 import {
   type RoleOption,
   TeamRoleSelectItemContent,
   teamRolesOptions,
 } from "./settings/TeamUserRoleField";
-import { FieldInfoTooltip } from "./ui/FieldInfoTooltip";
 import { Select } from "./ui/select";
 
 type Option = { label: string; value: string; description?: string };
+
+/**
+ * The seats this form hands out. Admin is not among them, as it never was:
+ * the form used to offer Member with a Lite tick-box, and an Admin seat is
+ * given from the members list to somebody already in.
+ */
+const INVITE_SEATS: readonly OrganizationUserRole[] = [
+  OrganizationUserRole.MEMBER,
+  OrganizationUserRole.EXTERNAL,
+  OrganizationUserRole.DEVELOPER,
+];
 
 type TeamAssignment = {
   teamId: string;
@@ -262,90 +264,22 @@ export function AddMembersForm({
             />
             <Field.ErrorText>{errors.emailsRaw?.message}</Field.ErrorText>
           </Field.Root>
-          <Box flex="1" pt="28px">
+          <Field.Root flex="1">
+            <Field.Label>Seat</Field.Label>
             <Controller
               control={control}
               name="orgRole"
               render={({ field }) => (
-                <Checkbox
-                  checked={field.value === OrganizationUserRole.EXTERNAL}
-                  onChange={(e) =>
-                    field.onChange(
-                      e.target.checked
-                        ? OrganizationUserRole.EXTERNAL
-                        : OrganizationUserRole.MEMBER,
-                    )
-                  }
-                  alignItems="flex-start"
-                >
-                  <VStack align="start" gap={0}>
-                    <HStack gap={0}>
-                      <Text
-                        fontSize="sm"
-                        fontWeight="medium"
-                        lineHeight="short"
-                      >
-                        Lite Member
-                      </Text>
-                      <InfoWithoutSelecting>
-                        <FieldInfoTooltip
-                          description={LITE_MEMBER_EXPLANATION}
-                          docHref={SEAT_TYPES_DOC_PATH}
-                          docLabel="How seats are counted"
-                          testId="lite-member-info"
-                        />
-                      </InfoWithoutSelecting>
-                    </HStack>
-                    <Text fontSize="xs" color="fg.muted">
-                      {LITE_MEMBER_SHORT_DESCRIPTION}
-                    </Text>
-                  </VStack>
-                </Checkbox>
+                <OrganizationUserRoleField
+                  value={field.value}
+                  onChange={field.onChange}
+                  roles={INVITE_SEATS}
+                  width="full"
+                  ariaLabel="Seat"
+                />
               )}
             />
-            <Controller
-              control={control}
-              name="orgRole"
-              render={({ field }) => (
-                <Checkbox
-                  checked={field.value === OrganizationUserRole.DEVELOPER}
-                  onChange={(e) =>
-                    field.onChange(
-                      e.target.checked
-                        ? OrganizationUserRole.DEVELOPER
-                        : OrganizationUserRole.MEMBER,
-                    )
-                  }
-                  alignItems="flex-start"
-                  marginTop={3}
-                  data-testid="invite-developer-seat"
-                >
-                  <VStack align="start" gap={0}>
-                    <HStack gap={0}>
-                      <Text
-                        fontSize="sm"
-                        fontWeight="medium"
-                        lineHeight="short"
-                      >
-                        Developer
-                      </Text>
-                      <InfoWithoutSelecting>
-                        <FieldInfoTooltip
-                          description={DEVELOPER_EXPLANATION}
-                          docHref={SEAT_TYPES_DOC_PATH}
-                          docLabel="How seats are counted"
-                          testId="developer-info"
-                        />
-                      </InfoWithoutSelecting>
-                    </HStack>
-                    <Text fontSize="xs" color="fg.muted">
-                      {DEVELOPER_SHORT_DESCRIPTION}
-                    </Text>
-                  </VStack>
-                </Checkbox>
-              )}
-            />
-          </Box>
+          </Field.Root>
         </HStack>
 
         {orgRole === OrganizationUserRole.DEVELOPER && (

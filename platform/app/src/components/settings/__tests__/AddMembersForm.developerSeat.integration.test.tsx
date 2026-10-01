@@ -9,6 +9,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/utils/api", () => ({
@@ -48,10 +49,14 @@ describe("AddMembersForm", () => {
   describe("given the invite is for a Developer", () => {
     /** @scenario An administrator invites a Developer while the plan is at its seat cap */
     it("hides the team assignment and sends the invitation with no team", async () => {
+      const user = userEvent.setup();
       const { onSubmit } = renderForm();
 
       expect(screen.getByText("Team Assignments")).toBeInTheDocument();
-      fireEvent.click(screen.getByText("Developer"));
+      await user.click(screen.getByRole("combobox", { name: "Seat" }));
+      await user.click(
+        await screen.findByRole("option", { name: /Developer/ }),
+      );
 
       expect(screen.queryByText("Team Assignments")).toBeNull();
       expect(screen.getByTestId("developer-no-team")).toBeInTheDocument();
