@@ -8,8 +8,11 @@ import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack.tsx";
+import { TerminalOutput } from "../../../elements/coding-agent/trace/terminal-output.tsx";
+import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
+import { BlockStack } from "../../transcript/block-stack.tsx";
 import { RenderInputOutput } from "../render-input-output.tsx";
+import { TraceMediaPart } from "../trace-media-part.tsx";
 
 vi.mock(
   "../../../../behavior/lent-media-part.tsx",
@@ -83,7 +86,14 @@ describe("Media rendering in trace views", () => {
     const blocks = parseContentBlocks([imagePart]);
     expect(blocks).toEqual([expect.objectContaining({ kind: "media" })]);
 
-    renderWithDesignSystem(<BlockStack blocks={blocks} toolCalls={[]} />);
+    renderWithDesignSystem(
+      <TranscriptRenderProvider
+        renderMediaPart={(part) => <TraceMediaPart part={part} />}
+        renderTerminalOutput={(text, isError) => <TerminalOutput text={text} isError={isError} />}
+      >
+        <BlockStack blocks={blocks} toolCalls={[]} />
+      </TranscriptRenderProvider>,
+    );
 
     expect(screen.getByTestId("media-part-image")).toBeInTheDocument();
   });
@@ -92,7 +102,14 @@ describe("Media rendering in trace views", () => {
   it("traces-v2 conversation view renders a PDF as a named attachment chip", () => {
     const blocks = parseContentBlocks([pdfPart]);
 
-    renderWithDesignSystem(<BlockStack blocks={blocks} toolCalls={[]} />);
+    renderWithDesignSystem(
+      <TranscriptRenderProvider
+        renderMediaPart={(part) => <TraceMediaPart part={part} />}
+        renderTerminalOutput={(text, isError) => <TerminalOutput text={text} isError={isError} />}
+      >
+        <BlockStack blocks={blocks} toolCalls={[]} />
+      </TranscriptRenderProvider>,
+    );
 
     const chip = screen.getByTestId("media-part-binary");
     expect(chip).toHaveTextContent("report.pdf");

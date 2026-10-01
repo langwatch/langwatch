@@ -1,20 +1,19 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 import { Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 
-import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 import { useActiveProject } from "../active-project-context.tsx";
 import { CodePreview } from "./code-preview.tsx";
 import { parseSnippet } from "./codegen/snippets.ts";
 
 export function OpenTelemetrySetup(): React.ReactElement {
-  const { project } = useActiveProject();
+  const { freshToken } = useActiveProject();
   const { appBaseUrl } = useUiDeployment();
   const [isVisible, setIsVisible] = useState(false);
 
-  const mintedApiKey = project?.apiKey;
-  const effectiveApiKey = mintedApiKey || API_KEY_PLACEHOLDER;
+  const effectiveApiKey = freshToken ?? API_KEY_PLACEHOLDER;
   const effectiveEndpoint = appBaseUrl;
 
   function toggleVisibility(): void {
@@ -77,8 +76,8 @@ service:
           code={envVarsCode}
           filename=".env"
           codeLanguage="bash"
-          sensitiveValue={mintedApiKey}
-          enableVisibilityToggle={true}
+          sensitiveValue={freshToken}
+          enableVisibilityToggle={!!freshToken}
           isVisible={isVisible}
           onToggleVisibility={toggleVisibility}
         />
@@ -103,8 +102,8 @@ service:
           filename="collector-config.yaml"
           languageIconUrl="/images/external-icons/otel.svg"
           codeLanguage="yaml"
-          sensitiveValue={mintedApiKey}
-          enableVisibilityToggle={true}
+          sensitiveValue={freshToken}
+          enableVisibilityToggle={!!freshToken}
           isVisible={isVisible}
           highlightLines={highlightLines}
           onToggleVisibility={toggleVisibility}

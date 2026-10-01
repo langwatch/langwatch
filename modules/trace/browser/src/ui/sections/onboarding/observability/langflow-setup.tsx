@@ -1,18 +1,17 @@
+import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 import { Accordion, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";
 
-import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 import { useActiveProject } from "../active-project-context.tsx";
 import { CodePreview } from "./code-preview.tsx";
 
 export function LangflowSetup(): React.ReactElement {
-  const { project } = useActiveProject();
+  const { freshToken } = useActiveProject();
   const [isVisible, setIsVisible] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string[]>([]);
 
-  const mintedApiKey = project?.apiKey;
-  const effectiveApiKey = mintedApiKey || API_KEY_PLACEHOLDER;
+  const effectiveApiKey = freshToken ?? API_KEY_PLACEHOLDER;
 
   function toggleVisibility(): void {
     setIsVisible((prev) => !prev);
@@ -95,8 +94,8 @@ langwatch.get_current_trace().update(
           code={envVarsCode}
           filename=".env"
           codeLanguage="bash"
-          sensitiveValue={mintedApiKey}
-          enableVisibilityToggle={true}
+          sensitiveValue={freshToken}
+          enableVisibilityToggle={!!freshToken}
           isVisible={isVisible}
           onToggleVisibility={toggleVisibility}
         />

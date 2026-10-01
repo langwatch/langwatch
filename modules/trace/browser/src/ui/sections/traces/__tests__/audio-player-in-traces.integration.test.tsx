@@ -10,8 +10,11 @@ import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack.tsx";
+import { TerminalOutput } from "../../../elements/coding-agent/trace/terminal-output.tsx";
+import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
+import { BlockStack } from "../../transcript/block-stack.tsx";
 import { RenderInputOutput } from "../render-input-output.tsx";
+import { TraceMediaPart } from "../trace-media-part.tsx";
 
 // TraceMediaPart resolves the owning project from context; MediaPart needs a
 // real id for its stored-object existence probe.
@@ -83,7 +86,14 @@ describe("Audio player in trace views", () => {
     const blocks = parseContentBlocks([inputAudioPart]);
     expect(blocks).toEqual([expect.objectContaining({ kind: "media" })]);
 
-    renderWithDesignSystem(<BlockStack blocks={blocks} toolCalls={[]} />);
+    renderWithDesignSystem(
+      <TranscriptRenderProvider
+        renderMediaPart={(part) => <TraceMediaPart part={part} />}
+        renderTerminalOutput={(text, isError) => <TerminalOutput text={text} isError={isError} />}
+      >
+        <BlockStack blocks={blocks} toolCalls={[]} />
+      </TranscriptRenderProvider>,
+    );
 
     expect(screen.getByTestId("media-part-audio")).toBeInTheDocument();
   });
