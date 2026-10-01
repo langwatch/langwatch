@@ -27,12 +27,10 @@ explicitly.
   injects its collaborators (the command queue, the run-id generator, and run-
   model resolution). The Suite service and its run repository remain
   package-owned.
-- `suite/web` owns the controlled scenario/target pickers, run dialogs, and
-  run-history presentation, transforms, polling, expansion, and store state.
-  As of this writing it is not composed into `apps/ui` — there is no page,
-  routing, or drawer host wiring `@langwatch/suite-browser` there yet; see
-  `dev/docs/plans/strict-feature-layout.md` for what is still open. The suite
-  restore itself closed on 2026-09-06.
+- `@langwatch/suite-browser` routes nothing: its declaration (`suite.web.ts`)
+  only declares the `suite:run-history` slice, and `apps/ui` installs it via
+  `browser-modules.generated.ts`. Scenario's browser module renders the
+  Suite-run pickers, dialogs and run history, reading that slice.
 - The REST `/api/suites` family (`createSuiteRestApp`, mounted from
   `apps/api/src/app-rest/app-rest.packaged-families.ts`) and the tRPC suite
   router both consume the process-owned `app.suites`; neither transport

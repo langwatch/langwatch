@@ -10,10 +10,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BatchSection } from "../batch-section.tsx";
 import { makeBatchRun, makeScenarioRunData } from "./run-history-fixtures.ts";
 
-vi.mock("../../elements/runs/summary-status-icon.tsx", () => ({
-  SummaryStatusIcon: () => <span data-testid="summary-status-icon" />,
-}));
-
 vi.mock("../scenario-run-content.tsx", () => ({
   ScenarioRunContent: ({
     scenarioRuns,

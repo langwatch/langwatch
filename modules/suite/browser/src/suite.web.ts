@@ -1,7 +1,6 @@
 /**
- * What a browser installs when it installs suite: nothing routed. Suite owns
- * no screens or drawers today; scenario's declaration routes every Suite-run
- * page and dialog, importing these components directly.
+ * Suite routes nothing in the browser: it only declares the `suite:run-history`
+ * slice at install. Scenario's declaration renders the Suite-run pages and dialogs.
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
