@@ -8,8 +8,6 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/governance.web.ts",

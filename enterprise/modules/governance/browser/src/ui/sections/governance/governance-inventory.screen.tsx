@@ -883,9 +883,7 @@ function useAddParam({
  * ANOMALY RULES USED TO BE A FOURTH TAB AND IS NOT ONE ANY MORE. A rule is a
  * standing instruction about what to watch for, not a thing the organization
  * runs, so it belongs with alerts and signals rather than in an inventory.
- * `AnomalyRulesTab` itself is untouched and still exported, because the
- * standalone page at ee/governance/dashboard/pages/anomaly-rules.tsx renders
- * the same component.
+ * `AnomalyRulesTab` is kept, though no route renders it yet.
  *
  * The Catalog pane is `ToolCatalogTab`, over the page's own registry read;
  * registering or editing a tool opens `AiToolEntryDrawer` from the page.

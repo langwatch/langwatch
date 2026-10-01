@@ -446,8 +446,7 @@ function PeoplePage() {
     (sample.active || !(reads.spend.isLoading || reads.people.isLoading));
 
   const [assigning, setAssigning] = useState<PeopleRow | null>(null);
-  // Main opened this from a URL-routed drawer singleton this branch has no
-  // host for (see the merge handoff); local state opens it instead.
+  // Local state opens it; `?add=1` opens it too, via the deep-link hook.
   const [creatingDepartment, setCreatingDepartment] = useState(false);
   useAddDepartmentDeepLink({ canManage, open: () => setCreatingDepartment(true) });
 

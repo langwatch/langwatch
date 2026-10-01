@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../../tsconfig.emit.json"],
-  "files": ["./src/governance.ts", "./src/governance.web.ts"],
+  "files": ["./src/governance.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
