@@ -15,6 +15,20 @@ describe("Prompt contract", () => {
     ).toBe("openai/gpt-5-mini");
   });
 
+  it("strips unknown keys instead of refusing them, as main's configData did", () => {
+    const parsed = promptConfigDataSchema.parse({
+      prompt: "Hello",
+      outputs: [{ identifier: "output", type: "str", legacy: true }],
+      model: "openai/gpt-5-mini",
+      demonstrations: { id: "d1", legacyColumn: "x" },
+      legacyField: 1,
+    });
+
+    expect(parsed).not.toHaveProperty("legacyField");
+    expect(parsed.demonstrations).toEqual({ id: "d1" });
+    expect(parsed.outputs[0]).toEqual({ identifier: "output", type: "str" });
+  });
+
   /** @scenario invalid handles are rejected at the contract boundary */
   it("rejects invalid handles before persistence", () => {
     expect(promptHandleSchema.validate("Invalid Handle")).toBe(false);
