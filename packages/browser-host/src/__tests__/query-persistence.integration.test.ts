@@ -1,16 +1,18 @@
 /**
- * Persisting marked reads across a reload, per user and per build, over an
+ * Mirroring marked reads across a reload, one object per query, per user and per build, over an
  * in-memory store. ADR-164; specs/ui/browser-query-caching.feature.
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
-import { QueryClient } from "@tanstack/react-query";
+import { hashKey, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
 import { cachePlanFor } from "../cache-tiers.ts";
 import {
   clearPersistedUiQueries,
+  indexedDbQueryStore,
   persistUiQueries,
+  type UiStoredQuery,
   type UiQueryStore,
 } from "../query-persistence.ts";
 
@@ -26,13 +28,13 @@ const plan = cachePlanFor({
 const orgGraph = trpcQueryKey("organization.getAll", { input: {}, type: "query" });
 const member = trpcQueryKey("organization.getMemberById", { input: { id: "u" }, type: "query" });
 
-function memoryStore(): UiQueryStore & { entries: Map<string, string> } {
-  const entries = new Map<string, string>();
+function memoryStore(): UiQueryStore & { entries: Map<string, unknown> } {
+  const entries = new Map<string, unknown>();
   return {
     entries,
-    getItem: async (key) => entries.get(key),
-    setItem: async (key, value) => entries.set(key, value),
-    removeItem: async (key) => void entries.delete(key),
+    get: async (key) => entries.get(key),
+    put: async (key, value) => void entries.set(key, value),
+    delete: async (key) => void entries.delete(key),
     keys: async () => [...entries.keys()],
   };
 }
@@ -43,17 +45,26 @@ async function session({
   userId,
   buildId = "build-1",
   write,
+  versions = new Map<string, string>(),
 }: {
   store: UiQueryStore;
   userId: string;
   buildId?: string;
   write?: (queryClient: QueryClient) => void;
+  versions?: Map<string, string>;
 }): Promise<QueryClient> {
   const queryClient = new QueryClient();
-  const { unsubscribe, restored } = persistUiQueries({ queryClient, plan, userId, buildId, store });
+  const { unsubscribe, restored } = persistUiQueries({
+    queryClient,
+    plan,
+    userId,
+    buildId,
+    store,
+    versions,
+  });
   await restored;
   write?.(queryClient);
-  await new Promise((resolve) => setTimeout(resolve, 1_100));
+  await new Promise((resolve) => setTimeout(resolve, 50));
   unsubscribe();
   return queryClient;
 }
@@ -83,9 +94,11 @@ describe("persistUiQueries", () => {
         },
       });
 
-      const saved = [...store.entries.values()].join("");
-      expect(saved).toContain("getAll");
-      expect(saved).not.toContain("getMemberById");
+      const saved = [...store.entries.keys()].length;
+      expect(saved).toBe(1);
+      const stored = [...store.entries.values()].map((entry) => JSON.stringify(entry)).join("");
+      expect(stored).toContain("getAll");
+      expect(stored).not.toContain("getMemberById");
     });
   });
 
@@ -113,12 +126,82 @@ describe("persistUiQueries", () => {
   });
 });
 
+describe("persistUiQueries versions", () => {
+  describe("given a versioned read was mirrored before a reload", () => {
+    /** @scenario "A restored version is sent as since" */
+    it("restores the version so the first fetch can send it as since", async () => {
+      const store = memoryStore();
+      const versions = new Map<string, string>();
+      await session({
+        store,
+        userId: "alice",
+        versions,
+        write: (qc) => {
+          versions.set(hashKey(orgGraph), "u.v1");
+          qc.setQueryData(orgGraph, ["acme"]);
+        },
+      });
+
+      const reloadedVersions = new Map<string, string>();
+      await session({ store, userId: "alice", versions: reloadedVersions });
+
+      expect(reloadedVersions.get(hashKey(orgGraph))).toBe("u.v1");
+    });
+  });
+
+  describe("given an entry that is corrupt", () => {
+    /** @scenario "A corrupt entry is dropped and the rest restore" */
+    it("drops it and restores the rest", async () => {
+      const store = memoryStore();
+      await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
+      store.entries.set("lw-query:alice:broken", { data: "no query key" });
+
+      const reloaded = await session({ store, userId: "alice" });
+
+      expect(reloaded.getQueryData(orgGraph)).toEqual(["acme"]);
+      expect(store.entries.has("lw-query:alice:broken")).toBe(false);
+    });
+  });
+
+  describe("given an entry written by another build", () => {
+    it("ignores it and removes it", async () => {
+      const store = memoryStore();
+      await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
+
+      await session({ store, userId: "alice", buildId: "build-2" });
+
+      expect([...store.entries.values()].some((entry) => isOfBuild(entry, "build-1"))).toBe(false);
+    });
+  });
+});
+
+function isOfBuild(entry: unknown, buildId: string): boolean {
+  return (
+    typeof entry === "object" && entry !== null && "buildId" in entry && entry.buildId === buildId
+  );
+}
+
+describe("indexedDbQueryStore", () => {
+  describe("given IndexedDB is unavailable", () => {
+    /** @scenario "Without IndexedDB the cache lives in memory" */
+    it("keeps the entry in memory for this document", async () => {
+      const entry: UiStoredQuery = { queryKey: ["a"], data: 1, updatedAt: 1, buildId: "b" };
+
+      await indexedDbQueryStore.put("lw-query:alice:x", entry);
+
+      expect(await indexedDbQueryStore.get("lw-query:alice:x")).toEqual(entry);
+      await indexedDbQueryStore.delete("lw-query:alice:x");
+      expect(await indexedDbQueryStore.get("lw-query:alice:x")).toBeUndefined();
+    });
+  });
+});
+
 describe("clearPersistedUiQueries", () => {
   describe("when the user logs out", () => {
     it("wipes every persisted cache and nothing else", async () => {
       const store = memoryStore();
       await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
-      await store.setItem("unrelated", "kept");
+      store.entries.set("unrelated", "kept");
 
       await clearPersistedUiQueries({ store });
 

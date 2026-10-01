@@ -82,6 +82,10 @@
       "types": "./dist/query-persistence.d.ts",
       "default": "./src/query-persistence.ts"
     },
+    "./query-sync": {
+      "types": "./dist/query-sync.d.ts",
+      "default": "./src/query-sync.ts"
+    },
     "./query-retry": {
       "types": "./dist/query-retry.d.ts",
       "default": "./src/query-retry.ts"

@@ -1792,6 +1792,10 @@ states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md
 
 **A versioned read answers `unchanged`** (Alex, 2026-10-01): a read declared `cache: { …, versioned: true }` takes an optional `since`; the tRPC host hashes the handler's answer with the same content hash and returns `{ unchanged: true }` when it matches, else `{ version, data }`. The handler never sees `since`; no write bumps anything. `organization.getScopeGraph` is the first. Contracts may also declare `invalidatedBy: [EVENT_TYPE]` to drive hints (approved, not yet built).
 
+**Reads are mirrored, not shared** (Alex, 2026-10-01): each tab keeps its own React Query cache, mirrored per query to IndexedDB as structured-clone objects keyed by user and query hash and discarded by build (memory where IndexedDB is unavailable). A tab gaining focus reads IndexedDB first and goes to the network only when it is behind.
+
+**Only the focused tab talks to the server** (Alex, 2026-10-01): a tab is focused when it is visible and its window holds focus; it alone polls and refetches, and hidden tabs make no calls. A BroadcastChannel carries `{ key, version }` only, never data, after a focused fetch lands; a receiver whose version differs marks the key stale without fetching. A read without a server version is compared by a hash of its data. There is no leader. A versioned read sends `since` = the version its cached data holds, resolves `unchanged` to that data, and is asked again on focus only after a 60 second cooldown. specs/ui/browser-query-caching.feature.
+
 A surface too wide for a typed hook calls a procedure by PATH through the
 shell's `UiRpc`, and the answer is published under the key the typed hook
 would have written, so the two never hold two versions of one read. **A

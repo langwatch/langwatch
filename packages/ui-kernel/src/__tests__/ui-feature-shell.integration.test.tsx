@@ -329,13 +329,13 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       };
     }
 
-    function memoryStore(): UiQueryStore & { entries: Map<string, string> } {
-      const entries = new Map<string, string>();
+    function memoryStore(): UiQueryStore & { entries: Map<string, unknown> } {
+      const entries = new Map<string, unknown>();
       return {
         entries,
-        getItem: async (key) => entries.get(key),
-        setItem: async (key, value) => entries.set(key, value),
-        removeItem: async (key) => void entries.delete(key),
+        get: async (key) => entries.get(key),
+        put: async (key, value) => void entries.set(key, value),
+        delete: async (key) => void entries.delete(key),
         keys: async () => [...entries.keys()],
       };
     }
@@ -368,7 +368,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       /** @scenario "A user switch never shows another user's cache" */
       it("saves only the marked read, under this user's entry, and removes the other", async () => {
         const store = memoryStore();
-        store.entries.set("lw-query-cache:user_0", "{}");
+        store.entries.set("lw-query:user_0:other", {});
         const host = new QueryClient();
         const shell = createUiFeatureShell({
           sessionQueryKey: TEST_SESSION_QUERY_KEY,
@@ -380,16 +380,15 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         });
 
         renderShell(shell, <div />, host);
-        await waitFor(() => expect(store.entries.has("lw-query-cache:user_0")).toBe(false));
+        await waitFor(() => expect(store.entries.has("lw-query:user_0:other")).toBe(false));
         host.setQueryData(orgGraph, ["org"]);
         host.setQueryData(member, { id: "u" });
 
-        await waitFor(
-          () => expect(store.entries.get("lw-query-cache:user_1")).toContain("getAll"),
-          { timeout: 3_000 },
-        );
-        expect([...store.entries.keys()]).toEqual(["lw-query-cache:user_1"]);
-        expect(store.entries.get("lw-query-cache:user_1")).not.toContain("getMemberById");
+        await waitFor(() => expect(store.entries.size).toBe(1), { timeout: 3_000 });
+        const [key] = [...store.entries.keys()];
+        expect(key?.startsWith("lw-query:user_1:")).toBe(true);
+        expect(JSON.stringify(store.entries.get(key ?? ""))).toContain("getAll");
+        expect(JSON.stringify([...store.entries.values()])).not.toContain("getMemberById");
       });
     });
   });

@@ -4,7 +4,13 @@
  * inline, and auto-reporting a background refetch would double it.
  */
 
-import { MutationCache, type Query, QueryCache, QueryClient } from "@tanstack/react-query";
+import {
+  focusManager,
+  MutationCache,
+  type Query,
+  QueryCache,
+  QueryClient,
+} from "@tanstack/react-query";
 
 import {
   applyCacheTiers,
@@ -15,6 +21,29 @@ import {
 import { showErrorToast } from "./errors.ts";
 import { shouldRetryQuery } from "./query-retry.ts";
 import { isForbiddenAnswer } from "./session-version.ts";
+
+let focusGateInstalled = false;
+
+/**
+ * Only a visible tab whose window holds focus counts as focused, so a hidden tab
+ * runs no interval and refetches nothing. Until the first event the library's
+ * own visibility check answers.
+ */
+function installFocusGate(): void {
+  if (focusGateInstalled || typeof document === "undefined") return;
+  focusGateInstalled = true;
+  focusManager.setEventListener((handleFocus) => {
+    const sync = () => handleFocus(document.visibilityState !== "hidden" && document.hasFocus());
+    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("focus", sync);
+    window.addEventListener("blur", sync);
+    return () => {
+      document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("focus", sync);
+      window.removeEventListener("blur", sync);
+    };
+  });
+}
 
 export type UiQueryClientOptions = {
   /**
@@ -48,11 +77,17 @@ export function createUiQueryClient({
     if (query && cachePlan.tiers.get(procedurePathOf(query.queryKey) ?? "") === "session") return;
     void invalidateSessionTier({ queryClient, plan: cachePlan });
   };
+  installFocusGate();
   const queryClient = new QueryClient({
     defaultOptions: {
       // Navigation and focus do not replay every mounted query; a screen
       // showing live state opts into focus refresh itself.
-      queries: { retry: shouldRetryQuery, staleTime: 30_000, refetchOnWindowFocus: false },
+      queries: {
+        retry: shouldRetryQuery,
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
+        refetchIntervalInBackground: false,
+      },
     },
     queryCache: new QueryCache({ onError: (error, query) => onForbidden({ error, query }) }),
     mutationCache: new MutationCache({

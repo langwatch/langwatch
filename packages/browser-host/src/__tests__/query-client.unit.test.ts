@@ -52,10 +52,20 @@ describe("createUiQueryClient", () => {
       });
     });
 
-    it("installs no QueryCache.onError — a query failure is never auto-reported", () => {
+    it("never auto-reports a query failure", async () => {
+      const { failed, host } = recordingHost();
+      setUiFeedbackHost(host);
       const client = createUiQueryClient();
 
-      expect(client.getQueryCache().config.onError).toBeUndefined();
+      await client
+        .fetchQuery({
+          queryKey: ["x"],
+          queryFn: () => Promise.reject(new Error("boom")),
+          retry: false,
+        })
+        .catch(() => {});
+
+      expect(failed).toEqual([]);
     });
   });
 

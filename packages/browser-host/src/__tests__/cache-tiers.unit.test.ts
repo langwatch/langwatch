@@ -47,6 +47,22 @@ describe("cachePlanFor", () => {
   it("marks only the reads declared persist", () => {
     expect([...plan.persisted]).toEqual(["organization.getAll"]);
   });
+
+  it("marks only the reads declared versioned", () => {
+    const versioned = cachePlanFor({
+      contracts: [
+        {
+          namespace: "organization",
+          members: {
+            getScopeGraph: { cache: { tier: "session", persist: true, versioned: true } },
+            getAll: { cache: { tier: "session" } },
+          },
+        },
+      ],
+    });
+
+    expect([...versioned.versioned]).toEqual(["organization.getScopeGraph"]);
+  });
 });
 
 describe("procedurePathOf", () => {

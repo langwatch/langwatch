@@ -1,7 +1,12 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
-import { cachePlanFor, unbatchedCachePaths } from "@langwatch/browser-host/cache-tiers";
+import {
+  cachePlanFor,
+  createUiVersionedReads,
+  type UiBindableVersionedReads,
+  unbatchedCachePaths,
+} from "@langwatch/browser-host/cache-tiers";
 import type {
   UiDeployment,
   UiFeedback,
@@ -142,6 +147,7 @@ class BrowserUiShell extends UiShell {
     drawers,
     transport,
     sessionVersions,
+    versionedReads,
     hosts,
     rootCapabilities,
   }: {
@@ -153,6 +159,7 @@ class BrowserUiShell extends UiShell {
     drawers: UiDrawerRegistry;
     transport: UiFeatureApiTransport;
     sessionVersions: SessionVersionWatch;
+    versionedReads: UiBindableVersionedReads;
     hosts: readonly UiModuleHostMount[];
     rootCapabilities: UiRootCapabilities;
   }): BrowserUiShell {
@@ -168,6 +175,7 @@ class BrowserUiShell extends UiShell {
           hosts,
           transport,
           sessionVersions,
+          versionedReads,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
           session: browserUiCapabilitiesHook(rootCapabilities),
@@ -242,11 +250,14 @@ export async function startUi(): Promise<void> {
     contracts: webModules.flatMap((module) => module.installation.apiContracts ?? []),
   });
   const sessionVersions = SessionVersionWatch.create();
+  // The shell owns the QueryClient and binds it to these when it renders (ADR-164).
+  const versionedReads = createUiVersionedReads({ plan: cachePlan });
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
   const transport = createUiFeatureApiClient({
     fetch: sessionVersionFetch({ watch: sessionVersions }),
     unbatchedPaths: unbatchedCachePaths({ plan: cachePlan }),
+    versionedReads,
     isDevelopment: config.process.mode === "development",
   });
   const rootCapabilities = await loadUiRootCapabilities();
@@ -268,6 +279,7 @@ export async function startUi(): Promise<void> {
       drawers: installedModuleDrawers(installed.modules),
       transport,
       sessionVersions,
+      versionedReads,
       hosts: installedModuleHostMounts(installed.modules),
       rootCapabilities,
     }),

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { uiBatchResponse } from "../testing";
 import { createUiFeatureApiClient } from "../transport";
 
 const SECRET_INPUT = {
@@ -8,11 +9,7 @@ const SECRET_INPUT = {
 };
 
 function answering(body: unknown): typeof globalThis.fetch {
-  return (async () =>
-    new Response(JSON.stringify([body]), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })) as typeof globalThis.fetch;
+  return (async () => uiBatchResponse({ results: [body] })) as typeof globalThis.fetch;
 }
 
 function logged(spies: {

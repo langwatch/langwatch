@@ -5,8 +5,10 @@
 import { BrowserUiRpc } from "@langwatch/browser-host/browser-rpc";
 import {
   cachePlanFor,
+  createUiVersionedReads,
   invalidateSessionTier,
   unbatchedCachePaths,
+  type UiBindableVersionedReads,
 } from "@langwatch/browser-host/cache-tiers";
 import {
   BrowserUiDocumentTitle,
@@ -25,9 +27,11 @@ import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host
 import { createUiQueryClient } from "@langwatch/browser-host/query-client";
 import {
   currentUiBuildId,
+  indexedDbQueryStore,
   persistUiQueries,
   type UiQueryStore,
 } from "@langwatch/browser-host/query-persistence";
+import { startUiQuerySync } from "@langwatch/browser-host/query-sync";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
@@ -70,6 +74,8 @@ export type UiFeatureShellInstall = {
   transport?: UiFeatureApiTransport;
   /** The watch the supplied transport's fetch reports session versions to (ADR-164). */
   sessionVersions?: SessionVersionWatch;
+  /** The versioned reads the supplied transport was built with; its cache is bound here. */
+  versionedReads?: UiBindableVersionedReads;
   /** Where the marked reads persist; IndexedDB when absent. */
   queryStore?: UiQueryStore;
   /**
@@ -111,6 +117,7 @@ export function createUiFeatureShell({
   moduleHosts: ModuleHosts = UiNoModuleHosts,
   transport,
   sessionVersions,
+  versionedReads,
   queryStore,
   failures = [],
   session,
@@ -122,6 +129,8 @@ export function createUiFeatureShell({
   const useSessionCapability = session ?? useUnavailableUiSession;
   // Every installed module's declared cache tiers, as one plan (ADR-164).
   const cachePlan = cachePlanFor({ contracts: apis.flatMap((api) => api.contracts ?? []) });
+  // The transport is built before the client the shell owns, so the cache is bound at render.
+  const reads = versionedReads ?? createUiVersionedReads({ plan: cachePlan });
 
   function UiCapabilities({
     transport: sessionTransport,
@@ -145,17 +154,31 @@ export function createUiFeatureShell({
     const queryClient = useQueryClient();
     const userId =
       live.session === UNAVAILABLE_UI_SESSION ? void 0 : live.session.currentUser()?.id;
-    // The marked reads are kept per user: a switch restores only this user's.
+    // The marked reads are mirrored per user, and every tab syncs their versions.
     useEffect(() => {
-      if (!userId || cachePlan.persisted.size === 0) return;
+      if (!userId || cachePlan.tiers.size === 0) return;
+      const store = queryStore ?? indexedDbQueryStore;
+      const buildId = currentUiBuildId();
       const { unsubscribe } = persistUiQueries({
         queryClient,
         plan: cachePlan,
         userId,
-        buildId: currentUiBuildId(),
-        ...(queryStore ? { store: queryStore } : {}),
+        buildId,
+        store,
+        versions: reads.versions,
       });
-      return unsubscribe;
+      const stopSync = startUiQuerySync({
+        queryClient,
+        plan: cachePlan,
+        store,
+        userId,
+        buildId,
+        versions: reads.versions,
+      });
+      return () => {
+        unsubscribe();
+        stopSync();
+      };
     }, [queryClient, userId]);
     const resolved = useMemo(
       () =>
@@ -222,8 +245,10 @@ export function createUiFeatureShell({
         createUiFeatureApiClient({
           fetch: sessionVersionFetch({ watch }),
           unbatchedPaths: unbatchedCachePaths({ plan: cachePlan }),
+          versionedReads: reads,
         }),
     );
+    reads.bind(queryClient);
     // A newer session version marks the session tier stale in whichever cache is serving.
     useEffect(
       () => watch.onNewer(() => void invalidateSessionTier({ queryClient, plan: cachePlan })),

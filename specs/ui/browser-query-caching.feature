@@ -66,6 +66,33 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
     Given a persisted cache written by one build
     When a different build restores it
     Then nothing is restored
+    And the other build's entries are removed
+
+  @unimplemented
+  Scenario: Each persisted read is its own object
+    Given two persisted reads are cached
+    When one of them is refetched
+    Then only that read's object in the store is rewritten
+
+  @integration
+  Scenario: A corrupt entry is dropped and the rest restore
+    Given the store holds one entry that is not a stored read and one valid entry
+    When the document reloads
+    Then the valid read is drawn from disk
+    And the corrupt entry is removed
+
+  @integration
+  Scenario: Without IndexedDB the cache lives in memory
+    Given IndexedDB is unavailable, as in a private window
+    When a persisted read is cached
+    Then reading it back during this document works
+    And nothing is written to disk
+
+  @integration
+  Scenario: A restored version is sent as since
+    Given a versioned read was persisted with version "v1"
+    When the document reloads and the read is revalidated
+    Then the request carries since "v1"
 
   @integration
   Scenario: Logout wipes the store
@@ -115,3 +142,77 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
     Given a read declared live, or several reads batched into one request
     When it answers
     Then the answer carries no ETag and is never answered 304
+
+  @unit
+  Scenario: A versioned read sends the version it holds
+    Given a read declared versioned is cached under version "v1"
+    When the read is asked again
+    Then the request carries since "v1"
+    And no since is sent when nothing is cached
+
+  @unit
+  Scenario: An unchanged answer keeps the cached data
+    Given a versioned read is cached under version "v1"
+    When the server answers unchanged
+    Then the caller receives the cached data
+
+  @unit
+  Scenario: A new version replaces the data
+    Given a versioned read is cached under version "v1"
+    When the server answers version "v2" with new data
+    Then the caller receives the new data
+    And version "v2" is remembered for the next request
+
+  @unit
+  Scenario: A fetch in the focused tab announces its version, never its data
+    Given this tab is focused and holds a read that stays fresh beyond a refetch
+    When a fetch for that read lands
+    Then the tab broadcasts the read's key and version only
+
+  @unit
+  Scenario: A tab behind an announced version marks the read stale without fetching
+    Given another tab announces version "v2" for a read this tab holds at "v1"
+    When the message arrives
+    Then the read is marked stale and nothing is fetched
+
+  @unit
+  Scenario: A tab already at the announced version does nothing
+    Given another tab announces version "v1" for a read this tab holds at "v1"
+    When the message arrives
+    Then the read is left as it is
+
+  @unit
+  Scenario: A message that is not a key and a version is ignored
+    Given a message without a version arrives on the channel
+    Then no read is marked stale
+
+  @unimplemented
+  Scenario: A tab refused a broadcast channel still syncs on focus
+    Given the browser refuses to open a BroadcastChannel
+    When the tab gains focus with a stale read
+    Then the read is revalidated as usual
+
+  @unit
+  Scenario: Gaining focus reads the disk before the network
+    Given a read was marked stale by another tab's announcement
+    And the stored copy is newer than the tab's
+    When the tab gains focus
+    Then the stored copy is drawn and nothing is fetched
+
+  @unimplemented
+  Scenario: Gaining focus fetches only a read still behind
+    Given a read was marked stale and the stored copy is not newer
+    When the tab gains focus
+    Then the read is fetched once, with its version as since
+
+  @unimplemented
+  Scenario: A versioned read is asked again on focus only after the cooldown
+    Given a versioned read was fetched less than 60 seconds ago
+    When the tab gains focus
+    Then it is not fetched
+    And a read fetched more than 60 seconds ago is revalidated
+
+  @unimplemented
+  Scenario: A hidden or unfocused tab makes no calls
+    Given a tab that is hidden or whose window is blurred
+    Then it is not focused for polling or revalidation

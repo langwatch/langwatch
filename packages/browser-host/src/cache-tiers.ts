@@ -21,6 +21,18 @@ export const PERSISTED_QUERY_MAX_AGE = 24 * 60 * 60 * 1000;
 export type UiCachePlan = Readonly<{
   tiers: ReadonlyMap<string, TrpcCacheTier>;
   persisted: ReadonlySet<string>;
+  versioned: ReadonlySet<string>;
+}>;
+
+/** The version each cached read was last answered under, by query hash. */
+export type UiQueryVersions = Map<string, string>;
+
+/** What the transport needs to send `since` and keep a read's data on `unchanged`. */
+export type UiVersionedReads = Readonly<{
+  paths: ReadonlySet<string>;
+  versions: UiQueryVersions;
+  /** The cache the data is read from; a getter, as the transport is built before the client. */
+  queryClient: () => QueryClient | undefined;
 }>;
 
 /** The part of a built `TrpcContract` the plan reads. */
@@ -37,6 +49,7 @@ export function cachePlanFor({
 }): UiCachePlan {
   const tiers = new Map<string, TrpcCacheTier>();
   const persisted = new Set<string>();
+  const versioned = new Set<string>();
 
   for (const contract of contracts) {
     for (const [name, member] of Object.entries(contract.members)) {
@@ -44,15 +57,33 @@ export function cachePlanFor({
       const path = `${contract.namespace}.${name}`;
       tiers.set(path, member.cache.tier);
       if (member.cache.persist) persisted.add(path);
+      if (member.cache.versioned) versioned.add(path);
     }
   }
 
-  return { tiers, persisted };
+  return { tiers, persisted, versioned };
 }
 
 /** Session and reference reads travel as lone GETs, so each URL's ETag names one body (ADR-164). */
 export function unbatchedCachePaths({ plan }: { plan: UiCachePlan }): ReadonlySet<string> {
   return new Set([...plan.tiers].flatMap(([path, tier]) => (tier === "live" ? [] : [path])));
+}
+
+/** Versioned reads whose cache is bound later: the shell's client is built after the transport. */
+export type UiBindableVersionedReads = UiVersionedReads & {
+  bind(queryClient: QueryClient): void;
+};
+
+export function createUiVersionedReads({ plan }: { plan: UiCachePlan }): UiBindableVersionedReads {
+  let bound: QueryClient | undefined;
+  return {
+    paths: plan.versioned,
+    versions: new Map<string, string>(),
+    queryClient: () => bound,
+    bind: (queryClient) => {
+      bound = queryClient;
+    },
+  };
 }
 
 /** The dotted procedure path a tRPC query key was built from, or undefined for any other key. */

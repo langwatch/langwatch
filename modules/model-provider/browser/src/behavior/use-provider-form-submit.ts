@@ -20,11 +20,25 @@ import {
   useShowErrorToast,
   type ModelProviderToast,
 } from "./model-provider-feedback.ts";
-import {
-  broadcastModelProvidersUpdated,
-  invalidateModelProviderQueries,
-} from "./model-provider-sync.ts";
 import type { ExtraHeader } from "./use-extra-headers.ts";
+
+type ModelProviderUtils = Pick<ReturnType<typeof api.useUtils>, "modelProvider">;
+
+/**
+ * Every read whose freshness depends on the stored provider and default rows. The refetch
+ * this starts lands in the focused tab, which broadcasts `{ key, version }` so other open
+ * tabs mark the same reads stale (#5827).
+ */
+function invalidateModelProviderQueries(utils: ModelProviderUtils) {
+  return Promise.all([
+    utils.modelProvider.getAllForProject.invalidate(),
+    utils.modelProvider.getAllForProjectForFrontend.invalidate(),
+    utils.modelProvider.listAllForProjectForFrontend.invalidate(),
+    utils.modelProvider.listAllForOrganizationForFrontend.invalidate(),
+    utils.modelProvider.getResolvedDefault.invalidate(),
+    utils.modelProvider.getDefaultModelsForProject.invalidate(),
+  ]);
+}
 
 /** Snapshot of all form state needed at submission time. */
 export type FormSnapshot = {
@@ -441,7 +455,6 @@ export function useProviderFormSubmit({
           customEmbeddingsModels: snapshot.provider.customEmbeddingsModels ?? [],
         });
         await invalidateModelProviderQueries(utils);
-        broadcastModelProvidersUpdated();
         onSuccess?.();
       } catch (err) {
         onError?.(err);
@@ -571,12 +584,6 @@ export function useProviderFormSubmit({
       // wizard, and any other surface that gates UI on "are there enabled providers?" picks up
       // the new state without needing a window-focus refetch.
       await invalidateModelProviderQueries(utils);
-      // This save may have happened in a tab opened by
-      // NoModelsConfiguredCallout's "Set up" link — broadcast so the
-      // opener tab's picker (a different QueryClient instance) refreshes
-      // immediately instead of waiting on a window-focus event that,
-      // for a window.open'd tab pair, often never reliably fires (#5827).
-      broadcastModelProvidersUpdated();
 
       toaster.create({
         title: "Model Provider Updated",

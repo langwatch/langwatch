@@ -1,7 +1,9 @@
+import { trpcQueryKey } from "@langwatch/api/web";
+import { hashKey, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
 import { isUiBatchRequest, uiBatchResponse } from "../testing";
-import { createUiFeatureApiClient } from "../transport";
+import { createUiFeatureApiClient, type UiFeatureApiClientOptions } from "../transport";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
   if (input === undefined) return "";
@@ -10,7 +12,10 @@ function requestUrl(input: RequestInfo | URL | undefined): string {
 
 type Call = { url: string; method: string };
 
-function transportOver(bodies: unknown[]): {
+function transportOver(
+  bodies: unknown[],
+  options: Omit<UiFeatureApiClientOptions, "fetch"> = {},
+): {
   client: ReturnType<typeof createUiFeatureApiClient>;
   calls: Call[];
 } {
@@ -26,7 +31,7 @@ function transportOver(bodies: unknown[]): {
     });
   }) as typeof globalThis.fetch;
 
-  return { client: createUiFeatureApiClient({ fetch }), calls };
+  return { client: createUiFeatureApiClient({ fetch, ...options }), calls };
 }
 
 /** One tRPC result, in the shape JSON transport sends back. */
@@ -118,5 +123,56 @@ describe("when a feature sends an answer on its way out of the document", () => 
     expect(inits[0]?.keepalive).toBe(true);
     expect(urls[0]).not.toContain("batch=1");
     expect(inits[1]?.keepalive).toBeUndefined();
+  });
+});
+
+describe("when a read is declared versioned", () => {
+  const path = "organization.getScopeGraph";
+  const key = trpcQueryKey(path, { input: {}, type: "query" });
+
+  function versionedTransport(bodies: unknown[]) {
+    const queryClient = new QueryClient();
+    const versions = new Map<string, string>();
+    const { client, calls } = transportOver(bodies, {
+      versionedReads: { paths: new Set([path]), versions, queryClient: () => queryClient },
+    });
+    return { client, calls, queryClient, versions };
+  }
+
+  /** @scenario "A versioned read sends the version it holds" */
+  /** @scenario "An unchanged answer keeps the cached data" */
+  it("sends the held version as since and resolves unchanged to the cached data", async () => {
+    const { client, calls, queryClient, versions } = versionedTransport([
+      [resultOf({ unchanged: true })],
+    ]);
+    queryClient.setQueryData(key, ["acme"]);
+    versions.set(hashKey(key), "u.v1");
+
+    const output = await client.query(path, {});
+
+    expect(output).toEqual(["acme"]);
+    expect(decodeURIComponent(calls[0]?.url ?? "")).toContain('"since":"u.v1"');
+  });
+
+  /** @scenario "A new version replaces the data" */
+  it("replaces the data and remembers the version when the version moved", async () => {
+    const { client, queryClient, versions } = versionedTransport([
+      [resultOf({ version: "u.v2", data: ["acme", "globex"] })],
+    ]);
+    queryClient.setQueryData(key, ["acme"]);
+    versions.set(hashKey(key), "u.v1");
+
+    const output = await client.query(path, {});
+
+    expect(output).toEqual(["acme", "globex"]);
+    expect(versions.get(hashKey(key))).toBe("u.v2");
+  });
+
+  it("sends no since when nothing is cached", async () => {
+    const { client, calls } = versionedTransport([[resultOf({ version: "u.v1", data: [] })]]);
+
+    await client.query(path, {});
+
+    expect(decodeURIComponent(calls[0]?.url ?? "")).not.toContain("since");
   });
 });
