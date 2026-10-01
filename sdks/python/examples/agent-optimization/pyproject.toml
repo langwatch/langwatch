@@ -17,5 +17,6 @@ package = false
 # Transitive-dependency security pins, so a re-resolution can't pull a
 # vulnerable version back in.
 constraint-dependencies = [
-    "pyjwt>=2.14.0",  # security: PyJWT advisories covering <=2.13.0 (#2492)
+    "pyjwt>=2.15.0",  # security: PyJWT advisories covering <=2.14.0 (#2492, #2632)
+    "urllib3>=2.8.0",  # security: urllib3 advisories covering <2.8.0 (#2597, #2598, #2610)
 ]

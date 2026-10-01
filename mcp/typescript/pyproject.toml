@@ -22,10 +22,12 @@ exclude-newer = "7 days"
 constraint-dependencies = [
     "python-dotenv>=1.2.2",  # security: python-dotenv advisory (#934)
     "python-liquid>=2.2.1",  # security: python-liquid advisory (#1528)
-    "tornado>=6.5.8",  # security: tornado advisories (#2159, #2173, #2233)
+    "tornado>=6.5.9",  # security: tornado advisories (#2159, #2173, #2233, #2665-#2667)
     "anyio>=4.14.2",  # security: anyio advisories (#2430, #2431)
     "httpx2>=2.12.0",  # security: httpx2 advisories (#2312, #2313, #2329)
-    "pyjwt>=2.14.0",  # security: PyJWT advisories covering <=2.13.0 (#2479)
+    "pyjwt>=2.15.0",  # security: PyJWT advisories covering <=2.14.0 (#2479, #2615)
+    "urllib3>=2.8.0",  # security: urllib3 advisories covering <2.8.0 (#2591, #2592, #2608)
+    "litellm>=1.96.2",  # security: litellm advisory covering 1.96.0-1.96.1 (#2648)
 ]
 
 [tool.uv.sources]

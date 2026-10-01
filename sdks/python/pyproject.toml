@@ -152,5 +152,6 @@ constraint-dependencies = [
     "anyio>=4.14.2",  # security: anyio advisories (#2434, #2435)
     "soupsieve>=2.9.0",  # security: soupsieve advisories (#2422, #2423)
     "accelerate>=1.15.0",  # security: accelerate advisory covers <=1.14.0 (#2307)
-    "pyjwt>=2.14.0",  # security: PyJWT advisories covering <=2.13.0 (#2493)
+    "pyjwt>=2.15.0",  # security: PyJWT advisories covering <=2.14.0 (#2493, #2633)
+    "urllib3>=2.8.0",  # security: urllib3 advisories covering <2.8.0 (#2600, #2601, #2611)
 ]
