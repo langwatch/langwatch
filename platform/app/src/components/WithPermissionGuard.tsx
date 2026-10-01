@@ -1,5 +1,11 @@
 import type { AuthzPermission as Permission } from "@langwatch/authz";
 import type React from "react";
+import {
+  productById,
+  productFromPathname,
+  seatReachesProduct,
+} from "~/features/navigation/products";
+import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { PermissionAlert } from "./PermissionAlert";
 
@@ -23,6 +29,30 @@ interface WithPermissionGuardOptions {
 }
 
 /**
+ * The seat gate on top of the permission gate. The permission is answered on
+ * the project in view, and a Developer (ADR-143) holds a member's permissions
+ * inside their own project, so `virtualKeys:view` alone would let them onto
+ * an organization-wide product. The product registry says which seats reach
+ * which product; a page that belongs to no product is not seat-gated here.
+ */
+function seatReachesPage({
+  pathname,
+  organizationRole,
+}: {
+  pathname: string;
+  organizationRole: Parameters<
+    typeof seatReachesProduct
+  >[0]["organizationRole"];
+}): boolean {
+  const productId = productFromPathname(pathname);
+  if (!productId) return true;
+  return seatReachesProduct({
+    product: productById(productId),
+    organizationRole,
+  });
+}
+
+/**
  * Higher-Order Component that guards components based on user permissions
  * Single Responsibility: Provide permission-based access control for wrapped components
  *
@@ -42,38 +72,35 @@ export function withPermissionGuard(
       bypassOnboardingRedirect = false,
     } = options ?? {};
 
-    const GuardedComponent = (props: P) => {
-      const { hasAnyPermission, isLoading } = useOrganizationTeamProject(
-        bypassOnboardingRedirect
-          ? {
-              redirectToOnboarding: false,
-              redirectToProjectOnboarding: false,
-            }
-          : undefined,
+    const contextOptions = bypassOnboardingRedirect
+      ? { redirectToOnboarding: false, redirectToProjectOnboarding: false }
+      : undefined;
+
+    const Fallback = () => {
+      const fallbackContent = (
+        <FallbackComponent permission={permission} message={customMessage} />
       );
+      // If a layout component is provided, wrap the fallback in it
+      return LayoutComponent ? (
+        <LayoutComponent>{fallbackContent}</LayoutComponent>
+      ) : (
+        fallbackContent
+      );
+    };
+
+    const GuardedComponent = (props: P) => {
+      const { pathname } = useRouter();
+      const { hasAnyPermission, organizationRole, isLoading } =
+        useOrganizationTeamProject(contextOptions);
 
       // Don't check permissions while still loading - let the wrapped component handle loading state
-      if (isLoading) {
-        return <WrappedComponent {...props} />;
-      }
-
       // Unified permission checker automatically routes to org or team permissions
-      const hasRequiredPermission = hasAnyPermission(permission);
+      const isAllowed =
+        isLoading ||
+        (hasAnyPermission(permission) &&
+          seatReachesPage({ pathname, organizationRole }));
 
-      if (!hasRequiredPermission) {
-        const fallbackContent = (
-          <FallbackComponent permission={permission} message={customMessage} />
-        );
-
-        // If a layout component is provided, wrap the fallback in it
-        if (LayoutComponent) {
-          return <LayoutComponent>{fallbackContent}</LayoutComponent>;
-        }
-
-        return fallbackContent;
-      }
-
-      return <WrappedComponent {...props} />;
+      return isAllowed ? <WrappedComponent {...props} /> : <Fallback />;
     };
 
     GuardedComponent.displayName = `withPermissionGuard(${

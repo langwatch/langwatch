@@ -74,6 +74,24 @@ Feature: Developer seat
     Then the request is refused with a message naming the Developer seat
     And the Developer still holds access to their personal team only
 
+  Scenario: A Developer is offered the Me product and nothing organisation-wide
+    Given a Developer in an organisation with the Gateway and Governance products switched on
+    When the Developer opens the product switcher
+    Then Me is offered
+    And Gateway and Governance are not offered
+
+  Scenario: A Developer cannot open an organisation-wide product by address
+    Given a Developer in the organisation
+    When they open a Gateway page by its address
+    Then the page says they do not have access
+    And a page of their own Me workspace still opens
+
+  Scenario: A Developer never sees the organisation's gateway keys
+    Given a Developer in the organisation
+    And the organisation holds a gateway key shared with every member
+    When the Developer asks for the list of gateway keys
+    Then the shared key is not in the list
+
   # ============================================================================
   # Downgrade
   # ============================================================================
