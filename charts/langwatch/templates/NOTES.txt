@@ -400,9 +400,10 @@ ClickHouse depends on the posture:
   writes an empty access model, so ClickHouse starts and LangWatchQL stays off.
   To turn it on later: add both keys to that Secret, delete the
   {{ .Release.Name }}-lwql-access-render-<spec hash> Job (helm upgrade or the Argo CD
-  sync runs it again), then
-  restart the ClickHouse pods so they mount the new access model:
+  sync runs it again). Once it is Complete, restart ClickHouse so it mounts
+  the new access model, and the app and workers so they read the passwords:
   kubectl -n {{ .Release.Namespace }} rollout restart statefulset {{ include "langwatch.clickhouse.serviceName" . }}
+  kubectl -n {{ .Release.Namespace }} rollout restart deployment {{ .Release.Name }}-app{{ if .Values.workers.enabled }} {{ .Release.Name }}-workers{{ end }}
 {{- else }}
 
   External / bring-your-own ClickHouse: SQL DDL (`sql` mode). The chart cannot

@@ -140,9 +140,11 @@ spec:
   apply annotations per Ingress object, and the gateway needs streaming
   settings the app routes do not. Everything else comes from the app Ingress
   settings. Precedence: ingress.annotations, then the nginx streaming
-  defaults (className nginx only), then ingress.gateway.annotations.
+  defaults (className nginx only), then ingress.gateway.annotations. Path
+  rewrites written for the app routes are left out: the gateway paths have no
+  capture groups, so an inherited rewrite-target would send /v1/... to /.
 */}}
-{{- $gwAnnotations := deepCopy (.Values.ingress.annotations | default dict) }}
+{{- $gwAnnotations := omit (deepCopy (.Values.ingress.annotations | default dict)) "nginx.ingress.kubernetes.io/rewrite-target" "nginx.ingress.kubernetes.io/use-regex" "nginx.ingress.kubernetes.io/app-root" }}
 {{- if eq (toString .Values.ingress.className) "nginx" }}
 {{- $gwAnnotations = mergeOverwrite $gwAnnotations (dict
       "nginx.ingress.kubernetes.io/proxy-buffering" "off"

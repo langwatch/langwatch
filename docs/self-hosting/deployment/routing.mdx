@@ -34,7 +34,7 @@ Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metr
 | Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
 | WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
 
-Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers by default and caps request bodies at 1 MB, so it needs annotations. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
+Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. The chart sets both buffering annotations to off so a controller-wide setting cannot change them. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
 
 ## Chart Ingress
 

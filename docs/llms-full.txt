@@ -9906,10 +9906,11 @@ Set `ingress.className` for your controller. The ingress-nginx annotations are a
 
 Three settings matter for every controller: response buffering off, an idle or read timeout above the longest stream you allow, and a body limit of at least 32 MB. The gateway lets a provider call run up to 14 minutes. [Routing and ingress controllers](/self-hosting/deployment/routing) has the full list and an Envoy Gateway HTTPRoute.
 
-AWS ALB example:
+AWS ALB example. The certificate comes from ACM rather than `ingress.gateway.tls.secretName`, so `gateway.publicUrl` states the https URL the CLI should use:
 
 ```yaml
 ingress:
+  enabled: true
   className: alb
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
@@ -9920,6 +9921,8 @@ ingress:
     host: gateway.acme.com
     annotations:
       alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=3600
+gateway:
+  publicUrl: https://gateway.acme.com
 ```
 
 ## Outbound endpoint policy
@@ -62406,7 +62409,7 @@ A missing required key leaves the pods that read it in `CreateContainerConfigErr
 <Note>
 **LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL stays unavailable; set `lwql.enabled: false` to turn it off entirely.
 
-To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again, then restart the ClickHouse StatefulSet.
+To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again. Once it is `Complete`, restart the ClickHouse StatefulSet and the app and workers Deployments, which read the passwords at startup.
 
 With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable and the rest of LangWatch runs normally. See the chart README for the exact role statements.
 </Note>
@@ -63029,7 +63032,7 @@ Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metr
 | Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
 | WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
 
-Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers by default and caps request bodies at 1 MB, so it needs annotations. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
+Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. The chart sets both buffering annotations to off so a controller-wide setting cannot change them. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
 
 ## Chart Ingress
 
@@ -66812,6 +66815,8 @@ With `autogen.enabled=false`, chart-managed Redis and PostgreSQL now need `redis
 Under Argo CD, first copy the password PostgreSQL currently accepts into a Secret of your own with another name: Argo CD prunes the chart's Secret once `existingSecret` is set.
 
 The LangWatchQL render Job is now named `<release>-lwql-access-render-<hash>` from its spec, and the install Job no longer expires. Argo CD no longer recreates it every few minutes or fails the sync on an immutable Job. Missing LangWatchQL passwords no longer block ClickHouse: the Job logs the missing keys and LangWatchQL stays off.
+
+Keep Argo CD pruning on, so a new spec replaces the old Job; without it, delete old render Jobs before a rollback, or the rollback finds its Job already complete and does not render again.
 
 The app now reads the gateway keys named by `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey`, the same keys the gateway pod reads.
 

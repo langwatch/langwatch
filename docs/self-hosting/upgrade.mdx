@@ -243,6 +243,8 @@ Under Argo CD, first copy the password PostgreSQL currently accepts into a Secre
 
 The LangWatchQL render Job is now named `<release>-lwql-access-render-<hash>` from its spec, and the install Job no longer expires. Argo CD no longer recreates it every few minutes or fails the sync on an immutable Job. Missing LangWatchQL passwords no longer block ClickHouse: the Job logs the missing keys and LangWatchQL stays off.
 
+Keep Argo CD pruning on, so a new spec replaces the old Job; without it, delete old render Jobs before a rollback, or the rollback finds its Job already complete and does not render again.
+
 The app now reads the gateway keys named by `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey`, the same keys the gateway pod reads.
 
 ### 3.16 or 3.17 to 3.18: Sign-in and SSO

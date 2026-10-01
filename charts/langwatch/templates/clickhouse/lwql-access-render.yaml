@@ -191,6 +191,14 @@ metadata:
   name: {{ $jobName }}
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
+  {{- if not .Release.IsUpgrade }}
+  # Argo CD applies waves in order and waits for a Job to complete before the
+  # next wave. Wave -1 puts the render after the Secrets it reads (-2) and
+  # before the ClickHouse StatefulSet (0), so a changed access model is
+  # written before the pods roll and mount it. Helm ignores the annotation.
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  {{- end }}
   {{- if .Release.IsUpgrade }}
   # On upgrade and rollback (both set .Release.IsUpgrade), run as a
   # pre-upgrade/pre-rollback hook so the new access Secret is written BEFORE the

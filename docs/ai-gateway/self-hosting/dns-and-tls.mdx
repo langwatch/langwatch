@@ -159,10 +159,11 @@ Set `ingress.className` for your controller. The ingress-nginx annotations are a
 
 Three settings matter for every controller: response buffering off, an idle or read timeout above the longest stream you allow, and a body limit of at least 32 MB. The gateway lets a provider call run up to 14 minutes. [Routing and ingress controllers](/self-hosting/deployment/routing) has the full list and an Envoy Gateway HTTPRoute.
 
-AWS ALB example:
+AWS ALB example. The certificate comes from ACM rather than `ingress.gateway.tls.secretName`, so `gateway.publicUrl` states the https URL the CLI should use:
 
 ```yaml
 ingress:
+  enabled: true
   className: alb
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
@@ -173,6 +174,8 @@ ingress:
     host: gateway.acme.com
     annotations:
       alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=3600
+gateway:
+  publicUrl: https://gateway.acme.com
 ```
 
 ## Outbound endpoint policy

@@ -161,9 +161,17 @@ test_nginx_settings_on_the_gateway_host() {
   local doc app
   render nginx "${APP_INGRESS[@]}" --set ingress.className=nginx \
     --set-string 'ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-read-timeout=120' \
+    --set-string 'ingress.annotations.nginx\.ingress\.kubernetes\.io/rewrite-target=/$2' \
     --set-string 'ingress.gateway.annotations.nginx\.ingress\.kubernetes\.io/proxy-send-timeout=7200'
   doc=$(doc_named nginx lw-gateway-ingress)
   app=$(doc_named nginx lw-ingress)
+  if printf '%s\n' "$doc" | grep -q 'rewrite-target'; then
+    fail "nginx gateway rewrite" "the gateway Ingress inherited the app rewrite-target, which sends /v1/... to /"
+  elif printf '%s\n' "$app" | grep -q 'rewrite-target'; then
+    ok "nginx gateway rewrite" "the app rewrite-target stays on the app Ingress"
+  else
+    fail "nginx gateway rewrite" "the app Ingress lost its rewrite-target"
+  fi
   if printf '%s\n' "$doc" | grep -q 'proxy-buffering: "off"' && printf '%s\n' "$doc" | grep -q 'proxy-body-size: 32m' \
       && printf '%s\n' "$doc" | grep -q 'proxy-read-timeout: "3600"'; then
     ok "nginx gateway" "buffering off, 32m body, 3600s read timeout on the gateway Ingress"

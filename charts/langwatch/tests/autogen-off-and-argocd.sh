@@ -164,17 +164,21 @@ test_key_names_are_remappable() {
 
 # @scenario "the LangWatchQL render Job is named by its spec"
 test_render_job_is_named_by_spec() {
-  render job1 "${OFF[@]}" || true
-  render job2 "${OFF[@]}" || true
-  render jobtag "${OFF[@]}" --set images.app.tag=9.9.9 || true
-  render jobup "${OFF[@]}" --is-upgrade || true
+  local variant
+  for variant in "job1" "job2" "jobtag --set images.app.tag=9.9.9" "jobup --is-upgrade"; do
+    # shellcheck disable=SC2086
+    if ! render $variant "${OFF[@]}"; then
+      fail "render job name" "render ${variant%% *} failed: $(cat "$tmp/${variant%% *}.err")"
+      return
+    fi
+  done
   local n1 n2 ntag nup
   n1=$(render_job_name job1)
   n2=$(render_job_name job2)
   ntag=$(render_job_name jobtag)
   nup=$(render_job_name jobup)
-  if [[ -z "$n1" ]]; then
-    fail "render job name" "no render Job in the output: $(head -3 "$tmp/job1.err")"
+  if [[ -z "$n1" || -z "$n2" || -z "$ntag" || -z "$nup" ]]; then
+    fail "render job name" "a render has no LangWatchQL render Job ($n1, $n2, $ntag, $nup)"
     return
   fi
   if [[ "$n1" != "$n2" ]]; then
@@ -208,6 +212,11 @@ test_render_job_is_named_by_spec() {
     ok "render job ttl" "the upgrade hook still expires"
   else
     fail "render job ttl" "the upgrade hook lost its TTL, so hook Jobs would pile up"
+  fi
+  if grep -q 'argocd.argoproj.io/sync-wave: "-1"' <<<"$install_doc"; then
+    ok "render job wave" "the render Job runs in Argo CD wave -1, before ClickHouse"
+  else
+    fail "render job wave" "the render Job has no Argo CD sync wave, so ClickHouse can roll before the new access model is written"
   fi
 }
 
