@@ -7,11 +7,13 @@ const logger = createLogger("langwatch:annotations:trace-sync");
  * Records an annotation change on its trace. `has:annotation` reads the trace
  * summary's annotation ids, which only these trace commands write: an
  * annotation kept in Postgres alone is listed by the API and invisible to
- * search. Every path that creates or deletes an annotation — the app's router
- * and the REST API — goes through here.
+ * search. `AnnotationService` calls it on every create and delete, whichever
+ * API wrote the annotation.
  *
- * Best-effort: Postgres is the source of truth, so a failed sync is logged and
- * the backfill task reconciles it, rather than failing a write that happened.
+ * Best-effort: Postgres is the source of truth, so a failed sync is logged
+ * rather than failing a write that happened. A failed add is repaired by the
+ * backfill task. A failed remove is not, since the backfill only merges ids:
+ * the trace keeps the stale id until the next remove event for it.
  */
 export async function syncAnnotationToTrace({
   action,

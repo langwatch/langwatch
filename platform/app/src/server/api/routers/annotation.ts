@@ -16,7 +16,6 @@ import {
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
 } from "~/server/annotations/annotationAnchor";
-import { syncAnnotationToTrace } from "~/server/annotations/syncAnnotationToTrace";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
@@ -542,7 +541,7 @@ export const annotationRouter = createTRPCRouter({
         anchorPath: input.anchorPath,
       });
 
-      const createdAnnotation = await service.create({
+      return service.create({
         id: nanoid(),
         projectId: input.projectId,
         traceId: input.traceId,
@@ -555,17 +554,6 @@ export const annotationRouter = createTRPCRouter({
         anchorId: input.anchorId,
         anchorPath: input.anchorPath,
       });
-
-      // Anchored comments sync too: a comment on one of its spans means a
-      // human touched this trace, which the has-annotation filter reads.
-      await syncAnnotationToTrace({
-        action: "add",
-        projectId: input.projectId,
-        traceId: input.traceId,
-        annotationId: createdAnnotation.id,
-      });
-
-      return createdAnnotation;
     }),
   updateByTraceId: protectedProcedure
     .input(
@@ -718,19 +706,10 @@ export const annotationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
-      const deletedAnnotation = await service.delete({
+      return service.delete({
         id: input.annotationId,
         projectId: input.projectId,
       });
-
-      await syncAnnotationToTrace({
-        action: "remove",
-        projectId: input.projectId,
-        traceId: deletedAnnotation.traceId,
-        annotationId: deletedAnnotation.id,
-      });
-
-      return deletedAnnotation;
     }),
   /**
    * The project's annotations list, and the export taken from it. One row per
