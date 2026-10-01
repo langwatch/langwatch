@@ -17,10 +17,11 @@ import type {
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
+import type { ChoicesRefRow } from "../../../features/langy/behavior/derived-cards/use-choices-ref-rows.ts";
 import { formatStatFigure, isComparableSeries } from "../../../model/langy-stat-figure.ts";
 import { LangyCardActionChip } from "../../elements/langy-card-action-chip.tsx";
 import { StreamingStatCard } from "../streaming-stat-card.tsx";
-import { LangyChoicesCard, type ChoicesRefRow } from "./langy-choices-card.tsx";
+import { LangyChoicesCard } from "./langy-choices-card.tsx";
 import { LangyDerivedCardFrame } from "./langy-derived-card-frame.tsx";
 
 export type LangyExploreLinkProps = {

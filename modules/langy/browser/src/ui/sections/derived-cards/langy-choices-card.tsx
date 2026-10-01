@@ -11,13 +11,8 @@ import type {
 import { Check, CircleSlash } from "lucide-react";
 import { useState } from "react";
 
+import type { ChoicesRefRow } from "../../../features/langy/behavior/derived-cards/use-choices-ref-rows.ts";
 import { LangyDerivedCardFrame } from "./langy-derived-card-frame.tsx";
-
-export type ChoicesRefRow =
-  | { state: "pending" }
-  | { state: "plain" }
-  | { state: "dead" }
-  | { state: "live"; primary?: string; secondary?: string };
 
 /**
  * An option's label is the answer, not a name for the thing it points at: a

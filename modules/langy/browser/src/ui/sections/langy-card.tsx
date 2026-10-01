@@ -219,6 +219,3 @@ function statusDotForInline(color: string, pulse: boolean, reduce: boolean): Rea
     />
   );
 }
-
-/** Re-export the intent list for gallery / migration tooling. */
-export { CARD_INTENTS } from "../../model/asaplangy-tokens.ts";

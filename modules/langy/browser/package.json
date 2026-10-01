@@ -7,8 +7,6 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/langy.web.ts",

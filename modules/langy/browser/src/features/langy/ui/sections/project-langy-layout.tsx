@@ -1,9 +1,10 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { Box } from "@langwatch/design-system/primitives";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
+import { Box } from "@langwatch/design-system/primitives";
 import { memo, type ReactNode, useEffect } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
 import { LangyProvider, useLangy } from "../../../../ui/sections/langy-page-context.tsx";
@@ -25,6 +26,7 @@ export default function ProjectLangyLayout({ children }: { children?: ReactNode 
     redirectToProjectOnboarding: false,
   });
   useLangyScopeReset();
+  useLangyConversationDeepLink();
 
   return (
     <ProjectLangySubtree projectId={project?.id ?? "no-project"} showLangy={showLangy}>
