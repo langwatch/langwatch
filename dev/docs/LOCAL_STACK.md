@@ -2,7 +2,7 @@
 
 Reference for bringing up and debugging a LangWatch stack on a development
 machine. The first-run walkthrough is `GETTING_STARTED.md`; failures that look
-like a slow boot are covered by the `haven-setup` skill.
+like a slow boot are covered by the `haven` skill's `troubleshooting.md`.
 
 ## Processes
 

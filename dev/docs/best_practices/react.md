@@ -5,24 +5,28 @@ there is no `src/pages/` file-based routing, and no server components.
 
 ## Page vs Component Separation
 
-- **Screens**: a feature's routable page content lives in its own `web`
-  package, under `web/src/screens/`. A screen renders UI; it does not know its
-  own URL, guard, or chrome.
-- **Routes and hosts**: `apps/ui` owns routing, permission guards, and chrome
-  composition, in `apps/ui/src/features/<area>/ui/sections/`. A route file
-  wires one feature's screen(s) into the app's router and wraps them with the
-  fixed order documented at the top of `apps/ui/src/ui/sections/ui-page.tsx`:
-  host outermost, settings chrome next, permission guard innermost around the
-  screen.
-- **Components**: reusable UI logic lives beside the screen that owns it, or
-  in the feature's own component directories — not duplicated into `apps/ui`.
+- **Screens**: a module's routable page content lives in its own browser
+  package (`modules/<name>/browser`), as `ui/sections/` components that the
+  module declares with `defineBrowserModule`. A screen renders UI; it does not
+  know its own URL, guard, or chrome.
+- **Routes and chrome**: `apps/ui` (`src/{main.tsx, shell/, styles/}`) owns
+  routing, permission guards and chrome, built from the modules' declarations.
+  A screen names the grant it `requires` and the release `flags` it sits behind;
+  the shell wraps it, so a module never imports the router or hand-rolls a guard.
+- **Components**: reusable UI belongs in the design system
+  (`@langwatch/design-system`) or beside the screen that owns it, in that
+  browser package's `ui/` folders. Nothing is shared between browser packages
+  except through the design system, a contract, or a `<name>-client` package.
 
 ## File Organization
 
-- `hooks/` for hooks
-- `components/` for components
-- `screens/` for a feature's routable pages (in that feature's `web` package)
-- `ui/sections/` for the app's routing/composition layer (in `apps/ui`)
+A browser package layers `model/` (pure) → `behavior/` (hooks, API bindings,
+stores) → `ui/elements|blocks|sections` (ARCHITECTURE.md §3.4).
+
+- `behavior/` for hooks
+- `ui/elements/` and `ui/blocks/` for components (they never fetch)
+- `ui/sections/` for a module's screens and the sections they compose
+- `apps/ui/src/shell/` for the app's routing and chrome
 
 ## Hooks
 

@@ -1,8 +1,10 @@
-# ADR-164: Browser query cache tiers, disk persistence and the session version
+# ADR-170: Browser query cache tiers, disk persistence and the session version
 
 **Date:** 2026-09-30
 
-**Status:** Accepted
+**Status:** Accepted. Superseded in part by ARCHITECTURE.md §10.2 (2026-10-01): every read is
+mirrored by default (no `persist` opt-in), and a row is kept by its read's schema hash, not the
+build id or a 24-hour `maxAge`. Decision 2 below is history.
 
 ## Context
 

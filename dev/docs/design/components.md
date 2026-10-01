@@ -20,18 +20,16 @@ import { Switch } from "@langwatch/design-system/switch";
 import { InputGroup } from "@langwatch/design-system/input-group";
 ```
 
-### Chakra UI Direct Imports
+### Primitives and raw parts (`@langwatch/design-system/primitives`)
 
 ```tsx
 import {
   Alert,
-  Avatar,
   Button,
   Card,
   Field,
   Table,
   Input,
-  Select,
   NativeSelect,
   Tabs,
   Textarea,
@@ -42,7 +40,7 @@ import {
   Box,
   Text,
   Heading,
-} from "@chakra-ui/react";
+} from "@langwatch/design-system/primitives";
 ```
 
 ## Drawer vs Dialog

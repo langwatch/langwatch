@@ -54,10 +54,10 @@ one module can serve several features.
 
 | Field             | Verify against                                                                                                                                                                        |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `surfaces.api`    | `modules/<f>/server/src/transport/public-rest/` and `transport/api-rest/`, mounted by `apps/api/src/api-<f>-rest.feature.ts` or `apps/api/src/app-rest/app-rest.packaged-families.ts` |
-| tRPC namespaces   | `apps/api/src/app-trpc/app-trpc.features.ts`                                                                                                                                          |
-| `platform.ui`     | `apps/ui/src/model/ui-route-table.ts` (the `path` of a route descriptor)                                                                                                              |
-| sidebar placement | `apps/ui/src/features/chrome/`                                                                                                                                                        |
+| `surfaces.api`    | `modules/<f>/process/src/transport/*.rest.ts` (`defineRestRouter`), mounted by the module's installation in `apps/api` (record §8) |
+| tRPC namespaces   | `modules/<f>/process/src/transport/*.trpc.ts`                                                                                                                                          |
+| `platform.ui`     | `apps/ui/src/shell/ui-route-table.ts` (the `path` of a route descriptor)                                                                                                              |
+| sidebar placement | `modules/navigation/browser/src/model/` (`project-nav-items.ts`, `section-nav-items.ts`)                                                                                                                                                        |
 | `platform.mcp`    | `mcp/typescript/src/create-mcp-server.ts` (`registerTools`) over `mcp/typescript/src/tools/`                                                                                          |
 | `code.cli`        | `sdks/typescript/src/cli/commands/` — one directory per command group, `sdks/typescript/src/cli/index.ts` is the entry                                                                |
 | `code.skill`      | `skills/<name>/SKILL.md` (the user-facing skills, not `.claude/skills`)                                                                                                               |

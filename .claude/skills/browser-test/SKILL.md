@@ -23,7 +23,7 @@ If a feature file path is given, **read it now** and extract the scenarios into 
 1. Explicit port in `$ARGUMENTS` → `http://localhost:<port>`
 2. A haven stack (the recommended path): `make haven status` names the slug, and the URL
    is `https://app.<slug>.langwatch.localhost:<port>` with the port from
-   `~/.portless/proxy.port`. See the `haven-setup` skill.
+   `~/.portless/proxy.port`. See the `haven` skill (`troubleshooting.md`).
 3. A plain `pnpm dev` stack: the browser application binds `PORT` (default 5560).
 4. A per-worktree isolated compose stack: `dev/scripts/dev-up.sh` writes `.dev-port` at
    the repo root with `APP_PORT` and `BASE_URL`; source it.

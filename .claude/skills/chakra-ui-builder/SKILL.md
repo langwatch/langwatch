@@ -1,19 +1,6 @@
 ---
 name: chakra-ui-builder
-description: >
-  Build responsive, accessible UI components and layouts using Chakra UI v3,
-  install or configure Chakra UI in new and existing projects, and design
-  scalable themes using tokens, semantic tokens, recipes, and slot recipes. Use
-  this skill whenever a user asks to build, create, or generate any UI
-  component, page, form, dashboard, navbar, card, landing section, pricing
-  table, or layout using Chakra UI; wants to add Chakra UI to a project, set up
-  ChakraProvider, run CLI snippets, configure color mode, or fix provider
-  wrapping; or asks about theming — defining brand colors, design tokens,
-  semantic tokens, dark mode values, component recipes, slot recipes, typegen,
-  or ejecting the default theme. Trigger on any Chakra UI building, setup, or
-  theming or charts request, however casually phrased — "add my brand colors",
-  "make a reusable card style", "build a bar chart", "show me a line chart",
-  "make me a login form", "build a sidebar", "add Chakra to my app".
+description: "Build or theme Chakra UI v3 components, recipes, slot recipes and tokens INSIDE packages/design-system only. Use only when editing files under packages/design-system. Feature code in modules/*/browser or apps/ui never imports Chakra: use the design-system skill instead."
 ---
 
 # Chakra UI Builder

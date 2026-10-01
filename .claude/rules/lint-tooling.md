@@ -22,4 +22,4 @@ Load the `lint-rule` skill to add or change a rule.
   policies by id.
 - TypeScript 7's root `typescript` export is a version constant. The compiler
   API lives behind `typescript/unstable/*`; sessions go through
-  `packages/test-harness/src/ts-ast.ts` (ADR-099).
+  `packages/test-harness` (ADR-099; see `src/__tests__/typescript-compiler-api.unit.test.ts`).

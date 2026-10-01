@@ -1,9 +1,9 @@
 ---
 paths:
   - "modules/*/browser/**"
-  - "modules/*/browser-kit/**"
+  - "modules/*/client/**"
   - "enterprise/modules/*/browser/**"
-  - "enterprise/modules/*/browser-kit/**"
+  - "enterprise/modules/*/client/**"
   - "apps/ui/**"
   - "packages/design-system/**"
   - "packages/browser-host/**"
@@ -29,9 +29,11 @@ component choice (`chakra-ui-*` only for raw Chakra v3). Authority:
 - **Drawers** are URL-routed singletons with a navigation stack. A sub-flow
   navigates (`openDrawer("target", { onSuccess, onClose: goBack })`); never
   mount a drawer inside another drawer.
-- **The kit law:** a browser package is closed. Sharing means moving the thing
-  to `*-browser-kit`: a leaf (contracts, design-system, browser-host only) that
-  fetches nothing, a real package, and normally only at three or more consumers.
+- **No kits** (§3.4): code repeated within a module stays there; across modules it
+  goes to the design system (props or a query result, never fetches), pure domain
+  logic to the owner's contract, framework hooks to `browser-host`. Data comes
+  from each module's `<name>-client`; client state lives in the one global UI
+  store, namespaced per module (§10.2).
 - **Frontend boundary:** no value-import chain from server code may reach a
   browser-only package, and no browser module value-imports server-shaped
   declarations. `import type` is always fine.
