@@ -44,6 +44,7 @@ import {
   type UpsertDatasetInput,
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
@@ -51,13 +52,16 @@ import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 
+import {
+  buildDatasetNormalizationPipeline,
+  type DatasetNormalizationDefinition,
+} from "../eventing/dataset-normalization.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
 import { ObjectStorageDatasetChunkRepository } from "../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
 import { DatasetContentService } from "../services/dataset-content.service.ts";
-import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
 import { DatasetNormalizeService } from "../services/dataset-normalize.service.ts";
 import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
 import { DatasetUploadService } from "../services/dataset-upload.service.ts";
@@ -119,7 +123,7 @@ export class DatasetModule implements DatasetApi {
 
   #datasets: DatasetService;
   #attachmentUploads: DatasetAttachmentUploadService;
-  #normalization: DatasetNormalizationService;
+  #normalization: DatasetNormalizeService;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
   #usage: DatasetRepositories["usage"];
   #experiments: ExperimentApi;
@@ -135,13 +139,10 @@ export class DatasetModule implements DatasetApi {
       objectStorage: members.objectStorage,
     });
 
-    this.#normalization = DatasetNormalizationService.create({
-      datasets: repositories.content,
-      normalize: DatasetNormalizeService.create({
-        repository: repositories.content,
-        chunks,
-        storedObjects: dependencies.storedObjects,
-      }),
+    this.#normalization = DatasetNormalizeService.create({
+      repository: repositories.content,
+      chunks,
+      storedObjects: dependencies.storedObjects,
     });
 
     this.#datasets = DatasetService.create({
@@ -498,6 +499,18 @@ export class DatasetModule implements DatasetApi {
     }
 
     return datasetPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
+  }
+
+  /** The command-only pipeline `dataset_normalization` registers. */
+  normalizationPipeline(): DatasetNormalizationDefinition {
+    return buildDatasetNormalizationPipeline({ normalize: this.#normalization });
+  }
+
+  /** Imports enqueue onto the registered sender; without one they normalize inline, as on main. */
+  connectNormalization(datasetNormalize: EventingCommandSender<DatasetNormalizePayload>): void {
+    this.#normalization.connect(async (payload) => {
+      await datasetNormalize.send(payload);
+    });
   }
 }
 

@@ -7173,6 +7173,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract

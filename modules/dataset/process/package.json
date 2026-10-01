@@ -19,14 +19,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./composition/dataset-content": {
-      "types": "./dist/repositories/prisma/prisma.dataset-content.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.dataset-content.repository.ts"
-    },
-    "./composition/dataset-migration": {
-      "types": "./dist/repositories/prisma/prisma.dataset-migration.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.dataset-migration.repository.ts"
     }
   },
   "scripts": {
@@ -43,6 +35,7 @@
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

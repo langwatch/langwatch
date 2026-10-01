@@ -1,7 +1,6 @@
 /**
- * The slug a dataset name resolves to, and what will happen on save. A
- * family-local copy of `platform/app/.../DatasetSlugDisplay`: deletes-only
- * forbids repointing it, so this one travels with the add-or-edit drawer.
+ * The slug a dataset name resolves to, and what will happen on save, shown
+ * in the add-or-edit drawer.
  */
 
 import {

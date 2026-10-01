@@ -118,8 +118,7 @@ Feature: Shared Dataset service
 
   Rule: The Datasets pages are served from the browser application
 
-    # Both pages moved out of platform/app with the family. What the application
-    # keeps is everything a feature-web package may not own: which grant each
+    # The application keeps everything a browser module may not own: which grant each
     # address is behind, the transport, where a dataset may be replicated to,
     # and the reader's membership.
 
