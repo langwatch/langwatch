@@ -1,13 +1,12 @@
 import type { WebScreen } from "@langwatch/browser";
 import { resolveUiPageAccess } from "@langwatch/browser/page-guard";
-import { describe, expect, it } from "vitest";
-
 /**
  * Main's page guards, one row per page (withPermissionGuard / withFeatureFlagGuard
  * on origin/main), read against what the installed modules now declare.
  * specs/ui/page-permission-guards.feature
  */
-import { browserModules } from "../../browser-modules.generated.ts";
+import { browserModules } from "@langwatch/installed-web-modules";
+import { describe, expect, it } from "vitest";
 
 const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
 

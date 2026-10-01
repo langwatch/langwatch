@@ -8,10 +8,10 @@ import { join } from "node:path";
 
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { RestHost } from "@langwatch/api/rest";
+import { processModules } from "@langwatch/installed-server-modules";
 import { composeApiApplication } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
-import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 const REPOSITORY_ROOT = join(import.meta.dirname, "../../../..");
