@@ -8,7 +8,7 @@ import { Readable } from "node:stream";
 
 import { createRestRuntime } from "@langwatch/api/rest";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { PermissionDecision } from "@langwatch/authz-contract";
+import type { PermissionDecision } from "@langwatch/authorization";
 import { initTRPC } from "@trpc/server";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";

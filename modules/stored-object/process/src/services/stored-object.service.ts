@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 
-import { PermissionDeniedError, type AuthzApi } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { type AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {

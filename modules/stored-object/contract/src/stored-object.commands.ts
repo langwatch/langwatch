@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { z, type ZodTypeAny } from "zod";
 
 import { storedObjectDeliveryAudienceSchema } from "./audiences.ts";

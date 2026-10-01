@@ -4,7 +4,7 @@ import {
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
   UnauthorizedError,
 } from "@langwatch/api/rest";
-import { ProjectPermissionDeniedError } from "@langwatch/authz-contract";
+import { ProjectPermissionDeniedError } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import {
   FILE_VIEW_PERMISSIONS,
