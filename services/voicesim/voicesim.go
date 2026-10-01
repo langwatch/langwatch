@@ -1,6 +1,7 @@
 // Package voicesim is a local stand-in for the voice providers a scenario voice
 // call talks to: ElevenLabs Conversational AI (the signed URL and the
-// conversation socket) and OpenAI's speech and transcription endpoints. Every
+// conversation socket, plus the model list a credential probe asks for) and
+// OpenAI's speech and transcription endpoints. Every
 // answer is canned and deterministic: tones for audio, scripted agent lines,
 // one fixed caller transcript. A console under /_sim shows recent calls.
 //
@@ -80,6 +81,8 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /v1/convai/conversation/get-signed-url", s.handleSignedURL)
 	mux.HandleFunc("GET /v1/convai/conversation", s.handleConversation)
+	mux.HandleFunc("GET /models", s.handleModels)
+	mux.HandleFunc("GET /v1/models", s.handleModels)
 	mux.HandleFunc("POST /v1/audio/speech", s.handleSpeech)
 	mux.HandleFunc("POST /v1/audio/transcriptions", s.handleTranscription)
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
@@ -146,6 +149,16 @@ func (s *Server) handleSignedURL(w http.ResponseWriter, r *http.Request) {
 	query := url.Values{"agent_id": {r.URL.Query().Get("agent_id")}, "conversation_signature": {"voicesim"}}
 	signed := url.URL{Scheme: scheme, Host: r.Host, Path: "/v1/convai/conversation", RawQuery: query.Encode()}
 	writeJSON(w, http.StatusOK, map[string]string{"signed_url": signed.String()})
+}
+
+// handleModels is ElevenLabs' model list, the call the product's credential probe
+// makes with the key in xi-api-key. Any key is accepted; it is served at /models
+// as well because a deployment's base URL may or may not carry the /v1 root.
+func (s *Server) handleModels(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, []map[string]any{
+		{"model_id": "eleven_multilingual_v2", "name": "Eleven Multilingual v2", "can_do_text_to_speech": true},
+		{"model_id": "eleven_flash_v2_5", "name": "Eleven Flash v2.5", "can_do_text_to_speech": true},
+	})
 }
 
 // handleSpeech is OpenAI's text-to-speech: a caller tone as long as the text,

@@ -18,7 +18,7 @@ const egress: ModelProviderEgress = {
 };
 
 const validateProviderApiKey = (provider: string, customKeys: Record<string, string>) =>
-  HttpModelProviderCredentialProbeService.validateProviderApiKey(provider, customKeys, egress);
+  HttpModelProviderCredentialProbeService.validateProviderApiKey({ provider, customKeys, egress });
 
 type ValidationResult = ModelProviderCredentialVerdict;
 
@@ -1093,5 +1093,94 @@ describe("given a check that never reached the provider", () => {
 
       expect(result.outcome).toBe("refused");
     });
+  });
+});
+
+describe("given a deployment that points a provider's probe at its own API root", () => {
+  const probeAt = ({
+    provider,
+    customKeys,
+    deployed,
+  }: {
+    provider: string;
+    customKeys: Record<string, string>;
+    deployed: Record<string, string>;
+  }) =>
+    HttpModelProviderCredentialProbeService.validateProviderApiKey({
+      provider,
+      customKeys,
+      egress,
+      deployedBaseUrls: deployed,
+    });
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+  });
+
+  it.each([
+    ["deepseek", "DEEPSEEK_API_KEY"],
+    ["xai", "XAI_API_KEY"],
+    ["cerebras", "CEREBRAS_API_KEY"],
+    ["groq", "GROQ_API_KEY"],
+  ])("asks that root's models endpoint for %s, not the vendor", async (provider, keyName) => {
+    const result = await probeAt({
+      provider,
+      customKeys: { [keyName]: "any-key" },
+      deployed: { [provider]: "http://127.0.0.1:5595/v1/" },
+    });
+
+    expect(result.outcome).toBe("verified");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith("http://127.0.0.1:5595/v1/models", expect.anything());
+  });
+
+  it("asks only that root for Gemini, with the key in the query", async () => {
+    await probeAt({
+      provider: "gemini",
+      customKeys: { GEMINI_API_KEY: "any-key" },
+      deployed: { gemini: "http://127.0.0.1:5595/v1" },
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:5595/v1/models?key=any-key",
+      expect.anything(),
+    );
+  });
+
+  it("asks that root for ElevenLabs with the xi-api-key header", async () => {
+    await probeAt({
+      provider: "elevenlabs",
+      customKeys: { ELEVENLABS_API_KEY: "any-key" },
+      deployed: { elevenlabs: "http://127.0.0.1:5591" },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:5591/models",
+      expect.objectContaining({
+        headers: expect.objectContaining({ "xi-api-key": "any-key" }),
+      }),
+    );
+  });
+
+  it("lets a base URL typed into the form win over the deployment's", async () => {
+    await probeAt({
+      provider: "openai",
+      customKeys: { OPENAI_API_KEY: "any-key", OPENAI_BASE_URL: "http://typed.example/v1" },
+      deployed: { openai: "http://127.0.0.1:5595/v1" },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith("http://typed.example/v1/models", expect.anything());
+  });
+
+  it("keeps the vendor's root for a provider the deployment names nothing for", async () => {
+    await probeAt({
+      provider: "deepseek",
+      customKeys: { DEEPSEEK_API_KEY: "any-key" },
+      deployed: { groq: "http://127.0.0.1:5595/v1" },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith("https://api.deepseek.com/v1/models", expect.anything());
   });
 });

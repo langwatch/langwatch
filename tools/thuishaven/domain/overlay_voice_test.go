@@ -15,7 +15,11 @@ func TestVoiceProviderEnvPointsTheSDKAtVoicesim(t *testing.T) {
 		t.Fatalf("+voice = %+v, %v", sel, err)
 	}
 	env := VoiceProviderEnv(map[string]string{"ELEVENLABS_API_KEY": "real"}, 45591)
-	want := []string{"ELEVENLABS_BASE_URL=http://127.0.0.1:45591", "VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1"}
+	want := []string{
+		"ELEVENLABS_BASE_URL=http://127.0.0.1:45591",
+		"VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1",
+		"ALLOWED_PROXY_HOSTS=127.0.0.1",
+	}
 	if !slices.Equal(env, want) {
 		t.Errorf("overlay = %v, want %v", env, want)
 	}
@@ -27,6 +31,7 @@ func TestVoiceProviderEnvAddsADummyKeyWhenNoneIsSet(t *testing.T) {
 	want := []string{
 		"ELEVENLABS_BASE_URL=http://127.0.0.1:45591",
 		"VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1",
+		"ALLOWED_PROXY_HOSTS=127.0.0.1",
 		"ELEVENLABS_API_KEY=voicesim",
 	}
 	if !slices.Equal(env, want) {

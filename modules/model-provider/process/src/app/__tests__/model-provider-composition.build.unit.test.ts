@@ -124,6 +124,14 @@ function createRealModelProviderApp(
       blockLocalHttpCalls: true,
       allowedProxyHosts: [],
       defaultModel: undefined,
+      probeBaseUrls: {
+        gemini: undefined,
+        deepseek: undefined,
+        xai: undefined,
+        cerebras: undefined,
+        groq: undefined,
+        elevenlabs: undefined,
+      },
     },
     resources: new ResourceScope(),
     secrets: SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(

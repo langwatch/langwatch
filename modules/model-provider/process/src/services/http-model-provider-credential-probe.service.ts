@@ -35,6 +35,9 @@ const providerDefaultBaseUrls: Record<string, string> = {
   cerebras: "https://api.cerebras.ai/v1",
 };
 
+/** Per provider, the API root a deployment probes in place of the vendor default. */
+type DeployedBaseUrls = Readonly<Record<string, string | undefined>>;
+
 /** Version-less API roots keyed by the backend provider key — see `apiRoot`. */
 const providerApiRoots: Record<string, string> = {
   gemini: "https://generativelanguage.googleapis.com",
@@ -752,6 +755,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     modelProviders: service,
     environment,
     egress,
+    deployedBaseUrls,
   }: {
     projectId: string;
     provider: string;
@@ -764,6 +768,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
      */
     environment: Readonly<Record<string, string | undefined>>;
     egress: ModelProviderEgress;
+    deployedBaseUrls?: DeployedBaseUrls;
   }): Promise<ModelProviderCredentialVerdict> {
     const providerDef = findModelProviderDefinition(provider);
     if (!providerDef) {
@@ -811,11 +816,12 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     }
     // Note: if customBaseUrl is not provided, validateProviderApiKey will use the default URL
 
-    return HttpModelProviderCredentialProbeService.validateProviderApiKey(
+    return HttpModelProviderCredentialProbeService.validateProviderApiKey({
       provider,
       customKeys,
       egress,
-    );
+      deployedBaseUrls,
+    });
   }
 
   /**
@@ -823,11 +829,17 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
    * @param customKeys - Record containing the API key and optional base URL
    * @returns Promise resolving to validation result
    */
-  static async validateProviderApiKey(
-    provider: string,
-    customKeys: Record<string, string>,
-    egress: ModelProviderEgress,
-  ): Promise<ModelProviderCredentialVerdict> {
+  static async validateProviderApiKey({
+    provider,
+    customKeys,
+    egress,
+    deployedBaseUrls = {},
+  }: {
+    provider: string;
+    customKeys: Record<string, string>;
+    egress: ModelProviderEgress;
+    deployedBaseUrls?: DeployedBaseUrls;
+  }): Promise<ModelProviderCredentialVerdict> {
     // Get provider definition from registry
     const providerDef = findModelProviderDefinition(provider);
     if (!providerDef) {
@@ -847,8 +859,10 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
 
     // Get auth strategy (default to bearer) and base URL
     const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
+    const deployedBaseUrl = deployedBaseUrls[provider]?.trim() ?? "";
     const defaultBaseUrl =
-      providerDefaultBaseUrls[provider] ?? VALIDATION_ONLY_BASE_URLS[provider] ?? "";
+      deployedBaseUrl ||
+      (providerDefaultBaseUrls[provider] ?? VALIDATION_ONLY_BASE_URLS[provider] ?? "");
 
     const agentPlatform = agentPlatformPair({ provider, customKeys });
 
@@ -869,7 +883,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
         apiKey,
         baseUrl,
         defaultBaseUrl,
-        apiRoot: providerApiRoots[provider],
+        apiRoot: deployedBaseUrl ? undefined : providerApiRoots[provider],
         agentPlatform,
       }),
       context: {
@@ -890,13 +904,20 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
      * own, and the caller that has one is the composition root.
      */
     environment?: Readonly<Record<string, string | undefined>>;
+    /** Per provider, the API root this deployment probes in place of the vendor's own. */
+    deployedBaseUrls?: DeployedBaseUrls;
   }): HttpModelProviderCredentialProbeService {
-    return new HttpModelProviderCredentialProbeService(input.egress, input.environment ?? {});
+    return new HttpModelProviderCredentialProbeService(
+      input.egress,
+      input.environment ?? {},
+      input.deployedBaseUrls ?? {},
+    );
   }
 
   private constructor(
     private readonly egress: ModelProviderEgress,
     private readonly environment: Readonly<Record<string, string | undefined>>,
+    private readonly deployedBaseUrls: DeployedBaseUrls,
   ) {
     super();
   }
@@ -905,11 +926,12 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     provider: string;
     customKeys: Record<string, string>;
   }): Promise<ModelProviderCredentialVerdict> {
-    return HttpModelProviderCredentialProbeService.validateProviderApiKey(
-      input.provider,
-      input.customKeys,
-      this.egress,
-    );
+    return HttpModelProviderCredentialProbeService.validateProviderApiKey({
+      provider: input.provider,
+      customKeys: input.customKeys,
+      egress: this.egress,
+      deployedBaseUrls: this.deployedBaseUrls,
+    });
   }
 
   probeStored(input: {
@@ -922,6 +944,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
       ...input,
       environment: this.environment,
       egress: this.egress,
+      deployedBaseUrls: this.deployedBaseUrls,
     });
   }
 }

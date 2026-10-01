@@ -435,6 +435,10 @@ func VoiceProviderEnv(resolved map[string]string, port int) []string {
 		fmt.Sprintf("ELEVENLABS_BASE_URL=http://127.0.0.1:%d", port),
 		VoiceLoopbackSwitch + "=1",
 	}
+	// The ElevenLabs credential probe goes to voicesim too; see LLMProviderEnv.
+	if resolved["ALLOWED_PROXY_HOSTS"] == "" {
+		env = append(env, "ALLOWED_PROXY_HOSTS=127.0.0.1")
+	}
 	if resolved["ELEVENLABS_API_KEY"] == "" {
 		env = append(env, "ELEVENLABS_API_KEY=voicesim")
 	}
@@ -466,13 +470,30 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 	return env
 }
 
+// llmProbeProviders are the providers whose credential probe the model-provider
+// module aims at the API root named by <PROVIDER>_BASE_URL. They get the base URL
+// only: a dummy key would seed an organization-level row for each one.
+var llmProbeProviders = []string{"DEEPSEEK_BASE_URL", "XAI_BASE_URL", "CEREBRAS_BASE_URL", "GROQ_BASE_URL", "GEMINI_BASE_URL"}
+
 // LLMProviderEnv points the product's OpenAI and Anthropic providers at llmsim
 // on port: the base URL the seed, the gateway and LiteLLM read, plus a dummy
-// key when none is set. A provider whose base URL .env already names is left
-// alone (see specs/setup/haven-llmsim.feature). The gateway appends /v1 itself.
+// key when none is set. DeepSeek, xAI, Cerebras, Groq and Gemini get a base URL
+// alone, which only their credential probe reads. A provider whose base URL .env
+// already names is left alone (see specs/setup/haven-llmsim.feature). The gateway
+// appends /v1 itself.
 func LLMProviderEnv(resolved map[string]string, port int) []string {
 	base := fmt.Sprintf("http://127.0.0.1:%d", port)
 	var env []string
+	for _, name := range llmProbeProviders {
+		if resolved[name] == "" {
+			env = append(env, name+"="+base+"/v1")
+		}
+	}
+	// A deployment that blocks local calls (every SaaS-shaped stack) would refuse the
+	// loopback probe; naming the loopback host admits the sims. Dev stacks only.
+	if resolved["ALLOWED_PROXY_HOSTS"] == "" {
+		env = append(env, "ALLOWED_PROXY_HOSTS=127.0.0.1")
+	}
 	for _, p := range []struct{ key, url, value string }{
 		{"OPENAI_API_KEY", "OPENAI_BASE_URL", base + "/v1"},
 		{"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", base},

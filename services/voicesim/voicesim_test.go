@@ -228,6 +228,29 @@ func TestSpeechIsADeterministicToneAndTranscriptionIsCanned(t *testing.T) {
 	}
 }
 
+// The product's ElevenLabs credential probe lists models with the key in xi-api-key, at the
+// base URL the deployment names, with or without a /v1 root. Any key is accepted.
+func TestModelListAnswersTheCredentialProbeForAnyKeyWithOrWithoutTheVersionRoot(t *testing.T) {
+	_, srv := newTestServer(t)
+	for _, path := range []string{"/models", "/v1/models"} {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("xi-api-key", "not-a-real-key")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var models []map[string]any
+		decodeErr := json.NewDecoder(resp.Body).Decode(&models)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || decodeErr != nil || len(models) == 0 {
+			t.Errorf("GET %s = %d, %d models, decode %v; want 200 and a model list", path, resp.StatusCode, len(models), decodeErr)
+		}
+	}
+}
+
 // @scenario "The console lists recent calls with their turns"
 func TestConsoleAPIListsCallsNewestFirstWithTurns(t *testing.T) {
 	_, srv := newTestServer(t)
