@@ -58,8 +58,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() 
 vi.mock("../../../errors/index.ts", () => ({ showErrorToast: vi.fn() }));
 
 const { EditModeBar } = await import("../../trace-drawer/edit-mode/edit-mode-bar.tsx");
-const { drawerChrome, getTraceDrawer, useTraceEditStore } =
-  await import("../../../../../index.ts");
+const { drawerChrome, getTraceDrawer, useTraceEditStore } = await import("../../../../../index.ts");
 const { setWindowAddress } = await import("../../../../../__tests__/window-location-router.ts");
 const { guardTraceEditExit } = await import("../../utils/trace-edit-mode.ts");
 const { useTraceDrawerNavigation } = await import("../use-trace-drawer-navigation.ts");
@@ -102,6 +101,9 @@ const discardDialog = () => screen.queryByText("Discard trace corrections?");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.openDrawer.mockImplementation(() => {
+    setWindowAddress({ url: drawerAddress(TRACE, "&drawer.edit=1") });
+  });
   mocks.backStack = [];
   drawerChrome.setState(drawerChrome.getInitialState(), true);
   useTraceEditStore.getState().discard();
@@ -164,7 +166,9 @@ describe("given a correction with unsaved changes", () => {
 
   describe("when the reviewer walks back through the drawer's history", () => {
     beforeEach(() => {
-      mocks.backStack = [{ drawer: "traceV2Details", params: { traceId: EARLIER_TRACE, mode: "trace" } }];
+      mocks.backStack = [
+        { drawer: "traceV2Details", params: { traceId: EARLIER_TRACE, mode: "trace" } },
+      ];
       setWindowAddress({
         url: drawerAddress(TRACE, "&drawer.edit=1"),
         state: { drawerStack: mocks.backStack },

@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
-import { renderHook } from "@testing-library/react";
+import { renderHook as testingRenderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useConversationPrefetch } from "../use-conversation-prefetch.ts";
+import { MemoryRouterWrapper } from "./memory-router-wrapper.tsx";
+
+const renderHook: typeof testingRenderHook = (callback, options) =>
+  testingRenderHook(callback, { ...options, wrapper: MemoryRouterWrapper });
 
 const prefetchMock = vi.fn();
 

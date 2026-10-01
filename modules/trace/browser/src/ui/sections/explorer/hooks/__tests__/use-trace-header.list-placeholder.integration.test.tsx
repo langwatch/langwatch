@@ -7,6 +7,7 @@ import type { TRPCLink } from "@trpc/client";
 import { getQueryKey } from "@trpc/react-query";
 import { observable } from "@trpc/server/observable";
 import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { traceApi } from "../../../../../behavior/trace-api.ts";
@@ -71,7 +72,9 @@ function render({ listed }: { listed: string[] }) {
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <traceApi.Provider client={client} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <MemoryRouter>
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        </MemoryRouter>
       </traceApi.Provider>
     );
   }
