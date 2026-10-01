@@ -487,7 +487,7 @@ describe("the api process installation", () => {
             return undefined;
           },
         },
-        apiKey: "sk-lw-session",
+        projectId: "project-1",
         callerUserId: undefined,
       });
 
