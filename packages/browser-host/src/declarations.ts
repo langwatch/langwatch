@@ -636,6 +636,13 @@ export type UiSuggestBodyProps = { state: AnnotationFormState; originalOutput: s
 /** Annotation's form footer: save, delete and cancel over the same state. */
 export type UiAnnotationFormFooterProps = { state: AnnotationFormState; padding: number };
 
+/** Navigation's sidebar groups: fold, unfold, restore each to its remembered preference. */
+export type UiNavigationSidebar = {
+  expandGroup(id: string): void;
+  collapseGroup(id: string): void;
+  restoreAll(): void;
+};
+
 export type UiDeclaredCapabilities = {
   addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
   agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
@@ -685,6 +692,7 @@ export type UiDeclaredCapabilities = {
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   runExperimentViaApiDialog: UiDeclaredComponent<UiRunExperimentViaApiDialogProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
+  sidebar: UiNavigationSidebar;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
   suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;
   studioEvaluatorEditor: UiDeclaredComponent<UiStudioEvaluatorEditorProps>;

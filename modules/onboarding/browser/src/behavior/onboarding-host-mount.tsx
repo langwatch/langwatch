@@ -59,13 +59,13 @@ function langyCapabilityOf(lent: UiLangyGuidedOnboarding | undefined): Onboardin
 
 const INERT_SIDEBAR: OnboardingSidebarCapability = {
   expandGroup() {
-    /* no sidebar capability wired yet */
+    /* no navigation module installed */
   },
   collapseGroup() {
-    /* no sidebar capability wired yet */
+    /* no navigation module installed */
   },
   restoreAll() {
-    /* no sidebar capability wired yet */
+    /* no navigation module installed */
   },
 };
 const INERT_GOVERNANCE: OnboardingGovernanceCapability = {
@@ -216,6 +216,11 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
     [declarations],
   );
 
+  const sidebar = useMemo(
+    () => declarations.declared("sidebar")[0]?.capability ?? INERT_SIDEBAR,
+    [declarations],
+  );
+
   const scope: OnboardingScope = useMemo(
     () => ({
       organization: graph.organization,
@@ -248,7 +253,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
         langy,
-        sidebar: INERT_SIDEBAR,
+        sidebar,
         governance: INERT_GOVERNANCE,
         joinOffers,
       }),
@@ -265,6 +270,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
       feedback,
       joinOffers,
       langy,
+      sidebar,
     ],
   );
 

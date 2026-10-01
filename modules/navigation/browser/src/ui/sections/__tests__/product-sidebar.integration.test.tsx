@@ -28,9 +28,9 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
 }));
 
 import { forgetMenuScrollPositions } from "../../../behavior/use-menu-scroll-position.ts";
+import { MENU_WIDTH_EXPANDED } from "../../../model/menu-widths.ts";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
 import { WithStubNavigationHost } from "../../../testing.tsx";
-import { MENU_WIDTH_EXPANDED } from "../main-menu.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
 
 const team = {
