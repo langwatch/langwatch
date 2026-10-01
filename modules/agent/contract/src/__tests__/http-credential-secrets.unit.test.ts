@@ -43,6 +43,41 @@ describe("a credential typed into an HTTP node", () => {
     });
 
     /** @scenario A credential that only wraps secret references is kept as references */
+    it("matches a listed scheme in any case", () => {
+      expect(holdsLiteralCredential("bearer {{ secrets.K }}")).toBe(false);
+      expect(holdsLiteralCredential("APIKEY {{ secrets.K }}")).toBe(false);
+      expect(holdsLiteralCredential("Token: {{ secrets.K }}")).toBe(false);
+    });
+
+    /** @scenario A credential that only wraps secret references is kept as references */
+    it("treats any field label before `=` or `:` as part of a reference", () => {
+      expect(holdsLiteralCredential("hunter={{ secrets.X }}")).toBe(false);
+      expect(holdsLiteralCredential("api_key={{ secrets.X }}")).toBe(false);
+      expect(holdsLiteralCredential("x-api-key: {{ secrets.X }}")).toBe(false);
+    });
+
+    /** @scenario A credential that only wraps secret references is kept as references */
+    it("treats any other word before a space and a reference as a literal", () => {
+      expect(holdsLiteralCredential("hunter {{ secrets.X }}")).toBe(true);
+      expect(holdsLiteralCredential("abc123 {{ secrets.X }}")).toBe(true);
+      expect(holdsLiteralCredential("Bearer extra {{ secrets.X }}")).toBe(true);
+    });
+
+    /** @scenario A credential that only wraps secret references is kept as references */
+    it("stores a value with any other word before a reference as a new secret", async () => {
+      const { reference, created, values } = secretStore();
+      const config = await httpAgentConfigStoringSecrets({
+        config: { headers: [{ key: "Authorization", value: "hunter {{ secrets.X }}" }] },
+        owner: "api",
+        reference,
+      });
+
+      expect(created).toHaveLength(1);
+      expect(Object.values(values)).toEqual(["hunter {{ secrets.X }}"]);
+      expect(config.headers?.[0]?.value).toBe(`{{ secrets.${created[0]} }}`);
+    });
+
+    /** @scenario A credential that only wraps secret references is kept as references */
     it("stores nothing for such a value and keeps it as typed", async () => {
       const { reference, created } = secretStore();
       const config = await httpAgentConfigStoringSecrets({

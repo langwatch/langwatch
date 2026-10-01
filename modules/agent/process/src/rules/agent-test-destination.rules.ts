@@ -17,8 +17,9 @@ export function referencedSecretValues(input: {
   values: Readonly<Record<string, string>>;
 }): Record<string, string> {
   const picked: Record<string, string> = {};
-  for (const [, name] of (JSON.stringify(input.referencing) ?? "").matchAll(SECRET_REFERENCE)) {
-    if (name !== undefined && Object.hasOwn(input.values, name)) picked[name] = input.values[name];
+  for (const [, name = ""] of (JSON.stringify(input.referencing) ?? "").matchAll(SECRET_REFERENCE)) {
+    const value = Object.hasOwn(input.values, name) ? input.values[name] : undefined;
+    if (value !== undefined) picked[name] = value;
   }
 
   return picked;

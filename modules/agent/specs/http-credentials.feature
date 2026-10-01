@@ -54,3 +54,6 @@ Feature: HTTP agent credentials
     When the agent or graph holding it is saved
     Then no new project secret is stored for it and it is kept as typed
     And at run time each reference inside it resolves to its secret's value
+    And a word followed by a space counts only when it is a listed scheme, in any case: Bearer, Basic, Token, ApiKey, Key, Bot or Digest
+    And any field label followed by "=" or ":", such as "api_key={{ secrets.X }}", keeps the value a reference
+    And any other word before a space, such as "hunter {{ secrets.X }}", is a literal stored as a secret

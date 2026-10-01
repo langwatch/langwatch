@@ -134,14 +134,24 @@ function inReferenceSpelling(value: string): string {
   return `${scheme}{{ secrets.${match[2]} }}`;
 }
 
+const CREDENTIAL_SCHEMES = ["Bearer", "Basic", "Token", "ApiKey", "Key", "Bot", "Digest"] as const;
+type CredentialScheme = (typeof CREDENTIAL_SCHEMES)[number];
+
+/** The scheme as a pattern matching it in any case, as HTTP schemes match. */
+function caselessPattern(scheme: CredentialScheme): string {
+  return scheme.replace(/[a-z]/gi, (letter) => `[${letter.toUpperCase()}${letter.toLowerCase()}]`);
+}
+
 const REFERENCE = String.raw`\{\{\s*secrets\.[A-Z][A-Z0-9_]*\s*\}\}`;
-/** References joined only by separators, behind at most one scheme word (`ApiKey `, `key=`). */
+/** References joined only by separators, behind a listed scheme and a space (`ApiKey `) or any
+ * field label and `=`/`:` (`api_key=`); the label names a field, it is not a credential. */
 const SCHEMED_REFERENCES = new RegExp(
-  String.raw`^(?:[A-Za-z]{1,20}[\s:=]+)?${REFERENCE}(?:[\s:=]*${REFERENCE})*$`,
+  String.raw`^(?:(?:${CREDENTIAL_SCHEMES.map(caselessPattern).join("|")})\s+|[A-Za-z][\w-]*\s*[:=]\s*)?` +
+    String.raw`${REFERENCE}(?:[\s:=]*${REFERENCE})*$`,
 );
 
-/** A value that is not blank and holds more than `{{ secrets.NAME }}` references, a scheme
- * word and separators (`:`, `=`, spaces). */
+/** A value that is not blank and holds more than `{{ secrets.NAME }}` references, separators
+ * and one listed scheme or field label; any other word before a space makes it a literal. */
 export function holdsLiteralCredential(value: string): boolean {
   const text = value.trim();
   if (text === "" || secretReferenceOf(inReferenceSpelling(text)) !== undefined) return false;
