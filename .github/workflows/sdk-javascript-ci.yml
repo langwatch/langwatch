@@ -288,6 +288,7 @@ jobs:
           --filter "@langwatch/ui..."
           --filter "@langwatch/tasks..."
           --filter "langwatch..."
+          --filter "@langwatch/scenario-child"
           --filter "@langwatch/workspace"
 
       - uses: ./.github/actions/nx-cache
