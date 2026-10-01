@@ -4,7 +4,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * caller's identity from the session the transport authenticated rather than
  * from the request body, and keeps tenant policy out of a viewer's catalogue.
  */
-import { PermissionDeniedError } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";

@@ -1,4 +1,5 @@
-import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   FEATURE_FLAG_REGISTRY,
   FeatureFlagApi,

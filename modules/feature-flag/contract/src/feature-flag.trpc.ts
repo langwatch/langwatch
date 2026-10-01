@@ -4,7 +4,7 @@
  * each of them and repeats nothing.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { experimentCatalogueEntrySchema } from "./feature-flag-experiment.ts";
